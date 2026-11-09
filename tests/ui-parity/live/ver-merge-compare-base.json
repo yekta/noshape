@@ -1,19 +1,19 @@
 {
  "scenario": "ver-merge-compare-base",
- "recorded": "2026-11-08T08:35:12.180Z",
+ "recorded": "2026-11-09T08:54:43.860Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "28aeeb3deaf183c570ed4382",
-  "workspace": "03b4ff3708283681ec5f25f5",
-  "element": "03871e6e55fc199cd0ffcaa3",
+  "document": "99fd01e837726525d737fe75",
+  "workspace": "abcfb78d6473543225363268",
+  "element": "0b02d263487400dfbc8302f2",
   "start": "doc-branches",
-  "startElement": "03871e6e55fc199cd0ffcaa3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "0b02d263487400dfbc8302f2",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 29401
+   "t": 30907
   },
   {
    "step": 2,
@@ -370,7 +370,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 33726
+   "t": 40321
   },
   {
    "step": 3,
@@ -512,7 +512,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 37498
+   "t": 56532
   },
   {
    "step": 4,
@@ -524,9 +524,10 @@
    },
    "ok": true,
    "at": [
-    1269,
-    154
+    1195,
+    153
    ],
+   "closedTab": "https://cad.onshape.com/documents/99fd01e837726525d737fe75/w/1e3000e65acb1539aac3abbc/and/w/abcfb78d6473543225363268/m/f",
    "state": {
     "focus": {
      "kind": "other",
@@ -654,7 +655,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 42085
+   "t": 74192
   }
  ]
 }

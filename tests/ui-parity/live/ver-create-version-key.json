@@ -1,18 +1,18 @@
 {
  "scenario": "ver-create-version-key",
- "recorded": "2026-11-08T01:16:06.942Z",
+ "recorded": "2026-11-09T08:10:01.568Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "b33cd2c689a4efc11090869e",
-  "workspace": "a24a17b34753ba18f032a8b5",
-  "element": "fa5af0f497f8be718af1d9d4",
+  "document": "25aebc8c099fb70998457e5a",
+  "workspace": "8ba67a68c79a214f547c6377",
+  "element": "ec281c3d58adc4172c7f5a01",
   "start": "doc-versions",
-  "startElement": "fa5af0f497f8be718af1d9d4",
+  "startElement": "ec281c3d58adc4172c7f5a01",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -208,7 +208,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 52933
+   "t": 46615
   },
   {
    "step": 2,
@@ -314,7 +314,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 56577
+   "t": 54481
   }
  ]
 }

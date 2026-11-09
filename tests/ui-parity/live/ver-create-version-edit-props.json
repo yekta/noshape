@@ -1,18 +1,18 @@
 {
  "scenario": "ver-create-version-edit-props",
- "recorded": "2026-11-08T07:26:33.336Z",
+ "recorded": "2026-11-09T09:21:33.897Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "0683d5c3e73009e670ccae35",
-  "workspace": "5799f07169c51f6cf44991b5",
-  "element": "06a7309d43d3b611f567a7d4",
+  "document": "f8d7a21d1cb6c45ffa571761",
+  "workspace": "e3d046fc8f07897ffd0d2b13",
+  "element": "994ef3f76b71de5a07b8d870",
   "start": "doc-branches",
-  "startElement": "06a7309d43d3b611f567a7d4",
+  "startElement": "994ef3f76b71de5a07b8d870",
   "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
@@ -237,7 +237,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 45395
+   "t": 38879
   },
   {
    "step": 2,
@@ -254,29 +254,37 @@
    ],
    "state": {
     "focus": {
-     "kind": "none"
+     "kind": "other",
+     "tag": "ul"
     },
     "dialog": {
      "kind": "modal",
-     "title": "Create version from Main",
+     "title": "Properties",
      "fields": [
       {
-       "label": null,
+       "label": "Name *",
        "kind": "input",
        "value": "V2"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Category",
        "kind": "input",
        "value": ""
       }
      ],
      "buttons": [
-      "Create",
-      "Create version and edit properties",
-      "Cancel"
+      "Undo",
+      "Redo",
+      "Apply",
+      "Save",
+      "Close"
      ],
-     "text": "Name: Description: (Maximum of 10000 characters) Note: Merging feature changes is only supported for Part Studio and Assembly tabs"
+     "text": "Properties V2 Version V2 Name * Description Category Onshape Version Apply Save Close"
     },
     "dialogs": [],
     "panels": null,
@@ -340,7 +348,7 @@
     "sketch": null,
     "drawing": null,
     "document": {
-     "workspace": "Main",
+     "workspace": "V2",
      "history": null,
      "compare": null,
      "tabs": [
@@ -363,7 +371,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 48457
+   "t": 48686
   }
  ]
 }

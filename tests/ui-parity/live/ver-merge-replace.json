@@ -1,19 +1,19 @@
 {
  "scenario": "ver-merge-replace",
- "recorded": "2026-11-08T07:33:38.145Z",
+ "recorded": "2026-11-09T08:36:44.528Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "c93f34bb8eeecb71f12d4f14",
-  "workspace": "95a48ce7b9ddd4d10c63cbf5",
-  "element": "30527ef1615e0bda431ebb14",
+  "document": "2169ec5c2498b41126dbcdc6",
+  "workspace": "7ea7a7cbba6e45c87b9f8fff",
+  "element": "e3aed005522ba337763e272a",
   "start": "doc-branches",
-  "startElement": "30527ef1615e0bda431ebb14",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "e3aed005522ba337763e272a",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 38821
+   "t": 28683
   },
   {
    "step": 2,
@@ -370,7 +370,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 43287
+   "t": 38697
   },
   {
    "step": 3,
@@ -512,7 +512,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 47147
+   "t": 56169
   },
   {
    "step": 4,
@@ -524,19 +524,13 @@
    },
    "ok": true,
    "at": [
-    1243,
-    264
+    1240,
+    132
    ],
    "state": {
     "focus": {
      "kind": "other",
-     "tag": "input",
-     "text": "",
-     "selection": [
-      0,
-      0
-     ],
-     "all": false
+     "tag": "div"
     },
     "dialog": {
      "kind": "modal",
@@ -546,29 +540,17 @@
        "label": "Replace with B1",
        "kind": "input",
        "value": ""
-      },
-      {
-       "label": "Keep Main Replace with B1",
-       "kind": "input",
-       "value": ""
       }
      ],
      "buttons": [
       "Merge",
       "Cancel"
      ],
-     "text": "Overall merge strategy Keep Main 0 tabs have changes Compare with base Replace with B1 1 tab has changes Compare with base Tabs 1 tab has changes Changes in Main Changes in B1 Tab merge strategy Part Studio 1 No changes Edited Keep Main Replace with B1 1 tab has no changes Assembly 1"
+     "text": "Overall merge strategy Keep Main 0 tabs have changes Compare with base Replace with B1 1 tab has changes Compare with base Tabs 1 tab has changes Changes in Main Changes in B1 Tab merge strategy Part Studio 1 No changes Edited Replace with B1 1 tab has no changes Assembly 1"
     },
     "dialogs": [],
     "panels": null,
-    "list": {
-     "kind": "dropdown",
-     "rows": [
-      "Keep Main"
-     ],
-     "highlighted": null,
-     "disabled": []
-    },
+    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -672,7 +654,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 51596
+   "t": 72042
   },
   {
    "step": 5,
@@ -826,7 +808,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 55470
+   "t": 90736
   }
  ]
 }

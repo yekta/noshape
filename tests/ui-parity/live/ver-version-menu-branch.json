@@ -1,19 +1,19 @@
 {
  "scenario": "ver-version-menu-branch",
- "recorded": "2026-11-08T02:24:00.988Z",
+ "recorded": "2026-11-09T09:22:48.701Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "ef8dda2016f9e29d8e3db1d8",
-  "workspace": "b450770a67c18661dc3590d2",
-  "element": "e172b3352495370ab26be51a",
+  "document": "73cfe5ca58ca206e13d467bb",
+  "workspace": "2da294179ec7d1889212e023",
+  "element": "a064e6a55ab286bff18cdb24",
   "start": "doc-versions",
-  "startElement": "e172b3352495370ab26be51a",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "a064e6a55ab286bff18cdb24",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -225,7 +225,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 25964
+   "t": 27480
   },
   {
    "step": 2,
@@ -362,7 +362,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 32816
+   "t": 37309
   },
   {
    "step": 3,
@@ -393,12 +393,12 @@
      "title": "Create workspace from V1",
      "fields": [
       {
-       "label": null,
+       "label": "Open new workspace",
        "kind": "input",
        "value": "B1"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Open new workspace",
        "kind": "input",
        "value": ""
       },
@@ -516,7 +516,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 37205
+   "t": 53435
   },
   {
    "step": 4,
@@ -529,40 +529,13 @@
    "ok": true,
    "at": [
     1052,
-    311
+    361
    ],
    "state": {
     "focus": {
-     "kind": "other",
-     "tag": "div"
+     "kind": "none"
     },
-    "dialog": {
-     "kind": "modal",
-     "title": "Create workspace from V1",
-     "fields": [
-      {
-       "label": null,
-       "kind": "input",
-       "value": "B1"
-      },
-      {
-       "label": "Description cannot contain HTML.",
-       "kind": "input",
-       "value": ""
-      },
-      {
-       "label": "Open new workspace",
-       "kind": "checkbox",
-       "value": true
-      }
-     ],
-     "buttons": [
-      "Create",
-      "Create workspace and edit properties",
-      "Cancel"
-     ],
-     "text": "Name: Description: (Maximum of 10000 characters) Open new workspace Note: Merging feature changes is only supported for Part Studio and Assembly tabs"
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -589,33 +562,14 @@
        "related": false,
        "hidden": false,
        "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
-      },
-      {
-       "name": "Extrude 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
       }
      ],
-     "rollbackAfter": "Extrude 2"
+     "rollbackAfter": "Extrude 1"
     },
     "parts": [
-     "Part 1",
-     "Part 2"
+     "Part 1"
     ],
-    "partsHeading": "Parts (2)",
+    "partsHeading": "Parts (1)",
     "undo": {
      "undo": false,
      "redo": false
@@ -625,12 +579,17 @@
     "sketch": null,
     "drawing": null,
     "document": {
-     "workspace": "Main",
+     "workspace": "B1",
      "history": [
+      {
+       "name": "B1",
+       "kind": "workspace",
+       "selected": true
+      },
       {
        "name": "Main",
        "kind": "workspace",
-       "selected": true
+       "selected": false
       },
       {
        "name": "V1",
@@ -664,7 +623,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 42172
+   "t": 76324
   }
  ]
 }

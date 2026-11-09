@@ -1,0 +1,1735 @@
+{
+ "scenario": "ver-show-more-changes",
+ "recorded": "2026-11-09T07:56:53.804Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+ },
+ "live": {
+  "document": "cc745dd2fdf40b2a9971d2c8",
+  "workspace": "4197f3c960766bc66e760db5",
+  "element": "8d79db825b060f5d3dce11c7",
+  "start": "doc-versions-many",
+  "startElement": "8d79db825b060f5d3dce11c7",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 4",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 5",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 6",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 7",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 8",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 9",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 10",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 11",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 12",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 13",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 14",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 15",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 16",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 17",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 18",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 19",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 20",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 21",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 22",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 23",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 24",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 25",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": null
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Versions and history"
+    }
+   },
+   "ok": true,
+   "at": [
+    20,
+    57
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 4",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 5",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 6",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 7",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 8",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 9",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 10",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 11",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 12",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 13",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 14",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 15",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 16",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 17",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 18",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 19",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 20",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 21",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 22",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 23",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 24",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 25",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": [
+      {
+       "name": "Main",
+       "kind": "workspace",
+       "selected": true
+      },
+      {
+       "name": "V1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "Start",
+       "kind": "start",
+       "selected": false
+      }
+     ],
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Versions and history",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 30340
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Show changes:Main"
+    }
+   },
+   "ok": true,
+   "at": [
+    241,
+    224
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 4",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 5",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 6",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 7",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 8",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 9",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 10",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 11",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 12",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 13",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 14",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 15",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 16",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 17",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 18",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 19",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 20",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 21",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 22",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 23",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 24",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 25",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": [
+      {
+       "name": "Main",
+       "kind": "workspace",
+       "selected": true
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 62",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 61",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 60",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 59",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 58",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 57",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 56",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 55",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 54",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 53",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 52",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 51",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 50",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 49",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 48",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 47",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 46",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 45",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 44",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 43",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 42",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 41",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 40",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 39",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 38",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 37",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 36",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 35",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 34",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 33",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 32",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 31",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 30",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 29",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 28",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 27",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 26",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 25",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 24",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 23",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 22",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 21",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 20",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 19",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 18",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 17",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 16",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 15",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 14",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 13",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Show more changes…",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "V1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "Start",
+       "kind": "start",
+       "selected": false
+      }
+     ],
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Versions and history",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 40123
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Show more changes…"
+    }
+   },
+   "ok": true,
+   "at": [
+    223,
+    1748
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 4",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 5",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 6",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 7",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 8",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 9",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 10",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 11",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 12",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 13",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 14",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 15",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 16",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 17",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 18",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 19",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 20",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 21",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 22",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 23",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 24",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 25",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": [
+      {
+       "name": "Main",
+       "kind": "workspace",
+       "selected": true
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 62",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 61",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 60",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 59",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 58",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 57",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 56",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 55",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 54",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 53",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 52",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 51",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 50",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 49",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 48",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 47",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 46",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 45",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 44",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 43",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 42",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 41",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 40",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 39",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 38",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 37",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 36",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 35",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 34",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 33",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 32",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 31",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 30",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 29",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 28",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 27",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 26",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 25",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 24",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 23",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 22",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 21",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 20",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 19",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 18",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 17",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 16",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 15",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 14",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 13",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Show more changes…",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "V1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "Start",
+       "kind": "start",
+       "selected": false
+      }
+     ],
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Versions and history",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 48914
+  }
+ ]
+}

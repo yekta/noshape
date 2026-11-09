@@ -1,0 +1,1055 @@
+{
+ "scenario": "ver-linked-selective-update",
+ "recorded": "2026-11-09T08:33:42.735Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+ },
+ "live": {
+  "document": "978323c434311ea291f97261",
+  "workspace": "62e89602734d9abb9d574882",
+  "element": "93547aee8691a2bb88f4f614",
+  "start": "doc-linked",
+  "startElement": "93547aee8691a2bb88f4f614",
+  "runner": "live2 .nstate-uip-1.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "doc_tab": "Assembly 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    381,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 37738
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Update all references to latest versions"
+    }
+   },
+   "ok": true,
+   "at": [
+    130,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": true
+      },
+      {
+       "label": "Selective update",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "uip Source",
+       "kind": "string",
+       "text": "V1 ⇨ V2"
+      }
+     ],
+     "error": null,
+     "ok": "enabled",
+     "okLabel": "Update all"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / uip Source / V1 / ⇨ / V2 / Update all",
+      "inputs": []
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 55299
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Selective update"
+    }
+   },
+   "ok": true,
+   "at": [
+    494,
+    124
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": false
+      },
+      {
+       "label": "Selective update",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "uip Source",
+       "kind": "boolean",
+       "checked": false,
+       "text": "V1 ⇨ V2"
+      }
+     ],
+     "error": null,
+     "ok": "disabled",
+     "okLabel": "Update selected"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / uip Source / V1 / ⇨ / V2 / Update selected",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 72870
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "checkbox": "uip Source"
+    }
+   },
+   "ok": true,
+   "at": [
+    416,
+    190
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": false
+      },
+      {
+       "label": "Selective update",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "uip Source",
+       "kind": "boolean",
+       "checked": false,
+       "text": "V1 ⇨ V2"
+      }
+     ],
+     "error": null,
+     "ok": "disabled",
+     "okLabel": "Update selected"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / uip Source / V1 / ⇨ / V2 / Update selected",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 89482
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Version graph:uip Source"
+    }
+   },
+   "ok": true,
+   "at": [
+    540,
+    198
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "button",
+     "label": null
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": false
+      },
+      {
+       "label": "Selective update",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "uip Source",
+       "kind": "boolean",
+       "checked": false,
+       "text": "V1 ⇨ V2"
+      },
+      {
+       "label": "uip Source",
+       "kind": "string",
+       "text": "V2"
+      }
+     ],
+     "error": null,
+     "ok": "disabled",
+     "okLabel": "Update selected"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / uip Source / V1 / ⇨ / V2 / Update selected / uip Source / V2 / Workspace / Version / Main / V2 / V1 / Start",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": {
+     "kind": "list",
+     "rows": [
+      "Main",
+      "V2",
+      "V1",
+      "Start"
+     ],
+     "highlighted": 1,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 104960
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "V2"
+    }
+   },
+   "ok": true,
+   "at": [
+    411,
+    275
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": false
+      },
+      {
+       "label": "Selective update",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "uip Source",
+       "kind": "boolean",
+       "checked": true,
+       "text": "V1 ⇨ V2"
+      }
+     ],
+     "error": null,
+     "ok": "enabled",
+     "okLabel": "Update selected"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / uip Source / V1 / ⇨ / V2 / Update selected",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": true
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 122084
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Update selected"
+    }
+   },
+   "ok": true,
+   "at": [
+    509,
+    467
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": false
+      },
+      {
+       "label": "Selective update",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 0 documents",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "uip Source",
+       "kind": "boolean",
+       "checked": false,
+       "text": "V2 ⇨ V2"
+      }
+     ],
+     "error": null,
+     "ok": "disabled",
+     "okLabel": "Update selected"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 0 documents / uip Source / V2 / ⇨ / V2 / Update selected",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 139539
+  }
+ ]
+}

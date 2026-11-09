@@ -1,18 +1,18 @@
 {
  "scenario": "ver-protection-enable",
- "recorded": "2026-11-08T08:17:31.865Z",
+ "recorded": "2026-11-09T09:28:51.600Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "77f25eefe2eb604cdf5a7d0d",
-  "workspace": "930aa98c9c24ed8774c4c576",
-  "element": "57340da2cee9896674be7e85",
+  "document": "a393c75b7ef3d0060944dc1c",
+  "workspace": "8ce7619804d34b6a2e736732",
+  "element": "d64f6c0a15f79a59f7e1c6d7",
   "start": "doc-branches",
-  "startElement": "57340da2cee9896674be7e85",
+  "startElement": "d64f6c0a15f79a59f7e1c6d7",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 36907
+   "t": 45077
   },
   {
    "step": 2,
@@ -366,7 +366,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 41451
+   "t": 49959
   },
   {
    "step": 3,
@@ -508,7 +508,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 45206
+   "t": 54076
   },
   {
    "step": 4,
@@ -656,7 +656,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 50056
+   "t": 57378
   },
   {
    "step": 5,
@@ -684,15 +684,56 @@
      "items": []
     },
     "features": {
-     "rows": [],
-     "rollbackAfter": null
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
     },
-    "message": "Workspace protection settings updated. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -741,7 +782,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 57701
+   "t": 64301
   },
   {
    "step": 6,
@@ -877,7 +918,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 62279
+   "t": 70457
   },
   {
    "step": 7,
@@ -1019,7 +1060,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 66530
+   "t": 74150
   },
   {
    "step": 8,
@@ -1167,7 +1208,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 69937
+   "t": 77264
   },
   {
    "step": 9,
@@ -1195,15 +1236,56 @@
      "items": []
     },
     "features": {
-     "rows": [],
-     "rollbackAfter": null
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
     },
-    "message": "Workspace protection settings updated. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -1252,7 +1334,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 74780
+   "t": 84690
   }
  ]
 }
