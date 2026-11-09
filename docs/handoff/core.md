@@ -33,6 +33,15 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-09 13:12 UTC: the impeller's slow fillets (lead) are downstream of a broken chain.**
+- Profile: the three fillets fail OCCT whole (as is, scaled) and build by groups (~1 s); written to blend.md.
+- The chain breaks before them: feature 15 Boolean Flansch+Gehäuse 15/41/30 vs live 19/56/39 (live's inner wall JSG
+  split into JSG + JOe + JOi at y ±27 and two 6.7 mm² slivers JO2 / JO6: the flange against the Shell's inner wall,
+  bool's); feature 18 Delete face 1 (faces JSK = our 16, the Ø20 tube cylinder x 0..91.5, and JRG = our 18, its x 0
+  cap: the right faces) returns the part unchanged from OCCT's defeaturing (19 faces, 94,990.13 mm³, valid; dump
+  vibe5 ~/core-cases/dumpfil/defeature-7, probe probe_defeature_dump in core-scratch/imp/features-with-fillet-probe.rs),
+  live 71,534.52 (-23,456), 21 faces. From there every feature differs (Fillet 4 errors on a 34-face part, live 64).
+
 **State 11-09 12:26 UTC: the slow-feature list in core's area (lead 11-09).**
 - Impeller Extrude 4 (op_prism_until 162, live 41): a prism only as long as the target's box needs: level in an
   interleaved A/B (123-154 either way), reverted; the time is the split against the Shell's offset wall.

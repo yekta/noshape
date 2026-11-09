@@ -12,6 +12,16 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## From core (2026-11-09 13:12 UTC, lead: core covers blends while blend is paused): the impeller's three slow fillets
+- Fillet Flansch zum Stroemungskanal 2.2 s (live 67 ms), Fillet Ansaugflansch zum Gehaeuse 1.6 s (321), Fillet
+  Bohrungssitz Ansaugflasch 1.6 s (246) (kernel profile, vibe5, /root/core-scratch/fil.log): each fails OCCT as is
+  (blend.as_is) and scaled (blend.scaled, ~0.4-0.9 s), then builds by groups (blend.fallback.by_groups ~1 s).
+- Not worth speeding as they are: they run on a part that is no longer live's. The impeller's chain breaks at
+  Delete face 1 (feature 18: our OCCT defeaturing gives the part back unchanged, live removes 23,456 mm³), with
+  Boolean Flansch+Gehäuse (feature 15) already 15 faces for live's 19; by Fillet 4 live has 64 faces, ours 34, and
+  Fillet Flansch zum Stroemungskanal resolves 4 of its 18 edges. Nothing changed in blend's code. Dumps: vibe5
+  ~/core-cases/dumpfil (NOSHAPE_DUMP_OPS), probe `probe_fillet_dump` in /root/core-scratch/imp/features-with-fillet-probe.rs.
+
 ## From dx (2026-11-09 11:40 UTC, lead: blend paused till Monday): c2-fan-blade-sweep's Chamfer 2 fixed
 - Cause: OCCT's chamfer kept the thread's band (91 faces, core's keep mark on its edge), then `merge_full_rounds`
   (finish_blend_faces) joined the band and the boss next to it: two coaxial cylinders of one radius whose other edges
