@@ -10,6 +10,11 @@ give the same with and without it (vibe5 ~/core-cases/asm2-with.log / asm2-witho
 folder of just those two (vibe5 ~/core-cases/asm2docs, symlinks) as NOSHAPE_PARITY_ASSEMBLIES, `cargo test --release -p
 noshape-ops --test all parity::parity_assemblies -- --ignored --nocapture` (~12 min each on vibe5).
 
+**11-09 16:58: speed under the feature-time definition, re-measured as the lead asked:** the model suite alone on vibe2 from
+load 1.0 (16:26, the T2 hang copy still on one core; the suite itself brings vibe2 to ~9) on 4e549553: **speed 79.4 % (58 of 97
+cases at or under live), index 88.7** (the regular 12:21 run: 79.1 %). vibe3 is 1.57× slower than vibe2 on the same documents
+even idle: speed only from vibe2. bin/quiet-speed.sh <run dir> <host> (worktree noshape-wt/qa-speed pinned to the run's green).
+
 **11-09 11:20:** GUI fuzz (vibe3 bin/fzloop.sh :61, noshape-green-new) had been on green aadc61e5 since 11-05: now 57f3d800
 (re-point the symlink with each green you want it on). Its seed 7425 "NOAPP" was Xvfb :61 refusing the connection once (not the
 app); watch-gui.base = 2. The asm bisect (lead 08:40) ended at the corpus refetch (asm.md 10:45); vibe3 runs the model suite
