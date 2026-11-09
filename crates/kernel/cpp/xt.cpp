@@ -50,7 +50,6 @@
 #include <GeomConvert.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
-#include <NCollection_Array2.hxx>
 #include <Geom_Circle.hxx>
 #include <gp_Lin.hxx>
 #include <Geom_ConicalSurface.hxx>
@@ -712,137 +711,6 @@ bool periodic_analytic(const occ::handle<Geom_Surface>& s)
 
 constexpr double kPrecision = 1e-8; // Parasolid linear precision (metres)
 
-// `b`'s closed direction (u when `in_u`) refit as a periodic cubic B-spline where its seam knot won't come down (a
-// single-span section: cf-hose-routing's swept hoses, degree 6 round their tube, the inner walls degree 12): each row
-// of poles across it, as a curve in homogeneous coordinates, interpolated at `n` uniform samples by a uniform periodic
-// cubic (a cyclic tridiagonal system), the other direction kept; the sample count doubled until the surface is within
-// `tol` of `b` between the samples. Null when it never is or a weight comes out non-positive. Parasolid's own hoses
-// are periodic rational cubics (live's x_t).
-occ::handle<Geom_BSplineSurface> periodic_refit(const occ::handle<Geom_BSplineSurface>& b, bool in_u, double tol)
-{
-  occ::handle<Geom_BSplineSurface> src = occ::down_cast<Geom_BSplineSurface>(b->Copy());
-  if (!in_u)
-    src->ExchangeUV();
-  double u0, u1, v0, v1;
-  src->Bounds(u0, u1, v0, v1);
-  const int nr = src->NbVPoles();
-  // Row j across u: the homogeneous curve sum N_i(u) w_ij P_ij and its weight sum N_i(u) w_ij.
-  NCollection_Array1<double> uk(1, src->NbUKnots());
-  NCollection_Array1<int>    um(1, src->NbUKnots());
-  src->UKnots(uk);
-  src->UMultiplicities(um);
-  std::vector<occ::handle<Geom_BSplineCurve>> rows, weights;
-  for (int j = 1; j <= nr; ++j)
-  {
-    NCollection_Array1<gp_Pnt> hp(1, src->NbUPoles()), wp(1, src->NbUPoles());
-    for (int i = 1; i <= src->NbUPoles(); ++i)
-    {
-      const double w = src->Weight(i, j);
-      hp(i)          = gp_Pnt(src->Pole(i, j).XYZ() * w);
-      wp(i)          = gp_Pnt(w, 0, 0);
-    }
-    rows.push_back(new Geom_BSplineCurve(hp, uk, um, src->UDegree()));
-    weights.push_back(new Geom_BSplineCurve(wp, uk, um, src->UDegree()));
-  }
-  NCollection_Array1<double> vk(1, src->NbVKnots());
-  NCollection_Array1<int>    vm(1, src->NbVKnots());
-  src->VKnots(vk);
-  src->VMultiplicities(vm);
-  for (int n = 32; n <= 4096; n *= 2)
-  {
-    // Uniform periodic cubic through the samples: (Q[k-1] + 4 Q[k] + Q[k+1]) / 6 = value at u_k, solved per
-    // coordinate (x w, y w, z w, w) by the cyclic Thomas algorithm (Sherman-Morrison).
-    auto solve = [&](const std::vector<double>& d) {
-      std::vector<double> a(n, 1.0 / 6), bdiag(n, 4.0 / 6), c(n, 1.0 / 6);
-      const double        gamma = -bdiag[0];
-      std::vector<double> bb = bdiag, x(n), z(n), u(n, 0.0);
-      bb[0] -= gamma;
-      bb[n - 1] -= a[0] * c[n - 1] / gamma;
-      u[0] = gamma, u[n - 1] = c[n - 1];
-      auto thomas = [&](const std::vector<double>& rhs, std::vector<double>& out) {
-        std::vector<double> cp(n), dp(n);
-        cp[0] = c[0] / bb[0], dp[0] = rhs[0] / bb[0];
-        for (int k = 1; k < n; ++k)
-        {
-          const double m = bb[k] - a[k] * cp[k - 1];
-          cp[k]          = c[k] / m;
-          dp[k]          = (rhs[k] - a[k] * dp[k - 1]) / m;
-        }
-        out[n - 1] = dp[n - 1];
-        for (int k = n - 2; k >= 0; --k)
-          out[k] = dp[k] - cp[k] * out[k + 1];
-      };
-      thomas(d, x);
-      thomas(u, z);
-      const double f = (x[0] + a[0] / gamma * x[n - 1]) / (1 + z[0] + a[0] / gamma * z[n - 1]);
-      for (int k = 0; k < n; ++k)
-        x[k] -= f * z[k];
-      return x;
-    };
-    NCollection_Array2<gp_Pnt> poles(1, n, 1, nr);
-    NCollection_Array2<double> wts(1, n, 1, nr);
-    bool                       ok = true;
-    for (int j = 0; j < nr && ok; ++j)
-    {
-      std::vector<double> dx(n), dy(n), dz(n), dw(n);
-      for (int k = 0; k < n; ++k)
-      {
-        const double t = u0 + (u1 - u0) * k / n;
-        const gp_Pnt h = rows[(size_t)j]->Value(t);
-        dx[k] = h.X(), dy[k] = h.Y(), dz[k] = h.Z(), dw[k] = weights[(size_t)j]->Value(t).X();
-      }
-      const std::vector<double> qx = solve(dx), qy = solve(dy), qz = solve(dz), qw = solve(dw);
-      for (int k = 0; k < n && ok; ++k)
-      {
-        ok = qw[(size_t)k] > 1e-9;
-        if (ok)
-        {
-          poles(k + 1, j + 1) = gp_Pnt(qx[(size_t)k] / qw[(size_t)k], qy[(size_t)k] / qw[(size_t)k], qz[(size_t)k] / qw[(size_t)k]);
-          wts(k + 1, j + 1)   = qw[(size_t)k];
-        }
-      }
-    }
-    if (!ok)
-      return nullptr;
-    // Periodic uniform knots u0 .. u1 (n + 1 of them, multiplicity 1): n poles.
-    NCollection_Array1<double> pk(1, n + 1);
-    NCollection_Array1<int>    pm(1, n + 1);
-    for (int k = 0; k <= n; ++k)
-      pk(k + 1) = u0 + (u1 - u0) * k / n, pm(k + 1) = 1;
-    occ::handle<Geom_BSplineSurface> out;
-    // The basis may lag the samples by a pole or two: the shift that puts the curve through them.
-    for (int shift = -2; shift <= 2 && out.IsNull(); ++shift)
-    {
-      NCollection_Array2<gp_Pnt> sp(1, n, 1, nr);
-      NCollection_Array2<double> sw(1, n, 1, nr);
-      for (int k = 1; k <= n; ++k)
-        for (int j = 1; j <= nr; ++j)
-        {
-          const int from = (k - 1 + shift + n) % n + 1;
-          sp(k, j)       = poles(from, j);
-          sw(k, j)       = wts(from, j);
-        }
-      occ::handle<Geom_BSplineSurface> c = new Geom_BSplineSurface(sp, sw, pk, vk, pm, vm, 3, src->VDegree(), true, false);
-      double worst = 0;
-      for (int k = 0; k < n && worst <= tol; ++k)
-        for (int j = 0; j <= 8 && worst <= tol; ++j)
-        {
-          const double t = u0 + (u1 - u0) * (k + (j % 2 == 0 ? 0.0 : 0.5)) / n, v = v0 + (v1 - v0) * j / 8;
-          worst          = std::max(worst, c->Value(t, v).Distance(src->Value(t, v)));
-        }
-      if (worst <= tol)
-        out = c;
-    }
-    if (!out.IsNull())
-    {
-      if (!in_u)
-        out->ExchangeUV();
-      return out;
-    }
-  }
-  return nullptr;
-}
-
 // The face's B-spline surface made periodic where the face goes all the way
 // round it (Parasolid's periodic B-surface: one face, no seam, like live's
 // smooth loft): a periodic direction, or a closed one whose seam is tangent.
@@ -891,12 +759,7 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
       ps->SetUPeriodic();
       up = ps->UMultiplicity(1) <= 1 || ps->RemoveUKnot(1, ps->UMultiplicity(1) - 1, kPrecision);
       if (!up)
-      {
-        // A seam knot that won't come down: refit periodic round u (only when v stays as it is).
-        occ::handle<Geom_BSplineSurface> refit = vp ? occ::handle<Geom_BSplineSurface>() : periodic_refit(b, true, kPrecision);
-        up                                     = !refit.IsNull();
-        ps                                     = up ? refit : occ::down_cast<Geom_BSplineSurface>(b->Copy());
-      }
+        ps = occ::down_cast<Geom_BSplineSurface>(b->Copy());
     }
     if (vp && !ps->IsVPeriodic())
     {
