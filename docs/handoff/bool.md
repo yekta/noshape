@@ -3,6 +3,23 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## c2-rings-loft's Shell 1 (by_quadrics, 11-09 11:45 UTC; lead: the rings-loft Shell, starting at the repair)
+- Its input dumped (NOSHAPE_DUMP_OPS; vibe4 ~/agents/bool-cases/rl-dump/shell-9 and -53: 17 faces, 2 removed, 1 mm)
+  and run alone (bool-c scratch probe xprobe::probe_shell_dump, PROBE_DUMP=<base>, NOSHAPE_SHELL_DEBUG for the laps):
+  quadrics 1.95 s = offsets 37, corners 116, edges 480, faces 134, repair 683 (crossings 35, splits 105 + 16, traces
+  364 + 61, joins 73), check 38, self-interference 270-500 ms.
+- **Landing:** the edges' OCCT intersections (GeomAPI_IntSS of the trimmed offsets, `near_edge` now shared) made
+  ahead on all threads for edges neither tangent, a seam nor between planes with a free-form face; one not made
+  there is made in the loop as before. Edges 480 -> 200 ms (edge 27, faces 6 / 11, 100 ms alone), the Shell 1.95 ->
+  1.5 s, the same result (44 / 123, 474.81 mm3). qa's shellmatrix / boolmatrix / gpf identical (CLI par1109), kernel
+  tests 350/350, model suite unchanged but for main's own (c2-extension-spring now compared to 12 of 16), g++-13 builds.
+- Tried, not kept: marching the edges first (the fallback of 64 points on both offsets): edges 707-921 ms and the
+  Shell then fails.
+- Next: the traces (8 curves where three offsets meet, ~45 ms each for ~1.6 mm: ~6 ms a step). `eval_grad` on a
+  free-form offset keeps one parameter hint per surface for every caller (Surf::hint), so queries at different places
+  restart from far-off hints (ShapeAnalysis UVFromIso 10 % of the Shell). A hint per caller, or the traces each on
+  their own copies of the surfaces (then on all threads), are the two ways in.
+
 ## OCCT patch 0027: a face's polyhedron kept (11-09 10:25 UTC; lead: the impeller's Delete face 2 first)
 - IntCurveSurface (TKGeomAlgo, IntCurveSurface_Inter.pxx): the edge / face intersection sampled the face into a
   polyhedron on every call, per span of the face and again per C2 span of the edge (Delete face 2's input: 503
