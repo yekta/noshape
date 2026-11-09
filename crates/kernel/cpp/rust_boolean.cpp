@@ -2643,10 +2643,12 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
 
 // OCCT's section of two faces, one of them free-form, brought onto both surfaces where its approximation is coarse
 // (its tolerance past 1e-5 m: a sphere's section with a B-spline face, cf-surface-pattern's, 2.4e-4 m off them,
-// our grey band about a face's boundary then millimetres wide): 65 of its points (from its own parameters, its
+// our grey band about a face's boundary then millimetres wide): 129 of its points (from its own parameters, its
 // curves on the faces as the first guesses) projected onto both surfaces in turn until within 1e-9 of each, the
-// curve and its curves on the faces fitted through them at those parameters, its tolerance what the fit is off
-// them between its points. Else (a point not brought onto both, the fit no tighter) the section as OCCT has it.
+// curve and its curves on the faces fitted through them by chord length; where the fit strays from the surfaces
+// between two points past 1e-7, their middle brought onto both too and the fit made again (up to five rounds: a
+// section OCCT gave 0.26 off, fitted through 129 points, wandered 3 mm between them); its tolerance what the fit is
+// off them between its points. Else (a point not brought onto both, the fit no tighter) the section as OCCT has it.
 static IntTools_Curve refined_section(const IntTools_Curve& ic, const TopoDS_Face& fa, const TopoDS_Face& fb)
 {
   auto analytic = [](const TopoDS_Face& f) {
@@ -2659,17 +2661,16 @@ static IntTools_Curve refined_section(const IntTools_Curve& ic, const TopoDS_Fac
     return ic;
   const occ::handle<Geom_Surface> sa = BRep_Tool::Surface(fa), sb = BRep_Tool::Surface(fb);
   const occ::handle<ShapeAnalysis_Surface> qa = new ShapeAnalysis_Surface(sa), qb = new ShapeAnalysis_Surface(sb);
-  const int    n = 128;
-  const double t0 = c->FirstParameter(), t1 = c->LastParameter();
-  occ::handle<NCollection_HArray1<gp_Pnt>>   pts = new NCollection_HArray1<gp_Pnt>(1, n + 1);
-  occ::handle<NCollection_HArray1<gp_Pnt2d>> ua  = new NCollection_HArray1<gp_Pnt2d>(1, n + 1), ub = new NCollection_HArray1<gp_Pnt2d>(1, n + 1);
-  occ::handle<NCollection_HArray1<double>>   prm = new NCollection_HArray1<double>(1, n + 1);
-  for (int k = 0; k <= n; ++k)
+  struct OnBoth
   {
-    const double t = t0 + (t1 - t0) * k / n;
-    gp_Pnt       m = c->Value(t);
-    gp_Pnt2d     pa = qa->NextValueOfUV(c1->Value(t), m, 1e-10), pb = qb->NextValueOfUV(c2->Value(t), m, 1e-10);
-    double       gap = 1;
+    gp_Pnt   p;
+    gp_Pnt2d a, b;
+  };
+  // (A point and its places on the faces, from guesses: on both within 1e-9, else false.)
+  auto onto = [&](gp_Pnt m, gp_Pnt2d pa, gp_Pnt2d pb, OnBoth& out) {
+    pa         = qa->NextValueOfUV(pa, m, 1e-10);
+    pb         = qb->NextValueOfUV(pb, m, 1e-10);
+    double gap = 1;
     for (int it = 0; it < 50 && gap > 1e-9; ++it)
     {
       const gp_Pnt xa = sa->Value(pa.X(), pa.Y()), xb = sb->Value(pb.X(), pb.Y());
@@ -2678,40 +2679,78 @@ static IntTools_Curve refined_section(const IntTools_Curve& ic, const TopoDS_Fac
       pa  = qa->NextValueOfUV(pa, m, 1e-10);
       pb  = qb->NextValueOfUV(pb, m, 1e-10);
     }
-    if (gap > 1e-8)
-      return ic;
-    pts->SetValue(k + 1, m);
-    ua->SetValue(k + 1, pa);
-    ub->SetValue(k + 1, pb);
-    prm->SetValue(k + 1, t);
-  }
-  // (Fitted by chord length: OCCT's parameters can bunch, the cubic through them waving between.)
-  occ::handle<NCollection_HArray1<double>> chord = new NCollection_HArray1<double>(1, n + 1);
-  chord->SetValue(1, 0.0);
-  for (int k = 2; k <= n + 1; ++k)
-    chord->SetValue(k, chord->Value(k - 1) + pts->Value(k).Distance(pts->Value(k - 1)));
-  if (!(chord->Value(n + 1) > 1e-9))
-    return ic;
-  for (int k = 2; k <= n + 1; ++k)
-    if (!(chord->Value(k) > chord->Value(k - 1)))
-      return ic;
-  prm = chord;
-  GeomAPI_Interpolate   f3(pts, prm, false, 1e-12);
-  Geom2dAPI_Interpolate fa2(ua, prm, false, 1e-12), fb2(ub, prm, false, 1e-12);
-  f3.Perform();
-  fa2.Perform();
-  fb2.Perform();
-  if (!f3.IsDone() || !fa2.IsDone() || !fb2.IsDone())
-    return ic;
-  const occ::handle<Geom_Curve> nc(f3.Curve());
-  const occ::handle<Geom2d_Curve> na(fa2.Curve()), nb(fb2.Curve());
-  double tol = 0;
-  for (int k = 0; k < n; ++k)
+    out = OnBoth{m, pa, pb};
+    return gap <= 1e-8;
+  };
+  const int           n = 128;
+  const double        t0 = c->FirstParameter(), t1 = c->LastParameter();
+  std::vector<OnBoth> ps;
+  for (int k = 0; k <= n; ++k)
   {
-    const double   t  = 0.5 * (prm->Value(k + 1) + prm->Value(k + 2));
-    const gp_Pnt   p  = nc->Value(t);
-    const gp_Pnt2d qa2 = na->Value(t), qb2 = nb->Value(t);
-    tol = std::max({tol, sa->Value(qa2.X(), qa2.Y()).Distance(p), sb->Value(qb2.X(), qb2.Y()).Distance(p)});
+    const double t = t0 + (t1 - t0) * k / n;
+    OnBoth       x;
+    if (!onto(c->Value(t), c1->Value(t), c2->Value(t), x))
+      return ic;
+    ps.push_back(x);
+  }
+  occ::handle<Geom_Curve>   nc;
+  occ::handle<Geom2d_Curve> na, nb;
+  double                    tol = 0;
+  for (int round = 0;; ++round)
+  {
+    const int m = static_cast<int>(ps.size());
+    occ::handle<NCollection_HArray1<gp_Pnt>>   pts = new NCollection_HArray1<gp_Pnt>(1, m);
+    occ::handle<NCollection_HArray1<gp_Pnt2d>> ua  = new NCollection_HArray1<gp_Pnt2d>(1, m), ub = new NCollection_HArray1<gp_Pnt2d>(1, m);
+    // (By chord length: OCCT's parameters can bunch, the cubic through them waving between.)
+    occ::handle<NCollection_HArray1<double>> prm = new NCollection_HArray1<double>(1, m);
+    for (int k = 0; k < m; ++k)
+    {
+      pts->SetValue(k + 1, ps[k].p);
+      ua->SetValue(k + 1, ps[k].a);
+      ub->SetValue(k + 1, ps[k].b);
+      prm->SetValue(k + 1, k == 0 ? 0.0 : prm->Value(k) + ps[k].p.Distance(ps[k - 1].p));
+      if (k > 0 && !(prm->Value(k + 1) > prm->Value(k)))
+        return ic;
+    }
+    GeomAPI_Interpolate   f3(pts, prm, false, 1e-12);
+    Geom2dAPI_Interpolate fa2(ua, prm, false, 1e-12), fb2(ub, prm, false, 1e-12);
+    f3.Perform();
+    fa2.Perform();
+    fb2.Perform();
+    if (!f3.IsDone() || !fa2.IsDone() || !fb2.IsDone())
+      return ic;
+    nc = f3.Curve();
+    na = fa2.Curve();
+    nb = fb2.Curve();
+    tol = 0;
+    std::vector<double> off(static_cast<size_t>(m - 1));
+    for (int k = 0; k + 1 < m; ++k)
+    {
+      const double   t   = 0.5 * (prm->Value(k + 1) + prm->Value(k + 2));
+      const gp_Pnt   p   = nc->Value(t);
+      const gp_Pnt2d qa2 = na->Value(t), qb2 = nb->Value(t);
+      off[(size_t)k]     = std::max(sa->Value(qa2.X(), qa2.Y()).Distance(p), sb->Value(qb2.X(), qb2.Y()).Distance(p));
+      tol                = std::max(tol, off[(size_t)k]);
+    }
+    if (tol <= 1e-7 || round == 5)
+      break;
+    // (A middle not brought onto both: the fit as it is.)
+    std::vector<OnBoth> more;
+    bool                all = true;
+    for (int k = 0; k + 1 < m && all; ++k)
+    {
+      more.push_back(ps[(size_t)k]);
+      if (off[(size_t)k] <= 1e-7)
+        continue;
+      const double t = 0.5 * (prm->Value(k + 1) + prm->Value(k + 2));
+      OnBoth       x;
+      all = onto(gp_Pnt((ps[(size_t)k].p.XYZ() + ps[(size_t)k + 1].p.XYZ()) / 2), na->Value(t), nb->Value(t), x);
+      more.push_back(x);
+    }
+    if (!all)
+      break;
+    more.push_back(ps.back());
+    ps = std::move(more);
   }
   tol = std::max(tol, 1e-7);
   if (!(tol < 0.5 * ic.Tolerance()))
