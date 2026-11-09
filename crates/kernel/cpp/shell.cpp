@@ -4642,7 +4642,16 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
   std::vector<TopoDS_Edge> ex(ne + 1);
   std::vector<char>        flip(ne + 1);
   std::vector<int>         group_edge(nf + 1, 0); // a collapsing face's edge (the first of its tangent edges)
-  std::map<int, std::pair<std::vector<double>, std::vector<gp_Pnt>>> marched_at; // a marched edge's points by parameter
+  // A marched edge's points by parameter, and the indices of those where it turns a corner (below).
+  struct Marched
+  {
+    std::vector<double> pr;
+    std::vector<gp_Pnt> pts;
+    std::vector<size_t> corners;
+    std::vector<int>    corner_faces; // the faces whose own bounds it crosses there
+    std::vector<std::pair<int, gp_Pnt2d>> corner_uv; // each corner's face and its place on it (exact, on the bound)
+  };
+  std::map<int, Marched> marched_at;
   // (A free-form offset only round the edge, its curve's box on the face and two walls more: the offsets keep
   // their faces' parameters; OCCT's intersection of whole B-spline offsets was most of c2-rings-loft's edges.)
   auto near_edge = [&](const TopoDS_Edge& e, int f) -> occ::handle<Geom_Surface> {
@@ -4672,6 +4681,34 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       return g;
     return new Geom_RectangularTrimmedSurface(g, u0, u1, v0, v1);
   };
+  // (Tangent at one place and creased at another (c2-impeller-loft's loft seams: their normals 1e-14 to 2 rad apart):
+  // the offsets' intersection has no well-defined place toward the tangent end (OCCT's came in 4-5 pieces, 0.11 mm off
+  // there): marched below instead. By the edge's curves on its faces, nine points.)
+  auto partly_tangent = [&](const TopoDS_Edge& e, int fa, int fb) {
+    double a0, a1, b0, b1;
+    const TopoDS_Face&              Fa = TopoDS::Face(faces(fa));
+    const TopoDS_Face&              Fb = TopoDS::Face(faces(fb));
+    const occ::handle<Geom2d_Curve> pa = BRep_Tool::CurveOnSurface(e, Fa, a0, a1), pb = BRep_Tool::CurveOnSurface(e, Fb, b0, b1);
+    if (pa.IsNull() || pb.IsNull() || fa == fb)
+      return false;
+    const occ::handle<Geom_Surface> sa = BRep_Tool::Surface(Fa), sb = BRep_Tool::Surface(Fb);
+    double                          amin = 10, amax = 0;
+    for (int w = 0; w <= 8; ++w)
+    {
+      const gp_Pnt2d qa = pa->Value(a0 + (a1 - a0) * w / 8), qb = pb->Value(b0 + (b1 - b0) * w / 8);
+      gp_Pnt         P;
+      gp_Vec         ua, va, ub, vb;
+      sa->D1(qa.X(), qa.Y(), P, ua, va);
+      sb->D1(qb.X(), qb.Y(), P, ub, vb);
+      const gp_Vec na = ua.Crossed(va), nb = ub.Crossed(vb);
+      if (na.Magnitude() < 1e-300 || nb.Magnitude() < 1e-300)
+        return false;
+      // (Each face's way out: its orientation on the solid.)
+      const double an = (Fa.Orientation() == TopAbs_REVERSED ? na.Reversed() : na).Angle(Fb.Orientation() == TopAbs_REVERSED ? nb.Reversed() : nb);
+      amin = std::min(amin, an), amax = std::max(amax, an);
+    }
+    return amin < 1e-3 && amax > 1e-2;
+  };
   // (The offsets' intersections the loop below asks OCCT for (an edge neither tangent, a seam nor between two planes,
   // a face of it free-form), made ahead on all threads: c2-rings-loft's 8 B-spline pairs took 35-100 ms each, one
   // after another. One not made here (it threw or failed, or the budget stopped it) is made in the loop, as before.)
@@ -4687,7 +4724,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
     {
       const int fa = efi[(size_t)i][0], fb = efi[(size_t)i][1];
       if (gone[(size_t)i] || degen[(size_t)i] || seam[(size_t)i] || tangent[(size_t)i] || cseam[(size_t)i] || group[(size_t)i] != 0
-          || (!sf[(size_t)fa].general && !sf[(size_t)fb].general))
+          || (!sf[(size_t)fa].general && !sf[(size_t)fb].general) || partly_tangent(TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD)), fa, fb))
         continue;
       jobs.push_back(i);
     }
@@ -4911,7 +4948,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
           return no("a tangent curve's offset failed");
         cands.push_back(fit.Curve());
       }
-      else
+      else if (!((sf[(size_t)fa].general || sf[(size_t)fb].general) && partly_tangent(e, fa, fb)))
       {
         if (group[(size_t)i] == 0 && ahead_ss[(size_t)i].done)
           cands = ahead_ss[(size_t)i].lines;
@@ -5013,17 +5050,13 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
           foot[k].sas = new ShapeAnalysis_Surface(BRep_Tool::Surface(foot[k].f));
           foot[k].s.Initialize(foot[k].f);
         }
-        for (int k = 1; k < n && marched; ++k)
-        {
+        // One step: the point on both offsets in the plane across the edge at its parameter w (from its own guess).
+        auto step_at = [&](double w, gp_XYZ& y, int k) -> bool {
           gp_Pnt p;
           gp_Vec d;
-          // (Closer at the ends: a corner can sit by a curl, where a free-form offset's parameters run fast.)
-          oc.D1(m0 + (m1 - m0) * 0.5 * (1 - std::cos(M_PI * k / n)), p, d);
+          oc.D1(w, p, d);
           if (d.Magnitude() < 1e-12)
-          {
-            marched = false;
-            break;
-          }
+            return false;
           quad::Surf pl;
           pl.kind                 = GeomAbs_Plane;
           pl.n                    = d.Normalized().XYZ();
@@ -5031,7 +5064,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
           const quad::Surf* s3[3] = {&sf[(size_t)fa], &sf[(size_t)fb], &pl};
           // (The point t off both faces' tangent planes: (na + nb) t / (1 + na·nb), right for tangent faces too.)
           const gp_XYZ      na    = foot[0].normal(p, 1e-6 * size), nb = foot[1].normal(p, 1e-6 * size);
-          gp_XYZ            y     = p.XYZ() - (na + nb) * (t / std::max(1 + na.Dot(nb), 1e-3));
+          y                       = p.XYZ() - (na + nb) * (t / std::max(1 + na.Dot(nb), 1e-3));
           // (One face removed: t off the kept one's tangent plane, on the removed one's; one wall in where the two
           // are all but parallel.)
           if (kept[(size_t)fa] != kept[(size_t)fb])
@@ -5040,11 +5073,15 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
             const double cc = nk.Dot(nr), den = 1 - cc * cc;
             y               = den > 1e-3 ? p.XYZ() + nk * (-t / den) + nr * (t * cc / den) : p.XYZ() - nk * t;
           }
-          const gp_XYZ y0m        = y;
-          marched                 = quad::solve3_grad(s3, y, size) && (y - p.XYZ()).Modulus() < 10 * thickness;
-          if (!marched)
-            marched = (y = y0m, quad::solve3_damped(s3, y, size)) && (y - p.XYZ()).Modulus() < 10 * thickness;
-          if (!marched && dbg)
+          // (Where the faces are tangent the point t along the common normal is on both offsets (to t θ²); the solve
+          // has no crossing to find there.)
+          if (kept[(size_t)fa] && kept[(size_t)fb] && na.Dot(nb) > std::cos(1e-4))
+            return true;
+          const gp_XYZ y0m = y;
+          bool         ok  = quad::solve3_grad(s3, y, size) && (y - p.XYZ()).Modulus() < 10 * thickness;
+          if (!ok)
+            ok = (y = y0m, quad::solve3_damped(s3, y, size)) && (y - p.XYZ()).Modulus() < 10 * thickness;
+          if (!ok && dbg)
           {
             gp_XYZ g0, g1;
             const double e0 = quad::eval_grad_near(sf[(size_t)fa], y0m, g0, size), e1 = quad::eval_grad_near(sf[(size_t)fb], y0m, g1, size);
@@ -5057,24 +5094,211 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
                 std::fprintf(stderr, "quadrics:   face %d own [%g, %g] x [%g, %g], surface [%g, %g] x [%g, %g], hint (%g, %g)\n", f, sf[(size_t)f].own[0], sf[(size_t)f].own[1], sf[(size_t)f].own[2], sf[(size_t)f].own[3], U0, U1, V0, V1, sf[(size_t)f].hint.X(), sf[(size_t)f].hint.Y());
               }
           }
-          q(k + 1)                = gp_Pnt(y);
+          return ok;
+        };
+        // (Closer at the ends: a corner can sit by a curl, where a free-form offset's parameters run fast.)
+        std::vector<double> ws(n + 1, 0.0);
+        for (int k = 1; k < n && marched; ++k)
+        {
+          ws[(size_t)k] = m0 + (m1 - m0) * 0.5 * (1 - std::cos(M_PI * k / n));
+          gp_XYZ y;
+          marched  = step_at(ws[(size_t)k], y, k);
+          q(k + 1) = gp_Pnt(y);
         }
         q(1)     = A;
         q(n + 1) = B;
+        // (Where it crosses a face's own bounds into GeomLib's tangent extension (on the face's tangent plane there,
+        // its curvature not), the offset turns a corner and the points' curve with it: the crossing found by halving
+        // the edge's parameter, each try a step, and the curve fitted in pieces meeting there (c2-impeller-loft's
+        // inlet seams: one smooth curve through it ran 0.27 mm off the inlet's offset).)
+        std::vector<gp_Pnt> qv(q.begin(), q.end());
+        std::vector<size_t> corners;
+        std::vector<int>    corner_faces;
+        std::vector<std::pair<int, gp_Pnt2d>> corner_uv;
+        if (marched && tangent_ext)
+        {
+          struct Side
+          {
+            int                                f;
+            occ::handle<ShapeAnalysis_Surface> sas;
+            gp_Pnt2d                           at;
+            bool                               has = false;
+          };
+          std::vector<Side> sides;
+          for (const int f : {fa, fb})
+            if (sf[(size_t)f].general && kept[(size_t)f] && !sf[(size_t)f].base.IsNull())
+              sides.push_back({f, new ShapeAnalysis_Surface(sf[(size_t)f].base)});
+          auto side_of = [&](Side& sd, const gp_Pnt& x) {
+            const double* own = sf[(size_t)sd.f].own;
+            sd.at             = sd.has ? sd.sas->NextValueOfUV(sd.at, x, 1e3 * tol) : sd.sas->ValueOfUV(x, 1e3 * tol);
+            sd.has            = true;
+            const double eu = 1e-9 * std::max(1.0, own[1] - own[0]), ev = 1e-9 * std::max(1.0, own[3] - own[2]);
+            return (int)(sd.at.X() < own[0] - eu) | (int)(sd.at.X() > own[1] + eu) << 1 | (int)(sd.at.Y() < own[2] - ev) << 2 | (int)(sd.at.Y() > own[3] + ev) << 3;
+          };
+          for (Side& sd : sides)
+          {
+            std::vector<int> sv(qv.size());
+            for (size_t k = 1; k + 1 < qv.size(); ++k)
+              sv[k] = side_of(sd, qv[k]);
+            for (size_t k = 1; k + 2 < qv.size() && marched; ++k)
+            {
+              if (sv[k] == sv[k + 1])
+                continue;
+              // (On the crossed bound's iso-line of the face's own surface, the point its offset has there that is on
+              // the other face's offset too: a root of the other's value along it, between the two points' places
+              // (Illinois). Their sides by projection are only good to a micrometre by the corner, the base's
+              // curvature changing there.)
+              const int     bit = sv[k] ^ sv[k + 1];
+              const double* own = sf[(size_t)sd.f].own;
+              const bool    along_u = (bit & 12) != 0; // a v bound crossed: the iso-line runs along u
+              const double  fixed = (bit & 1) ? own[0] : (bit & 2) ? own[1] : (bit & 4) ? own[2] : own[3];
+              const int     other = sd.f == fa ? fb : fa;
+              const quad::Surf& Sf  = sf[(size_t)sd.f];
+              auto on_iso = [&](double sp) {
+                gp_Pnt P;
+                gp_Vec du, dv;
+                Sf.base->D1(along_u ? sp : fixed, along_u ? fixed : sp, P, du, dv);
+                gp_Vec N = du.Crossed(dv);
+                if (N.Magnitude() < 1e-300)
+                  return gp_XYZ(1e300, 1e300, 1e300);
+                N.Normalize();
+                return P.XYZ() + N.XYZ() * Sf.d;
+              };
+              side_of(sd, qv[k]);
+              double lo = along_u ? sd.at.X() : sd.at.Y();
+              side_of(sd, qv[k + 1]);
+              double hi = along_u ? sd.at.X() : sd.at.Y();
+              double flo = quad::eval(sf[(size_t)other], on_iso(lo)), fhi = quad::eval(sf[(size_t)other], on_iso(hi));
+              gp_XYZ y   = qv[k + 1].XYZ();
+              if (!(flo * fhi < 0) || std::abs(flo) > 1e299 || std::abs(fhi) > 1e299)
+                continue;
+              int last = 0;
+              for (int it = 0; it < 60 && std::abs(hi - lo) > 1e-14 * std::max(1.0, std::abs(hi)); ++it)
+              {
+                const double mid = (lo * fhi - hi * flo) / (fhi - flo);
+                const double fm  = quad::eval(sf[(size_t)other], on_iso(mid));
+                if (std::abs(fm) < 1e-13 * size || std::abs(fm) > 1e299)
+                {
+                  lo = hi = mid;
+                  break;
+                }
+                if ((fm < 0) == (flo < 0))
+                {
+                  lo = mid, flo = fm;
+                  if (last == -1)
+                    fhi *= 0.5;
+                  last = -1;
+                }
+                else
+                {
+                  hi = mid, fhi = fm;
+                  if (last == 1)
+                    flo *= 0.5;
+                  last = 1;
+                }
+              }
+              const double s_corner = 0.5 * (lo + hi);
+              y                     = on_iso(s_corner);
+              if (std::abs(y.X()) > 1e299)
+                continue;
+              // (Its parameter on the edge: between the two points', by where it lies between them.)
+              const double fr = std::clamp((y - qv[k].XYZ()).Dot(qv[k + 1].XYZ() - qv[k].XYZ()) / std::max((qv[k + 1].XYZ() - qv[k].XYZ()).SquareModulus(), 1e-300), 1e-6, 1 - 1e-6);
+              hi              = ws[k] + (ws[k + 1] - ws[k]) * fr;
+              corners.push_back(k);
+              corner_uv.push_back({sd.f, gp_Pnt2d(along_u ? s_corner : fixed, along_u ? fixed : s_corner)});
+              if (std::find(corner_faces.begin(), corner_faces.end(), sd.f) == corner_faces.end())
+                corner_faces.push_back(sd.f);
+              qv.insert(qv.begin() + (std::ptrdiff_t)k + 1, gp_Pnt(y));
+              ws.insert(ws.begin() + (std::ptrdiff_t)k + 1, hi);
+              sv.insert(sv.begin() + (std::ptrdiff_t)k + 1, sv[k + 1]);
+              for (size_t& c2 : corners)
+                if (c2 > k)
+                  ++c2;
+              corners.back() = k + 1;
+              if (dbg)
+                std::fprintf(stderr, "quadrics: edge %d turns a corner at %.4f %.4f %.4f mm (face %d's own bounds)\n", i, y.X() * 1e3, y.Y() * 1e3, y.Z() * 1e3, sd.f);
+              ++k;
+            }
+          }
+          // (Sorted with their places.)
+          std::vector<size_t> order(corners.size());
+          for (size_t c2 = 0; c2 < order.size(); ++c2)
+            order[c2] = c2;
+          std::sort(order.begin(), order.end(), [&](size_t x, size_t y2) { return corners[x] < corners[y2]; });
+          std::vector<size_t>                   sc;
+          std::vector<std::pair<int, gp_Pnt2d>> su;
+          for (const size_t o : order)
+            sc.push_back(corners[o]), su.push_back(corner_uv[o]);
+          corners   = sc;
+          corner_uv = su;
+        }
         if (marched)
         {
           // By chord length; its curves on the faces fitted through the same points at the same parameters (below).
-          NCollection_Array1<double> pr(1, n + 1);
-          pr(1) = 0;
-          for (int k = 2; k <= n + 1; ++k)
-            pr(k) = pr(k - 1) + q(k).Distance(q(k - 1));
-          GeomAPI_PointsToBSpline fit(q, pr, 3, 8, GeomAbs_C2, 1e-7 * size);
-          if (fit.IsDone())
+          std::vector<double> pr(qv.size(), 0.0);
+          for (size_t k = 1; k < qv.size(); ++k)
+            pr[k] = pr[k - 1] + qv[k].Distance(qv[k - 1]);
+          // (Each piece fitted, then joined knot to knot: C0 at the corners, the poles there the corner.)
+          std::vector<size_t> ends = {0};
+          ends.insert(ends.end(), corners.begin(), corners.end());
+          ends.push_back(qv.size() - 1);
+          occ::handle<Geom_BSplineCurve> joined;
+          for (size_t cpos = 0; cpos + 1 < ends.size() && marched; ++cpos)
           {
-            c  = fit.Curve();
+            const int                  np3 = (int)(ends[cpos + 1] - ends[cpos] + 1);
+            NCollection_Array1<gp_Pnt> qq(1, np3);
+            NCollection_Array1<double> pp3(1, np3);
+            for (int k = 0; k < np3; ++k)
+              qq(k + 1) = qv[ends[cpos] + (size_t)k], pp3(k + 1) = pr[ends[cpos] + (size_t)k];
+            occ::handle<Geom_BSplineCurve> piece;
+            if (np3 >= 3)
+            {
+              GeomAPI_PointsToBSpline fit(qq, pp3, 3, 8, GeomAbs_C2, 1e-7 * size);
+              if (fit.IsDone())
+                piece = fit.Curve();
+            }
+            else
+            {
+              NCollection_Array1<double> kn(1, 2);
+              NCollection_Array1<int>    mu(1, 2);
+              kn(1) = pp3(1), kn(2) = pp3(np3), mu(1) = mu(2) = 2;
+              piece = new Geom_BSplineCurve(qq, kn, mu, 1);
+            }
+            if (piece.IsNull())
+            {
+              marched = false;
+              break;
+            }
+            if (joined.IsNull())
+            {
+              joined = piece;
+              continue;
+            }
+            const int deg = std::max(joined->Degree(), piece->Degree());
+            joined->IncreaseDegree(deg);
+            piece->IncreaseDegree(deg);
+            const int                  n1 = joined->NbPoles(), n2 = piece->NbPoles(), k1 = joined->NbKnots(), k2 = piece->NbKnots();
+            NCollection_Array1<gp_Pnt> poles(1, n1 + n2 - 1);
+            NCollection_Array1<double> knots(1, k1 + k2 - 1);
+            NCollection_Array1<int>    mults(1, k1 + k2 - 1);
+            for (int p = 1; p <= n1; ++p)
+              poles(p) = joined->Pole(p);
+            for (int p = 2; p <= n2; ++p)
+              poles(n1 + p - 1) = piece->Pole(p);
+            poles(n1) = qv[ends[cpos]];
+            for (int p = 1; p <= k1; ++p)
+              knots(p) = joined->Knot(p), mults(p) = joined->Multiplicity(p);
+            mults(k1) = deg;
+            for (int p = 2; p <= k2; ++p)
+              knots(k1 + p - 1) = piece->Knot(p), mults(k1 + p - 1) = piece->Multiplicity(p);
+            joined = new Geom_BSplineCurve(poles, knots, mults, deg);
+          }
+          if (marched && !joined.IsNull())
+          {
+            c  = joined;
             p0 = c->FirstParameter();
             p1 = c->LastParameter();
-            marched_at[i] = {std::vector<double>(pr.begin(), pr.end()), std::vector<gp_Pnt>(q.begin(), q.end())};
+            marched_at[i] = {pr, qv, corners, corner_faces, corner_uv};
           }
         }
       }
@@ -5374,18 +5598,31 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
             // A marched edge: its points' places on the offset, at the 3D curve's parameters, fitted (continuous in a
             // periodic u, then a whole number of turns to the original's start).
             const occ::handle<Geom_Surface>& g = sf[(size_t)i].off;
-            const auto& [pr, pts3]             = mp->second;
+            const auto& pr                     = mp->second.pr;
+            const auto& pts3                   = mp->second.pts;
             NCollection_Array1<gp_Pnt2d> uv(1, (int)pts3.size());
             NCollection_Array1<double>   pp(1, (int)pr.size());
             bool                         on = true;
             // (Each from the last one's place: a free-form offset can fold near a curl, its two sheets through one
             // point.)
             const occ::handle<ShapeAnalysis_Surface> sas = new ShapeAnalysis_Surface(g);
+            occ::handle<ShapeAnalysis_Surface>       base_sas;
             for (size_t p = 0; p < pts3.size() && on; ++p)
             {
               gp_Pnt2d w2 = p == 0 ? sas->ValueOfUV(pts3[p], 1e3 * tol) : sas->NextValueOfUV(uv((int)p), pts3[p], 1e3 * tol);
               if (p > 0 && g->Value(w2.X(), w2.Y()).Distance(pts3[p]) >= 1e3 * tol)
                 w2 = sas->ValueOfUV(pts3[p], 1e3 * tol);
+              // (Off by more than the tolerance (a foot on the offset found loosely, 6 um off by the impeller's inlet
+              // seam's corner, its curve on the face then 0.25 mm off between the points): the foot on the face's own
+              // surface instead where nearer (the offset keeps its parameters).)
+              if (sf[(size_t)i].general && !sf[(size_t)i].base.IsNull() && g->Value(w2.X(), w2.Y()).Distance(pts3[p]) > 1e3 * tol)
+              {
+                if (base_sas.IsNull())
+                  base_sas = new ShapeAnalysis_Surface(sf[(size_t)i].base);
+                const gp_Pnt2d wb = base_sas->NextValueOfUV(w2, pts3[p], 1e-12);
+                if (g->Value(wb.X(), wb.Y()).Distance(pts3[p]) < g->Value(w2.X(), w2.Y()).Distance(pts3[p]))
+                  w2 = wb;
+              }
               // (A free-form face's offset keeps its parameters: the nearest foot on the face's own patch, where the
               // projections land on another sheet of the offset.)
               if (sf[(size_t)i].general && g->Value(w2.X(), w2.Y()).Distance(pts3[p]) >= std::max(1e3 * tol, 1e-3 * size))
@@ -5411,14 +5648,109 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
             }
             if (!on)
               return no("a marched edge's curve on its face failed");
-            // (Interpolated: PointsToBSpline's 2D fit at given parameters ran 2 radians off its own points.)
-            occ::handle<TColgp_HArray1OfPnt2d> huv = new TColgp_HArray1OfPnt2d(uv);
-            occ::handle<TColStd_HArray1OfReal> hpp = new TColStd_HArray1OfReal(pp);
-            Geom2dAPI_Interpolate              fit2(huv, hpp, false, 1e-12);
-            fit2.Perform();
-            if (!fit2.IsDone())
-              return no("a marched edge's curve on its face failed");
-            occ::handle<Geom2d_Curve> c2(fit2.Curve());
+            // (Interpolated: PointsToBSpline's 2D fit at given parameters ran 2 radians off its own points.) In pieces
+            // meeting at the 3D curve's corners: the parameters turn one there too (GeomLib's tangent extension runs at
+            // its own speed: c2-impeller-loft's inlet seams, v past 1 thirty times slower), which one smooth curve
+            // through them overshoots (0.48 mm).
+            std::vector<gp_Pnt2d> uvs(uv.begin(), uv.end());
+            std::vector<double>   pps(pp.begin(), pp.end());
+            std::vector<size_t>   corners;
+            if (std::find(mp->second.corner_faces.begin(), mp->second.corner_faces.end(), i) != mp->second.corner_faces.end())
+            {
+              // (Turning a corner: its curve on the face from the 3D curve, four points a step, each projected from
+              // the last, the corners where they cross the face's own bounds found by halving the 3D curve's
+              // parameter with the same projection.)
+              double                        a0, a1;
+              const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(ex[(size_t)k], a0, a1);
+              auto foot = [&](const gp_Pnt2d& from, const gp_Pnt& x) {
+                gp_Pnt2d w = sas->NextValueOfUV(from, x, 1e3 * tol);
+                if (!base_sas.IsNull() || !sf[(size_t)i].base.IsNull())
+                {
+                  if (base_sas.IsNull())
+                    base_sas = new ShapeAnalysis_Surface(sf[(size_t)i].base);
+                  if (g->Value(w.X(), w.Y()).Distance(x) > 1e3 * tol)
+                  {
+                    const gp_Pnt2d wb = base_sas->NextValueOfUV(w, x, 1e-12);
+                    if (g->Value(wb.X(), wb.Y()).Distance(x) < g->Value(w.X(), w.Y()).Distance(x))
+                      w = wb;
+                  }
+                }
+                if (g->IsUPeriodic())
+                  w.SetX(w.X() + std::round((from.X() - w.X()) / g->UPeriod()) * g->UPeriod());
+                return w;
+              };
+              std::vector<gp_Pnt2d> nu = {uvs.front()};
+              std::vector<double>   np = {pps.front()};
+              for (size_t p = 1; p < uvs.size() && !c3.IsNull(); ++p)
+              {
+                for (int sub = 1; sub <= 4; ++sub)
+                {
+                  const double tp = sub == 4 ? pps[p] : pps[p - 1] + (pps[p] - pps[p - 1]) * sub / 4;
+                  gp_Pnt2d     w  = sub == 4 ? uvs[p] : foot(nu.back(), c3->Value(tp));
+                  if (sub == 4)
+                    for (size_t c2 = 0; c2 < mp->second.corners.size(); ++c2)
+                      if (mp->second.corners[c2] == p && mp->second.corner_uv[c2].first == i)
+                      {
+                        // (A corner on this face: its exact place, on the bound.)
+                        w = mp->second.corner_uv[c2].second;
+                        if (g->IsUPeriodic())
+                          w.SetX(w.X() + std::round((nu.back().X() - w.X()) / g->UPeriod()) * g->UPeriod());
+                        corners.push_back(nu.size());
+                      }
+                  nu.push_back(w);
+                  np.push_back(tp);
+                }
+              }
+              if (!c3.IsNull())
+              {
+                uvs = std::move(nu);
+                pps = std::move(np);
+              }
+            }
+            // Each piece interpolated, then joined knot to knot (C0 at the corners, the 3D curve's parameters kept).
+            std::vector<size_t> ends = {0};
+            ends.insert(ends.end(), corners.begin(), corners.end());
+            ends.push_back(uvs.size() - 1);
+            occ::handle<Geom2d_BSplineCurve> joined;
+            for (size_t c = 0; c + 1 < ends.size(); ++c)
+            {
+              const int                          np2 = (int)(ends[c + 1] - ends[c] + 1);
+              occ::handle<TColgp_HArray1OfPnt2d> huv = new TColgp_HArray1OfPnt2d(1, np2);
+              occ::handle<TColStd_HArray1OfReal> hpp = new TColStd_HArray1OfReal(1, np2);
+              for (int p = 0; p < np2; ++p)
+              {
+                huv->SetValue(p + 1, uvs[ends[c] + (size_t)p]);
+                hpp->SetValue(p + 1, pps[ends[c] + (size_t)p]);
+              }
+              Geom2dAPI_Interpolate fit2(huv, hpp, false, 1e-12);
+              fit2.Perform();
+              if (!fit2.IsDone())
+                return no("a marched edge's curve on its face failed");
+              occ::handle<Geom2d_BSplineCurve> piece = fit2.Curve();
+              if (piece->Degree() < 3)
+                piece->IncreaseDegree(3);
+              if (joined.IsNull())
+              {
+                joined = piece;
+                continue;
+              }
+              // (Poles end to end, the shared one once; knots likewise, the joint's multiplicity the degree.)
+              const int                    n1 = joined->NbPoles(), n2 = piece->NbPoles(), k1 = joined->NbKnots(), k2 = piece->NbKnots();
+              NCollection_Array1<gp_Pnt2d> poles(1, n1 + n2 - 1);
+              NCollection_Array1<double>   knots(1, k1 + k2 - 1);
+              NCollection_Array1<int>      mults(1, k1 + k2 - 1);
+              for (int p = 1; p <= n1; ++p)
+                poles(p) = joined->Pole(p);
+              for (int p = 2; p <= n2; ++p)
+                poles(n1 + p - 1) = piece->Pole(p);
+              for (int p = 1; p <= k1; ++p)
+                knots(p) = joined->Knot(p), mults(p) = joined->Multiplicity(p);
+              mults(k1) = 3;
+              for (int p = 2; p <= k2; ++p)
+                knots(k1 + p - 1) = piece->Knot(p), mults(k1 + p - 1) = piece->Multiplicity(p);
+              joined = new Geom2d_BSplineCurve(poles, knots, mults, 3);
+            }
+            occ::handle<Geom2d_Curve> c2(joined);
             double                    o0, o1;
             if (const occ::handle<Geom2d_Curve> co = BRep_Tool::CurveOnSurface(TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, o0, o1); !co.IsNull() && g->IsUPeriodic())
             {

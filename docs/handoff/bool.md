@@ -35,6 +35,23 @@ scratch /root/bool-scratch.
   there, more than their intersections. vibe3 A/B: Gehäuse check 2.7-3.0 -> 0.23-0.30 s, the Shell 4.1-4.9 -> 1.6-1.9
   s; rings-loft level. Results byte-identical (rings-loft shell-9 / -53, Gehäuse), shellmatrix / boolmatrix / gpf
   identical, kernel tests 351/351, suite unchanged, g++-13 builds.
+- **Landed (17:35 UTC): Shell Gehäuse's inlet seams.** The first extension attempt (polynomial continuation) curls
+  on edge 3, so GeomLib's tangent extension (`tangent_ext`) is built; it meets the face with only its tangent plane, so
+  the offset and the seams' curve turn a corner at the face's own bound (v = 1), and the seams' curves on the inlet's
+  offset, interpolated smoothly across it, ran 0.48 mm off (edge tolerance 7.3e-4). Now: partly tangent edges
+  (normals < 1e-3 rad apart somewhere, > 1e-2 elsewhere) marched, tangent points along the common normal; with
+  `tangent_ext`, a crossing of a face's own bound found exactly (on the bound's iso-line, Illinois on the other
+  offset's value), the 3D curve fitted in pieces joined C0 there, the curves on the face from the 3D curve (four points
+  a step) with the exact corner, in pieces; a loose foot (> 1e3 tol) tried on the base surface too. Seams' tolerance
+  7.3e-4 -> 2.0e-6, deviation 6.6e-8; every face meshes at 1e-5; volume 45,279.95 mm3 (was 45,279.19, live 45,272.92),
+  6 faces / 16 edges as live; Shell 1.09 s in the suite (was 1.11). Shellmatrix / boolmatrix / gpf identical, kernel
+  tests 352/352, model and ops Shell tests pass, suite unchanged but for main's own moves, g++-13 builds. The scroll
+  wall's offset still doesn't convert (GeomConvert error 0.2885 at 1e-7). The box (6.21 mm) is the query's: core
+  (core.md 14:30).
+- **Found (17:30 UTC), from main since core's c7c48f81 (Delete face takes away the region…): the impeller's Boolean 1
+  takes 4.56 s (live 79 ms; under 790 ms before), the document 18.7 -> 22.4 s.** 4.35 s is one BRepExtrema
+  min_distance: the Union leaves the parts apart in ours (live makes one part, 30 faces, 71,495 mm3), so basic.rs:49's
+  touching check measures two whole parts. Same with the old shell.cpp (imp-base.log). Told the lead.
 - **Next (asked of the lead):** the impeller's Booleans after the Shell (11 of 14, ~4.7 s of OCCT incl. Boolean
   Flansch+Gehäuse 1.7 s) decline "an offset face": `offset_as_bspline` (rust_boolean.cpp) fits one wall face (3.9e-8)
   but not the scroll's inner wall (u 0-3.3: GeomConvert_ApproxSurface error 0.29 m at 1e-7, 9e-3 at 1e-6, 6.6e-4 at
