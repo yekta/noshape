@@ -304,6 +304,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   v0.4.37's publish: v0.4.37 180 seeds, greens d6904caf / fc228df9 / d00d91d6 180 seeds, 0 deaths. Suites (SUITE-REGRESSIONS-1108):
   c2-impeller-loft's "Fillet Bohrungssitz Ansaugflasch" fails since the 18:54 run (core / blend; not a crash); speed numbers from
   vibe2 are load-bound now (day-old T2 processes there).
+- **qa 04:14: still no blocker on green 88bb798a** (psui UI only since 62a7e4bc: Variable Studio, documents page, Versions).
 - Open, not new in this cut (in v0.4.36 and v0.4.37): P1 WIN-SHOW-IN-EXPLORER (studios; still no fix on main, so this cut has it
   too), P1 SAVED-SKETCH-PLANE-LOST (blend).
 - Open P0s, long-running, not new: BLEND-RUST, SHELL-SLOW, REGEN-SPEED. At publish: the smoke, sweeps on the release CLI, the agent
