@@ -163,6 +163,35 @@ fn a_circle_loft_normal_to_its_start_as_live() {
     }
 }
 
+/// Live 2228 (c2-impeller-loft's Loft Gehäuse at V255): a Ø65 circle lofted, Normal to profile, to a D of a line, a
+/// spline and a line closed by a line. Along the smooth line-spline-line run each section's own parameter is a cubic
+/// in the face's u, its speed at a joint the geometric mean of the two pieces' (not each piece paired by its own
+/// parameter: 257,272.8 mm³), and the start step is the rule at every u (per pole only: 258,101). Live 257,078.4
+/// (its massproperties 257,080.9), its face within 0.3 µm of ours.
+#[test]
+fn a_loft_pairs_a_smooth_run_of_pieces_as_live() {
+    // The sketch's circle: two arcs meeting where the D's short side lines up (±40.68° off +z).
+    let (p, q) = (DVec2::new(21.1864836303326, 24.6451397111407), DVec2::new(-21.1864836303326, 24.6451397111407));
+    let arcs = [Segment2d::Arc3 { a: p, mid: DVec2::new(0.0, 32.5), b: q }, Segment2d::Arc3 { a: q, mid: DVec2::new(0.0, -32.5), b: p }];
+    let circle = make_face_from_wire(&make_wire_2d(&Plane::new(DVec3::new(0.0, 0.0, -34.0), DVec3::X, DVec3::Y), &arcs).unwrap(), true).unwrap();
+    let (a, b) = (DVec2::new(82.4182569980622, -30.0), DVec2::new(82.4182569980622, 30.0));
+    let spline = Segment2d::BSpline {
+        poles: vec![a, DVec2::new(99.8985510837477, -30.0), DVec2::new(159.331083452021, 0.0), DVec2::new(101.439282012209, 30.0), b],
+        weights: None,
+        knots: vec![0.0, 0.5, 1.0],
+        mults: vec![4, 1, 4],
+        degree: 3,
+        periodic: false,
+    };
+    let (c, d) = (DVec2::new(10.0, 30.0), DVec2::new(10.0, -30.0));
+    let profile = make_face_2d(&Plane::xy(), &[Segment2d::Line { a: d, b: a }, spline, Segment2d::Line { a: b, b: c }, Segment2d::Line { a: c, b: d }], &[]).unwrap();
+    let l = loft(&[circle, profile], &LoftOptions { solid: true, start: LoftEnd::Normal(1.0), squared_start_rule: true, ..Default::default() }).unwrap();
+    assert!(l.shape.is_valid());
+    assert_eq!(l.shape.faces().len(), 4);
+    let v = l.shape.volume().unwrap();
+    assert!(close(v, 257_080.0, 2e-5), "{v} vs live 257,078.4 / 257,080.9");
+}
+
 /// c2-impeller-loft's Loft (live: its ends' rims the sketches' 4 circles and 3 lines): a loft's edges on its sections
 /// keep the sections' curves, not ThruSections' B-spline copies; a square to a circle with Normal to profile, its 4
 /// lines and the circle's 4 arcs, valid.

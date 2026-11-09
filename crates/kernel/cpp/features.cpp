@@ -25,6 +25,7 @@
 #include <NCollection_HArray1.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <GeomAPI_Interpolate.hxx>
+#include <Geom2dAPI_Interpolate.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
 #include <BRepAdaptor_CompCurve.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
@@ -1494,6 +1495,316 @@ static std::vector<std::vector<double>> natural_bezier(const std::vector<std::ve
   return out;
 }
 
+// A side face of a loft: its sections as compatible rows over [u0, u1].
+struct LoftSide
+{
+  TopoDS_Face                                 face;
+  double                                      u0, u1, v0, v1;
+  std::vector<occ::handle<Geom_BSplineCurve>> rows;
+};
+
+// Live 2228 (c2-impeller-loft's Loft Gehäuse, a circle split in three arcs lofted to a line, a spline and a line):
+// Parasolid pairs the sections' points along a chain of side faces meeting smoothly by one parameter u. Each segment's
+// vertices sit at the mean of the sections' length fractions along the chain; on each segment a section's own
+// parameter is a cubic in u, at the chain's ends at its own speed and at a smooth vertex at the geometric mean of the
+// two segments' speeds there (|C'| per u, each segment's own parameter over [0, 1]). With the start rule at every u
+// (natural_loft's `steps`) ours lies within 0.3 µm of live's face. The rows are rebuilt so (false: unchanged).
+static bool pair_as_parasolid(std::vector<LoftSide>& sides, const std::vector<TopoDS_Wire>& wires, double size)
+{
+  const size_t n = wires.size(), m = sides.size();
+  if (m < 2 || n < 2)
+    return false;
+  for (const auto& sd : sides)
+    if (sd.rows.size() != n)
+      return false;
+  const double meet = 1e-6 * size;
+  // Each row's section edge, with its direction along the row.
+  struct Piece
+  {
+    BRepAdaptor_Curve c;
+    double            f = 0, l = 0;
+    bool              rev = false;
+    gp_Pnt at(double s) const { return c.Value(rev ? l - (l - f) * s : f + (l - f) * s); }
+    gp_Vec d(double s) const
+    {
+      gp_Pnt p;
+      gp_Vec v;
+      c.D1(rev ? l - (l - f) * s : f + (l - f) * s, p, v);
+      return v * (rev ? -(l - f) : (l - f));
+    }
+  };
+  std::vector<std::vector<Piece>> piece(m, std::vector<Piece>(n));
+  for (size_t s = 0; s < m; ++s)
+    for (size_t k = 0; k < n; ++k)
+    {
+      const auto&  row = sides[s].rows[k];
+      const gp_Pnt a = row->Value(sides[s].u0), b = row->Value(sides[s].u1);
+      const gp_Pnt mid = row->Value(0.5 * (sides[s].u0 + sides[s].u1));
+      bool         found = false;
+      for (TopExp_Explorer e(wires[k], TopAbs_EDGE); e.More() && !found; e.Next())
+      {
+        const TopoDS_Edge& edge = TopoDS::Edge(e.Current());
+        if (BRep_Tool::Degenerated(edge))
+          continue;
+        Piece pc{BRepAdaptor_Curve(edge)};
+        pc.f = pc.c.FirstParameter(), pc.l = pc.c.LastParameter();
+        const gp_Pnt pf = pc.c.Value(pc.f), pl = pc.c.Value(pc.l);
+        const bool   fwd = a.Distance(pf) < meet && b.Distance(pl) < meet, bwd = a.Distance(pl) < meet && b.Distance(pf) < meet;
+        if (!fwd && !bwd)
+          continue;
+        // (A closed edge either way round: by the row's direction at its start.)
+        gp_Pnt p;
+        gp_Vec t;
+        row->D1(sides[s].u0, p, t);
+        pc.rev = fwd && bwd ? t.Dot(pc.d(0)) < 0 : bwd;
+        double                        cf, cl;
+        const occ::handle<Geom_Curve> gc = BRep_Tool::Curve(edge, cf, cl);
+        if (gc.IsNull())
+          continue;
+        GeomAPI_ProjectPointOnCurve proj(mid, gc, cf, cl);
+        if (proj.NbPoints() == 0 || proj.LowerDistance() > 1e-4 * size)
+          continue;
+        piece[s][k] = pc;
+        found       = true;
+      }
+      if (!found)
+        return false;
+    }
+  // The sides in order round the sections (by section 0's points), each with its direction along the chain.
+  std::vector<size_t> order{0};
+  std::vector<bool>   dir{true}, used(m, false);
+  used[0] = true;
+  auto end_of = [&](size_t s, bool forward, bool last) {
+    const auto& sd = sides[s];
+    return sd.rows[0]->Value(forward == last ? sd.u1 : sd.u0);
+  };
+  bool closed = false;
+  while (true)
+  {
+    const gp_Pnt tip = end_of(order.back(), dir.back(), true);
+    bool         next = false;
+    for (size_t t = 0; t < m && !next; ++t)
+    {
+      if (used[t])
+        continue;
+      for (bool f : {true, false})
+        if (end_of(t, f, false).Distance(tip) < meet)
+        {
+          order.push_back(t), dir.push_back(f), used[t] = true, next = true;
+          break;
+        }
+    }
+    if (!next)
+    {
+      closed = tip.Distance(end_of(order.front(), dir.front(), false)) < meet;
+      break;
+    }
+  }
+  // An open run of sides found from the middle: start again from its first.
+  if (!closed)
+  {
+    while (true)
+    {
+      const gp_Pnt tip = end_of(order.front(), dir.front(), false);
+      bool         prev = false;
+      for (size_t t = 0; t < m && !prev; ++t)
+      {
+        if (used[t])
+          continue;
+        for (bool f : {true, false})
+          if (end_of(t, f, true).Distance(tip) < meet)
+          {
+            order.insert(order.begin(), t), dir.insert(dir.begin(), f), used[t] = true, prev = true;
+            break;
+          }
+      }
+      if (!prev)
+        break;
+    }
+  }
+  if (order.size() != m)
+    return false;
+  // A piece along the chain: s in [0, 1] from the chain's side.
+  auto along = [&](size_t i, size_t k) {
+    Piece p = piece[order[i]][k];
+    if (!dir[i])
+      p.rev = !p.rev;
+    return p;
+  };
+  // Smooth where every section is: chains break at any section's corner.
+  auto smooth = [&](size_t i, size_t j) {
+    for (size_t k = 0; k < n; ++k)
+    {
+      const gp_Vec a = along(i, k).d(1), b = along(j, k).d(0);
+      if (a.Magnitude() < 1e-12 || b.Magnitude() < 1e-12 || !a.IsParallel(b, 1e-6) || a.Dot(b) < 0)
+        return false;
+    }
+    return true;
+  };
+  std::vector<std::vector<size_t>> chains;
+  size_t                           first = 0;
+  bool                             loop  = false;
+  if (closed)
+  {
+    // Start the chains after a corner, if there is one.
+    first = m;
+    for (size_t i = 0; i < m && first == m; ++i)
+      if (!smooth((i + m - 1) % m, i))
+        first = i;
+    loop = first == m;
+    if (loop)
+      first = 0;
+  }
+  for (size_t c = 0; c < m; ++c)
+  {
+    const size_t i = (first + c) % m;
+    if (c == 0 || !smooth((i + m - 1) % m, i))
+      chains.emplace_back();
+    chains.back().push_back(i);
+  }
+  // All or nothing: the new rows by side.
+  std::vector<std::pair<size_t, std::vector<occ::handle<Geom_BSplineCurve>>>> fresh_rows;
+  for (const auto& chain : chains)
+  {
+    const size_t q = chain.size();
+    // A lone segment: its own parameters already; rebuilt from the edges' curves where one is curved (ThruSections'
+    // approximations of an arc came out degree 6 or 9 by how the sketch drew it, and the impeller's degree 6 one
+    // failed its Shell; live's is cubic).
+    bool curved = false;
+    for (size_t k = 0; k < n && q == 1; ++k)
+      curved = curved || piece[order[chain[0]]][k].c.GetType() != GeomAbs_Line;
+    if (q < 2 && !curved)
+      continue;
+    const bool wrap = loop && chains.size() == 1;
+    // Vertices at the mean length fraction.
+    std::vector<double> U(q + 1, 0.0);
+    for (size_t k = 0; k < n; ++k)
+    {
+      std::vector<double> len(q);
+      double              total = 0;
+      for (size_t c = 0; c < q; ++c)
+      {
+        const Piece& p = piece[order[chain[c]]][k];
+        len[c] = GCPnts_AbscissaPoint::Length(p.c, p.f, p.l, 1e-9 * size);
+        total += len[c];
+      }
+      if (!(total > 0))
+        return false;
+      double run = 0;
+      for (size_t c = 0; c < q; ++c)
+        U[c + 1] += (run += len[c]) / total / n;
+    }
+    U[q] = 1;
+    std::vector<double> h(q);
+    for (size_t c = 0; c < q; ++c)
+      if (!((h[c] = U[c + 1] - U[c]) > 0))
+        return false;
+    for (size_t c = 0; c < q; ++c)
+    {
+      const size_t i    = chain[c];
+      const LoftSide& sd = sides[order[i]];
+      // Each section's piece and its own parameter's slopes at the segment's ends: 1 at the chain's open ends, else
+      // the mean speed's.
+      std::vector<Piece>                     pieces;
+      std::vector<std::pair<double, double>> slopes;
+      for (size_t k = 0; k < n; ++k)
+      {
+        const Piece  p  = along(i, k);
+        const double es = p.d(0).Magnitude() / h[c], ee = p.d(1).Magnitude() / h[c];
+        double       a = 1, b = 1;
+        if (c > 0 || wrap)
+        {
+          const size_t pc = c > 0 ? c - 1 : q - 1;
+          a = std::sqrt(along(chain[pc], k).d(1).Magnitude() / h[pc] / es);
+        }
+        if (c + 1 < q || wrap)
+        {
+          const size_t nc = c + 1 < q ? c + 1 : 0;
+          b = std::sqrt(along(chain[nc], k).d(0).Magnitude() / h[nc] / ee);
+        }
+        if (!(a > 0 && a <= 3 && b > 0 && b <= 3))
+          return false;
+        pieces.push_back(p);
+        slopes.emplace_back(a, b);
+      }
+      // Section k's point at x along the chain, and its derivative in x.
+      auto tau = [&](size_t k, double x) {
+        const auto [a, b] = slopes[k];
+        return (-2 * x + 3) * x * x + a * x * (1 - x) * (1 - x) + b * x * x * (x - 1);
+      };
+      auto exact = [&](size_t k, double x) { return pieces[k].at(tau(k, x)); };
+      auto slope = [&](size_t k, double x) {
+        const auto [a, b] = slopes[k];
+        return pieces[k].d(tau(k, x)) * (6 * x * (1 - x) + a * (1 - x) * (1 - 3 * x) + b * x * (3 * x - 2));
+      };
+      // In the face's own direction and parameter: every row interpolated (C2 cubic: the Shell's offsets took C1
+      // or higher-degree fits badly) at common points, those between which a row strays over 1e-7 of the size halved.
+      const double                                span = sd.u1 - sd.u0;
+      auto                                        u_of = [&](double x) { return dir[i] ? sd.u0 + span * x : sd.u1 - span * x; };
+      std::vector<double>                         xs;
+      std::vector<occ::handle<Geom_BSplineCurve>> fresh;
+      for (int j = 0; j <= 16; ++j)
+        xs.push_back(j / 16.0);
+      while (fresh.empty())
+      {
+        if (xs.size() > 1000)
+          return false;
+        // The points in the face's u order.
+        std::vector<double> in_u = xs;
+        if (!dir[i])
+        {
+          std::reverse(in_u.begin(), in_u.end());
+          for (auto& x : in_u)
+            x = 1 - x;
+        }
+        const int                                np     = (int)in_u.size();
+        occ::handle<NCollection_HArray1<double>> params = new NCollection_HArray1<double>(1, np);
+        for (int j = 0; j < np; ++j)
+          params->SetValue(j + 1, sd.u0 + span * in_u[(size_t)j]);
+        std::vector<bool> split(xs.size() - 1, false);
+        for (size_t k = 0; k < n; ++k)
+        {
+          occ::handle<NCollection_HArray1<gp_Pnt>> P = new NCollection_HArray1<gp_Pnt>(1, np);
+          for (int j = 0; j < np; ++j)
+            P->SetValue(j + 1, exact(k, dir[i] ? in_u[(size_t)j] : 1 - in_u[(size_t)j]));
+          gp_Vec t0 = slope(k, dir[i] ? 0.0 : 1.0) / span, t1 = slope(k, dir[i] ? 1.0 : 0.0) / span;
+          if (!dir[i])
+            t0.Reverse(), t1.Reverse();
+          GeomAPI_Interpolate gi(P, params, false, 1e-12);
+          gi.Load(t0, t1, false);
+          gi.Perform();
+          if (!gi.IsDone())
+            return false;
+          for (size_t j = 0; j + 1 < xs.size(); ++j)
+          {
+            const double x = 0.5 * (xs[j] + xs[j + 1]);
+            split[j] = split[j] || gi.Curve()->Value(u_of(x)).Distance(exact(k, x)) > 1e-7 * size;
+          }
+          fresh.push_back(gi.Curve());
+        }
+        if (std::find(split.begin(), split.end(), true) == split.end())
+          break;
+        fresh.clear();
+        std::vector<double> more;
+        for (size_t j = 0; j + 1 < xs.size(); ++j)
+        {
+          more.push_back(xs[j]);
+          if (split[j])
+            more.push_back(0.5 * (xs[j] + xs[j + 1]));
+        }
+        more.push_back(1.0);
+        xs = more;
+      }
+      if (std::getenv("NOSHAPE_LOFT_DEBUG"))
+        std::fprintf(stderr, "pair_as_parasolid: side %zu, %d poles\n", order[i], fresh[0]->NbPoles());
+      fresh_rows.emplace_back(order[i], fresh);
+    }
+  }
+  for (auto& [i, rows] : fresh_rows)
+    sides[i].rows = rows;
+  return !fresh_rows.empty();
+}
+
 // Lofts through three or more sections: Parasolid interpolates between the
 // sections with a natural cubic spline at chord-length parameters (Onshape G10: Ø20 → square 12 → Ø20,
 // 6125.607 mm³), OCCT with one polynomial (a parabola through three,
@@ -1565,12 +1876,7 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
   // Each side face's sections as compatible rows (first pass), then one set of chord-length parameters for all of
   // them (second pass): parameters per face made the columns of neighbouring faces differ, so a rounded section's
   // line and arc faces met in different curves (gaps, and no tangency for a Shell's offset).
-  struct Side
-  {
-    TopoDS_Face                                 face;
-    double                                      u0, u1, v0, v1;
-    std::vector<occ::handle<Geom_BSplineCurve>> rows;
-  };
+  using Side = LoftSide;
   std::vector<Side> sides;
   for (TopExp_Explorer ex(loft, TopAbs_FACE); ex.More(); ex.Next())
   {
@@ -1638,6 +1944,8 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
         r->IncreaseDegree(3);
     sides.push_back({f, u0, u1, v0, v1, rows});
   }
+  // Rows retimed: the section edges' pcurves follow (below).
+  const bool retimed = !std::getenv("NOSHAPE_LOFT_OWN_PAIRING") && pair_as_parasolid(sides, wires, size);
   // Chord-length parameters: the mean distance between neighbouring
   // sections (live L2: square 40 -> Ø40 -> square 20 turned 45°, 45412.22
   // in Onshape's band; uniform ones give 45554), over every side face.
@@ -1787,6 +2095,30 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
     // Column by column: (x, y, z) or homogeneous (w x, w y, w z, w) with equal weights.
     const int  nu = rows[0]->NbPoles();
     const bool homogeneous = rows[0]->IsRational();
+    // The rule along the face: 0.9 (c·n) + 0.1 |c| of the chord c between the sections at each u (live 2228's face to
+    // 1e-5 at every u, not only at its poles), as the poles of a curve on the rows' knots through it at their Greville
+    // parameters. Rational rows: the rule's value per pole.
+    auto steps = [&](int a, int b, const gp_Vec& nrm) {
+      std::vector<double> f((size_t)nu);
+      for (int j = 1; j <= nu; ++j)
+      {
+        const gp_Vec on(rows[a]->Value(greville(j)), rows[b]->Value(greville(j)));
+        const double along = std::abs(on.Dot(nrm)), len = on.Magnitude();
+        f[(size_t)j - 1] = ends.squared_rule && len > 0 ? (0.9 * along * along + 0.1 * len * len) / len : 0.9 * along + 0.1 * len;
+      }
+      if (homogeneous || std::getenv("NOSHAPE_LOFT_STEP_PER_POLE"))
+        return f;
+      NCollection_Array1<double> g(1, nu);
+      NCollection_Array1<int>    contact(1, nu);
+      for (int j = 1; j <= nu; ++j)
+        g(j) = greville(j), contact(j) = 0;
+      std::vector<double> poles = f;
+      int                 bad   = 0;
+      BSplCLib::Interpolate(deg, flat, g, contact, 1, poles[0], bad);
+      return bad ? f : poles;
+    };
+    const std::vector<double> step0 = ends.start == 1 ? steps(0, 1, n0) : std::vector<double>();
+    const std::vector<double> step1 = ends.end == 1 ? steps(n - 1, n - 2, n1) : std::vector<double>();
     std::vector<double> t(n);
     for (int k = 0; k < n; ++k)
       t[k] = v0 + (v1 - v0) * (len[n - 1] > 0 ? len[k] / len[n - 1] : double(k) / (n - 1));
@@ -1817,9 +2149,7 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
           // Live's per pole column (2276 (G): a circle lofted to one on a perpendicular plane, the start step changing
           // round it): 0.9 (c·n) + 0.1 |c| for the chord c between the sections' points at the pole's Greville
           // parameter (a rational circle's poles sit off it).
-          const gp_Vec on(rows[a]->Value(greville(j)), rows[b]->Value(greville(j)));
-          const double along = std::abs(on.Dot(nrm)), len = on.Magnitude();
-          v = nrm * (mag * (ends.squared_rule && len > 0 ? (0.9 * along * along + 0.1 * len * len) / len : 0.9 * along + 0.1 * len));
+          v = nrm * (mag * (a == 0 ? step0 : step1)[(size_t)j - 1]);
         }
         else if (kind == 1)
           v = nrm * (mag * (r0 + (r1 - r0) * step(j)));
@@ -1901,6 +2231,33 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
       double      pf, pl;
       e.Orientation(TopAbs_FORWARD);
       PCurve p{e, u.face, BRep_Tool::CurveOnSurface(e, u.face, pf, pl), {}};
+      // Retimed rows: a section edge (v = const) at the u where the new surface's row meets each of its points.
+      occ::handle<Geom2d_Line> line = occ::down_cast<Geom2d_Line>(p.forward);
+      if (retimed && !line.IsNull() && std::abs(line->Direction().Y()) < 1e-12 && !BRep_Tool::IsClosed(e, u.face))
+      {
+        const occ::handle<Geom_Curve> row = u.surface->VIso(line->Location().Y());
+        double                        cf, cl;
+        const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, cf, cl);
+        const int                     m  = 32;
+        occ::handle<NCollection_HArray1<gp_Pnt2d>> pts = new NCollection_HArray1<gp_Pnt2d>(1, m + 1);
+        occ::handle<NCollection_HArray1<double>>   ts  = new NCollection_HArray1<double>(1, m + 1);
+        bool                                       ok  = !c3.IsNull();
+        for (int j = 0; j <= m && ok; ++j)
+        {
+          const double                t = pf + (pl - pf) * j / m;
+          GeomAPI_ProjectPointOnCurve on(c3->Value(t), row);
+          ok = on.NbPoints() > 0 && on.LowerDistance() < 1e-4 * size;
+          if (ok)
+            ts->SetValue(j + 1, t), pts->SetValue(j + 1, gp_Pnt2d(on.LowerDistanceParameter(), line->Location().Y()));
+        }
+        if (ok)
+        {
+          Geom2dAPI_Interpolate gi(pts, ts, false, 1e-12);
+          gi.Perform();
+          if (gi.IsDone())
+            p.forward = gi.Curve();
+        }
+      }
       if (BRep_Tool::IsClosed(e, u.face))
         p.reversed = BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Reversed()), u.face, pf, pl);
       pcurves.push_back(p);

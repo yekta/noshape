@@ -33,6 +33,43 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-09 06:30 UTC: the impeller's Loft Gehäuse as live (landing); 62a7e4bc landed.**
+- Suite ranking in core's area (suite-ease.log, 763/951): impeller 38 lost at Loft Gehäuse (+0.076 % volume); the
+  knife (Fillet 2), the fan blade (Chamfer 2), rings-loft (Chamfer 1's area) wait on blend; Surface Pattern 3 is
+  bool's cut; text indent / louver skasm's; the spring parked.
+- Live's massproperties of that very state (q2228/mass-11.json): 257,080.9 mm³, band 256,688.7-257,473.2 (±0.15 %),
+  area band 25,428-25,497; ours 257,272.8 / 25,456.9 sit inside, but the suite's live.jsonl has no band for index 10.
+  Probe: a copy with that band (vibe5 ~/core-cases/imp-band) to see what fails next; the band itself is the lead's call.
+- Per face (ours vs live bodydetails): the side B-spline JJG 15,101.59 vs 15,106.36 mm² (-0.03 %: the real shape
+  difference), the planar caps within live's own 1e-5 (circle cap 3318.307 = π 32.5², live 3318.349).
+- Live's pairing rule, read off q2228's face #74 (/root/core-scratch/imp/live74*.py, speeds.py, seg2.py): along a
+  chain of smooth segments, vertex u = mean of the sections' length fractions; per segment the section's own
+  parameter is a cubic Hermite in u; speed (|C'| per u, own parameter over [0, 1]) at the chain's ends the segment's
+  own, at a smooth vertex the geometric mean of the two segments' (circle 152.50, profile 252.28 / 263.16: exact).
+  Ours paired each segment by its own parameter (the line ~2 % of a segment off). Worktree: features.cpp
+  `pair_as_parasolid` in natural_loft (rows rebuilt from the edges' curves, 24 points interpolated with exact end
+  tangents; NOSHAPE_LOFT_OWN_PAIRING=1 the old way). Impeller Loft Gehäuse 257,272.8 -> 257,048.9 mm³ (live
+  257,078.4), area 25,456.9 -> 25,460.1 (live 25,461.8); the side face within 1.5 µm of live's #74 outside the
+  spline's segment (was up to 272 µm), up to 14 µm on it (cmp.py: STEP of ours vs live's).
+- Live's start derivative is the (squared) rule at every u, continuously (colrule.py: 1e-5 everywhere; per pole
+  column at Greville only 5e-3): `steps` in natural_loft now interpolates the rule at the Greville points on the
+  rows' knots (BSplCLib::Interpolate) for polynomial rows (NOSHAPE_LOFT_STEP_PER_POLE=1 the old way). With both:
+  257,077.58 mm³ (live 257,078.4 / 257,080.9), area -2.7e-6, face within 0.3 µm of live's everywhere. Suite (same
+  build, both env off = base): only the impeller changes; 10/48 still (the harness's 1e-6, no band in live.jsonl).
+- Shell Gehäuse failed on our loft (2.75 s), live's shells (T1 an_impeller_lofts_shell_as_live). The cause: our
+  inlet face (one segment) kept ThruSections' degree-6 rows. Now every chain with a curved piece is rebuilt from the
+  edges' curves (C2 cubic interpolation at common points, intervals halved where a row strays over 1e-7 of the size:
+  35/45/35/19 poles; C1 cubic or degree-7 fits made the Shell fail), and the section edges' pcurves are re-projected
+  onto the new rows (edge tolerance 9e-6, was 7.8e-4). With live's band (vibe5 ~/core-cases/imp-band) the impeller
+  goes 11/48: Shell Gehäuse 45,279.2 mm³ (live 45,272.9, +1.4e-4, as on live's own loft in T1) but its box reaches
+  z 6.21 (live 0): next, the quadrics Shell's (bool's?) to check.
+- Suite (base = same build, both env off): 763/951 either way, only the impeller changes (Loft Gehäuse -3e-6); its
+  time 9.5 -> 25.7 s because the features after the Shell now build instead of failing (Delete face 2 4.7 s, Extrude 1
+  2.2 s, ...). Kernel 350, model 422 pass; g++-13 clean. Assembly suite (asm-pair.log vs asm-keep.log of 01:00):
+  1262 / 191 (was 1264 / 167; main moved since); worse only asm-robot-relations / asm-scissor-lift, neither has a loft.
+- For the lead: live.jsonl index 10 has no band (live's two measurements of that state differ by 1e-5); with the
+  band from q2228/mass-11.json the impeller scores 11.
+
 **State 11-09 03:17 UTC: c2-hunting-knife's Loft 3 as live (landing); the keep mark landed (d00d91d6).**
 - Live 2291's Loft 3 face (4 x 26 poles) is exactly a Coons patch with the cubic Hermite 1 - 3u² + 2u³ across the
   guides and linear between the profiles, on its boundaries in their own parameters (0.00 µm; /root/core-scratch/
