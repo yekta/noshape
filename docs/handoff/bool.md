@@ -48,6 +48,28 @@ scratch /root/bool-scratch.
   tests 352/352, model and ops Shell tests pass, suite unchanged but for main's own moves, g++-13 builds. The scroll
   wall's offset still doesn't convert (GeomConvert error 0.2885 at 1e-7). The box (6.21 mm) is the query's: core
   (core.md 14:30).
+- **In progress (21:10 UTC, lead: option 2 not now; the speed cases closest to flipping, cheapest first):** documents
+  at x1-2 of live, single runs on idle vibe4 with the kernel profile (/root/bool-scratch/flip4, flip-tot.py; Boolean =
+  op_boolean + op_unify): stef-radijator-nlukic x1.03 gap 2 ms, Boolean 18 ms; pipeflange-steven x1.06 gap 12, B 58;
+  exercise-martinl x1.09 gap 7, B 26; cf-box-dovetail-joint x1.09 gap 33, B 157; c2-hex-bookcase-derived x1.14 gap 42,
+  B 186; cf-butt-joint-with-pin x1.14 gap 27, B 33 (offset faces 67); cf-sheet-metal-model-plus x1.25 gap 230, B 300,
+  Shell 47. Not flippable by Boolean/Shell: bracket03 (fillet/chamfer), part-draft (defeature/draft), hunting-knife
+  (chamfer/fillets), sm-louver (gap 3.8 s, B 0.85 s), sm-corner-break (gap 1.75 s, B 1.4-1.7 s), bottle-split (Shell 28
+  of gap 45). Corpora vibe4 ~/agents/bool-corpora/f1109-<doc> (replays /root/bool-scratch/flip-rec.log):
+  - stef-radijator: both Booleans ours (2.7 + 8 ms); pipeflange: all ours, a 25-face cut 16 ms and a 34-face 4-tool
+    cut 31 ms (49% of our time in `intervals_on`: numeric intersections with free-form boundaries, piece boxes);
+    martinl: one OCCT "a non-manifold result" 14.8 ms.
+  - hex-bookcase: "cut in half" d1f02bed OCCT 91 ms (live's feature 22 ms) declines on a 0.0054 mm2 sliver of the text
+    cut (core's glyph-prism µm faces, skasm.md 14:33; noted there 20:40): fixed there, likely ours; a7e821c7 27 ms
+    shares edges.
+  - box-dovetail: 8 cases "arguments share vertices" (OCCT ~127 ms): with the check off ours takes all 24, 0 differ,
+    ~25 ms (the flip: ~394 -> ~280 ms, live 360). But off for all, the corpora differ 10-13 cases each (gate
+    shared1): one-tool fuses sharing edges and faces, OCCT Kept / ours Modified (50 records in corpus2 1b2319a3):
+    `Origin::Same` needs one input per output entity and a shared shape comes in once per argument. Declining only
+    shared edges passes the gate (shared2: corpora + parity56 0 differ, taken as refine1; kg, kt, shfall as before)
+    but every dovetail and hex case shares edges: no gain, not landed. The fix would be an input to brep's Boolean
+    naming the entities of different arguments that are one shape (counted as one origin: Same, so Kept): asked of
+    the lead.
 - **Landed (19:55 UTC, lead: Boolean 1 is mine; bound the touching check; then measure option 2 on vibe3): the
   impeller's Boolean 1 took 4.56 s (live 79 ms).** 4.35 s was basic.rs's touching check (BRepExtrema MINMAX over
   whole parts; two face pairs, Part 1's plane face 5 and Offset face 11 against the block, 1.9-3.3 s each), run because

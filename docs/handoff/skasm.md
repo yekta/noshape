@@ -13,6 +13,11 @@
   per TrueType segment, no merging). So the µm pieces come from the sketch regions / profile faces (stencil pieces
   touching?). Next: list the text sketch's region loops and the profile edges per glyph (probe:
   /root/core-scratch/imp/features-with-hb-probe.rs `probe_boolean_faces`).
+- From bool (11-09 20:40 UTC): the same 0.0054 mm2 piece (object face 20, an extrusion 8 um wide at x 7.37-7.57,
+  y 66.04-66.05, poking 52 um above the top face) makes noshape's Boolean decline "cut in half" ("a piece's point on
+  another solid's face": its point is 21 um under the tool's coincident top face), so OCCT runs it in 91 ms (live's
+  feature 22 ms). Without the µm pieces that cut likely takes our path (~5-10 ms), and the document (ours 332 ms,
+  live 290 on vibe4) would come under live: a speed flip too.
 
 ## From psui (2026-11-09 10:12 UTC, lead: sketch-* is psui's while skasm is paused)
 - Part Studio and sketch ui-parity (574 recorded, all prefixes but drw / asm / doc / docs / ver / vs / fs / prefs):
