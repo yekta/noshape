@@ -8241,27 +8241,6 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
   for (const TopoDS_Shape& f : removed)
     removed_set.Add(f);
   const bool offset_ok = gap > 1e-5 && !collapses && !low_strip(solid.shape, removed_set, thickness);
-  // Free-form faces meeting at sharp edges (a twisted hexagon vase's sides): OCCT's offset spends seconds intersecting
-  // their offsets (2.6-3 s of 3.7 on the vase, 2 mm), the direct construction builds the same wall in 1.4-2.4 s and
-  // nearer live's (live 1769: 47868.377 / OCCT 47868.366 / live 47868.386 mm³): it goes first there.
-  bool sharp_freeform = false;
-  {
-    ShapeAncMap ef;
-    TopExp::MapShapesAndUniqueAncestors(solid.shape, TopAbs_EDGE, TopAbs_FACE, ef);
-    auto freeform = [](const TopoDS_Shape& f) {
-      const GeomAbs_SurfaceType k = BRepAdaptor_Surface(TopoDS::Face(f)).GetType();
-      return k == GeomAbs_BSplineSurface || k == GeomAbs_BezierSurface || k == GeomAbs_OffsetSurface || k == GeomAbs_OtherSurface;
-    };
-    for (int i = 1; i <= ef.Extent() && !sharp_freeform; ++i)
-    {
-      const ShapeList& fl = ef(i);
-      if (fl.Extent() != 2 || fl.First().IsSame(fl.Last()) || !freeform(fl.First()) || !freeform(fl.Last()))
-        continue;
-      BRepAdaptor_Curve c(TopoDS::Edge(ef.FindKey(i)));
-      const gp_Pnt      m = c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
-      sharp_freeform    = normal_at(TopoDS::Face(fl.First()), m).Angle(normal_at(TopoDS::Face(fl.Last()), m)) > 1e-3;
-    }
-  }
   Built      b;
   t_shell_path = "";
   // method: 0 = automatic, 1 = offset only, 2 = slabs only, 3 = planes only, 4 = quadrics only (tests).
@@ -8283,7 +8262,11 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
   const bool done = (method == 0 && removed.empty() && !outward && timed("inversion", [&] { return by_inversion(solid.shape, thickness, b); })) ||
                     (method == 0 && timed("regions", [&] { return by_regions(solid.shape, removed, thickness, sign, b); })) ||
                     (method == 0 && !std::getenv("NOSHAPE_SHELL_NO_SMOOTH") && timed("smooth", [&] { return by_smooth(solid.shape, removed, thickness, sign, b); })) ||
-                    (method == 0 && sharp_freeform && !std::getenv("NOSHAPE_SHELL_NO_QUADRICS") && timed("quadrics", [&] { return quadrics_tried = true, by_quadrics(solid.shape, removed, thickness, sign, b); })) ||
+                    // (The direct construction before OCCT's offset: where both build, the same walls quicker (the model
+                    // suite on a quiet host: cf-snap-hook 81 ms against 745, c2-bottle-split 19 / 48, cf-part-draft 8 / 17;
+                    // free-form sharp edges, a twisted hexagon vase, 1.4-2.4 s against 3.7); where it can't, it says so in
+                    // 0-7 ms.)
+                    (method == 0 && !std::getenv("NOSHAPE_SHELL_NO_QUADRICS") && timed("quadrics", [&] { return quadrics_tried = true, by_quadrics(solid.shape, removed, thickness, sign, b); })) ||
                     ((method == 0 || method == 1) && (offset_ok || method == 1) && timed("offset", [&] { return by_offset(solid.shape, removed, thickness, sign, b); })) ||
                     ((method == 0 || method == 3) && !std::getenv("NOSHAPE_SHELL_NO_PLANES") && timed("planes", [&] {
                        const bool ok = by_planes(solid.shape, removed, thickness, sign, b);
