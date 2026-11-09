@@ -121,7 +121,11 @@ impl VariableStudioView {
                 let (kind, default, rows, shown) = match &i.kind {
                     K::List { options, default } => {
                         let name = |id: &str| options.iter().find(|o| o.id == id).map(|o| o.name.clone());
-                        ("list", serde_json::json!(name(default)), options.iter().map(|o| o.name.clone()).collect(), serde_json::json!(shown.as_deref().and_then(name)))
+                        let mut rows: Vec<String> = options.iter().map(|o| o.name.clone()).collect();
+                        // The italic add row being typed in reads as a row (live vs-cfg-list-rows: its text is drawn there).
+                        let typed = self.cfg_cell.as_ref().filter(|e| e.key == format!("add-{}", i.id)).map(|e| e.input.read(cx).value().to_string());
+                        rows.extend(typed.filter(|t| !t.is_empty()));
+                        ("list", serde_json::json!(name(default)), rows, serde_json::json!(shown.as_deref().and_then(name)))
                     }
                     K::Checkbox { default } => ("checkbox", serde_json::json!(default), Vec::new(), serde_json::json!(shown.map(|v| v == "true"))),
                     K::Variable { default, .. } => ("variable", serde_json::json!(default.text), Vec::new(), serde_json::json!(shown)),
@@ -196,9 +200,12 @@ impl VariableStudioView {
         }
     }
 
+    /// An edit of the studio; made in a Part Studio's or Assembly's panel, Undo takes it back there (live
+    /// vs-ps-inserted-edit).
     fn edit(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut VariableStudio)) {
+        let origin = self.host.unwrap_or(self.tab);
         self.doc.update(cx, |doc, cx| {
-            doc.edit_tab(self.tab, desc, cx, |c| {
+            doc.edit_tab_in(self.tab, origin, desc, cx, |c| {
                 if let TabContent::VariableStudio(v) = c {
                     f(v)
                 }
@@ -441,6 +448,22 @@ fn kind_label(k: VarKind) -> &'static str {
     }
 }
 
+/// A length or angle literal with more decimals than the workspace's precision, rounded to it with its unit kept
+/// (live vs-value-decimals: "1.23456 mm" shows "1.235 mm", the typed text its tooltip).
+fn rounded_literal(text: &str, units: &noshape_units::UnitPrefs) -> Option<String> {
+    let t = text.trim();
+    let n = t.find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-' || c == '+')).unwrap_or(t.len());
+    let (number, rest) = t.split_at(n);
+    let decimals = number.split_once('.').map_or(0, |(_, d)| d.len());
+    let precision = match rest.trim() {
+        "mm" | "cm" | "m" | "in" | "ft" | "yd" | "µm" | "um" => units.length_precision,
+        "deg" | "rad" => units.angle_precision,
+        _ => return None,
+    } as usize;
+    let value: f64 = number.parse().ok()?;
+    (decimals > precision).then(|| format!("{value:.precision$}{rest}"))
+}
+
 fn is_expression(text: &str) -> bool {
     let t = text.trim();
     t.contains('#') || t.trim_start_matches(['-', '+']).contains(['+', '-', '*', '/', '(', '^'])
@@ -532,7 +555,7 @@ impl VariableStudioView {
         self.edit("Delete variable", cx, |s| noshape_ops::variable_studio::delete_variable(s, i))
     }
 
-    /// The more menu's Rename: edit the studio's name in its title row.
+    /// The more menu's Rename or a click on the title: edit the studio's name in its title row.
     fn start_rename(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
@@ -815,6 +838,7 @@ impl Render for VariableStudioView {
                 let unit = expression_unit(&studio, &v.expr.text, 0).unwrap_or(units.length);
                 noshape_units::format_quantity(q, &noshape_units::UnitPrefs { length: unit, ..units })
             });
+            let shown = shown.or_else(|| (!editing).then(|| rounded_literal(&v.expr.text, &units)).flatten());
             if crate::ui_script::active() {
                 // A cell being typed in shows what's typed (live vs-edit-value: "50" before Enter).
                 let value = if editing { expr.read(cx).value().to_string() } else { shown.clone().unwrap_or_else(|| noshape_units::localize(&v.expr.text)) };
@@ -885,6 +909,14 @@ impl Render for VariableStudioView {
                                     cx.notify();
                                 }))
                                 .capture_action(cx.listener(|this, _: &Enter, window, cx| {
+                                    // An entry that changes nothing ("1.23456 mm" with mm highlighted): Enter commits
+                                    // (live vs-value-decimals); so does the Enter an insertion sends after itself.
+                                    let Some(c) = this.completion.as_ref() else { return };
+                                    let text = this.inputs.get(&c.key).map(|(st, _)| st.read(cx).value().to_string()).unwrap_or_default();
+                                    if !c.enter_inserts(&text) {
+                                        this.set_completion(None);
+                                        return;
+                                    }
                                     cx.stop_propagation();
                                     this.accept_completion(None, true, window, cx);
                                 }))
@@ -1081,10 +1113,10 @@ impl Render for VariableStudioView {
                     .child(
                         h_flex()
                             .id("vs-collapse")
-                            .map(|d| crate::ui_script::mark(d, || collapse_mark))
                             .gap(px(3.))
                             .cursor_pointer()
-                            .child(crate::os_ui::glyph(if collapsed { crate::os_ui::GLYPH_COLLAPSED } else { crate::os_ui::GLYPH_EXPANDED }, 10., pal.text))
+                            // The fold glyph (the title beside it is its name's field).
+                            .child(div().map(|d| crate::ui_script::mark(d, || collapse_mark)).child(crate::os_ui::glyph(if collapsed { crate::os_ui::GLYPH_COLLAPSED } else { crate::os_ui::GLYPH_EXPANDED }, 10., pal.text)))
                             // An inserted studio's title starts with the studio icon (live
                             // part-studio/160); one there only through "Insert into all…" with
                             // the automatic-reference icon (live dom assembly-panel-variable-table).
@@ -1106,7 +1138,20 @@ impl Render for VariableStudioView {
                                         }
                                     }))
                                     .child(Input::new(st).h(px(26.)).appearance(false).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).pl(px(3.))).into_any_element(),
-                                None => div().map(|d| crate::ui_script::mark(d, || format!("table_title:{title}"))).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(title)).into_any_element(),
+                                // The title is its name's field: a click edits it (live vs-table-title-rename, vs-ps-inserted-drag).
+                                None => div()
+                                    .id("vs-title")
+                                    .map(|d| crate::ui_script::mark(d, || format!("table_title:{title}")))
+                                    .text_size(px(16.))
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(pal.text)
+                                    .cursor_text()
+                                    .child(crate::ui::user_text(title))
+                                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                        cx.stop_propagation();
+                                        this.start_rename(window, cx);
+                                    }))
+                                    .into_any_element(),
                             })
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.collapsed = !this.collapsed;
@@ -1117,6 +1162,7 @@ impl Render for VariableStudioView {
                     .child(
                         Button::new("vs-more")
                             .map(|d| crate::ui_script::mark(d, || menu_mark))
+                            .when(in_panel, |d| crate::ui_script::mark_first(d, || "panel_more:Variable table".into()))
                             .custom(plain)
                             .w(px(25.))
                             .h(px(22.))
@@ -1144,9 +1190,12 @@ impl Render for VariableStudioView {
                                         let m = m.item(crate::os_menu::OsMenuItem::new(format!("Switch to {name}")).on_click(move |_, window, cx| crate::actions::request_activate_tab(me, window, cx)));
                                         let m = if k > 0 { m.item(item("Move up").on_click(move |_, _, cx| crate::variable_insert::move_ref(&d1, target, me, false, cx))) } else { m };
                                         let m = if k + 1 < n { m.item(item("Move down").on_click(move |_, _, cx| crate::variable_insert::move_ref(&d2, target, me, true, cx))) } else { m };
-                                        m.item(collapse)
-                                            .item(item("Edit reference…").on_click(move |_, window, cx| crate::variable_insert::open_update(d4.clone(), target, me, window, cx)))
-                                            .item(item("Remove reference").on_click(move |_, _, cx| crate::variable_insert::set_ref(&d3, target, me, None, cx)))
+                                        // One there only through "Insert into all…" has no reference to edit or remove
+                                        // (live vs-ps-own-table-menu).
+                                        m.item(collapse).when(!auto_ref, |m| {
+                                            m.item(item("Edit reference…").on_click(move |_, window, cx| crate::variable_insert::open_update(d4.clone(), target, me, window, cx)))
+                                                .item(item("Remove reference").on_click(move |_, _, cx| crate::variable_insert::set_ref(&d3, target, me, None, cx)))
+                                        })
                                     }
                                     // Own table: only with inserted tables to collapse
                                     // (live document/15 vs 49).

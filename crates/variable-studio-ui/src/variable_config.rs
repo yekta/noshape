@@ -27,8 +27,8 @@ pub(super) const CONFIGURED: u32 = 0xfab601;
 
 /// A configuration table cell being typed in.
 pub(super) struct CfgEdit {
-    key: String,
-    input: Entity<InputState>,
+    pub(super) key: String,
+    pub(super) input: Entity<InputState>,
     _sub: Subscription,
 }
 
@@ -67,14 +67,18 @@ pub(super) fn cell_menu(m: crate::os_menu::OsMenu, view: Entity<VariableStudioVi
         }));
     }
     let what = if field == VsField::Value { "Value" } else { "Description" };
+    // Set to #<variable> shows no toast (live vs-cfg-set-to-cv).
     let item = |label: String, input: &ConfigInput| {
         let (view, variable, current, id, input_name) = (view.clone(), variable.clone(), current.clone(), input.id.clone(), input.name.clone());
+        let toast = !matches!(input.kind, ConfigInputKind::Variable { .. });
         OsMenuItem::new(label).on_click(move |_, _, cx| {
-            let toast = format!("#{variable} = {current} {what} added to {input_name}");
+            let message = format!("#{variable} = {current} {what} added to {input_name}");
             view.update(cx, |t, cx| {
                 t.edit(vsc::CONFIGURE, cx, |s| s.configuration.configure(&id, &variable, field, &current));
                 t.config_open = true;
-                t.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(toast)));
+                if toast {
+                    t.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(message)));
+                }
             })
         })
     };
@@ -222,10 +226,15 @@ impl VariableStudioView {
             s.select_all(window, cx);
         });
         let k = key.clone();
-        let sub = cx.subscribe_in(&input, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
+        let sub = cx.subscribe_in(&input, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) && this.cfg_cell.as_ref().is_some_and(|e| e.key == k) {
                 let text = st.read(cx).value().to_string();
                 this.cfg_cell = None;
+                // Enter leaves the cell selected, not editing (live vs-cfg-list-rows).
+                if matches!(ev, InputEvent::PressEnter { .. }) {
+                    let fh = this.cell_focus_handle(&k, cx);
+                    window.focus(&fh, cx);
+                }
                 let commit = commit.clone();
                 this.cfg_edit(vsc::EDIT, cx, move |c| commit(c, text));
                 cx.notify();
@@ -491,7 +500,7 @@ impl VariableStudioView {
         for (ix, (key, label)) in rows.iter().enumerate() {
             let on = *key == shown;
             let spot = RowSpot { list: matches!(input.kind, ConfigInputKind::List { .. }), current: on, default: *key == default_key, first: ix == 0, last: ix + 1 == count };
-            let (k1, id1) = (key.clone(), iid.clone());
+            let row_focus = self.cell_focus_handle(&format!("cfgrow-{iid}-{key}"), cx);
             let rename: Commit = {
                 let (id, key) = (iid.clone(), key.clone());
                 std::rc::Rc::new(move |c: &mut VsConfiguration, v: String| vsc::rename_row(c, &id, &key, &v))
@@ -516,11 +525,11 @@ impl VariableStudioView {
                     .cursor_pointer()
                     .when(on, |d| d.child(div().absolute().left_0().top_0().bottom_0().w(px(3.)).bg(blue)))
                     .child(name)
-                    // Clicking a row shows that configuration in the studio.
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        let (id, k) = (id1.clone(), k1.clone());
-                        this.cfg_edit(vsc::SWITCH, cx, move |c| vsc::switch(c, &id, &k));
-                    }))
+                    // A click only selects the cell (live vs-cfg-list-rows: the shown configuration stays); the row
+                    // menu's Switch to shows it.
+                    .track_focus(&row_focus)
+                    .focus(|st| st.border_2().border_color(blue))
+                    .on_mouse_down(MouseButton::Left, move |_, window, cx| window.focus(&row_focus, cx))
                     .os_context_menu({
                         let (view, input, key, label) = (cx.entity(), iid.clone(), key.clone(), if label.is_empty() { key.clone() } else { label.clone() });
                         move |m, _, _| Self::table_menu(m, view.clone(), input.clone(), key.clone(), label.clone(), None, spot)
@@ -550,6 +559,7 @@ impl VariableStudioView {
                 })
             };
             let key = format!("add-{iid}");
+            let add_focus = self.cell_focus_handle(&key, cx);
             let add_cell = match self.cfg_cell.as_ref().filter(|e| e.key == key) {
                 Some(e) => div().flex_1().child(Input::new(&e.input).appearance(false).text_size(px(13.33)).pl(px(3.))).into_any_element(),
                 None => div()
@@ -565,7 +575,7 @@ impl VariableStudioView {
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_cfg_text(key.clone(), String::new(), add.clone(), window, cx)))
                     .into_any_element(),
             };
-            table = table.child(h_flex().child(cell(NAME_W).map(|d| crate::ui_script::mark(d, || "config_row:Name".into())).child(add_cell)));
+            table = table.child(h_flex().child(cell(NAME_W).map(|d| crate::ui_script::mark(d, || "config_row:Name".into())).track_focus(&add_focus).child(add_cell)));
         }
         section = section.child(div().id(SharedString::from(format!("vcfg-table-{iid}"))).overflow_x_scroll().child(table));
         if columns.is_empty() {
@@ -743,7 +753,7 @@ impl VariableStudioView {
             let inputs: Vec<ConfigInput> = cfg
                 .inputs
                 .iter()
-                .filter(|i| q.is_empty() || i.name.to_lowercase().contains(&q))
+                .filter(|i| input_passes(&cfg, i, &q))
                 .filter(|i| {
                     let k = match i.kind {
                         ConfigInputKind::List { .. } => 0,
@@ -1229,5 +1239,28 @@ impl Render for IdsDialog {
                             .child(crate::os_ui::cancel_button("vid-cancel", "Cancel", cx).on_click(|_, window, cx| window.close_dialog(cx))),
                     ),
             )
+    }
+}
+
+/// Whether a configuration input passes the Filter inputs box: plain text matches its name; a command (`:name`,
+/// `:internalid`, `:variablename`, `:hasvisibilitycondition`) its own key, the value optionally quoted (the yes / no
+/// command takes true / false, empty = true).
+fn input_passes(cfg: &noshape_model::variables::VsConfiguration, input: &ConfigInput, query: &str) -> bool {
+    let query = query.trim();
+    if query.is_empty() {
+        return true;
+    }
+    let (cmd, value) = match query.strip_prefix(':') {
+        Some(rest) => rest.split_once(char::is_whitespace).map(|(c, v)| (c, v.trim())).unwrap_or((rest, "")),
+        None => ("name", query),
+    };
+    let value = value.trim_matches('"').to_lowercase();
+    let has = |s: &str| value.is_empty() || s.to_lowercase().contains(&value);
+    match cmd {
+        "name" => has(&input.name),
+        "internalid" => has(&input.id),
+        "variablename" => cfg.configured.iter().any(|c| c.input == input.id && has(&c.variable)),
+        "hasvisibilitycondition" => input.visible_when.is_some() == !matches!(value.as_str(), "false" | "no" | "0"),
+        _ => false,
     }
 }

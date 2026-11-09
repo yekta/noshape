@@ -67,6 +67,16 @@ pub fn page_state(window: &mut Window, cx: &mut App) -> Option<serde_json::Value
 
 /// `el` recording its bounds under `name` each time it is painted.
 pub fn mark<E: ParentElement>(el: E, name: impl FnOnce() -> String) -> E {
+    mark_with(el, name, false)
+}
+
+/// [`mark`] where the first element drawn with the name keeps it (live's runner takes the first match: a panel's
+/// first ⋯).
+pub fn mark_first<E: ParentElement>(el: E, name: impl FnOnce() -> String) -> E {
+    mark_with(el, name, true)
+}
+
+fn mark_with<E: ParentElement>(el: E, name: impl FnOnce() -> String, first: bool) -> E {
     if !active() {
         return el;
     }
@@ -75,6 +85,9 @@ pub fn mark<E: ParentElement>(el: E, name: impl FnOnce() -> String) -> E {
         canvas(
             move |b, window, _| {
                 if let Ok(mut m) = bounds().lock() {
+                    if first && m.contains_key(&name) {
+                        return;
+                    }
                     m.insert(name.clone(), (window.window_handle().window_id(), b));
                 }
                 if let Ok(mut c) = clips().lock() {

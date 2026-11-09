@@ -1,6 +1,6 @@
 {
  "name": "vs-ps-own-table-menu",
- "about": "Part Studio 1's Variable table: the own table's ⋯ (Copy table, Collapse all tables); Esc",
+ "about": "Part Studio 1's Variable table: the panel's first ⋯ (Variable Studio 1's, there automatically: Copy table, Rename, Switch to Variable Studio 1, Collapse all tables); Esc",
  "area": "psui",
  "source": "universe variable-studio (psui 11-08, studios' coverage list)",
  "start": "vs-vars",

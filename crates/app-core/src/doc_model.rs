@@ -174,6 +174,25 @@ impl DocModel {
         self.edit_tab_as(tab, description, false, cx, f)
     }
 
+    /// [`Self::edit_tab`] made in tab `origin` (an inserted Variable Studio's table in a Part Studio's panel): Undo
+    /// takes it back there ([`Session::set_undo_origin`]).
+    pub fn edit_tab_in<R>(&mut self, tab: TabId, origin: TabId, description: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut TabContent) -> R) -> Option<R> {
+        if self.session.read_only() {
+            return None;
+        }
+        self.flush_pending(cx);
+        let tab_name = self.session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+        let r = f(&mut self.session.doc.tab_mut(tab)?.content);
+        match self.session.commit(&[tab], false, &format!("{tab_name} :: {description}")) {
+            Ok(after) if origin != tab => self.session.set_undo_origin(after, origin),
+            Ok(_) => {}
+            Err(e) => cx.emit(DocEvent::Error(format!("Could not save change: {e:#}"))),
+        }
+        cx.emit(DocEvent::TabChanged(tab));
+        cx.notify();
+        Some(r)
+    }
+
     /// [`Self::edit_tab`] as an undo step even when it changes nothing (live's Hide mates on hidden mates).
     pub fn edit_tab_step<R>(&mut self, tab: TabId, description: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut TabContent) -> R) -> Option<R> {
         self.edit_tab_as(tab, description, true, cx, f)

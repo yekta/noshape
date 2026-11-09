@@ -573,6 +573,25 @@ fn a_noop_commit_keeps_the_previous_edit_undoable() {
     assert_eq!(*doc.manifest(u).unwrap(), *doc.manifest(s1).unwrap(), "the edit is undone, not skipped");
 }
 
+/// live vs-ps-inserted-edit: an edit of a Variable Studio made in a Part Studio's panel is undone in the Part Studio,
+/// not in the studio it changed; undoing it restores the studio.
+#[test]
+fn an_edit_made_in_another_tab_is_undone_there() {
+    let dir = TempDir::new();
+    let (mut doc, main) = new_doc(&dir);
+    let mut undo = UndoStack::new(main);
+    let s1 = undo.commit(&mut doc, &[set("tab/vs", b"1")], "Insert").unwrap();
+    undo.forget_since(0);
+    let s2 = undo.commit(&mut doc, &[set("tab/vs", b"2")], "Edit variable").unwrap();
+    undo.set_origin(s2, "tab/ps".into());
+    let in_tab = |tab: &'static str| move |names: &[String]| names.iter().any(|n| n == tab);
+    assert!(undo.can_undo_in(&doc, &in_tab("tab/ps")));
+    assert!(!undo.can_undo_in(&doc, &in_tab("tab/vs")), "not in the studio it changed");
+    let u = undo.undo_in_keeping(&mut doc, &in_tab("tab/ps"), &|_, v| v).unwrap().unwrap();
+    assert_eq!(*doc.manifest(u).unwrap(), *doc.manifest(s1).unwrap(), "the studio is restored");
+    assert!(undo.can_redo_in(&doc, &in_tab("tab/ps")) && !undo.can_redo_in(&doc, &in_tab("tab/vs")));
+}
+
 /// live2 2241: Hide mates on a mate already hidden is an undo step that undoes to the same look, and the edit before it
 /// stays undoable after it.
 #[test]

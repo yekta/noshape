@@ -4,7 +4,7 @@
 //! (Onshape: "your selection is made available immediately"); inserted
 //! entries show a check.
 
-use crate::doc_model::DocModel;
+use crate::doc_model::{DocEvent, DocModel};
 use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
@@ -48,8 +48,9 @@ struct DialogState {
     place: Option<usize>,
     /// Edit reference…: "Update Variable Studio" (live 2323), Undo held while it's open.
     update: bool,
-    /// Studios folded with their caret (live: they open expanded).
-    collapsed: HashSet<(Option<std::path::PathBuf>, TabId)>,
+    /// Studios folded or unfolded with their caret, or unfolded by a pick: the others as listed (live: a lone studio
+    /// expanded, several folded, vs-insert-dialog / vs-ps-shadowed).
+    toggled: HashSet<(Option<std::path::PathBuf>, TabId)>,
     other: bool,
     /// Other documents: the chosen document and version (microversion).
     document: Option<std::path::PathBuf>,
@@ -77,7 +78,8 @@ fn current_ref(doc: &noshape_model::Document, target: InsertTarget, studio: TabI
             TabContent::VariableStudio(v) => v.inserted.iter().find(|r| same_source(r, studio, external)).cloned(),
             _ => None,
         },
-        InsertTarget::Element(e) => vars::element_studios(doc, e).into_iter().find(|r| same_source(r, studio, external)),
+        // One there only through "Insert into all…" isn't ticked (live vs-ps-shadowed).
+        InsertTarget::Element(e) => vars::element_studios(doc, e).into_iter().find(|r| same_source(r, studio, external) && (r.external.is_some() || !vars::is_auto_referenced(doc, e, studio))),
     }
 }
 
@@ -130,14 +132,16 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
         return;
     }
     let path = external.as_ref().map(|e| e.path.clone());
+    let lone = studios.len() == 1;
     for (id, name, names, cfg) in studios {
         let cur = current_ref(current, target, id, &external);
         let whole = cur.as_ref().is_some_and(|r| r.variables.is_none());
         let key = (path.clone(), id);
-        let open = !state.borrow().collapsed.contains(&key);
+        let open = (lone) != state.borrow().toggled.contains(&key);
         let cfg_key = key.clone();
         let (doc1, st, ext1) = (doc.clone(), state.clone(), external.clone());
         let (open_mark, more_mark) = (format!("button:Configuration inputs:{name}"), format!("caret:Configuration inputs:{name}"));
+        let (configured, st_pick, key_pick, doc) = (!cfg.is_empty(), state.clone(), key.clone(), doc.clone());
         rows.push(
             h_flex()
                 .id(SharedString::from(format!("ivs-{}-{id}", path.as_ref().map(|p| p.display().to_string()).unwrap_or_default())))
@@ -184,8 +188,8 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                         .on_click(move |_, window, cx| {
                             cx.stop_propagation();
                             let mut s = st.borrow_mut();
-                            if !s.collapsed.remove(&key) {
-                                s.collapsed.insert(key.clone());
+                            if !s.toggled.remove(&key) {
+                                s.toggled.insert(key.clone());
                             }
                             window.refresh();
                         }),
@@ -203,37 +207,30 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                             .border_1()
                             .border_color(rgb(0xaaaaaa))
                             .bg(crate::theme::p().panel)
-                            .child(div().id(SharedString::from(format!("ivs-cfg-open-{id}"))).map(|d| crate::ui_script::mark(d, || open_mark)).px(px(5.)).h_full().flex().items_center().child(crate::assets::icon("configuration", 18., cx)).on_click({
-                                let (st, key) = (st.clone(), key.clone());
+                            // ▦ "Set to last viewed configuration" (live vs-insert-config-expand).
+                            .child(div().id(SharedString::from(format!("ivs-cfg-open-{id}"))).map(|d| crate::ui_script::mark(d, || open_mark)).px(px(5.)).h_full().flex().items_center().tooltip(crate::ui::tooltip("Set to last viewed configuration")).child(crate::assets::icon("configuration", 18., cx)).on_click({
+                                let (st, key, cfg, doc) = (st.clone(), key.clone(), cfg.clone(), doc.clone());
                                 move |_, window, cx| {
                                     cx.stop_propagation();
-                                    let mut s = st.borrow_mut();
-                                    if !s.config_open.remove(&key) {
-                                        s.config_open.insert(key.clone());
-                                    }
+                                    set_config(&st, &key, &cfg, true, &doc, cx);
                                     window.refresh();
                                 }
                             }))
                             // Live vs-926: Set to last viewed / Reset to default.
                             .child(div().id(SharedString::from(format!("ivs-cfg-more-{id}"))).map(|d| crate::ui_script::mark(d, || more_mark)).w(px(20.)).h_full().flex().items_center().justify_center().border_l_1().border_color(rgb(0xaaaaaa)).child(crate::ui::glyph("drawing-tool-caret", 12., pal.text)).on_click({
-                                let (st, key, last) = (st.clone(), key.clone(), cfg.active.clone());
+                                let (st, key, cfg, doc) = (st.clone(), key.clone(), cfg.clone(), doc.clone());
                                 move |e: &ClickEvent, window, cx| {
                                     cx.stop_propagation();
-                                    let (st1, st2, k1, k2, last) = (st.clone(), st.clone(), key.clone(), key.clone(), last.clone());
+                                    let (st, key, cfg, doc) = (st.clone(), key.clone(), cfg.clone(), doc.clone());
                                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-                                        let (st1, st2, k1, k2, last) = (st1.clone(), st2.clone(), k1.clone(), k2.clone(), last.clone());
-                                        m.item(crate::os_menu::OsMenuItem::new("Set to last viewed").on_click(move |_, window, _| {
-                                            let mut s = st1.borrow_mut();
-                                            s.config_values.insert(k1.clone(), last.clone());
-                                            s.config_open.insert(k1.clone());
-                                            window.refresh();
-                                        }))
-                                        .item(crate::os_menu::OsMenuItem::new("Reset to default").on_click(move |_, window, _| {
-                                            let mut s = st2.borrow_mut();
-                                            s.config_values.remove(&k2);
-                                            s.config_open.insert(k2.clone());
-                                            window.refresh();
-                                        }))
+                                        let item = |label: &'static str, last: bool| {
+                                            let (st, key, cfg, doc) = (st.clone(), key.clone(), cfg.clone(), doc.clone());
+                                            crate::os_menu::OsMenuItem::new(label).on_click(move |_, window, cx| {
+                                                set_config(&st, &key, &cfg, last, &doc, cx);
+                                                window.refresh();
+                                            })
+                                        };
+                                        m.item(item("Set to last viewed", true)).item(item("Reset to default", false))
                                     });
                                     crate::os_menu::open(e.position(), menu, window, cx);
                                 }
@@ -241,6 +238,17 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                     )
                 })
                 .on_click(move |_, window, cx| {
+                    // A pick unfolds the studio (live vs-ps-shadowed); a configured one shows its inputs (live
+                    // assembly/592: inline under the row).
+                    {
+                        let mut s = st_pick.borrow_mut();
+                        if !open && !s.toggled.remove(&key_pick) {
+                            s.toggled.insert(key_pick.clone());
+                        }
+                        if configured {
+                            s.config_open.insert(key_pick.clone());
+                        }
+                    }
                     set_ref(&doc1, target, id, if whole { None } else { Some(StudioRef { studio: id, variables: None, external: ext1.clone(), config: Default::default() }) }, cx);
                     window.refresh();
                 })
@@ -315,6 +323,22 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
 /// A configured studio's inputs in the dialog (help config-insert-vs-01):
 /// a select per list, a checkbox per checkbox, the value of a configuration
 /// variable, then [Generate], which inserts the studio in that configuration.
+/// Set to last viewed (the configuration the studio shows) or Reset to default; a toast when the picked values
+/// already are those (live vs-insert-set-last-viewed / -reset-default).
+fn set_config(state: &Rc<RefCell<DialogState>>, key: &(Option<std::path::PathBuf>, TabId), cfg: &vars::VsConfiguration, last: bool, doc: &Entity<DocModel>, cx: &mut App) {
+    let target = if last { cfg.active.clone() } else { Default::default() };
+    let current = state.borrow().config_values.get(key).cloned().unwrap_or_default();
+    if cfg.inputs.iter().all(|i| cfg.value_of(&current, &i.id) == cfg.value_of(&target, &i.id)) {
+        let what = if last { "last viewed" } else { "default" };
+        let message = format!("Configuration parameters already match {what} value.");
+        doc.update(cx, |_, cx| cx.emit(DocEvent::Info(message)));
+        return;
+    }
+    let mut s = state.borrow_mut();
+    s.config_values.insert(key.clone(), target);
+    s.config_open.insert(key.clone());
+}
+
 fn config_box(ctx: &Rows, id: TabId, key: &(Option<std::path::PathBuf>, TabId), cfg: &vars::VsConfiguration, external: Option<vars::ExternalStudio>) -> AnyElement {
     use noshape_model::configuration::ConfigInputKind;
     let pal = p();
@@ -529,9 +553,12 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                 })
         };
         let mut rows: Vec<AnyElement> = Vec::new();
+        // The version graph opens over the list, which stays (live vs-insert-version-graph: its rows still read).
+        let mut graph_rows: Vec<AnyElement> = Vec::new();
         if graph {
-            version_rows(&state, &path, &mut rows);
-        } else if !other {
+            version_rows(&state, &path, &mut graph_rows);
+        }
+        if !other {
             // This document, at Main or at a version picked in the graph.
             let at = state.borrow().own_version.clone();
             match at {
@@ -855,7 +882,16 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .child(h_flex().flex_none().border_b_1().border_color(rgb(0xeeeeee)).child(tab("ivs-current", "Current document", !other, state.clone())).child(tab("ivs-other", "Other documents", other, state.clone())))
                     .when(!other, |d| d.child(document_row).child(search_row))
                     .when(other && state.borrow().document.is_none(), |d| d.child(url_row))
-                    .child(v_flex().id("ivs-rows").flex_1().min_h_0().overflow_y_scroll().pt(px(1.)).children(rows))
+                    .child(
+                        div()
+                            .relative()
+                            .flex_1()
+                            .min_h_0()
+                            .flex()
+                            .flex_col()
+                            .child(v_flex().id("ivs-rows").flex_1().min_h_0().overflow_y_scroll().pt(px(1.)).children(rows))
+                            .when(!graph_rows.is_empty(), |d| d.child(v_flex().id("ivs-graph").absolute().inset_0().overflow_y_scroll().pt(px(1.)).bg(crate::theme::p().panel).occlude().children(graph_rows))),
+                    )
                     // Live: a 22 px footer under a #eaeaea rule with the ? at the right.
                     .child(
                         h_flex().h(px(22.)).flex_none().border_t_1().border_color(rgb(0xeaeaea)).justify_end().pr(px(4.)).child(

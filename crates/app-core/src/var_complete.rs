@@ -107,7 +107,8 @@ fn match_rank(name: &str, needle: &str) -> Option<u8> {
 
 /// The word under the cursor (letters, digits, `_`, starting with a letter
 /// or `_`, not after `#`) and the entries matching it, live's order:
-/// matches at the start, then at a camelCase word, each alphabetical.
+/// matches at the start, then at a camelCase word, then (a unit after a
+/// number) functions by its first letter, each alphabetical.
 pub fn word_entries(text: &str, cursor: usize, variables: &[&str], dim: Option<Dim>) -> Option<(Range<usize>, Vec<Entry>)> {
     let mut cursor = cursor.min(text.len());
     while !text.is_char_boundary(cursor) {
@@ -126,11 +127,15 @@ pub fn word_entries(text: &str, cursor: usize, variables: &[&str], dim: Option<D
     }
     let end = cursor + text[cursor..].chars().take_while(|&c| ident(c)).map(char::len_utf8).sum::<usize>();
     let needle = before[start..].to_ascii_lowercase();
+    // A unit being typed after a number ("45 mm"): live also lists the functions starting with its first letter,
+    // after the matches (live vs-value-chip: mm, max(, min()).
+    let after_number = before[..start].trim_end().ends_with(|c: char| c.is_ascii_digit() || c == '.');
+    let first_letter = |e: &Entry| (after_number && matches!(e, Entry::Function(..)) && e.name().to_ascii_lowercase().starts_with(&needle[..1])).then_some(2);
     let mut all: Vec<Entry> = variables.iter().map(|v| Entry::Variable(v.to_string())).collect();
     all.extend(FUNCTIONS.iter().map(|(n, a)| Entry::Function(n, a)));
     all.extend(units_for(dim).iter().map(|u| Entry::Unit(u)));
     all.extend(CONSTANTS.iter().map(|c| Entry::Constant(c)));
-    let mut ranked: Vec<(u8, String, usize, Entry)> = all.into_iter().enumerate().filter_map(|(i, e)| Some((match_rank(e.name(), &needle)?, e.name().to_ascii_lowercase(), i, e))).collect();
+    let mut ranked: Vec<(u8, String, usize, Entry)> = all.into_iter().enumerate().filter_map(|(i, e)| Some((match_rank(e.name(), &needle).or_else(|| first_letter(&e))?, e.name().to_ascii_lowercase(), i, e))).collect();
     ranked.sort_by(|a, b| (a.0, &a.1, a.2).cmp(&(b.0, &b.1, b.2)));
     let entries: Vec<Entry> = ranked.into_iter().map(|r| r.3).collect();
     (!entries.is_empty()).then_some((start..end, entries))
@@ -385,6 +390,8 @@ mod tests {
         let w = ["w"];
         assert_eq!(shown("1 i", len, &w), ["in", "isInteger(x)"]);
         assert_eq!(shown("1 m", len, &w), ["m", "max(x,y)", "min(x,y)", "mm"]);
+        assert_eq!(shown("45 mm", len, &w), ["mm", "max(x,y)", "min(x,y)"]);
+        assert_eq!(shown("40 mm + 5 mm", len, &w), ["mm", "max(x,y)", "min(x,y)"]);
         assert!(shown("1 d", len, &w).is_empty());
         assert_eq!(shown("c", len, &w), ["ceil(x)", "ceil(x,unit)", "clamp(x,min,max)", "cm", "cos(angle)"]);
         assert_eq!(shown("a", len, &w), ["abs(x)", "acos(x)", "asin(x)", "atan(x)", "atan2(y,x)"]);

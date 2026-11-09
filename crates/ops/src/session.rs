@@ -370,6 +370,13 @@ impl Session {
         self.commit_tabs(tabs, settings, description, Undo::Yes)
     }
 
+    /// The edit that produced `after` was made in tab `origin`, which it didn't change (an inserted Variable Studio's
+    /// table edited in a Part Studio's panel): Undo takes it back there, not in the tabs it changed (live
+    /// vs-ps-inserted-edit).
+    pub fn set_undo_origin(&mut self, after: MicroversionId, origin: TabId) {
+        self.undo.set_origin(after, Document::blob_name(origin));
+    }
+
     /// [`Self::commit`] of `tabs` as an undo step even when nothing changed (live's Hide mates on hidden mates).
     pub fn commit_step(&mut self, tabs: &[TabId], description: &str) -> Result<MicroversionId> {
         self.commit_tabs(tabs, false, description, Undo::EvenUnchanged)

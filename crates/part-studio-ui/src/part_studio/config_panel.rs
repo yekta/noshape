@@ -435,7 +435,7 @@ impl PartStudioView {
                 let v1 = cx.entity();
                 // Live 2213 (a): "Collapse all tables" only with more than one table (an inserted Variable Studio's).
                 let several = !noshape_model::variables::element_studios(&self.doc.read(cx).session.doc, self.tab).is_empty();
-                div().id("pvar-more").map(|d| crate::ui_script::mark(d, || "panel_more:Variable table".into())).cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
+                div().id("pvar-more").map(|d| crate::ui_script::mark_first(d, || "panel_more:Variable table".into())).cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
                     let v1 = v1.clone();
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                         let v1 = v1.clone();

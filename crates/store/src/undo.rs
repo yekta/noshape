@@ -56,6 +56,9 @@ struct Entry {
     description: String,
     /// Names the edit changed (None: not known yet, read from the store).
     changed: Option<Vec<String>>,
+    /// The tab's name the edit was made in when that isn't one it changed (a Variable Studio's table edited in a
+    /// Part Studio's panel): per-tab undo follows it.
+    origin: Option<String>,
 }
 
 /// Undo/redo for one branch during one editing session.
@@ -240,13 +243,28 @@ impl UndoStack {
         }
     }
 
-    /// Whether some edit `in_scope` (given the names it changed) can be undone.
+    /// The names an `in_scope` test sees for an edit: its origin when it has one, else the names it changed.
+    fn scope_names(doc: &Document, e: &Entry) -> Result<Vec<String>> {
+        match &e.origin {
+            Some(o) => Ok(vec![o.clone()]),
+            None => Self::changed_names(doc, e),
+        }
+    }
+
+    /// The edit that produced `after` was made in the tab named `origin` (see `Entry::origin`).
+    pub fn set_origin(&mut self, after: MicroversionId, origin: String) {
+        if let Some(e) = self.undo.iter_mut().rev().find(|e| e.after == after) {
+            e.origin = Some(origin);
+        }
+    }
+
+    /// Whether some edit `in_scope` (given the names it changed, or its origin) can be undone.
     pub fn can_undo_in(&self, doc: &Document, in_scope: &dyn Fn(&[String]) -> bool) -> bool {
-        self.undo.iter().any(|e| Self::changed_names(doc, e).is_ok_and(|c| in_scope(&c)))
+        self.undo.iter().any(|e| Self::scope_names(doc, e).is_ok_and(|c| in_scope(&c)))
     }
 
     pub fn can_redo_in(&self, doc: &Document, in_scope: &dyn Fn(&[String]) -> bool) -> bool {
-        self.redo.iter().any(|e| Self::changed_names(doc, e).is_ok_and(|c| in_scope(&c)))
+        self.redo.iter().any(|e| Self::scope_names(doc, e).is_ok_and(|c| in_scope(&c)))
     }
 
     /// Onshape-style per-tab undo: reverts the newest edit `in_scope`
@@ -264,9 +282,8 @@ impl UndoStack {
         self.check_fresh(doc)?;
         let mut found = None;
         for i in (0..self.undo.len()).rev() {
-            let c = Self::changed_names(doc, &self.undo[i])?;
-            if in_scope(&c) {
-                found = Some((i, c));
+            if in_scope(&Self::scope_names(doc, &self.undo[i])?) {
+                found = Some((i, Self::changed_names(doc, &self.undo[i])?));
                 break;
             }
         }
@@ -299,9 +316,8 @@ impl UndoStack {
         self.check_fresh(doc)?;
         let mut found = None;
         for i in (0..self.redo.len()).rev() {
-            let c = Self::changed_names(doc, &self.redo[i])?;
-            if in_scope(&c) {
-                found = Some((i, c));
+            if in_scope(&Self::scope_names(doc, &self.redo[i])?) {
+                found = Some((i, Self::changed_names(doc, &self.redo[i])?));
                 break;
             }
         }
@@ -351,7 +367,7 @@ impl UndoStack {
             return Ok(after);
         }
         let changed = changes.iter().map(|(n, _)| n.as_ref().to_string()).collect();
-        self.push(Entry { before, after, description: description.to_string(), changed: Some(changed) });
+        self.push(Entry { before, after, description: description.to_string(), changed: Some(changed), origin: None });
         Ok(after)
     }
 
@@ -368,6 +384,7 @@ impl UndoStack {
             after,
             description: description.to_string(),
             changed: None,
+            origin: None,
         });
     }
 

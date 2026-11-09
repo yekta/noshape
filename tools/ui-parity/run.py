@@ -420,10 +420,13 @@ TEXT_TAGS = {"input", "textarea", "select"}
 
 def no_field_focus(focus):
     """Whether no text field has the keyboard: "none", or "other" on a button, a row, a menu (live: Chrome focuses a
-    clicked button; ours' buttons take no focus). Two such are compared as equal (README "Focus")."""
+    clicked button; ours' buttons take no focus), or a feature dialog's button or link ("field" with tag button / a:
+    vs-insert-help, vs-insert-version-graph). Two such are compared as equal (README "Focus")."""
     if not isinstance(focus, dict):
         return focus is None
     if focus.get("kind") == "none":
+        return True
+    if focus.get("kind") == "field" and focus.get("tag") in ("button", "a") and not focus.get("text"):
         return True
     return focus.get("kind") == "other" and focus.get("tag") not in TEXT_TAGS and not focus.get("text") and focus.get("selection") in (None, [None, None])
 
@@ -573,6 +576,10 @@ def compare(live, ours, whole_document=True):
                 for f in d.get("fields") or []:
                     if isinstance(f, dict) and isinstance(f.get("value"), str):
                         f["value"] = re.sub(r"^List_[A-Za-z0-9]{14}$", "List_<id>", f["value"])
+        # Live's Free plan answers a paid feature (Release…, vs-tab-release) with its upgrade modal where ours opens the
+        # feature's dialog: a plan's limit, not compared (as PLAN_ROWS).
+        if isinstance(a.get("dialog"), dict) and "Start Professional Trial" in (a["dialog"].get("buttons") or []):
+            b["dialog"], b["focus"] = a["dialog"], a.get("focus")
         drawn_sizes(a, b)
         placed_alike(a, b)
         cloud_menu(a, b)

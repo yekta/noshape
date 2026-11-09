@@ -130,7 +130,12 @@ fn opens_on_tab() -> Option<String> {
 
 /// A key name of the scenario format as a GPUI keystroke ("Enter", "mod+z", "shift+e", "#").
 fn keystroke(key: &str) -> Option<Keystroke> {
-    let parts: Vec<&str> = key.split('+').collect();
+    // "+" itself, alone or after modifiers ("mod++"), isn't a separator (vs-value-chip typed "-" for it).
+    let parts: Vec<&str> = match key.strip_suffix("++") {
+        Some(mods) => mods.split('+').chain(["+"]).collect(),
+        None if key == "+" => vec!["+"],
+        None => key.split('+').collect(),
+    };
     let (last, mods) = parts.split_last()?;
     let mut spec: Vec<String> = mods
         .iter()
@@ -425,6 +430,9 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     Ok(at) => {
                         eprintln!("UI-SCRIPT step {} {what} at ({:.0}, {:.0})", i + 1, f32::from(at.x), f32::from(at.y));
                         let from = pointer.unwrap_or(at);
+                        // A hover where the pointer already rests (an earlier click there, which hid its tooltip)
+                        // comes from just outside, so the target sees the pointer arrive (vs-value-decimals).
+                        let from = if what == "hover" && from == at { at - point(px(0.), px(40.)) } else { from };
                         for k in 1..=3 {
                             let p = from + (at - from) * (k as f32 / 3.0);
                             let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: mods }), cx));
@@ -731,6 +739,9 @@ pub fn start_page(cx: &mut App) {
                 "click" | "dblclick" | "rclick" | "hover" => match found {
                     Ok(at) => {
                         let from = pointer.unwrap_or(at);
+                        // A hover where the pointer already rests (an earlier click there, which hid its tooltip)
+                        // comes from just outside, so the target sees the pointer arrive (vs-value-decimals).
+                        let from = if what == "hover" && from == at { at - point(px(0.), px(40.)) } else { from };
                         for k in 1..=3 {
                             let p = from + (at - from) * (k as f32 / 3.0);
                             let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: mods }), cx));
@@ -920,8 +931,10 @@ fn with_input_focus_in(s: &mut Value, window: &mut Window, cx: &mut App) {
     let chars = |b: usize| text.get(..b.min(text.len())).map_or(0, |t| t.chars().count());
     let (a, b) = (chars(sel.start), chars(sel.end));
     let all = a == 0 && b == text.chars().count() && b > 0;
-    // In a feature-style dialog (Insert Variable Studio's search) live reads it as that dialog's field.
-    if s["dialog"]["kind"] == "feature" {
+    // In a feature-style dialog (Insert Variable Studio's search) live reads it as that dialog's field; a modal's
+    // field over it (Create version…, its text in none of the dialog's fields) as "other" (live vs-insert-create-version).
+    let in_dialog = s["dialog"]["fields"].as_array().is_some_and(|f| text.is_empty() || f.iter().any(|f| f["text"] == json!(text) || f["value"] == json!(text)));
+    if s["dialog"]["kind"] == "feature" && in_dialog {
         // Its label when exactly one of the dialog's labelled text fields holds that text (live vs-cfg-checkbox-dialog:
         // "Name"); a search box has none (its "label" in our notes is its placeholder).
         let holds = |f: &&Value| matches!(f["kind"].as_str(), Some("string" | "input")) && !f["label"].as_str().is_some_and(|l| l.starts_with("Search ")) && (f["text"] == json!(text) || f["value"] == json!(text));
