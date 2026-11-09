@@ -133,6 +133,8 @@ impl DrawingEditor {
             if let Some(j) = d.duplicate_sheet(i) {
                 t.commit("Duplicate sheet", d, cx);
                 t.switch_sheet(j, cx);
+                // No row selected: a right-click right after gives that row's own menu (live2 drw-sheet-delete, -move-down).
+                t.sheet_rows.clear();
             }
         }));
         if let Some(paste) = self.sheet_paste_entry(cx) {

@@ -1033,6 +1033,14 @@ impl<'a> Translator<'a> {
             (None, None) => true,
         });
         if let (true, Some(c)) = (lands, ours) {
+            // A construction Use stays construction (c2-fan-blade-sweep's Sketch 9: its Ø6.8 boss circle bounds no
+            // region, the Ø7.5 circle's whole disc is cut).
+            if u.shape["construction"] == true
+                && let Some(cid) = c["id"].as_str()
+                && let Err(e) = self.call("sketch_set_construction", json!({ "sketch": id, "entities": [cid], "construction": true }))
+            {
+                problems.push(format!("sketch entity {}: its Use not made construction ({e})", u.eid));
+            }
             self.map_drawn(oid, &u.eid, &c, point, u.ends);
             self.used.insert((oid.to_string(), u.eid));
             return;
@@ -2098,9 +2106,12 @@ impl<'a> Translator<'a> {
                 let mut strings = Vec::new();
                 packed_strings(&tree, &mut strings);
                 own_edges = packed_face_edges(&tree);
-                // The sketch whose imprint the face is (the query's own
-                // operation), else the first sketch named.
-                let sk = root_operation(&tree).and_then(|o| o.strip_suffix(".imprint").map(str::to_string)).or_else(|| strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string));
+                // The sketch whose imprint the face is (the query's own operation; the last imprint named, after those
+                // of the curves it is told apart by: c2-fan-blade-sweep's RoBG), else the first sketch named.
+                let sk = root_operation(&tree)
+                    .and_then(|o| o.strip_suffix(".imprint").map(str::to_string))
+                    .or_else(|| strings.iter().rev().find_map(|s| s.strip_suffix(".imprint")).map(str::to_string))
+                    .or_else(|| strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string));
                 (sk, strings)
             }
             None => imprint_query_words(text),
@@ -3124,6 +3135,9 @@ impl<'a> Translator<'a> {
                     && r["area"].as_f64().is_none_or(|ours| (ours * k * k - a).abs() > 1e-3 * a.max(1e-12))
                 {
                     continue;
+                }
+                if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                    eprintln!("TRACE region_at {p:?} area {area:?}: {} at {w:?} d {d}", r["id"]);
                 }
                 if best.as_ref().is_none_or(|b| d < b.0)
                     && let Some(id) = r["id"].as_str()

@@ -38,6 +38,26 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
+## 11-09 14:34 UTC: drw-sheet-delete fixed in the app; c2-fan-blade-sweep 32 -> 40/53 (Extrude 10)
+
+- drw-sheet-delete wasn't the runner: the right-click that opened Duplicate left Sheet1's row selected, so the copy's
+  right-click made a 2-row (all rows) menu without Delete. Duplicate now clears the row selection (live's menus right
+  after are single-sheet ones for either row: drw-sheet-delete and -move-down). b6: 142/176 with sheet-delete matching
+  but sheet-move-down broken by my first try (selecting the copy); the clear fixes both (b7 to confirm).
+- Extrude 10: live's RoBG is a FACE of Sketch 11's imprint (TOPOLOGY: Sketch 10's circle's cap edge), area
+  102.35 mm² at x = -66; ours took Sketch 10's own circle region (x = -63): the packed query's root operation didn't
+  decode, so region_from_query fell back to the first ".wireOp" (Sketch 10). It now takes the last ".imprint" named
+  first. Fan 32 -> 40/53, suite 796 -> 804/947, nothing else moved. Next: feature 40 "Plane 4" (Curve point plane:
+  "requires a curve and a point").
+
+## 11-09 13:49 UTC: c2-fan-blade-sweep 28 -> 32/53: Extrude 8 was the translator's Use
+
+- Extrude 8's tool (made NEW) was a ring: the profile, not up-to-next. Sketch 9's Ø6.8 circle is a construction Use
+  (projected Poti2 boss edge) in live; our translator's sketch_use made it a plain curve, so the Ø7.5 disc was split
+  into a disc and a ring and the ring was picked. A construction Use is now made construction (parity.rs
+  use_projected). No live capture needed. Next: feature 32 "Extrude 10", "Bolt" 12/22/12 for live's 10/20/12,
+  volume 1402.96 for 1710.02 mm³. Suites to run before landing; runner's drw-sheet-delete next.
+
 ## 11-09 13:36 UTC: c2-fan-blade-sweep at 28/53, next Extrude 8 (open)
 
 - Extrude 8: REMOVE, UP_TO_NEXT, Opposite direction, merge scope "base"; Sketch 9 = one Ø7.5 circle (+ a construction
