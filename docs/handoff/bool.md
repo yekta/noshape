@@ -68,6 +68,16 @@ but its box reaches z 6.21 mm (live 0): the inlet's offset wall (the one run on 
 - **Surface Pattern 3 now (06:40, kernel profile):** 3.65 s: our Boolean 2.7 s (OCCT's sections asked ahead 0.58 s,
   once: later rounds reuse them; the final round's classification ~0.6 s; two restart rounds ~0.25 s each), unify
   0.66 s, op_unify 0.27 s. Live 537 ms.
+- **Shell: by_quadrics before OCCT's offset everywhere (queued 62d787a9, 07:55 UTC; lead: rule timed on a quiet host).**
+  Probe (env-gated in bool-c, XSHELLAB: every Shell of the model suite built by quadrics, offset, regions and smooth
+  on copies; vibe3, log shellab-v3.log): where quadrics and offset both build (c2-bottle-split, cf-part-draft,
+  exercise-jan, cf-snap-hook) the faces and volume are the same (to 0.001 mm3) and quadrics is quicker every time
+  (19-38 / 48 ms, 8 / 17, 3-8 / 8-11, 81-117 / 745-865); where quadrics can't, it fails in 0-7 ms (cf-lighten's
+  closed shells, cf-hose-routing, the impeller). So no rule beyond "first": the sharp free-form test is gone. The
+  earlier "cf-lighten +440 ms, cf-fill-pattern +2.1 s" was noise (fill-pattern has no Shell). Checks: qa's shellmatrix
+  (96), boolmatrix, cli-shell-gpf identical to main's (CLIs main1109 / quad1109); kernel tests 349/349; model suite
+  75/87, 764/951 (impeller's loft matching is main's since the base, not this); cf-snap-hook 1692 -> 1316 ms, c2-bottle-
+  split 156 -> 68 ms in the suite.
 - **Tried, not kept: states shared within groups** (/root/bool-scratch/wip/state-groups-1109.patch): pieces of one
   solid meeting across a curve no face of solid t has share their state against t (one piece's rays per group;
   coincident faces' solids counted, pieces on t's faces, sheets and turned periods apart). In sp-cut 1069 pieces'
