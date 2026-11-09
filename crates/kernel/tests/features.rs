@@ -113,6 +113,35 @@ fn a_loft_along_guides_of_several_curves_runs_through_them() {
     assert!(faces[0].is_valid());
 }
 
+/// Live 2291 (c2-hunting-knife's Loft 3, its face to 0.01 µm): between two profiles and two guides along its sides
+/// the face blends the profiles linearly and fades each guide's difference from that across by the cubic Hermite
+/// 1 - 3u² + 2u³; a guide of several curves pairs by each piece's share of its length, a spline in its own parameter.
+/// Straight profiles, a guide of a cubic spline and a line, a straight guide: the face's points at u = 1/2 (the
+/// pairing) and 1/4 (the Hermite) level with the spline's end.
+#[test]
+fn a_loft_between_guides_fades_them_across_as_live() {
+    let v = |x: f64, y: f64, z: f64| DVec3::new(x, y, z);
+    let line = |a: DVec3, b: DVec3| make_line(a, b).unwrap();
+    let (a0, a1, b0, b1) = (v(0., 0., 0.), v(10., 0., 0.), v(0., 20., 3.), v(10., 20., 3.));
+    let joint = v(0., 10., 3.);
+    let spline = make_bspline(&[a0, v(-2., 3., 0.), v(-3., 8., 2.), joint], None, &[0.0, 1.0], &[4, 4], 3, false).unwrap();
+    let share = spline.length().unwrap() / (spline.length().unwrap() + 10.0);
+    let g0 = make_wire(&[spline, line(joint, b0)]).unwrap();
+    let g1 = make_wire(&[line(a1, b1)]).unwrap();
+    let r = loft_guided_open(&make_wire(&[line(a0, a1)]).unwrap(), &make_wire(&[line(b0, b1)]).unwrap(), &[g0, g1], true, false).unwrap();
+    let faces = r.faces();
+    assert_eq!(faces.len(), 1);
+    assert!(faces[0].is_valid());
+    let other = a1 + (b1 - a1) * share;
+    let lin0 = a0 * (1.0 - share) + b0 * share;
+    for u in [0.5, 0.25] {
+        let h0 = 1.0 - 3.0 * u * u + 2.0 * u * u * u;
+        let want = lin0 + (other - lin0) * u + (joint - lin0) * h0;
+        let d = faces[0].project_point(want).unwrap().distance;
+        assert!(d < 1e-6, "u {u}: {d} off the face");
+    }
+}
+
 /// Live 2276 (loft Start condition Normal to profile, magnitude 1, End None): a Ø20 circle on Top lofted to a Ø20
 /// circle (D) 10 up and 5 aside, (I) 20 up and 5 aside (live's volumes), (G) on the plane x = 15 centred (15, 0, 15):
 /// a solid facing out (it came out inside out, -5300 mm³) with its start step per pole column (0.9 (c·n) + 0.1 |c| over 3

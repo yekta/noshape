@@ -14,7 +14,6 @@
 #include <BRepAdaptor_CompCurve.hxx>
 #include <TopExp.hxx>
 #include <Geom_TrimmedCurve.hxx>
-#include <GeomFill_BSplineCurves.hxx>
 #include <GeomConvert.hxx>
 #include <GeomConvert_CompCurveToBSplineCurve.hxx>
 #include <Approx_CurvilinearParameter.hxx>
@@ -650,6 +649,50 @@ TopoDS_Face simplest_face(const std::vector<std::vector<gp_Pnt>>& g, double tol)
   return as_analytic(grid_face(g), tol);
 }
 
+// A run of lines on one straight line, between curves running at other speeds (a spline in its own parameter), takes
+// their speeds at its ends, eased between as a cubic over its share of the length: the chain C1 where the curves'
+// shapes fix their own parameters (live 2291: c2-hunting-knife's guide, a spline, two lines and an arc; the lines'
+// speed 1.13 at the spline, 1 at the arc, 0.96 between). Lines where the speed would turn back stay as they are.
+void ease_lines(std::vector<occ::handle<Geom_BSplineCurve>>& pieces, std::vector<bool>& lines)
+{
+  for (size_t i = 0; i < pieces.size();)
+  {
+    if (!lines[i])
+    {
+      ++i;
+      continue;
+    }
+    // The run: lines on one straight line.
+    const gp_Dir dir(gp_Vec(pieces[i]->StartPoint(), pieces[i]->EndPoint()));
+    size_t       j = i + 1;
+    while (j < pieces.size() && lines[j] && gp_Dir(gp_Vec(pieces[j]->StartPoint(), pieces[j]->EndPoint())).Angle(dir) < 1e-9)
+      ++j;
+    const gp_Pnt q0 = pieces[i]->StartPoint(), q1 = pieces[j - 1]->EndPoint();
+    const double len = q0.Distance(q1);
+    const double a   = i > 0 ? pieces[i - 1]->DN(pieces[i - 1]->LastParameter(), 1).Magnitude() : 1.0;
+    const double b   = j < pieces.size() ? pieces[j]->DN(pieces[j]->FirstParameter(), 1).Magnitude() : 1.0;
+    if (len > 0 && (std::abs(a - 1) > 1e-9 || std::abs(b - 1) > 1e-9) && a > 0 && b > 0 && a * a + b * b <= 9)
+    {
+      const gp_Vec               d(q0, q1);
+      NCollection_Array1<gp_Pnt> poles(1, 4);
+      poles(1) = q0;
+      poles(2) = q0.Translated(d * (a / 3));
+      poles(3) = q1.Translated(d * (-b / 3));
+      poles(4) = q1;
+      NCollection_Array1<double> knots(1, 2);
+      NCollection_Array1<int>    mults(1, 2);
+      knots(1) = 0;
+      knots(2) = len;
+      mults(1) = mults(2) = 4;
+      pieces[i] = new Geom_BSplineCurve(poles, knots, mults, 3);
+      pieces.erase(pieces.begin() + (long)i + 1, pieces.begin() + (long)j);
+      lines.erase(lines.begin() + (long)i + 1, lines.begin() + (long)j);
+      j = i + 1;
+    }
+    i = j;
+  }
+}
+
 // A chain of edges as one B-spline, from `from` (an end of the chain): C0 at its joints.
 occ::handle<Geom_BSplineCurve> chain_bspline(const TopoDS_Shape& chain, const gp_Pnt& from, double tol, bool by_arc)
 {
@@ -660,7 +703,8 @@ occ::handle<Geom_BSplineCurve> chain_bspline(const TopoDS_Shape& chain, const gp
   mw.Add(edges);
   if (!mw.IsDone())
     return nullptr;
-  GeomConvert_CompCurveToBSplineCurve join;
+  std::vector<occ::handle<Geom_BSplineCurve>> pieces;
+  std::vector<bool>                           lines;
   for (BRepTools_WireExplorer x(mw.Wire()); x.More(); x.Next())
   {
     double                        f, l;
@@ -674,13 +718,7 @@ occ::handle<Geom_BSplineCurve> chain_bspline(const TopoDS_Shape& chain, const gp
     // 2319 (3): an arc profile paired by angle).
     const bool polynomial = !piece->IsRational() && !c->IsKind(STANDARD_TYPE(Geom_Line)) && !c->IsKind(STANDARD_TYPE(Geom_Conic))
                             && !(c->IsKind(STANDARD_TYPE(Geom_TrimmedCurve)) && occ::down_cast<Geom_TrimmedCurve>(c)->BasisCurve()->IsKind(STANDARD_TYPE(Geom_Conic)));
-    if (by_arc && polynomial)
-    {
-      NCollection_Array1<double> knots = piece->Knots();
-      BSplCLib::Reparametrize(0.0, GCPnts_AbscissaPoint::Length(GeomAdaptor_Curve(trimmed)), knots);
-      piece->SetKnots(knots);
-    }
-    else if (by_arc && !c->IsKind(STANDARD_TYPE(Geom_Line)))
+    if (by_arc && !polynomial && !c->IsKind(STANDARD_TYPE(Geom_Line)))
     {
       const occ::handle<Adaptor3d_Curve> ad(new GeomAdaptor_Curve(trimmed));
       Approx_CurvilinearParameter        arc(ad, tol, GeomAbs_C2, 14, 100);
@@ -688,17 +726,112 @@ occ::handle<Geom_BSplineCurve> chain_bspline(const TopoDS_Shape& chain, const gp
         return nullptr;
       piece = arc.Curve3d();
     }
+    // Its share of the chain: the range its length (Approx_CurvilinearParameter's is [0, 1]).
+    if (by_arc && !c->IsKind(STANDARD_TYPE(Geom_Line)))
+    {
+      NCollection_Array1<double> knots = piece->Knots();
+      BSplCLib::Reparametrize(0.0, GCPnts_AbscissaPoint::Length(GeomAdaptor_Curve(trimmed)), knots);
+      piece->SetKnots(knots);
+    }
     if (x.Current().Orientation() == TopAbs_REVERSED)
       piece->Reverse();
-    if (!join.Add(piece, tol))
-      return nullptr;
+    pieces.push_back(piece);
+    lines.push_back(c->IsKind(STANDARD_TYPE(Geom_Line)));
   }
+  if (by_arc)
+    ease_lines(pieces, lines);
+  // Each piece keeps its share of the chain's length (OCCT's ratio would rescale the next piece to the speed at the
+  // joint: c2-hunting-knife's guide, live 2291 has its line and arc at their length shares after the spline).
+  GeomConvert_CompCurveToBSplineCurve join;
+  for (const occ::handle<Geom_BSplineCurve>& piece : pieces)
+    if (!join.Add(piece, tol, false, false))
+      return nullptr;
   occ::handle<Geom_BSplineCurve> out = join.BSplineCurve();
   if (out.IsNull())
     return nullptr;
   if (out->StartPoint().Distance(from) > out->EndPoint().Distance(from))
     out->Reverse();
   return out;
+}
+
+// `c` on [0, 1] with at least degree `d` and every knot of `with` (as many times).
+void match_curve(const occ::handle<Geom_BSplineCurve>& c, int d, const occ::handle<Geom_BSplineCurve>& with)
+{
+  if (c->Degree() < d)
+    c->IncreaseDegree(d);
+  if (!with.IsNull())
+    c->InsertKnots(with->Knots(), with->Multiplicities(), 1e-12, false);
+}
+
+// `x` and `y` on one degree (at least `d`) and one knot vector.
+void match_curves(const occ::handle<Geom_BSplineCurve>& x, const occ::handle<Geom_BSplineCurve>& y, int d)
+{
+  d = std::max({d, x->Degree(), y->Degree()});
+  match_curve(x, d, nullptr);
+  match_curve(y, d, nullptr);
+  match_curve(x, d, y);
+  match_curve(y, d, x);
+}
+
+occ::handle<Geom_BSplineCurve> unit_range(const occ::handle<Geom_BSplineCurve>& c, bool reversed)
+{
+  occ::handle<Geom_BSplineCurve> out = occ::down_cast<Geom_BSplineCurve>(c->Copy());
+  if (reversed)
+    out->Reverse();
+  NCollection_Array1<double> knots = out->Knots();
+  BSplCLib::Reparametrize(0.0, 1.0, knots);
+  out->SetKnots(knots);
+  return out;
+}
+
+// The coefficients of a polynomial on [0, 1] (its Bezier coefficients `bezier`) in `basis`'s B-spline basis.
+std::vector<double> in_basis(const std::vector<double>& bezier, const occ::handle<Geom_BSplineCurve>& basis)
+{
+  const int                  n = (int)bezier.size();
+  NCollection_Array1<gp_Pnt> poles(1, n);
+  NCollection_Array1<double> knots(1, 2);
+  NCollection_Array1<int>    mults(1, 2);
+  for (int i = 0; i < n; ++i)
+    poles(i + 1) = gp_Pnt(0, 0, bezier[i]);
+  knots(1) = 0;
+  knots(2) = 1;
+  mults(1) = mults(2) = n;
+  occ::handle<Geom_BSplineCurve> f(new Geom_BSplineCurve(poles, knots, mults, n - 1));
+  match_curve(f, basis->Degree(), basis);
+  std::vector<double> out;
+  for (int i = 1; i <= f->NbPoles(); ++i)
+    out.push_back(f->Pole(i).Z());
+  return out;
+}
+
+// Parasolid's patch between two profiles `a`, `b` (u) and two guides `g0`, `g1` along its sides (v), all running from
+// the u = 0 / v = 0 corner: the profiles blended linearly in v, each guide's difference from that blend faded across
+// by the cubic Hermite (1 - 3u² + 2u³ from g0): live 2291's face to 0.01 µm. Exact as a B-spline; null for rational
+// curves.
+occ::handle<Geom_BSplineSurface> hermite_coons(occ::handle<Geom_BSplineCurve> a, occ::handle<Geom_BSplineCurve> b,
+                                               occ::handle<Geom_BSplineCurve> g0, occ::handle<Geom_BSplineCurve> g1)
+{
+  if (a->IsRational() || b->IsRational() || g0->IsRational() || g1->IsRational())
+    return nullptr;
+  match_curves(a, b, 3);
+  match_curves(g0, g1, 1);
+  const int du = a->Degree(), dv = g0->Degree();
+  if (a->NbPoles() != b->NbPoles() || g0->NbPoles() != g1->NbPoles())
+    return nullptr;
+  const std::vector<double> h0 = in_basis({1, 1, 0, 0}, a), h1 = in_basis({0, 0, 1, 1}, a), lv = in_basis({0, 1}, g0);
+  const int                 nu = a->NbPoles(), nv = g0->NbPoles();
+  if ((int)h0.size() != nu || (int)lv.size() != nv)
+    return nullptr;
+  const gp_XYZ a0 = a->StartPoint().XYZ(), a1 = a->EndPoint().XYZ(), b0 = b->StartPoint().XYZ(), b1 = b->EndPoint().XYZ();
+  NCollection_Array2<gp_Pnt> poles(1, nu, 1, nv);
+  for (int i = 1; i <= nu; ++i)
+    for (int j = 1; j <= nv; ++j)
+    {
+      const double w  = lv[j - 1];
+      const gp_XYZ d0 = g0->Pole(j).XYZ() - a0 * (1 - w) - b0 * w, d1 = g1->Pole(j).XYZ() - a1 * (1 - w) - b1 * w;
+      poles(i, j)     = gp_Pnt(a->Pole(i).XYZ() * (1 - w) + b->Pole(i).XYZ() * w + d0 * h0[i - 1] + d1 * h1[i - 1]);
+    }
+  return new Geom_BSplineSurface(poles, a->Knots(), g0->Knots(), a->Multiplicities(), g0->Multiplicities(), du, dv);
 }
 
 // A face filling the loop of `bounds` (four chains of edges in order round it: the profiles' and guides' own edges)
@@ -727,10 +860,9 @@ TopoDS_Face face_on_edges(const std::vector<TopoDS_Shape>& bounds, double tol)
     sides.push_back(c);
     at = c->EndPoint();
   }
-  // Stretch style: through the four curves exactly, area within live's band (Coons style is 0.05 % over); the inside
-  // isn't live's yet (the blade's volume +2.9 %, asked live).
-  GeomFill_BSplineCurves fill(sides[0], sides[1], sides[2], sides[3], std::getenv("NOSHAPE_LOFT_COONS") ? GeomFill_CoonsStyle : GeomFill_StretchStyle);
-  const occ::handle<Geom_BSplineSurface> surface = fill.Surface();
+  // Round the loop: profile a, guide g1, profile b back, guide g0 back.
+  const occ::handle<Geom_BSplineSurface> surface = hermite_coons(unit_range(sides[0], false), unit_range(sides[2], true),
+                                                                 unit_range(sides[3], true), unit_range(sides[1], false));
   if (surface.IsNull())
     return TopoDS_Face();
   // The loop round the surface's normal (the other way it bounds the rest of the plane).
@@ -931,6 +1063,17 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
       const double t = (u - ua[s]) / (ua[s + 1] - ua[s]);
       return b_at(sb[k] + lb * (ub[s] + (ub[s + 1] - ub[s]) * t));
     };
+    // One patch between two guides along its sides (c2-hunting-knife's Loft 3, closing a hole): bounded by the
+    // profiles' and guides' own edges, as Parasolid's face (it shares them with the faces around the hole).
+    if (sa.size() == 2 && cols.front() >= 0 && cols.back() >= 0 && vlo == 0 && vhi == 1 && !trim_profiles)
+    {
+      const TopoDS_Face exact = face_on_edges({A.wire, gs[cols.back()].shape, B.wire, gs[cols.front()].shape}, tol);
+      if (!exact.IsNull())
+      {
+        sew.Add(as_analytic(exact, 1e-6 * (1 + size)));
+        continue;
+      }
+    }
     std::vector<std::vector<gp_Pnt>> grid(NU + 1, std::vector<gp_Pnt>(NV + 1));
     for (int i = 0; i <= NU; ++i)
     {
@@ -950,16 +1093,7 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
         grid[i][j] = gp_Pnt(s);
       }
     }
-    TopoDS_Face face = simplest_face(grid, 1e-6 * (1 + size));
-    // One patch between two guides along its sides (c2-hunting-knife's Loft 3, closing a hole): bounded by the
-    // profiles' and guides' own edges, as Parasolid's face (it shares them with the faces around the hole).
-    if (sa.size() == 2 && cols.front() >= 0 && cols.back() >= 0 && vlo == 0 && vhi == 1 && !trim_profiles)
-    {
-      const TopoDS_Face exact = face_on_edges({A.wire, gs[cols.back()].shape, B.wire, gs[cols.front()].shape}, tol);
-      if (!exact.IsNull())
-        face = as_analytic(exact, 1e-6 * (1 + size));
-    }
-    sew.Add(face);
+    sew.Add(simplest_face(grid, 1e-6 * (1 + size)));
   }
   sew.Perform();
   return wrap(sew.SewedShape());
