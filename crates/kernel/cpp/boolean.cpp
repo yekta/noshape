@@ -4117,7 +4117,9 @@ bool loop_joint_candidates(const TopoDS_Shape& s)
   return false;
 }
 
-TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
+// `refit`: the joined edge's curves on its faces checked against its 3D curve, its tolerance what they need (an
+// imported STEP's pieces: their curves on the faces don't follow the 3D curve's parameter exactly).
+TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist, bool refit = false)
 {
   {
     const KernelTimer timer("unify.loop_check");
@@ -4373,6 +4375,11 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
       continue;
     B.SameRange(E, true);
     B.SameParameter(E, true);
+    if (refit)
+    {
+      B.SameParameter(E, false);
+      BRepLib::SameParameter(E, tol);
+    }
     rs->Replace(chain.front().Oriented(TopAbs_FORWARD), chain.front().Orientation() == TopAbs_REVERSED ? TopoDS::Edge(E.Reversed()) : E);
     for (size_t k = 1; k < chain.size(); ++k)
       rs->Remove(chain[k].Oriented(TopAbs_FORWARD));
@@ -8866,6 +8873,38 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
     else
       joined.Nullify();
   }
+  // Pieces whose curves on the faces run over other ranges than their 3D curve (a STEP edge's needn't be the same:
+  // join_loop_pieces leaves those): on a copy whose edges take their curve's range, joined if that comes out valid
+  // with fewer edges (c2-fan-blade-sweep's blade, 120 edges for live's 119). `ranged_face`: a face's copy and join.
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> ranged_face;
+  if (periodic && any)
+  {
+    BRepBuilderAPI_Copy ranged(result, true, false);
+    for (TopExp_Explorer e(ranged.Shape(), TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge& x = TopoDS::Edge(e.Current());
+      if (BRep_Tool::SameRange(x) && BRep_Tool::SameParameter(x))
+        continue;
+      BRepLib::SameRange(x);
+      BRepLib::SameParameter(x, Precision::Confusion());
+    }
+    HHist              again;
+    const TopoDS_Shape j = join_loop_pieces(ranged.Shape(), again, true);
+    ShapeIMap          before, after;
+    TopExp::MapShapes(result, TopAbs_EDGE, before);
+    TopExp::MapShapes(j, TopAbs_EDGE, after);
+    if (!j.IsSame(ranged.Shape()) && after.Extent() < before.Extent() && BRepCheck_Analyzer(j).IsValid())
+    {
+      for (TopExp_Explorer f(result, TopAbs_FACE); f.More(); f.Next())
+      {
+        TopoDS_Shape x = ranged.ModifiedShape(f.Current());
+        if (!again.IsNull() && !again->Modified(x).IsEmpty())
+          x = again->Modified(x).First();
+        ranged_face.Bind(f.Current(), x);
+      }
+      result = j;
+    }
+  }
   // A merged periodic face Parasolid couldn't bound: the part merged across planes only.
   if (periodic && !closes_without_seams(result) && closes_without_seams(s.shape))
     return merge_same_surface_faces(s, false);
@@ -8882,6 +8921,8 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
     f = whole->Value(f);
     if (!joined.IsNull() && !joined->Modified(f).IsEmpty())
       f = joined->Modified(f).First();
+    if (const TopoDS_Shape* r = ranged_face.Seek(f))
+      f = *r;
     const int k = nm.FindIndex(f);
     out.face_map.push_back(k > 0 ? (uint32_t)(k - 1) : UINT32_MAX);
   }

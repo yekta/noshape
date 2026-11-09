@@ -870,8 +870,15 @@ impl<'a> Translator<'a> {
         let mut ours = Vec::new();
         let part_query = if studio.is_null() { param("parts") } else { studio["partQuery"].clone() };
         for q in part_query["queries"].as_array().into_iter().flatten() {
+            // (qEverything(EntityType.BODY)'s ids start with the source's default bodies, its origin and planes, which
+            // aren't parts: live 2340, c2-fan-blade-sweep's Derived 2.)
+            let everything = q["queryString"].as_str().is_some_and(|s| s.contains("qEverything(EntityType.BODY)"));
             for id in q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str) {
-                ours.push(parts.get(id).cloned().ok_or_else(|| format!("Derived: the source's part {id} not built"))?);
+                match parts.get(id) {
+                    Some(p) => ours.push(p.clone()),
+                    None if everything => {}
+                    None => return Err(format!("Derived: the source's part {id} not built")),
+                }
             }
         }
         let mut params = Map::new();
