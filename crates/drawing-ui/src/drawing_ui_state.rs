@@ -261,11 +261,17 @@ impl DrawingEditor {
         annotations.extend(sheet_sketch_items(&sheet.sketch).into_iter().map(|k| (k, String::new())));
         annotations.sort();
         // What is drawn in selection colours (README "### Drawings"; live 2068): selected views; the Projected
-        // tool's parent drawn picked after Insert view placed it.
+        // tool's parent drawn picked after Insert view placed it. Live's reader (2402) says VIEW for a view drawn
+        // with the dark selection frame and EDGE for orange inside a view without it: a selected section, auxiliary
+        // or detail view is drawn with the light frame (a projected view either way, by its pixels: block-drawing's
+        // Right VIEW, its Top EDGE).
         let mut selection: Vec<(String, String)> = Vec::new();
         for s in &self.selection {
             match s {
-                Sel::View(id) => selection.push(("VIEW".into(), self.ui_view_name(*id))),
+                Sel::View(id) => {
+                    let framed = !sheet.view(*id).is_some_and(|v| matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Auxiliary { .. } | ViewKind::Detail { .. }));
+                    selection.push((if framed { "VIEW" } else { "EDGE" }.into(), self.ui_view_name(*id)));
+                }
                 Sel::Edge(id, _) => selection.push(("EDGE".into(), self.ui_view_name(*id))),
                 // Live's recorder can't read an annotation's selection (a clicked callout records []: live2's batch
                 // 9 and 10 recordings), so neither side records one.
