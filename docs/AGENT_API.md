@@ -615,7 +615,7 @@ Examples:
 
 A Part Studio's FeatureScript representation (Tab › Show code).
 
-The view-only code the Part Studio tab's Show code panel shows: the FeatureScript version and geometry.fs import, the "Default Units" annotation, main / build / buildPrivate = definePartStudio(…), and one `features.<id> = function(id) { … }` block per feature in list order. Queries are written as qUnion([]).
+The view-only code the Part Studio tab's Show code panel shows: the FeatureScript version and geometry.fs import, the "Default Units" annotation, main / build / buildPrivate = definePartStudio(…), and one `features.<id> = function(id) { … }` block per feature in list order: every parameter of std's precondition (enums as `Type.VALUE`, quantities as `{ 'value' : try(…), 'expression' : "…" }.value`), selections as packed persistent queries (`qCompressed`) in Onshape's form with our feature and sketch entity ids, a sketch's entities, constraints and initial guess.
 
 Examples:
 

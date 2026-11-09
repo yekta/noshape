@@ -27,7 +27,7 @@ pub mod table;
 pub use provider::{CustomFeatureProvider, DocImports, DocumentScripts, compile_in_document, compile_with_imports, doc_imports, external_studio, external_tab, set_external_tab_loader};
 pub use run::evaluate;
 pub use noshape_featurescript::lexer::symbol_occurrences;
-pub use studio::{CompiledStudio, CustomFeatureDef, Diagnostic, ParamDecl, Severity, compile, lookup};
+pub use studio::{CompiledStudio, CustomFeatureDef, Diagnostic, ParamDecl, ParamKindFs, Severity, compile, lookup};
 
 /// Provider for regenerations without an explicit one: the most recently
 /// compiled Feature Studios (registered by [`DocumentScripts::from_document`]).

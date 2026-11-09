@@ -207,13 +207,23 @@ impl PartStudioView {
     /// part-studio/615, dom/fs-showcode.txt).
     pub fn show_code(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let units = self.doc.read(cx).session.doc.settings.units;
-        let Some(code) = self.studio(cx).map(|ps| noshape_ops::show_code::part_studio_code(ps, &units)) else { return };
+        let Some(ps) = self.studio(cx).cloned() else { return };
         self.right_panel = None;
-        self.ui.show_code = Some(crate::part_studio_hooks::code_view(code, window, cx));
+        self.ui.show_code = Some(None);
+        let code = cx.background_spawn(async move { noshape_ops::show_code::part_studio_code(&ps, &units) });
+        self.ui.show_code_task = Some(cx.spawn_in(window, async move |this, cx| {
+            let code = code.await;
+            let _ = this.update_in(cx, |this, window, cx| {
+                if this.ui.show_code.is_some() {
+                    this.ui.show_code = Some(Some(crate::part_studio_hooks::code_view(code, window, cx)));
+                    cx.notify();
+                }
+            });
+        }));
         cx.notify();
     }
 
-    fn render_code_panel(&self, view: AnyView, cx: &mut Context<Self>) -> AnyElement {
+    fn render_code_panel(&self, view: Option<AnyView>, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         crate::ui::right_resizable(v_flex().relative(), 6.)
             .w(px(crate::ui::right_panel_w() + 6.))
@@ -243,7 +253,7 @@ impl PartStudioView {
                             })),
                     ),
             )
-            .child(div().flex_1().min_h_0().child(view))
+            .child(div().flex_1().min_h_0().children(view))
             .into_any_element()
     }
 

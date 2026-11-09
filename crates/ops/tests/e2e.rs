@@ -388,6 +388,110 @@ fn show_code_lists_each_feature() {
     assert_eq!(e.param.as_deref(), Some("tab"), "{e:?}");
 }
 
+/// Live's "fs pack src" Part Studio (dom/fs-packed-query.txt) built here: Show code reads as live's capture
+/// (dom/fs-showcode.txt) with our ids for live's.
+#[test]
+fn show_code_reads_as_lives_capture() {
+    let path = scratch("show-code-live.noshape");
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "circle", "points": [[60, 15], [65, 15]] }));
+    let regions = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" }))["regions"].clone();
+    let region = |at: f64| regions.as_array().unwrap().iter().find(|r| (r["area"].as_f64().unwrap_or(0.0) - at).abs() < 1.0).unwrap_or(&regions[0])["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region(1200.0)], "depth": "10 mm" } }));
+    let edge = |ctx: &mut Ctx, at: [f64; 3]| call(ctx, "query_entities", json!({ "kind": "edges", "at": [at] }))["edges"][0]["id"].as_str().unwrap().to_string();
+    let face = |ctx: &mut Ctx, at: [f64; 3]| call(ctx, "query_entities", json!({ "kind": "faces", "at": [at] }))["faces"][0]["id"].as_str().unwrap().to_string();
+    let e = edge(&mut ctx, [0.0, 0.0, 5.0]);
+    call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": [e], "radius": "3 mm" } }));
+    let e = edge(&mut ctx, [20.0, 30.0, 10.0]);
+    call(&mut ctx, "feature_add", json!({ "type": "chamfer", "params": { "entities": [e], "width": "2 mm" } }));
+    call(&mut ctx, "feature_add", json!({ "type": "cPlane", "params": { "entities": ["plane:top"], "cplaneType": "OFFSET", "offset": "25 mm" } }));
+    let top = face(&mut ctx, [20.0, 10.0, 10.0]);
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region(78.5)], "endBound": "UP_TO_SURFACE", "endBoundEntityFace": [top] } }));
+    let (front, back) = (face(&mut ctx, [20.0, 0.0, 5.0]), face(&mut ctx, [20.0, 30.0, 4.0]));
+    call(&mut ctx, "feature_add", json!({ "type": "cPlane", "params": { "entities": [front, back], "cplaneType": "MID_PLANE" } }));
+    call(&mut ctx, "feature_add", json!({ "type": "cPlane", "params": { "entities": ["plane:top", "origin"], "cplaneType": "PLANE_POINT" } }));
+    let code = call(&mut ctx, "tab_show_code", json!({ "tab": "Part Studio 1" }))["code"].as_str().unwrap().to_string();
+    if let Ok(out) = std::env::var("SHOW_CODE_OUT") {
+        std::fs::write(out, &code).unwrap();
+    }
+    // Live's sketch entities by their initial guess (the same geometry), its features by their order.
+    const LIVE_GUESS: &str = "\"r0\" : [0.0, 0.0, 1.0, 0.0, 0.0, 0.04], \"r1\" : [0.04, 0.0, 0.0, 1.0, 0.0, 0.03], \"r2\" : [0.04, 0.03, -1.0, 0.0, 0.0, 0.04], \"r3\" : [0.0, 0.03, 0.0, -1.0, 0.0, 0.03], \"c1\" : [0.06, 0.015, 1.0, 0.0, 0.005, -1.0]";
+    const LIVE_QUERIES: [&str; 9] = [
+        "%B5$QueryM4Sa$entityTypeBa$EntityTypeS4$FACESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S3.7$TopplaneOpS9$queryTypeS5$DUMMY",
+        "&1f3$eJydkFFPwjAUhf/M9VFCC2PwuHUFGoXhbX3AF7KtjTQGNrui2b+3DEM0mpj40vSec79ze3uTRvBwMq5bRZJQ0LYtDqV9PhXe1ses8EVCVvSno7rGyCmofJPf54ttuJqjt96aNhknlA1DWgnaOPtm9NzVh14pLk3dGU4L4NdCjoFnCx6QvW197brPeIY8USJfB6NujOsnC51SEDohkpDBBObl0yOtl9F+MzMpm+yG79aZvJEzeD1v1QdpkHdcseWOr5VQW2mgfTG+2l8eILSk4IYY4QRjnOKMVSH8Vg9isIfG2aPHSsYgVhsUa5WRy3o47s8rhCVWqNGcs8gXmdCgkxGS6G+O/pMb/cphxOLwsfOE8e/eB3T+mcU=",
+        "%B5$QueryM5S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA2C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2$r0C0M5R4R5R6R7R8RaRbRcRdS2$r3R4R5R6R7R8CbA1S11.9$FyUE18XOUbMicpL_0opExtrudeRbSa$SWEPT_EDGE",
+        "%B5$QueryM6S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA1C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2$r2R4R5R6R7S7$isStartFR8CbA1S11.9$FyUE18XOUbMicpL_0opExtrudeRbS8$CAP_EDGE",
+        "%B5$QueryM4Sa$entityTypeBa$EntityTypeS4$FACESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S3.7$TopplaneOpS9$queryTypeS5$DUMMY",
+        "%B5$QueryM5S12$disambiguationDataA1M2S12$disambiguationTypeS8$TOPOLOGYS8$entitiesA1A2C0M5Sb$derivedFromC0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2$c1R5R6R7R8R9CcA1S-d.7$imprintRcS7$IMPRINTD1R5C7S4$FACER7R8R9R12RcR13",
+        "&1a0$eJx1kN9vgjAQx/+Z2+tCERAfoRRtJuCumMy9kFYabbYJKzUb//1EE18WH+8+ue+Pe0pDeD1rOxaRID60ZpBfyhzO0pnulEknE1L4/0k99lqQGVTIl7xM1k3GNqzMWEl3YgGdNQdzkp9DElCvCIUEfXLGjdNVKoHdBxEAy5ZMKDiawXX2toyBIktqXpUX0PXaXi15m/rA24QIQp4jyNX71u9W4XGz0CmNGu/HWF31F/fvqc5VqAXxwmq6alhZ83onNAwf2u2PtwC8FT5Yb0qIAYYY4RxjlKhwj1dEHiP/MZphQKNLsTyhbKJiDmYQTlqXY0zVLf8C8nHLSPxWbVVh9v268bqe/Tp7bjWq6QPJppkU/gAsoIUJ",
+        "%B5$QueryM2S9$queryTypeB9$QueryTypeS5$UNIONSa$subqueriesA2C0M5S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA1C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpR0Sd$SKETCH_ENTITYSe$sketchEntityIdS2$r0R7CaS4$FACER9RaRbCfA1S11.9$FyUE18XOUbMicpL_0opExtrudeR0Sa$SWEPT_FACEC0M5R3A1M2R4R5R6A1C0M5R7R8R9RaRbRdR0ReRfS2$r2R7R15R9RaRbR17R0R18",
+        "%B5$QueryM2S9$queryTypeB9$QueryTypeS5$UNIONSa$subqueriesA2C0M4Sa$entityTypeBa$EntityTypeS4$FACESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S3.7$TopplaneOpR0S5$DUMMYC0M4R3C6S6$VERTEXR5R6R7CbA1S6.7$OriginpointOpR0Ra",
+    ];
+    let guesses = |text: &str| -> Vec<(String, String)> { text.split("], ").map(|e| { let (id, v) = e.split_once(" : ").unwrap(); (id.trim_matches('"').to_string(), v.trim_end_matches(']').to_string()) }).collect() };
+    let ours_guess = code.lines().find_map(|l| l.trim().strip_prefix("const initialGuess")).and_then(|l| l.split_once("= { ")).map(|(_, r)| r.trim_end_matches(" };").to_string()).unwrap();
+    let ours = guesses(&ours_guess);
+    let mut names: std::collections::HashMap<String, String> = guesses(LIVE_GUESS).into_iter().map(|(id, v)| (id, ours.iter().find(|(_, w)| *w == v).unwrap_or_else(|| panic!("no entity like live's {v} in {ours_guess}")).0.clone())).collect();
+    let fids: Vec<String> = code.lines().filter_map(|l| l.trim().strip_prefix("features.").and_then(|r| r.split_once(" = function")).map(|(f, _)| f.to_string())).collect();
+    names.insert("FbZU2oH5hP9eBC6_0".into(), fids[0].clone());
+    names.insert("FyUE18XOUbMicpL_0".into(), fids[1].clone());
+    use noshape_model::custom::host::packed::{Packed, unpack};
+    fn rename(p: &Packed, names: &std::collections::HashMap<String, String>) -> Packed {
+        match p {
+            Packed::Str(s) => Packed::Str(s.split('.').map(|x| names.get(x).cloned().unwrap_or_else(|| x.to_string())).collect::<Vec<_>>().join(".")),
+            Packed::Map(m) => Packed::Map(m.iter().map(|(k, v)| (rename(k, names), rename(v, names))).collect()),
+            Packed::Array(a) => Packed::Array(a.iter().map(|v| rename(v, names)).collect()),
+            Packed::Tagged(t, v) => Packed::Tagged(t.clone(), Box::new(rename(v, names))),
+            other => other.clone(),
+        }
+    }
+    let ours: Vec<&str> = code.split("qCompressed(1.0,\"").skip(1).map(|r| r.split('"').next().unwrap()).collect();
+    assert_eq!(ours.len(), LIVE_QUERIES.len(), "{code}");
+    for (i, (live, ours)) in LIVE_QUERIES.iter().zip(&ours).enumerate() {
+        assert_eq!(unpack(ours).unwrap(), rename(&unpack(live).unwrap(), &names), "query {i}");
+    }
+    // Live's complete parameter lists (the REST-made Fillet and Chamfer carry only what was sent): each key in
+    // order, and the enums as live writes them.
+    const LIVE_PARAMS: [(&str, &str, &str, &str); 5] = [
+        ("Extrude 1", "extrude", "domain,bodyType,operationType,surfaceOperationType,flatOperationType,entities,surfaceEntities,wallShape,midplane,thickness1,flipWall,thickness2,thickness,endBound,oppositeDirection,depth,endBoundEntityFace,endBoundEntityBody,endBoundEntityVertex,hasOffset,offsetDistance,offsetOppositeDirection,hasExtrudeDirection,extrudeDirection,startOffset,startOffsetBound,startOffsetDistance,startOffsetOppositeDirection,startOffsetEntity,symmetric,hasDraft,draftAngle,draftPullDirection,hasSecondDirection,secondDirectionBound,secondDirectionOppositeDirection,secondDirectionDepth,secondDirectionBoundEntityFace,secondDirectionBoundEntityBody,secondDirectionBoundEntityVertex,hasSecondDirectionOffset,secondDirectionOffsetDistance,secondDirectionOffsetOppositeDirection,hasSecondDirectionDraft,secondDirectionDraftAngle,secondDirectionDraftPullDirection,defaultScope,booleanScope,defaultSurfaceScope,booleanSurfaceScope", "OperationDomain.MODEL,ExtendedToolBodyType.SOLID,NewBodyOperationType.NEW,NewSurfaceOperationType.NEW,FlatOperationType.REMOVE,BoundingType.BLIND,StartOffsetType.BLIND,BoundingType.BLIND"),
+        ("Plane 1", "cPlane", "entities,cplaneType,offset,angle,oppositeDirection,flipAlignment,flipNormal,width,height", "CPlaneType.OFFSET"),
+        ("Extrude 2", "extrude", "domain,bodyType,operationType,surfaceOperationType,flatOperationType,entities,surfaceEntities,wallShape,midplane,thickness1,flipWall,thickness2,thickness,endBound,oppositeDirection,depth,endBoundEntityFace,endBoundEntityBody,endBoundEntityVertex,hasOffset,offsetDistance,offsetOppositeDirection,hasExtrudeDirection,extrudeDirection,startOffset,startOffsetBound,startOffsetDistance,startOffsetOppositeDirection,startOffsetEntity,symmetric,hasDraft,draftAngle,draftPullDirection,hasSecondDirection,secondDirectionBound,secondDirectionOppositeDirection,secondDirectionDepth,secondDirectionBoundEntityFace,secondDirectionBoundEntityBody,secondDirectionBoundEntityVertex,hasSecondDirectionOffset,secondDirectionOffsetDistance,secondDirectionOffsetOppositeDirection,hasSecondDirectionDraft,secondDirectionDraftAngle,secondDirectionDraftPullDirection,defaultScope,booleanScope,defaultSurfaceScope,booleanSurfaceScope", "OperationDomain.MODEL,ExtendedToolBodyType.SOLID,NewBodyOperationType.NEW,NewSurfaceOperationType.NEW,FlatOperationType.REMOVE,BoundingType.UP_TO_SURFACE,StartOffsetType.BLIND,BoundingType.BLIND"),
+        ("Plane 2", "cPlane", "entities,cplaneType,offset,angle,oppositeDirection,flipAlignment,flipNormal,width,height", "CPlaneType.MID_PLANE"),
+        ("Plane 3", "cPlane", "entities,cplaneType,offset,angle,oppositeDirection,flipAlignment,flipNormal,width,height", "CPlaneType.PLANE_POINT"),
+    ];
+    for (name, function, keys, enums) in LIVE_PARAMS {
+        let head = format!("annotation {{ \"Feature Name\" : \"{name}\" }}");
+        let line = code.lines().skip_while(|l| !l.contains(&head)).nth(1).unwrap_or_else(|| panic!("no {name}"));
+        let body = line.split_once(&format!("{function}(context, id + ")).unwrap_or_else(|| panic!("{name}: {line}")).1;
+        let ours_keys: Vec<&str> = body.split("\" : ").filter_map(|x| x.rsplit('"').next()).collect();
+        let ours_keys = ours_keys[..ours_keys.len() - 1].join(",");
+        assert_eq!(ours_keys, keys, "{name}'s parameters");
+        let ours_enums: Vec<&str> = body.split(&[' ', ',', '{', '}'][..]).filter(|w| w.contains('.') && w.starts_with(|c: char| c.is_ascii_uppercase()) && !w.contains('(')).collect();
+        assert_eq!(ours_enums.join(","), enums, "{name}'s enums");
+    }
+    // The sketch's entities and the rectangle's corners, as live writes them.
+    const LIVE_SKETCH: [&str; 9] = [
+        "skLineSegment(sketch, \"r0\", { \"construction\" : false, \"index\" : \"1\" });",
+        "skLineSegment(sketch, \"r1\", { \"construction\" : false, \"index\" : \"2\" });",
+        "skLineSegment(sketch, \"r2\", { \"construction\" : false, \"index\" : \"3\" });",
+        "skLineSegment(sketch, \"r3\", { \"construction\" : false, \"index\" : \"4\" });",
+        "skCircle(sketch, \"c1\", { \"construction\" : false, \"index\" : \"1\" });",
+        "skConstraint(sketch, \"k0\", { \"constraintType\" : ConstraintType.COINCIDENT, \"index\" : \"1\", \"name\" : \"\", \"localFirst\" : \"r0.end\", \"localSecond\" : \"r1.start\" });",
+        "skConstraint(sketch, \"k1\", { \"constraintType\" : ConstraintType.COINCIDENT, \"index\" : \"2\", \"name\" : \"\", \"localFirst\" : \"r1.end\", \"localSecond\" : \"r2.start\" });",
+        "skConstraint(sketch, \"k2\", { \"constraintType\" : ConstraintType.COINCIDENT, \"index\" : \"3\", \"name\" : \"\", \"localFirst\" : \"r2.end\", \"localSecond\" : \"r3.start\" });",
+        "skConstraint(sketch, \"k3\", { \"constraintType\" : ConstraintType.COINCIDENT, \"index\" : \"4\", \"name\" : \"\", \"localFirst\" : \"r3.end\", \"localSecond\" : \"r0.start\" });",
+    ];
+    for live in LIVE_SKETCH {
+        let mut line = live.to_string();
+        for (from, to) in &names {
+            line = line.replace(&format!("\"{from}\""), &format!("\"{to}\"")).replace(&format!("\"{from}."), &format!("\"{to}."));
+        }
+        assert!(code.lines().any(|l| l.trim() == line), "{line}\n{code}");
+    }
+}
+
 /// Two tabs of one name (two imports of one file): the name is an error that
 /// gives both ids, never silently the first tab; each id works.
 #[test]

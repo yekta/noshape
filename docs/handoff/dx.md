@@ -21,8 +21,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   feature-studio-ui (`ReadonlyCode`, hook `code_view`). The text is live's frame (ops `show_code.rs`, new op
   `tab_show_code`, e2e `show_code_lists_each_feature`): header, Default Units, main/build/buildPrivate =
   definePartStudio, one `features.F<id>` block per feature, values as `{ 'value' : try(…), 'expression' : "…" }.value`.
-  Not yet as live: queries are `qUnion([])` (live packs them with qCompressed), enums are quoted option ids (live
-  `CPlaneType.OFFSET`), feature ids are ours. fs-ps-show-code's last difference is live's take without Export…
+  Since 07:43 (lead: read like live's): every parameter of std's precondition in its order (custom
+  `std_feature::std_params`), enums `Type.VALUE`, unset values in Onshape's stored form ("0.025*m", "3.0*deg"),
+  angles "deg"; selections as live's persistent queries (DUMMY planes / Origin, IMPRINT regions, SWEPT_FACE /
+  SWEPT_EDGE / CAP_FACE / CAP_EDGE / SWEPT_BODY with ORIGINAL_DEPENDENCY, UNION for several) packed by
+  `host::packed::pack` (writes live's 12 strings byte for byte); sketches as skLineSegment / skCircle / skArc /
+  skPoint, corner COINCIDENTs, our constraints, the initial guess. e2e `show_code_reads_as_lives_capture` builds
+  "fs pack src" and checks against dom/fs-showcode.txt: all 9 queries, the Extrudes' and Planes' parameter lists and
+  enums, the sketch's entity and corner lines. Waiting on live2's UI-built capture (REQUESTS 07:30) for: what the UI
+  stores (all parameters? defaults' text), dimensions, arcs and points in a sketch, constraints to the origin; the
+  mate connector's queries aren't built here yet. fs-ps-show-code's last difference is live's take without Export…
   (re-record asked, REQUESTS 07:13).
 - **Notices counts:** live2 asked for the texts (REQUESTS 07:13): fs-shortcuts-sheet (the runner now types "/" for
   shift+/ as Playwright does; live counts 2 notices, ours 1) and fs-ed-error-squiggle (live 1 before Commit, 2

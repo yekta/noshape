@@ -225,6 +225,118 @@ impl Decoder<'_> {
     }
 }
 
+/// Encode a packed query as live's Show code writes it (the inverse of [`unpack`]): maps keyed in order, `R` for a
+/// value written before, `C` for a type name seen before, a string's `.`-pieces as `-<i>` once seen; over 400
+/// characters, zlib-compressed and base64'd (`&<hex length>$…`).
+pub fn pack(p: &Packed) -> String {
+    let plain = pack_plain(p);
+    if plain.len() <= 400 {
+        return plain;
+    }
+    let z = miniz_oxide::deflate::compress_to_vec_zlib(plain.as_bytes(), 6);
+    format!("&{:x}${}", plain.len(), base64_encode(&z))
+}
+
+/// [`pack`]'s `%…` text, uncompressed.
+pub fn pack_plain(p: &Packed) -> String {
+    let mut e = Encoder { out: String::from("%"), names: Vec::new(), values: Vec::new() };
+    e.value(p);
+    e.out
+}
+
+struct Encoder {
+    out: String,
+    names: Vec<String>,
+    values: Vec<Packed>,
+}
+
+impl Encoder {
+    fn name_index(&self, n: &str) -> Option<usize> {
+        self.names.iter().position(|x| x == n)
+    }
+
+    fn value(&mut self, p: &Packed) {
+        if let Some(i) = self.values.iter().position(|v| v == p) {
+            self.out.push_str(&format!("R{i:x}"));
+            return;
+        }
+        match p {
+            Packed::Tagged(t, inner) => {
+                match self.name_index(t) {
+                    Some(i) => self.out.push_str(&format!("C{i:x}")),
+                    None => {
+                        self.out.push_str(&format!("B{:x}${t}", t.len()));
+                        self.names.push(t.clone());
+                    }
+                }
+                self.untracked(inner);
+            }
+            other => self.untracked(other),
+        }
+        self.values.push(p.clone());
+    }
+
+    fn untracked(&mut self, p: &Packed) {
+        match p {
+            Packed::Map(m) => {
+                self.out.push_str(&format!("M{:x}", m.len()));
+                for (k, v) in m {
+                    self.value(k);
+                    self.value(v);
+                }
+            }
+            Packed::Array(a) => {
+                self.out.push_str(&format!("A{:x}", a.len()));
+                for v in a {
+                    self.value(v);
+                }
+            }
+            Packed::Str(s) => {
+                if let Some(i) = self.name_index(s) {
+                    self.out.push_str(&format!("E{i:x}"));
+                    return;
+                }
+                let pieces: Vec<&str> = s.split('.').collect();
+                let mut heads = Vec::new();
+                let mut text = String::new();
+                for piece in &pieces {
+                    match self.name_index(piece) {
+                        Some(i) => heads.push(format!("-{i:x}")),
+                        None => {
+                            heads.push(format!("{:x}", piece.len()));
+                            text.push_str(piece);
+                            self.names.push(piece.to_string());
+                        }
+                    }
+                }
+                self.out.push_str(&format!("S{}${text}", heads.join(".")));
+                if pieces.len() > 1 {
+                    self.names.push(s.clone());
+                }
+            }
+            Packed::Num(n) => self.out.push_str(&format!("D{n}")),
+            Packed::Bool(b) => self.out.push(if *b { 'T' } else { 'F' }),
+            Packed::Tagged(..) => self.value(p),
+        }
+    }
+}
+
+fn base64_encode(data: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    for c in data.chunks(3) {
+        let n = (u32::from(c[0]) << 16) | (u32::from(*c.get(1).unwrap_or(&0)) << 8) | u32::from(*c.get(2).unwrap_or(&0));
+        for k in 0..4 {
+            if k <= c.len() {
+                out.push(T[(n >> (18 - 6 * k) & 63) as usize] as char);
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
 fn base64(s: &str) -> Option<Vec<u8>> {
     let val = |c: u8| -> Option<u32> {
         Some(match c {
@@ -412,4 +524,28 @@ mod tests {
         let ids: Vec<&String> = all.windows(2).filter(|w| w[0] == "sketchEntityId").map(|w| &w[1]).collect();
         assert_eq!(ids, ["Ot7eIv3bhWER", "y3ipKFIl9DYz.start", "y3ipKFIl9DYz"]);
     }
+
+    /// Live's own packed queries (dom/fs-showcode.txt, Part Studio "fs pack src"; the compressed ones as their text):
+    /// packing what they unpack to writes them again, byte for byte; a long one compresses and reads back.
+    #[test]
+    fn packing_writes_lives_queries_again() {
+        for live in [
+            "%B5$QueryM4Sa$entityTypeBa$EntityTypeS4$FACESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S3.7$TopplaneOpS9$queryTypeS5$DUMMY",
+            "%B5$QueryM5S12$disambiguationDataA1M2S12$disambiguationTypeS8$TOPOLOGYS8$entitiesA4A2C0M5Sb$derivedFromC0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2$r0R5R6R7R8R9CcA1S-d.7$imprintRcS7$IMPRINTD1A2C0M5R4C0M5R5R6R7R8R9RbRcRdReS2$r1R5R6R7R8R9R12RcR13R15A2C0M5R4C0M5R5R6R7R8R9RbRcRdReS2$r2R5R6R7R8R9R12RcR13R15A2C0M5R4C0M5R5R6R7R8R9RbRcRdReS2$r3R5R6R7R8R9R12RcR13R15R5C7S4$FACER7R8R9R12RcR13",
+            "%B5$QueryM5S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA2C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2$r0C0M5R4R5R6R7R8RaRbRcRdS2$r3R4R5R6R7R8CbA1S11.9$FyUE18XOUbMicpL_0opExtrudeRbSa$SWEPT_EDGE",
+            "%B5$QueryM6S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA1C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2$r2R4R5R6R7S7$isStartFR8CbA1S11.9$FyUE18XOUbMicpL_0opExtrudeRbS8$CAP_EDGE",
+            "%B5$QueryM5S12$disambiguationDataA1M2S12$disambiguationTypeS8$TOPOLOGYS8$entitiesA1A2C0M5Sb$derivedFromC0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2$c1R5R6R7R8R9CcA1S-d.7$imprintRcS7$IMPRINTD1R5C7S4$FACER7R8R9R12RcR13",
+            "%B5$QueryM6S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA4C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2$r0C0M5R4R5R6R7R8RaRbRcRdS2$r1C0M5R4R5R6R7R8RaRbRcRdS2$r2C0M5R4R5R6R7R8RaRbRcRdS2$r3R4C6S4$FACER6R7S7$isStartFR8CbA1S11.9$FyUE18XOUbMicpL_0opExtrudeRbS8$CAP_FACE",
+            "%B5$QueryM5S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA4C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2$r0C0M5R4R5R6R7R8RaRbRcRdS2$r1C0M5R4R5R6R7R8RaRbRcRdS2$r2C0M5R4R5R6R7R8RaRbRcRdS2$r3R4C6S4$BODYR6R7R8CbA1S11.9$FyUE18XOUbMicpL_0opExtrudeRbSa$SWEPT_BODY",
+            "%B5$QueryM2S9$queryTypeB9$QueryTypeS5$UNIONSa$subqueriesA2C0M5S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA1C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpR0Sd$SKETCH_ENTITYSe$sketchEntityIdS2$r0R7CaS4$FACER9RaRbCfA1S11.9$FyUE18XOUbMicpL_0opExtrudeR0Sa$SWEPT_FACEC0M5R3A1M2R4R5R6A1C0M5R7R8R9RaRbRdR0ReRfS2$r2R7R15R9RaRbR17R0R18",
+            "%B5$QueryM2S9$queryTypeB9$QueryTypeS5$UNIONSa$subqueriesA2C0M4Sa$entityTypeBa$EntityTypeS4$FACESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S3.7$TopplaneOpR0S5$DUMMYC0M4R3C6S6$VERTEXR5R6R7CbA1S6.7$OriginpointOpR0Ra",
+        ] {
+            let p = unpack(live).unwrap();
+            assert_eq!(pack_plain(&p), live);
+            let packed = pack(&p);
+            assert_eq!(packed.starts_with('&'), live.len() > 400, "{packed}");
+            assert_eq!(unpack(&packed).unwrap(), p);
+        }
+    }
+
 }

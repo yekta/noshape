@@ -92,6 +92,20 @@ fn load(module: &str, name: &str) -> Option<Arc<StdFeature>> {
     Some(Arc::new(StdFeature { cell: cell.clone(), params, specs, editing, manipulator_change }))
 }
 
+/// Std's feature of built-in `type_id` (its function's name): the parameters its precondition declares, in order
+/// (a Part Studio's Show code writes every one). Loads std once.
+pub fn std_params(type_id: &str) -> Option<Vec<ParamDecl>> {
+    let (module, name) = std_name(type_id).or_else(|| {
+        let files = noshape_featurescript::std_files(noshape_featurescript::STD_VERSION).ok()?;
+        let head = format!("export const {type_id} = define");
+        files.iter().find_map(|(module, src)| {
+            let at = src.find(&head)? + "export const ".len();
+            Some((*module, &src[at..at + type_id.len()]))
+        })
+    })?;
+    loaded(module, name).map(|f| f.params.clone())
+}
+
 /// Evaluate the current feature with std's `name` from `module` (e.g.
 /// "sheetMetalFlange.fs", "sheetMetalFlange").
 pub fn evaluate(ev: &mut EvalCtx, module: &'static str, name: &'static str) -> FResult<()> {
