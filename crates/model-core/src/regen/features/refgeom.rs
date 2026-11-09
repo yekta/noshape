@@ -38,17 +38,14 @@ fn not_found(what: &str) -> FeatureError {
     FeatureError::new(format!("Selected {what} could not be resolved"))
 }
 
-/// Point where a vertex reference lies and the normal of one adjacent face.
+/// The world axes at the point a vertex reference lies at.
 fn vertex_csys(ev: &EvalCtx, r: &Reference) -> Option<Csys> {
     let p = ev.resolve_vertex_point(r)?;
     // A part's vertex: the world axes at the point (live "ui (10-25 d)",
     // ui-mass/04: a connector on a block's corner is world-aligned, not
-    // turned to a face).
-    if let Reference::SketchEntity { sketch, .. } = r
-        && let Some(s) = ev.ctx.sketch(*sketch)
-    {
-        return Some(Csys::new(p, s.frame.normal, Some(s.frame.x)));
-    }
+    // turned to a face). A sketch vertex too (cf-surface-pattern's Mate
+    // connector 1 on a sphere's axis end, sketched on a plane off Front: live's
+    // Surface Pattern 3 sets the spheres on the face, up along world Z).
     Some(Csys::new(p, DVec3::Z, Some(DVec3::X)))
 }
 

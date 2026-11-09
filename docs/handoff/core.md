@@ -59,6 +59,14 @@ What blend takes over:
   apart (2411); by live's own rule (coincident rounds joined, its synthetic) ours is right. A Parasolid approximation
   artefact, as cf-straight-spline's (lead 11-05: not imitated). Lead 11-09: agreed: unscored.json takes `"from": <feature
   index>` now (scored before it, not from it on); the spring 12/12 to the end.
+- cf-surface-pattern's Surface Pattern 3 (lead 11-09): its stamp is JTD (Revolve 1's sphere, r 14.35, as live) placed
+  by Mate connector 1 = ON_ENTITY POINT on Sketch 5's axis line start (the sphere's bottom pole; the sketch on a plane
+  off Front, its y world Z). refgeom.rs vertex_csys turned a sketch vertex's connector to the sketch plane (z ±y, from
+  the 10-18 batch, no live evidence): the spheres came sideways, half sunk (85 x ~1,060 mm³; live ~150 each). World
+  axes, as live's part vertices (ui 10-25 d): 129/382/255, live 131/387/258, volume / area / parts now as live.
+  Suite (suite-mc*.log, same build): only cf-surface-pattern changes; no assembly studio has a connector on a sketch
+  vertex (scan: core-scratch /tmp/core-mcscan.py); model 422, model-core 105, ops mate 17 pass; T1 features_b::
+  mate_connector_on_a_sketch_vertex_is_world_aligned. Landing. Next: the 2 faces / 5 edges / 3 vertices left.
 - Queue (lead 09:xx): (1) the spring: live 2411 answered (behaviours "core (2411)"): a union joins truly coincident
   rounds (synthetic: one edge 0..40); the spring keeps a tolerant vertex because Part 1's and Part 2's rounds are
   0-6.33 µm apart: find why ours joins curves 6 µm apart (unify / fuse tolerance), under bool's gate. (2) After the

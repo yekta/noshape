@@ -272,6 +272,21 @@ fn mate_connector_on_a_vertex_is_world_aligned() {
     assert!(vnear(c.z, DVec3::Z) && vnear(c.x, DVec3::X), "z {:?} x {:?}", c.z, c.x);
 }
 
+/// A sketch vertex too, whatever plane it was sketched on (cf-surface-pattern's Mate connector 1 on a sphere's axis
+/// end, sketched off Front: live's Surface Pattern 3 sets the spheres on the face, up along world Z).
+#[test]
+fn mate_connector_on_a_sketch_vertex_is_world_aligned() {
+    let mut s = block();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pt = sk.add_point(DVec2::new(0.01, 0.02));
+    let sketch = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    s.add("mateConnector", |p| p.set("originQuery", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: pt.0 }])));
+    let r = s.ok();
+    let c = &r.context.connectors[0];
+    assert!(vnear(c.origin, DVec3::new(0.01, 0.0, 0.02)), "{:?}", c.origin);
+    assert!(vnear(c.z, DVec3::Z) && vnear(c.x, DVec3::X), "z {:?} x {:?}", c.z, c.x);
+}
+
 #[test]
 fn helix_about_axis_length_and_turns() {
     let mut s = Studio::new();
