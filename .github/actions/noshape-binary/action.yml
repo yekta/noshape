@@ -29,7 +29,7 @@ runs:
         case "$RUNNER_OS" in
           macOS)
             hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" "$RUNNER_TEMP"/release/*.dmg
-            cp -R "$RUNNER_TEMP/dmg/noshape.app" "$RUNNER_TEMP/noshape.app"
+            cp -R "$RUNNER_TEMP"/dmg/*.app "$RUNNER_TEMP/noshape.app"
             hdiutil detach "$RUNNER_TEMP/dmg"
             echo "BIN=$RUNNER_TEMP/noshape.app/Contents/MacOS/noshape" >> "$GITHUB_ENV" ;;
           Linux)

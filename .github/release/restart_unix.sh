@@ -15,7 +15,7 @@ status=0
 if [ "$(uname)" = Darwin ]; then
   dl "noshape-$from-macos-arm64.dmg"
   hdiutil attach -nobrowse -readonly -mountpoint "$work/dmg" "$work/noshape-$from-macos-arm64.dmg"
-  rm -rf /Applications/noshape.app && cp -R "$work/dmg/noshape.app" /Applications/noshape.app
+  rm -rf /Applications/noshape.app && cp -R "$work"/dmg/*.app /Applications/noshape.app
   hdiutil detach "$work/dmg"
   doc="$HOME/Documents/update check.noshape"
   check --exe /Applications/noshape.app/Contents/MacOS/noshape --doc "$doc" --label 'macOS app' -- \
