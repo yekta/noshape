@@ -944,7 +944,7 @@ impl<'a> Translator<'a> {
     }
 
     /// Sketch entity `e` of sketch `oid` moved to live's solved geometry
-    /// (lines, circles, arcs, points and texts; `None`: no solve given or no change).
+    /// (lines, circles, arcs, fit splines, points and texts; `None`: no solve given or no change).
     fn solved_entity(&self, oid: &str, e: &Value) -> Option<Value> {
         let id = e["entityId"].as_str()?;
         let g = self.solved.get(&(oid.to_string(), id.to_string()))?;
@@ -990,6 +990,18 @@ impl<'a> Translator<'a> {
                     }
                     out["startParam"] = json!(t0);
                     out["endParam"] = json!(t1);
+                }
+            }
+            // A fit spline's through points and end derivatives (c2-impeller-loft's Stefevenrohr Führung: its stored
+            // points 0.5 mm from the arcs its ends are coincident with).
+            "interpolatedSplineSegment" if gt.starts_with("BTCurveGeometryInterpolatedSpline") => {
+                let pts: Vec<f64> = g["interpolationPoints"].as_array()?.iter().map(p2).collect::<Option<Vec<_>>>()?.concat();
+                out["geometry"]["interpolationPoints"] = json!(pts);
+                for (key, x, y) in [("startDerivative", "startDerivativeX", "startDerivativeY"), ("endDerivative", "endDerivativeX", "endDerivativeY")] {
+                    if let Some(d) = p2(&g[key]) {
+                        out["geometry"][x] = json!(d[0]);
+                        out["geometry"][y] = json!(d[1]);
+                    }
                 }
             }
             "point" if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchPoint")) => {
@@ -1089,6 +1101,24 @@ impl<'a> Translator<'a> {
                     self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}")), arm.clone());
                 }
                 self.handle_lines.insert((oid.clone(), format!("{eid}.{end}")), [at, tip]);
+            }
+        }
+        // A fit spline's points: live's ends and `<id>.<n>.internal` through points; its `startDerivative` /
+        // `endDerivative` our handles' tips (c2-impeller-loft's Stefevenrohr Führung: its ends coincident with arcs).
+        if let (true, Some(pts)) = (c["type"] == "spline", c["point_ids"].as_array()) {
+            let pts: Vec<&str> = pts.iter().filter_map(Value::as_str).collect();
+            for (n, pid) in pts.iter().enumerate() {
+                self.sketch_entities.insert((oid.clone(), format!("{eid}.{n}.internal")), pid.to_string());
+            }
+            for (end, pid) in [("start", pts.first()), ("end", pts.last())] {
+                if let Some(pid) = pid {
+                    self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}")), pid.to_string());
+                }
+            }
+            for (k, end) in ["startDerivative", "endDerivative"].into_iter().enumerate() {
+                if let Some(tip) = c["handles"].get(k).and_then(Value::as_str) {
+                    self.sketch_entities.entry((oid.clone(), format!("{eid}.{end}"))).or_insert_with(|| tip.to_string());
+                }
             }
         }
         // A Bezier's control polygon: live's `<id>.cppolygon.<n>` lines, pole to pole.
