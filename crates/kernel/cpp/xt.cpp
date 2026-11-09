@@ -893,7 +893,7 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
       if (!up)
       {
         // A seam knot that won't come down: refit periodic round u (only when v stays as it is).
-        occ::handle<Geom_BSplineSurface> refit = vp ? occ::handle<Geom_BSplineSurface>() : periodic_refit(b, true, kPrecision / 10);
+        occ::handle<Geom_BSplineSurface> refit = vp ? occ::handle<Geom_BSplineSurface>() : periodic_refit(b, true, kPrecision);
         up                                     = !refit.IsNull();
         ps                                     = up ? refit : occ::down_cast<Geom_BSplineSurface>(b->Copy());
       }
