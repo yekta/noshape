@@ -1,19 +1,19 @@
 {
  "scenario": "fs-ed-ctrl-click-std",
- "recorded": "2026-11-08T19:25:18.420Z",
+ "recorded": "2026-11-09T06:08:31.025Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "a518ad3a4b4fec8abdc3ffd9",
-  "workspace": "7c041004d559650e89de9000",
-  "element": "62640a55a0bc76488f055d57",
+  "document": "0192d9f4aae6c67bfaeb816f",
+  "workspace": "292e4ef50f11542560655e54",
+  "element": "7f1cbd2b19f77976528cbadf",
   "start": "fs-studio",
-  "startElement": "62640a55a0bc76488f055d57",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "7f1cbd2b19f77976528cbadf",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 31188
+   "t": 28686
   },
   {
    "step": 2,
@@ -233,7 +233,7 @@
      "notices": 0
     }
    },
-   "t": 35781
+   "t": 31994
   },
   {
    "step": 3,
@@ -317,7 +317,7 @@
      "notices": 0
     }
    },
-   "t": 37701
+   "t": 33823
   },
   {
    "step": 4,
@@ -401,7 +401,7 @@
      "notices": 0
     }
    },
-   "t": 39602
+   "t": 35637
   },
   {
    "step": 5,
@@ -483,7 +483,7 @@
      "notices": 0
     }
    },
-   "t": 44038
+   "t": 40720
   },
   {
    "step": 6,
@@ -497,16 +497,17 @@
    "ok": true,
    "at": [
     357,
-    527
+    164
    ],
+   "closedTab": "https://cad.onshape.com/documents/12312312345abcabcabcdeff/v/c31f2dcea3a7abd54f9bf94c/e/c2e68972a0b14c709954d6ca?jumpToI",
    "state": {
     "focus": {
      "kind": "other",
      "tag": "textarea",
-     "text": "\n\n",
+     "text": "annotation { \"Feature Type Name\" : \"My Feature\", \"Feature Type Description\" : \"\" }\n\n",
      "selection": [
-      0,
-      0
+      36,
+      46
      ],
      "all": false
     },
@@ -557,16 +558,16 @@
     "variables": null,
     "featurestudio": {
      "caret": [
-      13,
-      0
+      4,
+      46
      ],
-     "line": "",
+     "line": "annotation { \"Feature Type Name\" : \"My Feature\", \"Feature Type Description\" : \"\" }",
      "lines": 14,
      "committed": false,
      "notices": 0
     }
    },
-   "t": 49224
+   "t": 46019
   }
  ]
 }
