@@ -260,7 +260,10 @@ fn extrude_profile(ev: &EvalCtx, p: &Profile, dir: DVec3) -> FResult<NamedShape>
     if ev.bool("startOffset") {
         if ev.is("startOffsetBound", "BLIND") {
             let d = ev.length("startOffsetDistance")?;
-            start_shift = dir * if ev.bool("startOffsetOppositeDirection") { -d } else { d };
+            // std processStartOffsetData: along the extrude axis before Opposite direction turns it (live:
+            // c2-fan-blade-sweep's Extrude 4, 0.1 mm behind its sketch with Opposite direction ticked).
+            let axis = if ev.bool("oppositeDirection") { -dir } else { dir };
+            start_shift = axis * if ev.bool("startOffsetOppositeDirection") { -d } else { d };
         } else {
             let Some(r) = ev.query("startOffsetEntity").first() else { return err_at(&["startOffsetEntity"], "Select a valid entity.") };
             let t = start_offset_point(ev, r, p.frame.normal)?;

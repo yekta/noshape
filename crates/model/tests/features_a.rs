@@ -2993,3 +2993,21 @@ fn a_profiles_two_arcs_of_one_circle_extrude_to_one_face() {
     let b = &res.context.bodies[0];
     assert_eq!((b.shape.faces().len(), b.shape.edges().len(), b.shape.vertices().len()), (6, 12, 8));
 }
+
+/// A blind start offset runs along the sketch's normal whatever Opposite direction says (std processStartOffsetData:
+/// the extrude axis before it turns; live c2-fan-blade-sweep's Extrude 4: 0.1 mm behind its sketch, then 6 mm the
+/// other way).
+#[test]
+fn a_start_offset_ignores_opposite_direction() {
+    let mut t = T::new();
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.0, 0.0, 0.01, 0.01));
+    let r = t.regions(s)[0].clone();
+    let x = t.extrude(r, "6 mm", "NEW");
+    t.set(x, "startOffset", b(true));
+    t.set(x, "startOffsetBound", en("BLIND"));
+    t.set(x, "startOffsetDistance", e("1 mm"));
+    t.set(x, "oppositeDirection", b(true));
+    let res = t.ok();
+    let bb = res.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!((bb.max.z - 0.001).abs() < 1e-9 && (bb.min.z + 0.005).abs() < 1e-9, "{bb:?}");
+}

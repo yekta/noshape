@@ -38,6 +38,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
+## 11-09 13:03 UTC: c2-fan-blade-sweep Extrude 4: a blind start offset ignores Opposite direction
+
+- "base" 0.2 mm off: Sketch 5's plane is right (our frame = live's, x = -60); Extrude 4 has Starting offset 0.1 mm
+  with Opposite direction: std's processStartOffsetData moves along the extrude axis before Opposite direction turns
+  it, ours moved along the turned one (-59.9 for -60.1). Fixed in extrude.rs (T1 features_a::
+  a_start_offset_ignores_opposite_direction): 26 -> 28/53, model suite 792/947 (nothing else moved). Next: feature 28
+  "Extrude 8", a part too many ("Part 3", 3/2/0 faces/edges/vertices, 72.6 mm³).
+
 ## 11-09 11:51 UTC: c2-fan-blade-sweep 23 -> 26/53: a profile's two arcs of one circle one face
 
 - "klammer" (Extrude 1): Sketch 2's rectangle with two R13 fillets eating its 26 mm side (live keeps a zero-length
