@@ -1,0 +1,34 @@
+{
+ "name": "doc-quick-switch",
+ "about": "Ctrl+Space held: the quick tab switcher (most recent first), Space again, then Ctrl let go (switches)",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "ctrl+Space",
+   "hold": true
+  },
+  {
+   "do": "key",
+   "key": "ctrl+Space",
+   "hold": true
+  },
+  {
+   "do": "release"
+  }
+ ]
+}

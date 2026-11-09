@@ -1,0 +1,33 @@
+{
+ "name": "doc-nested-crumb-home",
+ "about": "In Folder 3: the 🏠 crumb (All tabs) back to the top",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-nested",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 3"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "All tabs"
+   }
+  }
+ ]
+}

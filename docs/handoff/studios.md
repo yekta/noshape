@@ -102,6 +102,12 @@ and labels; via only for Export Drawing (drw-export-dialog) and Export (tab). No
 modal (a CAD file picker), Ctrl/Shift+click tabs, scroll arrows, nested crumbs, Ctrl+Space, shortcuts from the top
 bar, the location box's Sort (ours has none yet), Copy workspace's browser marks. Asked live2 for both chunks.
 
+**2026-11-09 01:36 UTC (psui): documents batch 7, the rest (lead): 10 more scenarios, coverage 88.2 → 91.1 %.**
+Ctrl/Cmd+click and Shift+click a tab (ours now opens it in a new window and this one stays, as the menu's Open in new
+browser tab), the tab bar's scroll arrows (start `doc-many-tabs`, 31 tabs), nested folder crumbs and the … dropdown
+(start `doc-nested`), Ctrl+Space held and released (the runner's new `release` step). The location box's Sort is in
+(4c129d33). Import to Onshape and Copy workspace's New folder: live2 asked to describe them first (REQUESTS).
+
 **Coverage plan (lead: coverage is the lever; largest gap first).** Uncovered: documents/tabs/prefs 81 (74.1 %),
 Variable Studio 30 (69.4 %), versions 27 (83.8 %). `python3 tools/ui-parity/coverage_<area>.py --uncovered` lists
 them; an item counts once a scenario's steps contain one of its `via` chains (tools/ui-parity/universe/<area>.json;

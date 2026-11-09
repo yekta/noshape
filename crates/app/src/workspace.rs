@@ -1516,7 +1516,7 @@ impl Workspace {
                 let probe = bounds.clone();
                 // Live: 87 wide, "…" centred left of the 12 px padding and 2 px
                 // high; its dropdown opens upward from the crumb's left edge.
-                let crumb = breadcrumb("tab-crumbs", grey, Some(grey), false).w(px(87.)).pr(px(12.)).pb(px(8.)).justify_center();
+                let crumb = breadcrumb("tab-crumbs", grey, Some(grey), false).w(px(87.)).pr(px(12.)).pb(px(8.)).justify_center().map(|d| noshape_app_core::ui_script::mark(d, || "crumb:…".into()));
                 row = row.child(crumb.child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()).child("…").on_click(move |_, window, cx| {
                     let (crumbs, v) = (crumbs.clone(), v.clone());
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
@@ -1658,6 +1658,14 @@ impl Workspace {
                     .on_drag_move(gap_here)
                     .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                         if compare_off {
+                            return;
+                        }
+                        // Ctrl/Cmd+click or Shift+click: the tab in a new window, this one stays (live: a new browser
+                        // tab / window; the tab menu's Open in new browser tab).
+                        if e.modifiers().secondary() || e.modifiers().shift {
+                            if let Err(e) = crate::files::open_tab_window(this.doc.clone(), id, this.gpu.clone(), cx) {
+                                log::warn!("Could not open a window: {e}");
+                            }
                             return;
                         }
                         // The first click activated the tab; a double-click does nothing more (live 2279 (b): no
@@ -1866,6 +1874,7 @@ impl Workspace {
         let button = |left: bool, enabled: bool, cx: &mut Context<Self>| {
             div()
                 .id(if left { "tab-scroll-left" } else { "tab-scroll-right" })
+                .map(|d| noshape_app_core::ui_script::mark(d, move || if left { "button:Scroll left".into() } else { "button:Scroll right".into() }))
                 .w(px(24.))
                 .h(px(crate::ui::TAB_BAR_H))
                 .flex_none()
@@ -2634,7 +2643,9 @@ impl Workspace {
     /// before it, whose point it draws over its own notch).
     fn folder_crumb(&self, id: TabId, name: String, prev: Rgba, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
+        let mark = format!("crumb:{name}");
         breadcrumb(SharedString::from(format!("crumb-{id}")), pal.panel, Some(prev), true)
+            .map(|d| noshape_app_core::ui_script::mark(d, || mark))
             .pr(px(12.))
             .child(h_flex().max_w(px(100.)).overflow_hidden().gap(px(5.)).child(div().flex_none().child(folder_glyph(20., pal.text_muted))).child(self.folder_label(id, &name)))
             .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))

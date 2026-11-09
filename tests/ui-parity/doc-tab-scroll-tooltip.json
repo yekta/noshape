@@ -1,0 +1,16 @@
+{
+ "name": "doc-tab-scroll-tooltip",
+ "about": "31 tabs: the › hovered (its tooltip \"Scroll right (RMB: to last)\")",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-many-tabs",
+ "steps": [
+  {
+   "do": "hover",
+   "on": {
+    "button": "Scroll right"
+   },
+   "ms": 1500
+  }
+ ]
+}

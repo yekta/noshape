@@ -1,0 +1,23 @@
+{
+ "name": "doc-quick-switch-once",
+ "about": "Ctrl+Space once and let go: back to the previous tab",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 2"
+   }
+  },
+  {
+   "do": "key",
+   "key": "ctrl+Space",
+   "hold": true
+  },
+  {
+   "do": "release"
+  }
+ ]
+}

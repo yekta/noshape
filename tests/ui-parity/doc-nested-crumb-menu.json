@@ -1,0 +1,39 @@
+{
+ "name": "doc-nested-crumb-menu",
+ "about": "In Folder 3: the … crumb's dropdown of the hidden parent folders, then Folder 1 picked",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-nested",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 3"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "crumb": "…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Folder 1"
+   }
+  }
+ ]
+}

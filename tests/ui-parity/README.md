@@ -99,6 +99,8 @@ as the app's own config files, written into the run's config directory before it
 - `{"do": "key", "key": "Enter"}`: one key or chord; `mod` is Ctrl on Linux / Windows and Cmd on macOS (`mod+z`,
   `shift+e`, `alt+c`). Key names: `Enter`, `Escape`, `Tab`, `Backspace`, `Delete`, `ArrowUp` / `Down` / `Left` /
   `Right`, `Space`, `F2`, single characters.
+- A `key` step with `"hold": true` leaves its modifiers down (Ctrl+Space's quick tab switcher) until
+  `{"do": "release"}` lets them go (psui, 11-09).
 - `{"do": "drag", "from": TARGET, "to": TARGET}`.
 - `{"do": "wait", "until": "regenerated" | "dialog" | "ms", "ms": 500}`. Each side also waits, after every step,
   until its regeneration is idle (at most 30 s), so timing never decides a result.
@@ -273,6 +275,9 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   (?), its search box `{"field": "Search tabs"}` (the header's `{"button": "Search tabs"}` shows / hides it); a history row `{"history_row": "V1"}` clicked opens that version. Start `doc-files`: block plus file tabs
   dx-image.png, uip-table.csv, uip-data.json, uip-notes.txt, uip-page.pdf (tests/ui-parity/files), uploaded in that
   order, opening on Part Studio 1.
+  The tab bar's scroll arrows `{"button": "Scroll left"}` / `{"button": "Scroll right"}` (shown on overflow; start
+  `doc-many-tabs`: 31 tabs); in a nested folder the crumbs `{"crumb": "…"}` (the hidden parents' dropdown, its rows
+  by name) and `{"crumb": "Folder 3"}` (the open folder; start `doc-nested`: Folder 1 › Folder 2 › Folder 3).
 
 ### Variable Studio and Versions (studios, 11-07)
 - A start's Variable Studio tab may hold variables: `{"kind": "variablestudio", "name": "Variable Studio 1",

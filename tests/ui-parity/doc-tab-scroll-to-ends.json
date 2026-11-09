@@ -1,0 +1,21 @@
+{
+ "name": "doc-tab-scroll-to-ends",
+ "about": "31 tabs: right-click › (to the last tab), then right-click ‹ (to the first)",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-many-tabs",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "button": "Scroll right"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "button": "Scroll left"
+   }
+  }
+ ]
+}

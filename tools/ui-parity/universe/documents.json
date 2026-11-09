@@ -4249,7 +4249,18 @@
    "where": "document tab bar",
    "freq": 3,
    "cloud": false,
-   "source": "dom/keyboard-shortcuts.txt"
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Part Studio 2"
+      },
+      "do": "click",
+      "mods": "mod"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-shift-click-a-tab-open-in-new-window",
@@ -4258,7 +4269,18 @@
    "where": "document tab bar",
    "freq": 3,
    "cloud": false,
-   "source": "dom/keyboard-shortcuts.txt"
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Part Studio 2"
+      },
+      "do": "click",
+      "mods": "shift"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-double-click-a-tab-to-rename-inline",
@@ -4369,7 +4391,23 @@
    "where": "document tab bar inside nested folders",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:13335"
+   "source": "behaviours.md:13335",
+   "via": [
+    [
+     {
+      "on": {
+       "crumb": "…"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "menu": "Folder 1"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-breadcrumb-dropdown-of-hidden-parent-folders",
@@ -4378,7 +4416,17 @@
    "where": "document tab bar, nested folders",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:13355"
+   "source": "behaviours.md:13355",
+   "via": [
+    [
+     {
+      "on": {
+       "crumb": "…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-scroll-left-rmb-to-first",
@@ -4387,7 +4435,25 @@
    "where": "document tab bar right end ‹ (only on overflow)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1958"
+   "source": "behaviours.md:1958",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Scroll left"
+      },
+      "do": "click"
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Scroll left"
+      },
+      "do": "rclick"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-scroll-right-rmb-to-last",
@@ -4396,7 +4462,25 @@
    "where": "document tab bar right end › (only on overflow)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1958"
+   "source": "behaviours.md:1958",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Scroll right"
+      },
+      "do": "click"
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Scroll right"
+      },
+      "do": "rclick"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-tab-hover-card-thumbnail-after-1-s",
@@ -6209,7 +6293,18 @@
    "where": "in a document",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:20857"
+   "source": "behaviours.md:20857",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "ctrl+Space"
+     },
+     {
+      "do": "release"
+     }
+    ]
+   ]
   },
   {
    "id": "shortcut-quick-tab-switcher-hover-a-thumbnail-mouse-up-switches",
@@ -6358,7 +6453,18 @@
    "where": "tabs / links",
    "freq": 3,
    "cloud": false,
-   "source": "dom/keyboard-shortcuts.txt"
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Part Studio 2"
+      },
+      "do": "click",
+      "mods": "mod"
+     }
+    ]
+   ]
   },
   {
    "id": "shortcut-shift-click-open-in-new-window",
@@ -6367,7 +6473,18 @@
    "where": "tabs / links",
    "freq": 3,
    "cloud": false,
-   "source": "dom/keyboard-shortcuts.txt"
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Part Studio 2"
+      },
+      "do": "click",
+      "mods": "shift"
+     }
+    ]
+   ]
   },
   {
    "id": "shortcut-ctrl-u-feedback-report-a-bug",

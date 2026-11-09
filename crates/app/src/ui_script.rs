@@ -575,6 +575,12 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     }
                     None => Err(format!("unknown key {}", step["key"])),
                 },
+                // The modifiers a held "key" step left down (Ctrl+Space's switcher) let go.
+                "release" => {
+                    let ev = PlatformInput::ModifiersChanged(ModifiersChangedEvent { modifiers: Modifiers::default(), capslock: Default::default() });
+                    let _ = cx.update(|window, cx| window.dispatch_event(ev, cx));
+                    Ok(())
+                }
                 "wait" => {
                     match step["until"].as_str() {
                         Some("ms") => sleep(cx, step["ms"].as_u64().unwrap_or(500)).await,

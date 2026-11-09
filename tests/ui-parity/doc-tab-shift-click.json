@@ -1,0 +1,16 @@
+{
+ "name": "doc-tab-shift-click",
+ "about": "Shift+click an inactive tab (live: opens it in a new window; this one stays)",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 2"
+   },
+   "mods": "shift"
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "name": "doc-nested-crumbs",
+ "about": "Folder 1 › Folder 2 › Folder 3 opened from the tab bar: the crumbs (🏠, the hidden parents' …, Folder 3)",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-nested",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 3"
+   }
+  }
+ ]
+}

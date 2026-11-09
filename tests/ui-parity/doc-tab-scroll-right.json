@@ -1,0 +1,21 @@
+{
+ "name": "doc-tab-scroll-right",
+ "about": "31 tabs: the bar's › (Scroll right) once, then ‹ (Scroll left)",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-many-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Scroll right"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Scroll left"
+   }
+  }
+ ]
+}
