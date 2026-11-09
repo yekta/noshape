@@ -974,6 +974,40 @@ pub struct StdProps {
     pub description: Option<String>,
 }
 
+/// The Standard content tab's text as live's recorder reads it (live asm-standard-content-edit-instance): its heading,
+/// the rows' labels in `render_standard_content`'s order (a plain row's value too), the part number and description
+/// when set, then Insert. Select values aren't text to the recorder.
+pub(super) fn standard_panel_text(spec: &StandardSpec) -> Vec<String> {
+    let mut out: Vec<String> = ["Standard content", "Standard", "Category", "Class", "Component"].map(String::from).to_vec();
+    let Some(c) = standard::component(spec) else { return out };
+    out.push(c.size_label().to_string());
+    out.extend(c.params.iter().map(|p| p.label.clone()));
+    if let Some(size) = spec.size_row()
+        && c.shape.has_length()
+        && !c.lengths(size).is_empty()
+    {
+        out.push(c.length_label().to_string());
+        if !c.thread_lengths(size, spec.length.as_deref().unwrap_or_default()).is_empty() {
+            out.push("Thread length".into());
+        }
+    }
+    if let Some(hole) = spec.size_row().and_then(|s| s.hole_size.as_deref()) {
+        out.extend(["Hole size".to_string(), hole.to_string()]);
+    }
+    if let Some(rec) = c.recommended(spec.material()) {
+        out.extend(["Recommended sheet material".to_string(), rec.to_string()]);
+    }
+    out.extend(["Material", "Finish", "Part number"].map(String::from));
+    let props = std_props(spec);
+    if !props.part_number.is_empty() {
+        out.push(props.part_number.clone());
+    }
+    out.push("Description".into());
+    out.push(props.description.unwrap_or_else(|| spec.description()));
+    out.push("Insert".into());
+    out
+}
+
 fn std_props_path() -> std::path::PathBuf {
     crate::paths::config_dir().join("standard_content_properties.json")
 }

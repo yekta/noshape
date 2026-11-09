@@ -27,6 +27,27 @@ the translation now goes wrong where it had been skipping them:
 Repro: a folder with just the two (vibe4 ~/qa-bisect/docs: current corpus; ~/qa-bisect/docs-old: the backups in place) as
 NOSHAPE_PARITY_ASSEMBLIES, `cargo test --release -p noshape-ops --test all parity::parity_assemblies -- --ignored --nocapture`.
 
+## From psui (2026-11-09 13:59 UTC, lead: live2 2412): the pin-block connectors, settled; the flip icon is not
+- **Connectors: ours already matches live.** live2 2412: Revolute 1 over REST has no primaryAxisAlignment, both
+  implicit connectors Z = (0, 0, −1) in world (Part 1's hole at (0, 0, 10), Part 2's pin at its own (60, 0, 15),
+  moved by (−60, 0, −5)); corpus asm-flip-midaxis-default / -flipped say the same. Ours (ui_parity start, ops
+  `assembly_connectors`): pin mid axis (60, 0, 15) Z −Z, hole mid axis (0, 0, 10) Z −Z, the pin unrotated at
+  (−60, 0, −5). A probe of all 19 corpus documents with axis connectors (ours' implicit connector Z vs live's
+  `mateConnectorCS.zAxis`, part coordinates; patch /root/psui-scratch/q2412/cz-probe2.patch, env
+  NOSHAPE_PARITY_CONNECTOR_Z): of 172 connectors, MID / TOP / BOTTOM_AXIS_POINT agree wherever ours has the same
+  point, except mid axes on faces in isaac-ball (4) and pattern-std (2), live +Z / ours −Z at the same point, and
+  pinslot (2, 0.34 mm apart): worth a look, not pin-block. 14 found no point of ours (hand-drill-pinslot 8,
+  infento-subs 2, …). Nothing in `implicit.rs` changed.
+- **What differs is the flip icon when editing** (asm-mate-edit-escape, asm-mate-menu-edit): live shows the plain
+  `flip-direction` for the REST-made Revolute 1, ours `-opposite` (MateDialog::flip_icon_on: `-opposite` while the
+  model's flag says the axes agree). New mates after both picks show `-opposite` in live for agreeing connectors
+  (asm-fastened-two-faces, nothing turned), which ours matches. So live's icon seems to show the stored
+  primaryAxisAlignment (set by the UI's pick, absent over REST), which ours' one flag can't tell apart. Asked live2
+  (REQUESTS 14:00) for a UI-made mate's stored value and its icon when edited. run.py's icon rule is right as it is
+  (inverting it for mate dialogs breaks 12 asm-* scenarios).
+- Our naming of a cylinder's end points follows OCCT's axis (pin-block's hole: ours "top_axis" at z 0, "bottom_axis"
+  at z 20; live2 calls the z 20 one its top). Positions and Z agree with live; only the names differ.
+
 ## From psui (2026-11-09 08:55 UTC, lead): the pin-block Revolute flip, from the code
 - Our axis connectors on a cylinder (model-core `regen/implicit.rs`) take Z from OCCT's cylinder surface axis as
   is: no face orientation, same for Mid / Top / Bottom axis. pin-block's hole is the inner loop of Sketch 1's region,

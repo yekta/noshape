@@ -4347,8 +4347,21 @@ impl AssemblyView {
         if self.insert_config_inputs(studio, cx).is_empty() {
             return None;
         }
+        // The picked values as the dialog shows them (an input not picked: its default).
+        let shown = move |this: &Self, cx: &App| {
+            let inputs = this.insert_config_inputs(studio, cx);
+            let mut v = noshape_model::configuration::Configuration { inputs, configured: Vec::new() }.defaults();
+            if let Some(picked) = this.ui.insert_config.get(&studio) {
+                v.0.extend(picked.0.clone());
+            }
+            v
+        };
+        // Values already there: a toast, nothing changes (live asm-insert-config-reset-to-default, as the Variable
+        // Studio's vs-insert-reset-default).
+        let already = |this: &mut Self, what: &str, cx: &mut Context<Self>| this.show_cfg_toast(format!("Configuration parameters already match {what} value."), false, cx);
         let set_last = move |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
             match crate::assembly_hooks::last_viewed_config(studio) {
+                Some(v) if v.0.iter().all(|(k, x)| shown(this, cx).0.get(k) == Some(x)) => already(this, "last viewed", cx),
                 Some(v) => {
                     this.set_config_panel_values(&v, window, cx);
                     this.ui.insert_config.insert(studio, v);
@@ -4409,6 +4422,11 @@ impl AssemblyView {
                                 m.item(crate::os_menu::OsMenuItem::new("Set to last viewed").icon_name("cfg-last-viewed").on_click(move |_, window, cx| v1.update(cx, |this, cx| set_last(this, window, cx))))
                                     .item(crate::os_menu::OsMenuItem::new("Reset to default").icon_name("cfg-reset-default").on_click(move |_, window, cx| {
                                         v2.update(cx, |this, cx| {
+                                            let inputs = this.insert_config_inputs(studio, cx);
+                                            if shown(this, cx) == (noshape_model::configuration::Configuration { inputs, configured: Vec::new() }.defaults()) {
+                                                already(this, "default", cx);
+                                                return;
+                                            }
                                             this.ui.insert_config.remove(&studio);
                                             // Change configuration (qa5 CA5): its inputs go
                                             // back to their defaults too.

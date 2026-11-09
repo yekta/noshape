@@ -1,9 +1,9 @@
 {
  "name": "asm-menu-create-new-context",
- "about": "Part 2 › Edit in context; a Sketch on the context's top face of Part 1 (20, 20, 20), ✓ (Context 1); back to the assembly; Part 2 › Edit in context ▸ Create new context.",
+ "about": "Part 2 (the pin) › Edit in context; a Sketch on the context's top face of the block, which Revolute 1 puts at x 40…80, z 5…25 in the pin's Part Studio (70, 15, 25), ✓ (Context 1); back to the assembly; Part 2 › Edit in context ▸ Create new context. (On two-blocks the pick was the Part Studio's own face: no context, live2 2412.)",
  "area": "asm",
  "source": "psui 11-09: assembly coverage, batch 9 (asm paused; lead 11-09)",
- "start": "two-blocks",
+ "start": "pin-block",
  "steps": [
   {
    "do": "rclick",
@@ -27,9 +27,9 @@
    "do": "click",
    "on": {
     "face": [
-     20,
-     20,
-     20
+     70,
+     15,
+     25
     ]
    }
   },
@@ -42,7 +42,7 @@
   {
    "do": "click",
    "on": {
-    "doc_tab": "start two-blocks asm"
+    "doc_tab": "start pin-block asm"
    }
   },
   {

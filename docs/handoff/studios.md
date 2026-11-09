@@ -134,7 +134,7 @@ read mid-load or mid-close (8), ver-merge-replace's target, and five questions (
 the date input, Copy version closing the panel, empty custom features / releases). Known: ver-branch-no-open (live's
 checkbox takes the focus from the name field; ours keeps it).
 
-**2026-11-09 14:02 UTC (psui): lead's list from live2 2351 / 2403 / 2405.** Labels… in a row menu opens the Details
+**2026-11-09 13:26 UTC (psui): lead's list from live2 2351 / 2403 / 2405.** Labels… in a row menu opens the Details
 panel with Document labels open (no dialog), as the row's Labels icon. Import to Onshape: the cards swap the checkbox
 list (Split: "Create one document per part or assembly(not recommended)" in the composite part's place, with live's
 tooltip; Combine: no composite), and the page modal's labels are one line (548 px). Split's documents themselves are

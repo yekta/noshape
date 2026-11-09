@@ -703,9 +703,13 @@ impl AssemblyView {
         }
         // The Insert dialog, as live's recorder reads it since 11-09 (ver-insert-create-version): its tabs, then on
         // Current document the document, its sub-tabs, the search box's hint and the rows (not compared: live's lane
-        // document holds other runs' studios).
+        // document holds other runs' studios); on Standard content its rows (asm-standard-content-edit-instance).
         if self.insert_open {
             let mut text: Vec<String> = ["Current document", "Other documents", "Standard content"].map(String::from).to_vec();
+            if self.ui.insert_source == 2 {
+                let spec = self.ui.std.spec.clone().unwrap_or_else(|| noshape_model::assembly::standard::StandardSpec::new(noshape_model::assembly::standard::default_component()));
+                text.extend(super::standard_content::standard_panel_text(&spec));
+            }
             if self.ui.insert_source == 0 {
                 text.push(self.doc.read(cx).name());
                 text.extend(["Part Studios", "Assemblies"].map(String::from));
