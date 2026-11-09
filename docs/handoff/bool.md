@@ -25,6 +25,21 @@ scratch /root/bool-scratch.
   29 ms, quadrics 1.5 -> 1.28 s. qa's shellmatrix / boolmatrix / gpf identical, kernel tests 351/351, g++-13 builds.
   Scratch: bool-c's probe (PROBE_OUT writes the result; xprobe::probe_compare; XOLDTRACE / XPTS switches in bool-c's
   copy only).
+- **Shell Gehäuse (c2-impeller-loft; dump vibe4 / vibe3 ~/agents/bool-cases/imp-dump/shell-0, 4 faces, 2 removed,
+  3 mm): ce006f7e.** Quadrics 4.1-4.9 s, the self-interference check 2.7-3.8 s of it: one edge / face pair, a 120 mm
+  B-spline edge of the kept loft face against its own offset (the inner wall, 3 mm away all along), OCCT's
+  BeanFaceIntersector 2-3.7 s finding nothing (its polygon meets the offset's polyhedron everywhere; each candidate
+  an exact solve). Now the check's iterator measures a kept face's long edges (past 20 walls) against that face's own
+  offset first (BRepExtrema, on all threads) and leaves out pairs farther apart than a tenth of the wall; every other
+  pair as before. Measuring every pair was tried: c2-rings-loft's 253 B-spline / offset pairs cost 30-350 ms each
+  there, more than their intersections. vibe3 A/B: Gehäuse check 2.7-3.0 -> 0.23-0.30 s, the Shell 4.1-4.9 -> 1.6-1.9
+  s; rings-loft level. Results byte-identical (rings-loft shell-9 / -53, Gehäuse), shellmatrix / boolmatrix / gpf
+  identical, kernel tests 351/351, suite unchanged, g++-13 builds.
+- **Next (asked of the lead):** the impeller's Booleans after the Shell (11 of 14, ~4.7 s of OCCT incl. Boolean
+  Flansch+Gehäuse 1.7 s) decline "an offset face": `offset_as_bspline` (rust_boolean.cpp) fits one wall face (3.9e-8)
+  but not the scroll's inner wall (u 0-3.3: GeomConvert_ApproxSurface error 0.29 m at 1e-7, 9e-3 at 1e-6, 6.6e-4 at
+  1e-5), as if the offset is undefined somewhere in its range: likely the same face core found at 07:01 (its box to
+  z 6.21 mm against live's 0, no mesh in the document): the wall's run-on or bounds in by_quadrics.
 
 ## OCCT patch 0027: a face's polyhedron kept (11-09 10:25 UTC; lead: the impeller's Delete face 2 first)
 - IntCurveSurface (TKGeomAlgo, IntCurveSurface_Inter.pxx): the edge / face intersection sampled the face into a
