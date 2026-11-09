@@ -4076,6 +4076,11 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   text's glyph regions aren't live's. 13 of 17 features lost behind it.
 - [ ] P2 SUITE-LOUVER-SKETCH-9 (skasm, paused; core 2026-11-08 20:05 UTC): c2-sm-louver's Sketch 9 frame origin [0, 0,
   606.17] mm, live [-708.49, 351.45, 2.03] (on a sheet metal definition face); 5 of 36 features lost.
+- [ ] P2 SHEETMETAL-COPLANAR-WALLS (core; dx 2026-11-09 00:09 UTC, data exchange) cf-sheet-metal-model-plus's "Sheet
+  Metal Up to Part": seven planar faces on x = 25 lie up to 1.7e-4 mm apart (two on x = 13, 4.6e-4 mm), where live's
+  model has them on one plane. Exported (STEP, IGES) and read back, live's import (and ours) merges coplanar faces only
+  within 1e-7 m: 61 faces for live's 58 (exchange suite, "live imports ours"). Group our import of ours.step's planar
+  faces by normal and n·centroid to see them.
 - [ ] P2 SUITE-FAN-BLADE-IMPORT (dx, lead 20:07; core 2026-11-08 20:05 UTC): c2-fan-blade-sweep's derived source
   8b633129 (one STEP Import 1): "fan blade" 68/155/95 faces/edges/vertices, live 58/119/63; "fan" 159/470/313, live
   143/404/251 (run it alone: NOSHAPE_PARITY_MODELS=<models>/c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=8b633129…). dx 2026-11-08 21:27 UTC: ours kept the file's split

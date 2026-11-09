@@ -11,6 +11,29 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-09 00:09 UTC: data exchange (lead): "live imports ours" first, then "ours imports live's", then drawings
+
+- **Notes kept open (lead 11-08):** clamp-hms Medium is 34,712 triangles for live's 34,732 (−0.058 %, the 0.05 %
+  band missed by 20): some of its arcs carry one point more or fewer than live's and their points sit offset from
+  ours, while BRepMesh already splits every circle by live's count rule (checked edge by edge): what live does
+  differently there is unknown. The Ø28 probe disc (R 2 top fillet, Medium, 1074 steps round) live meshes
+  unstructured (468,788 triangles), not on our 2048 × 128 grid (524,518, +12 %); what makes live's grid structured
+  (pulley02, knob-jason Fine) or not is open.
+- "live imports ours" was 33/48 (live-ours.json in dx-exchange, 11-08 evening). Causes, by count:
+  1. IGES counts, 4 (hose, o-ring, knob-jason, pulley02): live's own IGES (HOOPS Exchange) cuts every periodic face
+     in two, its import joins them leaving vertices (pulley02 9/10/4 for the model's 9/8/0); live's import of ours
+     is the model's. Counted as live's shortcoming, as in the other direction (parity.rs, `model_topology`).
+  2. STL, 6: our REST-default STL (5°) came out coarser than live's. Revolved circles and ellipses (the o-rings)
+     now on the tori's grid (live 72 × 72 at 5°: 10,378 triangles for 10,368, volume within 0.03 %). Swept
+     B-spline tubes (the hoses, −0.5 % volume) still BRepMesh's: a face grid for B-splines is the next step
+     (BRepMesh's face angle halved reaches live's volume but with 25× the triangles).
+  3. Sheet metal STEP / IGES, 2: our file's model has seven faces on x = 25 that lie 1.7e-4 mm apart (two on x = 13,
+     4.6e-4 mm): live's import (and ours) merges coplanar faces only within 1e-7 m, so 61 faces for 58. Our model's
+     sheet metal walls, core's (TICKETS SHEETMETAL-COPLANAR-WALLS).
+  4. The hose's STEP / IGES / Parasolid, 3: our files make live's import split a tube's ring edge (12/13/3 for the
+     model's 12/12/0); live's own STEP is worse (12/16/8).
+  5. The spur gear's STEP (volume +0.2 %) and STL part count: open.
+
 ## 11-08 20:11 UTC: STL presets as live's facetter (lead: do the meshing work)
 
 - live2's knob-jason / pulley02-maxwell files (2335) read: live meshes a sphere's or torus's face on a grid of its

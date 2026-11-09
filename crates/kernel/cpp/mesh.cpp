@@ -129,17 +129,54 @@ void write_face(const IMeshData::IFaceHandle& f, const std::vector<cdt::Pt>& uv,
 // Coarse): along each direction the fewest equal steps whose chord sags by at most half the chord tolerance `tol`
 // on the direction's largest circle (u: the face's widest parallel, v: the tube or the sphere), and turns by at most
 // `ang`.
+// The axis a sphere, torus or surface of revolution of a circle or ellipse turns about and the radius of the curve it
+// sweeps (cf-o-ring-generator's revolved ellipses, which live meshes on a grid as tori); false for any other surface.
+bool swept_circle(const BRepAdaptor_Surface& s, gp_Ax1& axis, double& r)
+{
+  switch (s.GetType())
+  {
+    case GeomAbs_Torus:
+      axis = s.Torus().Axis(), r = s.Torus().MinorRadius();
+      return true;
+    case GeomAbs_Sphere:
+      axis = s.Sphere().Position().Axis(), r = s.Sphere().Radius();
+      return true;
+    case GeomAbs_SurfaceOfRevolution:
+      axis = s.AxeOfRevolution();
+      // A revolved ellipse (the generator's o-rings: live's 72 × 72 at 5°) by its tightest curvature radius b² / a.
+      switch (s.BasisCurve()->GetType())
+      {
+        case GeomAbs_Circle:
+          r = s.BasisCurve()->Circle().Radius();
+          return true;
+        case GeomAbs_Ellipse:
+        {
+          const gp_Elips e = s.BasisCurve()->Ellipse();
+          r                = e.MinorRadius() * e.MinorRadius() / e.MajorRadius();
+          return true;
+        }
+        default:
+          return false;
+      }
+    default:
+      return false;
+  }
+}
+
 void export_grid(const BRepAdaptor_Surface& s, double u0, double u1, double v0, double v1, double tol, double ang, int& nu, int& nv)
 {
-  const bool   torus = s.GetType() == GeomAbs_Torus;
-  const double r     = torus ? s.Torus().MinorRadius() : s.Sphere().Radius();
-  const double R     = torus ? s.Torus().MajorRadius() : 0.0;
-  double       ru    = 0;
-  for (int k = 0; k <= 512; ++k)
+  gp_Ax1 axis;
+  double r = 0;
+  if (!swept_circle(s, axis, r))
   {
-    const double v = v0 + (v1 - v0) * k / 512;
-    ru             = std::max(ru, torus ? R + r * std::cos(v) : r * std::cos(v));
+    nu = nv = 1;
+    return;
   }
+  // The face's widest parallel: its points' greatest distance from the axis.
+  const gp_Lin line(axis);
+  double       ru = 0;
+  for (int k = 0; k <= 512; ++k)
+    ru = std::max(ru, line.Distance(s.Value(u0, v0 + (v1 - v0) * k / 512)));
   // The angle a chord of a circle of radius `radius` may span: sagging tol / 2, turning ang.
   auto step = [&](double radius) { return std::min(ang, radius > tol / 2 ? 2 * std::acos(1 - tol / 2 / radius) : 3.14159265358979323846); };
   auto cells = [](double range, double st) { return (int)std::clamp(std::ceil(range / st - 1e-9), 1.0, 65536.0); };
@@ -155,7 +192,7 @@ void export_grid(const BRepAdaptor_Surface& s, double u0, double u1, double v0, 
   }
 }
 
-// An export's sphere or torus as live's facetter makes it: the boundary nodes and the nodes of `export_grid`'s grid
+// An export's sphere, torus or revolved circle as live's facetter makes it: the boundary nodes and the nodes of `export_grid`'s grid
 // that lie inside the face (a quarter cell clear of its boundary along both directions), triangulated in the
 // parameters scaled to lengths (planar_cdt); a seam's two sides are a whole ring's ends. The export's BRepMesh
 // deflection and angle are twice Parasolid's (mesh.rs). False (nothing written) when the face isn't clean.
@@ -727,14 +764,22 @@ public:
   }
 };
 
-// An export's sphere or torus: `grid_face`, else `fallback`.
+// An export's sphere, torus or revolved circle: `grid_face`, else `fallback`; any other revolution `plain`.
 class GridAlgo : public IMeshTools_MeshAlgo
 {
 public:
-  explicit GridAlgo(const occ::handle<IMeshTools_MeshAlgo>& fallback) : myFallback(fallback) {}
+  GridAlgo(const occ::handle<IMeshTools_MeshAlgo>& fallback, const occ::handle<IMeshTools_MeshAlgo>& plain) : myFallback(fallback), myPlain(plain) {}
 
   void Perform(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm, const Message_ProgressRange& range) override
   {
+    // A surface of revolution of anything but a circle: as the display meshes it.
+    gp_Ax1 axis;
+    double r = 0;
+    if (!swept_circle(*f->GetSurface(), axis, r))
+    {
+      myPlain->Perform(f, prm, range);
+      return;
+    }
     bool done = false;
     try
     {
@@ -751,17 +796,17 @@ public:
   }
 
 private:
-  occ::handle<IMeshTools_MeshAlgo> myFallback;
+  occ::handle<IMeshTools_MeshAlgo> myFallback, myPlain;
 };
 
-// The export path (`exact`): spheres and tori on `export_grid`'s grid; every other face as the display meshes it.
+// The export path (`exact`): spheres, tori and revolved circles on `export_grid`'s grid; every other face as the display meshes it.
 class ExportAlgoFactory : public IMeshTools_MeshAlgoFactory
 {
 public:
   occ::handle<IMeshTools_MeshAlgo> GetAlgo(const GeomAbs_SurfaceType type, const IMeshTools_Parameters& prm) const override
   {
-    if (type == GeomAbs_Torus || type == GeomAbs_Sphere)
-      return new GridAlgo(new BRepMesh_DelaunayNodeInsertionMeshAlgo<ExportGridSplitter, BRepMesh_DelaunayBaseMeshAlgo>());
+    if (type == GeomAbs_Torus || type == GeomAbs_Sphere || type == GeomAbs_SurfaceOfRevolution)
+      return new GridAlgo(new BRepMesh_DelaunayNodeInsertionMeshAlgo<ExportGridSplitter, BRepMesh_DelaunayBaseMeshAlgo>(), myOwn->GetAlgo(type, prm));
     return myOwn->GetAlgo(type, prm);
   }
 

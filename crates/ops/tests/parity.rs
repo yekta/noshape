@@ -471,6 +471,14 @@ fn exchange_round_trip() {
             let total = |v: &[PartState]| v.iter().filter_map(|p| p.volume).sum::<f64>();
             // (STEP, IGES: as Onshape's import, faces on one surface merged: a sheet metal model's coplanar walls one
             // face; by volume and area.)
+            // (An STL as live will read it: its own mesh's parts, volume and area, against what live's import of it
+            // is held to; the file live has may be older.)
+            if format == "STL"
+                && let (Ok(b), Some(live)) = (&back, expected(format))
+            {
+                let d = differences(&live, &mesh_counts(b.clone()));
+                println!("{name}: ours.stl as live will read it: {}", if d.is_empty() { "matches".into() } else { d.join("; ") });
+            }
             let diff = match back {
                 Ok(b) if format == "IGES" || format == "STEP" => differences(&mesh_counts(native.clone()), &mesh_counts(b)),
                 Ok(b) if format == "STL" => {
@@ -487,7 +495,21 @@ fn exchange_round_trip() {
                 waiting += 1;
                 continue;
             };
-            let diff = differences(&live, &parts_from_live_import(&theirs[format], format == "STL"));
+            let read = parts_from_live_import(&theirs[format], format == "STL");
+            let mut diff = differences(&live, &read);
+            // As for its files in ours: where live's import of its own file splits its model's edges or faces (its
+            // IGES writer cuts each periodic face in two, its import joins them back leaving their vertices: pulley02
+            // 9/10/4 for the model's 9/8/0) and live's import of ours keeps the model's, live's shortcoming.
+            if format != "STL" && !diff.is_empty() {
+                let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], false));
+                if let (Some(x), Some(own)) = (&xt, own)
+                    && let Some(held) = model_topology(&own, x)
+                    && differences(&held, &read).is_empty()
+                {
+                    println!("{name}: live's own {format} import splits its model's edges or faces: live's import of ours keeps the model's (live's shortcoming)");
+                    diff.clear();
+                }
+            }
             exports_ok += usize::from(diff.is_empty());
             println!("{name}: live imports ours.{ext}: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
         }
@@ -513,7 +535,22 @@ fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64) -> Vec<Pa
         let (Some(a), Some(b)) = (own[o].volume, model[m].volume) else { continue };
         let d = (a - b).abs();
         let inside = own[o].volume_band.is_some_and(|[lo, hi]| b >= lo && b <= hi);
-        if inside || d > 1e-2 * b.abs() {
+        if inside {
+            continue;
+        }
+        // An STL of live's off its model by over 1 % (cf-spur-gear's 65-tooth gear: 5601 mm³ for 5915.7, live's
+        // failure, no target): the model's, within 1 % as an STL read back is.
+        if d > 1e-2 * b.abs() {
+            if slack >= 2.0 {
+                let p = &mut out[o];
+                p.volume = Some(b);
+                p.volume_band = Some([b * 0.99, b * 1.01]);
+                p.volume_high = None;
+                if let Some(y) = model[m].area {
+                    p.area = Some(y);
+                    p.area_band = Some([y * 0.99, y * 1.01]);
+                }
+            }
             continue;
         }
         let p = &mut out[o];
