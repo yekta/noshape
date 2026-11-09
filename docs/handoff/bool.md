@@ -20,6 +20,24 @@ scratch /root/bool-scratch.
   Profiling: in-process sampler copied into kernel tests (crates/model/tests/sampler.rs; NOSHAPE_SAMPLE_OUT around
   brep_corpus_replay; /root/bool-scratch/spprof.sh <corpus>, prof2.py on vibe4). No gdb on the hosts.
 - Rotieren 1: asked the lead (park, or a band-coincidence rule to match OCCT's history); see its entry below.
+- **Landed 895a5311 (06:04 UTC)** with its gate: corpora + parity56 0 differences, taken counts and declines as
+  main's; knurl/gear level (spur gear 2.2 -> 1.7 s); shfall its known 2; model suite 75/87, 763/951 before and after,
+  every line alike; cf-surface-pattern 13.8 -> 5.6 s in the suite (live 4.2), Surface Pattern 3 10.6 -> 3.6 s.
+- **Next commit (8db0e996, core's / skasm's code, checks running):** boolean.cpp `usd_volume_change`'s memo keyed the
+  merged faces by their surfaces' handles; every try makes new ones, so Surface Pattern 3's same rejected merge was
+  checked 6 times (175-250 ms each). Keyed by the surface's kind and its point at the face's middle parameters:
+  usd.check 1049 -> 504 ms.
+- **Tried, not kept: by_quadrics before OCCT's offset** (env-gated in bool-c): cf-snap-hook's Shell 1 625 -> 50 ms, 18/18
+  still; the suite unchanged in matches, but cf-lighten +440 ms and cf-fill-pattern +2.1 s (several Shells each,
+  noisy run). Needs a per-Shell rule before it can go first.
+- **c2-rings-loft Circular pattern 2** (742 / 201 ms): 8 fuses; ours declines the first two "a face lost" (a cylinder
+  face whose top arc ending on the seam maps to a zero-length curve, 2D x 0.0577 -> 0.0577 instead of -> 0.0757:
+  corpus vibe4 ~/agents/bool-corpora/r1109-c2-rings-loft/e31206c047fd9e14, debug XLOST prints in bool-c) and two "two
+  edges leave a vertex in one direction"; the memo then sends the rest to OCCT. Parked: rings-loft's model differs
+  from live before it (feature 12). Recorded corpora of today: r1109-{c2-rings-loft, c2-valve-config, cf-lighten,
+  cf-snap-hook, c2-housing-draft}.
+- c2-valve-config Circular pattern 1 (309 / 67): our 7 one-at-a-time cuts, 34 ms each, no single hotspot
+  (classification 20 %, cylinder pairs 18 %, OCCT sections 14 %).
 
 ## Heads-up from core (2026-11-09 00:54 UTC, lead's call): unify steps skip edges marked "keep"
 - Intentional splits now survive later unifies, as live's: a thread's Split face, the Split feature / opSplitFace,
