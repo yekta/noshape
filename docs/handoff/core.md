@@ -57,7 +57,8 @@ What blend takes over:
   the unify then joins them. Our two pieces are one curve: the 1.9362 edge's curve run past the vertex lies on the
   0.5032 edge to 0.000 µm all along it. Live keeps the vertex only because its two procedural rounds are 0.1-6.3 µm
   apart (2411); by live's own rule (coincident rounds joined, its synthetic) ours is right. A Parasolid approximation
-  artefact, as cf-straight-spline's (lead 11-05: not imitated): proposed not scored past Linear pattern 2, lead's call.
+  artefact, as cf-straight-spline's (lead 11-05: not imitated). Lead 11-09: agreed: unscored.json takes `"from": <feature
+  index>` now (scored before it, not from it on); the spring 12/12 to the end.
 - Queue (lead 09:xx): (1) the spring: live 2411 answered (behaviours "core (2411)"): a union joins truly coincident
   rounds (synthetic: one edge 0..40); the spring keeps a tolerant vertex because Part 1's and Part 2's rounds are
   0-6.33 µm apart: find why ours joins curves 6 µm apart (unify / fuse tolerance), under bool's gate. (2) After the

@@ -659,7 +659,11 @@ fn parity_models() {
             let c = &s["copy"];
             index.push(json!({ "name": name, "document": c["did"], "workspace": c["wid"], "element": c["eid"], "url": c["url"], "title": s["title"], "original": s["original"]["url"] }));
         }
-        if let Some(u) = unscored.iter().find(|u| u["name"] == name.as_str()) {
+        // (With `from`: scored up to that feature index, not from it on.)
+        let unscored_from = unscored.iter().find(|u| u["name"] == name.as_str()).and_then(|u| Some((u["from"].as_u64()?, u["reason"].as_str().unwrap_or(""))));
+        if unscored_from.is_none()
+            && let Some(u) = unscored.iter().find(|u| u["name"] == name.as_str())
+        {
             println!("{name}: not scored ({})", u["reason"].as_str().unwrap_or(""));
             continue;
         }
@@ -677,10 +681,14 @@ fn parity_models() {
             }
             continue;
         }
-        let Some((features, live, refs)) = read_model(&dir) else {
+        let Some((features, mut live, refs)) = read_model(&dir) else {
             println!("{name}: unreadable features.json");
             continue;
         };
+        if let Some((from, why)) = unscored_from {
+            live.retain(|l| l["index"].as_u64().is_some_and(|i| i < from));
+            println!("{name}: not scored from feature {from} ({why})");
+        }
         let r = run_model(&name, &features, &live, &refs);
         let speed = match r.regen_ms {
             Some((ours, Some(l))) => format!("; regenerated in {ours:.0} ms, live {l:.0} ms (its features' times; reopened, listed and measured in {:.0} ms: open {:.0} ms, feature list {:.0} ms with the display)", r.wall_ms, r.open_ms, r.list_ms),
