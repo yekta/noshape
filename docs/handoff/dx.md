@@ -38,6 +38,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
+## 11-09 11:09 UTC: c2-fan-blade-sweep (lead: blend's Chamfer 2 while blend is paused): 0 -> 23/53, in progress
+
+- Chamfer 2: merge_full_rounds joined the thread's kept band; the blends' input copies dropped keep marks (blend.md
+  11:09). Derived 2: the translator's qEverything(BODY) ids skip the source's default bodies. The STEP blade's last
+  edge: merge_same_surface_faces joins pieces whose curves on the faces run over other ranges, on a copy made
+  same-range (join_loop_pieces' new `refit`, off for Booleans). Next: Extrude 1 "klammer" (feature 5). Suite checks
+  (kernel, model, model suite, exchange) running before landing.
+
 ## 11-09 09:58 UTC: o-ring rings, drawings 1304/1409 (136/176)
 
 - **o-ring Parasolid** (live 2411): live's own x_t writes each circle between the cylinder and the cone as one ring

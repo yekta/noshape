@@ -12,6 +12,17 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## From dx (2026-11-09 11:09 UTC, lead: blend paused till Monday): c2-fan-blade-sweep's Chamfer 2, in progress
+- Cause: the thread's band (core's keep mark on its edge) survived OCCT's chamfer (91 faces, the mark on) and then
+  `merge_full_rounds` (finish_blend_faces) joined the band and the boss next to it: two coaxial cylinders of one
+  radius, its rule for a full round's halves. It now leaves a kept edge alone. And the fillet / variable fillet /
+  chamfer copies of the input (`BRepBuilderAPI_Copy`) lost every keep mark: carried now (`carry_kept_marks`), as the
+  Booleans' copies do.
+- Source studio fb207f79: 18 -> 22/22 (to the end). Derived 2 (other source 8b633129, the STEP import) built too
+  (parity translator: qEverything(BODY)'s default bodies aren't parts) and the blade's last edge joined (dx's
+  import code). c2-fan-blade-sweep 0 -> 23/53; next: feature 5 Extrude 1 ("klammer" 7/15/10, live 6/12/8).
+- Suite checks running (state below when done).
+
 ## From core (2026-11-09 02:48 UTC): c2-hunting-knife now stops at Fillet 2 (feature 14)
 - With core's guided loft fix (Loft 3 as live's face, the blade 4983.62 mm³ in live's band), the knife runs 11 -> 14/52.
   Next difference: feature 14 "Fillet 2": ours ERROR "Failed to fillet selections.", live OK; "4.5\" BLADE" 16/43/28
