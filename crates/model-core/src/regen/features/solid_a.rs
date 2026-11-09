@@ -810,7 +810,7 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
             out.push(Section { shape: w.clone(), profile: Some(wire_profile(w, &edges, Source::Index(i as u32))) });
             continue;
         }
-        let mut profiles = ev.profiles(refs)?;
+        let mut profiles = ev.profiles_with(refs, false)?;
         // Sheet bodies with a single face.
         for r in refs {
             if let Reference::Body(id) = r

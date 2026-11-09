@@ -840,6 +840,12 @@ impl<'a> EvalCtx<'a> {
     /// profiles follow the pattern transform (sketch regions are already
     /// transformed through their sketch's frame).
     pub fn profiles(&self, refs: &[Reference]) -> FResult<Vec<Profile>> {
+        self.profiles_with(refs, true)
+    }
+
+    /// [`Self::profiles`]; `join_arcs`: a region's arcs of other entities on one circle one edge where nothing else meets
+    /// them (not a loft's sections: their vertices pair up, c2-impeller-loft's Loft Gehäuse).
+    pub fn profiles_with(&self, refs: &[Reference], join_arcs: bool) -> FResult<Vec<Profile>> {
         // Many sketch regions (a plate's 400 holes): their faces made in
         // parallel. Each region's face gets its own edges (region_profile
         // makes them from the segments), so they share nothing.
@@ -852,7 +858,7 @@ impl<'a> EvalCtx<'a> {
             }
             use rayon::prelude::*;
             let legacy = noshape_kernel::kernel_legacy();
-            let made: Vec<FResult<Profile>> = regions.into_par_iter().map(|(s, region, key)| noshape_kernel::with_kernel_legacy(legacy.clone(), || region_profile(&s, &region, key))).collect();
+            let made: Vec<FResult<Profile>> = regions.into_par_iter().map(|(s, region, key)| noshape_kernel::with_kernel_legacy(legacy.clone(), || region_profile_with(&s, &region, key, join_arcs))).collect();
             return made.into_iter().collect();
         }
         let mut out = Vec::new();
@@ -860,7 +866,7 @@ impl<'a> EvalCtx<'a> {
             match r {
                 Reference::SketchRegion { sketch, key } => {
                     let Some((s, region)) = p else { continue };
-                    out.push(region_profile(&s, &region, Source::Region { sketch: *sketch, key: key.clone() })?);
+                    out.push(region_profile_with(&s, &region, Source::Region { sketch: *sketch, key: key.clone() }, join_arcs)?);
                 }
                 Reference::Face(n) => {
                     for (bi, fi) in self.resolve_faces(std::slice::from_ref(r)) {
@@ -1513,6 +1519,11 @@ fn encloses_no_area(region: &noshape_sketch::regions::Region) -> bool {
 
 /// Kernel face for a sketch region, with each edge's sketch source.
 pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region, key: Source) -> FResult<Profile> {
+    region_profile_with(s, region, key, true)
+}
+
+/// [`region_profile`]; `join_arcs` as [`EvalCtx::profiles_with`]'s.
+pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::Region, key: Source, join_arcs: bool) -> FResult<Profile> {
     // A tool of no volume gives an invalid part in a Boolean: the feature fails instead.
     if encloses_no_area(region) {
         return Err(FeatureError::new(format!("{KERNEL_FAILURE}a selected region encloses no area")));
@@ -1549,8 +1560,14 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
             (b0 - a).length() < 1e-12 && d0.perp_dot(d).abs() < 1e-9 && d0.dot(d) > 0.0 && (e0 == e || alone(a, e0, e) || one_line(a0, b))
         };
         for (seg, src) in lp.segments.iter().zip(lp.sources.iter()) {
+            // (Arcs of other entities on one circle too, where nothing else of the sketch meets them: c2-fan-blade-sweep's
+            // "klammer", two R13 fillets that ate the side between them, one half cylinder in live.)
+            let other_arc = |e_prev: u32| match seg {
+                P::Arc { center, radius, start_angle, .. } => join_arcs && !legacy && alone(*center + DVec2::new(start_angle.cos(), start_angle.sin()) * *radius, e_prev, src.entity.0),
+                _ => false,
+            };
             if let (Some((P::Arc { center: c0, radius: r0, start_angle: s0, end_angle: e0, ccw: w0 }, e_prev)), P::Arc { center, radius, end_angle, ccw, .. }) = (out.last_mut(), seg)
-                && *e_prev == src.entity.0
+                && (*e_prev == src.entity.0 || other_arc(*e_prev))
                 && (*c0 - *center).length() < 1e-12
                 && (*r0 - *radius).abs() < 1e-12
                 && *w0 == *ccw

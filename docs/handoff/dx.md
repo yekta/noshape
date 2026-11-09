@@ -38,6 +38,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
+## 11-09 11:51 UTC: c2-fan-blade-sweep 23 -> 26/53: a profile's two arcs of one circle one face
+
+- "klammer" (Extrude 1): Sketch 2's rectangle with two R13 fillets eating its 26 mm side (live keeps a zero-length
+  line there; our translator leaves it out): live one half cylinder (6/12/8), ours two (7/15/10). region_profile
+  (eval.rs) now joins arcs of other entities on one circle where nothing else of the sketch meets them, as it did
+  collinear lines (T1 features_a::a_profiles_two_arcs_of_one_circle_extrude_to_one_face); not a loft's sections
+  (`profiles_with(refs, false)`: the first try cost c2-impeller-loft's Loft Gehäuse, 11 -> 10). Next: feature 15
+  "Extrude 4", "base"'s box 0.2 mm off along x (-59.9 for -60.1): Sketch 5 sits on J7G (one of Extrude 1's picked
+  regions: a sketch region as the plane?) and has its own zero-length line (cnNSpKzM8YjE.top) and 7 PROJECTED not
+  found. Model suite 76/87, 790/947 (only the fan moved; c2-extension-spring 12/12 is the models' new note), model 424.
+
 ## 11-09 11:40 UTC: c2-fan-blade-sweep 0 -> 23/53 (lead: blend's Chamfer 2 while blend is paused); o-ring confirmed
 
 - Chamfer 2: merge_full_rounds joined the thread's kept band; the blends' input copies dropped keep marks (blend.md
