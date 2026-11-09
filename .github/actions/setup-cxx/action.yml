@@ -6,7 +6,9 @@ description: >
   at baseline x86-64 (GCC 15: ~4 % faster than 24.04's own GCC 13 on
   release-fillet-hang, 11-06; the binary still runs on a stock 24.04: see the
   check in release.yml).
-  macOS and Windows: the runner's clang and MSVC, as they are. setup-ccache
+  macOS: the runner's clang with floating-point contraction off (-ffp-contract=off): Apple clang fuses multiply-adds
+  into FMA by default on arm64, which rounds differently from Linux and Windows (11-09: a user's fillet failed on
+  macOS alone). Windows: MSVC as it is (x64 /fp:precise does not contract). setup-ccache
   puts ccache in front of whatever this sets; setup-occt and setup-opennurbs
   key their caches by its version.
 inputs:
@@ -38,3 +40,11 @@ runs:
           echo "CXXFLAGS=-march=x86-64"
         } >> "$GITHUB_ENV"
         "g++-$v" --version | head -1
+    - name: No FMA contraction (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        {
+          echo "CFLAGS=-ffp-contract=off"
+          echo "CXXFLAGS=-ffp-contract=off"
+        } >> "$GITHUB_ENV"
