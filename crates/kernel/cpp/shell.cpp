@@ -152,12 +152,15 @@
 #include <Geom_CylindricalSurface.hxx>
 #include <ShapeFix_Edge.hxx>
 #include <GeomAPI_IntSS.hxx>
+#include <OSD_Parallel.hxx>
 #include <TopAbs.hxx>
 #include <Geom_Surface.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <gp_Mat.hxx>
 #include <array>
 #include <set>
+
+extern "C" int noshape_should_break();
 
 namespace noshape {
 
@@ -4564,6 +4567,75 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
   std::vector<char>        flip(ne + 1);
   std::vector<int>         group_edge(nf + 1, 0); // a collapsing face's edge (the first of its tangent edges)
   std::map<int, std::pair<std::vector<double>, std::vector<gp_Pnt>>> marched_at; // a marched edge's points by parameter
+  // (A free-form offset only round the edge, its curve's box on the face and two walls more: the offsets keep
+  // their faces' parameters; OCCT's intersection of whole B-spline offsets was most of c2-rings-loft's edges.)
+  auto near_edge = [&](const TopoDS_Edge& e, int f) -> occ::handle<Geom_Surface> {
+    const occ::handle<Geom_Surface>& g = sf[(size_t)f].off;
+    if (!sf[(size_t)f].general || g->IsUPeriodic() || g->IsVPeriodic())
+      return g;
+    double                          e0, e1;
+    const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, TopoDS::Face(faces(f)), e0, e1);
+    if (pc.IsNull())
+      return g;
+    double u0 = 1e300, u1 = -1e300, v0 = 1e300, v1 = -1e300;
+    for (int k = 0; k <= 16; ++k)
+    {
+      const gp_Pnt2d q = pc->Value(e0 + (e1 - e0) * k / 16);
+      u0 = std::min(u0, q.X()), u1 = std::max(u1, q.X()), v0 = std::min(v0, q.Y()), v1 = std::max(v1, q.Y());
+    }
+    gp_Pnt P;
+    gp_Vec du, dv;
+    g->D1(0.5 * (u0 + u1), 0.5 * (v0 + v1), P, du, dv);
+    if (du.Magnitude() < 1e-12 || dv.Magnitude() < 1e-12)
+      return g;
+    const double mu = 2 * thickness / du.Magnitude(), mv = 2 * thickness / dv.Magnitude();
+    double       U0, U1, V0, V1;
+    g->Bounds(U0, U1, V0, V1);
+    u0 = std::max(U0, u0 - mu), u1 = std::min(U1, u1 + mu), v0 = std::max(V0, v0 - mv), v1 = std::min(V1, v1 + mv);
+    if (!(u1 > u0) || !(v1 > v0))
+      return g;
+    return new Geom_RectangularTrimmedSurface(g, u0, u1, v0, v1);
+  };
+  // (The offsets' intersections the loop below asks OCCT for (an edge neither tangent, a seam nor between two planes,
+  // a face of it free-form), made ahead on all threads: c2-rings-loft's 8 B-spline pairs took 35-100 ms each, one
+  // after another. One not made here (it threw or failed, or the budget stopped it) is made in the loop, as before.)
+  struct AheadSS
+  {
+    bool                                 done = false;
+    std::vector<occ::handle<Geom_Curve>> lines;
+  };
+  std::vector<AheadSS> ahead_ss((size_t)ne + 1);
+  {
+    std::vector<int> jobs;
+    for (int i = 1; i <= ne; ++i)
+    {
+      const int fa = efi[(size_t)i][0], fb = efi[(size_t)i][1];
+      if (gone[(size_t)i] || degen[(size_t)i] || seam[(size_t)i] || tangent[(size_t)i] || cseam[(size_t)i] || group[(size_t)i] != 0
+          || (!sf[(size_t)fa].general && !sf[(size_t)fb].general))
+        continue;
+      jobs.push_back(i);
+    }
+    if (jobs.size() >= 2)
+      OSD_Parallel::For(0, static_cast<int>(jobs.size()), [&](int k) {
+        if (noshape_should_break() != 0)
+          return;
+        const int i = jobs[(size_t)k];
+        try
+        {
+          const TopoDS_Edge e = TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD));
+          GeomAPI_IntSS     is(near_edge(e, efi[(size_t)i][0]), near_edge(e, efi[(size_t)i][1]), 1e-9 * size);
+          if (!is.IsDone())
+            return;
+          for (int m = 1; m <= is.NbLines(); ++m)
+            ahead_ss[(size_t)i].lines.push_back(is.Line(m));
+          ahead_ss[(size_t)i].done = true;
+        }
+        catch (const Standard_Failure&)
+        {
+          ahead_ss[(size_t)i].lines.clear();
+        }
+      });
+  }
   for (int i = 1; i <= ne; ++i)
   {
     // (A removed face's seam has no offset: its rim bands get their own, below.)
@@ -4765,40 +4837,16 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       }
       else
       {
-        // (A free-form offset only round the edge, its curve's box on the face and two walls more: the offsets keep
-        // their faces' parameters; OCCT's intersection of whole B-spline offsets was most of c2-rings-loft's edges.)
-        auto near_edge = [&](int f) -> occ::handle<Geom_Surface> {
-          const occ::handle<Geom_Surface>& g = sf[(size_t)f].off;
-          if (!sf[(size_t)f].general || g->IsUPeriodic() || g->IsVPeriodic())
-            return g;
-          double                          e0, e1;
-          const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, TopoDS::Face(faces(f)), e0, e1);
-          if (pc.IsNull())
-            return g;
-          double u0 = 1e300, u1 = -1e300, v0 = 1e300, v1 = -1e300;
-          for (int k = 0; k <= 16; ++k)
-          {
-            const gp_Pnt2d q = pc->Value(e0 + (e1 - e0) * k / 16);
-            u0 = std::min(u0, q.X()), u1 = std::max(u1, q.X()), v0 = std::min(v0, q.Y()), v1 = std::max(v1, q.Y());
-          }
-          gp_Pnt P;
-          gp_Vec du, dv;
-          g->D1(0.5 * (u0 + u1), 0.5 * (v0 + v1), P, du, dv);
-          if (du.Magnitude() < 1e-12 || dv.Magnitude() < 1e-12)
-            return g;
-          const double mu = 2 * thickness / du.Magnitude(), mv = 2 * thickness / dv.Magnitude();
-          double       U0, U1, V0, V1;
-          g->Bounds(U0, U1, V0, V1);
-          u0 = std::max(U0, u0 - mu), u1 = std::min(U1, u1 + mu), v0 = std::max(V0, v0 - mv), v1 = std::min(V1, v1 + mv);
-          if (!(u1 > u0) || !(v1 > v0))
-            return g;
-          return new Geom_RectangularTrimmedSurface(g, u0, u1, v0, v1);
-        };
-        GeomAPI_IntSS is(near_edge(fa), near_edge(fb), 1e-9 * size);
-        if (!is.IsDone())
-          return no("two offsets don't intersect");
-        for (int k = 1; k <= is.NbLines(); ++k)
-          cands.push_back(is.Line(k));
+        if (group[(size_t)i] == 0 && ahead_ss[(size_t)i].done)
+          cands = ahead_ss[(size_t)i].lines;
+        else
+        {
+          GeomAPI_IntSS is(near_edge(e, fa), near_edge(e, fb), 1e-9 * size);
+          if (!is.IsDone())
+            return no("two offsets don't intersect");
+          for (int k = 1; k <= is.NbLines(); ++k)
+            cands.push_back(is.Line(k));
+        }
       }
       // A point's parameter on a candidate: its foot, or an end the point lies just past (an intersection of free-form
       // offsets stops at their bounds, which a corner between tangent faces lies on).
