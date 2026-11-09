@@ -469,7 +469,7 @@ impl Render for PerformancePanel {
             body.push(
                 v_flex()
                     .pb(px(5.))
-                    .child(row("Browser", "noshape".into(), false, cx))
+                    .child(row("Browser", "Noshape".into(), false, cx))
                     .child(row("Version", crate::VERSION.into(), false, cx))
                     .child(row("Platform", platform.into(), false, cx))
                     .child(row("GL vendor", vendor, false, cx))

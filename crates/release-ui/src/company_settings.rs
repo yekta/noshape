@@ -70,7 +70,7 @@ pub fn show(section: Section, cx: &mut App) {
         ..TitleBar::window_options()
     };
     match crate::os_menu::open_window(options, cx, |window, cx| {
-        window.set_window_title("Company settings — noshape");
+        window.set_window_title("Company settings — Noshape");
         let view = cx.new(|cx| CompanySettingsView::new(section, window, cx));
         // The ui-parity driver's state of this window: the section shown, the open dialog and menu, the message.
         let weak = view.downgrade();

@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>noshape</string>
+  <string>Noshape</string>
   <key>CFBundleDisplayName</key>
-  <string>noshape</string>
+  <string>Noshape</string>
   <key>CFBundleIdentifier</key>
   <string>app.noshape.noshape</string>
   <key>CFBundleIconFile</key>

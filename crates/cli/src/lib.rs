@@ -45,7 +45,7 @@ pub fn command_named(name: &str) -> Command {
     let about = if name == "noshape" {
         "noshape CAD. With no command (or a .noshape file) it opens the app; with a command it runs it for scripts and agents, JSON in and out"
     } else {
-        "noshape CAD for scripts and agents: every operation of the app, JSON in and out"
+        "Noshape CAD for scripts and agents: every operation of the app, JSON in and out"
     };
     // The command's name in usage lines, not argv[0]'s file name ("noshape.exe" on Windows).
     let mut cmd = Command::new(name.to_string())

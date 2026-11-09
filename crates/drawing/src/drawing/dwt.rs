@@ -51,7 +51,7 @@ pub fn apply_dwt_template(d: &mut super::Drawing, name: &str, bytes: &[u8]) -> R
 /// The templates of a DWT exported by noshape (primary, continuation).
 pub fn read_dwt(bytes: &[u8]) -> Result<Vec<SheetTemplate>, String> {
     let doc = acadrust::DwgReader::from_stream(std::io::Cursor::new(bytes.to_vec())).read().map_err(|e| e.to_string())?;
-    let json = doc.summary_info.custom_properties.iter().find(|(k, _)| k == PROPERTY).map(|(_, v)| v.clone()).ok_or_else(|| "This template has no noshape sheet format".to_string())?;
+    let json = doc.summary_info.custom_properties.iter().find(|(k, _)| k == PROPERTY).map(|(_, v)| v.clone()).ok_or_else(|| "This template has no Noshape sheet format".to_string())?;
     let t: Vec<SheetTemplate> = serde_json::from_str(&json).map_err(|e| e.to_string())?;
     if t.is_empty() { Err("This template has no sheet".into()) } else { Ok(t) }
 }

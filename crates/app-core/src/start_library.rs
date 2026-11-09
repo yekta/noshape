@@ -187,7 +187,7 @@ fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
     let conn = Connection::open_with_flags(&uri, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI | OpenFlags::SQLITE_OPEN_NO_MUTEX)?;
     let app_id: i64 = conn.query_row("PRAGMA application_id", [], |r| r.get(0))?;
     if app_id != i64::from(noshape_store::APPLICATION_ID) {
-        bail!("not a noshape document");
+        bail!("not a Noshape document");
     }
     let get = |key: &str| -> anyhow::Result<Option<Vec<u8>>> { Ok(conn.query_row("SELECT value FROM meta WHERE key = ?1", [key], |r| r.get(0)).optional()?) };
     let text = |v: Option<Vec<u8>>| v.map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();

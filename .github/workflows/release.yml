@@ -623,7 +623,7 @@ jobs:
           fi
           [ -s notes.md ] || echo "Release $GITHUB_REF_NAME." > notes.md
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
-            --title "noshape $GITHUB_REF_NAME" --notes-file notes.md
+            --title "Noshape $GITHUB_REF_NAME" --notes-file notes.md
 
   # The previous release, installed as a user installs it on each system, updates itself to the newest release from
   # GitHub through its own update card, Restart pressed on the screen (.github/release/check_restart.py: a release

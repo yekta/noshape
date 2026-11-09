@@ -92,7 +92,7 @@ impl Render for GuideView {
             .size_full()
             .bg(pal.panel)
             .text_color(pal.text)
-            .child(gpui_kit::component::TitleBar::new().bg(pal.panel_inactive).border_b_1().border_color(pal.border).child(div().pl(px(8.)).text_size(px(12.)).text_color(pal.text_muted).child("Help — noshape")))
+            .child(gpui_kit::component::TitleBar::new().bg(pal.panel_inactive).border_b_1().border_color(pal.border).child(div().pl(px(8.)).text_size(px(12.)).text_color(pal.text_muted).child("Help — Noshape")))
             .child(div().id("guide-text").flex_1().min_h_0().overflow_y_scroll().p(px(16.)).child(crate::doc_panels::markdown(text).w_full()))
             .children(whole)
     }
@@ -121,7 +121,7 @@ pub fn open_section(section: &str, cx: &mut App) {
     };
     let mut made = None;
     match crate::os_menu::open_window(options, cx, |window, cx| {
-        window.set_window_title("Help — noshape");
+        window.set_window_title("Help — Noshape");
         let view = cx.new(|_| GuideView { section });
         made = Some(view.clone());
         view

@@ -12,7 +12,7 @@ use noshape_ops::about::{COPYRIGHT, OCCT_NOTICE};
 
 actions!(noshape_about, [ShowAbout]);
 
-/// The macOS app menu's "About noshape" (the other OSs' Help menus have the row): the modal in the active window.
+/// The macOS app menu's "About Noshape" (the other OSs' Help menus have the row): the modal in the active window.
 pub fn init(cx: &mut App) {
     cx.on_action(|_: &ShowAbout, cx| {
         // (After the menu's dispatch: an update of the window it went to fails from inside it.)
@@ -69,7 +69,7 @@ pub fn open(window: &mut Window, cx: &mut App) {
                             .h(px(75.))
                             .gap(px(14.))
                             .child(crate::assets::icon("noshape-logo", 64., cx))
-                            .child(div().text_size(px(44.)).line_height(px(52.)).text_color(rgb(0x3d4647)).child("noshape")),
+                            .child(div().text_size(px(44.)).line_height(px(52.)).text_color(rgb(0x3d4647)).child("Noshape")),
                     )
                     .child(div().mt(px(20.)).debug_selector(|| "about-copyright".into()).child(COPYRIGHT))
                     .child(div().mt(px(20.)).max_w(px(740.)).child(OCCT_NOTICE))
@@ -88,7 +88,7 @@ pub fn open(window: &mut Window, cx: &mut App) {
                                     .on_click(|_, _, cx| open_notices(cx))
                                     .child("Open source software components"),
                             )
-                            .child("\u{a0}used in noshape."),
+                            .child("\u{a0}used in Noshape."),
                     ),
             )
             .footer(

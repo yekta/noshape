@@ -24,7 +24,7 @@ pub fn ops() -> Vec<Op> {
 fn about(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let path = notices_file().map_err(|e| OpError::new("io", format!("Could not write the notices file: {e}")))?;
     let mut v = json!({
-        "name": "noshape",
+        "name": "Noshape",
         "version": noshape_kernel::VERSION,
         "copyright": COPYRIGHT,
         "occt": OCCT_NOTICE,
@@ -40,7 +40,7 @@ fn system_check_op() -> Op {
     Op {
         group: "app",
         verb: "system_check",
-        summary: "What Help › System check shows: the system, its memory and the documents folder's disk, and the graphics adapter noshape draws with",
+        summary: "What Help › System check shows: the system, its memory and the documents folder's disk, and the graphics adapter Noshape draws with",
         description: "`os`, `arch`, `cpus`; `memory` (`total`, `available` bytes; available is null where the system doesn't say); `disk` (the documents folder's: `path`, `free`, `total` bytes); `graphics` (`adapter`, \"name (Backend)\", and `software`: true for a software renderer such as llvmpipe or WARP, which draws slowly). `problems` lists what the dialog marks: a software renderer, under 4 GB of memory, under 1 GB free on the disk.",
         fields: vec![],
         mutates: false,
@@ -85,7 +85,7 @@ fn help_op() -> Op {
     Op {
         group: "app",
         verb: "user_guide",
-        summary: "noshape's user guide, as Help › Help shows it (Markdown)",
+        summary: "Noshape's user guide, as Help › Help shows it (Markdown)",
         description: "`guide`: the guide's Markdown; with `section`, that section (what a dialog's ? opens), and `sections` lists them all. The FeatureScript standard library is featurestudio_std's, the keyboard shortcuts ui_shortcuts'.",
         fields: vec![opt("section", s(), "A section's title (\"Compare\", \"Variable Studios\"…).")],
         mutates: false,

@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=noshape
+Name=Noshape
 GenericName=Parametric CAD
 Comment=A fast, fully local, parametric CAD application
 Exec=noshape %f

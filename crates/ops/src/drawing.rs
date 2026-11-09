@@ -317,19 +317,19 @@ const JIS: [(&str, &str, SheetSize); 6] = [
 pub fn template_rows() -> Vec<TemplateRow> {
     let ansi = ANSI.iter().map(|&(file, name, size, inches)| TemplateRow {
         file,
-        document: "noshape ANSI Drawing Templates",
+        document: "Noshape ANSI Drawing Templates",
         standard: "ANSI",
         template: DrawingTemplate::standard(name, size, TitleBlockStyle::Ansi, inches, Projection::ThirdAngle),
     });
     let iso = ISO.iter().map(|&(file, name, size)| TemplateRow {
         file,
-        document: "noshape ISO Drawing Templates",
+        document: "Noshape ISO Drawing Templates",
         standard: "ISO",
         template: DrawingTemplate { decimal_comma: true, ..DrawingTemplate::standard(name, size, TitleBlockStyle::Iso, false, Projection::FirstAngle) },
     });
     let jis = JIS.iter().map(|&(file, name, size)| TemplateRow {
         file,
-        document: "noshape JIS Drawing Templates",
+        document: "Noshape JIS Drawing Templates",
         standard: "JIS",
         template: DrawingTemplate { decimal_comma: true, language: TitleLanguage::Japanese, ..DrawingTemplate::standard(name, size, TitleBlockStyle::Iso, false, Projection::ThirdAngle) },
     });

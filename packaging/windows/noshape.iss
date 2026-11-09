@@ -17,13 +17,13 @@
 
 [Setup]
 AppId={{6E0B3C55-2D7A-4C4B-9C8E-5F1A4E2B7D10}
-AppName=noshape
+AppName=Noshape
 AppVersion={#Version}
-AppVerName=noshape {#Version}
-AppPublisher=noshape
+AppVerName=Noshape {#Version}
+AppPublisher=Noshape
 AppPublisherURL=https://github.com/yekta/noshape
 DefaultDirName={autopf}\noshape
-DefaultGroupName=noshape
+DefaultGroupName=Noshape
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
@@ -52,15 +52,15 @@ Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "prepare.ps1"; Flags: dontcopy
 
 [Icons]
-Name: "{autoprograms}\noshape"; Filename: "{app}\noshape.exe"
+Name: "{autoprograms}\Noshape"; Filename: "{app}\noshape.exe"
 
 [Registry]
 ; The install folder on the user's PATH: `noshape` and `noshape mcp` in any new terminal or MCP client.
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath(ExpandConstant('{app}'))
 
 [Run]
-Filename: "{app}\noshape.exe"; Parameters: "agents connect"; Description: "Connect noshape to {code:FoundAgents} (its MCP server)"; Flags: postinstall runasoriginaluser runhidden waituntilterminated; Check: AgentsFound
-Filename: "{app}\noshape.exe"; Description: "Start noshape"; Flags: postinstall nowait skipifsilent runasoriginaluser
+Filename: "{app}\noshape.exe"; Parameters: "agents connect"; Description: "Connect Noshape to {code:FoundAgents} (its MCP server)"; Flags: postinstall runasoriginaluser runhidden waituntilterminated; Check: AgentsFound
+Filename: "{app}\noshape.exe"; Description: "Start Noshape"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
 [UninstallRun]
 ; Before the files go: the agents this install connected forget it (another noshape's entries stay).

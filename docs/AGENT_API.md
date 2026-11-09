@@ -350,7 +350,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 
 #### ops_list
 
-List every operation (tool) of the noshape API.
+List every operation (tool) of the Noshape API.
 
 Without filters: every tool's name and the groups with their sizes (short). With `group` (a group's name, its start or a word in it: "configuration" finds config) or `search` (words all found in a tool's name or summary): each tool's name, CLI command, summary and examples. Use `feature_types` and `feature_schema` for the Part Studio features and their parameters, ops_describe for a tool's full documentation.
 
@@ -424,7 +424,7 @@ Examples:
 
 Move the workspace to the latest feature library (FeatureScript standard library) version (☰ › Update workspace…).
 
-noshape ships one standard library, so a workspace is always at the latest: the reply says so in Onshape's words (`message`) with the version (`std_version`). References to other documents' versions are updated with document_update_references.
+Noshape ships one standard library, so a workspace is always at the latest: the reply says so in Onshape's words (`message`) with the version (`std_version`). References to other documents' versions are updated with document_update_references.
 
 Examples:
 
@@ -6986,7 +6986,7 @@ Examples:
 
 #### featurestudio_std
 
-The FeatureScript standard library noshape ships (Help › FeatureScript documentation): its modules, or one module's source.
+The FeatureScript standard library Noshape ships (Help › FeatureScript documentation): its modules, or one module's source.
 
 Without `module`: `version` and the `modules` by name ("geometry.fs", "evaluate.fs", …). With one: its `source`, as the read-only std document the app opens shows it.
 
@@ -7075,7 +7075,7 @@ Examples:
 
 #### agents_status
 
-The coding agents on this computer and whether noshape is connected to them.
+The coding agents on this computer and whether Noshape is connected to them.
 
 Claude Code (`claude` on PATH or where its installers put it), the Codex CLI (`codex`) and Claude Desktop (its folder: macOS ~/Library/Application Support/Claude, Windows %APPDATA%\Claude): for each, `found`, its configuration file and `state`: missing (not installed), not_connected, connected (noshape's MCP server starts this binary) or elsewhere (`connected_command`: another noshape binary). `found_names` lists the ones installed.
 
@@ -7091,7 +7091,7 @@ Examples:
 
 #### agents_connect
 
-Register noshape's MCP server with the coding agents installed (Help › Connect to coding agents…).
+Register Noshape's MCP server with the coding agents installed (Help › Connect to coding agents…).
 
 Adds `noshape` (`<command> mcp`) to each agent's MCP servers, user-wide: Claude Code with `claude mcp add --scope user`, the Codex CLI with `codex mcp add` (older versions: a [mcp_servers.noshape] table in ~/.codex/config.toml), Claude Desktop in claude_desktop_config.json (other servers kept). A file is backed up first (`<file>.noshape-backup`). An entry already starting this binary is left as it is; one starting another binary is updated. Restart Claude Desktop to load it.
 
@@ -7109,7 +7109,7 @@ Examples:
 
 #### agents_disconnect
 
-Remove noshape's MCP server from the coding agents (deletes or overwrites).
+Remove Noshape's MCP server from the coding agents (deletes or overwrites).
 
 Removes the `noshape` entry from each agent's MCP servers (with its own command where it has one, else from its configuration file, backed up first). Other servers are kept. With `command`, only entries that start that binary (the uninstallers pass their own, so another install's entry stays).
 
@@ -7164,7 +7164,7 @@ Examples:
 
 #### app_user_guide
 
-noshape's user guide, as Help › Help shows it (Markdown).
+Noshape's user guide, as Help › Help shows it (Markdown).
 
 `guide`: the guide's Markdown; with `section`, that section (what a dialog's ? opens), and `sections` lists them all. The FeatureScript standard library is featurestudio_std's, the keyboard shortcuts ui_shortcuts'.
 
@@ -7180,7 +7180,7 @@ Examples:
 
 #### app_system_check
 
-What Help › System check shows: the system, its memory and the documents folder's disk, and the graphics adapter noshape draws with.
+What Help › System check shows: the system, its memory and the documents folder's disk, and the graphics adapter Noshape draws with.
 
 `os`, `arch`, `cpus`; `memory` (`total`, `available` bytes; available is null where the system doesn't say); `disk` (the documents folder's: `path`, `free`, `total` bytes); `graphics` (`adapter`, "name (Backend)", and `software`: true for a software renderer such as llvmpipe or WARP, which draws slowly). `problems` lists what the dialog marks: a software renderer, under 4 GB of memory, under 1 GB free on the disk.
 

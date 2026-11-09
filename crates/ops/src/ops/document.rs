@@ -31,7 +31,7 @@ pub fn ops() -> Vec<Op> {
             group: "document",
             verb: "update_workspace",
             summary: "Move the workspace to the latest feature library (FeatureScript standard library) version (☰ › Update workspace…)",
-            description: "noshape ships one standard library, so a workspace is always at the latest: the reply says so in Onshape's words (`message`) with the version (`std_version`). References to other documents' versions are updated with document_update_references.",
+            description: "Noshape ships one standard library, so a workspace is always at the latest: the reply says so in Onshape's words (`message`) with the version (`std_version`). References to other documents' versions are updated with document_update_references.",
             fields: vec![doc_field()],
             mutates: false,
             destructive: false,

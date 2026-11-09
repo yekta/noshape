@@ -6696,7 +6696,7 @@ fn agents_and_command_line_tool_ops() {
 fn about_names_the_copyright_and_the_notices() {
     let mut ctx = Ctx::new();
     let r = call(&mut ctx, "app_about", json!({}));
-    assert_eq!((r["name"].as_str(), r["copyright"].as_str()), (Some("noshape"), Some("© 2026 Yekta")), "{r}");
+    assert_eq!((r["name"].as_str(), r["copyright"].as_str()), (Some("Noshape"), Some("© 2026 Yekta")), "{r}");
     assert!(!r["version"].as_str().unwrap().is_empty(), "{r}");
     assert!(r["occt"].as_str().unwrap().contains("GNU Lesser General Public License version 2.1"), "{r}");
     assert!(r.get("notices_text").is_none(), "the text only on request");

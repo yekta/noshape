@@ -51,7 +51,7 @@ pub fn show(opener: Option<Size<Pixels>>, cx: &mut App) {
         ..gpui_kit::component::TitleBar::window_options()
     };
     match crate::os_menu::open_window(options, cx, |window, cx| {
-        window.set_window_title("Keyboard shortcuts — noshape");
+        window.set_window_title("Keyboard shortcuts — Noshape");
         cx.new(|_| ShortcutsPage { scroll: ScrollHandle::new() })
     }) {
         Ok((handle, _)) => cx.set_global(ShortcutsWindow { handle }),
@@ -140,7 +140,7 @@ impl Render for ShortcutsPage {
             .bg(gpui_kit::rgb(0xffffff))
             .text_color(pal.text)
             // The window's own bar (moving, closing); live is a browser popup.
-            .child(gpui_kit::component::TitleBar::new().bg(pal.panel_inactive).border_b_1().border_color(pal.border).child(div().pl(px(8.)).text_size(px(12.)).text_color(pal.text_muted).child("Keyboard shortcuts — noshape")))
+            .child(gpui_kit::component::TitleBar::new().bg(pal.panel_inactive).border_b_1().border_color(pal.border).child(div().pl(px(8.)).text_size(px(12.)).text_color(pal.text_muted).child("Keyboard shortcuts — Noshape")))
             .child(div().flex_none().h(px(45.)).px(px(10.)).flex().items_center().text_size(px(19.)).text_color(crate::theme::themed(0x555555, 0xd7d7d7)).child(div().relative().top(px(3.)).child("Keyboard shortcuts")))
             // Chrome's scrollbar on the page's right edge (live: the columns are half of what is left).
             .child(

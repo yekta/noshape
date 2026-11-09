@@ -128,7 +128,7 @@ impl Gpu {
     fn worker(&self) -> &RenderWorker {
         match self.worker.wait() {
             Ok((w, _)) => w,
-            Err(e) => panic!("noshape needs a GPU (Vulkan, Metal or DirectX 12): {e}"),
+            Err(e) => panic!("Noshape needs a GPU (Vulkan, Metal or DirectX 12): {e}"),
         }
     }
 

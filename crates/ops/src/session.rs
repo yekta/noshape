@@ -210,7 +210,7 @@ impl Session {
             let Some((tab, index, rollback, name)) = hit else { continue };
             if index < rollback {
                 let lifted = std::mem::replace(&mut self.protection_lifted, true);
-                let r = self.edit_tab(tab, &format!("Roll back above {name}: noshape stopped while regenerating it"), |c| {
+                let r = self.edit_tab(tab, &format!("Roll back above {name}: Noshape stopped while regenerating it"), |c| {
                     if let TabContent::PartStudio(ps) = c {
                         ps.rollback = Some(index);
                     }
@@ -219,7 +219,7 @@ impl Session {
                 if r.is_err() {
                     continue;
                 }
-                notes.push(format!("noshape stopped while {name} regenerated (a crash, or the process was killed): the rollback bar is now above it. Edit or delete it, then move the rollback bar back."));
+                notes.push(format!("Noshape stopped while {name} regenerated (a crash, or the process was killed): the rollback bar is now above it. Edit or delete it, then move the rollback bar back."));
             }
             let _ = std::fs::remove_file(&m.path);
         }
@@ -818,7 +818,7 @@ mod tests {
         assert!(s.recovered.len() == 1 && s.recovered[0].contains(&name), "{:?}", s.recovered);
         assert!(!marker.exists() && !docs.exists(), "the marker and the dead process's file list are cleared");
         let last = s.store.history(s.branch).unwrap()[0].description.clone();
-        assert!(last.ends_with(&format!(":: Roll back above {name}: noshape stopped while regenerating it")), "{last}");
+        assert!(last.ends_with(&format!(":: Roll back above {name}: Noshape stopped while regenerating it")), "{last}");
         drop(s);
         // Opened again: nothing more to do.
         assert!(Session::open_with_markers(&path, Some(&markers)).unwrap().recovered.is_empty());

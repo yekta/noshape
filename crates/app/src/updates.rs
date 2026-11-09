@@ -243,7 +243,7 @@ fn whats_new(window: &mut Window, cx: &mut App) {
         let pal = p();
         let notes = if release.notes.trim().is_empty() { "No notes for this release.".to_string() } else { release.notes.clone() };
         let page = release.page.clone();
-        os::modal(dialog, format!("What's new in noshape {}", release.version()), 640.)
+        os::modal(dialog, format!("What's new in Noshape {}", release.version()), 640.)
             .child(
                 div()
                     .id("whats-new")
@@ -303,7 +303,7 @@ fn card_content(u: &Updates) -> Option<(os::BubbleKind, AnyElement)> {
             (
                 os::BubbleKind::Info,
                 row()
-                    .child(div().min_w_0().truncate().child(format!("noshape v{v} is available")))
+                    .child(div().min_w_0().truncate().child(format!("Noshape v{v} is available")))
                     .child(card_button("update-download", "Download", true).on_click(move |_, _, cx| cx.open_url(&page)))
                     .child(card_button("update-whats-new", "What's new", false).on_click(|_, window, cx| whats_new(window, cx)))
                     .into_any_element(),

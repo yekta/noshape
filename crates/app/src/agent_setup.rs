@@ -43,13 +43,13 @@ pub fn init(cx: &mut App) {
     cx.on_action(|_: &ConnectCodingAgents, cx| in_some_window(Scope::Agents, cx));
     // macOS: the app menu (noshape ▸), where Mac apps put these.
     if cfg!(target_os = "macos") {
-        cx.set_menus(vec![Menu::new("noshape").items([
-            MenuItem::action("About noshape", crate::about::ShowAbout),
+        cx.set_menus(vec![Menu::new("Noshape").items([
+            MenuItem::action("About Noshape", crate::about::ShowAbout),
             MenuItem::separator(),
             MenuItem::action("Install Command Line Tool…", InstallCommandLineTool),
             MenuItem::action("Connect to Coding Agents…", ConnectCodingAgents),
             MenuItem::separator(),
-            MenuItem::action("Quit noshape", crate::actions::Quit),
+            MenuItem::action("Quit Noshape", crate::actions::Quit),
         ])]);
     }
 }
@@ -171,7 +171,7 @@ fn check(what: What, env: &Env) -> Result<(Check, String), String> {
                 (Some(p), true) => (Check::Done, format!("installed: {}", p.display())),
                 (Some(p), false) => (Check::Offer, format!("installed: {} (not on PATH)", p.display())),
                 (None, _) => (Check::Offer, match &st.other {
-                    Some(o) => format!("not installed ({} starts another noshape)", o.display()),
+                    Some(o) => format!("not installed ({} starts another Noshape)", o.display()),
                     None => "not installed".into(),
                 }),
             }
@@ -277,12 +277,12 @@ fn show(setup: Rc<RefCell<Setup>>, env: Env, window: &mut Window, cx: &mut App) 
         let title = match scope {
             Scope::Cli => "Install command line tool",
             Scope::Agents => "Connect to coding agents",
-            Scope::Everything => "Set up noshape",
+            Scope::Everything => "Set up Noshape",
         };
         let intro = match scope {
             Scope::Cli => "The noshape command runs every operation of the app from a terminal, and its MCP server (noshape mcp) for coding agents.",
-            Scope::Agents => "Connected agents can use noshape through its MCP server (noshape mcp): ask them to model a part, edit a drawing or export files.",
-            Scope::Everything => "noshape can be used from a terminal and by coding agents through its MCP server (noshape mcp).",
+            Scope::Agents => "Connected agents can use Noshape through its MCP server (noshape mcp): ask them to model a part, edit a drawing or export files.",
+            Scope::Everything => "Noshape can be used from a terminal and by coding agents through its MCP server (noshape mcp).",
         };
         let choosing = s.phase == Phase::Choosing;
         let any = s.rows.iter().any(|r| r.on && r.check == Check::Offer);

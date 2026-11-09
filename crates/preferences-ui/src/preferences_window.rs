@@ -155,7 +155,7 @@ pub fn show(page: Page, cx: &mut App) {
         ..TitleBar::window_options()
     };
     match crate::os_menu::open_window(options, cx, |window, cx| {
-        window.set_window_title("My account — noshape");
+        window.set_window_title("My account — Noshape");
         let view = cx.new(|cx| PreferencesView::new(page, window, cx));
         // The ui-parity driver's Preferences page (tests/ui-parity/README.md "Documents page and Preferences").
         let weak = view.downgrade();

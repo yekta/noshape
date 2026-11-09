@@ -360,7 +360,7 @@ impl CreateDrawingDialog {
                     .child(h_flex().h(px(42.)).flex_none().border_b_1().border_color(pal.border).child(std_tab("All", cur, cx)).child(std_tab("ANSI", cur, cx)).child(std_tab("ISO", cur, cx)).child(std_tab("JIS", cur, cx)))
                     .child(list)
                     .when(self.source_filter == RECENT, |e| {
-                        e.child(div().flex_none().py(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("cd-show-builtin").label("Show noshape drawing templates").checked(self.show_builtin).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        e.child(div().flex_none().py(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("cd-show-builtin").label("Show Noshape drawing templates").checked(self.show_builtin).on_click(cx.listener(|this, v: &bool, _, cx| {
                             this.show_builtin = *v;
                             cx.notify();
                         }))))

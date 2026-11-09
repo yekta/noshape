@@ -11,7 +11,7 @@ pub enum StoreError {
     Io(#[from] std::io::Error),
     #[error("file already exists: {}", .0.display())]
     AlreadyExists(PathBuf),
-    #[error("not a noshape document")]
+    #[error("not a Noshape document")]
     NotADocument,
     #[error("document schema version {found} is newer than supported version {supported}")]
     NewerSchema { found: i64, supported: i64 },

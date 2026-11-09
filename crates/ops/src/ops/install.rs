@@ -23,7 +23,7 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "agents",
             verb: "status",
-            summary: "The coding agents on this computer and whether noshape is connected to them",
+            summary: "The coding agents on this computer and whether Noshape is connected to them",
             description: "Claude Code (`claude` on PATH or where its installers put it), the Codex CLI (`codex`) and Claude Desktop (its folder: macOS ~/Library/Application Support/Claude, Windows %APPDATA%\\Claude): for each, `found`, its configuration file and `state`: missing (not installed), not_connected, connected (noshape's MCP server starts this binary) or elsewhere (`connected_command`: another noshape binary). `found_names` lists the ones installed.",
             fields: vec![command_field()],
             mutates: false,
@@ -33,7 +33,7 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "agents",
             verb: "connect",
-            summary: "Register noshape's MCP server with the coding agents installed (Help › Connect to coding agents…)",
+            summary: "Register Noshape's MCP server with the coding agents installed (Help › Connect to coding agents…)",
             description: "Adds `noshape` (`<command> mcp`) to each agent's MCP servers, user-wide: Claude Code with `claude mcp add --scope user`, the Codex CLI with `codex mcp add` (older versions: a [mcp_servers.noshape] table in ~/.codex/config.toml), Claude Desktop in claude_desktop_config.json (other servers kept). A file is backed up first (`<file>.noshape-backup`). An entry already starting this binary is left as it is; one starting another binary is updated. Restart Claude Desktop to load it.",
             fields: vec![agents_field("Agents to connect (claude_code, codex, claude_desktop). Default: every one installed."), command_field()],
             mutates: false,
@@ -43,7 +43,7 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "agents",
             verb: "disconnect",
-            summary: "Remove noshape's MCP server from the coding agents",
+            summary: "Remove Noshape's MCP server from the coding agents",
             description: "Removes the `noshape` entry from each agent's MCP servers (with its own command where it has one, else from its configuration file, backed up first). Other servers are kept. With `command`, only entries that start that binary (the uninstallers pass their own, so another install's entry stays).",
             fields: vec![agents_field("Agents to disconnect. Default: every one connected."), opt("command", json!({ "type": "string" }), "Only entries that start this noshape binary. Default: any noshape entry.")],
             mutates: false,

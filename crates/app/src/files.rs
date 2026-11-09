@@ -140,7 +140,7 @@ pub fn open_tab_window(doc: Entity<doc_model::DocModel>, tab: noshape_model::doc
         app_id: Some("dev.noshape.noshape".into()),
         ..TitleBar::window_options()
     };
-    let title = format!("{} — noshape", doc.read(cx).session.name());
+    let title = format!("{} — Noshape", doc.read(cx).session.name());
     crate::os_menu::open_window(options, cx, move |window, cx| {
         window.set_window_title(&title);
         let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));
@@ -162,7 +162,7 @@ fn open_session_window(session: session::Session, gpu: Gpu, cx: &mut App) -> any
     noshape_render::perf::milestone("window: opening");
     let (handle, ws) = crate::os_menu::open_window(options, cx, move |window, cx| {
         noshape_render::perf::milestone("window: created");
-        window.set_window_title(&format!("{} — noshape", session.name()));
+        window.set_window_title(&format!("{} — Noshape", session.name()));
         let doc = cx.new(|cx| {
             let mut d = doc_model::DocModel::new(session);
             d.watch_external(cx);
@@ -203,13 +203,13 @@ pub fn prompt_open(gpu: Gpu, cx: &mut App) {
         // Deferred: the action is dispatched while that window is being
         // updated, so it can't be borrowed right now.
         cx.defer(move |cx| {
-            let _ = handle.update(cx, |_, window, cx| request_open_path("Open noshape document", "noshape document", &["noshape"], window, cx, open));
+            let _ = handle.update(cx, |_, window, cx| request_open_path("Open Noshape document", "Noshape document", &["noshape"], window, cx, open));
         });
         return;
     }
     let dir = documents_dir();
     cx.spawn(async move |cx| {
-        let file = rfd::AsyncFileDialog::new().set_title("Open noshape document").set_directory(&dir).add_filter("noshape document", &["noshape"]).pick_file().await;
+        let file = rfd::AsyncFileDialog::new().set_title("Open Noshape document").set_directory(&dir).add_filter("Noshape document", &["noshape"]).pick_file().await;
         if let Some(f) = file {
             let path = f.path().to_path_buf();
             cx.update(|cx| open(path, cx));

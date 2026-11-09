@@ -22,7 +22,7 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "featurestudio",
             verb: "std",
-            summary: "The FeatureScript standard library noshape ships (Help › FeatureScript documentation): its modules, or one module's source",
+            summary: "The FeatureScript standard library Noshape ships (Help › FeatureScript documentation): its modules, or one module's source",
             description: "Without `module`: `version` and the `modules` by name (\"geometry.fs\", \"evaluate.fs\", …). With one: its `source`, as the read-only std document the app opens shows it.",
             fields: vec![opt("module", s(), "A module's file name (\"common.fs\").")],
             mutates: false,

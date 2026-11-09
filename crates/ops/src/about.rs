@@ -8,7 +8,7 @@
 pub const COPYRIGHT: &str = "© 2026 Yekta";
 
 /// Open CASCADE's LGPL notice, named in the dialog itself.
-pub const OCCT_NOTICE: &str = "noshape uses Open CASCADE Technology 8.0.1 (OCCT), © Open Cascade SAS, under the GNU Lesser General Public License version 2.1 with the Open CASCADE exception (version 1.0).";
+pub const OCCT_NOTICE: &str = "Noshape uses Open CASCADE Technology 8.0.1 (OCCT), © Open Cascade SAS, under the GNU Lesser General Public License version 2.1 with the Open CASCADE exception (version 1.0).";
 
 /// The notices as shipped (embedded: they open offline).
 pub const NOTICES: &str = include_str!("../assets/THIRD-PARTY-NOTICES.txt");

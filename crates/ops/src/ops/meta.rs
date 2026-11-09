@@ -10,7 +10,7 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "ops",
             verb: "list",
-            summary: "List every operation (tool) of the noshape API",
+            summary: "List every operation (tool) of the Noshape API",
             description: "Without filters: every tool's name and the groups with their sizes (short). With `group` (a group's name, its start or a word in it: \"configuration\" finds config) or `search` (words all found in a tool's name or summary): each tool's name, CLI command, summary and examples. Use `feature_types` and `feature_schema` for the Part Studio features and their parameters, ops_describe for a tool's full documentation.",
             fields: vec![
                 opt("group", json!({ "type": "string" }), "Only this group (document, tab, feature, sketch, variable, config, part, material, query, analysis, render, export, import, featurestudio, history, assembly, context, drawing, view, ui...)."),

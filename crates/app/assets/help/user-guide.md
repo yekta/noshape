@@ -1,6 +1,6 @@
-# noshape help
+# Noshape help
 
-noshape works the way Onshape does, on your computer and offline: every menu, dialog and shortcut is where Onshape has it. This guide covers what is particular to a local app and where to start.
+Noshape works the way Onshape does, on your computer and offline: every menu, dialog and shortcut is where Onshape has it. This guide covers what is particular to a local app and where to start.
 
 ## Documents
 
@@ -118,5 +118,5 @@ Press **?** (Shift+/) or use Help › Keyboard shortcuts for the list of the tab
 
 ## When something looks wrong
 
-- **Help › System check** shows your graphics, memory and disk, and whether noshape runs on your graphics card or in software.
+- **Help › System check** shows your graphics, memory and disk, and whether Noshape runs on your graphics card or in software.
 - **Help › About** shows the version.

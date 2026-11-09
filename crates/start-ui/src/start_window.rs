@@ -84,7 +84,7 @@ fn open_new(source: Option<Source>, cx: &mut App) {
         ..TitleBar::window_options()
     };
     match crate::os_menu::open_window(options, cx, |window, cx| {
-        window.set_window_title("Documents — noshape");
+        window.set_window_title("Documents — Noshape");
         let view = cx.new(|cx| StartView::new(window, cx));
         // The ui-parity driver's documents page (tests/ui-parity/README.md "Documents page and Preferences").
         let weak = view.downgrade();
@@ -2361,7 +2361,7 @@ impl StartView {
                             .gap(px(5.))
                             .pl(px(8.))
                             .child(crate::assets::icon("noshape-logo", 22., cx))
-                            .child(div().text_size(px(21.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("noshape")),
+                            .child(div().text_size(px(21.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("Noshape")),
                     )
                     .child(
                         div().flex_1().flex().justify_center().child(
@@ -3889,7 +3889,7 @@ fn view_toggle(id: &'static str, glyph: &'static [u8], tip: &'static str, select
         .tooltip(crate::ui::tooltip(tip))
 }
 
-/// A folder's display name ("noshape documents" for the default folder).
+/// A folder's display name ("Noshape documents" for the default folder).
 /// Does a change pass the Search history ▾ filter (author, time, tab,
 /// tab kinds; `tabs`: the document's tabs and their kinds)?
 fn history_change_matches(f: &noshape_ops::history_filter::HistoryFilter, c: &lib::HistoryChange, tabs: &[(noshape_model::document::TabId, String, &'static str)]) -> bool {
@@ -3909,7 +3909,7 @@ fn history_change_matches(f: &noshape_ops::history_filter::HistoryFilter, c: &li
 
 fn folder_label(f: &Path) -> String {
     if f == crate::file_dialogs::documents_dir() {
-        "noshape documents".to_string()
+        "Noshape documents".to_string()
     } else {
         f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| f.display().to_string())
     }

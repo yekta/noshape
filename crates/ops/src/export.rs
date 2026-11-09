@@ -735,7 +735,7 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
                 _ => std::fs::write(path, three_mf(&meshes))?,
             }
         }
-        f => anyhow::bail!("{} export is not available in noshape yet", f.label()),
+        f => anyhow::bail!("{} export is not available in Noshape yet", f.label()),
     }
     Ok(())
 }

@@ -894,7 +894,7 @@ impl Workspace {
                             .on_click(|_, _, cx| crate::files::show_start_window(cx))
                             .child(crate::assets::icon("noshape-logo", 24., cx))
                             // The wordmark: #4a4a4a, white in dark mode (live dk-921).
-                            .child(div().text_size(px(21.)).font_weight(FontWeight::NORMAL).text_color(crate::theme::themed(0x4a4a4a, 0xffffff)).child("noshape")),
+                            .child(div().text_size(px(21.)).font_weight(FontWeight::NORMAL).text_color(crate::theme::themed(0x4a4a4a, 0xffffff)).child("Noshape")),
                     )
                     .child(self.render_doc_menu(cx))
                     .child(match self.renaming_doc.as_ref() {
