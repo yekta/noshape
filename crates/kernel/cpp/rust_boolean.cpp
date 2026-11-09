@@ -4,6 +4,9 @@
 #include "internal.hpp"
 
 #include <chrono>
+#include <cstdio>
+#include <GeomAdaptor_Surface.hxx>
+#include <Geom_BSplineCurve.hxx>
 #include <condition_variable>
 #include <deque>
 #include <functional>
@@ -2796,6 +2799,8 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
     TopoDS_Face                 fa, fb;
     bool                        done = false;
     std::vector<IntTools_Curve> lines;
+    double                      ms  = 0;
+    bool                        own = false;
   };
   std::vector<Job> jobs;
   for (size_t i = 0; i + 3 < pairs.size(); i += 4)
@@ -2808,15 +2813,24 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
       continue;
     jobs.push_back(Job{key, TopoDS::Face(input(*t_free->srcs, a.first, TopAbs_FACE, a.second)), TopoDS::Face(input(*t_free->srcs, b.first, TopAbs_FACE, b.second)), false, {}});
   }
+  static const bool trace = std::getenv("NOSHAPE_AHEAD_TRACE") != nullptr;
   OSD_Parallel::For(0, static_cast<int>(jobs.size()), [&](int k) {
     // (None started once the caller's budget or cancel says stop.)
     if (noshape_should_break() != 0)
       return;
+    const auto t0 = std::chrono::steady_clock::now();
+    struct Stamp
+    {
+      Job& j;
+      std::chrono::steady_clock::time_point t0;
+      ~Stamp() { j.ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); }
+    } stamp{jobs[k], t0};
     try
     {
       if (own_sections(jobs[k].fa, jobs[k].fb, jobs[k].lines))
       {
         jobs[k].done = true;
+        jobs[k].own  = true;
         return;
       }
       jobs[k].lines.clear();
@@ -2834,6 +2848,31 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
       jobs[k].lines.clear();
     }
   });
+  if (trace && !jobs.empty())
+  {
+    double own_ms = 0, occt_ms = 0;
+    int    own_n = 0, occt_n = 0;
+    for (const Job& j : jobs)
+      (j.own ? own_ms : occt_ms) += j.ms, ++(j.own ? own_n : occt_n);
+    std::fprintf(stderr, "AHEAD %zu pairs: own %d %.1f ms, occt %d %.1f ms\n", jobs.size(), own_n, own_ms, occt_n, occt_ms);
+    std::vector<size_t> order(jobs.size());
+    for (size_t i = 0; i < order.size(); ++i)
+      order[i] = i;
+    std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return jobs[a].ms > jobs[b].ms; });
+    for (size_t r = 0; r < std::min<size_t>(10, order.size()); ++r)
+    {
+      const Job& j = jobs[order[r]];
+      const int  ta = static_cast<int>(GeomAdaptor_Surface(BRep_Tool::Surface(j.fa)).GetType());
+      const int  tb = static_cast<int>(GeomAdaptor_Surface(BRep_Tool::Surface(j.fb)).GetType());
+      std::string poles;
+      for (const IntTools_Curve& ic : j.lines)
+      {
+        const occ::handle<Geom_BSplineCurve> bs = occ::down_cast<Geom_BSplineCurve>(ic.Curve());
+        poles += " " + (bs.IsNull() ? std::string("c") : std::to_string(bs->NbPoles()));
+      }
+      std::fprintf(stderr, "  %.2f ms %s types %d/%d done %d lines %zu poles%s\n", j.ms, j.own ? "own" : "occt", ta, tb, int(j.done), j.lines.size(), poles.c_str());
+    }
+  }
   for (Job& j : jobs)
     if (j.done)
       t_free->ahead.emplace(j.key, std::move(j.lines));
