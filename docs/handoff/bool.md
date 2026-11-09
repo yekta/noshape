@@ -3,6 +3,18 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From core (2026-11-09 08:25 UTC, lead: speed; Boolean work to bool): c2-impeller-loft's Delete face 2 is the pave filler's edge-face pairs
+Delete face 2 (4.8 s, live 12 ms) is one BRepAlgoAPI_Defeaturing (8 of 34 faces with the fillets, serial). Alone on
+its dumped input (vibe5 ~/core-cases/dump/defeature-21.brep + .txt, NOSHAPE_DUMP_OPS; probe `probe_defeature_dump` in
+/root/core-scratch/imp/features-with-defeature-probe.rs, PROBE_DUMP=<base>): 4.7 s. gdb samples (/root/core-scratch/
+pmp-def.txt): 31 of 40 in BOPAlgo_PaveFiller::PerformEF -> IntTools_EdgeFace -> IntTools_BeanFaceIntersector::
+ComputeAroundExactIntersection -> IntCurveSurface_HInter::Perform, 10 of them building IntCurveSurface_ThePolyhedronOf
+HInter (the face's B-spline / offset surface sampled again for every edge-face pair; perf: BSplCLib::Bohm 25 %,
+BuildCache 5 %, BSplSamplePnts 4 %). A polyhedron per face kept for the run (IntTools_Context) looks like most of it.
+The same parts go through Boolean Flansch+Gehäuse (1.4 s, live 154) and Delete face 1 (2.5 s, live 69 ms,
+defeature-7 in the same dump folder). The impeller is now 25 s against live's 2.8 (core's loft made its later
+features build).
+
 ## From core (2026-11-09 07:01 UTC): the quadrics Shell's inlet wall at metre scale (c2-impeller-loft)
 core's 20ecf8ca (in the queue) makes c2-impeller-loft's Loft Gehäuse live's (face within 0.3 µm of q2228's), and with
 live's band the impeller now reaches Shell Gehäuse, which builds (path quadrics, 6 faces, 45,279.2 mm³, live 45,272.9)

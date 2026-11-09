@@ -44,7 +44,8 @@ What blend takes over:
    Profile (impprof*.log, NOSHAPE_KERNEL_PROFILE, read the reopen block): Extrude 1 = eval::unchanged's two volumes
    (1.9 s: the segmented Gauss over the shelled offset walls, ~1 s each) + op_boolean 237 ms; the faces come back
    rebuilt (no TShape identity). Now `same_edges` first (every edge's length and ends within 1e-9 of the size):
-   2146 -> 238 ms; model 422, model-core 105 pass; suite 764/951 (the band), no document worse; interleaved A/B level (ab-edges*.out). Delete face 2 = one op_defeature 4.8 s (OCCT, serial): next, perf.
+   2146 -> 238 ms; model 422, model-core 105 pass; suite 764/951 (the band), no document worse; interleaved A/B level (ab-edges*.out). Landed d06e2ec9 (08:16). Delete face 2 = one op_defeature 4.8 s: 31/40 gdb samples in the pave filler's
+   edge-face pairs (the face's surface polyhedron rebuilt per pair): to bool (bool.md 08:25).
 
 **State 11-09 06:30 UTC: the impeller's Loft Gehäuse as live (landing); 62a7e4bc landed.**
 - Suite ranking in core's area (suite-ease.log, 763/951): impeller 38 lost at Loft Gehäuse (+0.076 % volume); the
