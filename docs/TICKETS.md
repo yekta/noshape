@@ -305,6 +305,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   c2-impeller-loft's "Fillet Bohrungssitz Ansaugflasch" fails since the 18:54 run (core / blend; not a crash); speed numbers from
   vibe2 are load-bound now (day-old T2 processes there).
 - **qa 04:14: still no blocker on green 88bb798a** (psui UI only since 62a7e4bc: Variable Studio, documents page, Versions).
+- **qa 05:05: still no blocker on green f5e9f8c6** (bool's snap-hook peg rounds). Two ticket documents change, both from bool's
+  Boolean now keeping the body: rust-zero-solid-f197's Mirror 3 gives one part of 27,142.42 mm³ (44 faces) where it left four
+  slivers of 9.3 / 18.8 mm³ and lost the 27,123.8 mm³ body; the fuzz document's later features, picked on the broken result, now
+  say "Select …" (not filed); cli-delete-gpf's Shell 3 now builds and Shell 5 fails (a fuzz document, 18 parts both).
 - Open, not new in this cut (in v0.4.36 and v0.4.37): P1 WIN-SHOW-IN-EXPLORER (studios; still no fix on main, so this cut has it
   too), P1 SAVED-SKETCH-PLANE-LOST (blend).
 - Open P0s, long-running, not new: BLEND-RUST, SHELL-SLOW, REGEN-SPEED. At publish: the smoke, sweeps on the release CLI, the agent
