@@ -4357,6 +4357,7 @@ impl AssemblyView {
             }
             cx.notify();
         };
+        let studio_name = self.doc.read(cx).session.doc.tab(studio).map(|t| t.name.clone()).unwrap_or_default();
         let view = cx.entity();
         let caret: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
         let probe = caret.clone();
@@ -4390,6 +4391,7 @@ impl AssemblyView {
                 .child(
                     div()
                         .id(SharedString::from(format!("inscfg-dd-{studio}")))
+                        .map(|d| crate::ui_script::mark(d, move || format!("caret:Insert configuration:{studio_name}")))
                         .relative()
                         .w(px(20.))
                         .h_full()

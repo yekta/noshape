@@ -10,6 +10,35 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## From psui (2026-11-09 08:51 UTC, lead: psui holds the assembly interaction area while asm is paused)
+What psui took and changed, so you pick up cleanly on Monday (all asm-*, vibe3 runs; logs psui's
+/root/psui-scratch/cmp-asm3.txt):
+- **Match:** 133 → 139 of the 142 recorded asm-* scenarios (612 states: 602 → 609). Fixed:
+  - Change configuration… reads as live's panel (document, studio, each shown input and value, parts, sketches:
+    `config_panel_text`), and Esc closes it from the page (`on_cancel`).
+  - Change to version… on this document's own parts: the Reference manager lists the document with its Start
+    ("Main ⇨ Start"), opens on Selective update, counts "Newer versions available for 0 documents" (its own row isn't
+    newer); the state reads it as live's panel. With a linked newer version it still opens on Update to latest.
+  - Create empty subassembly takes no undo step (store `NOT_UNDOABLE_PREFIXES`; e2e assembly_instance_menu).
+  - Editing a mate: its row shows selected and related, the Mate features folder related, a double click's own
+    selection goes (live asm-mate-menu-edit / -edit-escape), without relating the instances.
+  - The graphics right-click takes the face under the click itself (View normal to was missing when the menu came
+    before the hover pick, asm-section-view-edit).
+  - Triad Align / Anti-align with Z: the axis goes to ±Z and the next axis to +X (live's X arrow: X → Z, Y → X,
+    Z → Y), not the shortest turn. Only the X arrow is recorded; asm-triad-z-anti-align-with-z asks for one more.
+  - run.py `runner_names`: a panel's text naming live2's document / its "start <name>" Part Studio reads as ours'.
+- **Left (3):** asm-mate-edit-escape / asm-mate-menu-edit: the edited Revolute's flip toggle. Ours builds pin-block's
+  Revolute 1 flipped (default flip keeps Part 2's orientation) with the same placement as live's unflipped one, so
+  one of our mid-axis connectors points the other way: yours (implicit connector axes); live2 asked for the mate's
+  primaryAxisAlignment and both connectors' Z (REQUESTS 08:50). asm-menu-switch-to-part-studio: live's take missed
+  the click (re-record asked).
+- **Coverage:** menu items 80/89 → 89/89 with 10 new scenarios (dynamic suppression Edit / Remove expression, Create
+  new context, Open linked document, Show all instances, the Insert dialog's Set to last viewed / Reset to default,
+  a pattern field's Configure, Edit standard content instance…, triad Z anti-align); all run on ours, filed with live2
+  (REQUESTS 08:50). New marks: Insert dialog tabs (`tab:<label>`), standard content `button:Insert`, the configured
+  row's ▾ `caret:Insert configuration:<studio>`, the pattern and Mate connector dialogs' number fields
+  (`field:<label>`).
+
 ## From psui (2026-11-09 03:07 UTC, lead: for when you're back): the 8 asm-* scenarios that don't match in a full run
 psui's full ui-parity run on 4be31cf6's tree (vibe5, 1358 scenarios; the same with and without its checkbox change):
 asm-mate-edit-escape / asm-mate-menu-edit (a mate dialog's sixth field `checked` live true, ours false),

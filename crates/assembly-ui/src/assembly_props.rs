@@ -539,7 +539,13 @@ impl AssemblyView {
         // This document's workspace references (Main) and its versions.
         let local = asm.instances.iter().filter(|i| in_scope(i)).any(|i| matches!(i.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Assembly { .. }));
         if local && let Ok(vs) = dm.session.store.list_versions() {
-            let versions: Vec<crate::derived::VersionChoice> = vs.iter().rev().map(|v| crate::derived::VersionChoice { label: v.name.clone(), microversion: v.microversion }).collect();
+            let mut versions: Vec<crate::derived::VersionChoice> = vs.iter().rev().map(|v| crate::derived::VersionChoice { label: v.name.clone(), microversion: v.microversion }).collect();
+            // Change to version… offers the document's Start too (live asm-menu-change-to-version: "Main ⇨ Start").
+            if scope.is_some()
+                && let Some(root) = dm.session.store.graph().ok().and_then(|g| g.microversions.iter().find(|m| m.parents.is_empty()).map(|m| m.id))
+            {
+                versions.push(crate::derived::VersionChoice { label: "Start".into(), microversion: root });
+            }
             if !versions.is_empty() {
                 let thumbnail = dm.session.store.get_meta("thumbnail").ok().flatten().as_deref().and_then(crate::library::decode_thumbnail);
                 out.push(RefDoc { name: dm.name(), current: dm.session.store.branch(dm.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()), versions, keys: Vec::new(), path: dm.session.path.clone(), thumbnail });
@@ -578,7 +584,10 @@ impl AssemblyView {
     /// all then changes only them).
     pub(super) fn open_reference_manager(&mut self, scope: Option<Vec<InstanceId>>, cx: &mut Context<Self>) {
         let docs = self.referenced_docs(scope.as_deref(), cx);
-        self.ui.ref_manager = Some(RefManager { scope, tab: 0, docs, checked: HashSet::new(), chosen: HashMap::new() });
+        // Change to version… on this document's own parts opens on Selective update (live asm-menu-change-to-version);
+        // with a newer version of a linked document, on Update to latest (live 604–607).
+        let tab = u8::from(scope.is_some() && docs.iter().all(|d| d.keys.is_empty()));
+        self.ui.ref_manager = Some(RefManager { scope, tab, docs, checked: HashSet::new(), chosen: HashMap::new() });
         cx.notify();
     }
 
@@ -733,8 +742,10 @@ impl AssemblyView {
             );
         }
         let enabled = n > 0 && (tab == 0 || !m.checked.is_empty());
-        // Live 607: the line stays, "Newer versions available for 0 documents".
-        let info = format!("Newer versions available for {n} document{}", if n == 1 { "" } else { "s" });
+        // Live 607: the line stays, "Newer versions available for 0 documents"; this document's own row (Change to
+        // version…) isn't a newer one (asm-menu-change-to-version).
+        let newer = m.docs.iter().filter(|d| !d.keys.is_empty()).count();
+        let info = format!("Newer versions available for {newer} document{}", if newer == 1 { "" } else { "s" });
         Some(
             v_flex()
                 .w(px(330.))

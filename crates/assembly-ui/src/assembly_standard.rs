@@ -650,6 +650,7 @@ impl AssemblyView {
         let stack_on = self.std_stack_enabled() && !self.picking_replacement();
         let cell = |id: &'static str, w: f32| div().id(id).w(px(w)).h(px(34.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0xffffff)).border_1().border_color(gpui_kit::rgb(0xaaaaaa));
         let insert = cell("std-insert", 59.)
+            .map(|d| crate::ui_script::mark(d, || "button:Insert".into()))
             .rounded_l(px(5.25))
             .text_size(px(14.))
             .text_color(gpui_kit::rgb(0x333333))

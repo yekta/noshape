@@ -1849,6 +1849,10 @@ impl AssemblyView {
             MateDialogEvent::Cancel => this.close_mate(window, cx),
         });
         dialog.update(cx, |d, cx| window.focus(&d.focus_handle(cx), cx));
+        // Live (asm-mate-edit-escape): a double click's selection goes; the dialog's row shows as selected instead.
+        if editing.is_some() {
+            self.selected_mate = None;
+        }
         self.mate = Some(MateSession { dialog, editing, solve_all: false, hud: None, _sub: sub });
         self.ui.mate_field_focus = true;
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
@@ -3037,6 +3041,11 @@ impl AssemblyView {
                 // general menu. The selected instance's triad or face: its menu
                 // with Move to origin first (live ~14029, ~4632; ASM-TRIAD-MENU).
                 self.ui.menu_face = self.pick(*pick).filter(|t| t.kind == PickKind::Face);
+                // The menu's face items (View normal to, Select other…) read what is under the pointer: the click's own
+                // pick, as a quick right-click can come before the hover caught up (asm-section-view-edit).
+                if let Some(t) = self.pick(*pick) {
+                    self.hover = Some(t);
+                }
                 let handle = match self.overlay(*pick) {
                     Some(OverlayPick::Manip(h)) => Some(h),
                     _ => None,
@@ -3943,7 +3952,8 @@ impl AssemblyView {
         let FeatureRow { id, icon, name, ok, inactive, message, has_limits, hidden, tooltip, implicit } = f;
         // The added mates only count beside a selected one (clicks that
         // clear `selected_mate` leave them).
-        let selected = self.selected_mate == Some(id) || (self.selected_mate.is_some() && self.ui.more_mates.contains(&id));
+        // (And the mate whose dialog is open, live asm-mate-menu-edit.)
+        let selected = self.selected_mate == Some(id) || (self.selected_mate.is_some() && self.ui.more_mates.contains(&id)) || self.mate.as_ref().is_some_and(|m| m.editing == Some(id));
         let accent = pal.accent;
         let dim = hidden == Some(true);
         let color = feature_row_color(inactive, ok, dim);
@@ -4658,7 +4668,7 @@ impl AssemblyView {
         if !filtering || (tree && !mate_rows.is_empty()) {
             let folder = crate::ui::tree_row("mates-folder", false)
                     // Live (ui-parity asm-fastened-two-faces): also while a new mate has a picked connector.
-                    .when(self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || new_mate.as_ref().is_some_and(|m| m.4), related_row)
+                    .when(self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || new_mate.as_ref().is_some_and(|m| m.4) || self.mate.as_ref().is_some_and(|m| m.editing.is_some()), related_row)
                     .cursor_pointer()
                     .child(crate::ui::caret(mates_open))
                     // Live (request 1559, cf-6): a red ⬇ disc before the name
@@ -5102,6 +5112,7 @@ impl AssemblyView {
         let dtab = |id: &'static str, label: &'static str, on: bool, w: f32, h: f32, cx: &mut Context<Self>, f: fn(&mut AsmUi)| {
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, move || format!("tab:{label}")))
                 .w(px(w))
                 .h(px(h))
                 .px(px(14.))
@@ -6441,6 +6452,11 @@ impl AssemblyView {
         } else if self.ui.ps_in_context.is_some() || self.ui.ref_manager.is_some() {
             self.ui.ps_in_context = None;
             self.ui.ref_manager = None;
+            cx.notify();
+        } else if self.config_panel.is_some() {
+            // Change configuration opened from the menu leaves the focus on the page: Esc closes it there too (live
+            // asm-menu-change-configuration).
+            self.config_panel = None;
             cx.notify();
         } else if self.ui.dynamic_suppression.is_some() {
             self.ui.dynamic_suppression = None;

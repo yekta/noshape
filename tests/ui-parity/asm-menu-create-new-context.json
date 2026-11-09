@@ -1,0 +1,68 @@
+{
+ "name": "asm-menu-create-new-context",
+ "about": "Part 2 › Edit in context; a Sketch on the context's top face of Part 1 (20, 20, 20), ✓ (Context 1); back to the assembly; Part 2 › Edit in context ▸ Create new context.",
+ "area": "asm",
+ "source": "psui 11-09: assembly coverage, batch 9 (asm paused; lead 11-09)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit in context"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     20,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "start two-blocks asm"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Edit in context"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create new context"
+   }
+  }
+ ]
+}

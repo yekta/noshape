@@ -160,7 +160,8 @@ impl AssemblyView {
             let ok = self.pattern_from_session(p, cx).is_ok();
             rows.push(row(&p.name, if ok { "ok" } else { "error" }, true, true, false, false));
         }
-        let mate_selected = |id: MateId| self.selected_mate == Some(id) || (self.selected_mate.is_some() && self.ui.more_mates.contains(&id)) || self.ui.np_driver.as_ref().is_some_and(|d| d.mates.contains(&id));
+        // The mate whose dialog is open too (live asm-mate-menu-edit, asm-mate-edit-escape).
+        let mate_selected = |id: MateId| self.selected_mate == Some(id) || (self.selected_mate.is_some() && self.ui.more_mates.contains(&id)) || self.ui.np_driver.as_ref().is_some_and(|d| d.mates.contains(&id)) || editing == Some(id);
         let mut items: Vec<(MateId, Value)> = asm.connectors.iter().map(|c| (c.id, row(&c.name, "ok", mate_selected(c.id), false, mate_selected(c.id), c.hidden))).collect();
         items.extend(asm.mates.iter().filter(|m| asm.mate_generated_by(m.id).is_none()).map(|m| (m.id, row(&m.name, mate_state(m), mate_selected(m.id), editing == Some(m.id), mate_selected(m.id), m.hidden || !self.show_mates))));
         items.extend(asm.relations.iter().map(|r| (r.id, row(&r.name, "ok", mate_selected(r.id), false, mate_selected(r.id), false))));
@@ -185,7 +186,7 @@ impl AssemblyView {
             let ok = !members.is_empty() || !self.ui.group_patterns.is_empty();
             items.push((MateId(u64::MAX - 1), row(&asm.next_feature_name("Group"), if ok { "ok" } else { "error" }, true, true, false, !self.show_mates)));
         }
-        let folder_related = self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || picked || self.ui.np_driver.is_some();
+        let folder_related = self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || picked || self.ui.np_driver.is_some() || editing.is_some();
         rows.push(row(&format!("Mate features ({})", items.len()), "ok", false, false, folder_related, false));
         if !self.expanded.contains(&vec![MATE_FEATURES_COLLAPSED]) {
             for (id, r) in items {
@@ -624,6 +625,9 @@ impl AssemblyView {
         if let Some(f) = &self.ui.folder_name {
             out.push(panel("Folder name", vec![f.input.read(cx).value().to_string()]));
         }
+        if let Some(text) = self.config_panel_text(cx) {
+            out.push(panel("Change configuration", text));
+        }
         // Display states (live asm-display-states-open-escape): the name field's hint, then the states or the empty note.
         if self.ui.display_states {
             let mut text = vec!["(New display state name)".to_string()];
@@ -659,7 +663,19 @@ impl AssemblyView {
         }
         // Reference manager (live assembly/111–112): its two tabs.
         if let Some(r) = &self.ui.ref_manager {
-            out.push(json!({ "title": "Reference manager", "titleState": "ok", "kind": "other", "tabs": [{ "label": "Update to latest", "selected": r.tab == 0 }, { "label": "Selective update", "selected": r.tab == 1 }], "fields": [], "error": null, "ok": null }));
+            // Live's recorder reads it as a panel (asm-menu-change-to-version): the tabs, the line, each document's
+            // checkbox (Selective update), name and "current ⇨ chosen", the button.
+            let n = r.docs.iter().filter(|d| !d.keys.is_empty()).count();
+            let mut text = vec!["Update to latest".to_string(), "Selective update".into(), format!("Newer versions available for {n} document{}", if n == 1 { "" } else { "s" })];
+            for (i, d) in r.docs.iter().enumerate() {
+                if r.tab == 1 {
+                    text.push(if r.checked.contains(&i) { "[x] ".into() } else { "[ ] ".into() });
+                }
+                let chosen = r.chosen.get(&i).copied().unwrap_or(0);
+                text.extend([d.name.clone(), d.current.clone(), "⇨".into(), d.versions.get(chosen).map(|v| v.label.clone()).unwrap_or_default()]);
+            }
+            text.push(if r.tab == 0 { "Update all".into() } else { "Update selected".into() });
+            out.push(panel("Reference manager", text));
         }
         if let Some(p) = self.section_props(cx) {
             out.push(crate::section_dialog::state(&p));

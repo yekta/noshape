@@ -471,6 +471,32 @@ def drop_rows(state, drop):
     return state
 
 
+def runner_names(state, start, live_side):
+    """A panel's text naming the runners' own documents (asm-menu-change-configuration, -change-to-version): live2's
+    document ("noshape ui parity live2-1") and ours (the start's name) read alike, and live2's Part Studio, which its
+    runner names after the start, as ours' "Part Studio 1"."""
+    d = (state or {}).get("dialog")
+    if not (isinstance(d, dict) and d.get("kind") == "panel" and isinstance(d.get("text"), list) and start):
+        return state
+    def name(t):
+        if live_side and isinstance(t, str) and re.fullmatch(r"noshape ui parity live2-\d+", t):
+            return "<document>"
+        if live_side and t == f"start {start}":
+            return "Part Studio 1"
+        if not live_side and t == start:
+            return "<document>"
+        return t
+    d["text"] = [name(t) for t in d["text"]]
+    return state
+
+
+def scenario_start(name):
+    try:
+        return json.loads((ROOT / "tests" / "ui-parity" / f"{name}.json").read_text()).get("start")
+    except (OSError, ValueError, TypeError):
+        return None
+
+
 def compare(live, ours, whole_document=True):
     """(matched steps, total steps, first difference or None). `whole_document`: the scenario starts on a whole
     document or a page (README "Documents, tabs and preferences"); otherwise live's runner works in a lane copy whose
@@ -488,13 +514,15 @@ def compare(live, ours, whole_document=True):
     # info bubble ≈4.4 s, TOAST-AUTOHIDE) while ours still shows it isn't a difference: the runner doesn't wait live's
     # seconds between steps (sketch-dim-menu-unconfigure, feature-menu-edit-expression, vs-cfg-value-unconfigure).
     toast_shown = {}
+    start_name = scenario_start(live.get("scenario")) if isinstance(live.get("scenario"), str) else None
     for name, a, b, failed, t, step in pairs:
         if failed:
             if first is None:
                 first = (name, ".step", "ok", f"failed: {failed}")
             CAUSES.setdefault(".step", [0, f"ok / failed: {failed}"])[0] += 1
             continue
-        a = normalize_live(json.loads(json.dumps(a)))
+        a = runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True)
+        b = runner_names(json.loads(json.dumps(b)), start_name, False)
         if isinstance((a or {}).get("message"), str) and t is not None:
             toast_shown.setdefault(a["message"], t)
         if a is not None and a.get("message") is None and isinstance((b or {}).get("message"), str) and t is not None \

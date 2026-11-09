@@ -1,0 +1,31 @@
+{
+ "name": "asm-insert-config-reset-to-default",
+ "about": "Assembly 1's Insert dialog: Part Studio 1's configuration ▾ › Reset to default; Esc.",
+ "area": "asm",
+ "source": "psui 11-09: assembly coverage, batch 9 (asm paused; lead 11-09)",
+ "start": "config-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Insert configuration:Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Reset to default"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

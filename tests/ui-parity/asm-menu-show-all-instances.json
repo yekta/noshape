@@ -1,0 +1,33 @@
+{
+ "name": "asm-menu-show-all-instances",
+ "about": "Part 2 hidden from its row menu, then its row menu again › Show all instances.",
+ "area": "asm",
+ "source": "psui 11-09: assembly coverage, batch 9 (asm paused; lead 11-09)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Hide"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show all instances"
+   }
+  }
+ ]
+}

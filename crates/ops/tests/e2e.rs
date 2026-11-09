@@ -4024,6 +4024,9 @@ fn assembly_instance_menu() {
     assert_eq!(u["undone"], json!(false), "{u}");
     let cs = call(&mut ctx, "assembly_create_subassembly", json!({}));
     assert_eq!(count(&cs), 4);
+    // Nor for Create empty subassembly (live asm-menu-create-empty-subassembly: Undo stays off).
+    let u = call(&mut ctx, "history_undo", json!({ "tab": "Assembly 1" }));
+    assert_eq!(u["undone"], json!(false), "{u}");
     // Insert a sketch.
     let s = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "sketch": "Sketch 1" }));
     assert!(last(&mut ctx).ends_with(":: Insert : Sketch 1"));

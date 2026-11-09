@@ -1,0 +1,43 @@
+{
+ "name": "asm-pattern-field-configure",
+ "about": "A configured assembly (Configuration panel › Add configuration input), then Assembly linear pattern: right-click its Instance count field › Configure; Esc.",
+ "area": "asm",
+ "source": "psui 11-09: assembly coverage, batch 9 (asm paused; lead 11-09)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add configuration input"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Assembly linear pattern"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "field": "Instance count"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Configure"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

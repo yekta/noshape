@@ -1,0 +1,32 @@
+{
+ "name": "asm-triad-z-anti-align-with-z",
+ "about": "Part 2's triad Z arrow › Anti-align with Z.",
+ "area": "asm",
+ "source": "psui 11-09: assembly coverage, batch 9 (asm paused; lead 11-09)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "triad": "z"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Anti-align with Z"
+   }
+  }
+ ]
+}

@@ -1,0 +1,49 @@
+{
+ "name": "asm-standard-content-edit-instance",
+ "about": "Insert › Standard content: Insert the default component, ✓, then its row menu › Edit standard content instance…; Esc.",
+ "area": "asm",
+ "source": "psui 11-09: assembly coverage, batch 9 (asm paused; lead 11-09)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Standard content"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Countersunk"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit standard content instance…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

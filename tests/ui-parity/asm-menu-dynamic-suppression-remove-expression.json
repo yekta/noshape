@@ -1,0 +1,59 @@
+{
+ "name": "asm-menu-dynamic-suppression-remove-expression",
+ "about": "Part 2 suppressed by the expression 1 > 2; its row menu › Edit dynamic suppression ▸ Remove expression (Part 2 back).",
+ "area": "asm",
+ "source": "psui 11-09: assembly coverage, batch 9 (asm paused; lead 11-09)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Dynamic suppression"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Add expression…"
+   }
+  },
+  {
+   "do": "type",
+   "text": "1 > 2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Edit dynamic suppression"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Remove expression"
+   }
+  }
+ ]
+}

@@ -682,7 +682,7 @@ impl AssemblyView {
                 cx.notify();
             }))
         };
-        let value_row = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>| os::param_row_plain(label, st.clone());
+        let value_row = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>| crate::ui_script::mark(os::param_row_plain(label, st.clone()), move || format!("field:{label}"));
         let icon_tool = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
@@ -1638,7 +1638,7 @@ impl AssemblyView {
                     cx.notify();
                 }))
         };
-        let value_row = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>| os::param_row_plain(label, st.clone());
+        let value_row = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>| crate::ui_script::mark(os::param_row_plain(label, st.clone()), move || format!("field:{label}"));
         // A configured assembly: a field's right-click menu is one row, Configure (live 2209).
         let configurable = |this: &Self, id: &'static str, el: AnyElement, param: &'static str, cx: &mut Context<Self>| -> AnyElement {
             if this.cfg_input(cx).is_none() {
@@ -2978,6 +2978,41 @@ impl AssemblyView {
     /// the Insert dialog's configuration rows): 220 px, the instance name ✓ ✕,
     /// a labelled select per list input, a checkbox per checkbox, a value
     /// row per variable; ✓ applies.
+    /// The Change configuration dialog as live's recorder reads it (asm-menu-change-configuration): the document,
+    /// the studio, each shown input's name and value, then the parts and sketches.
+    pub(super) fn config_panel_text(&self, cx: &App) -> Option<Vec<String>> {
+        let s = self.config_panel.as_ref()?;
+        let studio = self.assembly(cx).and_then(|a| a.instance(s.instance)).and_then(|i| match &i.source {
+            InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } | InstanceSource::Sketch { studio, .. } => Some(*studio),
+            InstanceSource::Assembly { assembly, .. } => Some(*assembly),
+            _ => None,
+        });
+        let entry = studio.and_then(|t| self.catalog.studios.iter().find(|c| c.tab == t));
+        let mut text = vec![self.doc.read(cx).name(), entry.map(|e| e.name.clone()).unwrap_or_default()];
+        let (shown, effective) = noshape_model::configuration::Configuration { inputs: s.inputs.clone(), configured: Vec::new() }.visibility(&s.values);
+        for (inp, vis) in s.inputs.iter().zip(&shown).filter(|(_, v)| v.visible) {
+            text.push(inp.name.clone());
+            match &inp.kind {
+                ConfigInputKind::List { options, .. } => {
+                    let cur = effective.0.get(&inp.id).cloned().unwrap_or_default();
+                    let opts: Vec<_> = options.iter().filter(|o| vis.options.contains(&o.id)).collect();
+                    text.push(opts.iter().find(|o| o.id == cur).or(opts.first()).map(|o| o.name.clone()).unwrap_or_default());
+                }
+                ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. } => {
+                    if let Some((_, st)) = s.texts.iter().find(|(k, _)| *k == inp.id) {
+                        text.push(st.read(cx).value().to_string());
+                    }
+                }
+                _ => {}
+            }
+        }
+        if let Some(e) = entry {
+            text.extend(e.parts.iter().map(|p| p.1.clone()));
+            text.extend(e.sketches.iter().map(|(_, n)| n.clone()));
+        }
+        Some(text)
+    }
+
     pub(super) fn render_config_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(s) = &self.config_panel else { return div().into_any_element() };
@@ -3561,8 +3596,14 @@ impl AssemblyView {
         let axes = [f.x(), f.y(), f.z()];
         let m = match action {
             TriadAction::MoveToOrigin => Frame::new(-f.origin, glam::DQuat::IDENTITY),
+            // Live (asm-triad-align-with-z / -anti-align-with-z): the axis goes to ±Z and the next one to +X (X arrow:
+            // X → Z, Y → X, Z → Y), not the shortest turn.
             TriadAction::AlignZ(k, anti) => {
-                let r = glam::DQuat::from_rotation_arc(axes[k].normalize(), if anti { DVec3::NEG_Z } else { DVec3::Z });
+                let (a, n) = (axes[k].normalize(), axes[(k + 1) % 3].normalize());
+                let current = glam::DMat3::from_cols(a, n, a.cross(n));
+                let z = if anti { DVec3::NEG_Z } else { DVec3::Z };
+                let target = glam::DMat3::from_cols(z, DVec3::X, z.cross(DVec3::X));
+                let r = glam::DQuat::from_mat3(&(target * current.transpose())).normalize();
                 Frame::new(f.origin - r * f.origin, r)
             }
             // `k`: the ring right-clicked (it turns about ManipHandle::ring_axis).

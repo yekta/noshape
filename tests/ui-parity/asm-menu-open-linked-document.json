@@ -1,0 +1,27 @@
+{
+ "name": "asm-menu-open-linked-document",
+ "about": "Assembly 1: the linked instance's menu › Open linked document (uip Source at V1 opens in a new browser tab; this tab stays).",
+ "area": "asm",
+ "source": "psui 11-09: assembly coverage, batch 9 (asm paused; lead 11-09)",
+ "start": "doc-linked",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part Studio 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Open linked document"
+   }
+  }
+ ]
+}

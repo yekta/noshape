@@ -20,6 +20,8 @@ pub const NOT_UNDOABLE_PREFIXES: &[&str] = &[
     "Add selection to folder",
     "Move tab to document",
     "Create Drawing of",
+    // Live (asm-menu-create-empty-subassembly): Undo stays off after it, as after Move to new subassembly.
+    "Create empty subassembly",
     "Import ",
     "Store ",
 ];
