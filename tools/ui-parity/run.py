@@ -467,20 +467,20 @@ def compare(live, ours, whole_document=True):
     """(matched steps, total steps, first difference or None). `whole_document`: the scenario starts on a whole
     document or a page (README "Documents, tabs and preferences"); otherwise live's runner works in a lane copy whose
     tab bar isn't the start's, so `document` isn't compared."""
-    pairs = [("start", live.get("start"), ours.get("start"), None, None)]
+    pairs = [("start", live.get("start"), ours.get("start"), None, None, None)]
     clipboard_free = not copies(live)
     ours_steps = {s.get("step"): s for s in ours.get("steps", [])}
     for s in live.get("steps", []):
         o = ours_steps.get(s.get("step"), {})
         # A step ours couldn't do (its target not found) while live did: a difference, whatever the state after.
         failed = o.get("error") if o.get("ok") is False and s.get("ok") is not False else None
-        pairs.append((f"step {s.get('step')}", s.get("state"), o.get("state"), failed, s.get("t")))
+        pairs.append((f"step {s.get('step')}", s.get("state"), o.get("state"), failed, s.get("t"), s.get("do")))
     matched, first = 0, None
     # Live's toasts by when they first showed (live's own clock, `t` ms): one live had dropped by its timeout (an
     # info bubble ≈4.4 s, TOAST-AUTOHIDE) while ours still shows it isn't a difference: the runner doesn't wait live's
     # seconds between steps (sketch-dim-menu-unconfigure, feature-menu-edit-expression, vs-cfg-value-unconfigure).
     toast_shown = {}
-    for name, a, b, failed, t in pairs:
+    for name, a, b, failed, t, step in pairs:
         if failed:
             if first is None:
                 first = (name, ".step", "ok", f"failed: {failed}")
@@ -492,6 +492,11 @@ def compare(live, ours, whole_document=True):
         if a is not None and a.get("message") is None and isinstance((b or {}).get("message"), str) and t is not None \
                 and t - toast_shown.get(b["message"], t) >= TOAST_MS:
             b = dict(b, message=None)
+        # Live showing something else there (a dialog's notice): ours' toast hides what is under it, so the message
+        # isn't compared (ver-protection-enable: the runner reopened the dialog before ours' toast timed out).
+        elif a is not None and isinstance(a.get("message"), str) and isinstance((b or {}).get("message"), str) and a["message"] != b["message"] \
+                and t is not None and t - toast_shown.get(b["message"], t) >= TOAST_MS:
+            a, b = dict(a, message=None), dict(b, message=None)
         keys = KEYS + [k for k in LATER_KEYS if k in (a or {}) and (whole_document or k != "document")]
         if (a or {}).get("drawing"):
             keys = [k for k in keys if k not in NOT_IN_DRAWINGS]
@@ -502,6 +507,11 @@ def compare(live, ours, whole_document=True):
         drop = PLAN_ROWS | LOCAL_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
         a, b = fold_start_edits(drop_rows(a, drop)), fold_start_edits(drop_rows(b, drop))
         b = same_fieldless_focus(a, b)
+        # A native <select> picked from: live's pointer stays on it and its title (the picked value) shows as a
+        # tooltip; ours' pointer is on the list's row it picked (ver-filter-tab).
+        pick = ((step or {}).get("on") or {}).get("pick") if isinstance(step, dict) else None
+        if isinstance(pick, str) and a.get("tooltip") == pick and b.get("tooltip") is None:
+            b["tooltip"] = pick
         if a.get("tooltip") is None and isinstance(b.get("tooltip"), str) and NATIVE_TITLE_TOOLTIPS.match(b["tooltip"]):
             b["tooltip"] = None
         # A page's native <select> holding the keyboard: its open list is the OS's popup, which live's recorder can't read.
@@ -576,6 +586,15 @@ def compare(live, ours, whole_document=True):
                 for f in d.get("fields") or []:
                     if isinstance(f, dict) and isinstance(f.get("value"), str):
                         f["value"] = re.sub(r"^List_[A-Za-z0-9]{14}$", "List_<id>", f["value"])
+        # Live's account has folders, our run's scratch folder none: a location box's "No additional folders" notice
+        # (ver-view-version-copy) is ours alone; and live's documents are named "live2 uip <start> <time>" where ours
+        # are named after the start, so a "<document> - Copy" default compares as "<start> - Copy".
+        if a.get("message") is None and b.get("message") == "No additional folders":
+            b["message"] = None
+        if isinstance(a.get("dialog"), dict):
+            for f in a["dialog"].get("fields") or []:
+                if isinstance(f, dict) and isinstance(f.get("value"), str):
+                    f["value"] = re.sub(r"^live2? uip (\S+) \S+ - Copy$", r"\1 - Copy", f["value"])
         # Live's Free plan answers a paid feature (Release…, vs-tab-release) with its upgrade modal where ours opens the
         # feature's dialog: a plan's limit, not compared (as PLAN_ROWS).
         if isinstance(a.get("dialog"), dict) and "Start Professional Trial" in (a["dialog"].get("buttons") or []):

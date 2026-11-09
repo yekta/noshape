@@ -26,8 +26,8 @@ pub struct CompareGraphics {
     seen: Option<f32>,
 }
 
-/// A side's display: its Part Studio regenerated.
-fn regenerate(doc: &Document, tab: TabId, config: &noshape_model::configuration::ConfigValues) -> StudioDisplay {
+/// A side's display: its Part Studio regenerated (also the Repair panel's, repair_view.rs).
+pub(crate) fn regenerate(doc: &Document, tab: TabId, config: &noshape_model::configuration::ConfigValues) -> StudioDisplay {
     match doc.tab(tab).map(|t| &t.content) {
         Some(TabContent::PartStudio(ps)) => noshape_model::regen::Regenerator::new().regenerate(ps, config, &doc.settings.units, &noshape_model::regen::RegenOptions::default()).display,
         _ => StudioDisplay::default(),

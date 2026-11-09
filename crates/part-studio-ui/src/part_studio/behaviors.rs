@@ -1631,8 +1631,9 @@ impl PartStudioView {
     /// "Unsuppress" on a feature with an expression: drop it and leave the
     /// feature active (one undo step).
     pub(super) fn clear_dynamic_suppression(&mut self, id: FeatureId, cx: &mut Context<Self>) {
+        let desc = self.studio(cx).map(|s| noshape_ops::studio::suppress_description(s, &[id], false)).unwrap_or_default();
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, noshape_ops::studio::suppress_description(false), cx, |ps| noshape_ops::studio::set_suppressed(ps, &[id], false));
+            doc.edit_studio(self.tab, &desc, cx, |ps| noshape_ops::studio::set_suppressed(ps, &[id], false));
         });
     }
 

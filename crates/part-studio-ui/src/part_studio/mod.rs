@@ -2,6 +2,7 @@
 //! 3D viewport with selection, and feature dialogs with live preview.
 
 mod analysis;
+mod repair_view;
 mod appearance;
 mod behaviors;
 // What an agent's call asks of this view (live mode).
@@ -376,6 +377,8 @@ pub struct PartStudioView {
     gpu: Gpu,
     /// Versions and history › Compare graphics.
     compare_gfx: crate::compare_graphics::CompareGraphics,
+    /// Versions and history › View in repair: the Repair panel's graphics while it is open.
+    repair_view: Option<Entity<repair_view::RepairView>>,
     pub viewport: Entity<Viewport>,
     display: Arc<StudioDisplay>,
     built: Option<BuiltScene>,
@@ -563,6 +566,7 @@ impl PartStudioView {
             doc,
             gpu,
             compare_gfx: Default::default(),
+            repair_view: None,
             viewport,
             display: Arc::new(StudioDisplay::defaults()),
             built: None,
@@ -2082,6 +2086,13 @@ impl PartStudioView {
         if matches!(ev, ViewportEvent::CameraChanged) && !vp.read(cx).zoom_window {
             self.end_zoom_window_prompt(cx);
         }
+        // The Repair panel's graphics follow the camera while synchronized (without re-rendering the studio).
+        if matches!(ev, ViewportEvent::CameraChanged)
+            && let Some(view) = self.repair_view.clone()
+        {
+            let (doc, tab, camera) = (self.doc.clone(), self.tab, vp.read(cx).camera);
+            view.update(cx, |v, cx| v.update(&doc, tab, camera, cx));
+        }
         // Screen-sized geometry built here follows the zoom: resize it when
         // the scale changes, without re-rendering (perf; the manipulators'
         // glyphs are built by the renderer per frame).
@@ -2858,8 +2869,9 @@ impl PartStudioView {
     }
 
     fn set_suppressed(&mut self, ids: Vec<FeatureId>, suppressed: bool, cx: &mut Context<Self>) {
+        let desc = self.studio(cx).map(|s| noshape_ops::studio::suppress_description(s, &ids, suppressed)).unwrap_or_default();
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, noshape_ops::studio::suppress_description(suppressed), cx, |ps| noshape_ops::studio::set_suppressed(ps, &ids, suppressed));
+            doc.edit_studio(self.tab, &desc, cx, |ps| noshape_ops::studio::set_suppressed(ps, &ids, suppressed));
         });
     }
 
@@ -3429,10 +3441,12 @@ impl PartStudioView {
             .text_size(px(12.))
             .text_color(gpui_kit::rgb_static(0xffffff))
             .child(format!("Return to {branch}"))
+            // Back to the workspace; the Versions and history panel closes (live ver-view-version-return).
             .on_click(move |_, _, cx| {
                 doc.update(cx, |d, cx| {
                     if d.session.view_microversion(None).is_ok() {
                         d.reloaded(cx);
+                        cx.emit(crate::doc_model::DocEvent::Ui(noshape_ops::UiRequest::CloseHistory));
                     }
                 })
             });
@@ -6697,6 +6711,15 @@ impl Render for PartStudioView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let _t = noshape_render::perf::scope("ps.render");
         let pal = p();
+        // The Repair panel's graphics, following the main camera while synchronized.
+        if crate::repair_mode::is_open(&self.doc, cx) {
+            let gpu = self.gpu.clone();
+            let view = self.repair_view.get_or_insert_with(|| cx.new(|cx| repair_view::RepairView::new(gpu, window, cx))).clone();
+            let (doc, tab, camera) = (self.doc.clone(), self.tab, self.viewport.read(cx).camera);
+            view.update(cx, |v, cx| v.update(&doc, tab, camera, cx));
+        } else {
+            self.repair_view = None;
+        }
         // What GPUI still draws that follows the camera (perf: otherwise camera
         // moves are only presented): the sketch's boxes, glyphs and counts
         // (not its dimension labels at rest or its name), shown dimensions,
@@ -7141,9 +7164,8 @@ impl Render for PartStudioView {
                             .children(self.render_add_custom_features()),
                     )
                     // Versions and history › View in repair (repair_mode.rs, live
-                    // rp-906): the 567 px Repair panel right of the graphics; its
-                    // view-only second view comes from perf.
-                    .children(crate::part_studio_hooks::repair_panel(&self.doc, None, cx))
+                    // rp-906): the 567 px Repair panel right of the graphics, its view-only graphics (repair_view.rs).
+                    .children(crate::part_studio_hooks::repair_panel(&self.doc, self.repair_view.clone().map(|v| v.into_any_element()), cx))
                     .children(right),
             )
             .children(tb_panel);

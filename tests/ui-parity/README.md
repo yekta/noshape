@@ -338,7 +338,7 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   merge dialog's per-tab strategy select `{"dropdown": "Part Studio 1", "pick": "Keep Main"}` (by the tab's name, the
   row's text); the assembly Insert dialog's header squares by tooltip (`{"button": "Create version…"}`). Starts:
   `doc-versions-tabs` (an empty Part Studio 2 before V1), `doc-versions-reorder` (box and pin before V1, nothing
-  after), `doc-versions-many` (twelve sketches after V1), `fs-versioned` (fs-custom, then V1).
+  after), `doc-versions-many` (sixty empty sketches after V1), `fs-versioned` (fs-custom, then V1).
 - A start's `"linked": {"name": "uip Source", "start": {…a start…}, "insert": {"assembly": "Assembly 1", "source":
   "Part Studio 1", "version": "V1"}}` (psui, 11-09): another document named `name`, built from its own start, whose
   `source` tab at version `version` is inserted into this document's `assembly` (a reference to another document's

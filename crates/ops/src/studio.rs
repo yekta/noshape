@@ -83,9 +83,10 @@ pub fn delete_features(ps: &mut PartStudio, ids: &[FeatureId]) {
     sync_sketch_visibility(ps);
 }
 
-/// "Suppress" / "Unsuppress".
-pub fn suppress_description(suppressed: bool) -> &'static str {
-    if suppressed { "Suppress" } else { "Unsuppress" }
+/// "Suppress : Extrude 2" / "Unsuppress : Extrude 2" (live ver-history-entry-per-edit: the features named, as Delete's).
+pub fn suppress_description(ps: &PartStudio, ids: &[FeatureId], suppressed: bool) -> String {
+    let names: Vec<String> = ids.iter().filter_map(|id| ps.feature(*id).map(|f| f.name.clone())).collect();
+    format!("{} : {}", if suppressed { "Suppress" } else { "Unsuppress" }, names.join(", "))
 }
 
 /// Suppress / Unsuppress. Unsuppress on a feature with a dynamic

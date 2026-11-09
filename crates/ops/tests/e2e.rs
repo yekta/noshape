@@ -653,6 +653,9 @@ fn sketch_use_intersection_and_model_references() {
     let r = call(&mut ctx, "feature_suppress", json!({ "features": ["Extrude 1"], "suppressed": true }));
     let uses = r["regeneration"]["features"].as_array().unwrap().iter().find(|f| f["name"] == "Uses").unwrap().clone();
     assert_eq!((uses["status"].as_str(), uses["message"].as_str()), (Some("Warning"), Some("Some external references are missing.")), "{uses}");
+    // Its history entry names the feature (live ver-history-entry-per-edit).
+    let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert!(last.ends_with(":: Suppress : Extrude 1"), "{last}");
 }
 
 #[test]

@@ -771,7 +771,8 @@ fn suppress(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let ps = doc::studio(od.doc(), tab)?;
     let ids = features_arg(ps, a, "features")?;
     let on = a.bool_or("suppressed", true)?;
-    edit_studio(od, tab, studio::suppress_description(on), |ps| {
+    let desc = studio::suppress_description(ps, &ids, on);
+    edit_studio(od, tab, &desc, |ps| {
         studio::set_suppressed(ps, &ids, on);
         Ok(())
     })?;

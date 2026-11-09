@@ -7,8 +7,8 @@
 //!   clicked opens in Repair ([`picking`], [`toggle_picking`]);
 //! - change and version rows have "View in repair" ([`open`]);
 //! - the panel ([`render_panel`]): blue "Repair" title, a pill "Viewing
-//!   <entry>" with ↗ and ?, the view-only graphics (perf's second view of
-//!   [`document`], following the main camera while [`synchronized`]), and
+//!   <entry>" with ↗ and ?, the view-only graphics (part-studio-ui's repair_view.rs: [`document`] regenerated,
+//!   following the main camera while [`synchronized`]), and
 //!   the "Synchronize view" toggle at the bottom left;
 //! - the Part Studio's right strip gains the wrench "Repair panel", which
 //!   closes it ([`close`]).
@@ -84,21 +84,19 @@ pub fn toggle_picking(doc: &Entity<DocModel>, cx: &mut App) {
     changed(doc, cx);
 }
 
-/// The document as it was at the repaired entry (for the second view).
-#[allow(dead_code)] // Wired in next step: perf's second view of the Repair panel reads it.
+/// The document as it was at the repaired entry (the panel's graphics: part-studio-ui repair_view.rs).
 pub fn document(doc: &Entity<DocModel>, cx: &App) -> Option<Arc<Document>> {
     cx.try_global::<State>().and_then(|s| s.sessions.get(&doc.entity_id())).map(|s| s.doc.clone())
 }
 
 /// Whether the repair view follows the main camera ("Synchronize view", on
 /// by default).
-#[allow(dead_code)] // Wired in next step: perf's second view of the Repair panel reads it.
 pub fn synchronized(doc: &Entity<DocModel>, cx: &App) -> bool {
     cx.try_global::<State>().and_then(|s| s.sessions.get(&doc.entity_id())).is_some_and(|s| s.synchronized)
 }
 
 /// The panel's chrome (live rp-906): title, the "Viewing …" pill and the
-/// sync toggle around `graphics` (perf's view-only second view).
+/// sync toggle around `graphics` (the view-only graphics).
 pub fn render_panel(doc: &Entity<DocModel>, graphics: Option<AnyElement>, cx: &App) -> Option<AnyElement> {
     let s = cx.try_global::<State>()?.sessions.get(&doc.entity_id())?;
     let pal = p();

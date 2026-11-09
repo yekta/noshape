@@ -133,7 +133,11 @@ pub fn open_dialog(doc: Entity<DocModel>, branch: BranchId, window: &mut Window,
                 }
                 let r = doc.update(cx, |d, _| d.session.set_branch_protected(branch, v));
                 doc.update(cx, |d, cx| match r {
-                    Ok(()) => d.reloaded(cx),
+                    // Live ver-protection-enable: a bubble either way.
+                    Ok(()) => {
+                        d.reloaded(cx);
+                        cx.emit(DocEvent::Info("Workspace protection settings updated.".into()));
+                    }
                     Err(e) => cx.emit(DocEvent::Error(format!("{e:#}"))),
                 });
                 true

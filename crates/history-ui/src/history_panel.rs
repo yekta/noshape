@@ -88,6 +88,10 @@ pub struct HistoryPanel {
     graph: Option<VersionGraph>,
     search: Entity<InputState>,
     query: String,
+    /// The search Enter applied (live: typing alone doesn't search).
+    applied_query: String,
+    /// How many changes an open list shows past 50, by row (Show more changes…: 50 more each).
+    more_changes: HashMap<String, usize>,
     /// Rows whose "Show changes…" is open.
     expanded: HashSet<String>,
     /// Onshape's two toggles under the search box (live documents/118–119,
@@ -126,9 +130,20 @@ impl HistoryPanel {
                 cx.notify();
             }),
             cx.subscribe_in(&search, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
-                if matches!(ev, InputEvent::Change) {
-                    this.query = st.read(cx).value().to_string();
-                    cx.notify();
+                match ev {
+                    InputEvent::Change => {
+                        this.query = st.read(cx).value().to_string();
+                        // Emptied: the history again.
+                        if this.query.trim().is_empty() {
+                            this.applied_query.clear();
+                        }
+                        cx.notify();
+                    }
+                    InputEvent::PressEnter { .. } => {
+                        this.applied_query = st.read(cx).value().to_string();
+                        cx.notify();
+                    }
+                    _ => {}
                 }
             }),
         ];
@@ -139,7 +154,9 @@ impl HistoryPanel {
             graph: None,
             search,
             query: String::new(),
+            applied_query: String::new(),
             expanded: HashSet::new(),
+            more_changes: HashMap::new(),
             hide_merges: true,
             hide_auto_versions: true,
             filter_open: false,
@@ -206,7 +223,10 @@ impl HistoryPanel {
         let view = cx.entity();
         let tabs: Vec<(TabId, String)> = doc.tabs.iter().map(|t| (t.id, t.name.clone())).collect();
         let ta = tab_anchor.clone();
-        let tab_select = select("hist-f-tab", "Tab", tab_name.clone(), &tab_anchor).on_click(move |_: &ClickEvent, window, cx| {
+        // The chosen tab's name is its tooltip (live ver-filter-tab: a long name is truncated in the box).
+        let tab_select = select("hist-f-tab", "Tab", tab_name.clone(), &tab_anchor)
+            .when(edit.tab.is_some(), |d| d.tooltip(crate::ui::user_tooltip(tab_name.clone())))
+            .on_click(move |_: &ClickEvent, window, cx| {
             let (view, tabs) = (view.clone(), tabs.clone());
             let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                 m = m.select_list(148.);
@@ -953,6 +973,9 @@ fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, 
         .into_any_element()
 }
 
+/// An open change list shows this many changes, and as many more per "Show more changes…" (live rp-900).
+const CHANGES_PAGE: usize = 50;
+
 /// A row laid out at `y` (its top); `change` rows are 26 px high.
 struct Placed {
     row: Row,
@@ -972,7 +995,7 @@ impl Render for HistoryPanel {
         lanes.sort_by_key(|b| !graph.branches.iter().any(|x| x.id == *b && x.is_default));
         let rows = build_rows(&graph, &lanes);
         let info: HashMap<MicroversionId, &noshape_store::MicroversionInfo> = graph.microversions.iter().map(|m| (m.id, m)).collect();
-        let q = self.query.trim().to_lowercase();
+        let q = self.applied_query.trim().to_lowercase();
 
         // Lay out rows (with open "Show changes…" lists) to place the graph.
         let mut placed: Vec<Placed> = Vec::new();
@@ -982,23 +1005,41 @@ impl Render for HistoryPanel {
         // The toggles' tooltips (and names) say what a click does (live: "Hide merges", then "Show merges").
         let merges_tip = if self.hide_merges { "button:Hide merges" } else { "button:Show merges" };
         let auto_tip = if self.hide_auto_versions { "button:Hide automatic versions" } else { "button:Show automatic versions" };
-        for r in rows.iter().filter(|r| q.is_empty() || r.name.to_lowercase().contains(&q)) {
+        // A search (Enter) or an applied filter lists the matching changes alone, newest first, each once, across the
+        // workspaces (live ver-search-history-change, ver-filter-tab); none: "No changes found".
+        let results = filtering || !q.is_empty();
+        if results {
+            let mut found: Vec<&&noshape_store::MicroversionInfo> = info
+                .values()
+                .filter(|m| !m.parents.is_empty() && !(hide_merges && m.parents.len() > 1))
+                .filter(|m| q.is_empty() || m.description.to_lowercase().contains(&q))
+                .filter(|m| !filtering || self.change_matches(m, cx))
+                .collect();
+            found.sort_by_key(|m| std::cmp::Reverse(m.seq));
+            for m in found {
+                let lane = lanes.iter().position(|b| *b == m.branch).unwrap_or(0);
+                let c = Row { kind: RowKind::Change, mv: m.id, lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", m.id.short()), changes: vec![] };
+                placed.push(Placed { row: c, y, change: true });
+                y += CHANGE_H;
+            }
+        }
+        let mut more_at: HashMap<usize, String> = HashMap::new();
+        for r in rows.iter().filter(|_| !results) {
             placed.push(Placed { row: r.clone(), y, change: false });
             y += ROW_H;
-            // Hide merges (on by default) drops merge microversions from the
-            // change lists; an applied filter lists the matching changes.
-            let changes: Vec<MicroversionId> = r
-                .changes
-                .iter()
-                .filter(|mv| info.get(*mv).is_some_and(|m| !(hide_merges && m.parents.len() > 1)))
-                .filter(|mv| !filtering || info.get(*mv).is_some_and(|m| self.change_matches(m, cx)))
-                .copied()
-                .collect();
-            if (filtering || self.expanded.contains(&r.key)) && !changes.is_empty() {
-                for mv in &changes {
+            // Hide merges (on by default) drops merge microversions from the change lists.
+            let changes: Vec<MicroversionId> = r.changes.iter().filter(|mv| info.get(*mv).is_some_and(|m| !(hide_merges && m.parents.len() > 1))).copied().collect();
+            if self.expanded.contains(&r.key) && !changes.is_empty() {
+                // 50 at a time, then "Show more changes…" (live rp-900).
+                let limit = CHANGES_PAGE + self.more_changes.get(&r.key).copied().unwrap_or(0);
+                for mv in changes.iter().take(limit) {
                     let Some(m) = info.get(mv) else { continue };
                     let c = Row { kind: RowKind::Change, mv: *mv, lane: r.lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", mv.short()), changes: vec![] };
                     placed.push(Placed { row: c, y, change: true });
+                    y += CHANGE_H;
+                }
+                if changes.len() > limit {
+                    more_at.insert(placed.len() - 1, r.key.clone());
                     y += CHANGE_H;
                 }
             }
@@ -1161,7 +1202,7 @@ impl Render for HistoryPanel {
         // A version made with no change since the row before it shares its
         // microversion (V1 right after Start): the version row is the one meant.
         let version_at = |mv: MicroversionId| placed.iter().any(|p| p.row.kind == RowKind::Version && p.row.mv == mv);
-        for pl in &placed {
+        for (ix, pl) in placed.iter().enumerate() {
             let r = pl.row.clone();
             let is_row = |side: crate::compare_mode::Side| match r.kind {
                 RowKind::Workspace(b) => side == crate::compare_mode::Side::Workspace(b),
@@ -1214,8 +1255,9 @@ impl Render for HistoryPanel {
                         this.error(err, cx);
                     }
                 }
+                // Another workspace opens on a click (live ver-other-workspace-click).
                 RowKind::Workspace(b) if b != current_branch => {
-                    if e.click_count() >= 2 {
+                    if e.click_count() == 1 {
                         this.switch_branch(b, cx)
                     }
                 }
@@ -1253,7 +1295,7 @@ impl Render for HistoryPanel {
             } else {
                 let changes = r.changes.len();
                 let key = r.key.clone();
-                let open_changes = self.filter.is_active() || self.expanded.contains(&key);
+                let open_changes = self.expanded.contains(&key);
                 let name_el = match r.kind {
                     // A protected workspace carries a lock (help "Workspace Protections").
                     // A protected workspace's chip starts with a lock (live wp-929).
@@ -1438,6 +1480,33 @@ impl Render for HistoryPanel {
                 }
             });
             list.push(row.into_any_element());
+            if let Some(key) = more_at.get(&ix).cloned() {
+                list.push(
+                    div()
+                        .id(SharedString::from(format!("hist-more-{key}")))
+                        .map(|d| crate::ui_script::mark(d, || "button:Show more changes…".into()))
+                        .h(px(CHANGE_H))
+                        .flex_none()
+                        .pl(px(GRAPH_W + 5.))
+                        .flex()
+                        .items_center()
+                        .text_size(px(13.))
+                        .text_color(rgb(0x094174))
+                        .cursor_pointer()
+                        .hover(|d| d.underline())
+                        .child("Show more changes…")
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            *this.more_changes.entry(key.clone()).or_default() += CHANGES_PAGE;
+                            cx.notify();
+                        }))
+                        .into_any_element(),
+                );
+            }
+        }
+        if results && placed.is_empty() {
+            // Live's recorder reads this notice row as a version's (its name style).
+            drawn.push(serde_json::json!({ "name": "No changes found", "kind": "version", "selected": false }));
+            list.push(div().id("hist-none").h(px(ROW_H)).flex_none().pl(px(GRAPH_W + 5.)).pt(px(5.)).text_size(px(14.)).italic().text_color(pal.text_muted).child("No changes found").into_any_element());
         }
         *self.ui_drawn.borrow_mut() = drawn;
 

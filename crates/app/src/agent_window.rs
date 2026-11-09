@@ -39,6 +39,10 @@ impl Workspace {
                     }
                 }
             }
+            R::CloseHistory => {
+                self.history = None;
+                cx.notify();
+            }
             R::TabManager(search) => {
                 if search.is_some() != self.tab_manager.is_some() {
                     self.toggle_tab_manager(window, cx);
