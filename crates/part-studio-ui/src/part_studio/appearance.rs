@@ -230,7 +230,8 @@ impl PartStudioView {
         let rgb = [lin_to_srgb(color[0]), lin_to_srgb(color[1]), lin_to_srgb(color[2])];
         let transparency = 1.0 - color[3].clamp(0.0, 1.0);
         let hex = cx.new(|cx| InputState::new(window, cx).default_value(hex_field(rgb)));
-        let channels = [0, 1, 2].map(|i| cx.new(|cx| InputState::new(window, cx).default_value(rgb[i].to_string())));
+        // A click in R, G or B puts the caret there (live appearance-face-row-remove: no select-all).
+        let channels = [0, 1, 2].map(|i| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).default_value(rgb[i].to_string())));
         let alpha = cx.new(|cx| InputState::new(window, cx).default_value(noshape_units::to_fixed(f64::from(1.0 - transparency), 2)));
         // Live (behaviours "Appearance editor R / G / B / A / hex"): keystroke-filtered colour fields, rewritten as
         // typed (the filter below), not expression fields.
@@ -629,14 +630,15 @@ impl PartStudioView {
         // 1 px `#d7d7d7` rule (`#1651b0` while focused).
         let field = |label: &'static str, input: &Entity<InputState>, w: f32, focused: bool| {
             h_flex()
-                .map(|d| crate::ui_script::mark(d, move || format!("field:{label}")))
                 .h(px(27.))
                 .pr(px(4.))
                 .items_start()
                 // Live: the label box is 12 px (its 5 px padding overlaps the text).
                 .child(div().w(px(12.)).flex_none().pt(px(6.)).pl(px(2.)).h(px(21.)).text_size(px(12.)).line_height(px(16.)).text_color(gpui_kit::rgb(0x666666)).child(label))
                 .child(
+                    // The input itself is the field (live's runner clicks its middle: appearance-face-row-remove).
                     div()
+                        .map(|d| crate::ui_script::mark(d, move || format!("field:{label}")))
                         .w(px(w))
                         .h(px(27.))
                         .border_b_1()

@@ -609,6 +609,12 @@ def compare(live, ours, whole_document=True):
             b["dialog"], b["focus"] = None, a.get("focus")
         if isinstance(b.get("dialog"), dict):
             b["dialog"].pop("native", None)
+        # The keyboard shortcuts sheet's search: live's reader labels it "Search shortcuts" in a Part Studio start and
+        # by the sheet's header run together in a whole document's (shortcut-shift-slash / doc-shortcuts-search).
+        for side in (a, b):
+            for f in ((side.get("dialog") or {}).get("fields") or []) if isinstance(side.get("dialog"), dict) else []:
+                if isinstance(f, dict) and f.get("label") == "Keyboard shortcutsCustomize keyboard shortcuts":
+                    f["label"] = "Search shortcuts"
         # A paid plan's upsell tooltip (docs-account-my-account: "Try Onshape Professional"): ours has no plans.
         if isinstance(a.get("tooltip"), str) and "Onshape Professional" in a["tooltip"] and b.get("tooltip") is None:
             b["tooltip"] = a["tooltip"]
