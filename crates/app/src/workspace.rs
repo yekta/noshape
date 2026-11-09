@@ -490,7 +490,7 @@ impl Workspace {
         let session = &self.doc.read(cx).session;
         let workspace = match session.viewing_version() {
             Some(v) => v,
-            None => session.store.branch(session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()),
+            None => session.shown_workspace_name(),
         };
         let history = self.history.as_ref().map(|h| h.read(cx).ui_rows(cx));
         let compare = noshape_history_ui::compare_mode::ui_state(&self.doc, self.active, cx);
@@ -831,7 +831,7 @@ impl Workspace {
         let read_only = doc.session.read_only();
         let viewing_version = doc.session.viewing_version();
         // The current branch (Onshape shows the workspace name, e.g. "Main").
-        let branch_name = doc.session.store.branch(doc.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into());
+        let branch_name = doc.session.shown_workspace_name();
         let protected = doc.session.is_protected();
         TitleBar::new()
             .h(px(crate::ui::NAVBAR_H))

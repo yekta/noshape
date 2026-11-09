@@ -250,6 +250,13 @@ impl Session {
 
     /// The name of the version being viewed ("V1"), when the viewed point in
     /// history is a version.
+    /// The workspace whose name the navbar shows: a history point's own (live 2383: B1's merged change reads "B1"
+    /// from Main), else this one.
+    pub fn shown_workspace_name(&self) -> String {
+        let branch = self.viewing.and_then(|mv| self.store.microversion(mv).ok()).map_or(self.branch, |m| m.branch);
+        self.store.branch(branch).map(|b| b.name).unwrap_or_else(|_| "Main".into())
+    }
+
     pub fn viewing_version(&self) -> Option<String> {
         let mv = self.viewing?;
         if let Some(v) = self.store.list_versions().ok()?.into_iter().find(|v| v.microversion == mv) {

@@ -37,6 +37,10 @@ enum RowKind {
     Version,
     Start,
     Change,
+    /// A merge's history point in the workspace merged into ("Merge from B1", live 2383).
+    Merge,
+    /// The source's point a merge took (its change's description), where its lane leaves for the target.
+    Merged,
 }
 
 /// A popup anchor: a field's bounds from the last paint.
@@ -462,10 +466,24 @@ fn build_rows(graph: &VersionGraph, lanes: &[BranchId]) -> Vec<Row> {
     if let Some(root) = graph.microversions.iter().find(|m| m.parents.is_empty()) {
         rows.push(Row { kind: RowKind::Start, mv: root.id, lane: 0, time: root.created, name: "Start".into(), author: root.author.clone(), key: "start".into(), changes: vec![] });
     }
+    // Where branches meet (live 2383): each merge's point in its workspace and the source's point it took, as rows
+    // of their own unless a version or the start is there already.
+    let mut shown: HashSet<MicroversionId> = rows.iter().filter(|r| !matches!(r.kind, RowKind::Workspace(_))).map(|r| r.mv).collect();
+    let live_branch = |b: BranchId| graph.branches.iter().any(|x| x.id == b && !x.deleted);
+    for m in graph.microversions.iter().filter(|m| m.parents.len() >= 2 && live_branch(m.branch)) {
+        if shown.insert(m.id) {
+            rows.push(Row { kind: RowKind::Merge, mv: m.id, lane: lane_of(m.id), time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("m{}", m.id.short()), changes: vec![] });
+        }
+        let src = m.parents[1];
+        if let Some(s) = info.get(&src).filter(|s| live_branch(s.branch)) && shown.insert(src) {
+            rows.push(Row { kind: RowKind::Merged, mv: src, lane: lane_of(src), time: s.created, name: s.description.clone(), author: s.author.clone(), key: format!("s{}", src.short()), changes: vec![] });
+        }
+    }
     let rank = |k: RowKind| match k {
         RowKind::Workspace(_) => 0,
         RowKind::Version => 1,
-        _ => 2,
+        RowKind::Merge | RowKind::Merged => 2,
+        _ => 3,
     };
     rows.sort_by(|a, b| b.time.cmp(&a.time).then(rank(a.kind).cmp(&rank(b.kind))));
     let stops: HashSet<MicroversionId> = rows.iter().filter(|r| !matches!(r.kind, RowKind::Workspace(_))).map(|r| r.mv).collect();
@@ -1084,7 +1102,7 @@ impl Render for HistoryPanel {
                                 window.paint_path(path, rgb(0xffffff));
                             }
                         }
-                        RowKind::Version | RowKind::Change => {
+                        RowKind::Version | RowKind::Change | RowKind::Merge | RowKind::Merged => {
                             let mut f = PathBuilder::fill();
                             f.add_polygon(&circle(c, if kind == RowKind::Version { 4.5 } else { 3. }), true);
                             if let Ok(path) = f.build() {
@@ -1145,7 +1163,7 @@ impl Render for HistoryPanel {
             let r = pl.row.clone();
             let is_row = |side: crate::compare_mode::Side| match r.kind {
                 RowKind::Workspace(b) => side == crate::compare_mode::Side::Workspace(b),
-                RowKind::Version => side == crate::compare_mode::Side::Entry(r.mv),
+                RowKind::Version | RowKind::Merge | RowKind::Merged => side == crate::compare_mode::Side::Entry(r.mv),
                 _ => side == crate::compare_mode::Side::Entry(r.mv) && !version_at(r.mv),
             };
             let compare_side = comparing.map(|(base, target)| (is_row(base), is_row(target))).filter(|(b, t)| *b || *t);
@@ -1164,7 +1182,8 @@ impl Render for HistoryPanel {
             if crate::ui_script::active() {
                 let k = match kind {
                     RowKind::Workspace(_) => "workspace",
-                    RowKind::Version => "version",
+                    // Live's recorder reads a merge's points as versions (their names are `version-name`).
+                    RowKind::Version | RowKind::Merge | RowKind::Merged => "version",
                     RowKind::Start => "start",
                     RowKind::Change => "change",
                 };
@@ -1188,7 +1207,7 @@ impl Render for HistoryPanel {
                     cx.notify();
                 }
                 // The header wrench is on: this entry opens in Repair.
-                RowKind::Version | RowKind::Change | RowKind::Start if crate::repair_mode::picking(&this.doc, cx) => {
+                RowKind::Version | RowKind::Change | RowKind::Start | RowKind::Merge | RowKind::Merged if crate::repair_mode::picking(&this.doc, cx) => {
                     if let Err(err) = crate::repair_mode::open(&this.doc, mv, repair_label.clone(), cx) {
                         this.error(err, cx);
                     }
@@ -1377,8 +1396,9 @@ impl Render for HistoryPanel {
                         // window of its own, read-only.
                         let dn = d.clone();
                         let m = m.item(crate::os_menu::OsMenuItem::new("Open in new browser tab").on_click(move |_, _, cx| open_new_window(&dn, Some(mv), None, cx)));
-                        // Live rp-904: change rows have no "Branch to create workspace…".
-                        let m = if kind == RowKind::Change { m } else { m.item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, name1.clone(), window, cx))) };
+                        // Live rp-904: change rows have no "Branch to create workspace…", nor a merge's points (2383).
+                        let point = matches!(kind, RowKind::Change | RowKind::Merge | RowKind::Merged);
+                        let m = if point { m } else { m.item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, name1.clone(), window, cx))) };
                         let m = m
                             .item(crate::os_menu::OsMenuItem::new("Compare").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.compare_with_current(crate::compare_mode::Side::Entry(mv), name2.clone(), cx))));
                         let m = if other_version {
@@ -1387,21 +1407,24 @@ impl Render for HistoryPanel {
                         } else {
                             m
                         };
-                        let m = m
-                            // Live rp-904/905: change and version rows.
-                            .item(crate::os_menu::OsMenuItem::new("View in repair").on_click(move |_, _, cx| {
+                        // Live rp-904/905: change and version rows, and a merge's point in its workspace (not the
+                        // source's point, 2383).
+                        let m = if kind == RowKind::Merged {
+                            m
+                        } else {
+                            m.item(crate::os_menu::OsMenuItem::new("View in repair").on_click(move |_, _, cx| {
                                 let doc = v5r.read(cx).doc.clone();
                                 if let Err(e) = crate::repair_mode::open(&doc, mv, rl.clone(), cx) {
                                     v5r.update(cx, |t, cx| t.error(e, cx));
                                 }
                             }))
-                            ;
+                        };
                         // A version's Restore to <workspace>… opens the restore dialog; a change row has none (live 2351).
                         let (dr, rn) = (d.clone(), name.clone());
-                        let m = if kind == RowKind::Change { m } else { m.item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, window, cx| crate::merge_dialog::open_restore(dr.clone(), mv, rn.to_string(), window, cx))) };
+                        let m = if matches!(kind, RowKind::Change | RowKind::Merged) { m } else { m.item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, window, cx| crate::merge_dialog::open_restore(dr.clone(), mv, rn.to_string(), window, cx))) };
                         // Live rp-904: a change row ends with "Create version here…".
                         let dc = d.clone();
-                        let m = if kind == RowKind::Change { m.item(crate::os_menu::OsMenuItem::new("Create version here…").on_click(move |_, window, cx| open_create_version_at(dc.clone(), mv, window, cx))) } else { m };
+                        let m = if point { m.item(crate::os_menu::OsMenuItem::new("Create version here…").on_click(move |_, window, cx| open_create_version_at(dc.clone(), mv, window, cx))) } else { m };
                         match version_id {
                             Some(id) => {
                                 let m = m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d5.clone(), crate::version_properties::Item::Version(id), window, cx)));

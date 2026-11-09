@@ -1154,7 +1154,6 @@ impl Document {
                 up_to_date: true,
             });
         }
-        let into_name = self.branch(into)?.name;
 
         let mut result = Manifest::new();
         let mut taken = Vec::new();
@@ -1197,7 +1196,8 @@ impl Document {
                 result.insert(name.clone(), h);
             }
         }
-        let description = format!("Merge \"{from_name}\" into \"{into_name}\"");
+        // Onshape's entry for a merge (live 2383: the history row "Merge from B1").
+        let description = format!("Merge from {from_name}");
         let id = insert_microversion(
             &tx,
             NewMicroversion {

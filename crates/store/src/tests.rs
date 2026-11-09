@@ -308,7 +308,7 @@ fn merge_without_conflicts() {
     assert_eq!(info.parents, vec![m1, f2]);
     assert!(info.is_merge());
     assert_eq!(info.branch, main);
-    assert_eq!(info.description, "Merge \"feature\" into \"Main\"");
+    assert_eq!(info.description, "Merge from feature");
     assert_eq!(read(&doc, mv, "tab/a").as_deref(), Some("a-main"));
     assert_eq!(read(&doc, mv, "tab/b").as_deref(), Some("b-feat"));
     assert_eq!(read(&doc, mv, "tab/new").as_deref(), Some("new"));
