@@ -17,6 +17,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   "### Drawings"). Done: an edge clicked in a view is its own selection (`Sel::Edge`, EDGE; it moves, opens and menus
   as its view); a view stays selected through its menu's Copy, Paste, Zoom to fit, Group, Remove from group, Hide
   auto centermarks, Show all (live 2068 recordings, row by row).
+- Then a view's Copy takes the view alone (live drw-view-copy-paste: Paste adds Front only; the unit test that
+  copied its derived views changed): 125/176. drw-centermark and drw-centermark-align record the same Centermark
+  click differently (11-06's recorder lists the centermark after Escape, 11-07's at the click): left as is.
 - Left, not understood yet: live reports EDGE after a right-click at the middle of Top, Section, Auxiliary (a plain
   block: no edge there; Front gives VIEW), after a crop profile closes, a datum target's corner, a format painter
   click, Escape after a max / min dimension; counting every hovered edge as EDGE is wrong (89/176). A question to
