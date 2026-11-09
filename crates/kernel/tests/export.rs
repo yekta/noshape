@@ -1665,6 +1665,13 @@ fn parasolid_cone_seam_on_its_cylinders() {
     let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
     let after = x_dirs(&back);
     assert!(after.len() == 2 && after[0].distance(after[1]) < 1e-9, "the file's seams apart: {after:?}");
+    // The circle between them, cut in the model where each face's seam meets it, is one ring without a vertex in the
+    // file, as Parasolid writes it (live 2411: its import kept the cuts): no point of the file lies on it.
+    let text = std::fs::read_to_string(&path).unwrap();
+    let joined: String = text[text.find("**END_OF_HEADER").unwrap()..].lines().skip(1).collect();
+    let numbers: Vec<f64> = joined.split_whitespace().filter_map(|t| t.parse().ok()).collect();
+    let on_ring = numbers.windows(3).filter(|p| (p[0].hypot(p[1]) - 0.01).abs() < 1e-9 && (p[2] - 0.02).abs() < 1e-9).count();
+    assert_eq!(on_ring, 0, "a vertex on the cylinder's and cone's circle");
     let (a, b) = (volume_properties(&part).unwrap().mass, volume_properties(&back).unwrap().mass);
     assert!((a - b).abs() < 1e-9 * a, "{a} vs {b}");
     let _ = std::fs::remove_dir_all(&dir);

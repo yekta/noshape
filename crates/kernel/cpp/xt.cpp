@@ -51,6 +51,9 @@
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_Circle.hxx>
+#include <BRepBuilderAPI_MakeEdge.hxx>
+#include <ElCLib.hxx>
+#include <ShapeFix_Edge.hxx>
 #include <gp_Lin.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
@@ -895,6 +898,61 @@ struct BodyWriter
     return a.XDirection();
   }
 
+  // Arcs of one circle closing a loop on their own (a circle cut where its faces' seams meet it, at two points
+  // when they differ: cf-o-ring-generator's chamfer cones) are one ring edge, as Parasolid writes it (no seams, no
+  // vertex: live.x_t); written as arcs, live's import kept their vertices (27/30/8 for 27/26/0, live 2411). The ring
+  // is one edge for both faces (`rings`), with curves on them.
+  std::map<std::vector<const void*>, TopoDS_Edge> rings;
+
+  void whole_ring(std::vector<TopoDS_Edge>& cycle)
+  {
+    if (cycle.size() < 2)
+      return;
+    double                         f0, l0;
+    const occ::handle<Geom_Circle> c = occ::down_cast<Geom_Circle>(basis_curve(BRep_Tool::Curve(cycle[0], f0, l0)));
+    if (c.IsNull())
+      return;
+    std::vector<const void*> key;
+    for (const TopoDS_Edge& e : cycle)
+    {
+      double                         f, l;
+      const occ::handle<Geom_Circle> o = occ::down_cast<Geom_Circle>(basis_curve(BRep_Tool::Curve(e, f, l)));
+      if (o.IsNull() || o->Location().Distance(c->Location()) > kPrecision || std::abs(o->Radius() - c->Radius()) > kPrecision ||
+          std::abs(std::abs(o->Axis().Direction().Dot(c->Axis().Direction())) - 1) > 1e-12 || edge_faces.FindFromKey(e).Extent() != 2)
+        return;
+      // (Between planes and periodic analytic faces only: a B-surface closed with a seam is written split there,
+      // its arcs' vertices kept.)
+      for (const TopoDS_Shape& g : edge_faces.FindFromKey(e))
+      {
+        TopLoc_Location                 loc;
+        const occ::handle<Geom_Surface> s = basis_surface(BRep_Tool::Surface(TopoDS::Face(g), loc));
+        if (occ::down_cast<Geom_Plane>(s).IsNull() && !periodic_analytic(s))
+          return;
+      }
+      key.push_back(e.TShape().get());
+    }
+    std::sort(key.begin(), key.end());
+    auto it = rings.find(key);
+    if (it == rings.end())
+    {
+      TopoDS_Edge ring = BRepBuilderAPI_MakeEdge(c->Circ());
+      for (const TopoDS_Shape& g : edge_faces.FindFromKey(cycle[0]))
+        ShapeFix_Edge().FixAddPCurve(ring, TopoDS::Face(g), false);
+      it = rings.emplace(key, ring).first;
+    }
+    // The loop's way round: the first arc's direction at its start against the ring's there.
+    gp_Pnt p;
+    gp_Vec arc, along;
+    const bool back = cycle[0].Orientation() == TopAbs_REVERSED;
+    BRep_Tool::Curve(cycle[0], f0, l0)->D1(back ? l0 : f0, p, arc);
+    if (back)
+      arc.Reverse();
+    c->D1(ElCLib::Parameter(c->Circ(), p), p, along);
+    TopoDS_Edge ring = it->second;
+    ring.Orientation(arc.Dot(along) > 0 ? TopAbs_FORWARD : TopAbs_REVERSED);
+    cycle = {ring};
+  }
+
   XSurface surface_of(const TopoDS_Face& f, int face_index)
   {
     TopLoc_Location           loc;
@@ -1473,11 +1531,14 @@ struct BodyWriter
     for (int i = 0; i < nf; ++i)
       face_idx[i] = w.alloc();
 
+    for (int fi = 0; fi < nf; ++fi)
+      TopExp::MapShapesAndAncestors(faces(fi + 1), TopAbs_EDGE, TopAbs_FACE, edge_faces);
     // Fins (seams of periodic surfaces and degenerate edges dropped), in loops.
     face_loops.resize(nf);
     for (int fi = 0; fi < nf; ++fi)
-      for (const auto& cycle : exchange_loops(TopoDS::Face(faces(fi + 1)), true))
+      for (auto cycle : exchange_loops(TopoDS::Face(faces(fi + 1)), true))
       {
+        whole_ring(cycle);
         const size_t first = fins.size();
         for (const TopoDS_Edge& e : cycle)
         {
@@ -1669,8 +1730,6 @@ struct BodyWriter
     }
 
     // Surfaces and face senses.
-    for (int fi = 0; fi < nf; ++fi)
-      TopExp::MapShapesAndAncestors(faces(fi + 1), TopAbs_EDGE, TopAbs_FACE, edge_faces);
     face_sense.resize(nf);
     for (int fi = 0; fi < nf; ++fi)
     {
