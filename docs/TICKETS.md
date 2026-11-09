@@ -917,6 +917,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     sheet as a modal where live's step 1 has none).
   - asm: asm-config-input-menu-copy-input differs alone: step 2 `.focus.kind` live "other" / ours "none".
   - feature-menu-remove-expression matches alone (load).
+  **qa 12:33, the 08:00 run (green 72e620b0) against the 04:00 one:** models 75/87, features 763 → 764/951, scenarios 1229/1401 →
+  1282/1403, parity index 87.0 → 87.6 (speed 83.1 → 78.0, feature time; vibe2 still loaded by tonight's T2 hang copy, 10 h old at
+  12:20). Flags:
+  - core / bool: c2-impeller-loft 17.9 → 73.6 s, and "Delete face 1", "Delete face 2" ("Could not delete selected faces.") and
+    "Fillet Bohrungssitz Ansaugflasch" now fail (built before). Its Loft Gehäuse now matches live (core 92a169913: 10 → 11/48,
+    the first difference moved to Shell Gehäuse, volume 45,279.19 mm³ against live 45,272.92): the later features fail on the new
+    loft. bool's 627e05f5 (Delete face 2's defeaturing 9.9 → 3.9 s) is after this green.
+  - Load, not regressions: asm-face-menu, -section-view, -select-other, asm-section-view-turn-off, docs-trash-delete-forever,
+    docs-trash-details (all six match alone on 4e549553); cf-drive-train-generator 3.0 → 5.3 s, learning-center-michael 1.2 → 1.9 s.
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):

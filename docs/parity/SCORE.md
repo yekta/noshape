@@ -6,6 +6,7 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
+| 2026-11-09 | 72e620b0 (qa 12:33: the 08:00 run, models on vibe2) | 75/87 | 764/951 | 1282/1403 (7818/8077 states) | c2-impeller-loft's later features fail on its now-correct loft (SUITE-REGRESSIONS-1108); speed on a loaded vibe2 |
 | 2026-11-09 | 35fd1ddf (qa 08:05: the 04:00 run, models on vibe2) | 75/87 | 763/951 | 1229/1401 (7728/8069 states) | no new flags; first run with speed by the features' own regeneration time (psui 5516428a0), measured on a loaded vibe2: re-measured on a quiet host next |
 | 2026-11-09 | 19036006 (qa 04:08: the 23:24 run, models on vibe2) | 75/87 | 760/951 | 1151/1331 (7375/7722 states) | speed not comparable: vibe2 loaded by day-old T2 processes; the old (wall) speed definition, the last run with it |
 | 2026-11-08 | d6904caf (qa 23:35: the 18:54 run, models on vibe2) | 75/87 | 760/951 | 1082/1285 (7042/7407 states) | speed fell with vibe2's load (median ×1.21); flags in SUITE-REGRESSIONS-1108 |
@@ -134,6 +135,7 @@ mirror-face-type (a live DOM detail).
 | 2026-11-08 | d6904caf (18:54 run) | 79.6 | 79.9 | 97.0 | 73.1 | 90.7 | 85.8 | 100.0 | 77.1 | 63.5 | 64.4 | 65.7 | 73.2 | 65.1 |
 | 2026-11-09 | 19036006 (23:24 run) | 81.8 | 79.9 | 97.5 | 72.9 | 91.1 | 85.2 | 100.0 | 77.1 | 58.4 | 91.9 | 95.3 | 76.4 | 67.5 |
 | 2026-11-09 | 35fd1ddf (04:00 run; speed by feature time, loaded vibe2) | 87.0 | 80.2 | 97.6 | 73.0 | 91.6 | 85.7 | 100.0 | 88.5 | 83.1 | 91.9 | 96.4 | 94.8 | 82.4 |
+| 2026-11-09 | 72e620b0 (08:00 run; loaded vibe2) | 87.6 | 80.3 | 98.0 | 72.9 | 97.1 | 86.0 | 100.0 | 90.6 | 78.0 | 92.9 | 98.8 | 95.0 | 88.7 |
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
