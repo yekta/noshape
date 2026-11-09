@@ -62,7 +62,8 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
             opened(first, window, cx);
         }
     };
-    show(paths, doc_unit, false, Rc::new(on_ok), window, cx);
+    // A CAD file tab's own Import… has no Join adjacent surfaces (live2 2403).
+    show(paths, doc_unit, false, keep_files, Rc::new(on_ok), window, cx);
 }
 
 /// The documents page's Import files… (live dom/dialog-import-to-onshape.txt):
@@ -72,13 +73,14 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
 /// whether to split. The start window builds the documents (start hooks).
 pub fn open_for_page(paths: Vec<PathBuf>, on_import: noshape_start_ui::start_hooks::ImportCallback, window: &mut Window, cx: &mut App) {
     let unit = noshape_app_core::user_units::current().units.length;
-    show(paths, unit, true, Rc::new(move |c: Choice, window: &mut Window, cx: &mut App| on_import(c.ops(), c.split, window, cx)), window, cx);
+    show(paths, unit, true, true, Rc::new(move |c: Choice, window: &mut Window, cx: &mut App| on_import(c.ops(), c.split, window, cx)), window, cx);
 }
 
 /// What Import does with the options.
 type OnOk = Rc<dyn Fn(Choice, &mut Window, &mut App)>;
 
-fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, on_ok: OnOk, window: &mut Window, cx: &mut App) {
+/// `join`: offer Join adjacent surfaces (not for a file tab's own Import…).
+fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, join: bool, on_ok: OnOk, window: &mut Window, cx: &mut App) {
     // Native part files get Onshape's five-checkbox variant, mesh files
     // theirs (see the module docs).
     let all_of = |kinds: &[&str]| !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| kinds.contains(&e.to_string_lossy().to_lowercase().as_str())));
@@ -89,7 +91,6 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, on
     // Import material density: Onshape's own file-type list, when any file
     // is one (not STEP, SAT or PVZ; qa4 IMP-DENS).
     let density = noshape_ops::import::offers_material_density(&paths);
-    let zip = all_of(&["zip"]);
     let default_unit = if obj { noshape_units::LengthUnit::Meter } else { doc_unit };
     let unit = MESH_UNITS.iter().position(|(_, u)| *u == default_unit).unwrap_or(4);
     let choice = Rc::new(Cell::new(Choice { appearances: true, unit, ..Default::default() }));
@@ -200,9 +201,9 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, on
                     .child(v_flex().gap(px(13.)).when(!stl, |d| d.child(check("imp-app", "Import appearances", "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone())))
                     .when(density, |d| d.child(check("imp-dens", "Import material density", "Material density defined on models will be imported.", c.density, |c, v| c.density = v, choice.clone())))
                     .child(check("imp-yup", "Orient imported models with Y Axis Up", "Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.", c.y_up, |c, v| c.y_up = v, choice.clone()))
-                    // Live G41: Combine hides it for an assembly zip.
-                    .when(!(zip && c.combine), |d| d.child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone())))
-                    .when(!mesh, |d| d.child(check("imp-join", "Join adjacent surfaces", "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone()))))
+                    // Live G41, live2 2403: Combine to a single Part Studio has no composite part.
+                    .when(!c.combine, |d| d.child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone())))
+                    .when(!mesh && join, |d| d.child(check("imp-join", "Join adjacent surfaces", "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone()))))
                     // Live dom/dialog-import-stl.txt: "Units" (14 px / 600) over a 212 px select.
                     .when(units_select, |d| {
                         let ch = choice.clone();

@@ -7,6 +7,7 @@
 use crate::actions::{CloseWindow, NewDocument, OpenDocument};
 use crate::start_library::{self as lib, DocEntry, Library, ScanInput};
 use crate::os_ui as os;
+use gpui_kit::component::Disableable as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
@@ -322,7 +323,7 @@ pub struct StartView {
     history_filter_open: bool,
     history_filter: noshape_ops::history_filter::HistoryFilter,
     history_filter_edit: noshape_ops::history_filter::HistoryFilter,
-    history_dates: [Entity<InputState>; 2],
+    history_dates: [Entity<crate::date_time_field::DateTimeField>; 2],
     /// The "Folders" section of "Owned by me" is expanded.
     /// A document's name being renamed inline in its row (row menu › Rename; live: no modal).
     renaming: Option<(PathBuf, Entity<InputState>, Subscription)>,
@@ -396,7 +397,11 @@ impl StartView {
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search documents"));
         let label_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search labels"));
         let history_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search history"));
-        let history_dates = [cx.new(|cx| InputState::new(window, cx).placeholder("mm/dd/yyyy, --:--")), cx.new(|cx| InputState::new(window, cx).placeholder("mm/dd/yyyy, --:--"))];
+        // Live: native date-time inputs (live2 2405 (c)).
+        let history_dates = [cx.new(crate::date_time_field::DateTimeField::new), cx.new(crate::date_time_field::DateTimeField::new)];
+        for d in &history_dates {
+            cx.observe(d, |_, _, cx| cx.notify()).detach();
+        }
         let col_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search..."));
         let subs = vec![
             cx.subscribe(&col_search, |_, _, ev: &InputEvent, cx| {
@@ -1003,7 +1008,7 @@ impl StartView {
     /// "Copy document to"), the copy opened (as the document's ☰ › Copy workspace…; live docs-doc-menu-copy-workspace).
     fn copy_workspace(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
         let start = d.path.parent().map(Path::to_path_buf).unwrap_or_else(crate::file_dialogs::documents_dir);
-        let location = Location::new(start);
+        let location = Location::new(start).with_new_folder();
         let chosen = location.chosen.clone();
         let view = cx.entity();
         let source = d.path.clone();
@@ -1307,7 +1312,7 @@ impl StartView {
         window.open_dialog(cx, move |dialog, _, cx| {
             let (loc, view, f) = (location.clone(), view.clone(), f.clone());
             os::modal_doc_page(dialog, "Move documents and folders to", 460.)
-                .child(os::modal_body().child(os::field_label("Location")).child(location.render()))
+                .child(os::modal_body().child(os::field_label("Location")).child(location.render(cx)))
                 .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
                     let dir = loc.chosen.borrow().clone();
@@ -1645,7 +1650,9 @@ impl StartView {
             })));
         }
         let any_kind = !edit.kinds.is_empty();
-        let date = |st: &Entity<InputState>, tip: &'static str, cx: &App| div().id(tip).w(px(148.)).h(px(34.)).pl(px(4.)).border_b_1().border_color(rgb(0xeaeaea)).flex().items_center().tooltip(crate::ui::tooltip(tip)).child(div().flex_1().child(Input::new(st).appearance(false).text_size(px(14.)))).child(div().pr(px(6.)).child(crate::assets::icon("calendar", 16., cx)));
+        let date = |f: &Entity<crate::date_time_field::DateTimeField>, tip: &'static str| div().id(tip).w(px(148.)).h(px(34.)).pl(px(4.)).border_b_1().border_color(rgb(0xeaeaea)).flex().items_center().tooltip(crate::ui::tooltip(tip)).child(f.clone());
+        // Live: Search is off while a date is partly typed.
+        let dates_ok = self.history_dates.iter().all(|d| !d.read(cx).is_partial());
         v_flex()
             .id("vh-filter-panel")
             .occlude()
@@ -1691,7 +1698,7 @@ impl StartView {
                 ),
             )
             .child(h_flex().mt(px(14.)).h(px(36.)).items_start().child(label("Modified by")).child(by_select))
-            .child(h_flex().mt(px(14.)).items_start().child(label("Date modified")).child(v_flex().gap(px(14.)).child(date(&self.history_dates[0], "Start date", cx)).child(date(&self.history_dates[1], "End date", cx))))
+            .child(h_flex().mt(px(14.)).items_start().child(label("Date modified")).child(v_flex().gap(px(14.)).child(date(&self.history_dates[0], "Start date")).child(date(&self.history_dates[1], "End date"))))
             .child(
                 h_flex()
                     .justify_end()
@@ -1699,17 +1706,20 @@ impl StartView {
                     .pt(px(14.))
                     .pb(px(10.))
                     .pr(px(5.))
-                    .child(os::secondary_button("vh-f-reset", "Reset", cx).on_click(cx.listener(|t, _: &ClickEvent, window, cx| {
+                    .child(os::secondary_button("vh-f-reset", "Reset", cx).on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
                         t.history_filter_edit = HistoryFilter::default();
                         t.history_filter = HistoryFilter::default();
-                        for st in t.history_dates.clone() {
-                            st.update(cx, |s, cx| s.set_value("", window, cx));
+                        for d in t.history_dates.clone() {
+                            d.update(cx, |d, cx| d.clear(cx));
                         }
                         cx.notify();
                     })))
-                    .child(os::primary_button("vh-f-search", "Search").on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
-                        t.history_filter_edit.from = lib::parse_filter_date(&t.history_dates[0].read(cx).value(), false);
-                        t.history_filter_edit.to = lib::parse_filter_date(&t.history_dates[1].read(cx).value(), true);
+                    .child(os::primary_button("vh-f-search", "Search").disabled(!dates_ok).on_click(cx.listener(move |t, _: &ClickEvent, _, cx| {
+                        if !dates_ok {
+                            return;
+                        }
+                        t.history_filter_edit.from = t.history_dates[0].read(cx).millis();
+                        t.history_filter_edit.to = t.history_dates[1].read(cx).millis();
                         t.history_filter = t.history_filter_edit.clone();
                         t.history_filter_open = false;
                         cx.notify();
@@ -2249,7 +2259,7 @@ impl StartView {
         window.open_dialog(cx, move |dialog, _, cx| {
             let (loc, view, d) = (location.clone(), view.clone(), d.clone());
             os::modal_doc_page(dialog, "Move documents and folders to", 460.)
-                .child(os::modal_body().child(os::field_label("Location")).child(location.render()))
+                .child(os::modal_body().child(os::field_label("Location")).child(location.render(cx)))
                 .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
                     let dir = loc.chosen.borrow().clone();
@@ -3955,6 +3965,22 @@ pub struct Location {
     sort: Rc<std::cell::Cell<FolderSort>>,
     /// A folder row clicked once: selected, the dialog's button reads "Open" (live docs-new-doc-location).
     picked: Rc<RefCell<Option<PathBuf>>>,
+    /// Copy workspace's New folder (live2 2403; New document's box has none): the name of the folder being made,
+    /// while its inline row is open.
+    new_folder: Option<Rc<RefCell<Option<Entity<InputState>>>>>,
+}
+
+/// The inline New folder row's name made into a folder in `chosen`, which then shows it (live2 2403: made at once,
+/// kept if the dialog is cancelled).
+fn make_inline_folder(chosen: &Rc<RefCell<PathBuf>>, editing: &Rc<RefCell<Option<Entity<InputState>>>>, picked: &Rc<RefCell<Option<PathBuf>>>, cx: &App) {
+    let Some(st) = editing.borrow_mut().take() else { return };
+    let typed = st.read(cx).value().trim().to_string();
+    let name = lib::sanitize_name(if typed.is_empty() { "Untitled folder" } else { &typed });
+    let dir = chosen.borrow().join(name);
+    if std::fs::create_dir_all(&dir).is_ok() {
+        *chosen.borrow_mut() = canon(&dir);
+        *picked.borrow_mut() = None;
+    }
 }
 
 /// The names the user's history is written under (see `StartView::me`).
@@ -3986,16 +4012,31 @@ fn outside_folders() -> Vec<PathBuf> {
 impl Location {
     /// A browser starting at `chosen`.
     pub fn new(chosen: PathBuf) -> Self {
-        Self { root: canon(&crate::file_dialogs::documents_dir()), others: outside_folders(), chosen: Rc::new(RefCell::new(canon(&chosen))), exclude: None, sort: Default::default(), picked: Default::default() }
+        Self { root: canon(&crate::file_dialogs::documents_dir()), others: outside_folders(), chosen: Rc::new(RefCell::new(canon(&chosen))), exclude: None, sort: Default::default(), picked: Default::default(), new_folder: None }
+    }
+
+    /// With the header's New folder button (Copy workspace…).
+    pub fn with_new_folder(mut self) -> Self {
+        self.new_folder = Some(Default::default());
+        self
+    }
+
+    fn naming_folder(&self) -> bool {
+        self.new_folder.as_ref().is_some_and(|n| n.borrow().is_some())
     }
 
     /// The dialog's primary button: "Open" while a folder row is selected, else `label`.
     pub fn ok_label(&self, label: &'static str) -> &'static str {
-        if self.picked.borrow().is_some() { "Open" } else { label }
+        if self.picked.borrow().is_some() || self.naming_folder() { "Open" } else { label }
     }
 
-    /// The primary button while a folder row is selected: into that folder (true; the dialog stays).
-    pub fn open_picked(&self) -> bool {
+    /// The primary button while a folder row is selected (or a new one named): into that folder (true; the dialog
+    /// stays).
+    pub fn open_picked(&self, cx: &App) -> bool {
+        if let Some(editing) = self.new_folder.as_ref().filter(|_| self.naming_folder()) {
+            make_inline_folder(&self.chosen, editing, &self.picked, cx);
+            return true;
+        }
         let Some(f) = self.picked.borrow_mut().take() else { return false };
         *self.chosen.borrow_mut() = f;
         true
@@ -4026,13 +4067,14 @@ impl Location {
     /// Onshape's "Document location" browser: a header with home, back and
     /// the current place, above the list of its folders (click a folder to
     /// go into it; the place shown is the destination).
-    pub fn render(&self) -> AnyElement {
+    pub fn render(&self, cx: &App) -> AnyElement {
         let pal = p();
         let chosen = self.chosen.borrow().clone();
         let at_root = chosen == self.root;
         let children = self.children(&chosen);
         let mut list = v_flex().p(px(6.)).gap(px(2.));
-        if children.is_empty() {
+        let naming = self.new_folder.as_ref().and_then(|n| n.borrow().clone());
+        if children.is_empty() && naming.is_none() {
             list = list.items_center().pt(px(15.)).child(os::info_box("No additional folders"));
         }
         let picked = self.picked.borrow().clone();
@@ -4052,6 +4094,29 @@ impl Location {
                         }
                         window.refresh();
                     }),
+            );
+        }
+        // New folder's inline row: its name selected and focused; Enter makes it.
+        if let (Some(st), Some(editing)) = (naming, self.new_folder.clone()) {
+            let (c, p) = (self.chosen.clone(), self.picked.clone());
+            list = list.child(
+                h_flex()
+                    .id("loc-new-folder")
+                    .h(px(30.))
+                    .px(px(8.))
+                    .gap(px(7.))
+                    .rounded(px(3.))
+                    .bg(rgb(0xdeecf9))
+                    .text_size(px(14.))
+                    .capture_key_down(move |e: &KeyDownEvent, window, cx| {
+                        if e.keystroke.key == "enter" {
+                            cx.stop_propagation();
+                            make_inline_folder(&c, &editing, &p, cx);
+                            window.refresh();
+                        }
+                    })
+                    .child(os::glyph(os::GLYPH_FOLDER, 18., pal.text))
+                    .child(div().flex_1().min_w_0().map(|d| crate::ui_script::mark(d, || "field:New folder name".into())).child(Input::new(&st).appearance(false).text_size(px(14.)))),
             );
         }
         // Home and Back clear a selected row (live: at the top, Back only does that).
@@ -4094,6 +4159,32 @@ impl Location {
                             .child(self.shown()),
                     )
                     .child(div().flex_1())
+                    .when_some(self.new_folder.clone(), |d, editing| {
+                        d.child(
+                            div()
+                                .id("loc-new-folder-button")
+                                .map(|d| crate::ui_script::mark(d, || "button:New folder".into()))
+                                .w(px(28.))
+                                .h(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .rounded(px(3.))
+                                .cursor_pointer()
+                                .hover(|d| d.bg(rgb(0xeaeaea)))
+                                .tooltip(crate::ui::tooltip("New folder"))
+                                .child(crate::assets::icon("new-folder", 20., cx))
+                                .on_click(move |_, window, cx| {
+                                    let st = cx.new(|cx| InputState::new(window, cx).default_value("Untitled folder"));
+                                    st.update(cx, |s, cx| {
+                                        s.focus(window, cx);
+                                        s.select_all(window, cx);
+                                    });
+                                    *editing.borrow_mut() = Some(st);
+                                    window.refresh();
+                                }),
+                        )
+                    })
                     .child({
                         let sort = self.sort.clone();
                         div()
@@ -4304,7 +4395,7 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
                     })
                     .when_some(hint.clone(), |d, h| d.child(div().text_size(px(12.)).text_color(p().text_muted).child(h)))
                     .when_some(labels.clone().zip(label_search.clone()), |d, (l, st)| d.child(div().pt(px(6.)).child(os::field_label("Document labels"))).child(l.render(&st, window, cx)))
-                    .when_some(location.clone(), |d, loc| d.child(div().pt(px(6.)).child(os::field_label(loc.0))).child(loc.1.render())),
+                    .when_some(location.clone(), |d, loc| d.child(div().pt(px(6.)).child(os::field_label(loc.0))).child(loc.1.render(cx))),
             )
             .footer(
                 os::modal_footer()
@@ -4313,7 +4404,7 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
             )
             .on_ok(move |_, window, cx| {
                 // "Open": into the selected folder, the dialog stays.
-                if loc_ok.as_ref().is_some_and(|l| l.1.open_picked()) {
+                if loc_ok.as_ref().is_some_and(|l| l.1.open_picked(cx)) {
                     window.refresh();
                     return false;
                 }

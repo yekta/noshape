@@ -151,7 +151,7 @@ fn copy_dialog(doc: Entity<DocModel>, mv: Option<noshape_store::MicroversionId>,
         (d.session.path.clone(), d.name())
     };
     let start = path.parent().map(|p| p.to_path_buf()).unwrap_or_else(crate::files::documents_dir);
-    let location = Rc::new(crate::start_window::Location::new(start));
+    let location = Rc::new(crate::start_window::Location::new(start).with_new_folder());
     let name_st = cx.new(|cx| InputState::new(window, cx).default_value(format!("{name} - Copy")));
     let focus = name_st.clone();
     let title = if mv.is_some() { "Copy the active version to a new document" } else { "Copy the active workspace to a new document" };
@@ -163,12 +163,12 @@ fn copy_dialog(doc: Entity<DocModel>, mv: Option<noshape_store::MicroversionId>,
                     .child(os::field_label("Document name"))
                     .child(os::input_h(os::modal_input(Some("Document name"), &name_st, cx), 32.).text_size(px(14.)))
                     .child(os::field_label("Copy document to"))
-                    .child(location.render()),
+                    .child(location.render(cx)),
             )
             .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", location.ok_label("Create document")))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
-                // "Open": into the folder selected in the box, the dialog stays.
-                if loc.open_picked() {
+                // "Open": into the folder selected in the box (or the new one named), the dialog stays.
+                if loc.open_picked(cx) {
                     window.refresh();
                     return false;
                 }
@@ -221,7 +221,7 @@ pub fn move_to(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
     window.open_dialog(cx, move |dialog, _, cx| {
         let (loc, path) = (location.clone(), path.clone());
         os::modal(dialog, "Move documents and folders to", 460.)
-            .child(os::modal_body().child(os::field_label("Location")).child(location.render()))
+            .child(os::modal_body().child(os::field_label("Location")).child(location.render(cx)))
             .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
                 let dir = loc.chosen.borrow().clone();

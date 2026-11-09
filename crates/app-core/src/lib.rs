@@ -10,6 +10,7 @@ pub mod color_mixer;
 pub mod config_visibility;
 pub mod cursor;
 pub mod custom_tables;
+pub mod date_time_field;
 pub mod derived;
 pub mod display_cache;
 pub mod doc_files;

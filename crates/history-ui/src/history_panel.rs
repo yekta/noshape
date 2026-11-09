@@ -7,6 +7,7 @@ use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
+use gpui_kit::component::Disableable as _;
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
@@ -105,8 +106,8 @@ pub struct HistoryPanel {
     filter_closed_at: Option<std::time::Instant>,
     filter_edit: HistoryFilter,
     filter: HistoryFilter,
-    date_from: Entity<InputState>,
-    date_to: Entity<InputState>,
+    date_from: Entity<crate::date_time_field::DateTimeField>,
+    date_to: Entity<crate::date_time_field::DateTimeField>,
     /// Tabs each microversion changed (store diffs, for the Tab filters).
     changed_tabs: HashMap<MicroversionId, Vec<TabId>>,
     /// The rows last drawn, as the ui-parity state lists them (`ui_rows`).
@@ -124,7 +125,7 @@ impl HistoryPanel {
 
     pub fn new(doc: Entity<DocModel>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search history"));
-        let subs = vec![
+        let mut subs = vec![
             cx.subscribe_in(&doc, window, |this: &mut Self, _, _ev: &DocEvent, _, cx| {
                 this.graph = None;
                 cx.notify();
@@ -147,8 +148,11 @@ impl HistoryPanel {
                 }
             }),
         ];
-        let date_from = cx.new(|cx| InputState::new(window, cx).placeholder("mm/dd/yyyy, --:--"));
-        let date_to = cx.new(|cx| InputState::new(window, cx).placeholder("mm/dd/yyyy, --:--"));
+        // Live: native date-time inputs (live2 2405 (c)).
+        let date_from = cx.new(crate::date_time_field::DateTimeField::new);
+        let date_to = cx.new(crate::date_time_field::DateTimeField::new);
+        subs.push(cx.observe(&date_from, |_, _, cx| cx.notify()));
+        subs.push(cx.observe(&date_to, |_, _, cx| cx.notify()));
         Self {
             doc,
             graph: None,
@@ -179,11 +183,10 @@ impl HistoryPanel {
         f.matches(m, &session.doc, || cache.entry(m.id).or_insert_with(|| noshape_ops::history_filter::changed_tabs(&session.store, m)).clone())
     }
 
-    /// Read the panel's date fields ("mm/dd/yyyy, hh:mm"; the time is optional).
+    /// Read the panel's date fields (each a whole date and time, or none).
     fn read_dates(&mut self, cx: &App) {
-        let parse = crate::start_library::parse_filter_date;
-        self.filter_edit.from = parse(&self.date_from.read(cx).value(), false);
-        self.filter_edit.to = parse(&self.date_to.read(cx).value(), true);
+        self.filter_edit.from = self.date_from.read(cx).millis();
+        self.filter_edit.to = self.date_to.read(cx).millis();
     }
 
     /// The search ▾ panel (live documents/117, dom/documents-history-search-filter):
@@ -282,12 +285,14 @@ impl HistoryPanel {
                 { "label": "Tab", "kind": "enum", "text": tab_name },
                 { "label": "Tab types", "kind": "list", "items": kinds },
                 { "label": "Modified by", "kind": "enum", "text": edit.by.label() },
-                { "label": "Start date", "kind": "string", "text": self.date_from.read(cx).value().to_string() },
-                { "label": "End date", "kind": "string", "text": self.date_to.read(cx).value().to_string() },
+                { "label": "Start date", "kind": "string", "text": self.date_from.read(cx).text() },
+                { "label": "End date", "kind": "string", "text": self.date_to.read(cx).text() },
             ]);
             serde_json::json!({ "title": "Search history", "kind": "other", "tabs": [], "fields": fields, "error": null })
         });
-        let date = |st: &Entity<InputState>, tip: &'static str, cx: &App| div().map(|d| crate::ui_script::mark(d, || format!("field:{tip}"))).w(px(148.)).h(px(34.)).pl(px(4.)).border_b_1().border_color(rgb(0xeaeaea)).flex().items_center().id(tip).tooltip(crate::ui::tooltip(tip)).child(div().flex_1().child(Input::new(st).appearance(false).text_size(px(14.)))).child(div().pr(px(6.)).child(crate::assets::icon("calendar", 16., cx)));
+        let date = |f: &Entity<crate::date_time_field::DateTimeField>, tip: &'static str| div().map(|d| crate::ui_script::mark(d, || format!("field:{tip}"))).w(px(148.)).h(px(34.)).pl(px(4.)).border_b_1().border_color(rgb(0xeaeaea)).flex().items_center().id(tip).tooltip(crate::ui::tooltip(tip)).child(f.clone());
+        // Live: Search is off while a date is partly typed (an invalid date-time input).
+        let dates_ok = !self.date_from.read(cx).is_partial() && !self.date_to.read(cx).is_partial();
         v_flex()
             .id("hist-filter-panel")
             .occlude()
@@ -339,7 +344,7 @@ impl HistoryPanel {
                     ),
             )
             .child(h_flex().mt(px(14.)).h(px(36.)).items_start().child(label("Modified by")).child(by_select))
-            .child(h_flex().mt(px(14.)).items_start().child(label("Date modified")).child(v_flex().gap(px(14.)).child(date(&self.date_from, "Start date", cx)).child(date(&self.date_to, "End date", cx))))
+            .child(h_flex().mt(px(14.)).items_start().child(label("Date modified")).child(v_flex().gap(px(14.)).child(date(&self.date_from, "Start date")).child(date(&self.date_to, "End date"))))
             .child(
                 h_flex()
                     .justify_end()
@@ -347,14 +352,17 @@ impl HistoryPanel {
                     .pt(px(14.))
                     .pb(px(10.))
                     .pr(px(5.))
-                    .child(os::secondary_button("hist-f-reset", "Reset", cx).on_click(cx.listener(|t, _: &ClickEvent, window, cx| {
+                    .child(os::secondary_button("hist-f-reset", "Reset", cx).on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
                         t.filter_edit = HistoryFilter::default();
                         t.filter = HistoryFilter::default();
-                        t.date_from.update(cx, |s, cx| s.set_value("", window, cx));
-                        t.date_to.update(cx, |s, cx| s.set_value("", window, cx));
+                        t.date_from.update(cx, |s, cx| s.clear(cx));
+                        t.date_to.update(cx, |s, cx| s.clear(cx));
                         cx.notify();
                     })))
-                    .child(os::primary_button("hist-f-search", "Search").on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
+                    .child(os::primary_button("hist-f-search", "Search").disabled(!dates_ok).on_click(cx.listener(move |t, _: &ClickEvent, _, cx| {
+                        if !dates_ok {
+                            return;
+                        }
                         t.read_dates(cx);
                         t.filter = t.filter_edit.clone();
                         t.filter_open = false;

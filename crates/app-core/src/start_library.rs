@@ -235,21 +235,6 @@ fn read_entry(path: &Path, stamp: (Option<SystemTime>, Option<SystemTime>, u64),
     }
 }
 
-/// A Search history ▾ date field ("mm/dd/yyyy, hh:mm"; the time is
-/// optional: the day's start, or its end for `end`), in local time (ms).
-pub fn parse_filter_date(s: &str, end: bool) -> Option<i64> {
-    use chrono::{Local, NaiveDate, NaiveTime, TimeZone as _};
-    let s = s.trim();
-    let (d, t) = s.split_once(',').map(|(d, t)| (d.trim(), Some(t.trim()))).unwrap_or((s, None));
-    let date = NaiveDate::parse_from_str(d, "%m/%d/%Y").ok()?;
-    let time = match t.filter(|t| !t.is_empty() && !t.starts_with('-')) {
-        Some(t) => NaiveTime::parse_from_str(t, "%H:%M").or_else(|_| NaiveTime::parse_from_str(t, "%I:%M %p")).ok()?,
-        None if end => NaiveTime::from_hms_opt(23, 59, 59)?,
-        None => NaiveTime::MIN,
-    };
-    Local.from_local_datetime(&date.and_time(time)).single().map(|t| t.timestamp_millis())
-}
-
 /// Onshape's time stamps (live documents list and versions panel): "1:15 PM
 /// Today", "9:02 AM Yesterday", "Oct 12", "Oct 12, 2024", in local time.
 pub fn format_onshape_time(ms: i64) -> String {
