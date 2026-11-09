@@ -194,7 +194,7 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           mkdir -p out
-          app=dist/noshape.app
+          app=dist/Noshape.app
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
           cp target/release/noshape "$app/Contents/MacOS/noshape"
           cp packaging/icons/noshape.icns "$app/Contents/Resources/noshape.icns"
@@ -229,12 +229,15 @@ jobs:
           fi
           # The app alone, for in-app updates (the bundle is swapped in place; a download inside the app has no
           # quarantine flag).
-          ditto -c -k --keepParent "$app" "out/noshape-$VERSION-${{ matrix.asset }}.app.zip"
+          # Its folder inside is noshape.app as before: installed apps' updaters look for that name, and the swap keeps
+          # the installed bundle's own name.
+          ditto "$app" "$RUNNER_TEMP/update/noshape.app"
+          ditto -c -k --keepParent "$RUNNER_TEMP/update/noshape.app" "out/noshape-$VERSION-${{ matrix.asset }}.app.zip"
           ln -s /Applications dist/Applications
           # hdiutil underestimates the image size for large binaries; size it explicitly.
           size_mb=$(( $(du -sm dist | cut -f1) * 2 + 64 ))
           dmg="out/noshape-$VERSION-${{ matrix.asset }}.dmg"
-          hdiutil create -volname noshape -srcfolder dist -ov -fs HFS+ -size "${size_mb}m" -format UDZO "$dmg"
+          hdiutil create -volname Noshape -srcfolder dist -ov -fs HFS+ -size "${size_mb}m" -format UDZO "$dmg"
           if [ -n "${APPLE_SIGN_ID:-}" ]; then
             codesign --force --timestamp --sign "$APPLE_SIGN_ID" "$dmg"
             if [ -n "${ASC_KEY_PATH:-}" ]; then notarize "$dmg"; xcrun stapler staple "$dmg"; fi
@@ -443,24 +446,24 @@ jobs:
           check=.github/release/check_binary.py
           hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" dl/noshape-*-macos-arm64.dmg
           test ! -e "$RUNNER_TEMP/dmg/noshape-cli"
-          cp -R "$RUNNER_TEMP/dmg/noshape.app" /Applications/noshape.app
+          cp -R "$RUNNER_TEMP/dmg/Noshape.app" /Applications/Noshape.app
           hdiutil detach "$RUNNER_TEMP/dmg"
-          test "$(ls /Applications/noshape.app/Contents/MacOS)" = noshape
-          app=/Applications/noshape.app/Contents/MacOS/noshape
+          test "$(ls /Applications/Noshape.app/Contents/MacOS)" = noshape
+          app=/Applications/Noshape.app/Contents/MacOS/noshape
           # The bundle ID, and a Developer ID build accepted by Gatekeeper with its notarization ticket stapled.
-          codesign -dv /Applications/noshape.app 2> "$RUNNER_TEMP/sig.txt"; cat "$RUNNER_TEMP/sig.txt"
+          codesign -dv /Applications/Noshape.app 2> "$RUNNER_TEMP/sig.txt"; cat "$RUNNER_TEMP/sig.txt"
           grep -qx 'Identifier=app.noshape.noshape' "$RUNNER_TEMP/sig.txt"
-          codesign --verify --strict --deep /Applications/noshape.app
-          if codesign -dvv /Applications/noshape.app 2>&1 | grep -q '^Authority=Developer ID Application'; then
-            spctl -a -vv -t exec /Applications/noshape.app
-            xcrun stapler validate /Applications/noshape.app
+          codesign --verify --strict --deep /Applications/Noshape.app
+          if codesign -dvv /Applications/Noshape.app 2>&1 | grep -q '^Authority=Developer ID Application'; then
+            spctl -a -vv -t exec /Applications/Noshape.app
+            xcrun stapler validate /Applications/Noshape.app
             xcrun stapler validate dl/noshape-*-macos-arm64.dmg
           fi
           python3 $check "$app"
           # It updates itself (the bundle swapped; the new one must carry the Developer ID signature). A dry run only.
           if [ "$GITHUB_REF_TYPE" != tag ]; then
             python3 .github/release/check_update.py "$app" "$(ls dl/noshape-*-macos-arm64.app.zip)" sums "$(cat sums/identity.txt)" \
-              --inode /Applications/noshape.app
+              --inode /Applications/Noshape.app
           fi
           # What Help › Install command line tool… does (the admin prompt aside): /usr/local/bin/noshape → the app.
           sudo mkdir -p /usr/local/bin && sudo chown "$(id -u)" /usr/local/bin
