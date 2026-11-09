@@ -1,19 +1,19 @@
 {
  "scenario": "vs-cfg-checkbox-dialog",
- "recorded": "2026-11-08T08:20:46.887Z",
+ "recorded": "2026-11-09T03:07:52.580Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "644d660c3fe4680600ec7d72",
-  "workspace": "55c165faeb277c2922a026f5",
-  "element": "ab5e23a4c29c788250777ffe",
+  "document": "8963877d6a904db2892b3b5d",
+  "workspace": "419037bf4a76c7735ac29031",
+  "element": "f55740df62149b465d1a16c8",
   "start": "vs-vars",
-  "startElement": "ab5e23a4c29c788250777ffe",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "f55740df62149b465d1a16c8",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -187,7 +187,7 @@
     },
     "featurestudio": null
    },
-   "t": 23271
+   "t": 29738
   },
   {
    "step": 2,
@@ -285,7 +285,7 @@
     },
     "featurestudio": null
    },
-   "t": 28351
+   "t": 32810
   },
   {
    "step": 3,
@@ -382,7 +382,7 @@
     },
     "featurestudio": null
    },
-   "t": 33529
+   "t": 36325
   },
   {
    "step": 4,
@@ -410,8 +410,7 @@
      "rows": [
       "List",
       "Checkbox",
-      "Configuration variable",
-      "Paste inputs"
+      "Configuration variable"
      ],
      "highlighted": null,
      "disabled": []
@@ -490,7 +489,7 @@
     },
     "featurestudio": null
    },
-   "t": 39057
+   "t": 39730
   },
   {
    "step": 5,
@@ -630,7 +629,7 @@
     },
     "featurestudio": null
    },
-   "t": 44801
+   "t": 42954
   },
   {
    "step": 6,
@@ -764,7 +763,7 @@
     },
     "featurestudio": null
    },
-   "t": 47667
+   "t": 46704
   },
   {
    "step": 7,
@@ -857,9 +856,9 @@
      "configuration": [
       {
        "name": "Holes",
-       "kind": "holes",
-       "default": "true",
-       "shown": "",
+       "kind": "checkbox",
+       "default": true,
+       "shown": true,
        "rows": []
       }
      ],
@@ -869,7 +868,7 @@
     },
     "featurestudio": null
    },
-   "t": 53778
+   "t": 49807
   }
  ]
 }

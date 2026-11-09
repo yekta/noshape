@@ -1,6 +1,6 @@
 {
  "scenario": "vs-cfg-set-to-cv",
- "recorded": "2026-11-08T23:19:34.396Z",
+ "recorded": "2026-11-09T03:09:05.214Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,11 +8,11 @@
   "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "29b8fb531996f7fc691a566f",
-  "workspace": "8e16037166f1fcdeb9ed2c1b",
-  "element": "e0971ca410b9cd0cdcda3397",
+  "document": "0c23a462d26bd0ea1d971846",
+  "workspace": "09bde08f3f7983a211137662",
+  "element": "7a77f98d5ed6a48ac954a434",
   "start": "vs-vars",
-  "startElement": "e0971ca410b9cd0cdcda3397",
+  "startElement": "7a77f98d5ed6a48ac954a434",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -187,7 +187,7 @@
     },
     "featurestudio": null
    },
-   "t": 42797
+   "t": 30149
   },
   {
    "step": 2,
@@ -285,7 +285,7 @@
     },
     "featurestudio": null
    },
-   "t": 46821
+   "t": 32993
   },
   {
    "step": 3,
@@ -382,7 +382,7 @@
     },
     "featurestudio": null
    },
-   "t": 50759
+   "t": 36527
   },
   {
    "step": 4,
@@ -489,7 +489,7 @@
     },
     "featurestudio": null
    },
-   "t": 55001
+   "t": 39851
   },
   {
    "step": 5,
@@ -668,7 +668,7 @@
     },
     "featurestudio": null
    },
-   "t": 58270
+   "t": 42800
   },
   {
    "step": 6,
@@ -841,7 +841,7 @@
     },
     "featurestudio": null
    },
-   "t": 61063
+   "t": 45331
   },
   {
    "step": 7,
@@ -934,7 +934,7 @@
      "configuration": [
       {
        "name": "len",
-       "kind": "len",
+       "kind": "variable",
        "default": "1 mm",
        "shown": "1 mm",
        "rows": []
@@ -946,7 +946,7 @@
     },
     "featurestudio": null
    },
-   "t": 64896
+   "t": 48412
   },
   {
    "step": 8,
@@ -1049,7 +1049,7 @@
      "configuration": [
       {
        "name": "len",
-       "kind": "len",
+       "kind": "variable",
        "default": "1 mm",
        "shown": "1 mm",
        "rows": []
@@ -1061,7 +1061,7 @@
     },
     "featurestudio": null
    },
-   "t": 68348
+   "t": 51339
   },
   {
    "step": 9,
@@ -1154,7 +1154,7 @@
      "configuration": [
       {
        "name": "len",
-       "kind": "len",
+       "kind": "variable",
        "default": "1 mm",
        "shown": "1 mm",
        "rows": []
@@ -1166,7 +1166,7 @@
     },
     "featurestudio": null
    },
-   "t": 72355
+   "t": 55016
   }
  ]
 }

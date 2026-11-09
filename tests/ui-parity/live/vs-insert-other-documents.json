@@ -1,19 +1,19 @@
 {
  "scenario": "vs-insert-other-documents",
- "recorded": "2026-11-08T07:49:44.743Z",
+ "recorded": "2026-11-09T03:16:46.827Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "bb1fd9326924f73462e01586",
-  "workspace": "0ddc599c66a46d7ee450bd0e",
-  "element": "8c36467f6a228c7259a51b58",
+  "document": "9c39deca9c4bc162360afebf",
+  "workspace": "f97434651c13008aac1721c3",
+  "element": "196a577df1c5fa2caf4d2772",
   "start": "vs-two",
-  "startElement": "8c36467f6a228c7259a51b58",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "196a577df1c5fa2caf4d2772",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -184,13 +184,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 22350
+   "t": 30247
   },
   {
    "step": 2,
@@ -345,13 +346,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 27571
+   "t": 33811
   },
   {
    "step": 3,
@@ -372,20 +374,51 @@
     },
     "dialog": {
      "title": "Insert Variable Studio",
-     "titleState": "error",
      "kind": "feature",
-     "tabs": [],
+     "tabs": [
+      {
+       "label": "Current document",
+       "selected": false
+      },
+      {
+       "label": "Other documents",
+       "selected": true
+      }
+     ],
      "fields": [
       {
-       "label": "Standard",
-       "kind": "text",
-       "text": "",
-       "focused": false,
-       "state": "ok"
+       "label": "Search or paste URL",
+       "kind": "string",
+       "text": ""
+      },
+      {
+       "label": "Recent",
+       "kind": "list_row"
+      },
+      {
+       "label": "Owned by me",
+       "kind": "list_row"
+      },
+      {
+       "label": "Recently opened",
+       "kind": "list_row"
+      },
+      {
+       "label": "Created by me",
+       "kind": "list_row"
+      },
+      {
+       "label": "Shared with me",
+       "kind": "list_row"
+      },
+      {
+       "label": "Public",
+       "kind": "list_row"
       }
      ],
      "error": null,
-     "ok": "disabled"
+     "ok": "disabled",
+     "titleState": "error"
     },
     "dialogs": [
      {
@@ -474,13 +507,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 32535
+   "t": 37281
   },
   {
    "step": 4,
@@ -569,13 +603,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 38667
+   "t": 40168
   }
  ]
 }

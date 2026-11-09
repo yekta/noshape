@@ -1,0 +1,214 @@
+{
+ "scenario": "docs-columns-search",
+ "recorded": "2026-11-09T03:16:52.386Z",
+ "app": {
+  "name": "live",
+  "version": "1.223.92697.90c317e616c3",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.5 3dedc795"
+ },
+ "live": {
+  "page": "documents"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": null,
+  "features": null,
+  "parts": [],
+  "undo": null,
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": null,
+  "documents": {
+   "place": "Owned by me",
+   "selected": null,
+   "search": "",
+   "panel": "Details",
+   "advanced": false,
+   "columns": false
+  },
+  "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Add"
+    }
+   },
+   "ok": true,
+   "at": [
+    1479,
+    726
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "button"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": true
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 2234
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Search…"
+    }
+   },
+   "ok": true,
+   "at": [
+    1438,
+    772
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": true
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 4478
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "type",
+    "text": "Desc"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "Desc",
+     "selection": [
+      4,
+      4
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": true
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 6656
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 8538
+  }
+ ],
+ "tabsOpened": 7
+}

@@ -1,0 +1,129 @@
+{
+ "scenario": "docs-folders-view-toggle",
+ "recorded": "2026-11-09T03:06:33.359Z",
+ "app": {
+  "name": "live",
+  "version": "1.223.92697.90c317e616c3",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.5 3dedc795"
+ },
+ "live": {
+  "page": "documents"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": null,
+  "features": null,
+  "parts": [],
+  "undo": null,
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": null,
+  "documents": {
+   "place": "Owned by me",
+   "selected": null,
+   "search": "",
+   "panel": "Details",
+   "advanced": false,
+   "columns": false
+  },
+  "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "List"
+    }
+   },
+   "ok": true,
+   "at": [
+    1495,
+    537
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "button"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 2256
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Grid"
+    }
+   },
+   "ok": true,
+   "at": [
+    1459,
+    537
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "button"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 4477
+  }
+ ],
+ "tabsOpened": 7
+}

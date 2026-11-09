@@ -1,0 +1,127 @@
+{
+ "scenario": "docs-folder-crumb",
+ "recorded": "2026-11-09T03:05:38.449Z",
+ "app": {
+  "name": "live",
+  "version": "1.223.92697.90c317e616c3",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.5 3dedc795"
+ },
+ "live": {
+  "page": "documents"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": null,
+  "features": null,
+  "parts": [],
+  "undo": null,
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": null,
+  "documents": {
+   "place": "Owned by me",
+   "selected": null,
+   "search": "",
+   "panel": "Details",
+   "advanced": false,
+   "columns": false
+  },
+  "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "dblclick",
+    "on": {
+     "doc_row": "uip Folder"
+    }
+   },
+   "ok": true,
+   "at": [
+    930,
+    585
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "uip Folder",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?nodeId=dca6da9583e0bea7371a500f&resourceType=folder"
+   },
+   "t": 17599
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "crumb": "Owned by me"
+    }
+   },
+   "ok": true,
+   "at": [
+    313,
+    116
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": "Owned by me",
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?nodeId=6ad49ec58b4a0a5a73d38e52&resourceType=resourceuserowner"
+   },
+   "t": 20127
+  }
+ ],
+ "tabsOpened": 7
+}

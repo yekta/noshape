@@ -1,0 +1,350 @@
+{
+ "scenario": "docs-new-doc-location",
+ "recorded": "2026-11-09T03:08:55.074Z",
+ "app": {
+  "name": "live",
+  "version": "1.223.92697.90c317e616c3",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.5 3dedc795"
+ },
+ "live": {
+  "page": "documents"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": null,
+  "features": null,
+  "parts": [],
+  "undo": null,
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": null,
+  "documents": {
+   "place": "Owned by me",
+   "selected": null,
+   "search": "",
+   "panel": "Details",
+   "advanced": false,
+   "columns": false
+  },
+  "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Create"
+    }
+   },
+   "ok": true,
+   "at": [
+    110,
+    116
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "button"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Document…",
+      "Folder…",
+      "Import files…",
+      "Import from",
+      "Label…"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 2243
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Document…"
+    }
+   },
+   "ok": true,
+   "at": [
+    110,
+    155
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "Untitled document",
+     "selection": [
+      0,
+      17
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "New document",
+     "fields": [
+      {
+       "label": "Document name",
+       "kind": "input",
+       "value": "Untitled document"
+      },
+      {
+       "label": "Document labels",
+       "kind": "input",
+       "value": ""
+      }
+     ],
+     "buttons": [
+      "Create public document",
+      "Cancel"
+     ],
+     "text": "Document name Document labels Document location Owned by me uip Folder noshape test A nested-asm-B.step"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 4436
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "list_row": "uip Folder"
+    }
+   },
+   "ok": true,
+   "at": [
+    960,
+    318
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "New document",
+     "fields": [
+      {
+       "label": "Document name",
+       "kind": "input",
+       "value": "Untitled document"
+      },
+      {
+       "label": "Document labels",
+       "kind": "input",
+       "value": ""
+      }
+     ],
+     "buttons": [
+      "Open",
+      "Cancel"
+     ],
+     "text": "Document name Document labels Document location Owned by me uip Folder noshape test A nested-asm-B.step"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 6613
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Back"
+    }
+   },
+   "ok": true,
+   "at": [
+    725,
+    280
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "New document",
+     "fields": [
+      {
+       "label": "Document name",
+       "kind": "input",
+       "value": "Untitled document"
+      },
+      {
+       "label": "Document labels",
+       "kind": "input",
+       "value": ""
+      }
+     ],
+     "buttons": [
+      "Create public document",
+      "Cancel"
+     ],
+     "text": "Document name Document labels Document location Owned by me"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 8804
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Home"
+    }
+   },
+   "ok": false,
+   "error": "target not found: {\"button\":\"Home\"}",
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "New document",
+     "fields": [
+      {
+       "label": "Document name",
+       "kind": "input",
+       "value": "Untitled document"
+      },
+      {
+       "label": "Document labels",
+       "kind": "input",
+       "value": ""
+      }
+     ],
+     "buttons": [
+      "Create public document",
+      "Cancel"
+     ],
+     "text": "Document name Document labels Document location Owned by me"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 10702
+  }
+ ],
+ "tabsOpened": 7
+}

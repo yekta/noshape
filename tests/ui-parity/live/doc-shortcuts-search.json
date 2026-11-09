@@ -1,0 +1,473 @@
+{
+ "scenario": "doc-shortcuts-search",
+ "recorded": "2026-11-09T02:53:50.078Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+ },
+ "live": {
+  "document": "c6660aa6429db977735ce229",
+  "workspace": "83e16eda9fe30660cbdee9f2",
+  "element": "86712c84b7d86959cc8f9849",
+  "start": "doc-tabs",
+  "startElement": "86712c84b7d86959cc8f9849",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    },
+    {
+     "name": "Part Studio 2",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Variable Studio 1",
+     "kind": "variablestudio",
+     "active": false
+    },
+    {
+     "name": "Feature Studio 1",
+     "kind": "featurestudio",
+     "active": false
+    },
+    {
+     "name": "Folder 1",
+     "kind": "folder",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "key",
+    "key": "?"
+   },
+   "ok": true,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "",
+     "fields": [
+      {
+       "label": "Keyboard shortcutsCustomize keyboard shortcuts",
+       "kind": "input",
+       "value": ""
+      }
+     ],
+     "buttons": [],
+     "text": "Keyboard shortcutsCustomize keyboard shortcuts General Part Studio Assembly 3D view Sketch Feature Studio Drawing shift enter Accept & repeat command enter Accept command escape Cancel space Clear selection ctrl/cmd c Copy shift c Curve/surface analysis delete / backspace Delete selection shift d Dihedral analysis ctrl/cmd shift f FeatureScript search ctrl u Feedback/Report a bug a Flip primary axis k Hide/show mate connectors shift / Keyboard shortcuts shift Lock mate inference ctrl m Mate conn"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 50669
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Search shortcuts"
+    }
+   },
+   "ok": true,
+   "at": [
+    1296,
+    53
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "",
+     "fields": [
+      {
+       "label": "Keyboard shortcutsCustomize keyboard shortcuts",
+       "kind": "input",
+       "value": ""
+      }
+     ],
+     "buttons": [],
+     "text": "Keyboard shortcutsCustomize keyboard shortcuts General Part Studio Assembly 3D view Sketch Feature Studio Drawing shift enter Accept & repeat command enter Accept command escape Cancel space Clear selection ctrl/cmd c Copy shift c Curve/surface analysis delete / backspace Delete selection shift d Dihedral analysis ctrl/cmd shift f FeatureScript search ctrl u Feedback/Report a bug a Flip primary axis k Hide/show mate connectors shift / Keyboard shortcuts shift Lock mate inference ctrl m Mate conn"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 66210
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "type",
+    "text": "extrude"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "extrude",
+     "selection": [
+      7,
+      7
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "",
+     "fields": [
+      {
+       "label": "Keyboard shortcutsCustomize keyboard shortcuts",
+       "kind": "input",
+       "value": "extrude"
+      }
+     ],
+     "buttons": [],
+     "text": "Keyboard shortcutsCustomize keyboard shortcuts Search results in Keyboard shortcuts Part Studio shift e Extrude example Customized example Onshape default example Disabled Onshape controlled Has conflict * applies in drawing sketches"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 71380
+  }
+ ]
+}

@@ -1,0 +1,205 @@
+{
+ "scenario": "doc-file-csv-viewer",
+ "recorded": "2026-11-09T02:00:33.624Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+ },
+ "live": {
+  "document": "61a95ba951b406da18e86549",
+  "workspace": "6635ec8012a41835bc24d5c3",
+  "element": "66323439664b9732d78cb13a",
+  "start": "doc-files",
+  "startElement": "66323439664b9732d78cb13a",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    },
+    {
+     "name": "dx-image.png",
+     "kind": "image-element",
+     "active": false
+    },
+    {
+     "name": "uip-table.csv",
+     "kind": "file",
+     "active": false
+    },
+    {
+     "name": "uip-data.json",
+     "kind": "file",
+     "active": false
+    },
+    {
+     "name": "uip-notes.txt",
+     "kind": "txt-element",
+     "active": false
+    },
+    {
+     "name": "uip-page.pdf",
+     "kind": "pdf-element",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "doc_tab": "uip-table.csv"
+    }
+   },
+   "ok": true,
+   "at": [
+    785,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "dx-image.png",
+       "kind": "image-element",
+       "active": false
+      },
+      {
+       "name": "uip-table.csv",
+       "kind": "file",
+       "active": true
+      },
+      {
+       "name": "uip-data.json",
+       "kind": "file",
+       "active": false
+      },
+      {
+       "name": "uip-notes.txt",
+       "kind": "txt-element",
+       "active": false
+      },
+      {
+       "name": "uip-page.pdf",
+       "kind": "pdf-element",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 27530
+  }
+ ]
+}
