@@ -1560,7 +1560,8 @@ impl Workspace {
                     let (crumbs, v) = (crumbs.clone(), v.clone());
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                         m = m.dropdown();
-                        for (id, name) in crumbs {
+                        // Nearest parent first (live doc-nested-crumb-menu: Folder 2, Folder 1).
+                        for (id, name) in crumbs.into_iter().rev() {
                             let v = v.clone();
                             m = m.item(crate::os_menu::OsMenuItem::new(name).user().icon(folder_glyph(20., p().text)).on_click(move |_, _, cx| {
                                 v.update(cx, |t, cx| {

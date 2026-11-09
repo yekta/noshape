@@ -311,7 +311,11 @@ impl PreferencesView {
                 f["value"] = serde_json::json!(items.iter().map(|i| i.as_str().map(crate::i18n::tr).unwrap_or_default()).collect::<Vec<_>>());
             }
             // (Keyboard shortcuts' tab select is read as "Tab" in every language.)
-            if let Some(l) = f["label"].as_str().filter(|l| *l != "Keyboard shortcuts › Tab") {
+            // (A table's own name is live's reader's, not the page's: English in every language, live prefs-language-save
+            // "Material-Bibliotheken › Libraries".)
+            if let Some((section, table)) = f["label"].as_str().and_then(|l| l.split_once(" › ")).filter(|(_, t)| matches!(*t, "Libraries" | "Rules")) {
+                f["label"] = serde_json::json!(format!("{} › {table}", crate::units_prefs::shown_label(section)));
+            } else if let Some(l) = f["label"].as_str().filter(|l| *l != "Keyboard shortcuts › Tab") {
                 f["label"] = serde_json::json!(l.split(" › ").map(crate::units_prefs::shown_label).collect::<Vec<_>>().join(" › "));
             } else if f["label"] == "Keyboard shortcuts › Tab" {
                 f["label"] = serde_json::json!(format!("{} › Tab", crate::i18n::tr("Keyboard shortcuts")));
