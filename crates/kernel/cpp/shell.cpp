@@ -5684,15 +5684,18 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
     };
     // A face's offset's value at a point, where it means something: a free-form face's foot square below the point
     // (not held at the end of the surface it runs on as: 1e300).
-    auto value = [&](int j, const gp_XYZ& p) {
+    // (On the surfaces `S`: the wall's, or a trace's own copies of them.)
+    auto value_in = [&](const std::vector<quad::Surf>& S, int j, const gp_XYZ& p) {
       gp_XYZ g;
-      return quad::eval_grad_near(sf[(size_t)j], p, g, size);
+      return quad::eval_grad_near(S[(size_t)j], p, g, size);
     };
+    auto value = [&](int j, const gp_XYZ& p) { return value_in(sf, j, p); };
     // (Without the global projection: 1e300 where the last foot and a local search from it find none.)
-    auto quick_value = [&](int j, const gp_XYZ& p) {
+    auto quick_value_in = [&](const std::vector<quad::Surf>& S, int j, const gp_XYZ& p) {
       gp_XYZ g;
-      return quad::eval_grad_near(sf[(size_t)j], p, g, size, false);
+      return quad::eval_grad_near(S[(size_t)j], p, g, size, false);
     };
+    auto quick_value = [&](int j, const gp_XYZ& p) { return quick_value_in(sf, j, p); };
     // The crossings: points on three surfaces.
     struct Triple
     {
@@ -5816,7 +5819,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         kb[(size_t)j] = kb_all[(size_t)j];
     }
     BRepClass3d_SolidClassifier inside(so);
-    auto on_wall = [&](const gp_Pnt& p, double eps) {
+    auto on_wall_in = [&](const std::vector<quad::Surf>& S, BRepClass3d_SolidClassifier& in, const gp_Pnt& p, double eps) {
       // In the part: only across a removed face's surface can a point by the wall leave it (the classifier there).
       bool past_removed = false;
       for (int j = 1; j <= nf && !past_removed; ++j)
@@ -5827,13 +5830,13 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         b.Enlarge(thickness);
         if (b.IsOut(p))
           continue;
-        const double e = quick_value(j, p.XYZ());
+        const double e = quick_value_in(S, j, p.XYZ());
         past_removed   = std::abs(e) > 1e299 || e * (faces(j).Orientation() == TopAbs_REVERSED ? -1 : 1) > -eps;
       }
       if (past_removed)
       {
-        inside.Perform(p, std::max(eps, 1e3 * tol));
-        if (inside.State() == TopAbs_OUT)
+        in.Perform(p, std::max(eps, 1e3 * tol));
+        if (in.State() == TopAbs_OUT)
           return false;
       }
       // No nearer a kept face than the wall: exactly only where its surface is that near (a point on its offset or
@@ -5847,7 +5850,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         b.Enlarge(thickness);
         if (b.IsOut(p))
           continue;
-        const double e = std::abs(quick_value(j, p.XYZ()));
+        const double e = std::abs(quick_value_in(S, j, p.XYZ()));
         if (e <= eps || (e < 1e299 && e >= 2 * thickness - eps))
           continue;
         if (v.IsNull())
@@ -5858,6 +5861,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       }
       return true;
     };
+    auto on_wall = [&](const gp_Pnt& p, double eps) { return on_wall_in(sf, inside, p, eps); };
     // The edges split at the points on them, their pieces on the wall kept (an edge by no point: kept or dropped);
     // `ends`: the faces and the point of each kept piece's and new edge's ends.
     NCollection_DataMap<TopoDS_Shape, std::vector<TopoDS_Edge>, TopTools_ShapeMapHasher> pieces_of;
@@ -6143,8 +6147,28 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
     };
     // From a point where faces b and c meet without an edge of theirs: along their offsets' intersection, the way
     // that stays on the wall, until it comes to another such point of theirs or to a third surface (a new point).
-    auto trace = [&](size_t ti, int b, int c) -> bool {
-      const quad::Surf* s2[2] = {&sf[(size_t)b], &sf[(size_t)c]};
+    // A trace's surfaces (its own copies when traced alongside others: each from the same start whatever ran before),
+    // classifier and polylines; how a dry one ends: its points, then a point already there or a new one (where, the
+    // third face).
+    struct TraceEnv
+    {
+      std::vector<quad::Surf>&         S;
+      BRepClass3d_SolidClassifier&     in;
+      std::map<const void*, Polyline>& lines;
+    };
+    struct TraceEnd
+    {
+      bool                ok = false, run = false;
+      std::vector<gp_Pnt> pts;
+      long                k = -1;
+      gp_XYZ              p3;
+      int                 third = 0;
+      // (The surfaces' last feet when it ended, for the wall's surfaces to carry on from, as one traced in place.)
+      std::vector<std::pair<int, gp_Pnt2d>> feet;
+    };
+    auto trace = [&](size_t ti, int b, int c, TraceEnv& env, TraceEnd* dry) -> bool {
+      auto& S = env.S;
+      const quad::Surf* s2[2] = {&S[(size_t)b], &S[(size_t)c]};
       s2[0]->has_hint = s2[1]->has_hint = false;
       const double eps  = 1e-3 * thickness;
       const double step = 0.25 * thickness;
@@ -6178,8 +6202,8 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         return fail("a new edge along tangent offsets");
       // (The way on the wall: a fifth of a wall along each.)
       gp_XYZ ya, yb;
-      const bool wa = on_curve(start, tg, 0.2 * thickness, ya) && on_wall(gp_Pnt(ya), eps);
-      const bool wb = on_curve(start, tg.Reversed(), 0.2 * thickness, yb) && on_wall(gp_Pnt(yb), eps);
+      const bool wa = on_curve(start, tg, 0.2 * thickness, ya) && on_wall_in(S, env.in, gp_Pnt(ya), eps);
+      const bool wb = on_curve(start, tg.Reversed(), 0.2 * thickness, yb) && on_wall_in(S, env.in, gp_Pnt(yb), eps);
       if (wa == wb)
       {
         return fail("a new edge's way not found");
@@ -6187,6 +6211,26 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       if (wb)
         tg.Reverse();
       std::vector<gp_Pnt> pts = {gp_Pnt(start)};
+      // (Its end: a point already there, or a new one with its third face; a dry trace only notes it.)
+      auto end_at = [&](size_t k) {
+        if (dry != nullptr)
+        {
+          dry->ok = true, dry->pts = pts, dry->k = (long)k;
+          return true;
+        }
+        finish(pts, tps[k].p);
+        return make_edge(b, c, pts, tps[ti].v, tps[k].v);
+      };
+      auto end_new = [&](const gp_XYZ& p3, int third) {
+        if (dry != nullptr)
+        {
+          dry->ok = true, dry->pts = pts, dry->p3 = p3, dry->third = third;
+          return true;
+        }
+        const size_t k = add_triple(p3, b, c, third);
+        finish(pts, tps[k].p);
+        return make_edge(b, c, pts, tps[ti].v, tps[k].v);
+      };
       gp_XYZ              x = start;
       // The neighbours' offsets' values at the last two points (a nearly tangent one touches the curve: its value
       // dips to nothing without changing sign).
@@ -6203,7 +6247,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         for (const auto& [mp, mv] : m)
           if (mp.IsEqual(q, 0.0) && mv != -1.0)
             return mv;
-        const double v = value(j, q);
+        const double v = value_in(S, j, q);
         m[1]           = m[0];
         m[0]           = {q, v};
         return v;
@@ -6231,8 +6275,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
           const gp_XYZ d = tps[k].p - x;
           if (d.Modulus() <= (y - x).Modulus() * 1.01 && d.Dot(tg) > 0)
           {
-            finish(pts, tps[k].p);
-            return make_edge(b, c, pts, tps[ti].v, tps[k].v);
+            return end_at(k);
           }
         }
         // Across an edge of b's or c's (on its offset, so within its tolerance of the curve): it ends where it
@@ -6257,15 +6300,15 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
                 if (c3.IsNull())
                   continue;
                 // (First against the edge's polyline, its points cached with how far it strays from the curve.)
-                auto pl = polylines.find(E.TShape().get());
-                if (pl == polylines.end())
+                auto pl = env.lines.find(E.TShape().get());
+                if (pl == env.lines.end())
                 {
                   Polyline P;
                   for (int k = 0; k <= 64; ++k)
                     P.pts.push_back(c3->Value(c0 + (c1 - c0) * k / 64).XYZ());
                   for (int k = 0; k < 64; ++k)
                     P.sag = std::max(P.sag, (c3->Value(c0 + (c1 - c0) * (k + 0.5) / 64).XYZ() - 0.5 * (P.pts[(size_t)k] + P.pts[(size_t)k + 1])).Modulus());
-                  pl = polylines.emplace(E.TShape().get(), std::move(P)).first;
+                  pl = env.lines.emplace(E.TShape().get(), std::move(P)).first;
                 }
                 const double reach = std::max(10 * BRep_Tool::Tolerance(E), 1e-3 * thickness);
                 double       dmin  = 1e300;
@@ -6311,9 +6354,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
               p3 = ep.XYZ();
             if (dbg)
               std::fprintf(stderr, "quadrics: repair: %d-%d crosses an edge to %d at %.4f %.4f %.4f\n", b, c, ej, p3.X() * 1e3, p3.Y() * 1e3, p3.Z() * 1e3);
-            const size_t k = add_triple(p3, b, c, ej);
-            finish(pts, tps[k].p);
-            return make_edge(b, c, pts, tps[ti].v, tps[k].v);
+            return end_new(p3, ej);
           }
         }
         // Touching a neighbour's offset at the last point (its value least there, all but nothing): it ends there.
@@ -6354,20 +6395,18 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
           for (int k = 0; k < 40; ++k)
           {
             const double m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
-            const double f1 = std::abs(value(nbs[q2], at(m1)));
-            const double f2 = std::abs(value(nbs[q2], at(m2)));
+            const double f1 = std::abs(value_in(S, nbs[q2], at(m1)));
+            const double f2 = std::abs(value_in(S, nbs[q2], at(m2)));
             (f1 < f2 ? hi : lo) = f1 < f2 ? m2 : m1;
           }
           const gp_XYZ p3 = at(0.5 * (lo + hi));
           // (A touch only where its least is within a hundredth of the wall: c2-rings-loft's two loft halves nearly
           // tangent at the top of their crease, their offsets 0.1-3 um apart there.)
-          if (std::abs(value(nbs[q2], p3)) > 1e-2 * thickness)
+          if (std::abs(value_in(S, nbs[q2], p3)) > 1e-2 * thickness)
             continue;
           if (dbg)
             std::fprintf(stderr, "quadrics: repair: %d-%d touches %d's offset at %.4f %.4f %.4f\n", b, c, nbs[q2], p3.X() * 1e3, p3.Y() * 1e3, p3.Z() * 1e3);
-          const size_t k = add_triple(p3, b, c, nbs[q2]);
-          finish(pts, tps[k].p);
-          return make_edge(b, c, pts, tps[ti].v, tps[k].v);
+          return end_new(p3, nbs[q2]);
         }
         // Across the offset of a face next to b or c in the part (their offsets meet, run on past the faces): it
         // ends there.
@@ -6392,23 +6431,21 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
             for (int k = 0; k < 40; ++k)
             {
               const double mid = 0.5 * (lo + hi);
-              ((value(j, x + (y - x) * mid) > 0) == (e0 > 0) ? lo : hi) = mid;
+              ((value_in(S, j, x + (y - x) * mid) > 0) == (e0 > 0) ? lo : hi) = mid;
             }
             if (hi < ns)
               ns = hi, nb = j;
           }
-          if (nb != 0 && on_wall(gp_Pnt(x + (y - x) * ns), eps))
+          if (nb != 0 && on_wall_in(S, env.in, gp_Pnt(x + (y - x) * ns), eps))
           {
             gp_XYZ            p3    = x + (y - x) * ns;
-            const quad::Surf* s3[3] = {s2[0], s2[1], &sf[(size_t)nb]};
-            s2[0]->has_hint = s2[1]->has_hint = sf[(size_t)nb].has_hint = false;
+            const quad::Surf* s3[3] = {s2[0], s2[1], &S[(size_t)nb]};
+            s2[0]->has_hint = s2[1]->has_hint = S[(size_t)nb].has_hint = false;
             if (!quad::solve3_grad(s3, p3, size) || (p3 - x).Modulus() > 2 * step)
               return fail("a new edge's end not found");
             if (dbg)
               std::fprintf(stderr, "quadrics: repair: %d-%d crosses %d's offset at %.4f %.4f %.4f\n", b, c, nb, p3.X() * 1e3, p3.Y() * 1e3, p3.Z() * 1e3);
-            const size_t k = add_triple(p3, b, c, nb);
-            finish(pts, tps[k].p);
-            return make_edge(b, c, pts, tps[ti].v, tps[k].v);
+            return end_new(p3, nb);
           }
         }
         // (On the wall tested every fourth step; where a test fails, back to the last point tested and on step by
@@ -6420,7 +6457,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
           x = y;
           continue;
         }
-        if (on_wall(gp_Pnt(y), eps))
+        if (on_wall_in(S, env.in, gp_Pnt(y), eps))
         {
           unchecked = 0;
           pts.push_back(gp_Pnt(y));
@@ -6443,14 +6480,14 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         for (int k = 0; k < 30; ++k)
         {
           const double mid = 0.5 * (lo + hi);
-          (on_wall(gp_Pnt(x + (y - x) * mid), eps) ? lo : hi) = mid;
+          (on_wall_in(S, env.in, gp_Pnt(x + (y - x) * mid), eps) ? lo : hi) = mid;
         }
         const double bs  = hi;
         const gp_Pnt beyond(x + (y - x) * std::min(1.0, hi + 0.05));
         int          best = 0;
         double       bd   = 1e300;
-        inside.Perform(beyond, 1e3 * tol);
-        const bool out = inside.State() == TopAbs_OUT;
+        env.in.Perform(beyond, 1e3 * tol);
+        const bool out = env.in.State() == TopAbs_OUT;
         {
           const TopoDS_Vertex v = BRepBuilderAPI_MakeVertex(beyond);
           for (int j = 1; j <= nf; ++j)
@@ -6470,13 +6507,11 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         if (best == 0)
           return fail("a new edge leaves the wall by no surface");
         gp_XYZ            p3      = x + (y - x) * bs;
-        const quad::Surf* s3[3]   = {s2[0], s2[1], &sf[(size_t)best]};
-        s2[0]->has_hint = s2[1]->has_hint = sf[(size_t)best].has_hint = false;
+        const quad::Surf* s3[3]   = {s2[0], s2[1], &S[(size_t)best]};
+        s2[0]->has_hint = s2[1]->has_hint = S[(size_t)best].has_hint = false;
         if (!quad::solve3_grad(s3, p3, size) || (p3 - x).Modulus() > 2 * step)
           return fail("a new edge's end not found");
-        const size_t k = add_triple(p3, b, c, best);
-        finish(pts, tps[k].p);
-        return make_edge(b, c, pts, tps[ti].v, tps[k].v);
+        return end_new(p3, best);
       }
       return fail("a new edge's march didn't end");
     };
@@ -6495,14 +6530,88 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       if (open.empty())
         break;
       // (All of this round's: an edge traced from one point can end at another, closing its end too.)
-      for (const auto& [ti, b, c] : open)
-      {
+      auto closed_now = [&](size_t ti, int b, int c) {
         bool closed = false;
         for (const Made& m : made)
           closed = closed || (std::min(m.b, m.c) == std::min(b, c) && std::max(m.b, m.c) == std::max(b, c) && (TopExp::FirstVertex(m.e).IsSame(tps[ti].v) || TopExp::LastVertex(m.e).IsSame(tps[ti].v)));
-        if (!closed && !trace(ti, b, c))
+        return closed;
+      };
+      // (Each on its own copies of the surfaces (a free-form one's projector and last foot its own), a classifier and
+      // polylines, so the same from any start and on any thread: traced dry on all threads, then taken in order as
+      // one after another: one closed by an earlier one skipped, a new point within reach of one made this round
+      // taken as that one (add_triple), one not traced dry (it threw, or the budget stopped it) traced here.)
+      auto own_surfaces = [&]() {
+        std::vector<quad::Surf> S = sf;
+        for (quad::Surf& q : S)
+        {
+          q.has_hint = false;
+          q.nearest.reset();
+          if (q.general && !q.base.IsNull())
+            q.sas = new ShapeAnalysis_Surface(q.base);
+        }
+        return S;
+      };
+      std::vector<TraceEnd> dry(open.size());
+      std::vector<char>     dry_closed(open.size());
+      for (size_t k = 0; k < open.size(); ++k)
+        dry_closed[k] = closed_now(std::get<0>(open[k]), std::get<1>(open[k]), std::get<2>(open[k]));
+      OSD_Parallel::For(
+        0,
+        static_cast<int>(open.size()),
+        [&](int k) {
+          if (dry_closed[(size_t)k] || noshape_should_break() != 0)
+            return;
+          const auto [ti, b, c] = open[(size_t)k];
+          try
+          {
+            std::vector<quad::Surf>         S = own_surfaces();
+            BRepClass3d_SolidClassifier     in(so);
+            std::map<const void*, Polyline> lines;
+            TraceEnv                        env{S, in, lines};
+            trace(ti, b, c, env, &dry[(size_t)k]);
+            for (size_t j = 0; j < S.size(); ++j)
+              if (S[j].has_hint)
+                dry[(size_t)k].feet.push_back({(int)j, S[j].hint});
+            dry[(size_t)k].run = true;
+          }
+          catch (const Standard_Failure&)
+          {
+            dry[(size_t)k] = TraceEnd();
+          }
+        },
+        open.size() < 2);
+      for (size_t k = 0; k < open.size(); ++k)
+      {
+        const auto [ti, b, c] = open[k];
+        if (closed_now(ti, b, c))
+          continue;
+        TraceEnd& d = dry[k];
+        if (!d.run)
+        {
+          std::vector<quad::Surf>         S = own_surfaces();
+          BRepClass3d_SolidClassifier     in(so);
+          std::map<const void*, Polyline> lines;
+          TraceEnv                        env{S, in, lines};
+          if (!trace(ti, b, c, env, nullptr))
+            return false;
+          for (size_t j = 0; j < S.size(); ++j)
+            if (S[j].has_hint)
+              sf[j].hint = S[j].hint, sf[j].has_hint = true;
+          continue;
+        }
+        if (!d.ok)
+          return false;
+        for (const auto& [j, uv] : d.feet)
+        {
+          sf[(size_t)j].hint     = uv;
+          sf[(size_t)j].has_hint = true;
+        }
+        const size_t e = d.k >= 0 ? (size_t)d.k : add_triple(d.p3, b, c, d.third);
+        finish(d.pts, tps[e].p);
+        if (!make_edge(b, c, d.pts, tps[ti].v, tps[e].v))
           return false;
       }
+
       rlap("traces");
     }
     // The touched faces made again: their edges (pieces in place of split ones, new ones), in loops.
