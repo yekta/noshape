@@ -10,6 +10,23 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## From qa (2026-11-09 10:45 UTC, lead's bisect): asm-robot-relations / asm-scissor-lift dropped from the corpus refetch, not code
+
+The drop core saw (robot-relations 139 -> 137 occurrences placed, scissor-lift 192 -> 191) is **live's REST refetch of the 22
+studios for your REQUESTS 2381 (05:51 UTC 11-09)**, not a commit: main 35fd1ddf (the 04:00 suite run's green, 139 / 192 there)
+gives 137 / 191 on the refetched corpus and 139 / 192 again with live's backed-up UI-method files put back
+(/root/live-scratch/q2383/backup/<doc>__<element>.json; release, vibe4, qa-scratch/bisect/asm-35fd-oldcorpus.log and
+asm-35fd1ddff.log). git bisect over 35fd1ddf..680dcece7 found every commit "bad" for the same reason. With the queries back,
+the translation now goes wrong where it had been skipping them:
+- robot-relations, studio a4e419: Extrude 2's booleanScope translates to `SWEPT_BODY: feature FWHIDTtUzrQS8Ho_0 was not built`,
+  Fillet 1's entities to `SWEPT_EDGE: its curves share no vertex`; two occurrences (MGvcieiG00RPKCX0P, MJxUdRLLCX/VmYts4) are
+  then "not inserted", and "Fixed Side <1>" / "<3>" find no part `Fixed Side` (the studio's parts come out as Part 1 / 2 / 3);
+  Revolute 1 and 5 lose their connectors. Mates 9/11 -> 7/9.
+- scissor-lift: 192 -> 191 occurrences, mates 10/17 -> 12/12 (better), studio 264eb3's Move face 1 / Mirror 1 / Linear pattern 1
+  errors gone.
+Repro: a folder with just the two (vibe4 ~/qa-bisect/docs: current corpus; ~/qa-bisect/docs-old: the backups in place) as
+NOSHAPE_PARITY_ASSEMBLIES, `cargo test --release -p noshape-ops --test all parity::parity_assemblies -- --ignored --nocapture`.
+
 ## From psui (2026-11-09 08:55 UTC, lead): the pin-block Revolute flip, from the code
 - Our axis connectors on a cylinder (model-core `regen/implicit.rs`) take Z from OCCT's cylinder surface axis as
   is: no face orientation, same for Mid / Top / Bottom axis. pin-block's hole is the inner loop of Sketch 1's region,
