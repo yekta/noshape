@@ -1765,3 +1765,21 @@ fn a_round_consuming_a_bar_leaves_no_bridge() {
     assert_eq!((r.count(ShapeType::Face), shown.edge_count(), shown.vertex_count()), (22, 48, 28));
     assert!((vol_mm3(&r) - 4926.267).abs() < 1e-3, "{}", vol_mm3(&r));
 }
+
+/// A blend leaves a kept split alone (c2-fan-blade-sweep's Chamfer 2: the finish merged two neighbouring faces of one
+/// cylinder as a full round's halves, the thread's band among them; and the blend's copy of the part dropped the
+/// keep marks): a half cylinder split across by a kept edge keeps both faces through a chamfer of its top rim.
+#[test]
+fn a_chamfer_keeps_a_kept_split_of_a_cylinder() {
+    let r = 0.004;
+    let half = make_cylinder(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), r, 0.02, std::f64::consts::PI).unwrap();
+    let ring = make_circle(DVec3::new(0.0, 0.0, 0.01), DVec3::Z, r).unwrap();
+    let split = imprint_kept(&half, &[ring]).unwrap().shape;
+    let walls = |s: &Shape| s.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { radius, .. }) if (radius - r).abs() < 1e-9)).count();
+    assert_eq!(walls(&split), 2, "the split");
+    let rim: Vec<Shape> = split.edges().into_iter().filter(|e| matches!(e.edge_curve(), Ok(Curve::Circle { center, .. }) if (center.z - 0.02).abs() < 1e-9)).collect();
+    assert_eq!(rim.len(), 1);
+    let out = chamfer_checked(&split, &rim, ChamferSpec::Equal(0.0005), &[]).unwrap().shape;
+    assert!(out.is_valid());
+    assert_eq!(walls(&out), 2, "the kept split through the chamfer");
+}

@@ -4273,7 +4273,8 @@ using MakeBuild = std::function<BlendBuild(const Scaled& sc)>;
 // Round blends that met across the face between them (live W1: R2 on both top edges of a 4 mm rib "consumes the
 // rib top": one half-cylinder, 10 faces): OCCT's (made a hair smaller, the face between removed) are two cylinders
 // whose axes are 1e-7 apart; such neighbours, one radius on one axis, merged into one face. Only the edges between
-// them go: every other edge is kept.
+// them go: every other edge is kept, and so is an intentional split (`kept_edge`: c2-fan-blade-sweep's thread band
+// on a boss, which Chamfer 2 lost).
 void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
 {
   ShapeAncMap ef;
@@ -4283,7 +4284,7 @@ void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
   for (int i = 1; i <= ef.Extent(); ++i)
   {
     const ShapeList& fs = ef(i);
-    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || done.Contains(fs.First()) || done.Contains(fs.Last()))
+    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || done.Contains(fs.First()) || done.Contains(fs.Last()) || kept_edge(ef.FindKey(i)))
       continue;
     const TopoDS_Face   fa = TopoDS::Face(fs.First()), fb = TopoDS::Face(fs.Last());
     BRepAdaptor_Surface a(fa), b(fb);
@@ -7740,6 +7741,8 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
   // same sub-shapes in the same order: the history's indices are the input's).
   BRepBuilderAPI_Copy copy(s.shape, true, false);
   const TopoDS_Shape  in = copy.Shape();
+  // (The copy's edges are new: intentional splits stay marked, as through a Boolean's copies.)
+  carry_kept_marks(s.shape, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{copy.ModifiedShape(x)}; });
   for (TopoDS_Edge& e : es)
     e = TopoDS::Edge(copy.ModifiedShape(e));
   // Rounds that run into earlier rounds of their radius at a stationary ball (OCCT fails them, slowly): the part less
@@ -7915,6 +7918,8 @@ static OpOut op_fillet_variable_unbudgeted(const OcShape& s, const OcShape& edge
   // (OCCT's blend on a copy, as op_fillet's.)
   BRepBuilderAPI_Copy copy(s.shape, true, false);
   const TopoDS_Shape  in = copy.Shape();
+  // (The copy's edges are new: intentional splits stay marked, as through a Boolean's copies.)
+  carry_kept_marks(s.shape, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{copy.ModifiedShape(x)}; });
   const TopoDS_Edge   e  = TopoDS::Edge(copy.ModifiedShape(first_adjacent_face_edge_check(s.shape, edge.shape, "fillet edge")));
   std::vector<double> ps(params.begin(), params.end()), rs(radii.begin(), radii.end());
   return scaled_blend(in, checked, rmax, "variable fillet", [&](const Scaled& sc) -> BlendBuild {
@@ -8511,6 +8516,8 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
   // same sub-shapes in the same order: the history's indices are the input's).
   BRepBuilderAPI_Copy copy(s.shape, true, false);
   const TopoDS_Shape  in = copy.Shape();
+  // (The copy's edges are new: intentional splits stay marked, as through a Boolean's copies.)
+  carry_kept_marks(s.shape, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{copy.ModifiedShape(x)}; });
   for (TopoDS_Edge& e : es)
     e = TopoDS::Edge(copy.ModifiedShape(e));
   for (TopoDS_Face& f : fs)
