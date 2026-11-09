@@ -33,6 +33,37 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-09 09:05 UTC: REQUESTS 2413 filed (spring's coincident rounds); the impeller's Move face offsets.**
+- Live REQUESTS 2413: union of two parts' coincident spline rounds (and straight ones), the spring's own two edges.
+- Impeller, non-Boolean slow features: Remove Bohrung Flansch is 126 ms now (its 2 s was eval::unchanged, fixed).
+  Extrude Bohrungssitz Ansaugflansch (1.3 s), Remove Bohrung Ansaugflansch, Extrude 3: op_boolean (bool's).
+  Flansch verbreitern / (vorne): op_offset_faces ~470 ms each (live 10 / 6): OCCT's MakeOffset (Inter3d::ConnexIntByArc
+  on the enlarged extrusion face, gdb /root/core-scratch/pmp-off.txt) comes out empty, then offset_by_booleans does it
+  in ~40 ms, as live (adds 11,235.818 mm³, live 11,235.851; Extrude Flansch is already +7.2 from the Shell, bool's).
+  Dumps vibe5 ~/core-cases/dump/offsetfaces-1 / -3 (probe `probe_offset_dump`, core-scratch/imp/). Doing: a direct
+  route for a prism with some sides moved (2D outline: moved edges offset, tangent joints kept, kept lines extended,
+  holes kept; extruded to the other cap; history face by face) before OCCT. Next: Extrude 4 (op_prism_until 162, live 41).
+- 10:05: features.cpp `offset_prism_some_sides` (worktree, not landed): Flansch verbreitern 523 -> 14 ms, (vorne)
+  484 -> 15; volumes as the booleans route (+11,235.824, live 11,235.851). First suite: 4 custom features broke (Box
+  Joint, Butt Joint, Lighten, Mortise Tenon: planar beams; geometry identical to OCCT's, but OCCT's MakeOffset history
+  is all Generated, i -> i, and theirs then "Cannot resolve entities"; Generated + full edge / vertex history didn't
+  fix it, sub-shape order still differs). Only with a curved side: cf-lighten's Lighten 1 still fails ("Could not
+  modify selected fillets.", 764 -> 763). PARKED, not landed: /root/core-scratch/offset-prism-some-sides.patch (the
+  route + probes' notes); to land it the history must be OCCT's (order and relations) or the custom features' needs
+  understood. Gain ~1 s on the impeller only. Boolean input dump (NOSHAPE_DUMP_OPS, boolean.cpp): worktree, for the spring.
+- The spring (10:24): its Linear pattern 2 fuse (dump vibe5 ~/core-cases/dumpspr/boolean-8, probe
+  `probe_boolean_dump` in /root/core-scratch/imp/features-with-boolean-probe.rs, dump patch /root/core-scratch/
+  boolean-dump.patch) splits the round's boundary at (12.656, -2.5) as live (0.5032 + 1.9362 mm, live 0.503 + 1.936);
+  the unify then joins them. Our two pieces are one curve: the 1.9362 edge's curve run past the vertex lies on the
+  0.5032 edge to 0.000 µm all along it. Live keeps the vertex only because its two procedural rounds are 0.1-6.3 µm
+  apart (2411); by live's own rule (coincident rounds joined, its synthetic) ours is right. A Parasolid approximation
+  artefact, as cf-straight-spline's (lead 11-05: not imitated): proposed not scored past Linear pattern 2, lead's call.
+- Queue (lead 09:xx): (1) the spring: live 2411 answered (behaviours "core (2411)"): a union joins truly coincident
+  rounds (synthetic: one edge 0..40); the spring keeps a tolerant vertex because Part 1's and Part 2's rounds are
+  0-6.33 µm apart: find why ours joins curves 6 µm apart (unify / fuse tolerance), under bool's gate. (2) After the
+  spring: cf-surface-pattern's Surface Pattern 3 (10 parts, live 6): not the Boolean (bool): our pattern's tools take
+  ~90,000 mm³, live's ~18,700 (live keeps 108,150 of 126,856): the pattern's spheres differ upstream (11-08 note).
+
 **State 11-09 06:35 UTC: the lead's three (06:3x), in order.**
 1. Done: live's band on c2-impeller-loft's live.jsonl index 10 ("band_source": live core/q2228/mass-11.json), here
    and on vibe2-5 (/root/core-scratch/bin/imp-band.py, idempotent; backups live.jsonl.bak-core-0650; here
