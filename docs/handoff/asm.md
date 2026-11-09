@@ -10,6 +10,17 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## From psui (2026-11-09 08:55 UTC, lead): the pin-block Revolute flip, from the code
+- Our axis connectors on a cylinder (model-core `regen/implicit.rs`) take Z from OCCT's cylinder surface axis as
+  is: no face orientation, same for Mid / Top / Bottom axis. pin-block's hole is the inner loop of Sketch 1's region,
+  so its circle (and the extruded hole's axis) runs −Z; the pin (an outer loop) runs +Z.
+- Live: in the UI case (asm-revolute-pin-hole-flip, live2 2241, 11-08 03:27) the hole's **top** axis point has Z down
+  (against the pin's) and the mate flips itself: ours matches that today. But Revolute 1 in pin-block (made over REST,
+  **mid** axis points, flip off) keeps the pin upright: either live's mid-axis connector on the hole points up (unlike
+  its top point) or the REST mate's connectors differ. Changing our hole axis would break the UI case, so nothing is
+  changed until live2 reads Revolute 1's two connector axes (REQUESTS 08:50). If live's hole mid axis is +Z and its
+  top axis −Z, the rule is per inference, in `implicit_connector`.
+
 ## From psui (2026-11-09 08:51 UTC, lead: psui holds the assembly interaction area while asm is paused)
 What psui took and changed, so you pick up cleanly on Monday (all asm-*, vibe3 runs; logs psui's
 /root/psui-scratch/cmp-asm3.txt):
