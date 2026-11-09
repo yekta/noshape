@@ -2630,14 +2630,16 @@ impl<'a> Translator<'a> {
         Some(if revolve { self.revolve_entity(name, &op, &sk, &curves) } else { self.extrude_entity(name, is_start, crossing, &op, &sk, &curves) })
     }
 
-    /// An end of a curve a custom feature fit (`VERTEX` created by `<feature>.….opFitSpline`, ORDER 0 its start, 1 its
-    /// end: cf-extrude-vertex's Symmetric on the end of Extruded vertex along line): our vertex there.
+    /// An end of a curve a custom feature fit or a Helix made (`VERTEX` created by `<feature>.….opFitSpline` or
+    /// `.opHelix`, ORDER 0 its start, 1 its end: cf-extrude-vertex's Symmetric on the end of Extruded vertex along line,
+    /// c2-fan-blade-sweep's Plane 4 at its helix's start): our vertex there.
     fn fit_spline_vertex_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
+        let curve_op = |s: &str| s.strip_suffix(".opFitSpline").or_else(|| s.strip_suffix(".opHelix")).map(str::to_string);
         // Written (`dummyQuery(id+"F….opFitSpline",EntityType.VERTEX,0.0)`: cf-3d-spline's Plane 1) or packed.
         let written = text.split("dummyQuery(id+\"").nth(1).and_then(|r| {
             let (op, rest) = r.split_once("\",EntityType.VERTEX,")?;
             let n: f64 = rest.split(')').next()?.trim().parse().ok()?;
-            Some((op.strip_suffix(".opFitSpline")?.split('.').next()?.to_string(), n as usize))
+            Some((curve_op(op)?.split('.').next()?.to_string(), n as usize))
         });
         let (feature, order) = match written {
             Some(w) => w,
@@ -2646,16 +2648,16 @@ impl<'a> Translator<'a> {
                 if !strings.iter().any(|s| s == "VERTEX") {
                     return None;
                 }
-                let feature = strings.iter().find(|s| s.ends_with(".opFitSpline")).and_then(|s| s.split('.').next())?.to_string();
+                let feature = strings.iter().find_map(|s| curve_op(s))?.split('.').next()?.to_string();
                 let packed = text.split("qCompressed(1.0,\"").nth(1).and_then(|t| t.split('"').next())?;
                 (feature, packed_order(&noshape_model::custom::host::packed::unpack(packed).ok()?)?)
             }
         };
-        let Some(ours) = self.feature_ids.get(&feature).cloned() else { return Some(Err(format!("opFitSpline vertex: feature {feature} was not built"))) };
+        let Some(ours) = self.feature_ids.get(&feature).cloned() else { return Some(Err(format!("curve vertex: feature {feature} was not built"))) };
         let found = (|| -> Result<String, String> {
             let edges = self.call("query_entities", json!({ "kind": "edges", "created_by": ours, "limit": 2 }))?;
-            let [edge] = edges["edges"].as_array().map(Vec::as_slice).unwrap_or_default() else { return Err(format!("opFitSpline vertex: {feature} made no single curve of ours")) };
-            let at = f3(&edge[if order == 0 { "start" } else { "end" }]).ok_or("opFitSpline vertex: the curve has no ends")?;
+            let [edge] = edges["edges"].as_array().map(Vec::as_slice).unwrap_or_default() else { return Err(format!("curve vertex: {feature} made no single curve of ours")) };
+            let at = f3(&edge[if order == 0 { "start" } else { "end" }]).ok_or("curve vertex: the curve has no ends")?;
             let vertices = self.call("query_entities", json!({ "kind": "vertices", "limit": 5000 }))?;
             vertices["vertices"]
                 .as_array()
@@ -2664,7 +2666,7 @@ impl<'a> Translator<'a> {
                 .filter_map(|v| Some((v["id"].as_str()?, f3(&v["position"])?)))
                 .find(|(_, p)| (0..3).all(|i| (p[i] - at[i]).abs() < 1e-6))
                 .map(|(id, _)| id.to_string())
-                .ok_or_else(|| format!("opFitSpline vertex: no vertex of ours at the end {order} of {feature}'s curve"))
+                .ok_or_else(|| format!("curve vertex: no vertex of ours at the end {order} of {feature}'s curve"))
         })();
         Some(found)
     }

@@ -38,6 +38,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
+## 11-09 14:53 UTC: drawings 143/176; fan's Plane 4 mapped (41/53), Helix 1's on-axis end asked of live
+
+- b7 (main + Duplicate's clear): 143/176 scenarios, 1320/1406 states; drw-sheet-delete and -move-down both match.
+- Plane 4 (Curve point) names Helix 1's start as `ORDER 0` VERTEX of opHelix; live's file has no geometry for it
+  (the wire lists vertexCount only). fit_spline_vertex_from_query now maps opHelix as opFitSpline (0 start, 1 end).
+- Next difference, threadprofile's frame = Helix 1's tangent at its start: Helix 1's End point (-49, -73, 13) lies on
+  its axis, so helix.fs's end angle is atan2 of float noise; live made 9.5 turns (pitch 1.63), ours 10.108 (1.53).
+  Asked live (REQUESTS 14:53) whether an on-axis end is always half a turn from the start. Sweep 1 then takes 192 s
+  on our wrong helix (live 1.4 s for the whole studio): check its time once the helix matches; core's if it stays.
+
 ## 11-09 14:34 UTC: drw-sheet-delete fixed in the app; c2-fan-blade-sweep 32 -> 40/53 (Extrude 10)
 
 - drw-sheet-delete wasn't the runner: the right-click that opened Duplicate left Sheet1's row selected, so the copy's
