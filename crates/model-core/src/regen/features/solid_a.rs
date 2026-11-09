@@ -11,7 +11,7 @@ use crate::naming::Name;
 use crate::params::{ParamValue, ParamValues};
 use crate::reference::{BodyId, Reference, Role, Source};
 use crate::regen::eval::{EvalCtx, FResult, NamedShape, Profile, err, kernel_plane, sweep_names};
-use glam::DVec3;
+use glam::{DVec2, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
 use std::collections::BTreeMap;
@@ -62,7 +62,8 @@ fn may_self_intersect(profile: &Shape, path: &Shape, tool: &Shape, scale: f64) -
     let Some(pts) = profile.edges().iter().map(|e| samples(e, 16)).collect::<Option<Vec<_>>>() else { return true };
     // (The profile's samples as far apart as the most a point between them can be beyond them.)
     let gap = pts.iter().flat_map(|s| s.windows(2).map(|w| w[0].0.distance(w[1].0))).fold(0.0, f64::max);
-    let pts: Vec<DVec3> = pts.into_iter().flatten().map(|(p, _)| p).collect();
+    let edge_pts: Vec<Vec<DVec3>> = pts.into_iter().map(|s| s.into_iter().map(|(p, _)| p).collect()).collect();
+    let pts: Vec<DVec3> = edge_pts.iter().flatten().copied().collect();
     let mut path_pts: Vec<(DVec3, DVec3, f64)> = Vec::new();
     let mut arc = 0.0;
     for e in path.edges() {
@@ -86,7 +87,8 @@ fn may_self_intersect(profile: &Shape, path: &Shape, tool: &Shape, scale: f64) -
         let a = w[0].1.angle_between(w[1].1);
         (a > 1e-12).then(|| w[0].0.distance(w[1].0) / a)
     }).fold(f64::INFINITY, f64::min);
-    if helical_sweep_clear(&pts, &path_pts, tool).is_some() {
+    let normal = profile.find_plane(1e-7).ok().flatten().map(|p| p.unit_normal());
+    if normal.and_then(|n| helical_sweep_clear(&edge_pts, n, &path_pts, tool)).is_some() {
         return false;
     }
     if reach.is_nan() || reach >= 0.9 * tightest {
@@ -116,12 +118,14 @@ fn may_self_intersect(profile: &Shape, path: &Shape, tool: &Shape, scale: f64) -
     false
 }
 
-/// A profile swept along a helix, its frame following the helix's screw motion (checked on the swept `tool`: its
-/// vertices are the profile's at both ends): the swept points are (r, z - pitch·φ/2π, φ) in the helix's cylindrical
-/// coordinates, so turns meet only where two profile points share r and that height a whole number of pitches apart.
-/// A profile in a plane through the axis, off the axis and less than a pitch high, can't: Some. None when the path
-/// isn't a helix or the profile isn't so (the general test decides).
-fn helical_sweep_clear(profile: &[DVec3], path: &[(DVec3, DVec3, f64)], tool: &Shape) -> Option<()> {
+/// A planar profile swept along a helix, its frame following the helix's screw motion (checked on the swept `tool`:
+/// its vertices are the profile's at both ends). The screw keeps a point's radius r and w = z - rise·θ (θ its angle
+/// round the axis), so two swept points meet only where two profile points share r and their w differ by a whole
+/// number of pitches, or where the profile's own (r, w) image folds. Some where neither can happen: the profile within
+/// a quarter turn, its w less than a pitch apart, crossed by the screw everywhere the same way and its (r, w) outline
+/// not crossing itself. None when the path isn't a helix or the profile isn't so (the general test decides).
+fn helical_sweep_clear(edges: &[Vec<DVec3>], normal: DVec3, path: &[(DVec3, DVec3, f64)], tool: &Shape) -> Option<()> {
+    let profile: Vec<DVec3> = edges.iter().flatten().copied().collect();
     let n = path.len();
     if n < 8 {
         return None;
@@ -170,16 +174,27 @@ fn helical_sweep_clear(profile: &[DVec3], path: &[(DVec3, DVec3, f64)], tool: &S
         return None;
     }
     let pitch = (rise * std::f64::consts::TAU).abs();
-    // The profile in one half-plane through the axis, off the axis.
+    // Each profile point's (r, w), its angle from the first point's within a quarter turn, off the axis, and the
+    // screw crossing the profile's plane the same way at every point.
     let p0 = *profile.first()?;
-    let dir = (flat(p0) - centre).try_normalize()?;
-    for p in profile {
-        let d = flat(*p) - centre;
-        if d.dot(dir) < tol || d.cross(dir).length() > tol {
-            return None;
-        }
+    let theta0 = angle(p0);
+    let side = (axis.cross(flat(p0) - centre) + axis * rise).dot(normal).signum();
+    let rw = |p: DVec3| -> Option<DVec2> {
+        let d = flat(p) - centre;
+        let mut a = angle(p) - theta0;
+        a -= (a / std::f64::consts::TAU).round() * std::f64::consts::TAU;
+        let speed = axis.cross(d) + axis * rise;
+        let across = speed.dot(normal) * side;
+        (d.length() > tol && a.abs() < std::f64::consts::FRAC_PI_4 && across > 1e-3 * speed.length()).then(|| DVec2::new(d.length(), p.dot(axis) - rise * a))
+    };
+    let images: Vec<Vec<DVec2>> = edges.iter().map(|e| e.iter().map(|p| rw(*p)).collect::<Option<Vec<_>>>()).collect::<Option<_>>()?;
+    let (lo, hi) = images.iter().flatten().map(|q| q.y).fold((f64::INFINITY, f64::NEG_INFINITY), |(l, h), w| (l.min(w), h.max(w)));
+    if outline_crosses(&images, tol) {
+        return None;
     }
-    // The frame follows the screw: each profile point turned by the whole angle and raised is a vertex of the tool.
+    // The frame follows the screw: each tool vertex is a profile point or one turned by the whole angle and raised,
+    // within a hundredth of a pitch (OCCT places an oblique profile's sweep some 50 µm off it), which the turns'
+    // clearance then allows for.
     let screw = |p: DVec3| {
         let d = flat(p) - centre;
         let (x, y) = (d.dot(e1), d.dot(e2));
@@ -188,11 +203,31 @@ fn helical_sweep_clear(profile: &[DVec3], path: &[(DVec3, DVec3, f64)], tool: &S
     };
     let corners: Vec<DVec3> = tool.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect();
     let ends: Vec<DVec3> = profile.iter().map(|p| screw(*p)).collect();
-    if corners.is_empty() || !corners.iter().all(|v| profile.iter().chain(&ends).any(|p| p.distance(*v) < 1e3 * tol)) {
+    let off = corners.iter().map(|v| profile.iter().chain(&ends).map(|p| p.distance(*v)).fold(f64::INFINITY, f64::min)).fold(0.0, f64::max);
+    if corners.is_empty() || off > 0.01 * pitch || hi - lo >= pitch - 2.0 * (tol + off) {
         return None;
     }
-    let (lo, hi) = profile.iter().map(|p| p.dot(axis)).fold((f64::INFINITY, f64::NEG_INFINITY), |(l, h), z| (l.min(z), h.max(z)));
-    (hi - lo < pitch - 2.0 * tol).then_some(())
+    Some(())
+}
+
+/// Whether two pieces of the polylines cross each other (properly: not where neighbours meet, sharing an end within
+/// `tol`, nor along one line).
+fn outline_crosses(lines: &[Vec<DVec2>], tol: f64) -> bool {
+    let segs: Vec<(DVec2, DVec2)> = lines.iter().flat_map(|l| l.windows(2).map(|w| (w[0], w[1]))).collect();
+    let cross = |a: DVec2, b: DVec2| a.perp_dot(b);
+    for (i, &(a, b)) in segs.iter().enumerate() {
+        for &(c, d) in &segs[i + 1..] {
+            if [a, b].iter().any(|p| p.distance(c) < tol || p.distance(d) < tol) {
+                continue;
+            }
+            let (d1, d2) = (cross(b - a, c - a), cross(b - a, d - a));
+            let (d3, d4) = (cross(d - c, a - c), cross(d - c, b - c));
+            if d1 * d2 < 0.0 && d3 * d4 < 0.0 {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// The part of the sweep path a profile in its middle sweeps along (live
@@ -1894,10 +1929,12 @@ mod tests {
 mod sweep_tests {
     use super::*;
 
-    /// A V profile in a plane through a helix's axis, `h` high, swept along an 8-turn helix of radius 25.4 mm and
-    /// pitch 15.875 mm (c2-helical-sweep's thread), the profile just below the helix's start as there.
-    fn thread(h: f64) -> (Shape, Shape, Shape) {
-        let mm = |x: f64, z: f64| DVec3::new(x, 0.0, z) * 1e-3;
+    /// A V profile in a plane through a helix's axis (or tilted `tilt` from it about the radius), `h` high, swept
+    /// along an 8-turn helix of radius 25.4 mm and pitch 15.875 mm (c2-helical-sweep's thread), the profile just below
+    /// the helix's start as there.
+    fn thread(h: f64, tilt: f64) -> (Shape, Shape, Shape) {
+        let (s, c) = tilt.sin_cos();
+        let mm = |x: f64, z: f64| DVec3::new(x, (z + 0.6) * s, -0.6 + (z + 0.6) * c) * 1e-3;
         let path = k::make_helix(&k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 0.0254, 0.015875, 0.127, false, 0.0).unwrap();
         let (a, b, c) = (mm(25.414, -0.6), mm(16.66, -0.6 - h / 2.0), mm(25.414, -0.6 - h));
         let wire = k::make_wire(&[k::make_line(a, b).unwrap(), k::make_line(b, c).unwrap(), k::make_line(c, a).unwrap()]).unwrap();
@@ -1907,12 +1944,18 @@ mod sweep_tests {
     }
 
     /// The helix's screw motion decides: turns 15.875 mm apart can't meet a 10.1 mm profile (OCCT's whole check
-    /// skipped: 6.9 s there), a 20 mm one can (checked).
+    /// skipped: 6.9 s there), a 20 mm one can (checked). The same with the profile's plane tilted 5° off the axis
+    /// (c2-fan-blade-sweep's thread profile: OCCT's check 190 s), and tilted so far the turns' 10.1 mm profiles reach
+    /// a pitch along the screw.
     #[test]
     fn a_thread_lower_than_its_pitch_skips_the_self_intersection_check() {
-        let (profile, path, tool) = thread(10.1);
-        assert!(!may_self_intersect(&profile, &path, &tool, 1.0));
-        let (profile, path, tool) = thread(20.0);
+        for tilt in [0.0, 5f64.to_radians()] {
+            let (profile, path, tool) = thread(10.1, tilt);
+            assert!(!may_self_intersect(&profile, &path, &tool, 1.0), "{tilt}");
+            let (profile, path, tool) = thread(20.0, tilt);
+            assert!(may_self_intersect(&profile, &path, &tool, 1.0), "{tilt}");
+        }
+        let (profile, path, tool) = thread(10.1, 40f64.to_radians());
         assert!(may_self_intersect(&profile, &path, &tool, 1.0));
     }
 }
