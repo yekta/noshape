@@ -1058,6 +1058,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   exchange 42 → 43/48 live imports ours, index 90.4 → 90.5. No new failure. Speed: c2-hunting-knife 0.9 → 1.4 s (×1.6;
   the host ran ~7 % slower) and c2-hex-bookcase-derived 280 → 563 ms (live 290): both re-checked in the 19:02 run before
   filing.
+  **qa 21:00, the assembly suite on newest main (lead: did dx's helix / translator changes move an assembly?):** on 1b4b37b38
+  (dx's helix 0995e4c09) every assembly = 4f5863a2 (1261/1731 occurrences, 170/345 mates). On dc4b1a012: 1260/1731, 171/346:
+  - psui (dc4b1a012, in-feature points in the translator for c2-hex-bookcase-derived): asm-scissor-lift 191 -> 190/242
+    occurrences, mates 12/12 -> 13/13; new translator note "Studio eed029 › Sketch 7 (newSketch): its in-feature cPoint:
+    entities: query not mapped (no live geometry for it)". Its parent c4b86cba4 gives 191 / 12 alone, 44e52dafb 190 / 13
+    (vibe4, the document alone; logs qa-scratch/recut/sl-*.log). dx's translator change is not on main yet.
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
