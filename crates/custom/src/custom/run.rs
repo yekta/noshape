@@ -754,12 +754,26 @@ pub struct MonitorEntry {
     /// (tab, line, column) of the first row, to jump to.
     pub at: Option<(crate::document::TabId, usize, usize)>,
     pub rows: Vec<(String, String)>,
+    /// Where each of `rows` leads (live 2467: the stack rows are the links, the notice itself only folds them).
+    pub links: Vec<StackLink>,
+}
+
+/// A notice's stack row's link (live 2467).
+#[derive(Clone, Debug, PartialEq)]
+pub enum StackLink {
+    None,
+    /// A line (1-based, as shown) of a Feature Studio of the document.
+    Studio(crate::document::TabId, usize, usize),
+    /// A line of a std module ("onshape/std/feature.fs"): its source, read-only.
+    Std(String, usize, usize),
+    /// A tab (the Part Studio whose feature ran).
+    Tab(crate::document::TabId),
 }
 
 /// A runtime notice as a Monitor entry: the message, its stack rows
 /// (`line:col`, `module (function)`), innermost first, then `last` (the
 /// Part Studio and feature, no position).
-fn notice_entry(doc: &crate::document::Document, n: &noshape_featurescript::interp::Notice, last: String) -> MonitorEntry {
+fn notice_entry(doc: &crate::document::Document, n: &noshape_featurescript::interp::Notice, last: String, last_tab: Option<crate::document::TabId>) -> MonitorEntry {
     use crate::document::TabId;
     let module_tab = |m: &str| m.strip_prefix("tab:").and_then(|t| u64::from_str_radix(t, 16).ok()).map(TabId);
     let module_name = |m: &str| match module_tab(m) {
@@ -767,9 +781,16 @@ fn notice_entry(doc: &crate::document::Document, n: &noshape_featurescript::inte
         None => m.to_string(),
     };
     let place = |module: &str, function: &str| if function.is_empty() { module_name(module) } else { format!("{} ({function})", module_name(module)) };
+    let link = |module: &str, line: u32, col: u32| match module_tab(module) {
+        Some(t) => StackLink::Studio(t, line as usize, col as usize),
+        None if module.starts_with("onshape/std/") => StackLink::Std(module.to_string(), line as usize, col as usize),
+        None => StackLink::None,
+    };
     let mut rows = Vec::new();
+    let mut links = Vec::new();
     let innermost = n.trace.last().map(|f| f.function.to_string()).unwrap_or_default();
     rows.push((format!("{}:{}", n.pos.line, n.pos.col), place(&n.module, &innermost)));
+    links.push(link(&n.module, n.pos.line, n.pos.col));
     // Call sites, innermost first; the host's call (no module) ends the stack.
     for k in (0..n.trace.len()).rev() {
         let fr = &n.trace[k];
@@ -778,15 +799,17 @@ fn notice_entry(doc: &crate::document::Document, n: &noshape_featurescript::inte
         }
         let caller = if k > 0 { n.trace[k - 1].function.to_string() } else { String::new() };
         rows.push((format!("{}:{}", fr.pos.line, fr.pos.col), place(&fr.module, &caller)));
+        links.push(link(&fr.module, fr.pos.line, fr.pos.col));
     }
     rows.push((String::new(), last));
+    links.push(last_tab.map_or(StackLink::None, StackLink::Tab));
     let at = module_tab(&n.module).map(|t| (t, n.pos.line as usize, n.pos.col as usize));
     let severity = match n.kind {
         noshape_featurescript::NoticeKind::Error => super::Severity::Error,
         noshape_featurescript::NoticeKind::Warning => super::Severity::Warning,
         noshape_featurescript::NoticeKind::Info => super::Severity::Info,
     };
-    MonitorEntry { message: n.message.clone(), severity, at, rows }
+    MonitorEntry { message: n.message.clone(), severity, at, rows, links }
 }
 
 /// Profile of a Part Studio's last regeneration: time per Feature Studio
@@ -809,7 +832,7 @@ pub fn profile(doc: &crate::document::Document, part_studio: crate::document::Ta
 /// The notices of a custom table run as Monitor entries, ending with
 /// `last` ("pvz 2parts (main)", live 652).
 pub fn notice_entries(doc: &crate::document::Document, notices: &[noshape_featurescript::interp::Notice], last: &str) -> Vec<MonitorEntry> {
-    notices.iter().map(|n| notice_entry(doc, n, last.to_string())).collect()
+    notices.iter().map(|n| notice_entry(doc, n, last.to_string(), None)).collect()
 }
 
 /// Monitor contents of a Part Studio: the compile warnings / infos of the
@@ -864,12 +887,12 @@ pub fn monitor(doc: &crate::document::Document, part_studio: crate::document::Ta
             studios_done.push(studio_tab);
             for d in studio.diagnostics.iter().filter(|d| d.severity != super::Severity::Error && !d.parse) {
                 let pos = if d.line > 0 { format!("{}:{}", d.line, d.column) } else { String::new() };
-                entries.push(((false, d.line as u32, false), MonitorEntry { message: d.message.clone(), severity: d.severity, at: (d.line > 0).then_some((studio.tab, d.line, d.column)), rows: vec![(pos, module_name(&format!("tab:{studio_tab}")))] }));
+                entries.push(((false, d.line as u32, false), MonitorEntry { message: d.message.clone(), severity: d.severity, at: (d.line > 0).then_some((studio.tab, d.line, d.column)), rows: vec![(pos, module_name(&format!("tab:{studio_tab}")))], links: vec![if d.line > 0 { StackLink::Studio(studio.tab, d.line, d.column) } else { StackLink::None }] }));
             }
         }
         let Some(out) = output_of(f.id) else { continue };
         for n in out.notices.iter() {
-            entries.push(((n.module.starts_with("onshape/std/"), n.pos.line, true), notice_entry(doc, n, format!("{} ({})", tab.name, out.feature_name))));
+            entries.push(((n.module.starts_with("onshape/std/"), n.pos.line, true), notice_entry(doc, n, format!("{} ({})", tab.name, out.feature_name), Some(tab.id))));
         }
         text.push_str(&out.output);
     }

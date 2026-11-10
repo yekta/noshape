@@ -2598,6 +2598,13 @@ impl Workspace {
                     v.update(cx, |v, cx| v.goto_line(line, column, window, cx));
                 }
             }
+            // The Part Studio a notice's feature ran in (live 2467: the panel stays open).
+            crate::fs_notices::FsNoticesEvent::OpenTab(tab) => this.activate(*tab, window, cx),
+            crate::fs_notices::FsNoticesEvent::OpenStd(module, line, column) => {
+                if let Err(e) = crate::std_source::open(module, *line, *column, this.gpu.clone(), cx) {
+                    log::warn!("Could not open the standard library: {e}");
+                }
+            }
         });
         self.fs_notices = Some((panel, sub));
         cx.notify();

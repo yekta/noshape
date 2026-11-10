@@ -32,6 +32,10 @@ pub(crate) fn notice_icon(error: bool, info: bool) -> &'static str {
 
 pub enum FsNoticesEvent {
     Goto(TabId, usize, usize),
+    /// A notice's stack row naming a tab (its Part Studio).
+    OpenTab(TabId),
+    /// A std module's line (a stack row's ↗).
+    OpenStd(String, usize, usize),
     Close,
 }
 
@@ -76,6 +80,9 @@ pub struct FsNoticesPanel {
     filter: Entity<InputState>,
     notices: Vec<(TabId, String, Vec<Notice>)>,
     collapsed: HashSet<TabId>,
+    /// Monitor entries folded (their stack hidden), and the one last clicked (highlighted), by id (live 2467).
+    folded: HashSet<String>,
+    picked: Option<String>,
     /// "Result: …" lines of the Part Studios (from the workspace's views).
     results: HashMap<TabId, String>,
     /// `custom::run::output_generation` when the Monitor was last refreshed.
@@ -97,7 +104,7 @@ impl FsNoticesPanel {
             cx.subscribe_in(&doc, window, |this: &mut Self, _, _: &DocEvent, _, cx| this.refresh(cx)),
         ];
         let notices = document_notices(&doc, cx);
-        Self { doc, filter, notices, collapsed: HashSet::new(), results: HashMap::new(), output_generation: 0, _subs: subs }
+        Self { doc, filter, notices, collapsed: HashSet::new(), folded: HashSet::new(), picked: None, results: HashMap::new(), output_generation: 0, _subs: subs }
     }
 
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
@@ -114,33 +121,68 @@ impl FsNoticesPanel {
         }
     }
 
-    /// A Monitor entry: the notice, then its stack rows (`line:col`, place).
+    /// A Monitor entry: the notice, then its stack rows (`line:col`, place). Live 2467: a click on the notice (or its
+    /// chevron) folds its stack and highlights it, the caret staying; the stack rows are the links (a line of a Feature
+    /// Studio, std's source ↗, the Part Studio).
     fn monitor_item(&self, id: String, e: noshape_model::custom::run::MonitorEntry, cx: &mut Context<Self>) -> AnyElement {
+        use noshape_model::custom::run::StackLink;
         let pal = p();
         let mark = format!("notice:{}", e.message);
-        let mut item = v_flex()
-            .id(SharedString::from(id))
-            .map(|d| crate::ui_script::mark(d, || mark))
-            .cursor_pointer()
-            .hover(|d| d.bg(rgb(0xf5f5f5)))
-            .child(
-                h_flex()
-                    .h(px(22.))
-                    .child(div().w(px(38.)).flex_none().pl(px(23.)).child(os::glyph(os::GLYPH_CHEVRON_DOWN, 10., pal.text)))
-                    .child(div().w(px(28.)).flex_none().pl(px(5.)).child(crate::assets::icon(notice_icon(e.severity == Severity::Error, e.severity == Severity::Info), 16., cx)))
-                    .child(div().flex_1().min_w_0().truncate().px(px(5.)).text_size(px(14.)).text_color(pal.text).child(e.message.clone())),
-            );
-        for (pos, place) in e.rows {
-            item = item.child(
-                h_flex()
-                    .h(px(22.))
-                    .pl(px(66.))
-                    .child(div().min_w(px(45.)).flex_none().px(px(5.)).text_size(px(14.)).text_color(rgb(0x888888)).child(pos))
-                    .child(div().px(px(5.)).text_size(px(14.67)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(place)),
-            );
+        let open = !self.folded.contains(&id);
+        let picked = self.picked.as_deref() == Some(id.as_str());
+        let key = id.clone();
+        let mut item = v_flex().id(SharedString::from(id.clone())).child(
+            h_flex()
+                .id(SharedString::from(format!("{id}-row")))
+                .map(|d| crate::ui_script::mark(d, || mark))
+                .h(px(22.))
+                .cursor_pointer()
+                .when(picked, |d| d.bg(rgb(0xddeeff)))
+                .when(!picked, |d| d.hover(|d| d.bg(rgb(0xf5f5f5))))
+                .child(div().w(px(38.)).flex_none().pl(px(23.)).child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 10., pal.text)))
+                .child(div().w(px(28.)).flex_none().pl(px(5.)).child(crate::assets::icon(notice_icon(e.severity == Severity::Error, e.severity == Severity::Info), 16., cx)))
+                .child(div().flex_1().min_w_0().truncate().px(px(5.)).text_size(px(14.)).text_color(pal.text).child(e.message.clone()))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if !this.folded.remove(&key) {
+                        this.folded.insert(key.clone());
+                    }
+                    this.picked = Some(key.clone());
+                    cx.notify();
+                })),
+        );
+        if !open {
+            return item.into_any_element();
         }
-        if let Some((t, line, col)) = e.at {
-            item = item.on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.emit(FsNoticesEvent::Goto(t, line, col))));
+        for (k, (pos, place)) in e.rows.into_iter().enumerate() {
+            let link = e.links.get(k).cloned().unwrap_or(StackLink::None);
+            let std = matches!(link, StackLink::Std(..));
+            let row = h_flex()
+                .id(SharedString::from(format!("{id}-{k}")))
+                .h(px(22.))
+                .pl(px(if std { 50. } else { 66. }))
+                .cursor_pointer()
+                .hover(|d| d.bg(rgb(0xf5f5f5)))
+                .when(std, |d| {
+                    d.child(
+                        div()
+                            .id(SharedString::from(format!("{id}-{k}-ext")))
+                            .w(px(16.))
+                            .flex_none()
+                            .text_size(px(12.))
+                            .text_color(pal.text_muted)
+                            .child("↗")
+                            .tooltip(crate::ui::tooltip("Definition is in a linked reference external to this workspace")),
+                    )
+                })
+                .child(div().min_w(px(45.)).flex_none().px(px(5.)).text_size(px(14.)).text_color(rgb(0x888888)).child(pos))
+                .child(div().px(px(5.)).text_size(px(14.67)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(place))
+                .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| match &link {
+                    StackLink::Studio(t, line, col) => cx.emit(FsNoticesEvent::Goto(*t, *line, *col)),
+                    StackLink::Std(m, line, col) => cx.emit(FsNoticesEvent::OpenStd(m.clone(), *line, *col)),
+                    StackLink::Tab(t) => cx.emit(FsNoticesEvent::OpenTab(*t)),
+                    StackLink::None => {}
+                }));
+            item = item.child(row);
         }
         item.into_any_element()
     }
