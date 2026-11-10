@@ -12,6 +12,22 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## 11-10 11:35 UTC: knife's Chamfer 1 builds as sections, waits for live (local branch blend-chamfer, WIP commit)
+- Fillet 2's first land failed (kernel_robustness::oversize_fillets_like_onshape: the overflow fallback also took
+  convex lines and built rounds live refuses); now concave only, re-queued as 472c67a7.
+- Chamfer 1: OCCT's distance-angle chamfer fails along the blade's cutting edge (any size, either reference face,
+  each edge alone). WIP fallback (`BlendSpec::reference`, `ChamferRef`): when OCCT's chamfer fails, sections along
+  the chain, `r1` on the reference faces, the other distance from the angle and the faces' angle at each section
+  (law of sines), each face's direction the chord to its point at `r1` (a hollow grind), the section's corner out
+  in the air (the tool's sides needn't lie on the B-spline), one loft per edge (live: one face each), free chain ends
+  run on 2 x the size. Knife: Chamfer 1 19/51/33 (live 19/50/32); the curved strip left 0.055 mm wide (live 0.062),
+  the straight one 0.060 (live 0.022): the angle's reading is off on the straight part. Asked live (REQUESTS blend
+  11:35) for JZC / JZG's definitions and the edges round them. Patch /root/blend-scratch/patches/chamfer-as-sections-wip.patch,
+  probe features_c zz_probe_knife_chamfer1 (ZZ_KNIFE = vibe5 /tmp/blend-knife-c1.brep, Chamfer 1's input).
+- The impeller's "Chamfer Stevenrohr Halterung" / "Fillet Stevenrohr zum Halter" failures (qa's 4f5863a2 run): upstream,
+  handed to core (core.md 11:01).
+- Asked live 07:58 for the equal-distance chamfer rule (tilted hole, cylinder under a tilted plane): rings-loft waits.
+
 ## 11-10 10:29 UTC: knife's Fillet 2 as live (queued 965ea1f1), Chamfer 1 next; fillet fallback costs
 - Fillet 2: `BlendSpec::overflow` (a fallback after OCCT's fillet fails, overflow on, all lines): a concave line's
   section runs on 2R past its free ends; the faces its run-on pieces touch (supports aside) trim it, planes extended
