@@ -177,7 +177,8 @@ impl DrawingEditor {
         self.cancel(cx);
         self.tool = Tool::Select;
         self.detail_dlg = Some(DetailDlg { shape: if profile.is_some() { 3 } else { 0 }, pts: Vec::new(), view: Some(*parent), profile, scale: v.scale, label, style: v.detail_style, show_profile: !v.detail_hide_profile, clip_border: v.detail_clip_border, pick_region: false, picked: Vec::new(), edit: Some(id) });
-        self.selection = vec![Sel::View(id)];
+        // (Nothing shown selected while it is open: live2 2442's drw-detail-edit.)
+        self.selection.clear();
         self.update_preview(cx);
         cx.notify();
     }

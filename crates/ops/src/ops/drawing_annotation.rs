@@ -313,6 +313,7 @@ fn annotation_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             "Show dimensions"
         }
         "group" | "remove_from_group" | "group_annotation" | "remove_annotation_from_group" if !note_or_callout => return refuse("notes and callouts only"),
+        "group" if matches!(ann.kind, AnnotationKind::Balloon { .. }) => return refuse("a callout can't be grouped with a view (notes only)"),
         "group" => {
             if ann.view_group.is_some() {
                 return refuse("already grouped with a view (remove_from_group)");

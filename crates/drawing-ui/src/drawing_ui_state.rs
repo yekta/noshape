@@ -1,6 +1,7 @@
 //! The ui-parity state of a drawing tab and where its targets show (tests/ui-parity/README.md "### Drawings").
 
 use super::*;
+use crate::drawing_sketch::SkTool;
 use noshape_scene::drawing_tools::{DimTool, Pick, PickedPoint, Sel, Tool};
 use serde_json::{Value, json};
 
@@ -259,7 +260,8 @@ impl DrawingEditor {
         }
         // An inspection item is an annotation of its own in live, read as its number (live2 2226), hidden or not.
         annotations.extend(sheet.annotations.iter().filter_map(|a| a.inspection).map(|n| ("inspectionsymbol", n.to_string())));
-        annotations.extend(sheet_sketch_items(&sheet.sketch).into_iter().map(|k| (k, String::new())));
+        let open: &[noshape_sketch::EntityId] = if matches!(self.tool, Tool::Sketch { tool: SkTool::Point, .. }) { &self.tool_points } else { &[] };
+        annotations.extend(sheet_sketch_items(&sheet.sketch, open).into_iter().map(|k| (k, String::new())));
         annotations.sort();
         // What is drawn in selection colours (README "### Drawings"; live 2068): selected views; the Projected
         // tool's parent drawn picked after Insert view placed it. Live's reader (2402) says VIEW for a view drawn
@@ -363,11 +365,19 @@ impl DrawingEditor {
                     _ => false,
                 })
             };
+            // A selected view's orange inside another view's box counts there too (live2 2442: the Detail view placed
+            // over Top's box, right-clicked, is orange all over, its frame, boundary and edges: EDGE Top and EDGE
+            // Detail), a view with an edge picked included.
+            let lit_view = |w: ViewId| self.selection.iter().any(|s| matches!(s, Sel::View(x) | Sel::Edge(x, _) if *x == w));
+            let selected_view = |pick: u32, v: ViewId| match b.picks.get(pick as usize) {
+                Some(PickTarget::Edge { view, .. } | PickTarget::View(view)) => *view != v && lit_view(*view),
+                _ => false,
+            };
             for v in &sheet.views {
                 let Some(pl) = self.placement(v.id) else { continue };
                 let inside = |p: [f64; 2]| p[0] >= pl.min[0] && p[0] <= pl.max[0] && p[1] >= pl.min[1] && p[1] <= pl.max[1];
                 let mut px = 0.0;
-                for l in b.geometry.lines.iter().filter(|l| lit(l.pick)) {
+                for l in b.geometry.lines.iter().filter(|l| lit(l.pick) || selected_view(l.pick, v.id)) {
                     for w in l.points.windows(2) {
                         if inside([(w[0][0] + w[1][0]) / 2.0, (w[0][1] + w[1][1]) / 2.0]) {
                             px += (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]) * self.zoom;
@@ -555,11 +565,11 @@ fn ui_tool_name(t: &Tool) -> Option<&'static str> {
 /// The sheet's sketch geometry as live's recorder lists it with the annotations (live2 drw-sketch-spline,
 /// drw-sketch-point, drw-hatch-edit): each line, circle, arc and spline, a spline's through points, a point no curve
 /// uses, each hatch region.
-fn sheet_sketch_items(sk: &noshape_model::drawing::sheet_sketch::SheetSketch) -> Vec<&'static str> {
+fn sheet_sketch_items(sk: &noshape_model::drawing::sheet_sketch::SheetSketch, open: &[noshape_sketch::EntityId]) -> Vec<&'static str> {
     use noshape_sketch::entities::Geometry;
     let used: std::collections::HashSet<_> = sk.sketch.entities().flat_map(|e| e.point_refs()).collect();
     let mut out = Vec::new();
-    for e in sk.sketch.entities().filter(|e| !e.external) {
+    for e in sk.sketch.entities().filter(|e| !e.external && !open.contains(&e.id)) {
         match &e.geometry {
             Geometry::Point { .. } if !used.contains(&e.id) => out.push("sketchpoint"),
             Geometry::Point { .. } => {}

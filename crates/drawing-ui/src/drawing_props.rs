@@ -485,6 +485,8 @@ impl DrawingEditor {
 
     fn start_rotate_to_edge(&mut self, id: ViewId, vertical: bool, cx: &mut Context<Self>) {
         self.rotate_to_edge = Some((id, vertical));
+        // (The view's selection goes while the edge is picked: live2 drw-view-rotate-*.)
+        self.selection.clear();
         cx.notify();
     }
 

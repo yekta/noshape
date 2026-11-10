@@ -158,9 +158,11 @@ impl DrawingEditor {
                     });
                 }
             }
-            SkTool::Point => self.edit_sketch("Sketch point", cx, |s| {
-                s.sketch.add_point(v2(p));
-            }),
+            SkTool::Point => {
+                let mut placed = None;
+                self.edit_sketch("Sketch point", cx, |s| placed = Some(s.sketch.add_point(v2(p))));
+                self.tool_points.extend(placed);
+            }
             SkTool::Trim => {
                 let target = self.sketch_entity_at().or_else(|| self.sketch_point_at(self.cursor).map(|x| x.0));
                 if let Some(id) = target {

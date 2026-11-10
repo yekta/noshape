@@ -25,11 +25,13 @@ pub struct CentermarkDlg {
     pub pattern: bool,
     pub connecting: bool,
     pub picks: Vec<CmCircle>,
+    /// Single: the centermark each pick placed at once (live2 2442), by pick.
+    pub placed: Vec<u64>,
 }
 
 impl Default for CentermarkDlg {
     fn default() -> Self {
-        Self { mode: 0, reference_center: true, bolt_circle: true, radial_lines: false, pattern: true, connecting: true, picks: Vec::new() }
+        Self { mode: 0, reference_center: true, bolt_circle: true, radial_lines: false, pattern: true, connecting: true, picks: Vec::new(), placed: Vec::new() }
     }
 }
 
@@ -49,13 +51,31 @@ impl DrawingEditor {
             return false;
         }
         let Some(Pick::Circle { view, center, radius, r }) = self.circle_pick(self.cursor) else { return true };
-        // (Single too: the circles listed under Entities to include, marked on ✓ or Esc: live 2146.)
-        if let Some(d) = &mut self.centermark_dlg {
-            // Click again to drop a circle; all circles come from one view.
-            if let Some(i) = d.picks.iter().position(|p| p.view == view && (p.center[0] - center[0]).abs() < 1e-9 && (p.center[1] - center[1]).abs() < 1e-9) {
-                d.picks.remove(i);
-            } else if d.picks.first().is_none_or(|p| p.view == view) {
-                d.picks.push(CmCircle { view, center, radius, r });
+        // The circles listed under Entities to include; a Single centermark is drawn at once and stays (live2 2442,
+        // the click's centermark in the drawing at once), the others on ✓ or Esc.
+        let pos = self.cursor;
+        let Some(d) = &mut self.centermark_dlg else { return true };
+        let single = d.mode == 0;
+        // Click again to drop a circle (and a Single's mark); all circles come from one view.
+        if let Some(i) = d.picks.iter().position(|p| p.view == view && (p.center[0] - center[0]).abs() < 1e-9 && (p.center[1] - center[1]).abs() < 1e-9) {
+            d.picks.remove(i);
+            let gone = if single && i < d.placed.len() { Some(d.placed.remove(i)) } else { None };
+            if let Some(id) = gone {
+                self.edit_sheet("Centermark", cx, |s| s.annotations.retain(|a| a.id != id));
+            }
+        } else if d.picks.first().is_none_or(|p| p.view == view) {
+            let mark = CmCircle { view, center, radius, r };
+            d.picks.push(mark.clone());
+            if single {
+                let mut placed = None;
+                self.edit_sheet("Centermark", cx, |s| {
+                    let id = s.next_annotation_id();
+                    s.annotations.push(noshape_scene::drawing_tools::centermark(id, &mark, pos));
+                    placed = Some(id);
+                });
+                if let Some(d) = &mut self.centermark_dlg {
+                    d.placed.extend(placed);
+                }
             }
         }
         self.update_preview(cx);
@@ -89,14 +109,10 @@ impl DrawingEditor {
         }
         let pos = self.cursor;
         if d.mode == 0 {
-            self.edit_sheet("Centermark", cx, |s| {
-                for mark in &d.picks {
-                    let id = s.next_annotation_id();
-                    s.annotations.push(noshape_scene::drawing_tools::centermark(id, mark, pos));
-                }
-            });
+            // (Each already drawn on its click.)
             if let Some(d) = &mut self.centermark_dlg {
                 d.picks.clear();
+                d.placed.clear();
             }
             cx.notify();
             return;

@@ -85,6 +85,8 @@ pub(crate) fn helix_frame(ev: &EvalCtx) -> FResult<(DVec3, DVec3, DVec3, f64, f6
 pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
     let axis_type = ev.enum_("axisType").to_string();
     let (mut base, mut z, mut x, mut r0, mut taper, geom_height) = helix_frame(ev)?;
+    // The axis frame's own x (the circle's), which helix.fs measures the end's angle from.
+    let x0 = x;
     let left_handed = ev.is("handedness", "CCW");
     // Start condition.
     if ev.is("startType", "START_POINT") {
@@ -133,8 +135,16 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
             if axis_type == "AXIS" && radial.length() > 1e-9 && h > 1e-12 {
                 taper = ((radial.length() - r0) / h).atan();
             }
-            let y = z.cross(x);
-            let mut ang = radial.dot(y).atan2(radial.dot(x));
+            // As helix.fs: both points in the axis frame (fromWorld), angleBetween from its x, start to end. Its
+            // coordinates are taken clean of float noise (to 1e-12 m), as Parasolid's are: an end point on the axis then
+            // gives live's angle (c2-fan-blade-sweep's Helix 1, live 2440: the end's offset purely along the axis,
+            // projected on the circle's x axis -1.8e-18 m, so π and 9.5 turns, not ours' 10.108 from 1e-17 m of noise).
+            let clean = |v: DVec3| (v * 1e12).round() / 1e12;
+            let y0 = z.cross(x0);
+            let d = clean(p) - clean(base);
+            let to_end = d.dot(y0).atan2(d.dot(x0));
+            let to_start = x.dot(y0).atan2(x.dot(x0));
+            let mut ang = to_end - to_start;
             if left_handed {
                 ang = -ang;
             }

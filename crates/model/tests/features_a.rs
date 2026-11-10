@@ -2284,6 +2284,27 @@ fn helix_points_as_fs() {
     assert!((p - 0.02 / n).abs() < 1e-9);
 }
 
+/// An end point on the helix's axis (live 2421 / 2440): helix.fs measures the end's angle in the axis frame, and on
+/// the axis that is the frame's x (0°), whatever float noise the point carries. Pitch 1.5 mm, 14 mm: live's reads.
+#[test]
+fn helix_end_point_on_its_axis_turns_as_live() {
+    for (start, ccw, want) in [("0 deg", false, 9.0), ("90 deg", false, 8.75), ("180 deg", false, 8.5), ("90 deg", true, 9.25)] {
+        let mut t = T::new();
+        let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("14 mm"))]);
+        let mut sk = noshape_sketch::Sketch::new();
+        // (On the axis but for 1e-17 m, as a point placed through other features' transforms lands.)
+        let p = sk.add_point(DVec2::new(1e-17, -2e-17));
+        let s = t.sketch(Reference::FeaturePlane(pl), sk);
+        let end = Reference::SketchEntity { sketch: s, entity: p.0 };
+        let hand = if ccw { "CCW" } else { "CW" };
+        t.add("helix", &[("axisType", en("AXIS")), ("axis", q(vec![edge_axis_z()])), ("startRadius", e("3 mm")), ("pathType", en("PITCH")), ("helicalPitch", e("1.5 mm")), ("startAngle", e(start)), ("handedness", en(hand)), ("endType", en("END_POINT")), ("endPoint", q(vec![end]))]);
+        let r = t.ok();
+        let st = r.display.features.last().unwrap();
+        let Some(noshape_model::display::ComputedValue::Text(n)) = st.computed.iter().find(|(k, _)| k == "actualRevolutions").map(|(_, v)| v.clone()) else { panic!("{:?}", st.computed) };
+        assert!((n.parse::<f64>().unwrap() - want).abs() < 1e-9, "start {start}, {hand}: {n} turns, live {want}");
+    }
+}
+
 /// hole.fs holeScopeFlipHeuristics input: a point under a part, the hole
 /// pointing away from it, reports that part behind it.
 #[test]

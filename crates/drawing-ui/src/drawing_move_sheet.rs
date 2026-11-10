@@ -131,7 +131,8 @@ impl DrawingEditor {
         use noshape_scene::drawing_tools::annotation_edit::group_with_view;
         let sheet = self.current_sheet();
         let anns: Vec<&noshape_model::drawing::Annotation> = self.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { sheet.annotations.iter().find(|a| a.id == *x) } else { None }).collect();
-        let groupable = |a: &&noshape_model::drawing::Annotation| matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. });
+        // (Notes: a callout with its view selected has no Group in live's menu, live2 2442.)
+        let groupable = |a: &&noshape_model::drawing::Annotation| matches!(a.kind, AnnotationKind::Note { .. });
         if anns.is_empty() || !anns.iter().all(groupable) || anns.len() + views.len() != self.selection.len() {
             return Vec::new();
         }

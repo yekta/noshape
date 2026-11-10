@@ -510,6 +510,9 @@ pub struct DrawingEditor {
     /// The edge the Edge condition symbol tool's first click picked, drawn selected until its next click (live
     /// drw-edge-condition; Weld symbol's isn't). See [`Self::lit_tool_edge`].
     pub tool_edge: Option<Sel>,
+    /// Points the Sketch point tool placed since it was chosen: in the open drawing sketch until the tool ends (live
+    /// 2442: not in the drawing's data until Escape).
+    pub tool_points: Vec<noshape_sketch::EntityId>,
     pub insp_table: crate::drawing_panels::InspectionTableUi,
     /// Inserted image textures (see `drawing_images`).
     pub image_cache: crate::drawing_images::ImageCache,
@@ -769,6 +772,7 @@ impl DrawingEditor {
             inplace_field: None,
             panel_highlight: None,
             tool_edge: None,
+            tool_points: Vec::new(),
             insp_table: Default::default(),
             measure: None,
             status: None,

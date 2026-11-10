@@ -24,6 +24,22 @@ test only took profiles in a plane through the axis, so OCCT's self-intersection
 tilted profiles too: Sweep 1 0.23 s, the document 0.87 s. Your 7e7d69f2b stays; the tilt (feature 41's frame) is
 yours to finish.
 
+## 11-10 12:50 UTC: drawings 150 -> 156/172 with live2's 2442 re-records; the fan's helix turns as live's
+
+- **Drawings (b16, vibe5):** 156/172 scenarios, 1346/1372 states. New: a callout gets no Group with its view (live's
+  menu has none; ops refuse it; notes keep it), a Sketch point stays out of the drawing's data until the tool ends
+  (`tool_points`), a Single centermark is drawn at its click and stays listed until Esc, Edit detail and Rotate
+  view › Horizontal / Vertical to clear the selection, and a selected view's orange inside another view's box reads
+  as that view's (drw-view-rotate-*: the Detail over Top's box). Left: drw-view-rotate-horizontal-to step 9 (its
+  vertical twin reads the opposite), drw-centermark-align step 5 (live's recorder lag, 2442), drw-sheet-properties /
+  -rename (live's boxes in 2442 (7): rows 26/25/26, menu items 23.5 px from 3 px below the click; giving drawing
+  menus that geometry moved our pointer off drw-view-hide-auto-centermarks and fixed neither: reverted; our panel's
+  rows sit elsewhere, unmeasured), the reader-noise ones listed at 08:34, drw-format-painter (asked, 08:52).
+- **Helix end point on its axis:** the end's angle as helix.fs takes it (fromWorld in the axis frame, from its x),
+  on coordinates cleaned to 1e-12 m: Helix 1 now 9.5 turns as live (T1 features_a::helix_end_point_on_its_axis_turns_as_live,
+  live 2421's four reads). The fan stays 41/53: the frame's tilt is the curve itself (Parasolid's 40 rational
+  quadratic arcs a turn: start tangent 0.086059, ours exact 0.086236). Options for the lead in the 13:00 reply.
+
 ## 11-10 11:45 UTC: configuration variables by id (live 2458); STEP p-curves; read-back 43 -> 44/48
 
 - **Configuration variables:** `#` is the input's FeatureScript id (variable_exprs), Rename changes the shown name
