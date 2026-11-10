@@ -4,6 +4,7 @@
 pub mod actions;
 pub mod assembly_context;
 pub mod assets;
+pub mod bg_job;
 pub mod cached_slice;
 pub mod camera_menu;
 pub mod color_mixer;

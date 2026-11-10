@@ -3544,3 +3544,31 @@ fn a_selections_measurement_doesnt_hold_up_the_frame(cx: &mut TestAppContext) {
     draw(cx, window);
     cx.update(|cx| assert!(view.read(cx).measure_cache.as_ref().is_some_and(|c| c.selection.len() == 1 && c.results.is_some())));
 }
+
+/// Mass properties (lead 11-10, after the measure P0): the parts' mass properties are worked out off the UI thread,
+/// once per parts and model, not in every frame of the dialog: the frame that opens it draws with them pending.
+#[gpui::test]
+fn mass_properties_dont_hold_up_the_frame(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "mass-off-thread");
+    let part = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone()))).expect("the part");
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.selection = vec![part.clone()];
+        v.show_mass = true;
+        cx.notify();
+    }));
+    cx.update_window(window, |_, w, cx| {
+        w.draw(cx).clear(cx);
+    })
+    .unwrap();
+    cx.update(|cx| assert!(view.read(cx).ui.mass_job.as_ref().is_some_and(|j| j.value.is_none()), "worked out in the frame"));
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let mp = v.ui.mass_job.as_ref().and_then(|j| j.value.clone()).and_then(|(mp, _)| mp).expect("the mass properties arrived");
+        assert!(mp.volume > 0.0, "{mp:?}");
+    });
+    // Another frame doesn't start it again.
+    let before = cx.update(|cx| view.read(cx).ui.mass_job.as_ref().map(|j| j.key.clone()));
+    draw(cx, window);
+    cx.update(|cx| assert!(view.read(cx).ui.mass_job.as_ref().is_some_and(|j| Some(j.key.clone()) == before && j.value.is_some())));
+}

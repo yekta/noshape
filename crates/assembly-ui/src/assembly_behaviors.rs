@@ -399,12 +399,17 @@ pub struct AsmUi {
     /// and their measurements for the bottom-right readout.
     pub entity_sel: Vec<(Vec<InstanceId>, Reference)>,
     pub entity_measure: Vec<(String, noshape_model::regen::measure::Measurement)>,
+    /// The picks `entity_measure` is (being) measured for, off the UI thread (`ensure_entity_measure`).
+    pub entity_measure_for: Option<Vec<(Vec<InstanceId>, Reference)>>,
+    pub entity_measure_task: Option<gpui_kit::Task<()>>,
     /// The last graphics click (time, position): a second one there soon
     /// after is a double click, which clears the selection (live).
     pub last_click: Option<(std::time::Instant, DVec2)>,
     /// Measure tool (`[`): picked entities and their measurements.
     pub measure: Option<Vec<(Vec<InstanceId>, Reference)>>,
     pub measure_result: Vec<(String, noshape_model::regen::measure::Measurement)>,
+    /// The Measure panel's measurement under way (`measure_in_background`); a newer one replaces it.
+    pub measure_task: Option<gpui_kit::Task<()>>,
     /// The Measure panel's type and unit choices.
     pub measure_settings: crate::measure_panel::MeasureSettings,
     /// Section view (Shift+X): plane origin, normal, offset, flipped, offset field.
@@ -470,6 +475,10 @@ pub struct AsmUi {
     pub value_edit: Option<(MateId, usize, Entity<InputState>, Subscription)>,
     /// Mass and section properties dialog.
     pub mass: Option<super::mass::AsmMassUi>,
+    /// Its values, worked out off the UI thread (`crate::bg_job`): the selected instances' mass properties and
+    /// variance (keyed by them, the result and the parts' densities), and the picked faces' section.
+    pub mass_job: Option<crate::bg_job::BgJob<super::mass::AsmMassKey, super::mass::AsmMassValue>>,
+    pub section_job: Option<crate::bg_job::BgJob<super::mass::AsmSectionKey, Option<noshape_model::assembly::analysis::FaceSection>>>,
     /// The Isolate slider being dragged (pressed on it, button still down).
     pub iso_slider_drag: Option<&'static str>,
     /// Where panel dialogs were moved by their title.
@@ -4924,10 +4933,8 @@ impl AssemblyView {
         } else {
             Some(self.ui.entity_sel.iter().filter(|(_, r)| matches!(r, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_))).cloned().collect())
         };
-        self.ui.measure_result = match &self.ui.measure {
-            Some(picks) if !picks.is_empty() => noshape_model::assembly::analysis::measure_entities(&self.result, picks),
-            _ => Vec::new(),
-        };
+        let picks = self.ui.measure.clone().unwrap_or_default();
+        self.measure_in_background(picks, cx);
         self.update_capture(cx);
         self.refresh_scene(false, cx);
         cx.notify();
@@ -4946,9 +4953,54 @@ impl AssemblyView {
             None => list.push(key),
         }
         let picks = list.clone();
-        self.ui.measure_result = noshape_model::assembly::analysis::measure_entities(&self.result, &picks);
+        self.measure_in_background(picks, cx);
         self.refresh_scene(false, cx);
         cx.notify();
+    }
+
+    /// The Measure panel's rows for `picks`, worked out off the UI thread (two big imported parts take seconds; the
+    /// user's P0): none until they arrive. A newer set of picks replaces the task; a stale result is dropped.
+    pub(super) fn measure_in_background(&mut self, picks: Vec<(Vec<InstanceId>, Reference)>, cx: &mut Context<Self>) {
+        self.ui.measure_result = Vec::new();
+        self.ui.measure_task = None;
+        if picks.is_empty() {
+            return;
+        }
+        let result = self.result.clone();
+        let of = picks.clone();
+        self.ui.measure_task = Some(cx.spawn(async move |this, cx| {
+            let rows = cx.background_spawn(async move { noshape_model::assembly::analysis::measure_entities(&result, &of) }).await;
+            let _ = this.update(cx, |this, cx| {
+                if this.ui.measure.as_ref() != Some(&picks) {
+                    return;
+                }
+                this.ui.measure_result = rows;
+                this.refresh_scene(false, cx);
+                cx.notify();
+            });
+        }));
+    }
+
+    /// The bottom-right readout's measurement of the selected entities, started off the UI thread when the
+    /// selection has none (render calls it); `update_entity_measure` marks it stale.
+    pub(super) fn ensure_entity_measure(&mut self, cx: &mut Context<Self>) {
+        if self.ui.entity_sel.is_empty() || self.ui.entity_measure_for.as_ref() == Some(&self.ui.entity_sel) {
+            return;
+        }
+        let picks = self.ui.entity_sel.clone();
+        self.ui.entity_measure_for = Some(picks.clone());
+        let result = self.result.clone();
+        let of = picks.clone();
+        self.ui.entity_measure_task = Some(cx.spawn(async move |this, cx| {
+            let rows = cx.background_spawn(async move { noshape_model::assembly::analysis::measure_entities(&result, &of) }).await;
+            let _ = this.update(cx, |this, cx| {
+                if this.ui.entity_measure_for.as_ref() != Some(&picks) || this.ui.entity_sel != picks {
+                    return;
+                }
+                this.ui.entity_measure = rows;
+                cx.notify();
+            });
+        }));
     }
 
     /// The Measure panel (`crate::measure_panel`, live part-studio/82 and
@@ -4994,7 +5046,7 @@ impl AssemblyView {
                     }
                     list.remove(i);
                     let picks = list.clone();
-                    this.ui.measure_result = if picks.is_empty() { Vec::new() } else { noshape_model::assembly::analysis::measure_entities(&this.result, &picks) };
+                    this.measure_in_background(picks, cx);
                     this.refresh_scene(false, cx);
                     cx.notify();
                 })

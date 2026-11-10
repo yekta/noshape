@@ -1170,34 +1170,20 @@ impl PartStudioView {
                 let label = self.labeler(cx);
                 faces.iter().map(|r| label(r)).collect()
             };
-            let shapes: Vec<noshape_kernel::Shape> = faces.iter().flat_map(|f| measure::resolve_shapes(&ctx, f)).collect();
-            // Show calculation variance (live G31): the faces' bounds, once per faces and model.
-            let var = if self.ui.mass_variance && !shapes.is_empty() {
-                let key = (faces.clone(), std::sync::Arc::as_ptr(&ctx) as usize);
-                let hit = self.ui.mass_face_variance_cache.as_ref().filter(|(f, p, _)| *f == key.0 && *p == key.1).map(|(_, _, v)| *v);
-                match hit {
-                    Some(v) => v,
-                    None => {
-                        let v = measure::face_property_variance(&shapes);
-                        self.ui.mass_face_variance_cache = Some((key.0, key.1, v));
-                        v
-                    }
-                }
-            } else {
-                None
-            };
+            // Worked out off the UI thread, once per faces, model and variance (big faces take seconds): blank meanwhile.
+            let variance = self.ui.mass_variance;
+            let key = (faces.clone(), std::sync::Arc::as_ptr(&ctx) as usize, variance);
+            let c = ctx.clone();
+            let computed = crate::bg_job::bg_job(self, |v| &mut v.ui.face_mass_job, key, move || face_mass(&c, &faces, variance), cx);
+            // Show calculation variance (live G31): the faces' bounds.
+            let var = computed.as_ref().and_then(|f| f.var);
             let units = self.doc.read(cx).session.doc.settings.units;
             let mut fv = FaceMassView { faces: names, area: String::new(), perimeter: String::new(), inertia: None, polar: None, coplanar: true, unit: format!("{}⁴", units.length.symbol()) };
-            if !shapes.is_empty() {
-                let planes: Vec<Option<noshape_kernel::Plane>> = shapes.iter().map(|s| s.face_plane().ok().flatten()).collect();
-                let first = planes.first().cloned().flatten();
-                fv.coplanar = shapes.len() == 1
-                    || (planes.iter().all(Option::is_some)
-                        && first.as_ref().is_some_and(|p0| planes.iter().flatten().all(|p| p.normal.cross(p0.normal).length() < 1e-9 && (p.origin - p0.origin).dot(p0.normal).abs() < 1e-9)));
+            if let Some(fm) = computed.filter(|f| f.any) {
+                let first = fm.first;
+                fv.coplanar = fm.coplanar;
                 if fv.coplanar {
-                    let props: Vec<noshape_kernel::MassProperties> = shapes.iter().filter_map(|s| noshape_kernel::surface_properties(s).ok()).collect();
-                    let area: f64 = props.iter().map(|p| p.mass).sum();
-                    let perimeter: f64 = shapes.iter().map(|s| s.edges().iter().map(|e| e.length().unwrap_or(0.0)).sum::<f64>()).sum();
+                    let (props, area, perimeter) = (fm.props, fm.area, fm.perimeter);
                     let pm = |text: String, b: Option<f64>, unit: bool| match b {
                         Some(b) if unit => match text.split_once(' ') {
                             Some((_, u)) => format!("{text} {} {u}", crate::quantity_field::plus_minus(b)),
@@ -1229,21 +1215,31 @@ impl PartStudioView {
             // Live: nothing in "Parts to measure" → every value blank (not
             // all parts; behaviours "qa5 (10-26 p4)", qa5 P1-17).
             self.note_unmaterialed_parts(&bodies, cx);
-            let measured = if bodies.is_empty() { None } else { noshape_ops::analysis::studio_mass_properties(&ctx, &self.display, &studio, &bodies, reference.as_ref()) };
-            // Show calculation variance: the bounds, once per parts and model.
-            let var = if self.ui.mass_variance && !bodies.is_empty() {
-                let key = (bodies.clone(), std::sync::Arc::as_ptr(&ctx) as usize);
-                let hit = self.ui.mass_variance_cache.as_ref().filter(|(b, p, _)| *b == key.0 && *p == key.1).map(|(_, _, v)| v.clone());
-                match hit {
-                    Some(v) => v,
-                    None => {
-                        let v = measure::mass_property_variance(&ctx, &bodies, &|b| studio.part_properties.get(b).and_then(|p| p.density));
-                        self.ui.mass_variance_cache = Some((key.0, key.1, v.clone()));
-                        v
-                    }
-                }
+            // The parts' mass properties (and, shown, their variance) off the UI thread, once per parts, model and
+            // densities (two big imported parts take seconds): the values blank meanwhile.
+            let (measured, var) = if bodies.is_empty() {
+                (None, None)
             } else {
-                None
+                let densities: Vec<Option<f64>> = bodies.iter().map(|b| studio.part_properties.get(b).and_then(|p| p.density)).collect();
+                let variance = self.ui.mass_variance;
+                let key = (bodies.clone(), std::sync::Arc::as_ptr(&ctx) as usize, densities.clone(), variance);
+                let (c, of) = (ctx.clone(), bodies.clone());
+                let computed = crate::bg_job::bg_job(
+                    self,
+                    |v| &mut v.ui.mass_job,
+                    key,
+                    move || {
+                        let density = |b: &BodyId| of.iter().position(|x| x == b).and_then(|i| densities[i]);
+                        let mp = measure::mass_properties(&c, &of, &density);
+                        let var = if variance { measure::mass_property_variance(&c, &of, &density) } else { None };
+                        (mp, var)
+                    },
+                    cx,
+                );
+                match computed {
+                    Some((mp, var)) => (mp.map(|mp| noshape_ops::analysis::studio_mass_from(mp, &self.display, &studio, &bodies, reference.as_ref())), var),
+                    None => (None, None),
+                }
             };
             if let Some(noshape_ops::analysis::StudioMass { props: mp, reference }) = measured {
                 if let Some(name) = &reference {
@@ -2187,6 +2183,25 @@ impl PartStudioView {
         self.measure_cache = Some(super::MeasureCache { selection: sel.to_vec(), results: None, _task: task });
         None
     }
+}
+
+/// Mass properties' Face tab for `faces` (the slow part: their shapes' surface properties and perimeters).
+fn face_mass(ctx: &noshape_model::regen::context::Context, faces: &[noshape_model::reference::Reference], variance: bool) -> super::behaviors::FaceMass {
+    let shapes: Vec<noshape_kernel::Shape> = faces.iter().flat_map(|f| measure::resolve_shapes(ctx, f)).collect();
+    let var = if variance && !shapes.is_empty() { measure::face_property_variance(&shapes) } else { None };
+    let planes: Vec<Option<noshape_kernel::Plane>> = shapes.iter().map(|s| s.face_plane().ok().flatten()).collect();
+    let first = planes.first().cloned().flatten();
+    let coplanar = shapes.len() == 1
+        || (planes.iter().all(Option::is_some) && first.as_ref().is_some_and(|p0| planes.iter().flatten().all(|p| p.normal.cross(p0.normal).length() < 1e-9 && (p.origin - p0.origin).dot(p0.normal).abs() < 1e-9)));
+    let (props, area, perimeter) = if coplanar && !shapes.is_empty() {
+        let props: Vec<noshape_kernel::MassProperties> = shapes.iter().filter_map(|s| noshape_kernel::surface_properties(s).ok()).collect();
+        let area = props.iter().map(|p| p.mass).sum();
+        let perimeter = shapes.iter().map(|s| s.edges().iter().map(|e| e.length().unwrap_or(0.0)).sum::<f64>()).sum();
+        (props, area, perimeter)
+    } else {
+        (Vec::new(), 0.0, 0.0)
+    };
+    super::behaviors::FaceMass { any: !shapes.is_empty(), coplanar, props, first, area, perimeter, var }
 }
 
 /// The Part Studio's measurements of a selection: no part volume (live, qa5

@@ -3267,8 +3267,11 @@ impl AssemblyView {
     }
 
     /// The bottom-right readout's measurements of the selected entities.
+    /// (Cheap: render starts the measurement off the UI thread, `ensure_entity_measure`.)
     fn update_entity_measure(&mut self) {
-        self.ui.entity_measure = if self.ui.entity_sel.is_empty() { Vec::new() } else { analysis::measure_entities(&self.result, &self.ui.entity_sel) };
+        self.ui.entity_measure.clear();
+        self.ui.entity_measure_for = None;
+        self.ui.entity_measure_task = None;
     }
 
     fn select_target(&mut self, target: Option<AsmPickTarget>, additive: bool, _cx: &mut Context<Self>) {
@@ -6681,6 +6684,7 @@ impl Render for AssemblyView {
             self.schedule_eval(window, cx);
         }
         self.ensure_filter_input(window, cx);
+        self.ensure_entity_measure(cx);
         if self.panel == Some(SidePanel::Configurations) {
             self.ensure_cfg_filter(window, cx);
         }

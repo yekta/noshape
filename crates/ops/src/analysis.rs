@@ -19,10 +19,17 @@ pub struct StudioMass {
 /// in the computation has one (Onshape), and with a `reference` mate
 /// connector the inertia is about its origin and axes.
 pub fn studio_mass_properties(ctx: &Context, display: &StudioDisplay, ps: &PartStudio, bodies: &[BodyId], reference: Option<&ConnectorDisplay>) -> Option<StudioMass> {
+    let mp = measure::mass_properties(ctx, bodies, &|b| ps.part_properties.get(b).and_then(|p| p.density))?;
+    Some(studio_mass_from(mp, display, ps, bodies, reference))
+}
+
+/// [`studio_mass_properties`] from the parts' computed mass properties (`measure::mass_properties` with their
+/// densities, the slow part, which the Part Studio's dialog works out off the UI thread): the mass overrides and the
+/// reference frame.
+pub fn studio_mass_from(mut mp: measure::MassProperties, display: &StudioDisplay, ps: &PartStudio, bodies: &[BodyId], reference: Option<&ConnectorDisplay>) -> StudioMass {
     let props = &ps.part_properties;
     let all: Vec<BodyId> = if bodies.is_empty() { display.bodies.iter().map(|b| b.id.clone()).collect() } else { bodies.to_vec() };
     let overrides: Option<f64> = all.iter().map(|b| props.get(b).and_then(|p| p.mass_override)).sum();
-    let mut mp = measure::mass_properties(ctx, bodies, &|b| props.get(b).and_then(|p| p.density))?;
     if let Some(m) = overrides {
         if let Some(old) = mp.mass.filter(|o| *o > 0.0) {
             mp.inertia *= m / old;
@@ -44,5 +51,5 @@ pub fn studio_mass_properties(ctx: &Context, display: &StudioDisplay, ps: &PartS
         let r = glam::DMat3::from_cols(x, y, z);
         mp.inertia = r.transpose() * (mp.inertia + shift * m) * r;
     }
-    Some(StudioMass { props: mp, reference: name })
+    StudioMass { props: mp, reference: name }
 }

@@ -19,6 +19,12 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Value {
 /// A block (Part 1 <1>), a pin (Part 2 <1>) and a Linear pattern 1 of the
 /// pin (its copy Part 2 <2>), in Assembly 1 of a test window.
 fn pattern_assembly(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    let path = pattern_document(cx, name);
+    open_assembly(cx, &path)
+}
+
+/// [`pattern_assembly`]'s document.
+fn pattern_document(cx: &mut TestAppContext, name: &str) -> std::path::PathBuf {
     cx.update(gpui_kit::init);
     crate::assembly_hooks::register_for_tests();
     let dir = std::env::temp_dir().join(format!("noshape-asm-ui-{name}-{}", std::process::id()));
@@ -39,7 +45,7 @@ fn pattern_assembly(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, En
         let e = call(&mut ctx, "assembly_entities", json!({ "instance": "Part 1 <1>", "kind": "edges", "direction": [1, 0, 0] }))["edges"][0]["id"].clone();
         call(&mut ctx, "assembly_pattern", json!({ "kind": "linear", "seeds": ["Part 2 <1>"], "direction": { "instance": "Part 1 <1>", "entity": e }, "distance": "30 mm" }));
     }
-    open_assembly(cx, &path)
+    path
 }
 
 /// Assembly 1 of the document at `path` in a test window, evaluated.
@@ -755,4 +761,61 @@ fn dynamic_suppressions_panel_escape_and_remove(cx: &mut TestAppContext) {
     let act = act.clone();
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| act(v, w, cx))).unwrap();
     cx.update(|cx| assert_eq!(view.read(cx).message.as_ref().map(|m| m.1.as_str()), Some("Dynamic suppression removed.")));
+}
+
+/// User P0 (lead 11-10), in an assembly: the readout's and the Measure panel's measurements run off the UI thread.
+/// The frame that shows a selection draws without them (none yet), and they arrive with the background work.
+#[gpui::test]
+fn an_assembly_measurement_doesnt_hold_up_the_frame(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "measure-off-thread");
+    let picks: Vec<(Vec<InstanceId>, Reference)> = cx.update(|cx| {
+        let v = view.read(cx);
+        ["Part 1 <1>", "Part 2 <1>"]
+            .iter()
+            .map(|n| {
+                let id = instance(v, n, cx);
+                let occ = v.result.occurrences.iter().find(|o| o.top() == id).unwrap();
+                (vec![id], occ.face_refs[0].clone())
+            })
+            .collect()
+    });
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            v.ui.entity_sel = picks.clone();
+            v.update_entity_measure();
+            cx.notify();
+        })
+    });
+    // One frame with the background threads held: the readout's measurement is under way, not done in the frame.
+    cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.ui.entity_measure_for.as_ref() == Some(&picks) && v.ui.entity_measure.is_empty(), "measured in the frame");
+    });
+    draw(cx, window);
+    assert!(cx.update(|cx| !view.read(cx).ui.entity_measure.is_empty()), "the readout's rows arrived");
+    // The Measure panel (`[`) takes the selected faces: its rows come the same way.
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_measure(cx)));
+    assert!(cx.update(|cx| view.read(cx).ui.measure_result.is_empty()), "not measured on the click");
+    draw(cx, window);
+    assert!(cx.update(|cx| !view.read(cx).ui.measure_result.is_empty()), "the panel's rows arrived");
+}
+
+/// The Mass and section properties dialog's values are worked out off the UI thread, once per selection: the frame
+/// that opens it draws with them pending.
+#[gpui::test]
+fn assembly_mass_properties_dont_hold_up_the_frame(cx: &mut TestAppContext) {
+    let path = pattern_document(cx, "mass-off-thread");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selected = vec![instance(v, "Part 1 <1>", cx)];
+            v.toggle_mass(w, cx);
+        })
+    })
+    .unwrap();
+    cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+    cx.update(|cx| assert!(view.read(cx).ui.mass_job.as_ref().is_some_and(|j| j.value.is_none()), "worked out in the frame"));
+    draw(cx, window);
+    cx.update(|cx| assert!(view.read(cx).ui.mass_job.as_ref().and_then(|j| j.value.clone()).and_then(|(m, _)| m).is_some(), "the values arrived"));
 }

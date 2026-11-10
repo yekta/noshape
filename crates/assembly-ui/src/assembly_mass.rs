@@ -12,6 +12,13 @@ use super::*;
 use gpui_kit::component::input::InputEvent;
 use noshape_model::assembly::analysis::{AssemblyMass, assembly_mass_properties, face_section_properties};
 use noshape_model::assembly::eval::InstancePath;
+
+/// The Mass dialog's job: (selected instances, the result's address, the parts' densities, variance shown).
+pub type AsmMassKey = (Vec<InstanceId>, usize, std::collections::BTreeMap<(InstancePath, BodyId), Option<f64>>, bool);
+/// Its face section job: (the picked faces, the result's address).
+pub type AsmSectionKey = (Vec<(InstancePath, Reference)>, usize);
+/// Its value: the mass properties and the variance.
+pub type AsmMassValue = (Option<AssemblyMass>, Option<noshape_model::regen::measure::MassProperties>);
 // Shared with the Part Studio's Mass properties (noshape-app-core).
 pub use crate::properties_dialog::{mass_number as number, mass_unit};
 
@@ -34,7 +41,6 @@ pub struct AsmMassUi {
     /// Show calculation variance, and the bounds last computed (by the
     /// instances and the assembly result: two more integrations a part).
     pub variance: bool,
-    variance_cache: Option<(Vec<InstanceId>, usize, Option<noshape_model::regen::measure::MassProperties>)>,
 }
 
 /// The analysis tools of an assembly, in menu order (live assembly/734).
@@ -84,7 +90,7 @@ impl AssemblyView {
                     cx.notify();
                 }
             });
-            self.ui.mass = Some(AsmMassUi { faces: false, face_picks: Vec::new(), connector_active: false, reference: None, warning_closed: false, override_on: stored.is_some(), override_input, _override_sub: sub, variance: false, variance_cache: None });
+            self.ui.mass = Some(AsmMassUi { faces: false, face_picks: Vec::new(), connector_active: false, reference: None, warning_closed: false, override_on: stored.is_some(), override_input, _override_sub: sub, variance: false });
         }
         cx.notify();
     }
@@ -167,40 +173,29 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// Mass properties of the selected instances' parts (nothing when none is
-    /// selected: live 737 leaves every value blank), with each part's
-    /// material density from its Part Studio.
-    fn assembly_mass(&self, cx: &App) -> Option<AssemblyMass> {
-        if self.selected.is_empty() {
-            return None;
-        }
-        let doc = &self.doc.read(cx).session.doc;
-        // Mass overrides count (a part's, a subassembly's), as Onshape weighs them.
-        let densities = self.assembly(cx).map(|a| noshape_model::assembly::analysis::part_densities(doc, a, &self.result)).unwrap_or_default();
-        let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
-        assembly_mass_properties(&self.result, &self.selected, &density)
-    }
-
     /// Show calculation variance: the bounds of the selected instances'
     /// values, computed once per selection and assembly result.
-    fn assembly_variance(&mut self, cx: &App) -> Option<noshape_model::regen::measure::MassProperties> {
-        let key = (self.selected.clone(), Arc::as_ptr(&self.result) as usize);
-        if let Some((s, r, v)) = self.ui.mass.as_ref().and_then(|m| m.variance_cache.as_ref())
-            && *s == key.0
-            && *r == key.1
-        {
-            return v.clone();
-        }
-        let v = {
+    /// The selected instances' mass properties (and, shown, their variance) worked out off the UI thread, once per
+    /// selection, result and densities: `None` while under way.
+    fn assembly_mass_in_background(&mut self, variance: bool, cx: &mut Context<Self>) -> Option<AsmMassValue> {
+        let densities: std::collections::BTreeMap<(InstancePath, BodyId), Option<f64>> = {
             let doc = &self.doc.read(cx).session.doc;
-            let densities = self.assembly(cx).map(|a| noshape_model::assembly::analysis::part_densities(doc, a, &self.result)).unwrap_or_default();
-            let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
-            noshape_model::assembly::analysis::assembly_mass_variance(&self.result, &self.selected, &density)
+            self.assembly(cx).map(|a| noshape_model::assembly::analysis::part_densities(doc, a, &self.result).into_iter().collect()).unwrap_or_default()
         };
-        if let Some(m) = &mut self.ui.mass {
-            m.variance_cache = Some((key.0, key.1, v.clone()));
-        }
-        v
+        let key = (self.selected.clone(), Arc::as_ptr(&self.result) as usize, densities.clone(), variance);
+        let (result, selected) = (self.result.clone(), self.selected.clone());
+        crate::bg_job::bg_job(
+            self,
+            |v| &mut v.ui.mass_job,
+            key,
+            move || {
+                let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
+                let mass = assembly_mass_properties(&result, &selected, &density);
+                let var = if variance { noshape_model::assembly::analysis::assembly_mass_variance(&result, &selected, &density) } else { None };
+                (mass, var)
+            },
+            cx,
+        )
     }
 
     /// The 440 px "Mass and section properties" dialog in the feature-dialog
@@ -210,7 +205,9 @@ impl AssemblyView {
         let (faces, warning_closed, override_on, override_input) = (ui.faces, ui.warning_closed, ui.override_on, ui.override_input.clone());
         let pal = p();
         let units = self.units(cx);
-        let mass = if faces { None } else { self.assembly_mass(cx) };
+        // Off the UI thread (big imported parts take seconds): the values blank until they arrive.
+        let variance_on = self.ui.mass.as_ref().is_some_and(|m| m.variance);
+        let (mass, var) = if faces || self.selected.is_empty() { (None, None) } else { self.assembly_mass_in_background(variance_on, cx).unwrap_or((None, None)) };
         // The top-level row selects every instance: the field then holds the
         // assembly itself (live 739), whose Mass can be overridden.
         let top_level = self.assembly(cx).is_some_and(|a| !self.selected.is_empty() && a.instances.iter().filter(|i| a.generated_by(i.id).is_none()).all(|i| self.selected.contains(&i.id)));
@@ -241,8 +238,6 @@ impl AssemblyView {
         let can_accept = top_level && (overriding || stored);
         // Show calculation variance (live skasm G31): "41032.079 mm³ ± 2.100e+0
         // mm³" after each value, the inertia cells without a unit.
-        let variance_on = self.ui.mass.as_ref().is_some_and(|m| m.variance);
-        let var = if variance_on && !faces && !self.selected.is_empty() { self.assembly_variance(cx) } else { None };
         let with_pm = |text: String, bound: Option<f64>| match bound {
             Some(b) if !text.is_empty() => match text.split_once(' ') {
                 Some((_, unit)) => format!("{text} {} {unit}", crate::quantity_field::plus_minus(b)),
@@ -326,7 +321,13 @@ impl AssemblyView {
         // Face tab (live 851–854): Surface area, Perimeter, the 2×2 area
         // moments and the polar moment (mm⁴), no Override boxes; blank with a
         // red title while the faces aren't coplanar.
-        let section = if faces { face_section_properties(&self.result, &face_picks) } else { None };
+        let section = if faces && !face_picks.is_empty() {
+            let (result, picks) = (self.result.clone(), face_picks.clone());
+            let key = (face_picks.clone(), Arc::as_ptr(&self.result) as usize);
+            crate::bg_job::bg_job(self, |v| &mut v.ui.section_job, key, move || face_section_properties(&result, &picks), cx).flatten()
+        } else {
+            None
+        };
         let not_coplanar = faces && !face_picks.is_empty() && section.is_none();
         if faces {
             let area_dim = noshape_units::Dim { length: 2, angle: 0 };
@@ -363,7 +364,7 @@ impl AssemblyView {
                     let check: AnyElement = if top_level {
                         crate::ui::os_checkbox("amass-override", "Override", override_on)
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                                let computed = this.assembly_mass(cx).and_then(|m| m.props.mass);
+                                let computed = this.ui.mass_job.as_ref().and_then(|j| j.value.as_ref()).and_then(|(m, _)| m.as_ref()).and_then(|m| m.props.mass);
                                 let (sym, factor) = mass_unit(&this.units(cx));
                                 if let Some(m) = &mut this.ui.mass {
                                     m.override_on = !m.override_on;

@@ -9,6 +9,32 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## 2026-11-10 14:34 UTC: heavy work on the UI thread (lead: after the measure P0)
+
+Searched the Part Studio, assembly and app-core UI for kernel-heavy calls (measure, mass, distance, section,
+interference, curvature, thickness) and where they run. A shared helper now does the background part:
+`app_core::bg_job::bg_job(view, slot, key, work, cx)` (the value for the key, `None` while under way; another key
+replaces the job; the view redraws when it arrives).
+
+Fixed (each test: one frame drawn with the work pending, then it arrives):
+- Part Studio readout / Measure panel / its lines (P0, earlier today; whole parts not measured, live 2463).
+- Part Studio Mass properties, Part and Face tabs: `studio_mass_properties` (and the variance) and the faces'
+  `surface_properties` ran in **every frame** of the dialog; now a job per parts × model × densities × variance
+  (`ops::analysis::studio_mass_from` keeps the cheap override / reference part in render).
+- Assembly readout and Measure panel (`measure_entities`, on every selection change and pick).
+- Assembly Mass and section properties: `assembly_mass_properties` and `face_section_properties` ran in **every
+  frame** of the dialog; now jobs keyed by the selection, the result and the parts' densities.
+Already off the thread: interference, thickness, the tab Properties' assembly mass (`open_properties_mass_later`).
+
+Left (once per click, synchronous; big parts would stall that click):
+- Part Studio part › Properties… computed mass (`open_part_meta`, menus.rs) and its center of mass toggle
+  (`toggle_center_of_mass`).
+- Assembly part › Properties… computed mass (`open_metadata_of`, assembly_props.rs), the top row's Properties… total
+  mass (`open_assembly_properties` → `assembly_total_mass`), Show center of mass (`center_of_mass`,
+  assembly_behaviors.rs).
+- Curvature map: `curvature_values` over every mesh on the first frame after it is turned on (cached per display);
+  `vertex_colors` formats the appearances with Debug for its key on each scene build.
+
 ## 2026-11-10 14:18 UTC: user P0, two selected parts froze the app 51 s (landed 592fb25a, fc44c384)
 
 The Part Studio's readout, Measure panel and its lines measured the selection synchronously while drawing

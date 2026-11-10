@@ -407,8 +407,11 @@ pub struct UiState {
     pub sub_dialog: Option<(Entity<crate::feature_dialog::FeatureDialog>, Subscription)>,
     /// The no-material notice is due (shown ≈ 1 s after measuring; the ui-parity driver waits for it).
     pub material_notice_pending: bool,
-    pub mass_variance_cache: Option<(Vec<BodyId>, usize, Option<noshape_model::regen::measure::MassProperties>)>,
-    pub mass_face_variance_cache: Option<(Vec<Reference>, usize, Option<noshape_model::regen::measure::FaceVariance>)>,
+    /// Mass properties' Part tab: the parts' mass properties and their variance, worked out off the UI thread
+    /// (`crate::bg_job`), keyed by the parts, the model, their densities and whether the variance shows.
+    pub mass_job: Option<crate::bg_job::BgJob<PartsMassKey, PartsMass>>,
+    /// Its Face tab's: the faces' properties, keyed by the faces, the model and the variance.
+    pub face_mass_job: Option<crate::bg_job::BgJob<FaceMassKey, FaceMass>>,
     /// Mass Override changed in the open dialog (live ui-mass/10–15): the
     /// part, and its mass (kg; None = unticked, the computed mass). ✓
     /// stores it on the part; the mass box while it is typed into.
@@ -779,8 +782,8 @@ impl UiState {
             mass_state: None,
             sub_dialog: None,
             material_notice_pending: false,
-            mass_variance_cache: None,
-            mass_face_variance_cache: None,
+            mass_job: None,
+            face_mass_job: None,
             mass_override_edit: None,
             mass_override_input: None,
             measure_type: None,
@@ -4655,4 +4658,24 @@ fn remembered_group(kind: &noshape_model::params::ParamKind, units: &noshape_uni
         ParamKind::Num(n) if n.kind == NumKind::Angle => format!("angle:{:?}", units.angle),
         _ => String::new(),
     }
+}
+
+/// Mass properties' Part tab job: (parts, the model's address, their densities, variance shown) → (the parts' mass
+/// properties, their variance).
+pub type PartsMassKey = (Vec<BodyId>, usize, Vec<Option<f64>>, bool);
+pub type PartsMass = (Option<noshape_model::regen::measure::MassProperties>, Option<noshape_model::regen::measure::MassProperties>);
+/// Its Face tab job: (faces, the model's address, variance shown).
+pub type FaceMassKey = (Vec<Reference>, usize, bool);
+
+/// Mass properties' Face tab for some faces: their surface properties when coplanar (and the first one's plane),
+/// the total area and perimeter, the variance.
+#[derive(Clone)]
+pub struct FaceMass {
+    pub any: bool,
+    pub coplanar: bool,
+    pub props: Vec<noshape_kernel::MassProperties>,
+    pub first: Option<noshape_kernel::Plane>,
+    pub area: f64,
+    pub perimeter: f64,
+    pub var: Option<noshape_model::regen::measure::FaceVariance>,
 }
