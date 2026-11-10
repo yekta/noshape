@@ -94,6 +94,32 @@ faster, 12.1-12.4 s vs 8.4-11.1 s with it (vibe5 busy, two rounds each).
   tests 352/352, model and ops Shell tests pass, suite unchanged but for main's own moves, g++-13 builds. The scroll
   wall's offset still doesn't convert (GeomConvert error 0.2885 at 1e-7). The box (6.21 mm) is the query's: core
   (core.md 14:30).
+- **21:07 UTC 11-10 state (lead: flips on a quiet EPYC host, alternating; rulings back after a full gate with the hook
+  live; corner-break after spur gear is back to baseline on main, with quiet-host knurl / gear times).**
+  - **Regression and fix:** 08bd7f2d (17:08) let the 0028 hook answer every plane against an extrusion inside OCCT's
+    Boolean; once 0028's libTKBO reached the hosts (~17:30) OCCT built broken results from our curves across one (a
+    gear's end face on its teeth: cf-spur-gear 6 of 14 differ, one cut's volume 2e-14 m3). My gate for 08bd7f2d ran on
+    the old library (no hook): gates for section changes run with the hook live from now on. 44e52daf (19:56): the hook
+    answers core's coaxial case alone again (kernel 359/359, spur gear / gears / gpf back to baseline with the hook).
+    The lead cancelled v0.4.42 (it had 08bd7f2d).
+  - **Rulings back (branch bool-rulings, fd8765d34, not landed):** the hook answers a plane containing an extrusion's
+    direction only (the rulings; across one stays OCCT's). T1 bool_patterns::occts_section_along_an_extrusion_is_straight
+    and occts_gear_cut_keeps_its_volume (OCCT's path with the hook). Gate rulings1 with the hook live: corpora +
+    parity56, kg, shfall as refine1; OCCT's path alone (NOSHAPE_BOOL_RUST=0) over parity56 / bool-corpus / corpus2 /
+    spur gear, the rulings answer on and off: the same. Model suite (vibe4, against main 44e52daf): features the same
+    on all 88, no document slower. Knurl / gear (vibe5 as it was, load 5-9, alternating with main, our time as a share
+    of OCCT's in the same run; lead 22:0x: no quiet host with seven agents): k25-15 8.2 / 8.5 and 9.7 / 12.1 %, k25-25
+    5.6 / 4.3 and 6.3 / 5.3 %, spur gear 11.5 / 12.9 and 12.7 / 11.4 %: level. Landing 22:3x.
+  - **Corner-break (branch bool-ruled, c92a68896, not landed):** a piece's point past the tolerance off another
+    solid's face is a crossing (the grey band no longer declines it): its four sheet metal fuses ours (86 of 110),
+    OCCT's results. Gate grey1 as refine1 but spur gear (main's hook problem then); model suite (vibe5, main 44e52daf
+    against it) features the same, corner-break 2186 -> 1740 ms (live 1972); alternating on vibe5 (load 2-5) 2203 /
+    1774 ms. kg on main + this: as refine1, spur gear 0 differ. Knurl / gear (vibe5, load 5-8, alternating, share of
+    OCCT's): k25-15 9.1 / 8.4, 11.5 / 10.6, 8.3 / 10.3 %; k25-25 5.1 / 5.2, 6.8 / 7.0 %; spur gear 12.5 / 12.8, 12.7 /
+    12.4, 12.2 / 10.9 %: level. Queued 22:2x (2a12ef51).
+  - **Flips (vibe5, quiet runs, 7c60236c^ / 7c60236c alternating):** under live on main: sm-louver ~4.05 s (live 4.99),
+    bracket03 63 ms (67), butt-joint 145 (191), circular-pattern 188 (237); par_map_each makes no measurable
+    difference to them. Over live: sheet-metal-model-plus ~1.12 s (917), sm-corner-break ~2.25 s (1972).
 - **Landed (15:26 UTC 11-10, 8038dc03; lead: P0 then P1: the fast part distance for the Measured variable,
   query_measure, face pairs): `k::part_distance` (geom.cpp), Measure's min_row / entity_distance on it.** Faces (and free
   edges / vertices) with boxes and, for planar faces, their planes as lower bounds; coarse meshes of copies (faces of
