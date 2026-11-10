@@ -693,3 +693,66 @@ fn a_pattern_fields_configure_takes_the_click(cx: &mut TestAppContext) {
         assert!(v.pattern.is_none() && v.ui.cfg_toast.is_none(), "the pattern and its toast gone");
     });
 }
+
+/// Live asm-standard-content-edit-instance: an inserted instance that snapped on its way (turned onto a face) and then
+/// moves off every part turns back to how it was inserted, and its bounds' bottom centre follows the pointer.
+#[gpui::test]
+fn placing_off_a_snap_turns_the_instance_back(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "unturn");
+    let turned = [0.0, -std::f64::consts::FRAC_1_SQRT_2, 0.0, std::f64::consts::FRAC_1_SQRT_2];
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            v.start_placing(vec![pin], cx);
+            let start = v.ui.place_rotations.clone();
+            assert_eq!(start.len(), 1);
+            let mut solved = v.result.solved.clone();
+            for (id, pl) in &mut solved.placements {
+                if *id == pin {
+                    pl.rotation = turned;
+                }
+            }
+            v.apply_solved(solved, cx);
+            v.ui.place_moved = true;
+            // A corner of the graphics area: off every part.
+            v.pointer = glam::DVec2::new(30.0, 30.0);
+            assert!(v.update_placing(cx), "placed at the pointer");
+            let now = v.result.solved.placement(pin).unwrap().rotation;
+            assert_eq!(now, start[0].1, "turned back from the snap's {turned:?}");
+        })
+    });
+    draw(cx, window);
+}
+
+/// Live asm-menu-dynamic-suppression-edit- / -remove-expression: Undo is off while the Dynamic suppression panel is
+/// open, Escape closes it with nothing selected, and Remove expression says "Dynamic suppression removed.".
+#[gpui::test]
+fn dynamic_suppressions_panel_escape_and_remove(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "dyn-suppression");
+    let target = cx.update(|cx| super::props::DynTarget::Instance(instance(view.read(cx), "Part 2 <1>", cx)));
+    cx.update(|cx| view.update(cx, |v, cx| v.set_dynamic_suppression(target, Some("1 > 2".into()), cx)));
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).history_state(cx).0), "the expression is an undo step");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selected = vec![instance(v, "Part 2 <1>", cx)];
+            v.open_dynamic_suppression(target, w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).history_state(cx)), (false, false), "Undo off while the panel is open");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.on_cancel(&crate::actions::Cancel, w, cx))).unwrap();
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.ui.dynamic_suppression.is_none() && v.selected.is_empty(), "closed, nothing selected");
+        assert!(v.history_state(cx).0, "Undo back");
+    });
+    let remove = super::AssemblyView::dynamic_suppression_entries(target, true);
+    let Some(super::behaviors::MenuEntry::Sub { children, .. }) = remove.iter().find(|e| matches!(e, super::behaviors::MenuEntry::Sub { .. })) else { panic!("Edit dynamic suppression") };
+    let Some(super::behaviors::MenuEntry::Item { act, .. }) = children.iter().find(|e| matches!(e, super::behaviors::MenuEntry::Item { label, .. } if label == "Remove expression")) else { panic!("Remove expression") };
+    let act = act.clone();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| act(v, w, cx))).unwrap();
+    cx.update(|cx| assert_eq!(view.read(cx).message.as_ref().map(|m| m.1.as_str()), Some("Dynamic suppression removed.")));
+}

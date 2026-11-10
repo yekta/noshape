@@ -385,6 +385,9 @@ pub struct AsmUi {
     pub place_snap: Option<(MateConnectorRef, MateConnectorRef)>,
     /// The pointer moved over the graphics area since placing started.
     pub place_moved: bool,
+    /// The instances being placed: their rotations when placing started (a free placement keeps them; a snap's
+    /// orientation doesn't outlast the snap, live asm-standard-content-edit-instance).
+    pub place_rotations: Vec<(InstanceId, [f64; 4])>,
     /// A just-inserted instance's selection: no transform manipulator on it
     /// until the selection changes (live qa5 pass 7, A15).
     pub inserted_selection: Vec<InstanceId>,

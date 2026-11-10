@@ -206,7 +206,10 @@ impl AssemblyView {
         };
         // Live reads them over REST: a mate dialog's preview isn't stored yet.
         let previewing = self.mate.is_some();
-        let instances: Vec<Value> = asm.instances.iter().map(|i| json!({ "name": i.name, "fixed": i.fixed, "transform": transform(if previewing { &i.placement } else { placed.get(&i.id).unwrap_or(&i.placement) }) })).collect();
+        // Live's recorder reads them over REST: what the open Insert dialog inserted shows there only after ✓
+        // (asm-standard-content-edit-instance).
+        let pending = |id: InstanceId| self.insert_open && self.ui.insert_inserted.contains(&id);
+        let instances: Vec<Value> = asm.instances.iter().filter(|i| !pending(i.id)).map(|i| json!({ "name": i.name, "fixed": i.fixed, "transform": transform(if previewing { &i.placement } else { placed.get(&i.id).unwrap_or(&i.placement) }) })).collect();
         // As live's REST gives them: the mateType enum ("PIN_SLOT") and the feature status ("OK"; a suppressed mate's
         // too, asm-mate-menu-suppress).
         let rest_status = |m: &Mate| match mate_state(m) {

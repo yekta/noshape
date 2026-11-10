@@ -221,10 +221,15 @@ impl AssemblyView {
     pub(super) fn dynamic_suppression_entries(target: DynTarget, set: bool) -> Vec<behaviors::MenuEntry> {
         use behaviors::MenuEntry;
         let open: MenuAct = Rc::new(move |t, w, cx| t.open_dynamic_suppression(target, w, cx));
-        let remove: MenuAct = Rc::new(move |t, _, cx| t.set_dynamic_suppression(target, None, cx));
+        let unsuppress: MenuAct = Rc::new(move |t, _, cx| t.set_dynamic_suppression(target, None, cx));
+        // Live asm-menu-dynamic-suppression-remove-expression: "Dynamic suppression removed.".
+        let remove: MenuAct = Rc::new(move |t, _, cx| {
+            t.set_dynamic_suppression(target, None, cx);
+            t.message = Some((false, "Dynamic suppression removed.".into()));
+        });
         let item = |label: &str, act: MenuAct| MenuEntry::Item { label: label.into(), icon: None, disabled: false, act };
         if set {
-            vec![item("Unsuppress", remove.clone()), MenuEntry::Sub { label: "Edit dynamic suppression".into(), children: vec![item("Edit expression…", open), item("Remove expression", remove)] }]
+            vec![item("Unsuppress", unsuppress), MenuEntry::Sub { label: "Edit dynamic suppression".into(), children: vec![item("Edit expression…", open), item("Remove expression", remove)] }]
         } else {
             vec![MenuEntry::Sub { label: "Dynamic suppression".into(), children: vec![item("Add expression…", open)] }]
         }

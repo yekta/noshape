@@ -1468,6 +1468,7 @@ impl AssemblyView {
         // Live Onshape: the instance following the cursor is selected (amber),
         // and deselected once it is placed (assembly/04, 06).
         self.selected = ids.clone();
+        self.ui.place_rotations = ids.iter().filter_map(|id| self.result.solved.placement(*id).map(|p| (*id, p.rotation))).collect();
         self.placing = Some(ids);
         self.placing_point = None;
         self.ui.place_moved = false;
@@ -1593,9 +1594,40 @@ impl AssemblyView {
         let Some((lo, hi)) = bb else { return false };
         let anchor = DVec3::new((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, lo.z);
         let delta = p - anchor;
-        if delta.length() < 1e-12 {
+        let unturn = ids.iter().any(|id| self.ui.place_rotations.iter().any(|(i, r)| i == id && self.result.solved.placement(*id).is_some_and(|p| p.rotation != *r)));
+        if delta.length() < 1e-12 && !unturn {
             return false;
         }
+        let mut solved = self.result.solved.clone();
+        for (id, pl) in &mut solved.placements {
+            if !ids.contains(id) {
+                continue;
+            }
+            pl.translation = (DVec3::from(pl.translation) + delta).into();
+            // Off a snap target the instance turns back to how it was inserted (live: a free drop keeps its frame).
+            if let Some((_, r)) = self.ui.place_rotations.iter().find(|(i, _)| i == id) {
+                pl.rotation = *r;
+            }
+        }
+        if unturn {
+            // The bounds moved with the rotation: put their bottom centre back under the cursor.
+            self.apply_solved(solved, cx);
+            return self.update_placing_after_unturn(&ids, p, cx);
+        }
+        self.apply_solved(solved, cx);
+        true
+    }
+
+    /// [`update_placing`](Self::update_placing) after turning the instances back: their bounds' bottom centre to `p`.
+    fn update_placing_after_unturn(&mut self, ids: &[InstanceId], p: DVec3, cx: &mut Context<Self>) -> bool {
+        let mut bb: Option<(DVec3, DVec3)> = None;
+        for id in ids {
+            if let Some((a, b)) = self.result.instance_bounds(*id) {
+                bb = Some(bb.map(|(x, y)| (x.min(a), y.max(b))).unwrap_or((a, b)));
+            }
+        }
+        let Some((lo, hi)) = bb else { return true };
+        let delta = p - DVec3::new((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, lo.z);
         let mut solved = self.result.solved.clone();
         for (id, pl) in &mut solved.placements {
             if ids.contains(id) {
@@ -1916,6 +1948,8 @@ impl AssemblyView {
             None if self.pattern.is_some() => self.pattern.as_ref().map_or((false, false), |p| (!p.toggle_history.0.is_empty(), !p.toggle_history.1.is_empty())),
             // The Driving mate selector has no picks to undo (live asm-mate-menu-edit-driver-mate).
             None if self.ui.np_driver.is_some() => (false, false),
+            // Nor the Dynamic suppression panel (live: Undo off while it is open).
+            None if self.ui.dynamic_suppression.is_some() => (false, false),
             None => {
                 let d = self.doc.read(cx);
                 (d.can_undo(), d.can_redo())
@@ -6433,6 +6467,15 @@ impl AssemblyView {
             self.close_zebra(false, cx);
         } else if self.ui.mass.is_some() {
             self.ui.mass = None;
+            cx.notify();
+        } else if self.ui.dynamic_suppression.is_some() {
+            // As its ✕, and the target isn't selected any more (live asm-menu-dynamic-suppression-edit-expression).
+            self.ui.dynamic_suppression = None;
+            self.ui.dyn_applied = None;
+            self.selected.clear();
+            self.selected_mate = None;
+            window.focus(&self.focus, cx);
+            self.refresh_scene(false, cx);
             cx.notify();
         } else if let Some(p) = self.pattern.take() {
             // Its Configure goes with it, and the toast that said so (live asm-pattern-field-configure).
