@@ -1,18 +1,19 @@
 {
  "scenario": "drw-centermark",
- "recorded": "2026-11-06T11:49:34.841Z",
+ "recorded": "2026-11-10T09:57:01.512Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.2 backfilled"
+  "recorder": "2026-11-10.2 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "702bfdab3ed7ad3ab16e127d",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "5a1eef25f317761c0c1be053",
   "start": "hole-plate-drawing",
-  "startElement": "164441c15ca44d6dfc6c413e"
+  "startElement": "e14cce55628fbf2ae4425d70",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -21,6 +22,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -110,6 +112,7 @@
      ]
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -168,7 +171,7 @@
      "selection": []
     }
    },
-   "t": 216597
+   "t": 233974
   },
   {
    "step": 2,
@@ -209,6 +212,7 @@
      ]
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -263,11 +267,16 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "centermark",
+       "text": null
+      }
+     ],
      "selection": []
     }
    },
-   "t": 234473
+   "t": 260450
   },
   {
    "step": 3,
@@ -276,6 +285,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1054,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -283,6 +300,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -346,7 +364,7 @@
      "selection": []
     }
    },
-   "t": 250926
+   "t": 287039
   }
  ]
 }

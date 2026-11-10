@@ -1,19 +1,19 @@
 {
  "scenario": "drw-copy-annotation-drag",
- "recorded": "2026-11-07T11:28:08.223Z",
+ "recorded": "2026-11-10T08:49:59.722Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0 + live2 2026-11-07.5"
+  "recorder": "2026-11-10.2 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "2b852a59418cf84a7eca44ef",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "c0003108506bc1336f140642",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -41,7 +41,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (1)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -121,7 +121,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -161,7 +161,7 @@
      "selection": []
     }
    },
-   "t": 214250
+   "t": 232871
   },
   {
    "step": 2,
@@ -240,7 +240,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -280,7 +280,7 @@
      "selection": []
     }
    },
-   "t": 228274
+   "t": 260232
   },
   {
    "step": 3,
@@ -350,7 +350,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -390,7 +390,7 @@
      "selection": []
     }
    },
-   "t": 244150
+   "t": 285805
   },
   {
    "step": 4,
@@ -434,7 +434,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -479,7 +479,7 @@
      "selection": []
     }
    },
-   "t": 260752
+   "t": 312440
   },
   {
    "step": 5,
@@ -488,6 +488,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     931,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -514,7 +522,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -559,7 +567,7 @@
      "selection": []
     }
    },
-   "t": 275446
+   "t": 337931
   },
   {
    "step": 6,
@@ -577,6 +585,7 @@
     "mods": "alt"
    },
    "ok": true,
+   "mods": "alt",
    "at": [
     [
      665,
@@ -613,7 +622,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -653,12 +662,16 @@
       {
        "kind": "note",
        "text": "TEMP"
+      },
+      {
+       "kind": "note",
+       "text": "TEMP"
       }
      ],
      "selection": []
     }
    },
-   "t": 298472
+   "t": 381746
   }
  ]
 }

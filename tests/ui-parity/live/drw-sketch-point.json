@@ -1,19 +1,19 @@
 {
  "scenario": "drw-sketch-point",
- "recorded": "2026-11-07T12:15:36.680Z",
+ "recorded": "2026-11-10T09:09:25.497Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0 + live2 2026-11-07.5"
+  "recorder": "2026-11-10.2 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "54a363588d72cbac8843723a",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "953fcbd561b7a928c5eb8fea",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -41,7 +41,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (1)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -121,7 +121,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -161,7 +161,7 @@
      "selection": []
     }
    },
-   "t": 221807
+   "t": 236840
   },
   {
    "step": 2,
@@ -205,7 +205,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -245,7 +245,7 @@
      "selection": []
     }
    },
-   "t": 236562
+   "t": 262714
   },
   {
    "step": 3,
@@ -254,6 +254,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1149,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -280,7 +288,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -325,7 +333,7 @@
      "selection": []
     }
    },
-   "t": 252965
+   "t": 289897
   }
  ]
 }

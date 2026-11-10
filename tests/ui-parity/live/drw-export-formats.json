@@ -1,19 +1,19 @@
 {
  "scenario": "drw-export-formats",
- "recorded": "2026-11-07T08:41:17.705Z",
+ "recorded": "2026-11-10T09:20:37.801Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0 + live2 2026-11-07.5"
+  "recorder": "2026-11-10.2 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "ae5239b1dfcf9360086b7274",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "800f05fba2c6b9beabc3999c",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -92,7 +92,7 @@
    },
    "ok": true,
    "at": [
-    775,
+    1097,
     976
    ],
    "state": {
@@ -177,7 +177,7 @@
      "selection": []
     }
    },
-   "t": 238042
+   "t": 231703
   },
   {
    "step": 2,
@@ -189,7 +189,7 @@
    },
    "ok": true,
    "at": [
-    806,
+    1128,
     926
    ],
    "state": {
@@ -308,7 +308,7 @@
      "selection": []
     }
    },
-   "t": 255844
+   "t": 265579
   },
   {
    "step": 3,
@@ -433,7 +433,7 @@
      "selection": []
     }
    },
-   "t": 286162
+   "t": 305602
   },
   {
    "step": 4,
@@ -472,7 +472,7 @@
       {
        "label": "Version",
        "kind": "select",
-       "value": "2018"
+       "value": "2000"
       },
       {
        "label": "Sheets",
@@ -586,7 +586,7 @@
      "selection": []
     }
    },
-   "t": 301270
+   "t": 320639
   },
   {
    "step": 5,
@@ -739,7 +739,7 @@
      "selection": []
     }
    },
-   "t": 316024
+   "t": 335124
   },
   {
    "step": 6,
@@ -857,7 +857,7 @@
      "selection": []
     }
    },
-   "t": 332579
+   "t": 349587
   },
   {
    "step": 7,
@@ -975,7 +975,7 @@
      "selection": []
     }
    },
-   "t": 350324
+   "t": 364933
   },
   {
    "step": 8,
@@ -1056,7 +1056,7 @@
      "selection": []
     }
    },
-   "t": 367993
+   "t": 390989
   }
  ]
 }
