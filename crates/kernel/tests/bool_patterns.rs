@@ -331,6 +331,22 @@ fn a_plane_along_an_extrusion_cuts_it_in_straight_lines() {
     assert!((info.length - 10.0 * mm).abs() <= 1e-12, "{} m", info.length);
 }
 
+/// A sheet metal part's fuse of its flanges and bends (c2-sm-corner-break, 8 tools, recorded): a flange's face 20 um
+/// off a tool's (the tolerance 1e-5, four times that the grey band) is apart from it, as OCCT's: noshape's Boolean
+/// takes it (it declined), OCCT's result and history.
+#[test]
+fn a_face_just_past_the_tolerance_off_another_is_apart() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "773bcfdd61290a9f").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert_eq!(k::bool_corpus::Summary::of(&r).differences(&c.summary), Vec::<String>::new());
+}
+
 /// A sheet metal enclosure's fuse (qa4 S1: the flanges, bends and hem, recorded): noshape's Boolean's result valid and
 /// OCCT's volume. A bend on a trimmed left-handed cylinder came out the other way round: invalid, 7 mm³ more
 /// (RUST-SM-CUT-VOLUME).

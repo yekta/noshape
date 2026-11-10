@@ -3411,7 +3411,9 @@ impl Ctx<'_> {
                     if t.abs() > GREY * tol && !boxes_meet(q3, q3, g.lo, g.hi, GREY * tol) {
                         continue;
                     }
-                    if t.abs() <= GREY * tol {
+                    // (Within the tolerance: on the face. Past it, within the grey band, a crossing as any other: a sheet
+                    // metal part's flange 20 um off a tool's face (tolerance 1e-5) declined, OCCT keeping them apart.)
+                    if t.abs() <= tol {
                         if distance2(g.to2(p), gb) > tol && inside2(g.to2(p), gb) {
                             return Err(Decline("a piece's point on another solid's face"));
                         }
