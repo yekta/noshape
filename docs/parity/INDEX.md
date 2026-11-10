@@ -53,4 +53,8 @@ live and run in qa's 4-hourly run; coverage then grows as the owner writes more.
   complete run before it (qa 2026-11-08 14:11, 4b09e98c), recomputed from its models.log (each document slower than
   live is listed there with its feature-list time; the others are at or under live by it): **Speed 70.8 % → 81.7 %**
   (40 → 60 of 98 cases at or under live), **index 78.67 → 79.75**.
-
+- 2026-11-10 22:15 UTC (lead, qa): **Speed is measured on vibe5's EPYC, not vibe3's Xeon** (vibe3 runs our documents 1.5–2.5×
+  slower; live's times are absolute). vibe5 is shared, so each document's time carries the host's 1-minute load
+  (models-timed.log); a clean measurement is taken in the lead's 02:00–04:00 UTC window. The 15:02 run (e3a19f63)
+  recomputed with only its speed stage moved (same index.py, same other areas): **Speed 81.9 % → 90.2 %** (57 → 78 of 97 cases
+  at or under live), **index 90.5 → 91.4**, under load 4.1–11.8.
