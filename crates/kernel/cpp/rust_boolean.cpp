@@ -3928,6 +3928,10 @@ const char* brep_body_cached(const OcShape& s, BrepBody& b, double& max_tol) { r
 // other pair: 0, OCCT's own section as before.
 extern "C" int noshape_face_face(const TopoDS_Face& theF1, const TopoDS_Face& theF2, NCollection_Sequence<IntTools_Curve>& theCurves)
 {
+  // (NOSHAPE_BOOL_OWN_FACE_FACE=0: OCCT's own everywhere, to compare.)
+  static const bool off = std::getenv("NOSHAPE_BOOL_OWN_FACE_FACE") != nullptr && std::string(std::getenv("NOSHAPE_BOOL_OWN_FACE_FACE")) == "0";
+  if (off)
+    return 0;
   try
   {
     std::vector<IntTools_Curve> lines;
@@ -3942,8 +3946,14 @@ extern "C" int noshape_face_face(const TopoDS_Face& theF1, const TopoDS_Face& th
     if (!ours)
       return 0;
     const noshape::KernelTimer timer("occt.own_face_face");
-    for (const IntTools_Curve& c : lines)
+    // (Bounded, as OCCT's own: its pave filler drops a curve without bounds, so a whole circle is a trimmed one; an
+    // unbounded one left a full round's torus whole where live splits it along the bore.)
+    for (IntTools_Curve& c : lines)
+    {
+      if (!c.HasBounds() && !c.Curve().IsNull() && !Precision::IsInfinite(c.Curve()->FirstParameter()) && !Precision::IsInfinite(c.Curve()->LastParameter()))
+        c.SetCurves(new Geom_TrimmedCurve(c.Curve(), c.Curve()->FirstParameter(), c.Curve()->LastParameter()), c.FirstCurve2d(), c.SecondCurve2d());
       theCurves.Append(c);
+    }
     return 1;
   }
   catch (...)
