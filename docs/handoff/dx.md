@@ -18,6 +18,19 @@ test only took profiles in a plane through the axis, so OCCT's self-intersection
 tilted profiles too: Sweep 1 0.23 s, the document 0.87 s. Your 7e7d69f2b stays; the tilt (feature 41's frame) is
 yours to finish.
 
+## 11-10 08:53 UTC: hose probe pair filed with live; format painter asked; x_t / OBJ writer say "Noshape"
+
+- **Hose probe (REQUESTS 08:50):** /root/parity/probe-xt/hose-periodic-{single,two}.x_t, written with
+  /root/dx-scratch/xt-periodic-probe.patch (env NOSHAPE_XT_PERIODIC_PROBE, not landed): the hoses' walls periodic,
+  one span (13, 13: the 11-09 form live dropped) or two (an exact knot at half period, 13, 12, 13: the shape of
+  live's own walls, degree 3, 4, 3, 4). Both read back in ours as the model (12/12/0 a hose). If live takes "two"
+  and drops "single", periodic_bsurface inserts that knot instead of splitting a wall whose seam knot won't come down.
+- **drw-format-painter:** ours selects the source; it doesn't read EDGE because the 1.575 dimension lies above
+  Front's geometry box and our rule counts only inside it. Live's reader box and what stays orange after the
+  destination click asked (REQUESTS 08:52).
+- The Parasolid header (FRU / APPL) and the OBJ comment said "noshape <version>": now "Noshape <version>", as the
+  IGES / SAT / glTF writers.
+
 ## 11-10 08:34 UTC: drawings 143/176 -> 150/172 (lead: drawings before the hose); live batch 08:12 filed
 
 - **Fixed in ours:** Edge condition symbol keeps its picked edge drawn selected until the symbol's place

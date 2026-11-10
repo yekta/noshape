@@ -522,7 +522,7 @@ pub fn write_parasolid_assembly(path: &Path, root: &str, parts: &[ExportShape], 
             (0..3).flat_map(move |r| [m.x_axis[r], m.y_axis[r], m.z_axis[r], m.w_axis[r] * f])
         })
         .collect();
-    ck(ffi::write_parasolid_assembly(&l, &names, &colours, root, &part, &tf, path_str(path)?, version, &format!("noshape {}", crate::VERSION)))
+    ck(ffi::write_parasolid_assembly(&l, &names, &colours, root, &part, &tf, path_str(path)?, version, &format!("Noshape {}", crate::VERSION)))
 }
 
 /// [`write_parasolid`] in Parasolid version `version` (one of
@@ -532,7 +532,7 @@ pub fn write_parasolid_version(path: &Path, shapes: &[Shape], unit: LengthUnit, 
     let f = unit.mm_per_unit() * 1e-3;
     let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
-    ck(ffi::write_parasolid(&l, &[], &[], path_str(path)?, binary, version, &format!("noshape {}", crate::VERSION)))
+    ck(ffi::write_parasolid(&l, &[], &[], path_str(path)?, binary, version, &format!("Noshape {}", crate::VERSION)))
 }
 
 /// Parasolid's bare binary (`B`, little-endian, as Windows writers such as Cadenas PARTsolutions write vendor parts;
@@ -542,7 +542,7 @@ pub fn write_parasolid_bare(path: &Path, shapes: &[Shape], unit: LengthUnit) -> 
     let f = unit.mm_per_unit() * 1e-3;
     let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
-    ck(ffi::write_parasolid_bare(&l, path_str(path)?, PARASOLID_VERSIONS[0], &format!("noshape {}", crate::VERSION)))
+    ck(ffi::write_parasolid_bare(&l, path_str(path)?, PARASOLID_VERSIONS[0], &format!("Noshape {}", crate::VERSION)))
 }
 
 /// [`write_parasolid_version`] of named, coloured parts (sRGB 0–1): Onshape
@@ -553,7 +553,7 @@ pub fn write_parasolid_parts(path: &Path, parts: &[ExportShape], unit: LengthUni
     let v = parts.iter().map(|p| scaled(&p.shape, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
     let (names, colours) = names_colours(parts);
-    ck(ffi::write_parasolid(&l, &names, &colours, path_str(path)?, binary, version, &format!("noshape {}", crate::VERSION)))
+    ck(ffi::write_parasolid(&l, &names, &colours, path_str(path)?, binary, version, &format!("Noshape {}", crate::VERSION)))
 }
 
 /// Parts' names ("" when none) and colours (3 per part, NaN when none).
