@@ -330,6 +330,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-10 17:00 release (qa list 07:20, checked on green 4f5863a2 = v0.4.41's cut, the newest 3-platform green, CI 42768928011; the latest release is v0.4.41, cut 07:00 without a qa list)
+- **qa 07:20: no blocker.** v0.4.40 = v0.4.39 + the lead's icon fix (23afb1a2e) only. v0.4.41 = 4f5863a26, 56 commits past
+  v0.4.39's cut. Its sweeps on vibe3 (volume sweep 20, cf corpus 13, the 48 ticket documents) = green 4e549553 exactly. GUI
+  fuzz on green 57f3d800: seeds 7427–7840, 0 deaths (now on 4f5863a2). No CLI fuzz ran overnight (qa was out of quota).
+  The suites since 20:08 had lost their model / assembly / exchange stage (vibe2 gone): it runs on vibe3 now. A fresh run on
+  4f5863a2 started 07:02.
+- v0.4.41 is the first release with dx's 7e7d69f2b (P0 FAN-BLADE-SWEEP-HANG, c2-fan-blade-sweep's Sweep 1 331 s) and with
+  core's fix b5da62f83 (192 s -> 0.2 s). The 07:02 suite run times that document on the cut.
+- Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 T2-ASM-STANDARD-CONTENT-HANG (a T2 bench in ops,
+  not the app nor asm: ticket updated 07:30). Long-running P0s: BLEND-RUST, SHELL-SLOW, REGEN-SPEED.
+
 ## Release blockers for the 2026-11-09 17:00 release (qa list 16:34, cut 1b99f7a95 = green 4e549553's code + qa docs; the latest release is v0.4.38)
 - **qa 16:34: no blocker.** Greens since v0.4.38's cut (62a7e4bc5) with geometry changes swept on vibe3 (volume sweep 20, cf corpus
   13, the 48 ticket documents): f5e9f8c6 → 4e549553, all unchanged except f5e9f8c6's two fuzz ticket documents, for the better
@@ -3955,14 +3966,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Assemblies (asm)
-- [ ] P1 T2-ASM-STANDARD-CONTENT-HANG (asm; T2 hang) **the nightly T2 run's assembly tests never finish on vibe2**: the binary
-  `target-t2/debug/deps/all-*` of the assembly crate, run `--ignored --exact` with assembly::tests::
-  standard_content_parts_regenerate_with_mate_connectors first (then tapping_screw_tips_regenerate,
-  tapping_screw_recesses_iii_and_vi, … the 26 assembly::tests T2 cases), keeps one core at ~85 % for days: copies from the
-  nights of 11-07 and 11-08 had run 27 h and 50 h when the lead killed them (11-09 ~05:10); tonight's (started 02:09:52 on
-  vibe2) still ran at 05:15. The lead's nightly T2 now stops at 4 h. Their load (8 cores, 12–13) slowed qa's 18:54 and 23:24
-  model suites ~1.5× (SUITE-REGRESSIONS-1108). Find which case spins (run them one by one with a timeout) and fix or bound it.
-  (qa 2026-11-09 05:16, from the lead)
+- [ ] P1 T2-ASM-STANDARD-CONTENT-HANG (lead / core, was asm; T2 hang) **the nightly T2 never finishes: the spinning test
+  is ops' `regen_profile::bench_edit_latency`, not an assembly test** (qa 2026-11-10 07:30). The process the lead saw
+  listed `assembly::tests::standard_content_parts_regenerate_with_mate_connectors` first only because t2.sh hands all
+  333 T2 names to every test binary and the assembly names come first. On 4f5863a26 (vibe4, debug): that test alone passes in
+  25 s (333 catalogue parts, none over 1 s); all 26 assembly T2 tests together pass in 77.5 s; the nightly's own log
+  (vibe4 ~/lead/t2-2026-11-10.log, stopped at 4 h, 14,401 s) has the assembly binary "26 passed … 80.51 s", and in ops'
+  `all` binary every test ended except `regen_profile::bench_edit_latency` (running since the binary's start).
+  bench_edit_latency is `#[ignore = "T2 bench: tools/tiers/perf.sh"]`: it edits every parameter of every document in
+  tests/perf and ~/agents/profdocs (draft-hang, knurl-diamond, fins-400, parts-1000, …) with reuse off, each edit a full
+  regeneration, in a debug build here. Its reuse twin finished. Fix: t2-names.py leaves out the `T2 bench` tests (8 of
+  them, run by perf.sh in release), or the bench is bounded. Earlier nights (11-07 / 11-08, vibe2: copies killed after 27 h /
+  50 h) were most likely the same binary; their logs went with vibe2. (qa 2026-11-09 05:16, from the lead)
 - [ ] P3 SETLIB-STANDARD-CONTENT (asm, studios 11-08, lead ruling) Set library's "My standard content": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `standard_content` to the folder the user chose (Documents › a
   folder's Set library ▸ "My standard content", op `documents_set_library`; `libraries.json` in the config dir; one folder per
   library, setting another replaces it). The assembly's Insert › Standard content (assembly-ui assembly_standard.rs) should list, next to Onshape's own library, a "My standard content" entry holding

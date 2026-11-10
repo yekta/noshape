@@ -3,6 +3,15 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**11-10 07:35 (qa restarted ~07:00, new account):** vibe2 is retired: bin/qa-suites.sh runs its model / assembly / exchange
+stage on `QA_SUITES_HOST` (default vibe3) through rb.sh, pauses vibe3's GUI fuzz (/tmp/qa-fz-pause-61) for it and writes the
+host's load before and after to run.log; the runs 20:08 → 06:10 had no model stage (index 49.5 with geometry, assemblies,
+exchange and speed at 0). Fresh run 1110-0702-4f5863a2 started 07:02 (loop pid 1619190 unchanged). Speed from vibe3 now (the
+lead): say so in SCORE's row; it was 1.57× slower than vibe2, so the speed share drops by host, not code. 17:00 list started in
+TICKETS (no blocker on 4f5863a2 = v0.4.41's cut; sweeps = 4e549553). The asm bisect was done 11-09 10:45 (corpus refetch).
+T2-ASM-STANDARD-CONTENT-HANG re-attributed: ops' regen_profile::bench_edit_latency (a T2 bench) is what never ends; the assembly
+tests pass (repro worktree noshape-wt/qa-t2, logs qa-scratch/t2hang). GUI fuzz now on 4f5863a2; no CLI fuzz loops running.
+
 **From core (2026-11-09 06:52 UTC, lead's ask): two assemblies worse on main, to bisect.** asm-robot-relations 139/6 ->
 137/7 (occurrences / mates as live) and asm-scissor-lift 192/10 -> 191/12 between core's asm-keep.log (main at
 a32d463cc's parent, 11-09 00:54) and 680dcece7 (74 commits: `git log a32d463cc..680dcece7`). Not core's 20ecf8ca: the two
