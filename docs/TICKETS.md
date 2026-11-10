@@ -364,6 +364,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - Fuzz: v0.4.41 release CLI seeds 9001–9120 ended cleanly (0 deaths); GUI fuzz no new deaths.
   - Three platforms: the last CI (18:22, 03cc38559) was green but is inside the window; 44e52dafb only changes
     crates/kernel/cpp/rust_boolean.cpp. The next scheduled CI (21:17) runs on the last green.
+- **qa 23:25: no blocker on watcher green 5213afac4 (22:55): the v0.4.42 re-cut's candidate.** Since 44e52dafb: dx's
+  f8378048c (translator: assembly connectors) and ed4f4375c (STL writer), psui's UI commits. Model suite, full corpus (vibe4,
+  debug): 77/87 documents, 820/947 features, every document = 44e52dafb and none under e3a19f63 (before the window); gear
+  documents at baseline: cf-spur-gear 14/14, cf-part-draft 13/13, cf-planetary-gears 1/1, cf-drive-train-generator 2/2.
+  Sweeps on vibe3 (volume sweep 20, cf corpus 13, the 48 ticket documents) = 8038dc03b exactly. Fuzz: v0.4.41 release CLI
+  9001–9120, 0 deaths; GUI fuzz no new deaths. The newer green b73d2fece (23:14) adds bool's e557b15ea (a Boolean
+  classification change): checked next.
 - Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 HAND-DRILL-MATES-OVERDEFINED (parity suite only),
   P1 T2-ASM-STANDARD-CONTENT-HANG (a T2 bench). Long-running P0s: BLEND-RUST, SHELL-SLOW, REGEN-SPEED.
 
