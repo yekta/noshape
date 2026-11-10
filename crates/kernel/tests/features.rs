@@ -350,6 +350,87 @@ fn deleting_a_boss_through_a_curved_wall_cuts_its_region_away() {
     assert!((removed - 23_474.97).abs() < 0.5, "{removed} mm³ removed");
 }
 
+/// cf-lighten's Lighten deletes its tools' rounds before rounding them again: a prism's rounds between plane sides,
+/// convex or concave, go by running the sides on to their corner (the prism built again, as OCCT's Defeaturing).
+#[test]
+fn a_prisms_rounds_are_deleted_by_running_its_sides_on() {
+    let plane = Plane::xy();
+    let (r, k) = (5.0, 1.0 - PI / 4.0);
+    let l = |a: (f64, f64), b: (f64, f64)| Segment2d::Line { a: DVec2::new(a.0, a.1), b: DVec2::new(b.0, b.1) };
+    let arc = |c: (f64, f64), r: f64, a0: f64, a1: f64| Segment2d::Arc { center: DVec2::new(c.0, c.1), radius: r, start_angle: a0.to_radians(), end_angle: a1.to_radians() };
+    let rounded = [
+        l((-15.0, -10.0), (15.0, -10.0)),
+        arc((15.0, -5.0), r, -90.0, 0.0),
+        l((20.0, -5.0), (20.0, 5.0)),
+        arc((15.0, 5.0), r, 0.0, 90.0),
+        l((15.0, 10.0), (-15.0, 10.0)),
+        arc((-15.0, 5.0), r, 90.0, 180.0),
+        l((-20.0, 5.0), (-20.0, -5.0)),
+        arc((-15.0, -5.0), r, 180.0, 270.0),
+    ];
+    let plate = extrude(&make_face_2d(&plane, &rounded, &[]).unwrap(), DVec3::new(0.0, 0.0, 10.0)).unwrap().shape;
+    let rounds: Vec<Shape> = plate.faces().into_iter().filter(|f| matches!(f.face_surface().unwrap(), Surface::Cylinder { .. })).collect();
+    assert_eq!(rounds.len(), 4);
+    let d = delete_faces(&plate, &rounds[..2]).unwrap();
+    assert!(d.shape.is_valid());
+    assert_eq!(d.shape.faces().len(), 8);
+    assert!(close(d.shape.volume().unwrap(), 10.0 * (800.0 - 2.0 * r * r * k), 1e-6), "{}", d.shape.volume().unwrap());
+    // Every kept face has its image, on its own surface placed as it was (a plane read off it the same as off
+    // OCCT's result: cf-surface-pattern's Plane 4); the deleted ones none.
+    let out = d.shape.faces();
+    for (i, f) in plate.faces().iter().enumerate() {
+        let img = d.history.modified(0, ShapeType::Face, i as u32);
+        let deleted = rounds[..2].iter().any(|g| g.is_same(f));
+        assert_eq!(img.len(), usize::from(!deleted), "face {i}");
+        let Some(&j) = img.first() else { continue };
+        let (was, now) = (f.face_surface().unwrap(), out[j as usize].face_surface().unwrap());
+        match (was, now) {
+            (Surface::Plane(a), Surface::Plane(b)) => assert!(a.normal.dot(b.normal) > 1.0 - 1e-12 && a.x_dir.dot(b.x_dir) > 1.0 - 1e-12, "face {i}: {a:?} -> {b:?}"),
+            (Surface::Cylinder { axis: a, x_dir: x, .. }, Surface::Cylinder { axis: b, x_dir: y, .. }) => assert!(a.dot(b) > 1.0 - 1e-12 && x.dot(y) > 1.0 - 1e-12, "face {i}"),
+            (a, b) => panic!("face {i}: {a:?} -> {b:?}"),
+        }
+        if let (Ok(Some(a)), Ok(Some(b))) = (f.face_plane(), out[j as usize].face_plane()) {
+            assert!(a.normal.dot(b.normal) > 1.0 - 1e-12, "face {i}: outward {:?} -> {:?}", a.normal, b.normal);
+        }
+    }
+    // A concave round: an L's inner corner.
+    let ri = 3.0;
+    let c = std::f64::consts::FRAC_1_SQRT_2 * ri;
+    let ell = [
+        l((0.0, 0.0), (40.0, 0.0)),
+        l((40.0, 0.0), (40.0, 10.0)),
+        l((40.0, 10.0), (13.0, 10.0)),
+        Segment2d::Arc3 { a: DVec2::new(13.0, 10.0), mid: DVec2::new(13.0 - c, 13.0 - c), b: DVec2::new(10.0, 13.0) },
+        l((10.0, 13.0), (10.0, 30.0)),
+        l((10.0, 30.0), (0.0, 30.0)),
+        l((0.0, 30.0), (0.0, 0.0)),
+    ];
+    let solid = extrude(&make_face_2d(&plane, &ell, &[]).unwrap(), DVec3::new(0.0, 0.0, 10.0)).unwrap().shape;
+    assert!(close(solid.volume().unwrap(), 10.0 * (600.0 + ri * ri * k), 1e-6));
+    let round: Vec<Shape> = solid.faces().into_iter().filter(|f| matches!(f.face_surface().unwrap(), Surface::Cylinder { .. })).collect();
+    let d = delete_faces(&solid, &round).unwrap();
+    assert!(d.shape.is_valid());
+    assert_eq!(d.shape.faces().len(), 8);
+    assert!(close(d.shape.volume().unwrap(), 6000.0, 1e-6), "{}", d.shape.volume().unwrap());
+    // A round between a line and an arc: a quarter disc's corner.
+    let (big, rr) = (30.0_f64, 3.0);
+    let cx = ((big - rr).powi(2) - rr * rr).sqrt();
+    let at = rr.atan2(cx);
+    let quarter = [
+        l((0.0, 0.0), (cx, 0.0)),
+        Segment2d::Arc { center: DVec2::new(cx, rr), radius: rr, start_angle: -PI / 2.0, end_angle: at },
+        Segment2d::Arc { center: DVec2::ZERO, radius: big, start_angle: at, end_angle: PI / 2.0 },
+        l((0.0, big), (0.0, 0.0)),
+    ];
+    let disc = extrude(&make_face_2d(&plane, &quarter, &[]).unwrap(), DVec3::new(0.0, 0.0, 10.0)).unwrap().shape;
+    let small: Vec<Shape> = disc.faces().into_iter().filter(|f| matches!(f.face_surface().unwrap(), Surface::Cylinder { radius, .. } if radius < 5.0)).collect();
+    assert_eq!(small.len(), 1);
+    let d = delete_faces(&disc, &small).unwrap();
+    assert!(d.shape.is_valid());
+    assert_eq!(d.shape.faces().len(), 5);
+    assert!(close(d.shape.volume().unwrap(), 10.0 * PI * big * big / 4.0, 1e-6), "{}", d.shape.volume().unwrap());
+}
+
 #[test]
 fn split_and_section() {
     let b = box10();

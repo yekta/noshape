@@ -42,6 +42,7 @@
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <ElCLib.hxx>
 #include <ElSLib.hxx>
+#include <gp_Circ2d.hxx>
 #include <ShapeBuild_ReShape.hxx>
 #include <GeomAPI_PointsToBSpline.hxx>
 #include <Geom_SphericalSurface.hxx>
@@ -9206,6 +9207,322 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> defeature_by_region(const T
   return std::make_pair(r, h);
 }
 
+// A prism's rounds deleted: two plane caps square to one direction, the other faces planes along it or cylinders
+// about axes along it, each deleted one a cylinder whose two neighbours (lines or arcs in the caps) run on to where
+// they meet, edited in place (cf-lighten's Lighten rounds its tools again: OCCT's Defeaturing took 35-70 ms per tool);
+// false where the shape isn't such a prism or a neighbour would be cut back.
+static bool delete_prism_rounds(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& del, TopoDS_Shape& out, HHist& hist)
+{
+  if (solid.ShapeType() != TopAbs_SOLID || del.empty())
+    return false;
+  auto gone = [&](const TopoDS_Shape& f) { return std::any_of(del.begin(), del.end(), [&](const TopoDS_Shape& d) { return d.IsSame(f); }); };
+  BRepAdaptor_Surface first(TopoDS::Face(del[0]));
+  if (first.GetType() != GeomAbs_Cylinder)
+    return false;
+  const gp_Dir dir = first.Cylinder().Axis().Direction();
+  ShapeIMap fm;
+  TopExp::MapShapes(solid, TopAbs_FACE, fm);
+  std::vector<TopoDS_Face> caps;
+  int                      dels = 0;
+  for (int i = 1; i <= fm.Extent(); ++i)
+  {
+    const TopoDS_Face   f = TopoDS::Face(fm(i));
+    BRepAdaptor_Surface a(f);
+    const bool          d = gone(f);
+    dels += d;
+    if (a.GetType() == GeomAbs_Plane && a.Plane().Axis().Direction().IsParallel(dir, 1e-9) && !d)
+      caps.push_back(f);
+    else if (a.GetType() == GeomAbs_Plane && std::abs(a.Plane().Axis().Direction().Dot(dir)) < 1e-9 && !d)
+      continue;
+    else if (a.GetType() != GeomAbs_Cylinder || !a.Cylinder().Axis().Direction().IsParallel(dir, 1e-9))
+      return false;
+  }
+  if (caps.size() != 2 || dels != (int)del.size())
+    return false;
+  for (const TopoDS_Face& c : caps)
+  {
+    int wires = 0;
+    for (TopExp_Explorer w(c, TopAbs_WIRE); w.More(); w.Next())
+      ++wires;
+    if (wires != 1)
+      return false;
+  }
+  const gp_Pln p0 = BRepAdaptor_Surface(caps[0]).Plane(), p1 = BRepAdaptor_Surface(caps[1]).Plane();
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+  // The outline: cap 0's edges in order, each with the side face along it, in the cap's plane coordinates.
+  struct Seg
+  {
+    TopoDS_Edge e;
+    TopoDS_Face side;
+    bool        gone;
+    gp_Pnt2d    a, b, m;
+    bool        line;
+    gp_Circ2d   circ;
+    bool        ccw;
+  };
+  auto flat = [&](const gp_Pnt& p) {
+    double x, y;
+    ElSLib::Parameters(p0, p, x, y);
+    return gp_Pnt2d(x, y);
+  };
+  const double two_pi = 2 * M_PI;
+  auto turn = [&](const Seg& s, const gp_Pnt2d& from, const gp_Pnt2d& to) {
+    const double t0 = ElCLib::Parameter(s.circ, from), t1 = ElCLib::Parameter(s.circ, to);
+    return std::fmod((s.ccw ? t1 - t0 : t0 - t1) + 2 * two_pi, two_pi);
+  };
+  std::vector<Seg> segs;
+  for (BRepTools_WireExplorer ex(BRepTools::OuterWire(caps[0]), caps[0]); ex.More(); ex.Next())
+  {
+    const TopoDS_Edge& e = ex.Current();
+    const int          k = ef.FindIndex(e);
+    if (k == 0 || ef(k).Extent() != 2)
+      return false;
+    Seg sg;
+    sg.e = e;
+    for (const TopoDS_Shape& f : ef(k))
+      if (!f.IsSame(caps[0]))
+        sg.side = TopoDS::Face(f);
+    sg.gone = gone(sg.side);
+    TopoDS_Vertex va, vb;
+    TopExp::Vertices(e, va, vb, true);
+    sg.a = flat(BRep_Tool::Pnt(va));
+    sg.b = flat(BRep_Tool::Pnt(vb));
+    BRepAdaptor_Curve c(e);
+    sg.m    = flat(c.Value(0.5 * (c.FirstParameter() + c.LastParameter())));
+    sg.line = c.GetType() == GeomAbs_Line;
+    sg.ccw  = true;
+    if (!sg.line)
+    {
+      if (c.GetType() != GeomAbs_Circle)
+        return false;
+      const gp_Circ cc = c.Circle();
+      sg.circ          = gp_Circ2d(gp_Ax2d(flat(cc.Location()), gp_Dir2d(1, 0)), cc.Radius());
+      const double ab = turn(sg, sg.a, sg.b), am = turn(sg, sg.a, sg.m);
+      sg.ccw          = am < ab;
+    }
+    segs.push_back(sg);
+  }
+  const int n = (int)segs.size();
+  if (n != fm.Extent() - 2 || n - dels < 3)
+    return false;
+  for (int i = 0; i < n; ++i)
+    for (int j = i + 1; j < n; ++j)
+      if (segs[i].side.IsSame(segs[j].side))
+        return false;
+  // Where two neighbours run on meet: of their crossings, the one nearest the round between them.
+  auto meet = [&](const Seg& p, const Seg& q, const gp_Pnt2d& by, gp_Pnt2d& x) {
+    std::vector<gp_Pnt2d> xs;
+    auto on_line = [](const Seg& s, std::vector<gp_Pnt2d>& out, const Seg& c) {
+      const gp_Vec2d u(s.a, s.b);
+      const gp_Vec2d w(c.circ.Location(), s.a);
+      const double   A = u.SquareMagnitude(), B = 2 * u.Dot(w), C = w.SquareMagnitude() - c.circ.Radius() * c.circ.Radius();
+      const double   D = B * B - 4 * A * C;
+      if (A <= 0 || D < 0)
+        return;
+      for (int sgn : {-1, 1})
+        out.push_back(s.a.Translated(u * ((-B + sgn * std::sqrt(D)) / (2 * A))));
+    };
+    if (p.line && q.line)
+    {
+      const gp_Vec2d u(p.a, p.b), v(q.a, q.b), w(p.a, q.a);
+      const double   c = u.Crossed(v);
+      if (std::abs(c) < 1e-9 * u.Magnitude() * v.Magnitude())
+        return false;
+      xs.push_back(p.a.Translated(u * (w.Crossed(v) / c)));
+    }
+    else if (p.line || q.line)
+      on_line(p.line ? p : q, xs, p.line ? q : p);
+    else
+    {
+      const gp_Pnt2d c0 = p.circ.Location(), c1 = q.circ.Location();
+      const double   r0 = p.circ.Radius(), r1 = q.circ.Radius(), d = c0.Distance(c1);
+      if (d < 1e-12)
+        return false;
+      const double a = (d * d + r0 * r0 - r1 * r1) / (2 * d), h2 = r0 * r0 - a * a;
+      if (h2 < 0)
+        return false;
+      const gp_Vec2d e(c0, c1);
+      const gp_Pnt2d mid = c0.Translated(e * (a / d));
+      const gp_Vec2d perp(-e.Y() / d, e.X() / d);
+      for (int sgn : {-1, 1})
+        xs.push_back(mid.Translated(perp * (sgn * std::sqrt(h2))));
+    }
+    if (xs.empty())
+      return false;
+    x = *std::min_element(xs.begin(), xs.end(), [&](const gp_Pnt2d& a, const gp_Pnt2d& b) { return a.Distance(by) < b.Distance(by); });
+    return true;
+  };
+  // A neighbour only grows: a line past its end, an arc turning further.
+  const double tol = 1e-7;
+  auto grows = [&](const Seg& s, const gp_Pnt2d& from, const gp_Pnt2d& to) {
+    if (s.line)
+    {
+      const gp_Vec2d u(s.a, s.b);
+      return gp_Vec2d(s.a, to).Dot(u) >= u.SquareMagnitude() - tol * u.Magnitude() &&
+             gp_Vec2d(s.a, from).Dot(u) <= tol * u.Magnitude();
+    }
+    const double was = turn(s, s.a, s.b), now = turn(s, from, to);
+    return now >= was - tol / s.circ.Radius() && now < two_pi - 1e-6;
+  };
+  std::vector<gp_Pnt2d> start(n), end(n);
+  for (int i = 0; i < n; ++i)
+    start[i] = segs[i].a, end[i] = segs[i].b;
+  for (int i = 0; i < n; ++i)
+  {
+    if (!segs[i].gone)
+      continue;
+    const int ip = (i + n - 1) % n, iq = (i + 1) % n;
+    if (segs[ip].gone || segs[iq].gone)
+      return false;
+    gp_Pnt2d x;
+    if (!meet(segs[ip], segs[iq], segs[i].m, x))
+      return false;
+    end[ip]   = x;
+    start[iq] = x;
+  }
+  for (int i = 0; i < n; ++i)
+    if (!segs[i].gone && !grows(segs[i], start[i], end[i]))
+      return false;
+  // In place, as OCCT's Defeaturing: each round and its cap edges go, its neighbours' cap edges run on along their own
+  // curves to the corner, and the two edges it shared with them become one there; every other face, edge and surface
+  // is the same as before (a face's plane, an edge's direction are read off them: a mid plane's normal).
+  auto lift   = [&](const gp_Pnt2d& q) { return ElSLib::Value(q.X(), q.Y(), p0); };
+  auto shared = [](const TopoDS_Shape& a, const TopoDS_Shape& b) {
+    for (TopExp_Explorer x(a, TopAbs_EDGE); x.More(); x.Next())
+      for (TopExp_Explorer y(b, TopAbs_EDGE); y.More(); y.Next())
+        if (x.Current().IsSame(y.Current()))
+          return TopoDS::Edge(x.Current().Oriented(TopAbs_FORWARD));
+    return TopoDS_Edge();
+  };
+  const gp_Vec                                         n1(p1.Axis().Direction());
+  const double                                         den = gp_Vec(dir).Dot(n1);
+  BRepTools_ReShape                                    rs;
+  std::vector<TopoDS_Edge>                             fresh;
+  std::vector<std::pair<TopoDS_Vertex, TopoDS_Vertex>> moved;
+  if (std::abs(den) < 1e-12)
+    return false;
+  for (int i = 0; i < n; ++i)
+  {
+    if (!segs[i].gone)
+      continue;
+    const Seg &r = segs[i], &p = segs[(i + n - 1) % n], &q = segs[(i + 1) % n];
+    const gp_Pnt        x0 = lift(end[(i + n - 1) % n]);
+    const gp_Pnt        x1 = x0.Translated(gp_Vec(dir) * (gp_Vec(x0, p1.Location()).Dot(n1) / den));
+    const TopoDS_Vertex vx[2] = {BRepBuilderAPI_MakeVertex(x0).Vertex(), BRepBuilderAPI_MakeVertex(x1).Vertex()};
+    const TopoDS_Edge   pr = shared(p.side, r.side), rq = shared(r.side, q.side);
+    if (pr.IsNull() || rq.IsNull())
+      return false;
+    // The corner edge runs as the round's edge with its first neighbour did.
+    auto from0 = [&](const TopoDS_Edge& e) {
+      const gp_Pnt a = BRep_Tool::Pnt(TopExp::FirstVertex(e));
+      return p0.Distance(a) < p1.Distance(a);
+    };
+    const TopoDS_Edge corner = from0(pr) ? BRepBuilderAPI_MakeEdge(vx[0], vx[1]).Edge() : BRepBuilderAPI_MakeEdge(vx[1], vx[0]).Edge();
+    rs.Replace(pr, corner);
+    rs.Replace(rq, from0(rq) == from0(pr) ? corner : TopoDS::Edge(corner.Reversed()));
+    fresh.push_back(corner);
+    for (int c = 0; c < 2; ++c)
+    {
+      const TopoDS_Edge re = shared(r.side, caps[c]);
+      if (re.IsNull())
+        return false;
+      moved.emplace_back(TopExp::FirstVertex(re), vx[c]);
+      moved.emplace_back(TopExp::LastVertex(re), vx[c]);
+      rs.Remove(re);
+    }
+    rs.Remove(r.side);
+  }
+  // The neighbours' cap edges: their ends at a round moved to its corner, on their own curves.
+  auto to = [&](const TopoDS_Vertex& v) {
+    for (const auto& [from, x] : moved)
+      if (from.IsSame(v))
+        return x;
+    return TopoDS_Vertex();
+  };
+  for (int k = 0; k < n; ++k)
+  {
+    if (segs[k].gone || (!segs[(k + n - 1) % n].gone && !segs[(k + 1) % n].gone))
+      continue;
+    for (const TopoDS_Face& cap : caps)
+    {
+      const TopoDS_Edge e = shared(segs[k].side, cap);
+      if (e.IsNull())
+        return false;
+      TopoDS_Vertex a, b;
+      TopExp::Vertices(e, a, b);
+      const TopoDS_Vertex na = to(a), nb = to(b);
+      if (na.IsNull() && nb.IsNull())
+        continue;
+      double                        f, l;
+      const occ::handle<Geom_Curve> crv = BRep_Tool::Curve(e, f, l);
+      if (crv.IsNull())
+        return false;
+      auto at = [&](const TopoDS_Vertex& v, double near_to, int way) {
+        GeomAPI_ProjectPointOnCurve pr(BRep_Tool::Pnt(v), crv);
+        if (pr.NbPoints() == 0 || pr.LowerDistance() > tol)
+          return std::nan("");
+        double u = pr.LowerDistanceParameter();
+        if (crv->IsPeriodic())
+        {
+          const double per = crv->Period();
+          while (way > 0 && u < near_to - 1e-9)
+            u += per;
+          while (way < 0 && u > near_to + 1e-9)
+            u -= per;
+        }
+        return u;
+      };
+      const double nf = na.IsNull() ? f : at(na, f, -1), nl = nb.IsNull() ? l : at(nb, l, 1);
+      if (!(nf <= f + 1e-9 && nl >= l - 1e-9 && nl > nf))
+        return false;
+      BRepBuilderAPI_MakeEdge me(crv, na.IsNull() ? a : na, nb.IsNull() ? b : nb, nf, nl);
+      if (!me.IsDone())
+        return false;
+      rs.Replace(e, me.Edge());
+      fresh.push_back(me.Edge());
+    }
+  }
+  TopoDS_Shape result = rs.Apply(solid);
+  ShapeFix_Edge fix;
+  for (TopExp_Explorer fx(result, TopAbs_FACE); fx.More(); fx.Next())
+    for (TopExp_Explorer ex(fx.Current(), TopAbs_EDGE); ex.More(); ex.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(ex.Current());
+      if (std::none_of(fresh.begin(), fresh.end(), [&](const TopoDS_Edge& g) { return g.IsSame(e); }))
+        continue;
+      double f, l;
+      if (BRep_Tool::CurveOnSurface(e, TopoDS::Face(fx.Current()), f, l).IsNull())
+      {
+        fix.FixAddPCurve(e, TopoDS::Face(fx.Current()), false, tol);
+        if (fix.Status(ShapeExtend_FAIL))
+          return false;
+      }
+    }
+  for (const TopoDS_Edge& e : fresh)
+    fix.FixSameParameter(e);
+  ShapeIMap rm;
+  TopExp::MapShapes(result, TopAbs_FACE, rm);
+  GProp_GProps g;
+  BRepGProp::VolumeProperties(result, g);
+  if (result.IsNull() || rm.Extent() != fm.Extent() - dels || g.Mass() <= 0 || !BRepCheck_Analyzer(result).IsValid())
+    return false;
+  hist = new BRepTools_History();
+  ShapeIMap em;
+  TopExp::MapShapes(solid, TopAbs_EDGE, em);
+  for (const ShapeIMap* m : {&fm, &em})
+    for (int i = 1; i <= m->Extent(); ++i)
+    {
+      const TopoDS_Shape v = rs.Value((*m)(i));
+      if (v.IsNull())
+        hist->Remove((*m)(i));
+      else if (!v.IsSame((*m)(i)))
+        hist->AddModified((*m)(i), v);
+    }
+  out = result;
+  return true;
+}
+
 static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
 {
   require_non_null(s.shape, "shape");
@@ -9213,6 +9530,15 @@ static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
     fail_invalid("delete face needs at least one face");
   check_faces_in(s.shape, faces.items);
   dump_op("defeature", s.shape, faces.items, "defeature");
+  {
+    TopoDS_Shape prism;
+    HHist        ph;
+    if (!std::getenv("NOSHAPE_DEFEATURE_OCCT") && delete_prism_rounds(s.shape, faces.items, prism, ph))
+    {
+      std::vector<TopoDS_Shape> args{s.shape};
+      return make_result(args, prism, ph.get());
+    }
+  }
   BRepAlgoAPI_Defeaturing mk;
   mk.SetShape(s.shape);
   mk.AddFacesToRemove(to_list(faces.items));

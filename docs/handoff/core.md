@@ -33,6 +33,15 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-10 22:00 UTC: delete face of a prism's rounds in place (cf-lighten 602 -> ~218 ms, live 114).**
+- cf-lighten's Lighten 1 re-rounds its tools (opModifyFillet): OCCT's Defeaturing took 35-70 ms per tool, 242 of its
+  431 ms. `delete_prism_rounds` (features.cpp, tried first in op_defeature; NOSHAPE_DEFEATURE_OCCT=1 skips it): a
+  prism whose deleted faces are rounds between lines or arcs; the round's neighbours run on to their meeting point,
+  edited in place with BRepTools_ReShape as OCCT does, every other face, surface and edge kept. A rebuilt prism
+  (MakePrism) wasn't enough: new surfaces and edge directions flipped cf-surface-pattern's Plane 4 (a mid plane of an
+  edge after Draft 1's delete). T1 kernel features::a_prisms_rounds_are_deleted_by_running_its_sides_on.
+- learning-center-michael's Fillet 2 (630 / 46 ms) is bool's (blend.md speed survey: the 12-tool ball cut).
+
 **State 11-10 20:15 UTC: the model suite's failing features in core's area (lead: by features lost, skip blend / bool).**
 - Landed 730d6f28: c2-impeller-loft's Extrude 4 (a region picked by its edge's side along a spline) takes live's rib.
   Model suite on main 44e52daf: 77/87 documents, 820/947 features (818 before; hex-bookcase 15 -> 17, psui's), nothing worse.
@@ -44,8 +53,13 @@ What blend takes over:
 - cf-surface-pattern SP3 (3 features): Loft 1's middle v knot (live 0.49687, ours 0.50033). Live 2421's lofts rule out
   chord means, centroids, poles and arc length along the v columns (C: live 0.440475, chord mean 0.444477, arc 0.4402,
   but no change on cf; A's pairing differs from live's: one 34-pole surface there, our 4 faces). Asked for C's poles
-  (REQUESTS core 20:02). Probe: kernel `surfacing::loft_middle_knot_probe` (local, not landed). SP3's 6.7 s (live
-  0.54 s) is its Boolean: our B-rep path 1 s then OCCT's ~5 s (bool's).
+  (REQUESTS core 20:02). Probe: kernel `surfacing::loft_middle_knot_probe` (/root/core-scratch/loftknot/probe.patch).
+  SP3's 6.7 s (live 0.54 s) is its Boolean: our B-rep path 1 s then OCCT's ~5 s (bool's).
+- Live 2474 (core/q2469/poles.txt): C's middle section sits exactly at the knot and the v columns are natural cubics
+  through the sections (P1 202.91160961 mm, ours the same at that k): only k's rule differs. Ruled out since: every
+  single section measure (an equivalent offset would be 19.72 mm: mean |p| 21.37, centroids 20.89-20.95, pole / box
+  centre 20.62), the v columns' bending energy minimised (0.469-0.482), arc length over 11 sample sets x 3 starts x
+  1-7 passes (best 1.2e-4 off). Parked (P3, 3 features) until a rule fits; scripts in /root/core-scratch/loftknot.
 
 **State 11-10 14:58 UTC: the Windows "Rib Dizisi" P0 (lead): tangent coaxial sections, ours and OCCT's (patch 0028).**
 - Cause: a user's rib pattern fuses 0.4 mm rounds (tori) touching a Ø46 mm cylinder from inside along a circle
