@@ -1039,6 +1039,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     (mates 1/4 → 3/6). Assembly results 1262 → 1261/1731.
   - psui (recording, not code): doc-tab-properties-drawing step 2 `.dialog.fields[10].value` live "11/09/2026", ours
     "11/10/2026": the field shows today's date, so the scenario differs on every day after live recorded it.
+  **qa 19:36, the 15:02 run (green e3a19f63) against the 07:02 one:** features 816 → 817/947, scenarios 1354 → 1375/1450,
+  exchange 42 → 43/48 live imports ours, index 90.4 → 90.5. No new failure. Speed: c2-hunting-knife 0.9 → 1.4 s (×1.6;
+  the host ran ~7 % slower) and c2-hex-bookcase-derived 280 → 563 ms (live 290): both re-checked in the 19:02 run before
+  filing.
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):

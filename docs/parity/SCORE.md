@@ -140,6 +140,7 @@ mirror-face-type (a live DOM detail).
 | 2026-11-09 | 4e549553 (12:21 run; vibe2 with the T2 hang) | 88.7 | 83.1 | 98.1 | 72.9 | 99.2 | 89.0 | 100.0 | 91.7 | 79.1 | 92.5 | 98.5 | 93.9 | 88.8 |
 | 2026-11-09 | 4e549553 (the model suite alone on vibe2 from load 1.0, 16:26–16:57; speed by feature time; the other areas from the 12:21 run) | 88.7 | 83.1 | 98.1 | 72.9 | 99.2 | 89.0 | 100.0 | 91.7 | 79.4 | 92.5 | 98.5 | 93.3 | 88.8 |
 | 2026-11-10 | 4f5863a2 = v0.4.41 (07:02 run; models / assemblies / exchange on vibe3 from load 0.7, vibe2 retired; speed by feature time on vibe3) | 90.4 | 86.2 | 98.1 | 72.8 | 97.2 | 90.4 | 100.0 | 91.7 | 84.3 | 92.5 | 98.5 | 93.5 | 95.4 |
+| 2026-11-10 | e3a19f63 (15:02 run; its vibe3 stage redone 16:43–19:23 after a link failure, models from load 3.3 beside other agents' jobs, ~7 % slower than 10:59) | 90.5 | 86.3 | 98.1 | 72.8 | 97.9 | 94.4 | 100.0 | 92.7 | 81.9 | 92.5 | 98.5 | 93.9 | 95.7 |
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
