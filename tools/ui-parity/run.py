@@ -720,6 +720,9 @@ def compare(live, ours, whole_document=True):
             for f in ((side.get("dialog") or {}).get("fields") or []) if isinstance(side.get("dialog"), dict) else []:
                 if isinstance(f, dict) and f.get("label") == "Drawn by" and f.get("value"):
                     f["value"] = "<user>"
+                # A date the day sets (Date drawn, Last changed date: today's on each side) as a date, not the literal.
+                if isinstance(f, dict) and "date" in str(f.get("label") or "").lower() and isinstance(f.get("value"), str) and re.fullmatch(r"\d{2}/\d{2}/\d{4}", f["value"]):
+                    f["value"] = "<MM/DD/YYYY>"
         # The Free plan's public-document icon's tooltip under the pointer (docs-row-menu): ours has no public documents.
         if a.get("tooltip") == "This is a public document." and b.get("tooltip") is None:
             b["tooltip"] = a["tooltip"]
