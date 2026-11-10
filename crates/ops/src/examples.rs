@@ -263,6 +263,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("assembly_standard_content", &[r##"{}"##, r##"{"standard": "ISO", "category": "Bolts & screws", "class": "Socket head screws", "component": "Hex socket head cap screw ISO 4762"}"##]),
     ("assembly_insert_standard", &[r##"{"component": "Hex socket head cap screw ISO 4762", "holes": [{"instance": "Base <1>", "entity": "face:…"}], "auto_size": true}"##]),
     ("assembly_edit_standard", &[r##"{"instances": ["Hex socket head cap screw M6x1.00 x 20 <1>"], "length": "30"}"##]),
+    ("assembly_standard_properties", &[r##"{"instance": "Hex socket head cap screw M6x1.00 x 20 <1>", "part_number": "SHCS-0620", "description": "M6 x 20 cap screw"}"##, r##"{"component": "Hex socket head cap screw ISO 4762", "size": "M6x1.00"}"##]),
     // drawings
     ("assembly_edit_in_context", &[r##"{"instance": "Part 1 <1>"}"##, r##"{"instance": "Part 1 <1>", "context": "Context 1"}"##]),
     ("assembly_create_part_studio_in_context", &[r##"{"origin": "Mate connector 1"}"##]),

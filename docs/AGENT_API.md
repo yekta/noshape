@@ -325,7 +325,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move), [`variable_insert_studio`](#variable_insert_studio), [`variable_remove_studio`](#variable_remove_studio), [`variable_move_studio`](#variable_move_studio), [`variable_create_studio`](#variable_create_studio), [`variable_studio_settings`](#variable_studio_settings)
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_duplicate_input`](#config_duplicate_input), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
-- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_snap`](#assembly_snap), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_measure`](#assembly_measure), [`assembly_mass_properties`](#assembly_mass_properties), [`assembly_update_references`](#assembly_update_references), [`assembly_properties`](#assembly_properties), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_reorder`](#assembly_reorder), [`assembly_mate_value`](#assembly_mate_value), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_add_to_named_positions`](#assembly_add_to_named_positions), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_animate`](#assembly_animate), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_move_instance`](#assembly_move_instance), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance), [`assembly_switch_to_tab`](#assembly_switch_to_tab), [`assembly_open_linked_document`](#assembly_open_linked_document)
+- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_snap`](#assembly_snap), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_measure`](#assembly_measure), [`assembly_mass_properties`](#assembly_mass_properties), [`assembly_update_references`](#assembly_update_references), [`assembly_properties`](#assembly_properties), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_reorder`](#assembly_reorder), [`assembly_mate_value`](#assembly_mate_value), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_add_to_named_positions`](#assembly_add_to_named_positions), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_animate`](#assembly_animate), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_move_instance`](#assembly_move_instance), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_standard_properties`](#assembly_standard_properties), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance), [`assembly_switch_to_tab`](#assembly_switch_to_tab), [`assembly_open_linked_document`](#assembly_open_linked_document)
 - **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly), [`context_go_to_assembly`](#context_go_to_assembly)
 - **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_edit_detail`](#drawing_edit_detail), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_edit_hatch`](#drawing_edit_hatch), [`drawing_element_properties`](#drawing_element_properties), [`drawing_format_line`](#drawing_format_line), [`drawing_title_field`](#drawing_title_field), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_image`](#drawing_image), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_edge_condition`](#drawing_edge_condition), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit), [`drawing_mbd`](#drawing_mbd), [`drawing_table_properties`](#drawing_table_properties), [`drawing_copy`](#drawing_copy), [`drawing_paste`](#drawing_paste), [`drawing_change_configuration`](#drawing_change_configuration), [`drawing_paste_table`](#drawing_paste_table), [`drawing_replace`](#drawing_replace), [`drawing_replicate`](#drawing_replicate), [`drawing_switch_to_reference`](#drawing_switch_to_reference), [`drawing_pin_reference`](#drawing_pin_reference), [`drawing_update_references`](#drawing_update_references), [`drawing_open_feature_studio`](#drawing_open_feature_studio), [`drawing_switch_sheet`](#drawing_switch_sheet), [`drawing_sheets_panel`](#drawing_sheets_panel)
 - **ui**: [`ui_state`](#ui_state), [`ui_preferences`](#ui_preferences), [`ui_toolbar`](#ui_toolbar), [`ui_search_tools`](#ui_search_tools), [`ui_shortcuts`](#ui_shortcuts), [`ui_select`](#ui_select), [`ui_list`](#ui_list)
@@ -2301,7 +2301,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio, Assembly or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `kind` | one of `list`, `checkbox`, `variable` | required | Input kind. |
-| `name` | string |  | Name (a List: "Configuration", then "List input 1"...; required for a Checkbox, whose id is made from it as live's ("My flag" → My_flag), and for a variable: its #name). |
+| `name` | string |  | Name (a List: "Configuration", then "List input 1"...; required for a Checkbox, whose id is made from it as live's ("My flag" → My_flag), and for a variable: its shown name, its FeatureScript id made from it, the reply's `input`, which `#` names: `#len`). |
 | `default` | boolean |  | Checkbox: Default (checked, as live's dialog opens). |
 | `variable_kind` | one of `LENGTH`, `ANGLE`, `INTEGER`, `REAL`, `TEXT` |  | Variable: kind (default LENGTH). |
 | `value` | string or number |  | Variable: default value expression. |
@@ -2310,6 +2310,8 @@ Examples:
 #### config_edit_input
 
 Rename a configuration input or change a configuration variable's default and range (edits the document (one undoable history entry)).
+
+`name` renames the input as its ⋯ › Rename: the shown name only ("size (#len)"); a configuration variable keeps its FeatureScript id, so its `#id` uses keep working, in Part Studios and Assemblies (live 2458). Changing the id is config_edit_ids. `value` / `range`: a variable's default and range (Edit definition…).
 
 Examples:
 
@@ -2526,7 +2528,7 @@ Examples:
 
 Edit FeatureScript IDs of a configuration input and its options (edits the document (one undoable history entry)).
 
-Edit FeatureScript IDs…: the input's id and, for a List, its options' ids (`options`: {current option id or name: new id}); configured values follow.
+Edit FeatureScript IDs… (Part Studios and Variable Studios; an Assembly has none, as live): the input's id and, for a List, its options' ids (`options`: {current option id or name: new id}); configured values follow. As live's "Break references and change ID", expressions using a variable's old `#id` aren't rewritten: they fail as undefined until changed (live 2458).
 
 Examples:
 
@@ -3618,6 +3620,36 @@ Examples:
 | `auto_size` | boolean |  | Auto-size: the size fitting the first hole (bolts and screws round down, nuts and washers up). |
 | `placement` | one of `insert`, `closest`, `furthest` |  | Insert, Insert closest to selection (against the face, under what is there) or Insert furthest from selection (at the end of the stack). |
 | `flip` | boolean |  | Flip the part on its mate connector (the `a` key). |
+
+#### assembly_standard_properties
+
+A standard content part's Part number and Description.
+
+The Insert panel's pencil and a standard content instance's Properties…: the Part number and Description of one configuration, kept on this computer for every document (company / user wide, as live), not in the document. Give `instance` (a standard content instance of the assembly) or the component as assembly_insert_standard takes it. Without `part_number` / `description`, reads them; `description` null (or the generated text) goes back to the generated one. Returns the part number, the description shown and the generated description.
+
+Examples:
+
+```json
+{"instance": "Hex socket head cap screw M6x1.00 x 20 <1>", "part_number": "SHCS-0620", "description": "M6 x 20 cap screw"}
+{"component": "Hex socket head cap screw ISO 4762", "size": "M6x1.00"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
+| `instance` | string |  | A standard content instance (id or name); else the component fields. |
+| `standard` | string |  | Standard. |
+| `category` | string |  | Category. |
+| `class` | string |  | Class. |
+| `component` | string |  | Component. |
+| `size` | string |  | Size (default: the component's default, or auto-size from the first hole with `auto_size`). |
+| `length` | string |  | Length (default: the size's first). |
+| `params` | object |  | Other selects: {label: option}. |
+| `material` | string |  | Material. |
+| `finish` | string |  | Finish. |
+| `part_number` | string |  | Part number (empty: none). |
+| `description` | string or null |  | Description (null: the generated one). |
 
 #### assembly_edit_standard
 
@@ -5708,6 +5740,10 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | An Assembly tab for the assembly toolbar (default: the Part Studio toolbar). |
 | `set` | object |  | Settings to change (see the reply). |
+| `add_custom_features` | array of string |  | Add custom features (the ⊞ panel's rows): custom feature `type` ids to put on the toolbar (a Feature Studio's row: all of its features), for every Part Studio of this user, kept alphabetical; the reply's `messages` are live's toasts. |
+| `remove_custom_features` | array of string |  | Custom feature `type` ids taken off the toolbar (a second click in the panel, or Remove in the ▾). |
+| `document` | string |  | With add_custom_features: the document the features come from (a .noshape path), for the toast's version. |
+| `version` | string |  | With `document`: its named version ("V1"): the toast says "from version V1" ("from published version V1" when published). |
 
 #### ui_search_tools
 
@@ -6393,7 +6429,7 @@ Examples:
 
 Measure entities (lengths, areas, radii, distances, angles).
 
-The Measure tool: one entity gives its length/area/radius...; two give the minimum distance (with dx, dy, dz) and the angle between them. Values in workspace units.
+The Measure tool: one entity gives its length/area/radius...; two give the minimum distance (with dx, dy, dz) and the angle between them. Values in workspace units. A whole part among them gives no measurement, as Onshape (live 2463: its readout and Measure panel stay empty; measure its faces, edges or vertices, or its volume with query_mass).
 
 Examples:
 

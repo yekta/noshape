@@ -63,6 +63,24 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "assembly",
+            verb: "standard_properties",
+            summary: "A standard content part's Part number and Description",
+            description: "The Insert panel's pencil and a standard content instance's Properties…: the Part number and Description of one configuration, kept on this computer for every document (company / user wide, as live), not in the document. Give `instance` (a standard content instance of the assembly) or the component as assembly_insert_standard takes it. Without `part_number` / `description`, reads them; `description` null (or the generated text) goes back to the generated one. Returns the part number, the description shown and the generated description.",
+            fields: {
+                let mut f = vec![doc_field(), asm_field(), opt("instance", s(), "A standard content instance (id or name); else the component fields.")];
+                f.extend(spec_fields());
+                f.extend([
+                    opt("part_number", s(), "Part number (empty: none)."),
+                    opt("description", json!({ "type": ["string", "null"] }), "Description (null: the generated one)."),
+                ]);
+                f
+            },
+            mutates: false,
+            destructive: false,
+            run: properties,
+        },
+        Op {
+            group: "assembly",
             verb: "edit_standard",
             summary: "Edit standard content instances (size, length, selects, material, finish)",
             description: "Edit standard content instance…: the instances take the new values and keep their mates.",
@@ -243,6 +261,47 @@ fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     v["inserted"] = json!(ids.iter().map(|i| format!("inst:{}", i.0)).collect::<Vec<_>>());
     v["spec"] = spec_json(&spec);
     Ok(v.into())
+}
+
+fn properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let spec = match a.opt_str("instance")? {
+        Some(key) => {
+            let (od, tab) = target(ctx, a)?;
+            let asm: &Assembly = assembly(od, tab)?;
+            let id = find_instance(asm, key, "instance")?;
+            asm.instance(id).and_then(|i| i.source.standard()).cloned().ok_or_else(|| OpError::param("instance", "not standard content"))?
+        }
+        None => {
+            let c = find_component(a)?;
+            apply_spec(StandardSpec::new(c), c, a)?
+        }
+    };
+    let generated = spec.description();
+    let mut props = crate::standard_props::std_props(&spec);
+    let mut changed = false;
+    if let Some(n) = a.opt_str("part_number")? {
+        props.part_number = n.trim().to_string();
+        changed = true;
+    }
+    // (`get` drops a null; null here means the generated description.)
+    match a.value.get("description") {
+        None => {}
+        Some(Value::Null) => {
+            props.description = None;
+            changed = true;
+        }
+        Some(Value::String(d)) => {
+            // (The generated text itself is no description of its own.)
+            let d = d.trim().to_string();
+            props.description = (d != generated).then_some(d);
+            changed = true;
+        }
+        Some(_) => return Err(OpError::param("description", "a string, or null for the generated description")),
+    }
+    if changed {
+        crate::standard_props::save_std_props(&spec, props.clone());
+    }
+    Ok(json!({ "spec": spec_json(&spec), "part_number": props.part_number, "description": props.description.clone().unwrap_or_else(|| generated.clone()), "generated_description": generated, "own_description": props.description.is_some() }).into())
 }
 
 fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

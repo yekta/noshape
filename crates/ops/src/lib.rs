@@ -53,6 +53,7 @@ pub mod shortcuts;
 pub mod show_code;
 pub mod sketch_export;
 pub mod sketch_use;
+pub mod standard_props;
 pub mod studio;
 pub mod tab_move;
 pub mod tool_search;

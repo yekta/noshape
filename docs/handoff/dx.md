@@ -24,6 +24,21 @@ test only took profiles in a plane through the axis, so OCCT's self-intersection
 tilted profiles too: Sweep 1 0.23 s, the document 0.87 s. Your 7e7d69f2b stays; the tilt (feature 41's frame) is
 yours to finish.
 
+## 11-10 16:30 UTC: agent API audit of the last two days' UI (lead)
+
+- **STANDARD-CONTENT-PROPS-OP:** the Part number / Description store moved from assembly-ui to ops
+  (`standard_props.rs`, same file and keys); op `assembly_standard_properties` (an instance or the component; null
+  description = the generated one). e2e standard_content_part_number_and_description.
+- **Custom features on the toolbar:** `ui_toolbar` gains `add_custom_features` / `remove_custom_features` (a studio's
+  row = all its ids), alphabetical as the panel keeps them, live's toast per feature added in `messages` ("… from
+  (published) version V1" with `document` + `version`); `set.custom_features` sorts too. e2e custom_features_on_the_toolbar.
+- **Measure:** `query_measure` gives no measurement with a whole part among the entities (live 2463, psui fc44c384),
+  with a `note`; assembly_measure takes only entities already. e2e measure_takes_no_whole_part (none existed).
+- **Configuration variables:** config_add_input / config_edit_input / config_edit_ids describe name vs `#id` (Rename keeps
+  uses, Edit FeatureScript IDs breaks them); an Assembly's config_edit_ids refuses by `tab` with a message.
+- **Checked, current:** tab_show_code (2 e2e), render_print (Print setup / Download image, e2e), documents_import
+  split / per_part (e2e). AGENT_API.md regenerated.
+
 ## 11-10 14:45 UTC: the Helix as Parasolid's curve (lead's (A)); queued 15:44 after the suite
 
 - **Curve (kernel build.cpp `make_helix`, cylindrical):** a rational quadratic arc every 9° (n = ceil(turns·40)),

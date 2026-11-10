@@ -919,6 +919,24 @@ fn block_with_hole(ctx: &mut Ctx, file: &str) {
     assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
 }
 
+/// The Measure tool (query_measure): a face's area; a whole part among the entities gives no measurement, as Onshape
+/// (live 2463: the readout and the Measure panel stay empty), with a note saying why.
+#[test]
+fn measure_takes_no_whole_part() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "measure-parts.noshape");
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1], "limit": 1 }))["faces"][0]["id"].as_str().unwrap().to_string();
+    let m = call(&mut ctx, "query_measure", json!({ "entities": [top] }));
+    let area = m["measurements"].as_array().unwrap().iter().find_map(|x| x["value"]["area"].as_f64()).unwrap_or_else(|| panic!("{m}"));
+    assert!((area - (80.0 * 40.0 - std::f64::consts::PI * 25.0)).abs() < 1e-3, "{m}");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    for entities in [json!([part]), json!([part, top])] {
+        let m = call(&mut ctx, "query_measure", json!({ "entities": entities }));
+        assert_eq!(m["measurements"], json!([]), "{m}");
+        assert!(m["note"].as_str().is_some_and(|n| n.contains("no whole part")), "{m}");
+    }
+}
+
 /// query_entities `of`: what lies next to given entities (a face's edges,
 /// two faces' common edge, an edge's faces, a corner's edges).
 #[test]
@@ -2354,6 +2372,49 @@ export const slab = defineFeature(function(context is Context, id is Id, definit
     assert_eq!(r["feature_status"]["status"], "Ok", "{r}");
     let v = num(&call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"][0]["volume"]);
     assert!((v - 8000.0).abs() < 1e-3, "volume {v}");
+}
+
+/// Add custom features (psui c1cb5e34, live 2361 / 2213): a version's custom features onto the user's toolbar one by
+/// one or a whole Feature Studio at once, kept alphabetical, live's toast for each one added, Remove taking one off.
+#[test]
+fn custom_features_on_the_toolbar() {
+    let mut ctx = Ctx::new();
+    let lib = scratch("custom-toolbar-lib.noshape");
+    call(&mut ctx, "document_create", json!({ "path": lib.to_str().unwrap() }));
+    call(&mut ctx, "tab_create", json!({ "kind": "featurestudio", "name": "Blocks" }));
+    let feature = |name: &str, var: &str| format!(r#"
+annotation {{ "Feature Type Name" : "{name}" }}
+export const {var} = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {{
+    }}
+    {{
+        fCuboid(context, id + "box", {{ "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(10, 20, 10) * millimeter }});
+    }});
+"#);
+    let src = format!("FeatureScript 3095;\nimport(path : \"onshape/std/geometry.fs\", version : \"3095.0\");\n{}{}", feature("Slab", "slab"), feature("Beam", "beam"));
+    call(&mut ctx, "featurestudio_edit", json!({ "source": src }));
+    call(&mut ctx, "featurestudio_commit", json!({}));
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let user = scratch("custom-toolbar-user.noshape");
+    call(&mut ctx, "document_create", json!({ "path": user.to_str().unwrap() }));
+    let l = call(&mut ctx, "feature_types", json!({ "document": lib.to_str().unwrap(), "version": "V1" }));
+    let ty = |name: &str| l["feature_studios"][0]["features"].as_array().unwrap().iter().find(|f| f["name"] == name).unwrap()["type"].as_str().unwrap().to_string();
+    let (slab, beam) = (ty("Slab"), ty("Beam"));
+    let names = |r: &Value| r["toolbar"]["custom_features"].as_array().unwrap().iter().map(|f| f["name"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let r = call(&mut ctx, "ui_toolbar", json!({ "add_custom_features": [slab], "document": lib.to_str().unwrap(), "version": "V1" }));
+    assert_eq!(r["messages"], json!(["Custom feature \"Slab\" was added to your toolbar from version V1."]), "{r}");
+    // The Feature Studio's row: all of its features (only Beam is new), alphabetical.
+    let r = call(&mut ctx, "ui_toolbar", json!({ "add_custom_features": [slab, beam], "document": lib.to_str().unwrap(), "version": "V1" }));
+    assert_eq!(r["messages"], json!(["Custom feature \"Beam\" was added to your toolbar from version V1."]), "{r}");
+    assert_eq!(names(&r), ["Beam", "Slab"], "{r}");
+    // Account-wide: read back without a document, as every Part Studio does.
+    assert_eq!(names(&call(&mut ctx, "ui_toolbar", json!({}))), ["Beam", "Slab"]);
+    let r = call(&mut ctx, "ui_toolbar", json!({ "remove_custom_features": [slab] }));
+    assert_eq!(names(&r), ["Beam"], "{r}");
+    let e = try_call(&mut ctx, "ui_toolbar", json!({ "add_custom_features": ["extrude"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("add_custom_features[0]"), "{e:?}");
+    call(&mut ctx, "ui_toolbar", json!({ "remove_custom_features": [beam] }));
 }
 
 /// Every format the Import dialog takes that we can write: the block is
@@ -4216,6 +4277,33 @@ fn an_instance_named_with_a_slash_is_found_by_name() {
     assert!(name.contains('/'), "{name}");
     let r = call(&mut ctx, "assembly_set_state", json!({ "instances": [name], "fixed": true }));
     assert!(r["instances"].as_array().unwrap().iter().any(|i| i["id"] == id && i["fixed"] == true), "{r}");
+}
+
+/// STANDARD-CONTENT-PROPS-OP: a standard content configuration's Part number and Description (the Insert panel's
+/// pencil, the instance's Properties…), kept for this computer: set by instance, read back by the component.
+#[test]
+fn standard_content_part_number_and_description() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "std-props.noshape");
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1" }));
+    let s = call(&mut ctx, "assembly_insert_standard", json!({ "component": "Socket button head cap screw", "size": "1/4-20" }));
+    let id = s["inserted"][0].as_str().unwrap().to_string();
+    let p = call(&mut ctx, "assembly_standard_properties", json!({ "instance": id }));
+    let generated = p["generated_description"].as_str().unwrap().to_string();
+    assert!(!generated.is_empty() && p["description"] == generated.as_str() && p["part_number"] == "", "{p}");
+    let p = call(&mut ctx, "assembly_standard_properties", json!({ "instance": id, "part_number": "STD-0042", "description": "Button screw, zinc" }));
+    assert_eq!((p["part_number"].as_str(), p["description"].as_str(), p["own_description"].as_bool()), (Some("STD-0042"), Some("Button screw, zinc"), Some(true)), "{p}");
+    // The same configuration named by its component: the same values (they belong to it, not to the instance).
+    let q = call(&mut ctx, "assembly_standard_properties", json!({ "component": "Socket button head cap screw", "size": "1/4-20" }));
+    assert_eq!((q["part_number"].as_str(), q["description"].as_str()), (Some("STD-0042"), Some("Button screw, zinc")), "{q}");
+    // Another size has none of its own.
+    let other = call(&mut ctx, "assembly_standard_properties", json!({ "component": "Socket button head cap screw", "size": "#10-24" }));
+    assert_eq!(other["part_number"], "", "{other}");
+    // null: the generated description again.
+    let r = call(&mut ctx, "assembly_standard_properties", json!({ "instance": id, "description": null }));
+    assert_eq!((r["description"].as_str(), r["own_description"].as_bool()), (Some(generated.as_str()), Some(false)), "{r}");
+    let e = try_call(&mut ctx, "assembly_standard_properties", json!({ "instance": "Part Studio 1 <1>" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("instance"), "{e:?}");
 }
 
 /// Assembly configurations: a List input suppressing an instance in one
@@ -7330,7 +7418,8 @@ fn renaming_a_configuration_variable_keeps_its_uses() {
     let m = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
     assert_eq!(m["mates"][0]["ok"], true, "the mate's #gap still resolves: {m}");
     assert!((lift(&mut ctx).abs() - 5.0).abs() < 1e-6, "{}", lift(&mut ctx));
-    assert!(try_call(&mut ctx, "config_edit_ids", json!({ "tab": "Assembly 1", "input": "gap", "id": "space" })).is_err(), "an Assembly's ids can't be edited");
+    let e = try_call(&mut ctx, "config_edit_ids", json!({ "tab": "Assembly 1", "input": "gap", "id": "space" })).unwrap_err();
+    assert!(e.param.as_deref() == Some("tab") && e.message.contains("no Edit FeatureScript IDs"), "an Assembly's ids can't be edited: {e:?}");
 }
 
 /// ASM-CONFIG-VARIABLE-NOOP: an assembly's configuration variable is a `#name` for mates, in each configuration.

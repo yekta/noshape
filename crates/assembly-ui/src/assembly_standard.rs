@@ -962,17 +962,9 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
 }
 
 /// Nuts and washers stack: they have a second connector on their top face.
-/// Company/user wide properties of a standard content configuration (the
-/// Part number pencil, live skb/800): kept in the config directory for the
-/// user, keyed by the full configuration.
-#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct StdProps {
-    #[serde(default)]
-    pub part_number: String,
-    /// None = the generated description.
-    #[serde(default)]
-    pub description: Option<String>,
-}
+/// Company/user wide properties of a standard content configuration (the Part number pencil, live skb/800): the
+/// store is ops' (assembly_standard_properties sets them too).
+pub use noshape_ops::standard_props::{StdProps, save_std_props, std_props};
 
 /// The Standard content tab's text as live's recorder reads it (live asm-standard-content-edit-instance): its heading,
 /// the rows' labels in `render_standard_content`'s order (a plain row's value too), the part number and description
@@ -1008,47 +1000,3 @@ pub(super) fn standard_panel_text(spec: &StandardSpec) -> Vec<String> {
     out
 }
 
-fn std_props_path() -> std::path::PathBuf {
-    crate::paths::config_dir().join("standard_content_properties.json")
-}
-
-/// The configuration's key: the spec with its defaults spelt out.
-fn std_props_key(spec: &StandardSpec) -> String {
-    let mut s = spec.clone();
-    s.material = Some(spec.material().to_string());
-    s.finish = Some(spec.finish().to_string());
-    if let Some(c) = standard::component(spec) {
-        for p in &c.params {
-            s.params.insert(p.label.clone(), spec.param(&p.label).to_string());
-        }
-    }
-    serde_json::to_string(&s).unwrap_or_default()
-}
-
-fn load_std_props() -> std::collections::BTreeMap<String, StdProps> {
-    let saved: std::collections::BTreeMap<String, StdProps> = std::fs::read_to_string(std_props_path()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
-    // Keys saved before the generic parameters (head_slot, series…) read
-    // again as specs and keyed the current way.
-    saved.into_iter().map(|(k, v)| (serde_json::from_str::<StandardSpec>(&k).map(|s| std_props_key(&s)).unwrap_or(k), v)).collect()
-}
-
-pub fn std_props(spec: &StandardSpec) -> StdProps {
-    load_std_props().remove(&std_props_key(spec)).unwrap_or_default()
-}
-
-pub(super) fn save_std_props(spec: &StandardSpec, props: StdProps) {
-    let mut all = load_std_props();
-    let key = std_props_key(spec);
-    if props.part_number.is_empty() && props.description.is_none() {
-        all.remove(&key);
-    } else {
-        all.insert(key, props);
-    }
-    let p = std_props_path();
-    if let Some(dir) = p.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    if let Ok(t) = serde_json::to_string_pretty(&all) {
-        let _ = std::fs::write(p, t);
-    }
-}

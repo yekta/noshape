@@ -49,7 +49,15 @@ pub fn ops() -> Vec<Op> {
             verb: "toolbar",
             summary: "The Part Studio's or Assembly's toolbar customization (Customize toolbar…) and the S shortcut toolbars",
             description: "The user's toolbar settings (per user, for every document): `removed` (tool ids taken off the Part Studio toolbar), `group_order` (the tool sets' order, indices of the default sets), `hide_search` (Hide \"Search tools\"), `shortcut_tools` (the S toolbar's feature tool ids; null: Onshape's ten), `sketch_shortcut_tools` / `drawing_shortcut_tools` (the sketch and drawing S toolbars' tools by name; null: the defaults), `custom_features` (Add custom features: the custom features of document versions on the ⊞ tool, their `type` ids from feature_types with `document` and `version`; set the list to add or Remove one). Without `set` replies with them; `set` changes the given ones and saves them, as Customize toolbar… and Preferences › Shortcut toolbars do. With `tab` an Assembly, the assembly toolbar's: `removed` (its tool ids, `sets` lists them), `order` (the tool sets' order), `hide_search`, `shortcut_tools` (Preferences › Shortcut toolbars › Assembly: tool ids; null: Onshape's eleven). With the app open the windows' toolbars follow.",
-            fields: vec![doc_field(), opt("tab", s(), "An Assembly tab for the assembly toolbar (default: the Part Studio toolbar)."), opt("set", json!({ "type": "object" }), "Settings to change (see the reply).")],
+            fields: vec![
+                doc_field(),
+                opt("tab", s(), "An Assembly tab for the assembly toolbar (default: the Part Studio toolbar)."),
+                opt("set", json!({ "type": "object" }), "Settings to change (see the reply)."),
+                opt("add_custom_features", strings(), "Add custom features (the ⊞ panel's rows): custom feature `type` ids to put on the toolbar (a Feature Studio's row: all of its features), for every Part Studio of this user, kept alphabetical; the reply's `messages` are live's toasts."),
+                opt("remove_custom_features", strings(), "Custom feature `type` ids taken off the toolbar (a second click in the panel, or Remove in the ▾)."),
+                opt("document", s(), "With add_custom_features: the document the features come from (a .noshape path), for the toast's version."),
+                opt("version", s(), "With `document`: its named version (\"V1\"): the toast says \"from version V1\" (\"from published version V1\" when published)."),
+            ],
             mutates: false,
             destructive: false,
             run: toolbar,
@@ -242,6 +250,38 @@ fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
     }
     let mut prefs = ToolbarPrefs::load();
+    // Add custom features / Remove (live 2361, 2213): one by one, the list alphabetical, the user's own for every
+    // Part Studio.
+    let mut messages: Vec<String> = Vec::new();
+    let (adds, removes) = (a.opt_array("add_custom_features")?, a.opt_array("remove_custom_features")?);
+    if adds.is_some() || removes.is_some() {
+        let from = match (a.opt_str("document")?, a.opt_str("version")?) {
+            (Some(d), Some(v)) => format!(" from {}", super::feature::version_phrase(d, v)?),
+            (Some(_), None) => return Err(OpError::param("version", "the document's named version (\"V1\")")),
+            _ => String::new(),
+        };
+        // (The open document's own Feature Studios too.)
+        if let Ok(od) = ctx.doc(a.opt_str("doc")?) {
+            let _ = noshape_model::custom::DocumentScripts::from_document(od.doc());
+        }
+        for (i, v) in adds.into_iter().flatten().enumerate() {
+            let field = format!("add_custom_features[{i}]");
+            let id = v.as_str().ok_or_else(|| OpError::param(&field, "a custom feature type id"))?;
+            let t = noshape_model::features::get(id).filter(|_| id.starts_with("custom:")).ok_or_else(|| OpError::param(&field, &format!("no custom feature `{id}` (feature_types with `document` and `version`)")))?;
+            if prefs.custom_features.iter().all(|f| f.type_id != id) {
+                prefs.custom_features.push(crate::prefs::CustomTool { type_id: id.to_string(), name: t.name.to_string() });
+                messages.push(format!("Custom feature \"{}\" was added to your toolbar{from}.", t.name));
+            }
+        }
+        for (i, v) in removes.into_iter().flatten().enumerate() {
+            let id = v.as_str().ok_or_else(|| OpError::param(&format!("remove_custom_features[{i}]"), "a custom feature type id"))?;
+            prefs.custom_features.retain(|f| f.type_id != id);
+        }
+        prefs.custom_features.sort_by_key(|f| f.name.to_lowercase());
+        prefs.save();
+        ctx.reload_prefs = true;
+        reload_toolbars(ctx, a)?;
+    }
     if let Some(set) = a.object("set")?.filter(|m| !m.is_empty()) {
         // Feature tool ids (a document's custom features when one is open).
         if let Ok(od) = ctx.doc(a.opt_str("doc")?) {
@@ -273,6 +313,8 @@ fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 "drawing_shortcut_tools" => prefs.drawing_shortcut_tools = names(k, v)?,
                 "custom_features" => {
                     prefs.custom_features = tool_ids(k, v)?.into_iter().filter_map(|id| noshape_model::features::get(&id).map(|t| crate::prefs::CustomTool { type_id: id, name: t.name.to_string() })).collect();
+                    // (Alphabetical, as the toolbar lists them.)
+                    prefs.custom_features.sort_by_key(|f| f.name.to_lowercase());
                 }
                 _ => return Err(OpError::param(&format!("set.{k}"), "removed, group_order, hide_search, shortcut_tools, sketch_shortcut_tools, drawing_shortcut_tools or custom_features")),
             }
@@ -281,7 +323,11 @@ fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         ctx.reload_prefs = true;
         reload_toolbars(ctx, a)?;
     }
-    Ok(json!({ "toolbar": prefs, "shortcut_tools": prefs.shortcut_tools() }).into())
+    let mut out = json!({ "toolbar": prefs, "shortcut_tools": prefs.shortcut_tools() });
+    if !messages.is_empty() {
+        out["messages"] = json!(messages);
+    }
+    Ok(out.into())
 }
 
 /// The windows' toolbars follow saved settings (with a document open).

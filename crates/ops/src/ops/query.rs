@@ -64,7 +64,7 @@ pub fn ops() -> Vec<Op> {
             group: "query",
             verb: "measure",
             summary: "Measure entities (lengths, areas, radii, distances, angles)",
-            description: "The Measure tool: one entity gives its length/area/radius...; two give the minimum distance (with dx, dy, dz) and the angle between them. Values in workspace units.",
+            description: "The Measure tool: one entity gives its length/area/radius...; two give the minimum distance (with dx, dy, dz) and the angle between them. Values in workspace units. A whole part among them gives no measurement, as Onshape (live 2463: its readout and Measure panel stay empty; measure its faces, edges or vertices, or its volume with query_mass).",
             fields: vec![doc_field(), tab_field(), req("entities", strings(), "Reference ids.")],
             mutates: false,
             destructive: false,
@@ -644,6 +644,10 @@ fn measure(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let units = od.doc().settings.units;
     let k = len_scale(&units);
     let sel = parse_refs(a, "entities")?;
+    // Onshape measures no whole part (live 2463): nothing at all with one among the entities.
+    if sel.iter().any(|r| matches!(r, noshape_model::reference::Reference::Body(_))) {
+        return Ok(json!({ "units": units_json(&units), "measurements": [], "note": "Onshape measures no whole part: pick its faces, edges or vertices (or query_mass for its volume)." }).into());
+    }
     let r = od.regenerate(tab, None)?;
     let out: Vec<Value> = measure(&r.context, &sel).into_iter().map(|(label, m)| measurement_json(label, m, k)).collect();
     Ok(json!({ "units": units_json(&units), "measurements": out }).into())

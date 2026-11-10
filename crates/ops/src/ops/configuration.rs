@@ -39,7 +39,7 @@ pub fn ops() -> Vec<Op> {
                 doc_field(),
                 cfg_tab_field(),
                 req("kind", json!({ "type": "string", "enum": ["list", "checkbox", "variable"] }), "Input kind."),
-                opt("name", s(), "Name (a List: \"Configuration\", then \"List input 1\"...; required for a Checkbox, whose id is made from it as live's (\"My flag\" → My_flag), and for a variable: its #name)."),
+                opt("name", s(), "Name (a List: \"Configuration\", then \"List input 1\"...; required for a Checkbox, whose id is made from it as live's (\"My flag\" → My_flag), and for a variable: its shown name, its FeatureScript id made from it, the reply's `input`, which `#` names: `#len`)."),
                 opt("default", json!({ "type": "boolean", "default": true }), "Checkbox: Default (checked, as live's dialog opens)."),
                 opt("variable_kind", json!({ "type": "string", "enum": ["LENGTH", "ANGLE", "INTEGER", "REAL", "TEXT"] }), "Variable: kind (default LENGTH)."),
                 opt("value", json!({ "type": ["string", "number"] }), "Variable: default value expression."),
@@ -53,7 +53,7 @@ pub fn ops() -> Vec<Op> {
             group: "config",
             verb: "edit_input",
             summary: "Rename a configuration input or change a configuration variable's default and range",
-            description: "",
+            description: "`name` renames the input as its ⋯ › Rename: the shown name only (\"size (#len)\"); a configuration variable keeps its FeatureScript id, so its `#id` uses keep working, in Part Studios and Assemblies (live 2458). Changing the id is config_edit_ids. `value` / `range`: a variable's default and range (Edit definition…).",
             fields: vec![
                 doc_field(),
                 cfg_tab_field(),
@@ -207,7 +207,7 @@ pub fn ops() -> Vec<Op> {
             group: "config",
             verb: "edit_ids",
             summary: "Edit FeatureScript IDs of a configuration input and its options",
-            description: "Edit FeatureScript IDs…: the input's id and, for a List, its options' ids (`options`: {current option id or name: new id}); configured values follow.",
+            description: "Edit FeatureScript IDs… (Part Studios and Variable Studios; an Assembly has none, as live): the input's id and, for a List, its options' ids (`options`: {current option id or name: new id}); configured values follow. As live's \"Break references and change ID\", expressions using a variable's old `#id` aren't rewritten: they fail as undefined until changed (live 2458).",
             fields: vec![doc_field(), cfg_tab_field(), req("input", s(), "Input id or name."), opt("id", s(), "New input id."), opt("options", json!({ "type": "object" }), "Option renames: {option: new id}.")],
             mutates: true,
             destructive: false,
@@ -789,6 +789,9 @@ fn propagate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn edit_ids(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if vs::is_vs(ctx, a)? {
         return vs::edit_ids(ctx, a);
+    }
+    if asm::is_assembly(ctx, a)? {
+        return Err(OpError::param("tab", "an Assembly's configuration inputs have no Edit FeatureScript IDs… (as live): its ids stay as made from their first names"));
     }
     let (od, tab) = studio_target(ctx, a)?;
     let ps = doc::studio(od.doc(), tab)?;

@@ -414,6 +414,18 @@ fn types(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(json!({ "feature_types": out }).into())
 }
 
+/// A document version's custom features loaded (so their `type` ids resolve), and how Add custom features' toast names
+/// it: "version V1", "published version V4".
+pub(crate) fn version_phrase(document: &str, version: &str) -> Result<String, OpError> {
+    let (path, v, snapshot) = crate::derived::named_version(document, version)?;
+    for t in snapshot.ordered_tabs().into_iter().filter(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))) {
+        let key = crate::derived::ExternalRef { path: path.clone(), microversion: v.microversion, tab: t.id.to_string() }.key();
+        let _ = noshape_model::custom::external_studio(&key);
+    }
+    let published = crate::versions::is_published_fs(&path, v.microversion);
+    Ok(format!("{}version {}", if published { "published " } else { "" }, v.label))
+}
+
 /// The custom features of a document's version, by Feature Studio (Add custom features).
 fn version_types(document: &str, version: &str) -> Result<OpOutput, OpError> {
     let (path, v, snapshot) = crate::derived::named_version(document, version)?;
