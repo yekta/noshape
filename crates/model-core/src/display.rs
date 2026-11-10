@@ -300,6 +300,8 @@ pub struct SketchDisplay {
     #[serde(skip)]
     pub glyphs: Vec<ConstraintGlyph>,
     pub hidden: bool,
+    /// Its plane is a face of a sheet metal flat (live 2468): drawn in the flat view, not the main one.
+    pub on_flat: bool,
     /// Remaining degrees of freedom (0 = fully defined).
     pub dof: usize,
     /// Custom sketch appearance (linear RGBA) when not being edited.

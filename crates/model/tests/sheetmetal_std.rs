@@ -2042,3 +2042,50 @@ fn a_pattern_of_a_flanged_part_copies_it_whole() {
     let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| (b.shape.faces().len(), b.shape.volume().unwrap_or(0.0) * 1e9)).collect();
     assert!(solids.len() == 2 && solids.iter().all(|&(f, v)| f == faces && (v - volume).abs() < 1e-3), "the seed {faces} faces, {volume} mm³; the parts {solids:?}");
 }
+
+/// An L of two sketch lines on `plane`, Extrude-type Sheet metal model as live 2468 made its probes (c2-sm-louver's
+/// "Side": opposite direction, flip direction up; depth 50, 2 mm thick, R 2, K 0.45): its flat body's box in mm.
+fn probe_flat_box(plane: DatumPlane, pts: [(f64, f64); 3]) -> ([f64; 3], [f64; 3]) {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = pts.map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    let lines = [sk.add_line_between(p[0], p[1]).unwrap(), sk.add_line_between(p[1], p[2]).unwrap()];
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(plane)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("EXTRUDE"));
+        pv.set("sketchCurves", ParamValue::Query(lines.iter().map(|e| Reference::SketchEntity { sketch, entity: e.0 }).collect()));
+        pv.set("depth", expr("50 mm"));
+        pv.set("thickness", expr("2 mm"));
+        pv.set("radius", expr("2 mm"));
+        pv.set("kFactor", expr("0.45"));
+        pv.set("oppositeDirection", ParamValue::Bool(true));
+        pv.set("flipDirectionUp", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let part = &r.context.bodies[part(&r)];
+    let flat = noshape_model::sheetmetal::flat_body(&r.context, &noshape_model::sheetmetal::flat_body_id(&part.id), &part.name).expect("the flat body");
+    let b = flat.shape.bounding_box(false).expect("its box");
+    let r3 = |v: DVec3| [v.x, v.y, v.z].map(|c| (c * 1e6).round() / 1e3);
+    (r3(b.min), r3(b.max))
+}
+
+/// Live 2468: the flat lies where its fixed face (the first sketch segment's) puts it: (p·x, p·y, (p − o)·n) with
+/// that face's plane frame, so under z = 0 with in-plane coordinates kept (SM Front: (−y, z, −x); SM Top: (x, z, −y)).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn the_flat_lies_where_its_first_wall_puts_it() {
+    let front = probe_flat_box(DatumPlane::Front, [(0.0, 30.0), (0.0, 0.0), (40.0, 0.0)]);
+    assert_eq!(front, ([0.0, -36.555, -2.0], [50.0, 30.0, 0.0]), "SM Front");
+    let top = probe_flat_box(DatumPlane::Top, [(100.0, 0.0), (140.0, 0.0), (140.0, 30.0)]);
+    assert_eq!(top, ([100.0, 0.0, -2.0], [166.555, 50.0, 0.0]), "SM Top");
+    // Its sketch line off the origin: still under z = 0, y 0…50 (z = 80 − y).
+    let (lo, hi) = probe_flat_box(DatumPlane::Top, [(200.0, 80.0), (240.0, 80.0), (240.0, 110.0)]);
+    assert_eq!((lo[1], lo[2], hi[1], hi[2]), (0.0, -2.0, 50.0, 0.0), "SM Top offset: {lo:?} {hi:?}");
+    // The wall drawn first is the fixed one: x = −y, x −30…40.555.
+    let (lo, hi) = probe_flat_box(DatumPlane::Top, [(340.0, 30.0), (340.0, 0.0), (300.0, 0.0)]);
+    assert_eq!((lo[0], lo[2], hi[0], hi[2]), (-30.0, -2.0, 40.555, 0.0), "SM Top wall-first: {lo:?} {hi:?}");
+}

@@ -5167,6 +5167,31 @@ fn a_linked_parts_properties_save_into_its_version() {
     assert!(!bom.to_string().contains("Q2464"), "{a} {bom}");
 }
 
+/// Live 2468: a sheet metal part's flat lies where its fixed face (the first wall) puts it, here the plate's region on
+/// Top, thickened up: z 0…2 with the plate kept at x 0…60, y 0…40 and the flange unrolled beside it. A sketch on its top
+/// face is on the flat (z 2, normal +z) and shows only in the flat view; the flat is in no whole-part query.
+#[test]
+fn a_sketch_on_the_sheet_metal_flat() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "sheet-metal-flat-sketch.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "2 mm", "radius": "2 mm" } }));
+    let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [1, 0, 0], "near": [30, 0, 2], "limit": 1 }))["edges"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalFlange", "params": { "edges": [e], "distance": "20 mm" } }));
+    let parts = call(&mut ctx, "query_parts", json!({}));
+    assert_eq!(parts["parts"].as_array().map(Vec::len), Some(1), "the flat is no part: {parts}");
+    let t = call(&mut ctx, "sheetmetal_table", json!({}));
+    let faces = t["flat_faces"].as_array().expect("flat faces").clone();
+    let num = |v: &Value| v.as_str().and_then(|s| s.parse::<f64>().ok()).or_else(|| v.as_f64()).unwrap_or(f64::NAN);
+    let top = faces.iter().filter(|f| num(&f["normal"][2]) > 0.999).max_by(|a, b| num(&a["area"]).total_cmp(&num(&b["area"]))).expect("a top face").clone();
+    assert_eq!(top["part"], "Flat pattern of Part 1", "{top}");
+    assert!((num(&top["offset"]) - 2.0).abs() < 1e-6, "the top face at z 2: {top}");
+    let s = call(&mut ctx, "sketch_create", json!({ "plane": top["id"] }));
+    assert_eq!(s["feature_status"]["status"], "Ok", "{s}");
+    assert_eq!(s["on_flat"], true, "{s}");
+    assert!((num(&s["frame"]["origin"][2]) - 2.0).abs() < 1e-6 && num(&s["frame"]["normal"][2]) > 0.999, "{s}");
+}
+
 /// A callout on a part's silhouette is that part's, not the part of an edge
 /// a little way off (qa BALLOON-WRONG-ITEM: a click on a pin's silhouette
 /// near the plate's edge showed the plate's item).

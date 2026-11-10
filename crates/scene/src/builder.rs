@@ -943,7 +943,8 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     if opts.show_sketches || opts.editing_sketch.is_some() {
         for sk in &display.sketches {
             let editing = opts.editing_sketch == Some(sk.feature);
-            if sk.hidden && !editing {
+            // (A sketch on a sheet metal flat is drawn in the flat view: live 2468.)
+            if (sk.hidden || sk.on_flat) && !editing {
                 continue;
             }
             if !opts.show_sketches && !editing {

@@ -76,6 +76,19 @@ pub struct FlatPattern {
     /// The part it was built for ([`body_key`]): a std-built flat (made when
     /// its sheet metal feature rebuilt the part) holds only for that shape.
     pub built_for: Option<[f64; 8]>,
+    /// Where live lays the flat out, when known ([`FlatPlace`]).
+    pub place: Option<FlatPlace>,
+}
+
+/// Live 2468: the flat is laid out by its fixed face (the first sketch segment's): a point p of that face goes to
+/// (p·x, p·y, (p − o)·n) with the face's plane frame (o, x, n), so the flat keeps its in-plane coordinates and lies
+/// on z = 0, the sheet `front` above it and `back` below.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FlatPlace {
+    /// [`FlatPattern::shape`]'s space → the flat's place.
+    pub view: DMat4,
+    pub front: f64,
+    pub back: f64,
 }
 
 impl FlatPattern {
@@ -83,6 +96,9 @@ impl FlatPattern {
     /// world's, its reference side at z 0 facing +Z (live REST
     /// isFlattenedBody of "qa5 sm": z −2…0; the flat view shows it from Top).
     fn flat_view_matrix(&self) -> DMat4 {
+        if let Some(p) = &self.place {
+            return p.view;
+        }
         let (x, y, n) = (self.frame.unit_x(), self.frame.unit_y(), self.frame.unit_x().cross(self.frame.unit_y()));
         DMat4::from_cols(x.extend(0.0), y.extend(0.0), n.extend(0.0), self.frame.origin.extend(1.0)).inverse()
     }
@@ -102,12 +118,18 @@ impl FlatPattern {
     /// `thickness` deep.
     pub fn flat_view_solid(&self) -> Option<Shape> {
         let face = self.shape.as_ref()?.transformed(&mat_transform(&self.flat_view_matrix())).ok()?;
-        k::ops::extrude(&face, DVec3::new(0.0, 0.0, -self.thickness)).ok().map(|r| r.shape)
+        let Some(p) = &self.place else {
+            return k::ops::extrude(&face, DVec3::new(0.0, 0.0, -self.thickness)).ok().map(|r| r.shape);
+        };
+        let face = if p.back > 0.0 { face.translated(DVec3::new(0.0, 0.0, -p.back)).ok()? } else { face };
+        k::ops::extrude(&face, DVec3::new(0.0, 0.0, p.front + p.back)).ok().map(|r| r.shape)
     }
 
-    /// The bend lines in the flat view's place (on the top, z 0).
+    /// The bend lines in the flat view's place (on z 0).
     pub fn flat_view_bend_lines(&self) -> Vec<(DVec3, DVec3)> {
-        self.bend_lines.iter().map(|b| (b.a.extend(0.0), b.b.extend(0.0))).collect()
+        let m = self.flat_view_matrix();
+        let to = |a: DVec2| if self.place.is_some() { m.transform_point3(self.frame.to_world(a)) } else { a.extend(0.0) };
+        self.bend_lines.iter().map(|b| (to(b.a), to(b.b))).collect()
     }
 
     /// Bounding box of the outline (min, max) in plane coordinates.
@@ -485,7 +507,7 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
     let shape = shape.map(|s| split_bend_zones(&s, &frame, &lines));
-    Ok(FlatPattern { frame, loops, bend_lines: lines, forms, heads, shape, thickness: t, warnings, built_for: None })
+    Ok(FlatPattern { frame, loops, bend_lines: lines, forms, heads, shape, thickness: t, warnings, built_for: None, place: None })
 }
 
 /// A flat pattern from planar pieces already laid flat in `frame` (walls and
@@ -519,7 +541,7 @@ pub fn flat_from_pieces(frame: k::Plane, pieces: &[Shape], bend_lines: Vec<FlatB
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
     let shape = shape.map(|s| split_bend_zones(&s, &frame, &bend_lines));
-    Ok(FlatPattern { frame, loops, bend_lines, forms: Vec::new(), heads: Vec::new(), shape, thickness, warnings, built_for: None })
+    Ok(FlatPattern { frame, loops, bend_lines, forms: Vec::new(), heads: Vec::new(), shape, thickness, warnings, built_for: None, place: None })
 }
 
 /// The flat region split along both sides of every bend zone (the strip
