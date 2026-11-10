@@ -40,14 +40,18 @@ impl AssemblyView {
                     let name = self.result.occurrences.iter().find(|o| o.path.starts_with(&path) && o.body == body).map(|o| o.body_name.clone()).unwrap_or_else(|| inst.name.rsplit_once(" <").map(|(b, _)| b.to_string()).unwrap_or(inst.name.clone()));
                     (props, name)
                 };
-                let computed = self.result.occurrences.iter().find(|o| o.path.starts_with(&path)).filter(|_| props.material.is_some()).and_then(|o| {
-                    let density = |_: &BodyId| props.density;
-                    noshape_model::regen::measure::mass_properties(&o.context, std::slice::from_ref(&o.body), &density)?.mass
+                // The computed mass off the UI thread (a big imported part takes seconds): "Calculating…" until it comes.
+                let part = self.result.occurrences.iter().find(|o| o.path.starts_with(&path)).filter(|_| props.material.is_some()).map(|o| (o.context.clone(), o.body.clone()));
+                let density = props.density;
+                let mass = cx.background_spawn(async move {
+                    let (ctx, body) = part?;
+                    let m = noshape_model::regen::measure::mass_properties(&ctx, std::slice::from_ref(&body), &|_: &BodyId| density)?.mass?;
+                    Some(format!("{} kg", noshape_units::to_fixed(m, 4)))
                 });
                 let spec = MetaSpec {
                     category: "Onshape Part",
                     material: Some(props.material.clone().unwrap_or_else(|| "Unassigned".into())),
-                    computed_mass: computed.map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))),
+                    computed_mass: None,
                     bom_options: None,
                     drawing_info: None,
                     values: MetaValues {
@@ -62,8 +66,9 @@ impl AssemblyView {
                     },
                 };
                 let (doc, view) = (self.doc.clone(), cx.entity());
-                crate::properties_dialog::open_properties(
+                crate::properties_dialog::open_properties_mass_later(
                     spec,
+                    mass,
                     move |v, _, cx| {
                         let body = body.clone();
                         doc.update(cx, |d, cx| {
@@ -131,9 +136,13 @@ impl AssemblyView {
     pub(super) fn open_assembly_properties(&mut self, tab: noshape_model::document::TabId, window: &mut Window, cx: &mut Context<Self>) {
         // This assembly's own row: its computed mass and Mass override
         // (live assembly/726: "Mass ƒ ☑ Override 2 lb").
-        let computed = (tab == self.tab).then(|| self.assembly_total_mass(cx)).flatten();
-        let computed = (tab == self.tab).then(|| computed.map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))).unwrap_or_default());
-        open_assembly_metadata(self.doc.clone(), tab, computed, window, cx);
+        if tab != self.tab {
+            open_assembly_metadata(self.doc.clone(), tab, None, window, cx);
+            return;
+        }
+        // Worked out off the UI thread (big imported parts take seconds): "Calculating…" until it comes.
+        let mass = self.assembly_total_mass_later(cx);
+        open_assembly_metadata_mass_later(self.doc.clone(), tab, mass, window, cx);
     }
 
     /// Instance row › Instance properties…: the Reference designator.

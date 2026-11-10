@@ -395,6 +395,8 @@ pub struct UiState {
     /// the connector it holds.
     /// A part's shown center of mass (part, world point).
     pub com: Option<(BodyId, glam::DVec3)>,
+    /// The center of mass being worked out off the UI thread for that part (Show center of mass on a big part).
+    pub com_task: Option<(BodyId, Task<()>)>,
     pub mass_ref_active: bool,
     pub mass_reference: Option<Reference>,
     /// Mass and section properties › Show calculation variance, and the
@@ -776,6 +778,7 @@ impl UiState {
             list_collapsed: false,
             mass_faces: false,
             com: None,
+            com_task: None,
             mass_ref_active: false,
             mass_reference: None,
             mass_variance: false,

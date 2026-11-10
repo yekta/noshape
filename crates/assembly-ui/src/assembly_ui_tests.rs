@@ -857,3 +857,32 @@ fn switch_to_part_studio_carries_the_part(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(*got.borrow(), [format!("show {body:?}")]);
 }
+
+/// Show center of mass in an assembly (lead 11-10, the synchronous calls list): each part's own center is worked out
+/// off the UI thread once; the marker comes when known, and a re-evaluation (a drag moves parts) weighs the moved
+/// centers again without measuring the parts again.
+#[gpui::test]
+fn assembly_center_of_mass_is_worked_out_off_the_click(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "com-off-thread");
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_center_of_mass(Vec::new(), cx)));
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.ui.com.is_none() && v.ui.com_task.is_some() && v.ui.com_ids.is_some(), "worked out on the click");
+    });
+    draw(cx, window);
+    let parts = cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.ui.com.is_some(), "the marker");
+        v.ui.com_parts.len()
+    });
+    // Part 1 and Part 2 (its pattern copy shares Part 2's model): each measured once.
+    assert_eq!(parts, 2, "each part's own center remembered");
+    // The same result again (as after a drag's solve): the marker at once, nothing measured again.
+    cx.update(|cx| view.update(cx, |v, cx| v.refresh_center_of_mass(cx)));
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.ui.com.is_some() && v.ui.com_task.is_none(), "weighed again without measuring");
+    });
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_center_of_mass(Vec::new(), cx)));
+    cx.update(|cx| assert!(view.read(cx).ui.com.is_none() && view.read(cx).ui.com_ids.is_none(), "hidden"));
+}

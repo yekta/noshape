@@ -775,16 +775,20 @@ impl PartStudioView {
         use crate::properties_dialog::{MetaSpec, MetaValues};
         let props = self.studio(cx).and_then(|s| s.part_properties.get(&body).cloned()).unwrap_or_default();
         let name = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
-        let computed = self.context.as_ref().filter(|_| props.material.is_some()).and_then(|ctx| {
-            let density = |_: &BodyId| props.density;
-            noshape_model::regen::measure::mass_properties(ctx, std::slice::from_ref(&body), &density)?.mass
-        });
         // Live (assembly/1246: "2 lb"): masses in the document's mass unit.
         let (msym, mfac) = crate::properties_dialog::mass_unit(&self.doc.read(cx).session.doc.settings.units);
+        // The computed mass off the UI thread (a big imported part takes seconds): "Calculating…" until it comes.
+        let mass = self.context.clone().filter(|_| props.material.is_some()).map(|ctx| {
+            let (density, of) = (props.density, body.clone());
+            cx.background_spawn(async move {
+                let m = noshape_model::regen::measure::mass_properties(&ctx, std::slice::from_ref(&of), &|_: &BodyId| density)?.mass?;
+                Some(format!("{} {msym}", crate::properties_dialog::mass_number(m * mfac)))
+            })
+        });
         let spec = MetaSpec {
             category: "Onshape Part",
             material: Some(props.material.clone().unwrap_or_else(|| "Unassigned".into())),
-            computed_mass: computed.map(|m| format!("{} {msym}", crate::properties_dialog::mass_number(m * mfac))),
+            computed_mass: None,
             bom_options: None,
             drawing_info: None,
             values: MetaValues {
@@ -835,8 +839,7 @@ impl PartStudioView {
         let kept = configured.clone();
         crate::properties_dialog::open_part_properties_configured(
             spec,
-            Some(reset_to),
-            configured,
+            crate::properties_dialog::PartExtras { mass, reset_to: Some(reset_to), configured },
             move |v, _, cx| {
                 let body = body.clone();
                 let values = noshape_ops::studio::PartPropertyValues {
@@ -2092,12 +2095,25 @@ impl PartStudioView {
     /// Show / hide a part's center of mass (live ui-com/02: a quartered
     /// black-and-white disc at the point, over everything).
     pub(super) fn toggle_center_of_mass(&mut self, body: &BodyId, cx: &mut Context<Self>) {
-        if self.ui.com.as_ref().is_some_and(|(b, _)| b == body) {
-            self.ui.com = None;
-        } else {
-            let props = self.studio(cx).map(|s| s.part_properties.clone()).unwrap_or_default();
-            let at = self.context.as_ref().and_then(|ctx| noshape_model::regen::measure::mass_properties(ctx, std::slice::from_ref(body), &|b| props.get(b).and_then(|p| p.density))).map(|mp| mp.center_of_mass);
-            self.ui.com = at.map(|p| (body.clone(), p));
+        let shown = self.ui.com.as_ref().is_some_and(|(b, _)| b == body) || self.ui.com_task.as_ref().is_some_and(|(b, _)| b == body);
+        self.ui.com = None;
+        self.ui.com_task = None;
+        // Worked out off the UI thread (a big imported part takes seconds): the marker comes when it is known.
+        if !shown && let Some(ctx) = self.context.clone() {
+            let density = self.studio(cx).and_then(|s| s.part_properties.get(body)).and_then(|p| p.density);
+            let (of, b) = (body.clone(), body.clone());
+            let task = cx.spawn(async move |this, cx| {
+                let at = cx.background_spawn(async move { noshape_model::regen::measure::mass_properties(&ctx, std::slice::from_ref(&of), &|_| density).map(|mp| mp.center_of_mass) }).await;
+                let _ = this.update(cx, |this, cx| {
+                    if this.ui.com_task.as_ref().is_none_or(|(x, _)| *x != b) {
+                        return;
+                    }
+                    this.ui.com_task = None;
+                    this.ui.com = at.map(|p| (b, p));
+                    cx.notify();
+                });
+            });
+            self.ui.com_task = Some((body.clone(), task));
         }
         cx.notify();
     }

@@ -3572,3 +3572,27 @@ fn mass_properties_dont_hold_up_the_frame(cx: &mut TestAppContext) {
     draw(cx, window);
     cx.update(|cx| assert!(view.read(cx).ui.mass_job.as_ref().is_some_and(|j| Some(j.key.clone()) == before && j.value.is_some())));
 }
+
+/// Show center of mass (lead 11-10, the synchronous calls list): worked out off the UI thread, the marker comes when it
+/// is known; a second click while it is under way takes it back.
+#[gpui::test]
+fn center_of_mass_is_worked_out_off_the_click(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "com-off-thread");
+    let body = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.id.clone())).expect("the part");
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_center_of_mass(&body, cx)));
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.ui.com.is_none() && v.ui.com_task.is_some(), "worked out on the click");
+    });
+    draw(cx, window);
+    cx.update(|cx| assert!(view.read(cx).ui.com.as_ref().is_some_and(|(b, _)| *b == body), "the marker"));
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_center_of_mass(&body, cx)));
+    cx.update(|cx| assert!(view.read(cx).ui.com.is_none() && view.read(cx).ui.com_task.is_none(), "hidden"));
+    // Shown and hidden again before it arrives: nothing shows.
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.toggle_center_of_mass(&body, cx);
+        v.toggle_center_of_mass(&body, cx);
+    }));
+    draw(cx, window);
+    cx.update(|cx| assert!(view.read(cx).ui.com.is_none(), "taken back"));
+}

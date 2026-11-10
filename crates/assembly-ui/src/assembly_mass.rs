@@ -138,13 +138,18 @@ impl AssemblyView {
     }
 
     /// Computed mass of the whole assembly (kg), for its Properties….
-    pub(super) fn assembly_total_mass(&self, cx: &App) -> Option<f64> {
+    /// The whole assembly's mass, "12.5 kg", worked out off the UI thread (the top row's Properties…).
+    pub(super) fn assembly_total_mass_later(&self, cx: &App) -> Task<Option<String>> {
         let doc = &self.doc.read(cx).session.doc;
         // Mass overrides count (a part's, a subassembly's), as Onshape weighs them.
         let densities = self.assembly(cx).map(|a| noshape_model::assembly::analysis::part_densities(doc, a, &self.result)).unwrap_or_default();
-        let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
         let all: Vec<InstanceId> = self.assembly(cx).map(|a| a.instances.iter().map(|i| i.id).collect()).unwrap_or_default();
-        assembly_mass_properties(&self.result, &all, &density).and_then(|m| m.props.mass)
+        let result = self.result.clone();
+        cx.background_spawn(async move {
+            let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
+            let m = assembly_mass_properties(&result, &all, &density).and_then(|m| m.props.mass)?;
+            Some(format!("{} kg", noshape_units::to_fixed(m, 4)))
+        })
     }
 
     /// The overriding mass being typed (kg): with a unit as written, else in

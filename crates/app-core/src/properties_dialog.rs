@@ -972,11 +972,16 @@ pub fn open_properties(spec: MetaSpec, on_save: impl Fn(MetaValues, &mut Window,
 /// its tab's menu): Calculate value says "Calculating…" until then, and shows it when it comes.
 pub fn open_properties_mass_later(spec: MetaSpec, mass: Task<Option<String>>, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
     let on_save: SaveFn = Rc::new(on_save);
-    let form = cx.new(|cx| {
-        let mut f = MetaForm::new(spec, on_save, window, cx);
-        f.mass_pending = true;
-        f
-    });
+    let form = cx.new(|cx| MetaForm::new(spec, on_save, window, cx));
+    mass_arrives_later(&form, mass, window, cx);
+    let name = form.read(cx).name.clone();
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
+    name.update(cx, |s, cx| s.focus(window, cx));
+}
+
+/// The form's computed mass, worked out off the UI thread (`mass`): "Calculating…" until it arrives.
+fn mass_arrives_later(form: &Entity<MetaForm>, mass: Task<Option<String>>, window: &mut Window, cx: &mut App) {
+    form.update(cx, |f, _| f.mass_pending = true);
     let weak = form.downgrade();
     let handle = window.window_handle();
     cx.spawn(async move |cx| {
@@ -995,9 +1000,6 @@ pub fn open_properties_mass_later(spec: MetaSpec, mass: Task<Option<String>>, on
         });
     })
     .detach();
-    let name = form.read(cx).name.clone();
-    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
-    name.update(cx, |s, cx| s.focus(window, cx));
 }
 
 /// [`open_properties`] with the item's card in a left tree (Part Studio
@@ -1019,7 +1021,8 @@ pub fn open_properties_with_card(spec: MetaSpec, card: ItemCard, on_save: impl F
 /// (`reset_to`). Its `configured` fields have configured values in the
 /// active configuration: they show those values, disabled (Configured
 /// properties).
-pub fn open_part_properties_configured(spec: MetaSpec, reset_to: Option<MetaValues>, configured: Vec<&'static str>, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, on_release: impl Fn(&mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+pub fn open_part_properties_configured(spec: MetaSpec, part: PartExtras, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, on_release: impl Fn(&mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    let PartExtras { mass, reset_to, configured } = part;
     let on_save: SaveFn = Rc::new(on_save);
     let on_release: ReleaseFn = Rc::new(on_release);
     let form = cx.new(|cx| {
@@ -1029,6 +1032,9 @@ pub fn open_part_properties_configured(spec: MetaSpec, reset_to: Option<MetaValu
         f.configured = configured;
         f
     });
+    if let Some(mass) = mass {
+        mass_arrives_later(&form, mass, window, cx);
+    }
     let name = form.read(cx).name.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
     // Live: the first field (Name) has the focus when the modal opens.
@@ -1054,6 +1060,14 @@ pub fn open_properties_read_only(spec: MetaSpec, read_only: Vec<&'static str>, o
     if let Some(f) = first {
         f.update(cx, |s, cx| s.focus(window, cx));
     }
+}
+
+/// A Part Studio part's Properties beyond [`MetaSpec`]: its computed mass worked out off the UI thread
+/// ("Calculating…" until it arrives), the values Reset all restores, the fields configured in the active configuration.
+pub struct PartExtras {
+    pub mass: Option<Task<Option<String>>>,
+    pub reset_to: Option<MetaValues>,
+    pub configured: Vec<&'static str>,
 }
 
 /// Instance properties…: a 600 px modal with the instance's name and its

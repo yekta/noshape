@@ -378,6 +378,12 @@ pub struct AsmUi {
     pub thumbs: super::thumbs::InsertThumbs,
     /// Show center of mass: (instances, empty = whole assembly; world point).
     pub com: Option<(Vec<InstanceId>, DVec3)>,
+    /// The instances whose center of mass is asked for (shown once known; empty: the whole assembly).
+    pub com_ids: Option<Vec<InstanceId>>,
+    /// Each part's own mass (its volume without a material) and center of mass, by its model and body: worked out
+    /// off the UI thread once (`com_task`), so a drag only weighs the moved centers again.
+    pub com_parts: HashMap<(usize, BodyId, Option<u64>), (f64, DVec3)>,
+    pub com_task: Option<Task<()>>,
     /// Origin row › Hide: the assembly origin triad is not drawn (still pickable from the row).
     pub origin_hidden: bool,
     /// Snap-insert: (source connector on the inserted instance, target), and
@@ -1139,7 +1145,7 @@ impl AssemblyView {
         }
         if !suppressed {
             let tg = targets.clone();
-            let com_on = self.ui.com.as_ref().is_some_and(|(c, _)| *c == targets);
+            let com_on = self.ui.com_ids.as_ref().is_some_and(|c| *c == targets);
             m.push(icon_item(if com_on { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
         }
         if !suppressed && !isolating {
@@ -2123,7 +2129,7 @@ impl AssemblyView {
             }),
             MenuEntry::Sep,
             item("Rename", |t, w, cx| t.rename_tab(w, cx)),
-            icon_item(if self.ui.com.as_ref().is_some_and(|(c, _)| c.is_empty()) { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", |t, _, cx| t.toggle_center_of_mass(Vec::new(), cx)),
+            icon_item(if self.ui.com_ids.as_ref().is_some_and(|c| c.is_empty()) { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", |t, _, cx| t.toggle_center_of_mass(Vec::new(), cx)),
         ];
         // Live assembly/530–532: right after Show center of mass, once an
         // instance at this level is fixed.
@@ -2563,7 +2569,7 @@ impl AssemblyView {
         m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
         if mirror {
             let tg = copies.clone();
-            let com_on = self.ui.com.as_ref().is_some_and(|(c, _)| *c == copies);
+            let com_on = self.ui.com_ids.as_ref().is_some_and(|c| *c == copies);
             m.push(icon_item(if com_on { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
         }
         let tg = copies.clone();
@@ -5775,40 +5781,74 @@ impl AssemblyView {
     /// row: the whole assembly). Parts are weighted by their density
     /// (volume when a part has no material).
     pub(super) fn toggle_center_of_mass(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
-        if self.ui.com.as_ref().is_some_and(|(cur, _)| *cur == ids) {
-            self.ui.com = None;
-            cx.notify();
-            return;
-        }
-        match self.center_of_mass(&ids, cx) {
-            Some(p) => self.ui.com = Some((ids, p)),
-            None => self.message = Some((false, "No solid parts to compute a center of mass for.".into())),
-        }
+        let shown = self.ui.com_ids.as_ref().is_some_and(|cur| *cur == ids);
+        self.ui.com = None;
+        self.ui.com_ids = (!shown).then_some(ids);
+        self.refresh_center_of_mass(cx);
         cx.notify();
     }
 
-    /// Keep the shown center of mass at the solved positions.
-    pub(super) fn refresh_center_of_mass(&mut self, cx: &App) {
-        if let Some((ids, _)) = self.ui.com.clone() {
-            self.ui.com = self.center_of_mass(&ids, cx).map(|p| (ids, p));
-        }
-    }
-
-    fn center_of_mass(&self, ids: &[InstanceId], cx: &App) -> Option<DVec3> {
+    /// The shown center of mass at the solved positions: from each part's own center, worked out once off the UI
+    /// thread (a big imported part takes seconds; a drag re-evaluates on every move).
+    pub(super) fn refresh_center_of_mass(&mut self, cx: &mut Context<Self>) {
+        let Some(ids) = self.ui.com_ids.clone() else {
+            self.ui.com = None;
+            return;
+        };
         let doc = &self.doc.read(cx).session.doc;
-        let mut mass = 0.0;
-        let mut moment = DVec3::ZERO;
-        for o in self.result.occurrences.iter().filter(|o| !o.hidden && (ids.is_empty() || ids.contains(&o.top()))) {
-            let density = |b: &BodyId| match doc.tab(o.studio).map(|t| &t.content) {
-                Some(TabContent::PartStudio(ps)) => ps.part_properties.get(b).and_then(|p| p.density),
-                _ => None,
-            };
-            let Some(mp) = noshape_model::regen::measure::mass_properties(&o.context, std::slice::from_ref(&o.body), &density) else { continue };
-            let m = mp.mass.unwrap_or(mp.volume);
-            mass += m;
-            moment += o.transform.transform_point3(mp.center_of_mass) * m;
+        let parts: Vec<_> = self
+            .result
+            .occurrences
+            .iter()
+            .filter(|o| !o.hidden && (ids.is_empty() || ids.contains(&o.top())))
+            .map(|o| {
+                let density = match doc.tab(o.studio).map(|t| &t.content) {
+                    Some(TabContent::PartStudio(ps)) => ps.part_properties.get(&o.body).and_then(|p| p.density),
+                    _ => None,
+                };
+                (Arc::as_ptr(&o.context) as usize, o.body.clone(), density.map(f64::to_bits), o.context.clone(), o.transform)
+            })
+            .collect();
+        let missing: Vec<_> = parts.iter().filter(|(c, b, d, _, _)| !self.ui.com_parts.contains_key(&(*c, b.clone(), *d))).map(|(c, b, d, ctx, _)| (*c, b.clone(), *d, ctx.clone())).collect();
+        if !missing.is_empty() {
+            self.ui.com_task = Some(cx.spawn(async move |this, cx| {
+                let done = cx
+                    .background_spawn(async move {
+                        missing
+                            .into_iter()
+                            .map(|(c, b, d, ctx)| {
+                                let density = d.map(f64::from_bits);
+                                let mp = noshape_model::regen::measure::mass_properties(&ctx, std::slice::from_ref(&b), &|_| density);
+                                ((c, b, d), mp.map(|mp| (mp.mass.unwrap_or(mp.volume), mp.center_of_mass)).unwrap_or((0.0, DVec3::ZERO)))
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .await;
+                let _ = this.update(cx, |this, cx| {
+                    this.ui.com_parts.extend(done);
+                    this.ui.com_task = None;
+                    this.refresh_center_of_mass(cx);
+                    cx.notify();
+                });
+            }));
+            return;
         }
-        (mass > 0.0).then(|| moment / mass)
+        // Only the parts shown now stay remembered (an edited part's old model goes).
+        let used: HashSet<(usize, BodyId, Option<u64>)> = parts.iter().map(|(c, b, d, _, _)| (*c, b.clone(), *d)).collect();
+        self.ui.com_parts.retain(|k, _| used.contains(k));
+        let (mut mass, mut moment) = (0.0, DVec3::ZERO);
+        for (c, b, d, _, t) in &parts {
+            let (m, local) = self.ui.com_parts[&(*c, b.clone(), *d)];
+            mass += m;
+            moment += t.transform_point3(local) * m;
+        }
+        if mass > 0.0 {
+            self.ui.com = Some((ids, moment / mass));
+        } else {
+            self.ui.com = None;
+            self.ui.com_ids = None;
+            self.message = Some((false, "No solid parts to compute a center of mass for.".into()));
+        }
     }
 
     /// The center of mass indicator (Onshape's quartered circle).

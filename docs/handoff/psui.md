@@ -26,14 +26,12 @@ Fixed (each test: one frame drawn with the work pending, then it arrives):
   frame** of the dialog; now jobs keyed by the selection, the result and the parts' densities.
 Already off the thread: interference, thickness, the tab Properties' assembly mass (`open_properties_mass_later`).
 
-Left (once per click, synchronous; big parts would stall that click):
-- Part Studio part › Properties… computed mass (`open_part_meta`, menus.rs) and its center of mass toggle
-  (`toggle_center_of_mass`).
-- Assembly part › Properties… computed mass (`open_metadata_of`, assembly_props.rs), the top row's Properties… total
-  mass (`open_assembly_properties` → `assembly_total_mass`), Show center of mass (`center_of_mass`,
-  assembly_behaviors.rs).
-- Curvature map: `curvature_values` over every mesh on the first frame after it is turned on (cached per display);
-  `vertex_colors` formats the appearances with Debug for its key on each scene build.
+Then also fixed: Properties…' computed mass in both studios ("Calculating…" until it comes: `PartExtras.mass`,
+`open_properties_mass_later`, the top row's `assembly_total_mass_later`), Show center of mass in both (the assembly's
+remembers each part's own center by model and body, so the re-evaluation of every drag only weighs the moved centers;
+it measured every part again on each one before).
+Left: the curvature map's `curvature_values` over every mesh on the first frame after it is turned on (cached per
+display); `vertex_colors` formats the appearances with Debug for its key on each scene build.
 
 ## 2026-11-10 14:18 UTC: user P0, two selected parts froze the app 51 s (landed 592fb25a, fc44c384)
 
