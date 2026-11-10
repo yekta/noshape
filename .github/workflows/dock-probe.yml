@@ -46,3 +46,85 @@ jobs:
             run "E1-30 #Hs = $v: rebuild" "$C" feature list --doc dh.noshape --tab "E1-30 - Egik Gece Standi"
           done
           rm -rf "$w"
+
+  # core: core-dock-0028 (main + the tangent sections + OCCT patch 0028) built on Windows, macOS and Linux; E1-30
+  # opened on one OCCT thread with the kernel profile, then three opens, #Hs edits, E2's exit code.
+  build-profile:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    env:
+      URL: ${{ secrets.DOCK_PROBE_URL }}
+      KEY: ${{ secrets.DOCK_PROBE_KEY }}
+      CARGO_PROFILE_RELEASE_DEBUG: line-tables-only
+      CARGO_PROFILE_RELEASE_STRIP: none
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: core-dock-0028
+      - name: Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev libx11-dev libx11-xcb-dev libxcb1-dev \
+            libxi-dev libxcursor-dev libxrandr-dev libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libasound2-dev
+      - name: macOS tools
+        if: runner.os == 'macOS'
+        run: brew install ninja || true
+      - name: MSVC developer environment
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
+      - uses: ./.github/actions/setup-cxx
+      - uses: ./.github/actions/setup-occt
+      - uses: ./.github/actions/setup-opennurbs
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: occt-V8_0_1
+          save-if: false
+      - name: Build the CLI (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo build --release --locked -p noshape-cli
+          if ($LASTEXITCODE -ne 0) { throw "build failed" }
+      - name: Build the CLI (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: cargo build --release --locked -p noshape-cli
+      - name: Trace
+        run: |
+          set +e +o pipefail
+          C=$(ls "$PWD"/target/release/noshape-cli.exe "$PWD"/target/release/noshape-cli 2>/dev/null | head -1)
+          w="$RUNNER_TEMP/p"; mkdir -p "$w"; cd "$w"
+          curl -fsSL "$URL" -o d.enc
+          openssl enc -d -aes-256-cbc -pbkdf2 -in d.enc -out dock.noshape -pass "pass:$KEY"; rm -f d.enc
+          export HOME="$w/home"; mkdir -p "$HOME"
+          t() { local s=$(date +%s%N); "$@"; local e=$?; echo "  wall $(( ($(date +%s%N) - s) / 1000000 )) ms (exit $e)" >&2; }
+          cp dock.noshape a.noshape
+          NOSHAPE_OCCT_THREADS=1 NOSHAPE_AHEAD_TRACE=1 NOSHAPE_KERNEL_PROFILE=1 t "$C" feature list --doc a.noshape --tab "E1-30 - Egik Gece Standi" > a.json 2> a.err
+          grep wall a.err
+          echo "---- Booleans: path and decline ----"; grep "^BOOL" a.err | sort | uniq -c | sort -nr | head -30
+          echo "---- AHEAD summaries ----"; grep "^AHEAD" a.err
+          echo "---- slowest pairs ----"; grep -E "^  [0-9.]+ ms (own|occt) " a.err | sort -t' ' -k3 -nr | head -12
+          echo "---- cylinder/torus pairs over 10 ms, with their lines ----"; awk '/^CYLTOR/{split($0,f," "); on=(f[4]+0>=10)} /^CYLTOR/||/^   line/{if(on) print}' a.err | head -80
+          echo "---- Rib Dizisi profile ----"; grep -A12 "PROFILE) Rib Dizisi" a.err
+          echo "---- default threads, three opens ----"
+          for i in 1 2 3; do cp dock.noshape b$i.noshape; NOSHAPE_KERNEL_PROFILE=1 t "$C" feature list --doc b$i.noshape --tab "E1-30 - Egik Gece Standi" > b$i.json 2> b$i.err; grep wall b$i.err; jq -c '{n: (.features|length), sum_ms: ([.features[].regen_ms // 0]|add|floor), not_ok: [.features[]|select(.status!="Ok" and .status!="Suppressed")|[.name,.status]], top: ([.features[]|[(.regen_ms // 0|floor), .name]]|sort|.[-4:])}' b$i.json; done
+          echo "---- feature statuses and parts (for the Linux / Windows comparison) ----"
+          jq -c '[.features[]|[.name,.status]]' b1.json | md5sum
+          "$C" part list --doc b1.noshape --tab "E1-30 - Egik Gece Standi" 2>/dev/null | jq -c '[.parts[]?|{name, volume: ((.volume // 0)*1e9|round), faces: .faces}]' | head -c 1500; echo
+          for v in "50 mm" "30 mm"; do cp dock.noshape dh.noshape; "$C" variable set --doc dh.noshape --tab "E1-30 - Egik Gece Standi" --variable "#Hs" --value "$v" > /dev/null 2>&1; t "$C" feature list --doc dh.noshape --tab "E1-30 - Egik Gece Standi" > h.json 2> h.err; echo "#Hs $v: $(grep wall h.err)"; jq -c '{sum_ms: ([.features[].regen_ms // 0]|add|floor), not_ok: [.features[]|select(.status!="Ok" and .status!="Suppressed")|.name]}' h.json; done
+          cp dock.noshape e2.noshape; "$C" feature list --doc e2.noshape --tab "E2 - C Stand" > /dev/null 2> e2.err; echo "E2 exit $?"
+          rm -rf "$w"
