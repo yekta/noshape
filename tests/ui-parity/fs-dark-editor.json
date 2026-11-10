@@ -1,0 +1,22 @@
+{
+ "name": "fs-dark-editor",
+ "about": "the dark theme: the code editor in Ace's twilight colours",
+ "area": "studios",
+ "source": "psui 11-10 (Feature Studio coverage, live 2466: window / theme)",
+ "start": "fs-studio",
+ "theme": "dark",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  }
+ ]
+}

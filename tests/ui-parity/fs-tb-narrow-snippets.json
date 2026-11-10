@@ -1,0 +1,24 @@
+{
+ "name": "fs-tb-narrow-snippets",
+ "about": "a 1600 px window: the six snippet menus fold into one split button; its ▾ is one flat list of all their snippets",
+ "area": "studios",
+ "source": "psui 11-10 (Feature Studio coverage, live 2466: window / theme)",
+ "start": "fs-studio",
+ "window": {
+  "width": 1600
+ },
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Snippets"
+   }
+  }
+ ]
+}

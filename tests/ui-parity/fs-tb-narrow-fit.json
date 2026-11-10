@@ -1,0 +1,18 @@
+{
+ "name": "fs-tb-narrow-fit",
+ "about": "a 1500 px window: the toolbar fits by its stages (labels go, groups fold), clipped, never wrapped",
+ "area": "studios",
+ "source": "psui 11-10 (Feature Studio coverage, live 2466: window / theme)",
+ "start": "fs-studio",
+ "window": {
+  "width": 1500
+ },
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  }
+ ]
+}

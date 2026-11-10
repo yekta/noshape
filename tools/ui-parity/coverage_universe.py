@@ -9,7 +9,8 @@ counted.
 An item counts as covered by a scenario whose steps contain one of its `via` chains in order (other steps may come
 between). A chain is a list of step patterns: `{"do": "rclick", "on": {"doc_tab": "*"}}`, `{"on": {"menu":
 "Duplicate"}}`, `{"do": "key", "key": "alt+t"}`; a value "*" matches anything, "re:<regex>" a regular expression
-(whole value), and an `on` pattern matches a target holding those keys with those values. An item without `via` is
+(whole value), and an `on` pattern matches a target holding those keys with those values. A scenario's view
+(`"window"` / `"theme"`) is a first step `{"do": "view", "width": 1480, "theme": "dark"}`. An item without `via` is
 not covered by anything yet.
 """
 import argparse
@@ -26,6 +27,8 @@ def value_matches(pat, val):
     if pat == "*":
         return val is not None
     if isinstance(pat, str) and pat.startswith("re:"):
+        # (A number, as a view's width, by its digits.)
+        val = str(val) if isinstance(val, (int, float)) and not isinstance(val, bool) else val
         return isinstance(val, str) and re.fullmatch(pat[3:], val) is not None
     if isinstance(pat, dict):
         return isinstance(val, dict) and all(value_matches(v, val.get(k)) for k, v in pat.items())
@@ -57,6 +60,10 @@ def chain_in(chain, steps):
 def steps_of(sc):
     # A drag's `from` is where its press is: it matches `on` patterns too.
     out = []
+    # The scenario's view (live 2466: `"window": {"width": 1480}`, `"theme": "dark"`) as a first step
+    # `{"do": "view", "width": …, "theme": …}`, so a chain can ask for a narrow window or the dark theme.
+    if sc.get("window") or sc.get("theme"):
+        out.append({"do": "view", "width": (sc.get("window") or {}).get("width", 1919), "theme": sc.get("theme", "light")})
     for s in sc.get("steps", []):
         if s.get("do") == "drag":
             s = dict(s, on=s.get("from"))

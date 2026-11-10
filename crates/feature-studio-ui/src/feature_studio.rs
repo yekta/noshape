@@ -1517,8 +1517,9 @@ impl Default for ToolbarFit {
 }
 
 impl ToolbarFit {
-    /// Re-picks the stage from last frame's layout; true when it changed.
-    fn refit(&mut self) -> bool {
+    /// Re-picks the stage from last frame's layout, within the window (`window_w`: the row may lay out wider than
+    /// the window and be clipped there; live fits to the window: 1480 px folds everything); true when it changed.
+    fn refit(&mut self, window_w: Pixels) -> bool {
         let tb = self.toolbar.get();
         if tb.size.width <= px(0.) {
             return false;
@@ -1529,8 +1530,9 @@ impl ToolbarFit {
                 self.widths[i] = Some(v);
             }
         }
-        let avail = f32::from(tb.size.width);
-        let overflow = (f32::from(self.end.get().right() - tb.right())).max(0.);
+        let right = tb.right().min(window_w);
+        let avail = f32::from(right - tb.left());
+        let overflow = (f32::from(self.end.get().right() - right)).max(0.);
         let natural = avail - f32::from(self.spacer.get().size.width) + overflow;
         // Width each step adds (estimates until both sides were seen).
         let [uf, uc, nl, sf, sc] = self.widths;
@@ -1579,7 +1581,7 @@ fn text_of(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<String> {
 
 impl FeatureStudioView {
     /// The toolbar (a cached view: see `render`).
-    fn render_toolbar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    fn render_toolbar(&mut self, window_w: Pixels, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let probe = |cell: &Rc<std::cell::Cell<Bounds<Pixels>>>| {
             let c = cell.clone();
@@ -1588,9 +1590,10 @@ impl FeatureStudioView {
         // Toolbar cells: 32 px, transparent, `#d7d7d7` hover (live toolbar tooltips list).
         let cell = |id: SharedString| h_flex().id(id).relative().flex_none().h(px(32.)).px(px(6.)).gap(px(2.)).rounded(px(3.)).cursor_pointer().hover(|d| d.bg(pal.border));
         let tools_anchor: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
-        // Fit-to-width stage, re-picked from the last frame's layout.
-        if self.tb.refit() {
-            cx.notify();
+        // Fit-to-width stage, re-picked from the last frame's layout; the toolbar is a cached slice: it is the one
+        // to draw again (notifying this view alone left the first frame's stage on).
+        if self.tb.refit(window_w) {
+            self.redraw_toolbar(cx);
         }
         let stage = self.tb.stage;
         let (can_undo, can_redo) = {
@@ -1615,7 +1618,7 @@ impl FeatureStudioView {
                             d.update(cx, |d, cx| d.undo(cx));
                         }
                     }),
-                crate::ui::tool_caret("fs-undo-caret", cx).opacity(if can_undo || can_redo { 1. } else { 0.4 }).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                crate::ui::tool_caret("fs-undo-caret", cx).opacity(if can_undo || can_redo { 1. } else { 0.4 }).map(|d| crate::ui_script::mark(d, || "caret:Undo".into())).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     let b = a2.get();
                     this.open_undo_menu(point(b.left(), b.bottom() + px(2.)), window, cx);
                 })),
@@ -1682,7 +1685,7 @@ impl FeatureStudioView {
                             .tooltip(crate::ui::tooltip(face.clone()))
                             .child(div().text_size(px(14.)).text_color(pal.text).child(face))
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.insert_snippet(&format!("{face_text}\n"), window, cx))),
-                        crate::ui::tool_caret("fs-snip-caret", cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        crate::ui::tool_caret("fs-snip-caret", cx).map(|d| crate::ui_script::mark(d, || "caret:Snippets".into())).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                             let b = sa.get();
                             this.open_all_snippets(point(b.left(), b.bottom() + px(2.)), window, cx);
                         })),
@@ -1701,7 +1704,7 @@ impl FeatureStudioView {
                             .child(os::glyph(os::GLYPH_FS_IMPORT, 20., pal.text))
                             .child(probe(&self.import_anchor))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_import(window, cx))),
-                        crate::ui::tool_caret("fs-import-caret", cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        crate::ui::tool_caret("fs-import-caret", cx).map(|d| crate::ui_script::mark(d, || "caret:Import".into())).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                             let b = ia.get();
                             this.open_import_menu(point(b.left(), b.bottom() + px(2.)), window, cx);
                         })),
@@ -1714,12 +1717,14 @@ impl FeatureStudioView {
         };
         // A resize re-lays the toolbar out without rendering this view: when
         // its width changes, render again so the stage follows.
-        let (rendered_w, tb_cell, view) = (self.tb.toolbar.get().size.width, self.tb.toolbar.clone(), cx.entity().downgrade());
-        let watch = canvas(|_, _, _| {}, move |_, _, _, cx| {
-            if tb_cell.get().size.width != rendered_w {
-                let view = view.clone();
+        let (rendered_w, tb_cell, slice) = (self.tb.toolbar.get().size.width, self.tb.toolbar.clone(), self.toolbar.as_ref().map(|t| t.downgrade()));
+        let watch = canvas(|_, _, _| {}, move |_, _, window, cx| {
+            if tb_cell.get().size.width != rendered_w || tb_cell.get().right() > window.viewport_size().width {
+                let slice = slice.clone();
                 cx.defer(move |cx| {
-                    let _ = view.update(cx, |_, cx| cx.notify());
+                    if let Some(s) = slice.and_then(|s| s.upgrade()) {
+                        s.update(cx, |_, cx| cx.notify());
+                    }
                 });
             }
         })
@@ -1847,6 +1852,19 @@ impl FeatureStudioView {
     }
 }
 
+impl FeatureStudioView {
+    /// The toolbar's cached slice drawn again (its fit stage changed), after the frame that found it.
+    fn redraw_toolbar(&self, cx: &mut Context<Self>) {
+        if let Some(t) = self.toolbar.as_ref().map(|t| t.downgrade()) {
+            cx.defer(move |cx| {
+                if let Some(t) = t.upgrade() {
+                    t.update(cx, |_, cx| cx.notify());
+                }
+            });
+        }
+    }
+}
+
 impl Render for FeatureStudioView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let read_only = self.read_only(cx);
@@ -1854,7 +1872,7 @@ impl Render for FeatureStudioView {
             // A cached view (see `crate::cached_slice`): a caret blink in the
             // editor doesn't rebuild it. It shows the caret's line and
             // symbol, so it follows the editor's edits and cursor moves.
-            let t = crate::cached_slice::Slice::new(&cx.entity(), |this, _, cx| this.render_toolbar(cx), cx);
+            let t = crate::cached_slice::Slice::new(&cx.entity(), |this, window, cx| this.render_toolbar(window.viewport_size().width, cx), cx);
             crate::cached_slice::Slice::observing(&t, &self.editor, cx);
             crate::cached_slice::Slice::observing(&t, &self.doc, cx);
             t

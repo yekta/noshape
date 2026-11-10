@@ -280,7 +280,20 @@
    "where": "toolbar at ≤1480 px",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2352"
+   "source": "behaviours.md:2352",
+   "via": [
+    [
+     {
+      "do": "view",
+      "width": "re:1[0-4][0-9][0-9]"
+     },
+     {
+      "on": {
+       "caret": "Undo"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-new-feature",
@@ -445,7 +458,20 @@
    "where": "toolbar below 1760 px",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2356"
+   "source": "behaviours.md:2356",
+   "via": [
+    [
+     {
+      "do": "view",
+      "width": "re:1[0-7][0-9][0-9]"
+     },
+     {
+      "on": {
+       "caret": "Snippets"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-import",
@@ -492,7 +518,20 @@
    "where": "toolbar below 1760 px",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2365"
+   "source": "behaviours.md:2365",
+   "via": [
+    [
+     {
+      "do": "view",
+      "width": "re:1[0-7][0-9][0-9]"
+     },
+     {
+      "on": {
+       "caret": "Import"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-commit",
@@ -666,7 +705,20 @@
    "where": "narrow window",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2351"
+   "source": "behaviours.md:2351",
+   "via": [
+    [
+     {
+      "do": "view",
+      "width": "re:1[0-7][0-9][0-9]"
+     },
+     {
+      "on": {
+       "doc_tab": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ed-typing",
@@ -936,7 +988,20 @@
    "where": "Preferences dark theme",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3601"
+   "source": "behaviours.md:3601",
+   "via": [
+    [
+     {
+      "do": "view",
+      "theme": "dark"
+     },
+     {
+      "on": {
+       "editor": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ed-profile-stale",

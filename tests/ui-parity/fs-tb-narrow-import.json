@@ -1,0 +1,24 @@
+{
+ "name": "fs-tb-narrow-import",
+ "about": "a 1600 px window: the Feature Studio's toolbar folds Import and Format Studio into Import ▾; its ▾ lists both",
+ "area": "studios",
+ "source": "psui 11-10 (Feature Studio coverage, live 2466: window / theme)",
+ "start": "fs-studio",
+ "window": {
+  "width": 1600
+ },
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Import"
+   }
+  }
+ ]
+}

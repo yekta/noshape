@@ -318,8 +318,10 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         eprintln!("UI-SCRIPT FAIL: not done after {}s", WATCHDOG.as_secs());
         std::process::exit(3);
     });
-    // Live's page (Chrome's viewport on its runner): the same toolbar groups and dialog places.
-    window.resize(size(px(1919.), px(992.)));
+    // Live's page (Chrome's viewport on its runner): the same toolbar groups and dialog places; a scenario's own width
+    // and theme as live's runner sets them (live 2466).
+    apply_view(&scenario);
+    window.resize(size(px(view_width(&scenario)), px(992.)));
     window.activate_window();
     cx.activate(true);
     cx.spawn_in(window, async move |ws, cx| {
@@ -652,6 +654,18 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
     .detach();
 }
 
+/// The scenario's window width (`"window": {"width": 1480}`, live 2466), else live's runner's 1919 px.
+fn view_width(scenario: &Value) -> f32 {
+    scenario["window"]["width"].as_f64().map_or(1919.0, |w| w as f32)
+}
+
+/// The scenario's theme (`"theme": "dark"`, live 2466: Preferences › dark set for the take).
+fn apply_view(scenario: &Value) {
+    if scenario["theme"] == "dark" {
+        noshape_app_core::theme::set_dark(true);
+    }
+}
+
 /// Runs a page scenario (README "Documents page and Preferences"): the steps go to the window in front (the page it
 /// starts on, then any window a step opened: a document, Preferences), whose registered reader gives the state.
 pub fn start_page(cx: &mut App) {
@@ -694,7 +708,7 @@ pub fn start_page(cx: &mut App) {
         }
         let Some(first) = win else { fail("no window opened") };
         let _ = first.update(cx, |_, window, _| {
-            window.resize(size(px(1919.), px(992.)));
+            window.resize(size(px(view_width(&scenario)), px(992.)));
             window.activate_window();
         });
         sleep(cx, 1500).await;
