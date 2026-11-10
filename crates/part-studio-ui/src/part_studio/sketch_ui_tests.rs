@@ -3478,9 +3478,9 @@ fn a_removed_parts_outline_is_computed_once_off_the_ui_thread(cx: &mut TestAppCo
 }
 
 /// User P0 (lead 11-10): selecting two big imported parts froze the app for 51 s while the readout measured them on
-/// the UI thread. The measurement is now a background task keyed by the selection: the frame that shows the selection
-/// draws without it (no readout yet), and the readout, the Measure panel and its lines take it when it arrives. Two
-/// many-faced prisms stand in for the user's parts.
+/// the UI thread. Whole parts aren't measured (live 2463), and the rest is a background task keyed by the selection:
+/// the frame that shows the selection draws without it (no readout yet), and the readout, the Measure panel and its
+/// lines take it when it arrives. Two many-faced prisms stand in for the user's parts.
 #[gpui::test]
 fn a_selections_measurement_doesnt_hold_up_the_frame(cx: &mut TestAppContext) {
     // A 96-sided star prism and a copy 50 mm along X: many faces each.
@@ -3500,8 +3500,17 @@ fn a_selections_measurement_doesnt_hold_up_the_frame(cx: &mut TestAppContext) {
     ] });
     let (window, view) = part_studio_from(cx, "measure-off-thread", Some(start));
     wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count() == 2);
-    let parts: Vec<Reference> = cx.update(|cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect());
-    assert_eq!(parts.len(), 2, "the two prisms");
+    let bodies: Vec<Reference> = cx.update(|cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect());
+    assert_eq!(bodies.len(), 2, "the two prisms");
+    // Two whole parts: nothing to measure, no task (live 2463).
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.selection = bodies.clone();
+        cx.notify();
+    }));
+    draw(cx, window);
+    cx.update(|cx| assert!(view.read(cx).measure_cache.is_none(), "whole parts aren't measured"));
+    // A face of each: measured off the UI thread.
+    let parts: Vec<Reference> = cx.update(|cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.face_refs[0].clone()).collect());
     cx.update(|cx| view.update(cx, |v, cx| {
         v.selection = parts.clone();
         cx.notify();

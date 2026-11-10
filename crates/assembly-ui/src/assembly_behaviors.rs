@@ -1104,7 +1104,7 @@ impl AssemblyView {
         let mut m: Vec<MenuEntry> = Vec::new();
         // Properties (list only): the part's metadata and the instance's own.
         if !graphics && !multi {
-            if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. } | InstanceSource::PartStudio { .. }) {
+            if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Standard { .. }) {
                 m.push(item("Properties…", move |t, w, cx| t.open_instance_metadata(top, w, cx)));
             }
             m.push(item("Instance properties…", move |t, w, cx| t.open_instance_properties(top, w, cx)));

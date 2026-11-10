@@ -133,6 +133,8 @@ pub struct MetaForm {
     /// Part Studio parts: fields with a configured value in the active
     /// configuration ("Name", "Part number"…; Configured properties).
     configured: Vec<&'static str>,
+    /// Fields shown but not edited (a standard content part's Name, live skb 10-20).
+    read_only: Vec<&'static str>,
     material: Option<String>,
     computed_mass: Option<String>,
     bom_options: Option<Vec<String>>,
@@ -242,6 +244,7 @@ impl MetaForm {
             on_release: None,
             reset_to: None,
             configured: Vec::new(),
+            read_only: Vec::new(),
             spec_category: spec.category,
             card: None,
             material: spec.material,
@@ -538,7 +541,13 @@ impl MetaForm {
 
     /// A text field, or its configured box.
     fn field(&self, name: &'static str, st: &Entity<InputState>, cx: &App) -> AnyElement {
-        if self.configured.contains(&name) { configured_box(name, st.read(cx).value().to_string()) } else { text_field(st) }
+        if self.configured.contains(&name) {
+            configured_box(name, st.read(cx).value().to_string())
+        } else if self.read_only.contains(&name) {
+            gray_box(st.read(cx).value().to_string(), false).into_any_element()
+        } else {
+            text_field(st)
+        }
     }
 }
 
@@ -1022,6 +1031,21 @@ pub fn open_part_properties_configured(spec: MetaSpec, reset_to: Option<MetaValu
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
     // Live: the first field (Name) has the focus when the modal opens.
     name.update(cx, |s, cx| s.focus(window, cx));
+}
+
+/// [`open_properties`] with `read_only` fields shown greyed, not edited (a standard content part's Name, live skb
+/// 10-20); the first editable field has the focus.
+pub fn open_properties_read_only(spec: MetaSpec, read_only: Vec<&'static str>, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    let on_save: SaveFn = Rc::new(on_save);
+    let name_locked = read_only.contains(&"Name");
+    let form = cx.new(|cx| {
+        let mut f = MetaForm::new(spec, on_save, window, cx);
+        f.read_only = read_only;
+        f
+    });
+    let first = if name_locked { form.read(cx).part_number.clone() } else { form.read(cx).name.clone() };
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
+    first.update(cx, |s, cx| s.focus(window, cx));
 }
 
 /// Instance properties…: a 600 px modal with the instance's name and its

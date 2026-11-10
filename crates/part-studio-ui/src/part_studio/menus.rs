@@ -1463,9 +1463,10 @@ impl PartStudioView {
                 .child(div().pl(px(5.)).pr(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(label))
                 .child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(value))
         };
-        let selected_names: Vec<String> = {
+        let (selected_names, measured_names): (Vec<String>, Vec<String>) = {
             let label = self.labeler(cx);
-            self.selection.iter().map(|r| label(r)).collect()
+            let measured = self.selection.iter().filter(|r| !matches!(r, Reference::Body(_))).map(|r| label(r)).collect();
+            (self.selection.iter().map(|r| label(r)).collect(), measured)
         };
         if self.show_mass {
             // Onshape (live, dom/dialog-mass-properties.txt): a 440 px dialog in the
@@ -1745,7 +1746,8 @@ impl PartStudioView {
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .text_color(pal.text)
                 .child(h_flex().h(px(29.)).pl(px(6.)).border_b_1().border_color(pal.border).child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)).child(close("measure-close", true, cx)))
-                .child(field("Select entities to measure", selected_names, true, false, true).mt(px(5.)).mb(px(5.)))
+                // It takes no whole parts (live 2463).
+                .child(field("Select entities to measure", measured_names, true, false, true).mt(px(5.)).mb(px(5.)))
                 .child(select_row("Measure type:", type_menu))
                 .child(select_row("Length unit:", length_menu))
                 .child(select_row("Angle unit:", angle_menu))
@@ -2160,6 +2162,12 @@ impl PartStudioView {
     /// (the readout shows nothing meanwhile), then the view redraws with them (readout, panel and lines alike). A
     /// new selection drops the old task, and a result for a selection no longer current is ignored.
     pub(super) fn selection_measurement(&mut self, sel: &[noshape_model::reference::Reference], ctx: std::sync::Arc<noshape_model::regen::context::Context>, cx: &mut Context<Self>) -> Option<Vec<(String, measure::Measurement)>> {
+        // Onshape measures no whole part (live 2463: two parts leave the readout empty and the panel without rows;
+        // their faces and edges measure as usual).
+        if sel.iter().any(|r| matches!(r, noshape_model::reference::Reference::Body(_))) {
+            self.measure_cache = None;
+            return None;
+        }
         if let Some(c) = &self.measure_cache
             && c.selection == sel
         {

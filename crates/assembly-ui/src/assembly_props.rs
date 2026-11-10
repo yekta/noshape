@@ -83,6 +83,25 @@ impl AssemblyView {
                     cx,
                 );
             }
+            // A standard content part (live skb 10-20): Name and Material shown, Part number and Description its
+            // own, kept user wide for its configuration as the Insert panel's pencil keeps them.
+            InstanceSource::Standard { spec } => {
+                use crate::properties_dialog::{MetaSpec, MetaValues};
+                let props = super::standard_content::std_props(&spec);
+                let generated = spec.description();
+                let values = MetaValues { name: spec.part_name(), description: props.description.clone().unwrap_or_else(|| generated.clone()), part_number: props.part_number.clone(), ..Default::default() };
+                let meta = MetaSpec { category: "Onshape Part", material: Some(spec.material().to_string()), computed_mass: None, bom_options: None, drawing_info: None, values };
+                crate::properties_dialog::open_properties_read_only(
+                    meta,
+                    vec!["Name"],
+                    move |v, _, _| {
+                        let description = (v.description != generated).then_some(v.description.clone());
+                        super::standard_content::save_std_props(&spec, super::standard_content::StdProps { part_number: v.part_number.trim().to_string(), description });
+                    },
+                    window,
+                    cx,
+                );
+            }
             _ => {
                 if let Some(studio) = inst.source.studio() {
                     crate::assembly_hooks::tab_properties(self.doc.clone(), studio, window, cx);

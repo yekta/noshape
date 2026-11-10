@@ -1036,7 +1036,7 @@ pub fn std_props(spec: &StandardSpec) -> StdProps {
     load_std_props().remove(&std_props_key(spec)).unwrap_or_default()
 }
 
-fn save_std_props(spec: &StandardSpec, props: StdProps) {
+pub(super) fn save_std_props(spec: &StandardSpec, props: StdProps) {
     let mut all = load_std_props();
     let key = std_props_key(spec);
     if props.part_number.is_empty() && props.description.is_none() {

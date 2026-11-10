@@ -4005,6 +4005,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Assemblies (asm)
+- [ ] P2 STANDARD-CONTENT-PROPS-OP (psui 11-10, found adding the instance's Properties…): a standard content part's
+  Part number and Description (the Insert panel's pencil, and now the instance's Properties…, live skb 10-20: kept
+  company/user wide per configuration) live in assembly-ui's own `standard_content_properties.json` and no op sets or
+  reads them; the agent API can't do what the pencil does. Move the store below ops (app-core or model) and add an op
+  (`assembly_standard_properties`, with an e2e test).
 - [ ] P1 T2-ASM-STANDARD-CONTENT-HANG (lead / core, was asm; T2 hang) **the nightly T2 never finishes: the spinning test
   is ops' `regen_profile::bench_edit_latency`, not an assembly test** (qa 2026-11-10 07:15). The process the lead saw
   listed `assembly::tests::standard_content_parts_regenerate_with_mate_connectors` first only because t2.sh hands all
