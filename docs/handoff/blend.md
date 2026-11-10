@@ -31,12 +31,12 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   takes 1.7 s (live 19 ms): the per-section projections and OCCT's failed attempt first; to speed once its shape is
   live's.
 - Fillet 2's land: 2nd and 3rd attempts failed on core's OCCT lib sync (the STEP read test 0.5 -> 6.8 s, and a rustc
-  crash); queued again as dfa2b701.
+  crash); landed 13:32 as 76cbef0e.
 - The impeller's "Chamfer Stevenrohr Halterung" / "Fillet Stevenrohr zum Halter" failures (qa's 4f5863a2 run): upstream,
   handed to core (core.md 11:01).
 - Asked live 07:58 for the equal-distance chamfer rule (tilted hole, cylinder under a tilted plane): rings-loft waits.
 
-## 11-10 10:29 UTC: knife's Fillet 2 as live (queued 965ea1f1), Chamfer 1 next; fillet fallback costs
+## 11-10 10:29 UTC: knife's Fillet 2 as live (landed 13:32 as 76cbef0e), Chamfer 1 next; fillet fallback costs
 - Fillet 2: `BlendSpec::overflow` (a fallback after OCCT's fillet fails, overflow on, all lines): a concave line's
   section runs on 2R past its free ends; the faces its run-on pieces touch (supports aside) trim it, planes extended
   by `k::extend_face`, a B-spline by the new `k::extend_face_over` (only the sides the run-on's points over the
