@@ -10,6 +10,44 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## From dx (2026-11-10 16:48 UTC, lead): HAND-DRILL-MATES-OVERDEFINED, diagnosed: connectors and parts, not redundancy
+
+asm-hand-drill-pinslot, qa's P1 (mates 28 -> 5/52 at dx's ee69e4a6a). Each mate's two connector frames dumped at live's
+places (ours from `connector_world`, live's = occurrence transform x `mateConnectorCS`):
+- **Ball 5 and Cylindrical 12 / 13 are live's**, origin and axes to 1e-9 m. They and every other mate are one group:
+  no instance is fixed at the root and all 68 mates join one rigid cluster. So one mate the cluster can't satisfy
+  fails `group_conflict` for the whole group: nothing moves and every mate that doesn't hold reads "Mate overdefines
+  the assembly." (32 of them). The solver didn't reject a redundant but consistent set: the set is inconsistent.
+  The 28 before was hollow: with Ball 5, Cylindrical 12 / 13 and Planar 2 / 4 unresolved the group was looser and
+  our mates dragged 18 parts up to 15.6 mm off live's places to satisfy the wrong connectors.
+- **The inconsistent ends** (off live's axis or plane, not just slid along it):
+  - Pin slot 7 / Cylindrical 23 end 1, 10.3mm Gear Triple Connector (studio 9c7c54), CENTER: our query read as
+    another hole of the pattern, 4.218 mm off the pin's axis. **Fixed (translator)**: an edge's CENTER / MID_POINT
+    is checked against live's frame and the edge of its part whose point is live's taken (Pin slot 7 now live's). Cylindrical 23
+    still: no circle of ours is centred at live's (0, 6.2, 8.8375) mm. Live's is the tangent edge of 9c7c54's Fillet 3
+    (0.3 mm) on that hole; ours is the hole's sharp edge at y 6.5, so our Fillet 3 (status OK) rounds another edge,
+    likely another hole of the pattern as the connector's query did: dx's.
+  - Planar 11 end 0, Top Ring Gear (0d1e01), MID_POINT: 0.2 mm off the plane. Live's edge is the chamfer's at
+    y -5.0; ours -5.2 because 0d1e01's Chamfer 1 fails ("Failed to chamfer selections.": chamferMethod APEX_RANGE,
+    TWO_OFFSETS 0.2 / 1.5 mm on 42 tooth edges). core's.
+  - Cylindrical 22 end 0, Gear Selector Ring Gear (f79298), BOTTOM_AXIS_POINT: ours is the other end of the axis
+    (2.6 mm along, z reversed): ours likely takes "bottom" from our cylinder's axis direction, which runs the other
+    way from live's on this face. **asm's** (which end an implicit axis point takes).
+- **Not resolved at all (no constraint, "cannot resolve mate connectors")**: the 9.02mm Gear 5 Connector (studios
+  9fbc05 / f79298) isn't inserted: its second Spur gear's centre is an in-feature mate connector on Extrude 1's cap
+  edge made from the first Spur gear's internal `blankSketch` circle `center`, which the translator can't name
+  (dx's: a custom feature's internal sketches); 15 mates hang on it. Pin slot 1–5, Cylindrical 1–6, Planar 1 / 10,
+  Cylindrical 26 / 27: an end on the Chuck to Gearbox Shaft / C Clip / gears not found by query or live's frame.
+- Also fixed (translator, my ee69e4a6a's regression): a region told apart by another sketch's imprint is that
+  sketch's only when the imprint is the TOPOLOGY entity's own (the fan's RoBG), not one deeper in an edge's history
+  (the spur gear's Extrude 6: "Select face or sketch region to extrude." gone).
+- Landed with them: the assembly suite one document per process (the whole run hits vibe5's earlyoom): every
+  assembly as before but the drill, 5 -> 6/52; the model suite 76/87, 818/947 either way.
+- For asm (not changed): when one mate in a big cluster can't hold, ours flags every mate the least-squares
+  compromise leaves off (here 23 to 32, and which ones shifts with any connector change: 6 or 14 of 52 with the same three
+  inconsistent ends), live flags the mates it can't satisfy. Worth a live probe (a 10-mate chain with one off mate)
+  before changing `group_conflict`.
+
 ## From dx (2026-11-10 09:05 UTC, lead, asm paused): variable renames reach Assemblies
 
 - A Variable Studio variable renamed now renames `#old` in every Assembly that sees the studio (they were skipped:

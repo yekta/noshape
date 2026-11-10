@@ -19,6 +19,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (redundant mates live accepts; asm is paused until Wednesday). Logs: qa-scratch/bisect/hd-<sha>.log; repro: a folder
   with just asm-hand-drill-pinslot as NOSHAPE_PARITY_ASSEMBLIES and NOSHAPE_PARITY_MODELS, `cargo test -q -p noshape-ops
   --test all parity::parity_assemblies -- --ignored --nocapture` (~10 min on vibe4; vibe4 ~/qa-bisect/hd).
+  **dx 11-10 16:50, diagnosed (asm.md "HAND-DRILL-MATES-OVERDEFINED"):** Ball 5 / Cylindrical 12 / 13's connectors
+  are live's to 1e-9 m; all 68 mates are one cluster, and three ends off live's axis / plane make it inconsistent, so
+  `group_conflict` fails the lot (not redundancy). The 28 was hollow (18 parts dragged up to 15.6 mm). Fixed in the
+  translator: an edge's CENTER / MID_POINT checked against live's frame (Pin slot 7), the imprint-region regression
+  (spur gear Extrude 6). Left: Cylindrical 23 (9c7c54's Fillet 3 rounds another hole's edge: dx), Planar 11 (0d1e01's APEX_RANGE Chamfer 1
+  fails: core), Cylindrical 22 (BOTTOM_AXIS_POINT takes the other end: asm), the Gear 5 Connector (in-feature
+  connector on a Spur gear's internal sketch: dx), 15 mates on it.
 
 ## psui, 2026-11-09
 - [x] (verified by qa 2026-11-10 on green 4f5863a2 = v0.4.41, core b5da62f83: c2-fan-blade-sweep regenerates in 1.56 s on vibe3, live 1.42 s) P0 FAN-BLADE-SWEEP-HANG (dx, speed regression; found by psui's re-measure 11-09 19:40): c2-fan-blade-sweep's

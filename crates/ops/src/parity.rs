@@ -537,22 +537,30 @@ impl<'a> Translator<'a> {
     /// EntityInferenceType) lies at `origin` (part coordinates, metres): an
     /// assembly's connector found from live's frame when its query isn't read.
     pub fn connector_entity(&mut self, inference: &str, origin: [f64; 3]) -> Result<String, String> {
-        let (kind, key) = match inference {
-            "CENTER" | "TOP_AXIS_POINT" | "MID_AXIS_POINT" | "BOTTOM_AXIS_POINT" => ("edges", "center"),
-            "MID_POINT" => ("edges", "midpoint"),
-            "POINT" => ("vertices", "position"),
-            _ => ("faces", "centroid"),
-        };
+        let (kind, key) = connector_kind(inference);
+        self.connector_entities(inference, origin)?.into_iter().next().ok_or_else(|| format!("no {} of ours with its {key} at {:?} mm", &kind[..kind.len() - 1], origin.map(|c| c * 1e3)))
+    }
+
+    /// Every entity whose implicit connector of `inference` lies at `origin` (see [`Self::connector_entity`]).
+    pub fn connector_entities(&mut self, inference: &str, origin: [f64; 3]) -> Result<Vec<String>, String> {
+        Ok(self.connector_candidates(inference, origin)?.into_iter().map(|(id, _)| id).collect())
+    }
+
+    /// [`Self::connector_entities`] on the part of entity `of` (a studio's other parts may have a circle there too:
+    /// asm-scissor-lift's pins in their holes).
+    pub fn connector_entities_on_part_of(&mut self, of: &str, inference: &str, origin: [f64; 3]) -> Result<Vec<String>, String> {
+        let r = self.call("query_entities", json!({ "kind": "faces", "of": [of], "limit": 1 }))?;
+        let Some(part) = r["faces"][0]["part"].as_str().map(str::to_string) else { return Ok(Vec::new()) };
+        Ok(self.connector_candidates(inference, origin)?.into_iter().filter(|(_, p)| *p == part).map(|(id, _)| id).collect())
+    }
+
+    /// (id, part) of each entity whose implicit connector of `inference` lies at `origin`.
+    fn connector_candidates(&mut self, inference: &str, origin: [f64; 3]) -> Result<Vec<(String, String)>, String> {
+        let (kind, key) = connector_kind(inference);
         let r = self.call("query_entities", json!({ "kind": kind, "near": mm(origin), "limit": 50 }))?;
         let k = per_unit(&r["units"]);
         let at = |e: &Value| (0..3).map(|i| e[key][i].as_f64().map_or(f64::INFINITY, |c| (c * k - origin[i]).abs())).fold(0.0, f64::max);
-        r[kind]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter(|e| at(e) <= 1e-6)
-            .find_map(|e| e["id"].as_str().map(str::to_string))
-            .ok_or_else(|| format!("no {} of ours with its {key} at {:?} mm", &kind[..kind.len() - 1], origin.map(|c| c * 1e3)))
+        Ok(r[kind].as_array().into_iter().flatten().filter(|e| at(e) <= 1e-6).filter_map(|e| Some((e["id"].as_str()?.to_string(), e["part"].as_str().unwrap_or_default().to_string()))).collect())
     }
 
     /// Places an instance of the assembly tab `assembly` where live has its occurrence:
@@ -2209,14 +2217,20 @@ impl<'a> Translator<'a> {
         let (sk, strings) = match text.split("qCompressed(1.0,\"").nth(1).and_then(|r| r.split('"').next()) {
             Some(packed) => {
                 let Ok(tree) = noshape_model::custom::host::packed::unpack(packed) else { return Ok(None) };
+                // A body told apart by region faces is the body's (c2-hunting-knife's Extrude 8 booleanScope: Loft 1's
+                // SWEPT_BODY).
+                if packed_entity_type(&tree).as_deref() == Some("BODY") {
+                    return Ok(None);
+                }
                 let mut strings = Vec::new();
                 packed_strings(&tree, &mut strings);
                 own_edges = packed_face_edges(&tree);
-                // The sketch whose imprint the face is (the query's own operation; the last imprint named, after those
-                // of the curves it is told apart by: c2-fan-blade-sweep's RoBG), else the first sketch named.
+                // The sketch whose imprint the face is (the query's own operation, or that of an edge it is told apart
+                // by: c2-fan-blade-sweep's RoBG), else the first sketch named (an imprint deeper in an edge's history
+                // is another face's: asm-hand-drill-pinslot's spur gear Extrude 6, by Sketch 1's).
                 let sk = root_operation(&tree)
                     .and_then(|o| o.strip_suffix(".imprint").map(str::to_string))
-                    .or_else(|| strings.iter().rev().find_map(|s| s.strip_suffix(".imprint")).map(str::to_string))
+                    .or_else(|| packed_face_imprint(&tree))
                     .or_else(|| strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string));
                 (sk, strings)
             }
@@ -4420,6 +4434,59 @@ fn packed_face_edges(p: &noshape_model::custom::host::packed::Packed) -> Vec<Str
     out
 }
 
+/// A packed query's own entity type (`EDGE`, `FACE`, `BODY`…).
+fn packed_entity_type(p: &noshape_model::custom::host::packed::Packed) -> Option<String> {
+    use noshape_model::custom::host::packed::Packed;
+    let Packed::Tagged(_, inner) = p else { return None };
+    let Packed::Map(m) = inner.as_ref() else { return None };
+    let (_, t) = m.iter().find(|(k, _)| matches!(k, Packed::Str(s) if s == "entityType"))?;
+    match t {
+        Packed::Tagged(_, v) => match v.as_ref() {
+            Packed::Str(s) => Some(s.clone()),
+            _ => None,
+        },
+        Packed::Str(s) => Some(s.clone()),
+        _ => None,
+    }
+}
+
+/// The sketch that imprinted one of a packed face query's TOPOLOGY entities (that entity's own operation, not one deeper
+/// in its history).
+fn packed_face_imprint(p: &noshape_model::custom::host::packed::Packed) -> Option<String> {
+    use noshape_model::custom::host::packed::Packed;
+    fn field<'a>(p: &'a Packed, key: &str) -> Option<&'a Packed> {
+        let Packed::Map(kv) = (match p {
+            Packed::Tagged(_, inner) => inner.as_ref(),
+            other => other,
+        }) else {
+            return None;
+        };
+        kv.iter().find(|(k, _)| matches!(k, Packed::Str(s) if s == key)).map(|(_, v)| v)
+    }
+    fn text(p: &Packed) -> Option<&str> {
+        match p {
+            Packed::Str(s) => Some(s),
+            Packed::Tagged(_, inner) => text(inner),
+            Packed::Array(a) => a.first().and_then(text),
+            _ => None,
+        }
+    }
+    let Some(Packed::Array(data)) = field(p, "disambiguationData") else { return None };
+    let items = data
+        .iter()
+        .filter(|d| field(d, "disambiguationType").and_then(text) == Some("TOPOLOGY"))
+        .filter_map(|d| match field(d, "entities") {
+            Some(Packed::Array(groups)) => Some(groups),
+            _ => None,
+        })
+        .flatten()
+        .flat_map(|g| match g {
+            Packed::Array(a) => a.iter().collect::<Vec<_>>(),
+            other => vec![other],
+        });
+    items.filter_map(|q| field(q, "operationId").and_then(text)).find_map(|o| o.strip_suffix(".imprint").map(str::to_string))
+}
+
 fn packed_strings(p: &noshape_model::custom::host::packed::Packed, out: &mut Vec<String>) {
     use noshape_model::custom::host::packed::Packed;
     match p {
@@ -5226,6 +5293,17 @@ struct Level<'a> {
     tab: String,
 }
 
+/// The entities an implicit connector of `inference` sits on, and the point of theirs it is at (query_entities' kind
+/// and key).
+fn connector_kind(inference: &str) -> (&'static str, &'static str) {
+    match inference {
+        "CENTER" | "TOP_AXIS_POINT" | "MID_AXIS_POINT" | "BOTTOM_AXIS_POINT" => ("edges", "center"),
+        "MID_POINT" => ("edges", "midpoint"),
+        "POINT" => ("vertices", "position"),
+        _ => ("faces", "centroid"),
+    }
+}
+
 /// A row-major 4×4 transform (metres) as a matrix.
 fn mat(m: &[f64]) -> Option<glam::DMat4> {
     (m.len() >= 16).then(|| glam::DMat4::from_cols_array(&[m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14], m[3], m[7], m[11], m[15]]))
@@ -5538,8 +5616,16 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 Ok(_) => Err("its entity resolved to nothing".to_string()),
                 Err(e) => Err(e),
             };
+            // Live's frame, when known, settles an edge's centre or midpoint: the query's edge if its point is there,
+            // else the one whose point is (asm-hand-drill-pinslot's Gear Triple Connector: its query read as another
+            // hole of the pattern, 4.2 mm off the pin's axis, so every mate of the drill failed with it). Not an axis
+            // point or a face's centre: the face's end circles have the same point, not the same frame.
             let found = match (found, connector_origins.get(key)) {
                 (Err(_), Some(o)) => t.connector_entity(inference, *o),
+                (Ok(e), Some(o)) if matches!(inference.as_str(), "CENTER" | "MID_POINT") && e.starts_with("edge:") => match t.connector_entities_on_part_of(&e, inference, *o) {
+                    Ok(at) if !at.is_empty() && !at.contains(&e) => Ok(at[0].clone()),
+                    _ => Ok(e),
+                },
                 (found, _) => found,
             };
             match found {
@@ -5956,6 +6042,21 @@ mod tests {
         for neighbour in ["EuqcNC5engaa", "jTOeizUlYODs"] {
             assert!(all.iter().any(|s| s == neighbour), "{all:?}");
         }
+    }
+
+    /// A region told apart by an edge another sketch imprints is that sketch's (c2-fan-blade-sweep's RoBG: Sketch 11's,
+    /// though Sketch 10's curve is named first); an imprint deeper in an edge's history is not (asm-hand-drill-pinslot's
+    /// spur gear Extrude 6: its Sketch 6 regions, the gear blank's edges coming from Sketch 1's imprint).
+    #[test]
+    fn a_regions_sketch_is_the_one_imprinting_an_edge_it_names() {
+        let fan = noshape_model::custom::host::packed::unpack("%B5$QueryM5S12$disambiguationDataA1M2S12$disambiguationTypeS8$TOPOLOGYS8$entitiesA1A2C0M5Sb$derivedFromC0M6R0A1M2R1S13$ORIGINAL_DEPENDENCYS9$originalsA1C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S12.6$FBxLq6GKEAbr8qK_11wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdSc$vYQOYSg3tFhAR7R8R9RaS7$isStartFRbCeA1S12.9$FvlyBHEacHA2SWO_11opExtrudeReS8$CAP_EDGER7R8R9RaRbCeA1S12.7$F2lNAqUxFyXDiED_12imprintReS7$IMPRINTD1R7C9S4$FACER9RaRbR1cReR1d").unwrap();
+        assert_eq!(super::packed_face_imprint(&fan).as_deref(), Some("F2lNAqUxFyXDiED_12"));
+        let gear = noshape_model::custom::host::packed::unpack("&639$eJytVF1zojAU/TPZRx0SvvQRMbSsFmjA3bovTiCxplWggNv67zcBa7G6ndmZnXE03pt77j3nHvg2McH9nleHOzOGCDBR010qHve0EUU+pQ114B26zCSHkscjkIRROA9vlvLI80Y0gteO4SBXu7PiFDBeid+ceVWxkxEzpt2lgyqeUIBPf2ID4OkNliUbUTdFdTjCuwQ7iR8GMlGUvGo7+2yCgM8cGEM4tIA3/xUVYfi0DV6X491hhV5FxcMyHoMXxaoFYiCe4cS9XeEg8ZNlzEH9zJts0w3gszgDKJuni+z5+8OL+UY0xZlAgojuoJaNSY6sZA6pXAx1EBL/xg+c+WqKIxxMceAuZduiEo8ip9v6WGgSi9hkRMZu1s2cDgccePfLTMvziT56mNzOnJWWbmn+HLdjkYwwouhTxnjO9rsrOANodUBNUTSbszob1OVW5FxxMBzYTf+JQ8cPyg9y5JdFTNeWS/AcF6smEkPUcUOrxuv1M4dj0I5ZlPitqfaMk0wtyYlWqrCF7hpdNKByfKR9mt8cDpDWEZBAFMQ/cZS0UKfbcjMirxuaZzygOx5DgHoAthyopE3Dq7woo+4gkQzghtHyimCWvL8p0pSzopwUxZZTdX0M/CDBJMZucrksG3jrbL1Y4OzNeVoGVraCYldWIm9kpQ38u4jIaumHNUjIAvescMJCMPnAU4y9YLZGgbO3Zy+llqYreJJRPQQEau02LPADkwQ/9Dmw4UCHQO5Zt6YDeN2ZR9HlyTr3DYGjTw5B1xxCkPnFJo2st0mCqERE6UcIMYK4TOiaGhL2mutmO3Y/MlYRKsF1di4WMaQkxECtFMQwjwWG3THvw3YxaS/2rsYVLXTlcEj/JsdIvqi6B+1f9UDK2ZZ5zdzWcATWYrvlTVF67W/r8clc2uPc4/9btEtxjPG7OMTQvxSPmPRqfX/px+gfFB/Prg==").unwrap();
+        assert_eq!(super::packed_face_imprint(&gear), None);
+        // c2-hunting-knife's Extrude 8 booleanScope: Loft 1's body, told apart by Sketch 12's regions.
+        let body = noshape_model::custom::host::packed::unpack("&56c$eJylVNuSojAQ/ZnsoxThpj5iiBovwCSsii8WStAoigLe5usHtGZG3anaXX2hQp8+p0/Snfxq6OBtz9NzX2dQAaHIgvVUzPdBLpKNFeSBCfvKn4h33nIGVeBQ0iK22ZtY2MW2hW3kszpIUjEXmyDOTA3JfZ3KpQiFrAY8x3V6TssvlnyTi1zwzDRMpcxiUxDyVBx42EyT9SUSXJPOZbVGAPDXD9MAtlq4oCxElifpNVgDiGLTI45dAMmWpxerJGwogIQmZBBKBmiudn2X5yv5tDz77+8T5ShS7mwL17vyGC5CIWBd7KH2BNse8XzGQbbi+WxxNUBCNpOgVIEG0Jaj36PTQTM80pNpldZonQZ0inhRrRJJVSDW21RscspZFZC+S4ntWfC6X2pcvl8kGlJOIwplVoF6qS5BAG9gqBU41Cms/jtfeZGvv8g3XuRXf+TTKqoXE9A0Eb7H7gUvXYBlo2TQHJNohdBgnuq78NyZKJ+1ZmBw9LtuO4qtAUYPjlT1Oy22o85+z8j6Dau3Q001qn+O8OOW7hzEqNaeoaFcPyanbH7roBXLMlfYqtlcth6HSAkKdg385ejU+rea5gk3X+ITG2Xz25TwPzQOo90xMczTkBbgcxqF7alUB+PETbYL0pGnXRSJOOa5mc6elzSkigrBiL6Nxj3bdTZr/JxWRVUvBku1HxWKoCo/RK9j13As/769xaNybBkrnunRQPi5kCdKsu0lUXntA8CG2PUmJesD5FWYjw==").unwrap();
+        assert_eq!(super::packed_entity_type(&body).as_deref(), Some("BODY"));
+        assert_eq!(super::packed_entity_type(&fan).as_deref(), Some("FACE"));
     }
 
     /// stef-radijator's Fillet 1 names `TNHaprdwY81W.1.18.0` of an 18-instance circular pattern listing the seed
