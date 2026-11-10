@@ -2036,12 +2036,33 @@ impl<'a> Translator<'a> {
     fn edge_side_probe(&self, sk: &str, g: &Value, q: &EdgeSide) -> Option<glam::DVec2> {
         use glam::DVec2;
         #[derive(Clone, Copy)]
-        enum C {
+        enum C<'a> {
             Line(DVec2, DVec2),
             /// Centre, radius and an arc's start angle and sweep (anticlockwise).
             Circle(DVec2, f64, Option<(f64, f64)>),
+            /// A spline, finely sampled.
+            Poly(&'a [DVec2]),
         }
         let pt = |v: &Value| Some(DVec2::new(v[0].as_f64()?, v[1].as_f64()?));
+        let pt3 = |v: &Value| Some([v[0].as_f64()?, v[1].as_f64()?, v[2].as_f64()?]);
+        // Live's samples of each spline of the sketch, in our sketch's plane and units.
+        let k = per_unit(&g["units"]);
+        let ours_frame = (pt3(&g["frame"]["origin"]), pt3(&g["frame"]["x"]), pt3(&g["frame"]["y"]));
+        let polys: HashMap<String, Vec<DVec2>> = match (self.frames.get(sk), ours_frame) {
+            (Some([lo, lx, ly]), (Some(o), Some(x), Some(y))) => self
+                .curves
+                .iter()
+                .filter(|((s, _), poly)| s == sk && poly.len() > 2)
+                .map(|((_, id), poly)| {
+                    let to_ours = |p: &[f64; 2]| {
+                        let w: [f64; 3] = std::array::from_fn(|i| (lo[i] + p[0] * lx[i] + p[1] * ly[i]) / k - o[i]);
+                        DVec2::new((0..3).map(|i| w[i] * x[i]).sum(), (0..3).map(|i| w[i] * y[i]).sum())
+                    };
+                    (id.clone(), poly.iter().map(to_ours).collect())
+                })
+                .collect(),
+            _ => HashMap::new(),
+        };
         let curve = |live: &str| -> Option<C> {
             let ours = self.sketch_entities.get(&(sk.to_string(), live.to_string()))?;
             let e = g["entities"].as_array()?.iter().find(|e| e["id"] == ours.as_str())?;
@@ -2055,16 +2076,34 @@ impl<'a> Translator<'a> {
                     let sweep = (b.y.atan2(b.x) - a0).rem_euclid(std::f64::consts::TAU);
                     Some(C::Circle(c, a.length(), Some((a0, if sweep == 0.0 { std::f64::consts::TAU } else { sweep }))))
                 }
+                "spline" => polys.get(live).map(|p| C::Poly(p.as_slice())),
                 _ => None,
             }
+        };
+        // The nearest point of a polyline to `p`, the segment it is on and how far.
+        let nearest = |pts: &[DVec2], p: DVec2| -> (DVec2, usize, f64) {
+            let mut best = (pts[0], 0, f64::INFINITY);
+            for (i, w) in pts.windows(2).enumerate() {
+                let d = w[1] - w[0];
+                let q = w[0] + d * ((p - w[0]).dot(d) / d.length_squared().max(1e-300)).clamp(0.0, 1.0);
+                if q.distance(p) < best.2 {
+                    best = (q, i, q.distance(p));
+                }
+            }
+            best
         };
         let size = |c: C| match c {
             C::Line(a, b) => a.distance(b),
             C::Circle(_, r, _) => r,
+            C::Poly(p) => p.windows(2).map(|w| w[0].distance(w[1])).sum(),
         };
         let tangent = |c: C, p: DVec2| match c {
             C::Line(a, b) => (b - a).normalize_or_zero(),
             C::Circle(o, _, _) => (p - o).perp().normalize_or_zero(),
+            C::Poly(pts) => {
+                let i = nearest(pts, p).1;
+                (pts[i + 1] - pts[i]).normalize_or_zero()
+            }
         };
         let edge = curve(&q.edge)?;
         let tol = 1e-6 * size(edge).max(1.0);
@@ -2074,10 +2113,14 @@ impl<'a> Translator<'a> {
                 (p - (a + d * ((p - a).dot(d) / d.length_squared().max(1e-300)).clamp(0.0, 1.0))).length() <= tol
             }
             C::Circle(o, r, arc) => (p.distance(o) - r).abs() <= tol && arc.is_none_or(|(a0, sweep)| ((p - o).to_angle() - a0).rem_euclid(std::f64::consts::TAU) <= sweep + tol / r || ((p - o).to_angle() - a0).rem_euclid(std::f64::consts::TAU) >= std::f64::consts::TAU - tol / r),
+            // (Its samples' chords: a thousandth of it.)
+            C::Poly(pts) => nearest(pts, p).2 <= 1e3 * tol,
         };
         // Where two curves meet (a tangent touch once).
         let meet = |a: C, b: C| -> Vec<DVec2> {
             let mut pts = match (a, b) {
+                // (A spline meets another curve at its ends here: where the sketch's curves join.)
+                (C::Poly(p), o) | (o, C::Poly(p)) => [p[0], p[p.len() - 1]].into_iter().filter(|e| on(o, *e)).collect(),
                 (C::Line(p, q), C::Line(u, v)) => {
                     let (d, e) = (q - p, v - u);
                     let den = d.perp_dot(e);
@@ -2110,6 +2153,22 @@ impl<'a> Translator<'a> {
         let along = |p: DVec2, by: f64| match edge {
             C::Line(a, b) => p + (b - a).normalize_or_zero() * by,
             C::Circle(o, r, _) => o + DVec2::from_angle(by / r).rotate(p - o),
+            C::Poly(pts) => {
+                // Walked along the samples from the nearest point, forward (by > 0) or back.
+                let (mut at, i, _) = nearest(pts, p);
+                let mut left = by.abs();
+                let mut j = if by > 0.0 { i + 1 } else { i };
+                loop {
+                    let next = pts[j];
+                    let d = at.distance(next);
+                    if d >= left || (by > 0.0 && j + 1 == pts.len()) || (by <= 0.0 && j == 0) {
+                        break if d > 0.0 { at + (next - at) * (left.min(d) / d) } else { at };
+                    }
+                    left -= d;
+                    at = next;
+                    j = if by > 0.0 { j + 1 } else { j - 1 };
+                }
+            }
         };
         let distance = |c: C, p: DVec2| match c {
             C::Line(a, b) => {
@@ -2117,6 +2176,7 @@ impl<'a> Translator<'a> {
                 (p - (a + d * ((p - a).dot(d) / d.length_squared().max(1e-300)).clamp(0.0, 1.0))).length()
             }
             C::Circle(o, r, _) => (p.distance(o) - r).abs(),
+            C::Poly(pts) => nearest(pts, p).2,
         };
         let (at, other) = match &q.vertex {
             Some(([a, b], flag)) => {
@@ -2132,6 +2192,7 @@ impl<'a> Translator<'a> {
                 match edge {
                     C::Line(a, b) => (a + b) * 0.5,
                     C::Circle(o, r, arc) => o + DVec2::from_angle(arc.map_or(0.0, |(a0, sweep)| a0 + 0.5 * sweep)) * r,
+                    C::Poly(pts) => pts[pts.len() / 2],
                 },
                 None,
             ),
@@ -4444,6 +4505,14 @@ fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
             let key = if g["interpolationPoints"].is_array() { "interpolationPoints" } else { "controlPoints" };
             let flat: Vec<f64> = g[key].as_array()?.iter().filter_map(Value::as_f64).collect();
             let mut poly: Vec<[f64; 2]> = flat.chunks(2).map(|c| [c[0], c[1]]).collect();
+            // A fit spline with its end derivatives: the curve itself, finely (a region probe steps along it).
+            let (d0, d1) = (glam::DVec2::new(num("startDerivativeX"), num("startDerivativeY")), glam::DVec2::new(num("endDerivativeX"), num("endDerivativeY")));
+            if key == "interpolationPoints" && g["isPeriodic"].as_bool() != Some(true) && d0.length() > 0.0 && d1.length() > 0.0 && poly.len() >= 2
+                && let Some(n) = noshape_sketch::nurbs::Nurbs::interpolate_with_ends(&poly.iter().map(|p| glam::DVec2::new(p[0], p[1])).collect::<Vec<_>>(), d0, d1)
+            {
+                let (a, b) = n.domain();
+                return Some((0..=128).map(|i| n.point(a + (b - a) * i as f64 / 128.0)).map(|p| [p.x, p.y]).collect());
+            }
             // A periodic one closes.
             if g["isPeriodic"].as_bool() == Some(true)
                 && let Some(&first) = poly.first()
