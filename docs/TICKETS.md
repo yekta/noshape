@@ -369,7 +369,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   rust-zero-solid-f197, for the better: its Fillet 1 now builds (was "Failed to fillet selections."; blend's 5034e162e, a
   concave round running off its edge), so Part 1 is 32,264.11 mm³ (was 27,142.42), Fillet 2 "2 missing selections" (was 1).
   Fuzz: v0.4.41 release CLI 9001–9060 done, 0 deaths (9061– running). Still waiting on the 15:17 CI (on 05e8bcde8) for Windows.
-- **qa 16:08: no blocker; cut candidate watcher GREEN 8038dc03b (15:40) = core's OCCT patch 0028 (126109008, now landed as a
+- **qa 16:07: no blocker; cut candidate watcher GREEN 8038dc03b (15:40) = core's OCCT patch 0028 (126109008, now landed as a
   commit) + bool's Measure distance.** The 15:17 CI (42843547947) on 126109008 passed T1 on Linux, macOS and Windows: the
   Windows Rhino export failure of 12:26 is gone (export::imported_nist_parts_write_to_rhino_and_pvz passes there). The
   watcher's red on 126109008 at 15:13 (model kernel_robustness::a_full_round_of_a_bore_or_a_boss_is_a_half_torus) was the build
