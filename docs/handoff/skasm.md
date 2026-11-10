@@ -6,7 +6,20 @@
   with that face's evPlane (o, x, n), so the flat lies under z = 0 (z −t…0), sketch side +Z, in-plane coordinates
   kept. Never drawn in the main view nor in whole-part queries (only qCorrespondingInFlat); in the flat view its faces
   pick as "Flat pattern of Part 1" (cross-highlighting the folded face), their menu has New sketch…, and a sketch on
-  one lives (and shows) only in the flat view. Building that, with an e2e test and the model suite.
+  one lives (and shows) only in the flat view. Built:
+  - Placement: std's flat carries `FlatPlace` (shape space → the flat's place; the fixed face is the model's first
+    WALL, `model_id`'s ".0"): the definition normal goes to +Z, so an Extrude model with Opposite direction lies at
+    z −t…0 (live's five probes, T2 `sheetmetal_std::the_flat_lies_where_its_first_wall_puts_it`) and a Thicken without
+    it at 0…+t (c2-sm-louver's S2E6G at +2.032). The native route keeps its old placement (no live case yet).
+  - A flat face is `sheetmetal::flat_face_name(part, i)` (the part's feature with the flat bit, `Copy { instance: the
+    part's index, of: New(i) }`); a sketch on one resolves to the flat (`flat_face_frame`: origin the face's own
+    centre, as live's evPlane there), shows only in the flat view (`SketchDisplay::on_flat`). sheetmetal_table lists
+    `flat_faces`; e2e `a_sketch_on_the_sheet_metal_flat`; the translator's `face_on_plane` falls back to them.
+  - c2-sm-louver 31 -> 32/36 (Sketch 9 matches; next is Extrude 3, bool's OCCT case).
+  - Flat view: a click selects the flat's face (the main view lights the part's base wall face on that side), New
+    sketch… on the right-clicked one, the flat's sketches drawn there. Not yet live's: the sketch is edited in the main
+    view (the flat drawn under it there), where live sketches inside the flat view; the cross-highlight is the base
+    wall's face, not the exact counterpart.
 
 ## From psui (2026-11-10 18:35 UTC, lead: c2-hex-bookcase-derived's text, skasm paused)
 - Took SUITE-HEX-BOOKCASE-TEXT. On main its text was already live's (core's `rejoin_pieces`, 11-09 18:40) and the µm

@@ -1698,7 +1698,17 @@ impl PartStudioView {
         // Versions and history › Compare: both sides (crate::compare_graphics).
         let (mode, up) = (self.opts.display_mode, self.gpu.uploader());
         let owner = crate::compare_graphics::Owner::<Self> { get: |this: &mut Self| &mut this.compare_gfx, then: |this, cx| this.refresh_scene(false, cx) };
+        let statics = built.static_instances;
         match self.compare_gfx.scene(&self.doc, self.tab, mode, up, owner, cx) {
+            // Live (ver-compare-hover-part): a face is picked, lit and selected in Compare as outside it when the base
+            // is the open model: its picks ride along undrawn, its highlights drawn over both sides.
+            Some(mut compare) if self.compare_base_is_open(cx) => {
+                compare.instances.extend(scene.instances.into_iter().enumerate().filter(|(k, i)| *k >= statics || i.pickable).map(|(k, mut i)| {
+                    i.pick_only |= k < statics;
+                    i
+                }));
+                scene = compare;
+            }
             Some(compare) => scene = compare,
             None if crate::part_studio_hooks::compare_blend(&self.doc, cx).is_none() => self.compare_gfx.clear(),
             None => {}
@@ -1710,6 +1720,14 @@ impl PartStudioView {
             (vp.tool_cursor, vp.overlay_cursor) = (tool_cursor, overlay_cursor);
             vp.set_scene(Arc::new(scene), geometry_changed, cx)
         });
+    }
+
+    /// Comparing with the open model as the base (its Part Studio as it is here).
+    fn compare_base_is_open(&self, cx: &App) -> bool {
+        use noshape_model::TabContent::PartStudio;
+        let Some((base, ..)) = crate::part_studio_hooks::compare_documents(&self.doc, cx) else { return false };
+        let open = &self.doc.read(cx).session.doc;
+        matches!((base.tab(self.tab).map(|t| &t.content), open.tab(self.tab).map(|t| &t.content)), (Some(PartStudio(a)), Some(PartStudio(b))) if a == b)
     }
 
     // ------------------------------------------------------------ labels
