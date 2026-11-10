@@ -3510,12 +3510,23 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
 /// `f` of 0..n on all threads, in order; declines "cancelled" once the caller's cancel flag is set (checked
 /// every 16 items; the workers take the caller's flag).
 pub(crate) fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> R<Vec<T>> {
+    par_map_by(n, 64, 16, f)
+}
+
+/// The same for few items that may each be long (a section of 512 spans placed on its faces: 4.5 ms of 32 items'
+/// 18 ms, all on one thread in runs of 16): a thread an item, each taking the next one.
+pub(crate) fn par_map_each<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> R<Vec<T>> {
+    par_map_by(n, 1, 1, f)
+}
+
+/// `f` of 0..n on a thread per `per` items (up to the machine's), each taking `run` items at a time.
+fn par_map_by<T: Send>(n: usize, per: usize, run: usize, f: &(dyn Fn(usize) -> T + Sync)) -> R<Vec<T>> {
     crate::check_cancel()?;
     // (The machine's threads, counted once: on Linux each count reads the cgroup files, 3 % of a sheet metal part's
     // warm regeneration when asked on every call.)
     static CPUS: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
     let cpus = *CPUS.get_or_init(|| std::thread::available_parallelism().map_or(1, |x| x.get()));
-    let threads = cpus.min(n.div_ceil(64)).max(1);
+    let threads = cpus.min(n.div_ceil(per)).max(1);
     if threads == 1 {
         let mut out = Vec::with_capacity(n);
         for i in 0..n {
@@ -3532,11 +3543,11 @@ pub(crate) fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> R<V
     let work = || {
         let mut out = Vec::new();
         loop {
-            let k = next.fetch_add(16, std::sync::atomic::Ordering::Relaxed);
+            let k = next.fetch_add(run, std::sync::atomic::Ordering::Relaxed);
             if k >= n || crate::cancelled() {
                 break;
             }
-            out.extend((k..(k + 16).min(n)).map(|i| (i, f(i))));
+            out.extend((k..(k + run).min(n)).map(|i| (i, f(i))));
         }
         out
     };
@@ -4422,7 +4433,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             *x = firsts.get(&(fs0, ft0, from, a, b)).map(|&k0| (k0, j));
         }
     }
-    let first = par_map(pending.len(), &|k| source[k].is_none().then(|| place(k)))?;
+    let first = par_map_each(pending.len(), &|k| source[k].is_none().then(|| place(k)))?;
     // A place turned by `j` steps from face `f0` onto face `f` (its vertex the one of `f` there), if it can be.
     let turn_end = |e: End, f: usize, also: Option<usize>, g: &Rigid| -> Option<End> {
         Some(match e {
@@ -4468,7 +4479,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let ivs = |x: &[Ival], f: usize| -> Option<Vec<Ival>> { x.iter().map(|iv| Some([(iv[0].0, turn_end(iv[0].1, f, None, &g)?), (iv[1].0, turn_end(iv[1].1, f, None, &g)?)])).collect() };
         Some((ivs(ia0, fs)?, ivs(ib0, ft)?))
     };
-    let rest = par_map(pending.len(), &|k| first[k].is_none().then(|| turned(k).map_or_else(|| place(k), Ok)))?;
+    let rest = par_map_each(pending.len(), &|k| first[k].is_none().then(|| turned(k).map_or_else(|| place(k), Ok)))?;
     let places: Vec<R<(Vec<Ival>, Vec<Ival>)>> = first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a part's places")).collect();
     for (p, x) in pending.into_iter().zip(places) {
         let (ia, ib) = x?;
