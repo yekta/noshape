@@ -125,11 +125,17 @@ impl FlatPattern {
         k::ops::extrude(&face, DVec3::new(0.0, 0.0, p.front + p.back)).ok().map(|r| r.shape)
     }
 
-    /// The bend lines in the flat view's place (on z 0).
+    /// A point of the flat (plane coordinates, as [`Self::loops`]) in the flat view's place, on its top.
+    pub fn flat_view_point(&self, p: DVec2) -> DVec3 {
+        match &self.place {
+            Some(pl) => pl.view.transform_point3(self.frame.to_world(p)) + DVec3::Z * pl.front,
+            None => p.extend(0.0),
+        }
+    }
+
+    /// The bend lines in the flat view's place (on its top).
     pub fn flat_view_bend_lines(&self) -> Vec<(DVec3, DVec3)> {
-        let m = self.flat_view_matrix();
-        let to = |a: DVec2| if self.place.is_some() { m.transform_point3(self.frame.to_world(a)) } else { a.extend(0.0) };
-        self.bend_lines.iter().map(|b| (to(b.a), to(b.b))).collect()
+        self.bend_lines.iter().map(|b| (self.flat_view_point(b.a), self.flat_view_point(b.b))).collect()
     }
 
     /// Bounding box of the outline (min, max) in plane coordinates.

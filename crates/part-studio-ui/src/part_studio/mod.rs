@@ -1403,11 +1403,14 @@ impl PartStudioView {
         }
         accent.extend(self.ui.appearance_hover.iter().cloned());
         accent.extend(self.sm_hover_refs());
+        // A face of the flat selected in the flat view lights the part's face it shows (live 2468).
+        selection.extend(self.flat_cross_selection(cx));
         let cs = self.cs_preview();
         if let Some((seeds, _)) = &cs {
             selection.extend(seeds.iter().cloned());
         }
         let mut extra = self.sketch_overlay(&mut selection, &mut accent, cx);
+        extra.extend(self.flat_backdrop(cx));
         extra.extend(self.extrude_end_cap(cx));
         // The manipulator's glyph follows the camera: the renderer builds it
         // for every frame (camera_geometry.rs).
@@ -1776,7 +1779,11 @@ impl PartStudioView {
                 Reference::Plane(DatumPlane::Top) => "Top plane".into(),
                 Reference::Plane(DatumPlane::Front) => "Front plane".into(),
                 Reference::Plane(DatumPlane::Right) => "Right plane".into(),
-                Reference::Face(n) => format!("Face of {}", owner(n.creator()).map(fname).unwrap_or_else(|| "part".into())),
+                Reference::Face(n) => match noshape_model::sheetmetal::flat_face_of(n) {
+                    // A face of a sheet metal flat: its model's (live 2468: "Face of SM Front").
+                    Some((part, _)) => format!("Face of {}", fname(part.feature)),
+                    None => format!("Face of {}", owner(n.creator()).map(fname).unwrap_or_else(|| "part".into())),
+                },
                 Reference::Edge(n) => format!("Edge of {}", owner(noshape_ops::studio::edge_creator_by(n, |f| names.iter().position(|(i, _)| *i == f))).map(fname).unwrap_or_else(|| "part".into())),
                 // A vertex reads "Vertex of <feature>", named by the latest
                 // feature among its faces' creators (live "qa5 sm" (7): the
