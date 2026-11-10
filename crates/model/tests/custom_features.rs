@@ -2334,7 +2334,8 @@ export const showStudio = defineFeature(function(context is Context, id is Id, d
     });
     source.configuration.inputs.push(ConfigInput { id: "hole1".into(), name: "Hole".into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None, excluded: false });
     let mut f = source.new_feature(&fx.ty("boxAndPin"), &fx.units).unwrap();
-    f.params.set("size", expr("#Len"));
+    // (`#` names a configuration variable's FeatureScript id, not its shown name: live 2458.)
+    f.params.set("size", expr("#len1"));
     f.params.set("radius", expr("4 mm"));
     f.params.set("fillet", expr("1 mm"));
     source.features.push(f);

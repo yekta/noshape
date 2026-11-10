@@ -41,10 +41,10 @@ impl PartStudioView {
 
     /// Where a configuration variable is used (the Usages table, live 433):
     /// "<feature> <parameter>" for every parameter whose expression names
-    /// `#<name>`.
-    pub(super) fn variable_usages(&self, name: &str, cx: &App) -> Vec<String> {
+    /// `#<id>` (its FeatureScript id, not its shown name: live 2458).
+    pub(super) fn variable_usages(&self, id: &str, cx: &App) -> Vec<String> {
         let Some(studio) = self.studio(cx) else { return Vec::new() };
-        let needle = format!("#{name}");
+        let needle = format!("#{id}");
         let mut out = Vec::new();
         for f in &studio.features {
             let Some(ty) = f.feature_type() else { continue };
@@ -107,7 +107,7 @@ impl PartStudioView {
         // a variable's usages ("Extrude 1 Depth"); nothing for a text input.
         let mut lines = Vec::new();
         match &inp.kind {
-            ConfigInputKind::Variable { .. } => lines.extend(self.variable_usages(&inp.name, cx)),
+            ConfigInputKind::Variable { .. } => lines.extend(self.variable_usages(&inp.id, cx)),
             ConfigInputKind::Text { .. } => return,
             _ => {
                 let (head, rows): (&str, Vec<(String, String)>) = match &inp.kind {

@@ -1366,9 +1366,9 @@ impl PartStudioView {
 
     /// A configuration variable's table (live 433): "Usages ①" over one row
     /// per use ("Extrude 1 Depth"), or the "No features are configured" note.
-    fn render_usages(&self, section: Div, name: &str, grid: Rgba, cx: &mut Context<Self>) -> Div {
+    fn render_usages(&self, section: Div, id: &str, grid: Rgba, cx: &mut Context<Self>) -> Div {
         let pal = p();
-        let usages = self.variable_usages(name, cx);
+        let usages = self.variable_usages(id, cx);
         if usages.is_empty() {
             return section.child(
                 div().pt(px(5.)).pr(px(5.)).child(
@@ -1403,7 +1403,7 @@ impl PartStudioView {
         // Live 433: "Hole Default: false".
         let default_text = input.default_text();
         // Live 433: variables read "Len (#Len)".
-        let variable_ref = matches!(input.kind, ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. }).then(|| format!("(#{})", input.name));
+        let variable_ref = matches!(input.kind, ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. }).then(|| format!("(#{})", input.id));
         // Header bar.
         let (i1, i2, i3) = (iid.clone(), iid.clone(), iid.clone());
         let picking = self.ui.configure_pick.as_deref() == Some(iid.as_str());
@@ -1618,10 +1618,10 @@ impl PartStudioView {
                     this.edit_config(noshape_ops::config::EDIT_VARIABLE_INPUT, cx, |ps| noshape_ops::config::set_variable_default(ps, &a, v));
                 });
                 let _ = value;
-                section = self.render_usages(section, &input.name, grid, cx);
+                section = self.render_usages(section, &input.id, grid, cx);
             }
             ConfigInputKind::Text { .. } => {
-                section = self.render_usages(section, &input.name, grid, cx);
+                section = self.render_usages(section, &input.id, grid, cx);
             }
             _ => {
                 // Header (live 444): "Name" (or "Value"), then per feature a

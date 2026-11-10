@@ -376,8 +376,10 @@ impl Document {
         for (name, data) in blobs {
             if name.starts_with("tab/") {
                 let mut tab = serde_json::from_slice::<Tab>(data)?;
-                if let TabContent::PartStudio(ps) = &mut tab.content {
-                    ps.upgrade_saved_params();
+                match &mut tab.content {
+                    TabContent::PartStudio(ps) => ps.upgrade_saved_params(),
+                    TabContent::Assembly(a) => a.upgrade_config_variable_ids(),
+                    _ => {}
                 }
                 tabs.push(tab);
             }

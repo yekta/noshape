@@ -222,10 +222,7 @@ pub(super) fn add_input(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::OpOu
         return Err(OpError::param("range", "assembly configuration variables have no range"));
     }
     edit(od, tab, config::ADD_INPUT, |x| {
-        let id = asm_config::add_input(x, label);
-        if let Some(n) = &name {
-            asm_config::rename_input(x, &id, n);
-        }
+        let id = asm_config::add_input(x, label, name.as_deref());
         if let Some(ConfigInputKind::Checkbox { default }) = x.configuration.inputs.iter_mut().find(|i| i.id == id).map(|i| &mut i.kind) {
             *default = checked;
         }

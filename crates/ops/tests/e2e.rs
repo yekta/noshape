@@ -7253,6 +7253,57 @@ fn the_bom_follows_configurations() {
     assert_eq!(rows, vec![(0, "Sub".to_string(), 1), (1, "Part 1".to_string(), 2), (0, "Sub".to_string(), 1), (1, "Part 1".to_string(), 1)], "{bom}");
 }
 
+/// Live 2458: a configuration variable's `#` is its FeatureScript id, not its shown name. Rename changes only the name
+/// ("size (#len)"), so its uses keep working, in a Part Studio and an Assembly alike; only Edit FeatureScript IDs
+/// changes the id, and that breaks them (they are not rewritten); an Assembly's ids can't be edited.
+#[test]
+fn renaming_a_configuration_variable_keeps_its_uses() {
+    let mut ctx = Ctx::new();
+    let path = scratch("config-var-rename.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let len = call(&mut ctx, "config_add_input", json!({ "kind": "variable", "name": "len", "value": "10 mm" }))["input"].as_str().unwrap().to_string();
+    assert_eq!(len, "len");
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"]], "depth": "#len", "operationType": "NEW" } }));
+    let volume = |ctx: &mut Ctx| num(&call(ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"][0]["volume"]);
+    assert!((volume(&mut ctx) - 8000.0).abs() < 1e-6);
+    call(&mut ctx, "config_edit_input", json!({ "input": "len", "name": "size" }));
+    let l = call(&mut ctx, "config_list", json!({}));
+    let input = l["inputs"].as_array().unwrap().iter().find(|i| i["id"] == "len").unwrap_or_else(|| panic!("{l}"));
+    assert_eq!(input["name"], "size", "{l}");
+    assert!((volume(&mut ctx) - 8000.0).abs() < 1e-6, "#len still resolves after the rename");
+    let f = call(&mut ctx, "feature_list", json!({ "tab": "Part Studio 1" }));
+    assert_eq!(f["features"].as_array().unwrap().iter().find(|x| x["name"] == "Extrude 1").unwrap()["status"], "Ok", "{f}");
+    // The id changed: Extrude 1 keeps `#len` and fails.
+    call(&mut ctx, "config_edit_ids", json!({ "input": "len", "id": "size" }));
+    let f = call(&mut ctx, "feature_list", json!({ "tab": "Part Studio 1" }));
+    let ext = f["features"].as_array().unwrap().iter().find(|x| x["name"] == "Extrude 1").unwrap().clone();
+    assert_eq!(ext["status"], "Error", "{ext}");
+    let fe = call(&mut ctx, "feature_get", json!({ "tab": "Part Studio 1", "feature": "Extrude 1" }));
+    assert!(fe.to_string().contains("#len"), "the use isn't rewritten: {fe}");
+
+    // An Assembly: a variable `gap` used by a mate offset, renamed `space`.
+    call(&mut ctx, "config_edit_ids", json!({ "input": "size", "id": "len" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_set_state", json!({ "tab": "Assembly 1", "instances": ["Part 1 <1>"], "fixed": true }));
+    let gap = call(&mut ctx, "config_add_input", json!({ "tab": "Assembly 1", "kind": "variable", "name": "gap", "value": "5 mm" }))["input"].as_str().unwrap().to_string();
+    assert_eq!(gap, "gap", "its id from its name");
+    let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0].clone();
+    let (top, bottom) = (face(&mut ctx, "Part 1 <1>", 1.0)["id"].clone(), face(&mut ctx, "Part 1 <2>", -1.0)["id"].clone());
+    call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": top }, "b": { "instance": "Part 1 <2>", "entity": bottom }, "offset": { "z": "#gap" } }));
+    let lift = |ctx: &mut Ctx| num(&face(ctx, "Part 1 <2>", -1.0)["centroid"][2]) - 10.0;
+    assert!((lift(&mut ctx).abs() - 5.0).abs() < 1e-6, "{}", lift(&mut ctx));
+    call(&mut ctx, "config_edit_input", json!({ "tab": "Assembly 1", "input": "gap", "name": "space" }));
+    let l = call(&mut ctx, "config_list", json!({ "tab": "Assembly 1" }));
+    assert_eq!(l["inputs"][0]["name"], "space", "{l}");
+    let m = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    assert_eq!(m["mates"][0]["ok"], true, "the mate's #gap still resolves: {m}");
+    assert!((lift(&mut ctx).abs() - 5.0).abs() < 1e-6, "{}", lift(&mut ctx));
+    assert!(try_call(&mut ctx, "config_edit_ids", json!({ "tab": "Assembly 1", "input": "gap", "id": "space" })).is_err(), "an Assembly's ids can't be edited");
+}
+
 /// ASM-CONFIG-VARIABLE-NOOP: an assembly's configuration variable is a `#name` for mates, in each configuration.
 #[test]
 fn an_assembly_configuration_variable_drives_a_mate_offset() {

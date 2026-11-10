@@ -18,9 +18,10 @@ Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fu
   circular pattern spacing, configuration variables' defaults and ranges, configured values and instances'
   configuration values. e2e `variable_studio_rename_reaches_assemblies`. `assembly_list` now reports a linear /
   circular pattern's `distance` (or angle) text and `count`.
-- Open, asked of live (REQUESTS 09:20): an Assembly's (and a Part Studio's) configuration variable renamed keeps
-  its `#old` uses today (asm_config / config `rename_input` change only the name). If live renames the uses,
-  call `rename_variable_refs` / `variable_table::rename_refs` from there, with an e2e each.
+- Configuration variables (live 2458, done 11-10 11:45): `#` names an input's FeatureScript id, not its shown name
+  (`Configuration::variable_exprs`), so Rename changes only the name and every use keeps working; an assembly's new
+  variable gets its id from its name (no id editing in assemblies, as live); older assemblies' random `in…` ids
+  become their names on load (`Assembly::upgrade_config_variable_ids`). e2e renaming_a_configuration_variable_keeps_its_uses.
 
 ## From qa (2026-11-09 10:45 UTC, lead's bisect): asm-robot-relations / asm-scissor-lift dropped from the corpus refetch, not code
 

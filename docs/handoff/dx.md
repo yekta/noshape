@@ -24,6 +24,28 @@ test only took profiles in a plane through the axis, so OCCT's self-intersection
 tilted profiles too: Sweep 1 0.23 s, the document 0.87 s. Your 7e7d69f2b stays; the tilt (feature 41's frame) is
 yours to finish.
 
+## 11-10 11:45 UTC: configuration variables by id (live 2458); STEP p-curves; read-back 43 -> 44/48
+
+- **Configuration variables:** `#` is the input's FeatureScript id (variable_exprs), Rename changes the shown name
+  only, Edit FeatureScript IDs breaks uses (not rewritten), assemblies have no id editing and their new variables
+  get ids from their names; old assemblies migrated on load. The Configuration panel shows `name (#id)`, Usages
+  search the id. e2e renaming_a_configuration_variable_keeps_its_uses; custom_features test data now `#len1`.
+- **STEP / IGES import (kernel io.cpp `refine_freeform_pcurves`):** a file without p-curves (Onshape's, ours) gets
+  loose projections on free-form faces (cf-spur-gear's flanks 3.6 µm off, -0.3 mm² on the 32-tooth gear read back);
+  those edges are projected again 1000x tighter, kept when twice as close, on faces up to 200 poles and edges up to
+  200 (NIST's cap screw's 1300-pole thread faces: 0.15-0.25 s an edge for nothing; screw read-back test 5 s holds).
+  cf-spur-gear: ours reads ours.step back now matches; live.step 4122.70 -> 4123.01 mm² (live 4123.70: its 4-pole
+  edges lie 7.6 µm off its cones; reaching live needs those edges re-intersected, TICKETS INTEGRATOR-BSPLINE-GEAR).
+  A synthetic T1 (a trimmed spline extrusion) didn't reproduce the loose projection; the exchange suite (T2) covers it.
+- **Read-back left (4):** hose x_t (split walls; live drops both periodic probes, 2452: parked), sheet metal STEP /
+  x_t (1-2e-6: our model's near-coplanar walls, SHEETMETAL-COPLANAR-WALLS; writing offset bends fitted to 1e-8 made
+  the x_t read-back +24 mm³ instead: reverted), wave spring x_t (+1.4e-6 volume, area exact: likely our integral on
+  its B-spline faces; the finer-step check ran out of time).
+- **Helix (live 2440):** Parasolid's helix = 40 rational quadratic spans a turn (weights cos 4.5°, axial control
+  points linear); its start tangent is the first leg (0.086059). Live's 9.5 turns: its end point and circle centre
+  share exact y, z, so fromWorld gives x = 0.0155 * xAxis.x = -1.8e-18, angle π; ours has 1e-17 noise in y, z.
+  Next: build the helix that way and take the end angle as helix.fs does on noise-free coordinates.
+
 ## 11-10 09:05 UTC: variable renames reach Assemblies (lead's user bug family)
 
 - (1) Variable Studio rename → Assemblies: done (asm.md 11-10 09:05, e2e variable_studio_rename_reaches_assemblies).

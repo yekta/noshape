@@ -18,16 +18,26 @@ pub fn rand_id() -> String {
 }
 
 /// Configure Assembly ▾ / Add configuration input ▾: "List", "Checkbox"
-/// or "Variable" (live 191). Returns the input id.
-pub fn add_input(a: &mut Assembly, label: &str) -> String {
+/// or "Variable" (live 191), with `name` or the next default one. Returns the input id.
+pub fn add_input(a: &mut Assembly, label: &str, name: Option<&str>) -> String {
     let n = a.configuration.inputs.len() + 1;
     let id = format!("in{}", rand_id());
     let input = match label {
         "Checkbox" => ConfigInput { id: id.clone(), name: format!("Checkbox {n}"), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None, excluded: false },
-        "Variable" => ConfigInput { id: id.clone(), name: format!("Variable {n}"), kind: ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("10 mm"), min: None, max: None }, visible_when: None, excluded: false },
+        // A configuration variable's id is what `#` names (its FeatureScript id, from its name; live 2458).
+        "Variable" => {
+            let taken: Vec<String> = a.configuration.inputs.iter().map(|i| i.id.clone()).collect();
+            let name = name.map_or_else(|| format!("Variable {n}"), |s| s.trim().to_string());
+            let id = noshape_model::configuration::fs_identifier(&name, &taken);
+            ConfigInput { id, name, kind: ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("10 mm"), min: None, max: None }, visible_when: None, excluded: false }
+        }
         _ => acfg::new_list_input(id.clone(), n),
     };
+    let id = input.id.clone();
     a.configuration.inputs.push(input);
+    if let Some(n) = name {
+        rename_input(a, &id, n);
+    }
     id
 }
 

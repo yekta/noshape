@@ -53,7 +53,7 @@ impl AssemblyView {
     /// Configure Assembly ▾ / Add configuration input ▾: List, Checkbox,
     /// Configuration variable (a List is created at once, live 191).
     pub(super) fn add_asm_config_input(&mut self, kind: &'static str, window: &mut Window, cx: &mut Context<Self>) {
-        let id = self.edit(noshape_ops::config::ADD_INPUT, cx, |a| noshape_ops::asm_config::add_input(a, kind));
+        let id = self.edit(noshape_ops::config::ADD_INPUT, cx, |a| noshape_ops::asm_config::add_input(a, kind, None));
         // A new List: the focus is in its italic "Name" add row (live2 2208).
         if let Some(id) = id.filter(|_| kind == "List") {
             self.edit_cfg_cell(format!("opt-new-{id}"), String::new(), Self::add_option_commit(id), window, cx);
@@ -621,7 +621,7 @@ impl AssemblyView {
                 let value = self.cfg_cell_text(format!("var-def-{iid}"), default.text.clone(), (px(13.33), FontWeight::NORMAL), false, commit, cx);
                 let value_w = crate::ui::col_w(&table, "default", COL_W);
                 section = section.child(h_flex().border_l_1().border_color(grid).child(head(name_w).relative().child("Name").child(grip("name", NAME_W))).child(head(value_w).relative().child("Default value").child(grip("default", COL_W))));
-                section = section.child(h_flex().border_l_1().border_color(grid).child(cell(name_w).child(format!("#{}", input.name))).child(cell(value_w).child(value)));
+                section = section.child(h_flex().border_l_1().border_color(grid).child(cell(name_w).child(format!("#{}", input.id))).child(cell(value_w).child(value)));
             }
             ConfigInputKind::Text { .. } => {}
             _ => {

@@ -469,13 +469,14 @@ impl Configuration {
         }
     }
 
-    /// Configuration variables as expression variables (name -> text).
+    /// Configuration variables as expression variables (`#` + its FeatureScript id, not its shown name: live 2458,
+    /// "size (#len)" after a Rename) -> text.
     pub fn variable_exprs(&self, values: &ConfigValues) -> Vec<(String, VariableKind, String)> {
         self.inputs
             .iter()
             .filter_map(|i| match &i.kind {
                 ConfigInputKind::Variable { kind, .. } => {
-                    Some((i.name.clone(), *kind, self.value_of(values, &i.id).unwrap_or_default()))
+                    Some((i.id.clone(), *kind, self.value_of(values, &i.id).unwrap_or_default()))
                 }
                 _ => None,
             })

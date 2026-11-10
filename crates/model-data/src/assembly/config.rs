@@ -309,6 +309,31 @@ fn restore_mate_param(m: &mut Mate, base: &Mate, p: &str) {
 }
 
 impl Assembly {
+    /// Older documents gave an assembly's configuration variable a random id ("in" + hex) that no `#` could name, so
+    /// its uses went by its shown name: the id becomes that name (when it is a FeatureScript identifier no other input
+    /// has), its configured parameters and visibility conditions following.
+    pub fn upgrade_config_variable_ids(&mut self) {
+        let legacy = |id: &str| id.strip_prefix("in").is_some_and(|h| h.len() >= 8 && h.chars().all(|c| c.is_ascii_hexdigit()));
+        let ids: Vec<(String, String)> = self
+            .configuration
+            .inputs
+            .iter()
+            .filter(|i| matches!(i.kind, ConfigInputKind::Variable { .. }) && legacy(&i.id) && crate::configuration::fs_identifier(&i.name, &[]) == i.name)
+            .filter(|i| !self.configuration.inputs.iter().any(|o| o.id == i.name))
+            .map(|i| (i.id.clone(), i.name.clone()))
+            .collect();
+        for (old, new) in ids {
+            let mut c = self.configuration.inputs_only();
+            c.change_ids(&old, &new, &[]);
+            self.configuration.inputs = c.inputs;
+            for p in self.configuration.configured.iter_mut().filter(|p| p.input == old) {
+                p.input = new.clone();
+            }
+        }
+    }
+}
+
+impl Assembly {
     /// The current (unconfigured) value of a configurable parameter.
     pub fn config_param_value(&self, target: ConfigTarget, p: &str) -> Option<ParamValue> {
         match target {
@@ -511,5 +536,25 @@ impl Assembly {
             ConfigTarget::Pattern(id) => patterns.contains(&id),
             ConfigTarget::Connector(id) => connectors.contains(&id),
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An older assembly's configuration variable (random id, its uses by name) gets its name as its id on load, so
+    /// `#gap` keeps resolving now that `#` names the id; a new input's id is left alone.
+    #[test]
+    fn a_legacy_variable_id_becomes_its_name() {
+        let var = |id: &str, name: &str| ConfigInput { id: id.into(), name: name.into(), kind: ConfigInputKind::Variable { kind: crate::configuration::VariableKind::Length, default: ExprValue::new("5 mm"), min: None, max: None }, visible_when: None, excluded: false };
+        let mut a = Assembly::default();
+        a.configuration.inputs = vec![var("in18f3a2b4c5d6", "gap"), var("Variable_2", "Variable 2"), var("in2a3b4c5d6e7f", "Not an id")];
+        a.configuration.configured.push(AsmConfiguredParam { input: "in18f3a2b4c5d6".into(), target: ConfigTarget::Mate(MateId(1)), param: "offsetZ".into(), values: Default::default() });
+        a.upgrade_config_variable_ids();
+        let ids: Vec<&str> = a.configuration.inputs.iter().map(|i| i.id.as_str()).collect();
+        assert_eq!(ids, ["gap", "Variable_2", "in2a3b4c5d6e7f"]);
+        assert_eq!(a.configuration.configured[0].input, "gap");
+        assert!(a.configuration.inputs_only().variable_exprs(&Default::default()).iter().any(|(n, ..)| n == "gap"));
     }
 }
