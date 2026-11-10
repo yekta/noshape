@@ -1,18 +1,18 @@
 {
  "scenario": "ver-linked-change-to-version",
- "recorded": "2026-11-09T08:00:34.038Z",
+ "recorded": "2026-11-10T18:06:36.780Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-10.3 0a4d2573 + live2 2026-11-10.1"
  },
  "live": {
-  "document": "be208d4e671e99adbb5cdfa3",
-  "workspace": "e33c81d4499fa786b9a4a856",
-  "element": "a40157b979c2575939b4ec02",
+  "document": "dc24d68964a58a401629b2a5",
+  "workspace": "671ead4375413d7fe4adb372",
+  "element": "a2ce92768d4c61af9f347b0b",
   "start": "doc-linked",
-  "startElement": "a40157b979c2575939b4ec02",
+  "startElement": "a2ce92768d4c61af9f347b0b",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -186,18 +186,21 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 35381
+   "t": 36376
   },
   {
    "step": 2,
    "do": {
     "do": "rclick",
     "on": {
-     "instance": "Part Studio 1 <1>"
+     "instance": "Part 1 <1>"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"instance\":\"Part Studio 1 <1>\"}",
+   "ok": true,
+   "at": [
+    90,
+    209
+   ],
    "state": {
     "focus": {
      "kind": "none"
@@ -205,7 +208,41 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Properties…",
+      "Instance properties…",
+      "Hide",
+      "Hide other instances",
+      "Hide all instances",
+      "Show center of mass",
+      "Isolate…",
+      "Make transparent…",
+      "Suppress",
+      "Dynamic suppression",
+      "Fix",
+      "Use best available tessellation",
+      "Edit in context",
+      "Add mate connector to instance origin…",
+      "Replace instances…",
+      "Copy Part 1 <1>",
+      "Move to new subassembly",
+      "Update linked document…",
+      "Open linked document",
+      "Pin reference",
+      "Export…",
+      "Release…",
+      "Add comment",
+      "Zoom to selection",
+      "Create Drawing of Part 1…",
+      "Add selection to folder…",
+      "Create empty subassembly",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -237,7 +274,7 @@
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
+       "cls": "is-instance  fake-hover context-menu-active"
       },
       {
        "name": "Mate features (0)",
@@ -284,7 +321,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 39730
+   "t": 43044
   },
   {
    "step": 3,
@@ -303,7 +340,41 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Properties…",
+      "Instance properties…",
+      "Hide",
+      "Hide other instances",
+      "Hide all instances",
+      "Show center of mass",
+      "Isolate…",
+      "Make transparent…",
+      "Suppress",
+      "Dynamic suppression",
+      "Fix",
+      "Use best available tessellation",
+      "Edit in context",
+      "Add mate connector to instance origin…",
+      "Replace instances…",
+      "Copy Part 1 <1>",
+      "Move to new subassembly",
+      "Update linked document…",
+      "Open linked document",
+      "Pin reference",
+      "Export…",
+      "Release…",
+      "Add comment",
+      "Zoom to selection",
+      "Create Drawing of Part 1…",
+      "Add selection to folder…",
+      "Create empty subassembly",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -335,7 +406,7 @@
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
+       "cls": "is-instance  fake-hover context-menu-active"
       },
       {
        "name": "Mate features (0)",
@@ -382,7 +453,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 41984
+   "t": 44962
   },
   {
    "step": 4,
@@ -393,11 +464,18 @@
    "ok": true,
    "pointer": {
     "at": [
-     381,
-     975
+     90,
+     209
     ],
-    "hover": [],
-    "element": "span.os-tab-name.extended-child-tooltip"
+    "hover": [
+     {
+      "_serializedByteLength": 0,
+      "path": [
+       "MK+dPGi3xGXt1fFih"
+      ]
+     }
+    ],
+    "element": "div#context-menu-layer"
    },
    "state": {
     "focus": {
@@ -485,7 +563,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 45864
+   "t": 48438
   }
  ]
 }

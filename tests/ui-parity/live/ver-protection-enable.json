@@ -1,18 +1,18 @@
 {
  "scenario": "ver-protection-enable",
- "recorded": "2026-11-09T09:28:51.600Z",
+ "recorded": "2026-11-10T18:27:18.736Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-10.3 0a4d2573 + live2 2026-11-10.2"
  },
  "live": {
-  "document": "a393c75b7ef3d0060944dc1c",
-  "workspace": "8ce7619804d34b6a2e736732",
-  "element": "d64f6c0a15f79a59f7e1c6d7",
+  "document": "9ed6abd2b32b43f83b4798a6",
+  "workspace": "c04c439639404fc7e25fc5e3",
+  "element": "26fbca92ce8b5a4f712d31c1",
   "start": "doc-branches",
-  "startElement": "d64f6c0a15f79a59f7e1c6d7",
+  "startElement": "26fbca92ce8b5a4f712d31c1",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 45077
+   "t": 28148
   },
   {
    "step": 2,
@@ -366,7 +366,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 49959
+   "t": 30749
   },
   {
    "step": 3,
@@ -508,7 +508,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 54076
+   "t": 33764
   },
   {
    "step": 4,
@@ -656,7 +656,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 57378
+   "t": 38409
   },
   {
    "step": 5,
@@ -733,7 +733,7 @@
      "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "Workspace protection settings updated. × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -782,7 +782,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 64301
+   "t": 42519
   },
   {
    "step": 6,
@@ -918,7 +918,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 70457
+   "t": 45920
   },
   {
    "step": 7,
@@ -1060,7 +1060,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 74150
+   "t": 50423
   },
   {
    "step": 8,
@@ -1208,7 +1208,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 77264
+   "t": 53717
   },
   {
    "step": 9,
@@ -1285,7 +1285,7 @@
      "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "Workspace protection settings updated. × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -1334,7 +1334,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 84690
+   "t": 58735
   }
  ]
 }

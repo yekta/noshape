@@ -1,19 +1,19 @@
 {
  "scenario": "asm-menu-change-to-version",
- "recorded": "2026-11-07T01:48:36.924Z",
+ "recorded": "2026-11-10T18:07:41.473Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+  "recorder": "2026-11-10.3 0a4d2573 + live2 2026-11-10.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "72b569b4e3075c663a623e5c",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "8b40f90f56a73273c62e89c5",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "fbd9c2146a18cf5cba6d5b3a",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -21,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -155,6 +156,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -302,7 +304,7 @@
     },
     "drawing": null
    },
-   "t": 31883
+   "t": 39149
   },
   {
    "step": 2,
@@ -329,7 +331,7 @@
       "Selective update",
       "Newer versions available for 0 documents",
       "[ ] ",
-      "noshape ui parity live2-1",
+      "noshape ui parity live2-3b",
       "Main",
       "⇨",
       "Start",
@@ -337,6 +339,19 @@
      ]
     },
     "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 0 documents / noshape ui parity live2-3b / Main / ⇨ / Start / Update selected",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -451,7 +466,7 @@
     },
     "drawing": null
    },
-   "t": 34623
+   "t": 43524
   },
   {
    "step": 3,
@@ -460,12 +475,21 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     225,
+     677
+    ],
+    "hover": [],
+    "element": "div.ns-tree-root"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -580,7 +604,7 @@
     },
     "drawing": null
    },
-   "t": 38354
+   "t": 47214
   }
  ]
 }

@@ -1,19 +1,19 @@
 {
  "scenario": "ver-branch-edit-props",
- "recorded": "2026-11-09T09:21:34.480Z",
+ "recorded": "2026-11-10T18:28:48.237Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-10.3 0a4d2573 + live2 2026-11-10.2"
  },
  "live": {
-  "document": "5babc29510812af4477697db",
-  "workspace": "8c41ea553bfd19c02d8ef9df",
-  "element": "537b5e64128f7e116a7f2999",
+  "document": "f81d707e69453b2e83d4ee0f",
+  "workspace": "672ffafa314623e58a7a770a",
+  "element": "38449ac2943ce58b2c45ca0c",
   "start": "doc-branches",
-  "startElement": "537b5e64128f7e116a7f2999",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "38449ac2943ce58b2c45ca0c",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 39559
+   "t": 30328
   },
   {
    "step": 2,
@@ -372,7 +372,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 49401
+   "t": 32751
   },
   {
    "step": 3,
@@ -403,12 +403,12 @@
      "title": "Create workspace from V1",
      "fields": [
       {
-       "label": "Open new workspace",
+       "label": "Name",
        "kind": "input",
        "value": "B2"
       },
       {
-       "label": "Open new workspace",
+       "label": "Description",
        "kind": "input",
        "value": ""
       },
@@ -531,7 +531,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 65818
+   "t": 36325
   },
   {
    "step": 4,
@@ -544,7 +544,7 @@
    "ok": true,
    "at": [
     1219,
-    361
+    311
    ],
    "state": {
     "focus": {
@@ -553,10 +553,10 @@
     },
     "dialog": {
      "kind": "modal",
-     "title": "Properties",
+     "title": "Create workspace from V1",
      "fields": [
       {
-       "label": "Name *",
+       "label": "Name",
        "kind": "input",
        "value": "B2"
       },
@@ -566,19 +566,17 @@
        "value": ""
       },
       {
-       "label": "Category",
-       "kind": "input",
-       "value": ""
+       "label": "Open new workspace",
+       "kind": "checkbox",
+       "value": true
       }
      ],
      "buttons": [
-      "Undo",
-      "Redo",
-      "Apply",
-      "Save",
-      "Close"
+      "Create",
+      "Create workspace and edit properties",
+      "Cancel"
      ],
-     "text": "Properties B2 Workspace B2 Name * Description Category Onshape Workspace Apply Save Close"
+     "text": "Name: Description: (Maximum of 10000 characters) Open new workspace Note: Merging feature changes is only supported for Part Studio and Assembly tabs"
     },
     "dialogs": [],
     "panels": null,
@@ -606,14 +604,33 @@
        "related": false,
        "hidden": false,
        "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
       }
      ],
-     "rollbackAfter": "Extrude 1"
+     "rollbackAfter": "Extrude 2"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
@@ -623,13 +640,8 @@
     "sketch": null,
     "drawing": null,
     "document": {
-     "workspace": "B2",
+     "workspace": "Main",
      "history": [
-      {
-       "name": "B2",
-       "kind": "workspace",
-       "selected": true
-      },
       {
        "name": "B1",
        "kind": "workspace",
@@ -638,7 +650,7 @@
       {
        "name": "Main",
        "kind": "workspace",
-       "selected": false
+       "selected": true
       },
       {
        "name": "V1",
@@ -672,7 +684,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 79196
+   "t": 50885
   }
  ]
 }

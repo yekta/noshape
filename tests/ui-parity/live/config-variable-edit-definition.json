@@ -1,16 +1,16 @@
 {
  "scenario": "config-variable-edit-definition",
- "recorded": "2026-11-08T18:05:59.542Z",
+ "recorded": "2026-11-10T18:11:29.189Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "recorder": "2026-11-10.3 0a4d2573 + live2 2026-11-10.1"
  },
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "86fd617b970b7435a31da293",
+  "element": "8c0700d6bae410f3083171ef",
   "start": "config-blocks",
   "startElement": "1328021391bf38fdb065789b",
   "runner": "live2 .nstate-uip-3.json"
@@ -147,7 +147,7 @@
    },
    "ok": true,
    "at": [
-    -3488,
+    953,
     976
    ],
    "state": {
@@ -165,16 +165,16 @@
     "features": {
      "rows": [
       {
-       "name": "start config-blocks asm",
+       "name": "Sketch 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Origin",
+       "name": "Extrude 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -183,36 +183,31 @@
        "cls": ""
       },
       {
-       "name": "Part 1 <1>",
+       "name": "Sketch 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Part 2 <1>",
+       "name": "Extrude 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Mate features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
+       "cls": ""
       }
      ],
-     "rollbackAfter": null
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
@@ -271,7 +266,7 @@
     },
     "drawing": null
    },
-   "t": 48236
+   "t": 35301
   },
   {
    "step": 2,
@@ -284,7 +279,7 @@
    "ok": true,
    "at": [
     1904,
-    461
+    478
    ],
    "state": {
     "focus": {
@@ -301,16 +296,16 @@
     "features": {
      "rows": [
       {
-       "name": "start config-blocks asm",
+       "name": "Sketch 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Origin",
+       "name": "Extrude 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -319,41 +314,36 @@
        "cls": ""
       },
       {
-       "name": "Part 1 <1>",
+       "name": "Sketch 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Part 2 <1>",
+       "name": "Extrude 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Mate features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
+       "cls": ""
       }
      ],
-     "rollbackAfter": null
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "No features are configured Right click sketch dimensions, features, or feature parameters to configure them.",
     "tooltip": null,
     "sketch": null,
     "assembly": {
@@ -408,11 +398,20 @@
     "drawing": null,
     "panel": {
      "title": "Configurations",
-     "rows": [],
+     "rows": [
+      {
+       "name": "Small",
+       "active": true
+      },
+      {
+       "name": "Large",
+       "active": false
+      }
+     ],
      "banner": null
     }
    },
-   "t": 57081
+   "t": 41781
   },
   {
    "step": 3,
@@ -424,8 +423,8 @@
    },
    "ok": true,
    "at": [
-    1650,
-    129
+    1648,
+    942
    ],
    "state": {
     "focus": {
@@ -452,16 +451,16 @@
     "features": {
      "rows": [
       {
-       "name": "start config-blocks asm",
+       "name": "Sketch 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Origin",
+       "name": "Extrude 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -470,41 +469,36 @@
        "cls": ""
       },
       {
-       "name": "Part 1 <1>",
+       "name": "Sketch 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Part 2 <1>",
+       "name": "Extrude 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Mate features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
+       "cls": ""
       }
      ],
-     "rollbackAfter": null
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "No features are configured Right click sketch dimensions, features, or feature parameters to configure them.",
     "tooltip": null,
     "sketch": null,
     "assembly": {
@@ -559,11 +553,20 @@
     "drawing": null,
     "panel": {
      "title": "Configurations",
-     "rows": [],
+     "rows": [
+      {
+       "name": "Small",
+       "active": true
+      },
+      {
+       "name": "Large",
+       "active": false
+      }
+     ],
      "banner": null
     }
    },
-   "t": 62543
+   "t": 47062
   },
   {
    "step": 4,
@@ -575,8 +578,8 @@
    },
    "ok": true,
    "at": [
-    1560,
-    225
+    1558,
+    903
    ],
    "state": {
     "focus": {
@@ -675,16 +678,16 @@
     "features": {
      "rows": [
       {
-       "name": "start config-blocks asm",
+       "name": "Sketch 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Origin",
+       "name": "Extrude 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -693,41 +696,36 @@
        "cls": ""
       },
       {
-       "name": "Part 1 <1>",
+       "name": "Sketch 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Part 2 <1>",
+       "name": "Extrude 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Mate features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
+       "cls": ""
       }
      ],
-     "rollbackAfter": null
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "No features are configured Right click sketch dimensions, features, or feature parameters to configure them.",
     "tooltip": null,
     "sketch": null,
     "assembly": {
@@ -782,11 +780,20 @@
     "drawing": null,
     "panel": {
      "title": "Configurations",
-     "rows": [],
+     "rows": [
+      {
+       "name": "Small",
+       "active": true
+      },
+      {
+       "name": "Large",
+       "active": false
+      }
+     ],
      "banner": null
     }
    },
-   "t": 68954
+   "t": 49975
   },
   {
    "step": 5,
@@ -892,16 +899,16 @@
     "features": {
      "rows": [
       {
-       "name": "start config-blocks asm",
+       "name": "Sketch 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Origin",
+       "name": "Extrude 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -910,41 +917,36 @@
        "cls": ""
       },
       {
-       "name": "Part 1 <1>",
+       "name": "Sketch 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Part 2 <1>",
+       "name": "Extrude 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Mate features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
+       "cls": ""
       }
      ],
-     "rollbackAfter": null
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "No features are configured Right click sketch dimensions, features, or feature parameters to configure them.",
     "tooltip": null,
     "sketch": null,
     "assembly": {
@@ -999,11 +1001,20 @@
     "drawing": null,
     "panel": {
      "title": "Configurations",
-     "rows": [],
+     "rows": [
+      {
+       "name": "Small",
+       "active": true
+      },
+      {
+       "name": "Large",
+       "active": false
+      }
+     ],
      "banner": null
     }
    },
-   "t": 73046
+   "t": 53180
   },
   {
    "step": 6,
@@ -1033,16 +1044,16 @@
     "features": {
      "rows": [
       {
-       "name": "start config-blocks asm Copy 1",
+       "name": "Sketch 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Origin",
+       "name": "Extrude 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1051,41 +1062,36 @@
        "cls": ""
       },
       {
-       "name": "Part 1 <1>",
+       "name": "Sketch 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Part 2 <1>",
+       "name": "Extrude 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Mate features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
+       "cls": ""
       }
      ],
-     "rollbackAfter": null
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "No assembly features are configured",
+    "message": "No features are configured / No features are configured",
     "tooltip": null,
     "sketch": null,
     "assembly": {
@@ -1140,11 +1146,20 @@
     "drawing": null,
     "panel": {
      "title": "Configurations",
-     "rows": [],
+     "rows": [
+      {
+       "name": "Small",
+       "active": true
+      },
+      {
+       "name": "Large",
+       "active": false
+      }
+     ],
      "banner": null
     }
    },
-   "t": 78243
+   "t": 56879
   },
   {
    "step": 7,
@@ -1157,7 +1172,7 @@
    "ok": true,
    "at": [
     1903,
-    169
+    411
    ],
    "state": {
     "focus": {
@@ -1171,8 +1186,11 @@
      "rows": [
       "Copy table",
       "Copy input",
+      "Move up",
       "Rename",
       "Edit definition…",
+      "Edit FeatureScript IDs…",
+      "Exclude from properties",
       "Visibility conditions…",
       "Input propagation…",
       "Delete"
@@ -1187,16 +1205,16 @@
     "features": {
      "rows": [
       {
-       "name": "start config-blocks asm Copy 1",
+       "name": "Sketch 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Origin",
+       "name": "Extrude 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1205,41 +1223,36 @@
        "cls": ""
       },
       {
-       "name": "Part 1 <1>",
+       "name": "Sketch 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Part 2 <1>",
+       "name": "Extrude 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Mate features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
+       "cls": ""
       }
      ],
-     "rollbackAfter": null
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "No assembly features are configured",
+    "message": "No features are configured / No features are configured",
     "tooltip": null,
     "sketch": null,
     "assembly": {
@@ -1294,11 +1307,20 @@
     "drawing": null,
     "panel": {
      "title": "Configurations",
-     "rows": [],
+     "rows": [
+      {
+       "name": "Small",
+       "active": true
+      },
+      {
+       "name": "Large",
+       "active": false
+      }
+     ],
      "banner": null
     }
    },
-   "t": 82290
+   "t": 61456
   },
   {
    "step": 8,
@@ -1310,8 +1332,8 @@
    },
    "ok": true,
    "at": [
-    1828,
-    280
+    1818,
+    549
    ],
    "state": {
     "focus": {
@@ -1372,16 +1394,16 @@
     "features": {
      "rows": [
       {
-       "name": "start config-blocks asm Copy 1",
+       "name": "Sketch 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Origin",
+       "name": "Extrude 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1390,41 +1412,36 @@
        "cls": ""
       },
       {
-       "name": "Part 1 <1>",
+       "name": "Sketch 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Part 2 <1>",
+       "name": "Extrude 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Mate features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
+       "cls": ""
       }
      ],
-     "rollbackAfter": null
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "No assembly features are configured",
+    "message": "No features are configured / No features are configured",
     "tooltip": null,
     "sketch": null,
     "assembly": {
@@ -1479,11 +1496,20 @@
     "drawing": null,
     "panel": {
      "title": "Configurations",
-     "rows": [],
+     "rows": [
+      {
+       "name": "Small",
+       "active": true
+      },
+      {
+       "name": "Large",
+       "active": false
+      }
+     ],
      "banner": null
     }
    },
-   "t": 87893
+   "t": 65240
   },
   {
    "step": 9,
@@ -1494,8 +1520,8 @@
    "ok": true,
    "pointer": {
     "at": [
-     1827,
-     279
+     1817,
+     548
     ],
     "hover": [],
     "element": "div.tables-container.config-tables-container"
@@ -1515,16 +1541,16 @@
     "features": {
      "rows": [
       {
-       "name": "start config-blocks asm Copy 1",
+       "name": "Sketch 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Origin",
+       "name": "Extrude 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1533,41 +1559,36 @@
        "cls": ""
       },
       {
-       "name": "Part 1 <1>",
+       "name": "Sketch 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Part 2 <1>",
+       "name": "Extrude 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Mate features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
+       "cls": ""
       }
      ],
-     "rollbackAfter": null
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "No assembly features are configured",
+    "message": "No features are configured / No features are configured",
     "tooltip": null,
     "sketch": null,
     "assembly": {
@@ -1622,11 +1643,20 @@
     "drawing": null,
     "panel": {
      "title": "Configurations",
-     "rows": [],
+     "rows": [
+      {
+       "name": "Small",
+       "active": true
+      },
+      {
+       "name": "Large",
+       "active": false
+      }
+     ],
      "banner": null
     }
    },
-   "t": 92748
+   "t": 69013
   }
  ]
 }

@@ -1,19 +1,19 @@
 {
  "scenario": "ver-version-properties-tree",
- "recorded": "2026-11-09T08:49:11.541Z",
+ "recorded": "2026-11-10T18:23:51.545Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-10.3 0a4d2573 + live2 2026-11-10.2"
  },
  "live": {
-  "document": "c9a67567dceaff7a8a14a6a4",
-  "workspace": "e3e0320f6e9593f657b98d4e",
-  "element": "c2b6582937b8cc6d0e949cc1",
+  "document": "342b86d82fc34d917ec72c59",
+  "workspace": "63c8d458110e6eb6e943ebd7",
+  "element": "e4ebafe2df6fe5fdb5bf1e82",
   "start": "doc-versions",
-  "startElement": "c2b6582937b8cc6d0e949cc1",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "e4ebafe2df6fe5fdb5bf1e82",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -225,7 +225,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 30603
+   "t": 27955
   },
   {
    "step": 2,
@@ -362,7 +362,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 40386
+   "t": 31042
   },
   {
    "step": 3,
@@ -397,7 +397,7 @@
        "value": ""
       },
       {
-       "label": "Category",
+       "label": "Onshape Version",
        "kind": "input",
        "value": ""
       }
@@ -473,7 +473,7 @@
     "sketch": null,
     "drawing": null,
     "document": {
-     "workspace": "V1",
+     "workspace": "Main",
      "history": [
       {
        "name": "Main",
@@ -512,7 +512,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 56937
+   "t": 34838
   },
   {
    "step": 4,
@@ -547,7 +547,7 @@
        "value": ""
       },
       {
-       "label": "Category",
+       "label": "Onshape Version",
        "kind": "input",
        "value": ""
       }
@@ -662,7 +662,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 73238
+   "t": 51723
   },
   {
    "step": 5,
@@ -697,7 +697,7 @@
        "value": ""
       },
       {
-       "label": "Category",
+       "label": "Onshape Part Studio",
        "kind": "input",
        "value": ""
       },
@@ -832,7 +832,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 90223
+   "t": 55934
   },
   {
    "step": 6,
@@ -953,7 +953,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 108763
+   "t": 60324
   }
  ]
 }

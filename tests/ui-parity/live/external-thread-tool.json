@@ -1,18 +1,19 @@
 {
  "scenario": "external-thread-tool",
- "recorded": "2026-11-06T14:34:13.214Z",
+ "recorded": "2026-11-10T18:32:36.233Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.4 c2684ac9"
+  "recorder": "2026-11-10.3 0a4d2573 + live2 2026-11-10.2"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "0007ea0fa765d80c0f147cf0",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "370ade735e36d535d2a516cd",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -20,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -105,14 +107,14 @@
       {
        "label": "Size",
        "kind": "enum",
-       "text": "13/16",
+       "text": "1/4",
        "lookup": true,
        "state": "ok"
       },
       {
        "label": "Threads/inch",
        "kind": "enum",
-       "text": "12 tpi",
+       "text": "20 tpi",
        "lookup": true,
        "state": "ok"
       },
@@ -175,14 +177,14 @@
        {
         "label": "Size",
         "kind": "enum",
-        "text": "13/16",
+        "text": "1/4",
         "lookup": true,
         "state": "ok"
        },
        {
         "label": "Threads/inch",
         "kind": "enum",
-        "text": "12 tpi",
+        "text": "20 tpi",
         "lookup": true,
         "state": "ok"
        },
@@ -222,6 +224,7 @@
       "ok": "disabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -272,7 +275,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 26784
+   "t": 34169
   },
   {
    "step": 2,
@@ -281,12 +284,21 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     650,
+     58
+    ],
+    "hover": [],
+    "element": "use"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -328,7 +340,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 30067
+   "t": 37507
   }
  ]
 }

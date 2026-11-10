@@ -1,19 +1,19 @@
 {
  "scenario": "ver-create-version-edit-props",
- "recorded": "2026-11-09T09:21:33.897Z",
+ "recorded": "2026-11-10T18:21:32.370Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-10.3 0a4d2573 + live2 2026-11-10.1"
  },
  "live": {
-  "document": "f8d7a21d1cb6c45ffa571761",
-  "workspace": "e3d046fc8f07897ffd0d2b13",
-  "element": "994ef3f76b71de5a07b8d870",
+  "document": "2c6144831626d0c079ddc464",
+  "workspace": "0b9e17fe14063a4718e13820",
+  "element": "45e122f2eef15a1677053573",
   "start": "doc-branches",
-  "startElement": "994ef3f76b71de5a07b8d870",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "45e122f2eef15a1677053573",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -237,7 +237,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 38879
+   "t": 33386
   },
   {
    "step": 2,
@@ -250,41 +250,34 @@
    "ok": true,
    "at": [
     1230,
-    322
+    272
    ],
    "state": {
     "focus": {
      "kind": "other",
-     "tag": "ul"
+     "tag": "div"
     },
     "dialog": {
      "kind": "modal",
-     "title": "Properties",
+     "title": "Create version from Main",
      "fields": [
       {
-       "label": "Name *",
+       "label": null,
        "kind": "input",
        "value": "V2"
       },
       {
-       "label": "Description",
-       "kind": "input",
-       "value": ""
-      },
-      {
-       "label": "Category",
+       "label": "Description cannot contain HTML.",
        "kind": "input",
        "value": ""
       }
      ],
      "buttons": [
-      "Undo",
-      "Redo",
-      "Apply",
-      "Save",
-      "Close"
+      "Create",
+      "Create version and edit properties",
+      "Cancel"
      ],
-     "text": "Properties V2 Version V2 Name * Description Category Onshape Version Apply Save Close"
+     "text": "Name: Description: (Maximum of 10000 characters) Note: Merging feature changes is only supported for Part Studio and Assembly tabs"
     },
     "dialogs": [],
     "panels": null,
@@ -348,7 +341,7 @@
     "sketch": null,
     "drawing": null,
     "document": {
-     "workspace": "V2",
+     "workspace": "Main",
      "history": null,
      "compare": null,
      "tabs": [
@@ -371,7 +364,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 48686
+   "t": 48368
   }
  ]
 }
