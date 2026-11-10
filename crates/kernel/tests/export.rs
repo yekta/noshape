@@ -1690,3 +1690,51 @@ fn parasolid_cone_seam_on_its_cylinders() {
     assert!((a - b).abs() < 1e-9 * a, "{a} vs {b}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// An STL's curved wall made of an extruded B-spline curve (a user's printed tab copied from a STEP, lead 11-10) is
+/// facetted in strips along its straight rulings, as Parasolid's: no node inside the face (BRepMesh's node insertion
+/// put ~1,400 to 15,000 there, up to 11 s a face, and tilted the user's facets up to 3.3°: a zig-zag band in the
+/// slicer), every facet along the surface (its normal within 0.1° of the surface's at its centre).
+#[test]
+fn an_extruded_spline_walls_facets_follow_the_surface() {
+    let mm = 1e-3;
+    let n = 8;
+    let arc = |r: f64| -> Vec<DVec3> {
+        (0..=n).map(|i| {
+            let s = i as f64 / n as f64;
+            let a = (-30.0 + 60.0 * (s + 0.3 * s * (1.0 - s))).to_radians();
+            let r = r * (1.0 + 0.04 * (3.0 * a).sin());
+            DVec3::new(r * a.cos(), r * a.sin(), 0.0) * mm
+        }).collect()
+    };
+    let (outer, inner) = (arc(40.0), arc(38.0));
+    let edges = [
+        make_interpolated_spline(&outer, &[], false).unwrap(),
+        make_line(outer[n], inner[n]).unwrap(),
+        make_interpolated_spline(&inner.iter().rev().copied().collect::<Vec<_>>(), &[], false).unwrap(),
+        make_line(inner[0], outer[0]).unwrap(),
+    ];
+    let profile = make_face_from_wire(&make_wire(&edges).unwrap(), true).unwrap();
+    let tab = extrude(&profile, DVec3::Z * 38.0 * mm).unwrap().shape;
+    let faces = tab.faces();
+    let walls: Vec<usize> = (0..faces.len()).filter(|&k| matches!(faces[k].face_surface(), Ok(Surface::Extrusion { .. }))).collect();
+    assert_eq!(walls.len(), 2, "two extruded spline walls");
+    // An STL at Medium (chordal 0.12 mm, 6.25°) as the export takes it.
+    let t = tessellate_export(&tab, 0.12 * 2e-6, 12.5f64.to_radians()).unwrap();
+    assert_eq!(t.faces.len(), faces.len());
+    let p = |i: u32| DVec3::from(t.positions[i as usize].map(f64::from));
+    for &k in &walls {
+        let f = &t.faces[k];
+        let tris = &t.indices[f.first_index as usize..(f.first_index + f.index_count) as usize];
+        let worst = tris
+            .chunks(3)
+            .map(|c| {
+                let (a, b, c) = (p(c[0]), p(c[1]), p(c[2]));
+                let n = (b - a).cross(c - a).normalize();
+                n.dot(faces[k].normal_at_point((a + b + c) / 3.0).unwrap()).abs().min(1.0).acos().to_degrees()
+            })
+            .fold(0.0, f64::max);
+        assert!(worst < 0.1, "wall {k}: a facet {worst:.3}° off the surface");
+        assert_eq!(f.vertex_count as usize, tris.len() / 3 + 2, "wall {k}: strips between its edges' nodes, none inside ({} nodes, {} triangles)", f.vertex_count, tris.len() / 3);
+    }
+}

@@ -10,6 +10,24 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-10 19:45 UTC: STL zig-zag on an extruded B-spline wall (lead's user P1); hand drill diagnosed
+
+- **STL (user's "Fan Riser", private, vibe3:~/lead-private):** the curved tab is a SurfaceOfExtrusion (a STEP
+  B-spline curve extruded along z), which the export gave to BRepMesh's node insertion: ~2,000 inner nodes a face,
+  facets tilted up to 3.29° off the surface (p99 1.42°), the slicer's diamond band. Now the export grids it as a
+  B-spline's (`grid_face`: the basis curve's knots and turn along u, only the bounds along the straight rulings):
+  strips between the edges' nodes as Parasolid facets, each triangle checked on the surface (else the old path).
+  The tab: 3,498 -> 586 triangles a face, facets within 0.05°; the part 87,794 -> 70,242 triangles, meshed in 270 ->
+  64 ms. Aspect ratio is not the measure: strips are tall (p50 212 on the tab) and live's own STLs run p99 23–1,146
+  (cf-spur-gear 262, motor-mount-jack 372), so no p99 < 20 bound: the T1 bounds the facets' normals and asks for
+  strips (`an_extruded_spline_walls_facets_follow_the_surface`; old path: 1,494 inner nodes).
+- **Hand drill** (asm.md "HAND-DRILL-MATES-OVERDEFINED"): translator fixes, an edge's CENTER / MID_POINT connector
+  checked against live's frame (Pin slot 7), the imprint region of a TOPOLOGY entity's own imprint (spur gear Extrude
+  6), a BODY query told apart by region faces left to the body handlers (c2-hunting-knife's booleanScopes: they read
+  as another sketch's region; now "SWEPT_BODY of Loft 1: no part of ours", Loft 1 untranslated). Models 76/87,
+  818/947 either way. Next of mine there: 9c7c54's Fillet 3 / connector (sketch pattern copies), the Spur gear's
+  in-feature connector on its internal sketch (15 mates).
+
 ## From qa (2026-11-10 12:26 UTC, lead's bisect): asm-hand-drill-pinslot's mates 28 -> 5/52 from your ee69e4a6a
 
 Your translator change makes Studio 4bed3f / e0abe1 build as live, and then Ball 5 / Cylindrical 12 / 13 resolve and our

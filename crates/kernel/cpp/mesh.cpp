@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <BRepAdaptor_Surface.hxx>
+#include <Geom_BSplineCurve.hxx>
 #include <chrono>
 #include <functional>
 #include <atomic>
@@ -213,6 +214,14 @@ std::vector<double> spline_lines(const BRepAdaptor_Surface& S, bool in_u, double
       if (k(i) > a + 1e-9 * (b - a) && k(i) < b - 1e-9 * (b - a))
         knots.push_back(k(i));
   }
+  // An extruded B-spline curve's knots along it (u).
+  if (S.GetType() == GeomAbs_SurfaceOfExtrusion && in_u && S.BasisCurve()->GetType() == GeomAbs_BSplineCurve)
+  {
+    const occ::handle<Geom_BSplineCurve> c = S.BasisCurve()->BSpline();
+    for (int i = 1; i <= c->NbKnots(); ++i)
+      if (c->Knot(i) > a + 1e-9 * (b - a) && c->Knot(i) < b - 1e-9 * (b - a))
+        knots.push_back(c->Knot(i));
+  }
   knots.push_back(b);
   if (knots.size() > 4097)
     return {};
@@ -280,10 +289,10 @@ std::vector<double> spline_lines(const BRepAdaptor_Surface& S, bool in_u, double
   return lines;
 }
 
-// An export's sphere, torus, revolved circle or B-spline face as live's facetter makes it: the boundary nodes and the
-// nodes of its grid (`export_grid`'s, `spline_lines`') that lie inside the face (a quarter cell clear of its boundary
-// along both directions), triangulated in the parameters scaled to lengths (a B-spline's in its grid's indices;
-// planar_cdt); a seam's two sides are a whole ring's ends. The export's BRepMesh deflection and angle are twice Parasolid's (mesh.rs). False (nothing
+// An export's sphere, torus, revolved circle, B-spline face or extruded curve as live's facetter makes it: the
+// boundary nodes and the nodes of its grid (`export_grid`'s, `spline_lines`') that lie inside the face (a quarter cell
+// clear of its boundary along both directions), triangulated in the parameters scaled to lengths (a B-spline's and an
+// extrusion's in its grid's indices; planar_cdt); a seam's two sides are a whole ring's ends. The export's BRepMesh deflection and angle are twice Parasolid's (mesh.rs). False (nothing
 // written) when the face isn't clean.
 bool grid_face(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm)
 {
@@ -301,7 +310,8 @@ bool grid_face(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm
   }
   std::vector<double> us, vs;
   const double        tol = prm.Deflection / 2, ang = prm.Angle / 2;
-  const bool spline = S.GetType() == GeomAbs_BSplineSurface || S.GetType() == GeomAbs_BezierSurface;
+  const bool extrusion = S.GetType() == GeomAbs_SurfaceOfExtrusion;
+  const bool spline    = S.GetType() == GeomAbs_BSplineSurface || S.GetType() == GeomAbs_BezierSurface || extrusion;
   if (spline)
   {
     us = spline_lines(S, true, u0, u1, v0, v1, tol, ang);
@@ -389,6 +399,25 @@ bool grid_face(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm
   std::vector<int> tris;
   if (!cdt::triangulate(plane, rings, tris, ring_nodes))
     return false;
+  // An extrusion's grid has no rows inside (its rulings are straight): its triangles span the boundary's nodes, so
+  // each is kept only on the surface (a fan round a hole may cut across the curve).
+  if (extrusion)
+  {
+    const double dev = f->GetDeflection();
+    auto         off = [&](const cdt::Pt& q, const gp_XYZ& m) { return S.Value(q.x, q.y).Distance(gp_Pnt(m)) > dev; };
+    for (size_t t = 0; t < tris.size(); t += 3)
+    {
+      const size_t   a = (size_t)tris[t], b = (size_t)tris[t + 1], c = (size_t)tris[t + 2];
+      const cdt::Pt& pa = uv[a];
+      const cdt::Pt& pb = uv[b];
+      const cdt::Pt& pc = uv[c];
+      auto           mid = [&](const cdt::Pt& p, const cdt::Pt& q) { return cdt::Pt{(p.x + q.x) / 2, (p.y + q.y) / 2}; };
+      if (off({(pa.x + pb.x + pc.x) / 3, (pa.y + pb.y + pc.y) / 3}, (xyz[a].XYZ() + xyz[b].XYZ() + xyz[c].XYZ()) / 3) ||
+          off(mid(pa, pb), (xyz[a].XYZ() + xyz[b].XYZ()) / 2) || off(mid(pb, pc), (xyz[b].XYZ() + xyz[c].XYZ()) / 2) ||
+          off(mid(pc, pa), (xyz[c].XYZ() + xyz[a].XYZ()) / 2))
+        return false;
+    }
+  }
   write_face(f, uv, xyz, tris);
   return true;
 }
@@ -874,8 +903,8 @@ public:
   }
 };
 
-// An export's sphere, torus or revolved circle: `grid_face`, else `fallback`; a B-spline face `grid_face`, else
-// `plain`; any other revolution `plain`.
+// An export's sphere, torus or revolved circle: `grid_face`, else `fallback`; a B-spline face or an extruded curve
+// `grid_face`, else `plain`; any other revolution `plain`.
 class GridAlgo : public IMeshTools_MeshAlgo
 {
 public:
@@ -888,7 +917,7 @@ public:
     gp_Ax1                    axis;
     double                    r      = 0;
     const GeomAbs_SurfaceType type   = f->GetSurface()->GetType();
-    const bool                spline = type == GeomAbs_BSplineSurface || type == GeomAbs_BezierSurface;
+    const bool                spline = type == GeomAbs_BSplineSurface || type == GeomAbs_BezierSurface || type == GeomAbs_SurfaceOfExtrusion;
     if (!spline && !swept_circle(*f->GetSurface(), axis, r))
     {
       myPlain->Perform(f, prm, range);
@@ -918,15 +947,16 @@ private:
   occ::handle<IMeshTools_MeshAlgo> myFallback, myPlain;
 };
 
-// The export path (`exact`): spheres, tori, revolved circles and B-spline faces on their grids; every other face as
-// the display meshes it.
+// The export path (`exact`): spheres, tori, revolved circles, B-spline faces and extruded curves on their grids (an
+// extruded curve's node insertion zig-zagged its normals across the face: a user's printed STEP tab, lead 11-10);
+// every other face as the display meshes it.
 class ExportAlgoFactory : public IMeshTools_MeshAlgoFactory
 {
 public:
   occ::handle<IMeshTools_MeshAlgo> GetAlgo(const GeomAbs_SurfaceType type, const IMeshTools_Parameters& prm) const override
   {
     if (type == GeomAbs_Torus || type == GeomAbs_Sphere || type == GeomAbs_SurfaceOfRevolution || type == GeomAbs_BSplineSurface ||
-        type == GeomAbs_BezierSurface)
+        type == GeomAbs_BezierSurface || type == GeomAbs_SurfaceOfExtrusion)
       return new GridAlgo(new BRepMesh_DelaunayNodeInsertionMeshAlgo<ExportGridSplitter, BRepMesh_DelaunayBaseMeshAlgo>(), myOwn->GetAlgo(type, prm));
     return myOwn->GetAlgo(type, prm);
   }
