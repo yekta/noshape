@@ -347,6 +347,48 @@ fn a_face_just_past_the_tolerance_off_another_is_apart() {
     assert_eq!(k::bool_corpus::Summary::of(&r).differences(&c.summary), Vec::<String>::new());
 }
 
+/// OCCT's own Boolean asks noshape for some sections (patch 0028's hook): a plane containing an extrusion's direction
+/// gets the rulings, exact lines (an imported Mac mini's wall cut by a window's side: 10.0012 mm for 10 before); a plane
+/// across one is OCCT's own (our curves there made it build broken gear cuts). A prism on a profile with a B-spline side,
+/// sectioned by a box whose side contains the prism's direction: that edge a line, as tall as the prism.
+#[test]
+fn occts_section_along_an_extrusion_is_straight() {
+    let _ = k::set_working_scale(1000.0);
+    let mm = 1e-3;
+    let p = |x: f64, y: f64| DVec3::new(x, y, 0.0) * mm;
+    let side = k::make_bspline(&[p(0.0, 0.0), p(5.0, 6.0), p(15.0, 6.0), p(20.0, 0.0)], None, &[0.0, 1.0], &[4, 4], 3, false).unwrap();
+    let base = k::make_bspline(&[p(20.0, 0.0), p(0.0, 0.0)], None, &[0.0, 1.0], &[2, 2], 1, false).unwrap();
+    let face = k::make_face_from_wire(&k::make_wire(&[side, base]).unwrap(), true).unwrap();
+    let prism = k::extrude(&face, DVec3::Z * 10.0 * mm).unwrap().shape;
+    let cutter = k::make_box_corners(DVec3::new(8.0, -5.0, -1.0) * mm, DVec3::new(30.0, 10.0, 20.0) * mm).unwrap();
+    let r = k::section(&prism, &cutter).unwrap();
+    let ruling: Vec<k::Shape> = r
+        .shape
+        .edges()
+        .into_iter()
+        .filter(|e| e.edge_info().is_ok_and(|i| (i.start.x - 8.0 * mm).abs() < 1e-9 && (i.end.x - 8.0 * mm).abs() < 1e-9 && i.start.y > 1.0 * mm && (i.start.z - i.end.z).abs() > 5.0 * mm))
+        .collect();
+    assert_eq!(ruling.len(), 1, "the section's edge on the B-spline side");
+    let info = ruling[0].edge_info().unwrap();
+    assert!(matches!(info.curve, k::Curve::Line { .. }), "{:?}", info.curve);
+    assert!((info.length - 10.0 * mm).abs() <= 1e-12, "{} m", info.length);
+}
+
+/// A spur gear's cut of 9 tooth gaps (cf-spur-gear, recorded) by OCCT's own Boolean: its result as noshape's (the volume
+/// recorded). With the hook answering a plane across the teeth's extrusions OCCT built 80 faces and 50 % more volume.
+#[test]
+fn occts_gear_cut_keeps_its_volume() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "2d4e1d455718dd9d").expect("the recorded cut");
+    k::set_rust_boolean(Some(false));
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    k::set_rust_boolean(None);
+    let r = r.expect("OCCT's cut");
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-6 * c.summary.volume, "valid {}, volume {v} against {}", r.shape.is_valid(), c.summary.volume);
+}
+
 /// A sheet metal enclosure's fuse (qa4 S1: the flanges, bends and hem, recorded): noshape's Boolean's result valid and
 /// OCCT's volume. A bend on a trimmed left-handed cylinder came out the other way round: invalid, 7 mm³ more
 /// (RUST-SM-CUT-VOLUME).
