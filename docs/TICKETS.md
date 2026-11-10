@@ -356,6 +356,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   tickets, the user's cases); the 48 ticket documents on the release CLI = green 4f5863a2. Agent session (Haiku, the release's
   MCP): 9 tool calls, 0 failed, the block right (23,214.6 mm³). qa-os (run 42781223370): macOS footer and Show in Finder OK;
   Windows footer OK, Show in Explorer still fails (WIN-SHOW-IN-EXPLORER, not new).
+- **qa 13:15, after main's red (11:44–12:41: core's unlanded OCCT patch 0028 libs synced into /opt/occt): the list is on watcher
+  GREEN 7dd64bd82 (12:54), the first green after the restore.** export::step_writes_the_used_part_of_long_splines passes there
+  (rerun by qa on vibe4's current /opt/occt: 1 passed, 11 s; all 25 kernel export tests 115 s). Sweeps on vibe3 (volume sweep,
+  cf corpus, the 48 ticket documents) = 4f5863a2 exactly. Fuzz: v0.4.41 release CLI seeds 9001–9031, 0 deaths; GUI fuzz on
+  4f5863a2, 0 new deaths. **No blocker so far, but not yet 3-platform:** the last CI (42815793431, b2c82787f, 12:26) failed on
+  Windows only: kernel export::imported_nist_parts_write_to_rhino_and_pvz, "every part to Rhino" 7 of 8 (Linux and macOS
+  passed; CI builds OCCT from patches/occt, not /opt/occt). Since the green CI 297ea7dcb only bool 564260870 and core
+  59c60fdb9 touch the kernel (both crates/kernel/cpp/rust_boolean.cpp). The watcher's red 7c88d371b (12:41) had this test
+  failing on Linux too, while the libs were being swapped. Needs CI on 7dd64bd82 or later before the cut.
 - v0.4.41 is the first release with dx's 7e7d69f2b (P0 FAN-BLADE-SWEEP-HANG, c2-fan-blade-sweep's Sweep 1 331 s) and with
   core's fix b5da62f83 (192 s -> 0.2 s). The 07:02 suite run times that document on the cut.
 - Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 T2-ASM-STANDARD-CONTENT-HANG (a T2 bench in ops,
