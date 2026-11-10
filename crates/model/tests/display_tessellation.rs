@@ -131,3 +131,21 @@ fn curved_bodies_get_a_coarse_preview_first() {
     assert!(preview.needs_refine);
     assert!(circle_segments(&preview) < circle_segments(&regen(&ps)), "the preview circle is coarser");
 }
+
+/// A used (projected) B-spline is drawn with its two ends only, no points along it (live 2461: the user's used STEP
+/// edge showed a row of its control points).
+#[test]
+fn a_used_bspline_shows_only_its_ends() {
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let ctrl = [DVec2::new(0.0, 0.0), DVec2::new(0.01, 0.02), DVec2::new(0.02, -0.01), DVec2::new(0.03, 0.015), DVec2::new(0.04, 0.0)];
+    let id = sk.add_bspline(&ctrl, 3).unwrap();
+    sk.entity_mut(id).unwrap().external = true;
+    let mut sketch = ps.new_feature("sketch", &units).unwrap();
+    sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    ps.features.push(sketch);
+    let d = regen(&ps).display;
+    assert_eq!(d.sketches[0].points.len(), 2, "only the spline's two ends: {:?}", d.sketches[0].points.iter().map(|p| p.position).collect::<Vec<_>>());
+}

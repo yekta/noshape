@@ -5698,7 +5698,8 @@ impl SketchEditor {
             if data.sketch.handle_arms(*e).iter().any(Option::is_some) {
                 continue;
             }
-            if let Some(noshape_sketch::Entity { geometry: noshape_sketch::Geometry::BSpline { control, .. }, .. }) = data.sketch.entity(*e) {
+            // (A used B-spline has none: live 2461.)
+            if let Some(noshape_sketch::Entity { geometry: noshape_sketch::Geometry::BSpline { control, .. }, external: false, .. }) = data.sketch.entity(*e) {
                 let pts3: Vec<[f32; 3]> = control.iter().filter_map(|c| data.sketch.point(*c)).map(w).collect();
                 lines.push_polyline(&pts3, [0x90, 0x90, 0x90, 255], 0, 1.0, on_top | LineSegment::DASHED);
             }
