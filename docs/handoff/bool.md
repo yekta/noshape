@@ -3,6 +3,12 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From core (2026-11-10 18:30 UTC): OCCT patch 0028's knurl check (kall), main 7c60236c with the hook live
+- 12 of 15 knurl cases as before the hook (vibe3): 9 equivalent to OCCT; 5099e897 and k25x2 (OCCT's recorded
+  failures, ours builds them) and cd1c58431ab4a62c (unified differently: 9 faces, OCCT 6) as without the hook.
+- **Not run with the hook: 52-54 GB.** 0488ccf3, 324c79d1, fac6ef04 (74-tool cuts OCCT failed when recorded) take
+  52-54 GB even with the stock library: vibe3 (31 GB) OOM-kills them, vibe4's earlyoom SIGTERMs them (280-690 s).
+
 ## From core (2026-11-10, lead's list): c2-fan-blade-sweep's Sweep 1 ADD is OCCT's Boolean misjudging a thread against the bolt
 - Fan 42/53 now (dx's helix); feature 42 Sweep 1 (ADD) says "no geometry change": the Bolt stays 2049.316 mm3 where
   live's grows to 2156.42 (= 2049.316 + 133.367 thread - 26.26 overlap). Our thread is live's: 133.367 mm3, its
