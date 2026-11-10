@@ -6938,6 +6938,11 @@ impl Render for PartStudioView {
                     this.toggle_shortcut_sheet(window, cx);
                     return;
                 }
+                // The configuration variable dialog, opened by Edit definition… with no field focused (live).
+                if this.ui.var_input.take().is_some() {
+                    cx.notify();
+                    return;
+                }
                 if this.close_insert_go(cx) {
                     return;
                 }

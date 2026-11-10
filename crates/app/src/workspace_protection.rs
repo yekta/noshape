@@ -69,7 +69,10 @@ pub fn open_dialog(doc: Entity<DocModel>, branch: BranchId, window: &mut Window,
                                 .border_color(rgb(0xfcda7f))
                                 .bg(rgb(0xfff8e6))
                                 .child("These tabs should be updated:")
-                                .child(div().text_color(rgb(0x094174)).child(stale.join(", "))),
+                                .child(div().text_color(rgb(0x094174)).child(stale.join(", ")))
+                                // An alert of its own for live's recorder (ver-protection-drawings-notice: "These tabs should
+                                // be updated: Part 1 Drawing 1 / Workspace protection restrictions …"; live 3339's " , ").
+                                .map(|d| noshape_app_core::ui_script::mark_message(d, || format!("These tabs should be updated: {}", stale.join(" , ")))),
                         )
                     })
                     .child({

@@ -15,7 +15,8 @@
     part's index, of: New(i) }`); a sketch on one resolves to the flat (`flat_face_frame`: origin the face's own
     centre, as live's evPlane there), shows only in the flat view (`SketchDisplay::on_flat`). sheetmetal_table lists
     `flat_faces`; e2e `a_sketch_on_the_sheet_metal_flat`; the translator's `face_on_plane` falls back to them.
-  - c2-sm-louver 31 -> 32/36 (Sketch 9 matches; next is Extrude 3, bool's OCCT case).
+  - c2-sm-louver 31 -> 32/36 (Sketch 9 matches; next is Extrude 3, bool's OCCT case). Model suite against main
+    f8378048c: 820 -> 821/947, the louver only, nothing worse.
   - Flat view: a click selects the flat's face (the main view lights the part's base wall face on that side), New
     sketch… on the right-clicked one, the flat's sketches drawn there. Not yet live's: the sketch is edited in the main
     view (the flat drawn under it there), where live sketches inside the flat view; the cross-highlight is the base

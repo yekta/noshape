@@ -511,7 +511,9 @@ pub fn ui_state(doc: &Entity<DocModel>, tab: Option<TabId>, cx: &App) -> Option<
     let s = session(doc, cx)?;
     // A Feature Studio's compare has no Only show differences (live fs-compare).
     let code = tab.and_then(|t| s.base.tab(t)).is_some_and(|t| matches!(t.content, TabContent::FeatureStudio(_)));
-    let mut out = serde_json::json!({ "base": s.base_label, "target": s.target_label, "only_differences": (!code).then_some(s.only_differences), "features": null, "selected": null });
+    // Nor a tab one side lacks: no compare panel (live ver-compare-tab-missing).
+    let missing = tab.is_some_and(|t| s.base.tab(t).is_none() || s.target.tab(t).is_none());
+    let mut out = serde_json::json!({ "base": s.base_label, "target": s.target_label, "only_differences": (!code && !missing).then_some(s.only_differences), "features": null, "selected": null });
     let ps = |d: &Document| tab.and_then(|t| d.tab(t)).and_then(|t| match &t.content {
         TabContent::PartStudio(p) => Some(p.clone()),
         _ => None,
