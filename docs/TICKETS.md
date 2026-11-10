@@ -356,7 +356,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   tickets, the user's cases); the 48 ticket documents on the release CLI = green 4f5863a2. Agent session (Haiku, the release's
   MCP): 9 tool calls, 0 failed, the block right (23,214.6 mm³). qa-os (run 42781223370): macOS footer and Show in Finder OK;
   Windows footer OK, Show in Explorer still fails (WIN-SHOW-IN-EXPLORER, not new).
-- **qa 13:15, after main's red (11:44–12:41: core's unlanded OCCT patch 0028 libs synced into /opt/occt): the list is on watcher
+- **qa 13:09, after main's red (11:44–12:41: core's unlanded OCCT patch 0028 libs synced into /opt/occt): the list is on watcher
   GREEN 7dd64bd82 (12:54), the first green after the restore.** export::step_writes_the_used_part_of_long_splines passes there
   (rerun by qa on vibe4's current /opt/occt: 1 passed, 11 s; all 25 kernel export tests 115 s). Sweeps on vibe3 (volume sweep,
   cf corpus, the 48 ticket documents) = 4f5863a2 exactly. Fuzz: v0.4.41 release CLI seeds 9001–9031, 0 deaths; GUI fuzz on
