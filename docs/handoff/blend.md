@@ -12,6 +12,24 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## c2-hunting-knife's Fillet 2 (11-10 07:56 UTC, not landed: local branch blend-runon, WIP commit)
+- The edge: a 0.95 mm concave line (x -4, z -14.43, y -0.95..0) between the floor and a 55° slope, R 3, overflow
+  on. Its y -0.95 end is where the blade's grind face (a 4 x 6 B-spline) cuts in. Live: the round runs straight on
+  past that end across the whole half-blade (y -2..0), trimmed by the grind face extended below the floor (the
+  grind face grows 0.466 mm², the side y = -2 gets a 0.023 mm² sliver): 17/46/30, +0.396 mm³, one round face (JYC).
+- Ours: OCCT's fillet builds the same cylinder (x -4.896..-2.438) but puts a 0.82 mm² B-spline patch where the grind
+  face should extend, and the solid is invalid → "Failed to fillet selections.". The section route (propagation
+  off) stops the round at the edge's end with a cap: 19 faces, +0.348.
+- Prototype (`BlendSpec::overflow`, `trimmed_run_on` in blend_section, a fallback after OCCT fails): the concave
+  line's section runs on 2R past both ends; the run-on pieces' neighbouring faces (grind, side y = -2, mid plane
+  y = 0) extended split the tool, the pieces inside all of them fused. With the grind face extended 0.9 mm: valid,
+  +0.390 mm³, 18 faces (the extension stays its own face). Fragile: at 0.6 mm the fuse is invalid, from 1.2 mm on
+  the extended B-spline no longer splits the tool (a kernel probe: OCCT's section of a box with that face extended
+  6-12 mm gives 1 edge, and the split loses volume). Probes: features_c zz_probe_knife (ZZ_KNIFE = dump), kernel
+  blend zz_knife_* (ZZ_CASE = vibe5 /tmp/blend-knife/fillet-3).
+- What a real fix needs: extend only the face's sides the run-on crosses, by the length it needs (not all four by
+  2R), and merge the extension into the face (`k::merge_faces_on` on the extended surface) for live's 17 faces.
+
 ## From core (2026-11-09 14:22 UTC, covering blends): c2-impeller-loft's Fillet 1 needs a cliff-edge round
 - With core's Delete face 1 (c7c48f81) the impeller holds through feature 20; feature 21 Fillet 1 (R10, one closed
   edge where the stern tube's cylinder JSO meets the housing's outer wall, a B-spline; Allow edge overflow OFF)
@@ -141,6 +159,15 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   ±2.49). So live's run-on is its chamfer surface continued, ours the rim's chamfer continued along the rim. Not built
   yet (quota): next, compare KRpB's 17 points with our run-on's edge, then build the run-on as the chamfer surface
   extended along its own ruling (blend_section ring_blend RimBlend::Chamfer).
+  11-10 07:15 (scripts /root/blend-scratch/runon/*.py, our dump ours.txt): the run-on is not the difference. Live's
+  JRC rows lie exactly on the notch cylinder (r 3.13739) and the side plane, and every ruling is the chord of one
+  rolling ball, R = 0.9196 (all 9 grid rulings within 2 µm, past the arc's end too): the setback is 1.000 only at the
+  arc's middle (-62°), 0.917 at its top end, 1.011 at the notch's bottom (dihedral 85-95° along the arc), the same on
+  both faces. R = d tan(φ_mid / 2), φ_mid the dihedral at the edge's middle. Ours (OCCT's chamfer) keeps 1.000
+  everywhere, hence the strip cut to ±2.49 (live ±2.53). Live carries that ball round the rim past the arc's end, as
+  ours carries the rim's chamfer. Fix in ring_blend: the wedge's rim filleted at R, each round face replaced by the
+  ruled face between its two contact edges. Asked the lead whether live's chamfers in general follow this rule
+  (it changes every equal-distance chamfer on an edge whose dihedral varies).
 - opChamfer distance-and-angle side: live 2336's rule (off = cap) breaks cf-spur-gear's gear 8; reverted, see
   TICKETS CHAMFER-FS-OPCHAMFER (patch opchamfer-cap-rule.patch).
 
