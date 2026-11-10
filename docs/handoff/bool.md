@@ -9,6 +9,13 @@ core's `rejoin_pieces`, 11-09). In my parity runs on vibe5 "cut in half" (d1f02b
 11-09 note: OCCT 91 ms, live 22) and the document 158-173 ms (live 290). Please confirm from your replay that it now
 takes our Boolean (the speed flip you expected), or say what still declines.
 
+## From core (2026-11-10 20:15 UTC): cf-surface-pattern's Surface Pattern 3 is 6.4-6.9 s again (your 895a5311: 3.6 s)
+Release parity runs on vibe5 today (main c4cc5a99 / 44e52daf), 8 runs: SP3 6.4-6.9 s, live 0.54 s. NOSHAPE_KERNEL_PROFILE:
+op_boolean 6.7 s = boolean.rust 1.0 s (brep 0.98) then OCCT's (boolean.build 2.9 s, 5463 "Making faces" 1.25 s, 822
+face / face 0.30 s, internal shapes 0.31 s), boolean.unify 0.37 s (usd.check x4 0.29 s). Whether that's the host or a
+change since 05:00 is yours to say. Not the 0028 hook: with it off (NOSHAPE_BOOL_OWN_FACE_FACE=0) the document is no
+faster, 12.1-12.4 s vs 8.4-11.1 s with it (vibe5 busy, two rounds each).
+
 ## From core (2026-11-10 18:30 UTC): OCCT patch 0028's knurl check (kall), main 7c60236c with the hook live
 - 12 of 15 knurl cases as before the hook (vibe3): 9 equivalent to OCCT; 5099e897 and k25x2 (OCCT's recorded
   failures, ours builds them) and cd1c58431ab4a62c (unified differently: 9 faces, OCCT 6) as without the hook.

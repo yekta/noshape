@@ -33,6 +33,20 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-10 20:15 UTC: the model suite's failing features in core's area (lead: by features lost, skip blend / bool).**
+- Landed 730d6f28: c2-impeller-loft's Extrude 4 (a region picked by its edge's side along a spline) takes live's rib.
+  Model suite on main 44e52daf: 77/87 documents, 820/947 features (818 before; hex-bookcase 15 -> 17, psui's), nothing worse.
+- Of the 9 documents short (818/947 before it): impeller Shell Gehäuse and fan Sweep 1 are bool's; hunting-knife
+  Chamfer 1, setback fillet, face blend are blend's; c2-rings-loft's Circular pattern 1 too: ours vs live per feature,
+  Extrude 2 +0.13 mm², Fillet 1 +0.001, Chamfer 1 -0.47, Shell 1 -0.65, Extrude 3 -0.66, the pattern -0.67 (Chamfer 1's
+  gap carried on, within the band until the pattern adds area); louver Sketch 9 is the flat pattern's sketch
+  (psui's REQUESTS 2468); hex-bookcase psui fixed (dc4b1a01).
+- cf-surface-pattern SP3 (3 features): Loft 1's middle v knot (live 0.49687, ours 0.50033). Live 2421's lofts rule out
+  chord means, centroids, poles and arc length along the v columns (C: live 0.440475, chord mean 0.444477, arc 0.4402,
+  but no change on cf; A's pairing differs from live's: one 34-pole surface there, our 4 faces). Asked for C's poles
+  (REQUESTS core 20:02). Probe: kernel `surfacing::loft_middle_knot_probe` (local, not landed). SP3's 6.7 s (live
+  0.54 s) is its Boolean: our B-rep path 1 s then OCCT's ~5 s (bool's).
+
 **State 11-10 14:58 UTC: the Windows "Rib Dizisi" P0 (lead): tangent coaxial sections, ours and OCCT's (patch 0028).**
 - Cause: a user's rib pattern fuses 0.4 mm rounds (tori) touching a Ø46 mm cylinder from inside along a circle
   (coaxial, R + r = its radius to 2e-14 m). OCCT's marching through the tangency is rounding-sensitive: one pair
