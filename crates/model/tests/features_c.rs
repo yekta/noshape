@@ -3972,3 +3972,50 @@ fn a_round_running_off_its_edge_meets_the_grind_face_extended_as_live() {
     let x_max = grind.bounding_box(true).unwrap().max.x / mm(1.0);
     assert!((x_max - -3.1588).abs() < 2e-3, "grind face to x {x_max} (live -3.1588)");
 }
+
+/// c2-hunting-knife's Chamfer 1 on the blade as Fillet 2 leaves it (live 2462): offset 0.45 mm, angle 22.5°, opposite
+/// direction, on the grind face's two edges with the cutting edge's strips (a B-spline and a line, tangent), which
+/// OCCT's chamfer can't build. Live's section keeps constant offsets from the two faces (0.2445 / 0.472 mm, the asked
+/// distance and angle at the middle of the longest edge), so the strips left vary: 0.011 mm at the straight end, 0.044
+/// where the edges meet, 0.055 on the curve; one face per edge.
+#[test]
+fn a_distance_angle_chamfer_keeps_constant_offsets_as_live() {
+    let brep = include_str!("data/knife-chamfer1-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    // The grind face's edges with the strips at y -0.25: the line along the bottom and the curve up to the tip.
+    let edges: Vec<Reference> = b.shape.edges().iter().enumerate().filter(|(_, e)| e.edge_info().is_ok_and(|i| near(i.start.y, mm(-0.25), 1e-9) && near(i.end.y, mm(-0.25), 1e-9) && i.length > mm(40.0))).map(|(i, _)| Reference::Edge((*b.edges[i]).clone())).collect();
+    assert_eq!(edges.len(), 2);
+    s.add("chamfer", move |p| {
+        p.set("entities", ParamValue::Query(edges));
+        p.set("chamferType", en("OFFSET_ANGLE"));
+        p.set("width", expr("0.45 mm"));
+        p.set("angle", expr("22.5 deg"));
+        p.set("oppositeDirection", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let sh = &r.context.bodies[0].shape;
+    assert_eq!(sh.faces().len(), 19);
+    // The strips' widths: where each strip meets a chamfer face, |y| (their other edge is the mid plane, y 0).
+    let faces = sh.faces();
+    let ef = sh.edge_faces().unwrap();
+    let strip = |i: usize| { let b = faces[i].bounding_box(true).unwrap(); b.min.y > mm(-0.1) && b.max.x - b.min.x > mm(30.0) && faces[i].area().unwrap() < mm(1.0) * mm(10.0) };
+    let chamfer = |i: usize| matches!(faces[i].face_surface(), Ok(noshape_kernel::Surface::BSpline { .. })) && faces[i].area().unwrap() < mm(1.0) * mm(100.0);
+    let mut at: Vec<(f64, f64)> = Vec::new();
+    for (i, e) in sh.edges().iter().enumerate() {
+        let fs = &ef[i];
+        if fs.len() == 2 && ((strip(fs[0] as usize) && chamfer(fs[1] as usize)) || (strip(fs[1] as usize) && chamfer(fs[0] as usize))) {
+            let x = e.edge_info().unwrap();
+            for k in 0..=400 {
+                let p = e.point_at(x.first_param + (x.last_param - x.first_param) * k as f64 / 400.0).unwrap();
+                at.push((p.x / mm(1.0), -p.y / mm(1.0)));
+            }
+        }
+    }
+    for (x, live) in [(-7.8078, 0.01105), (-28.9001, 0.02745), (-49.9924, 0.04385), (-76.3178, 0.05501), (-101.3669, 0.04988)] {
+        let w = at.iter().min_by(|a, b| (a.0 - x).abs().total_cmp(&(b.0 - x).abs())).map(|p| p.1).unwrap();
+        assert!((w - live).abs() < 0.002, "strip at x {x}: {w} mm (live {live})");
+    }
+}

@@ -692,6 +692,7 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
             cliff: false,
             sides: Some(super::blend_section::Sides { side1: a.clone(), ratio, hold: Vec::new() }),
             overflow: false,
+            reference: None,
         };
         let blend_failed = |e: crate::regen::eval::FeatureError| if e.message == "Failed to fillet selections." { fe("Failed to blend faces.") } else { e };
         if edges.is_empty() {

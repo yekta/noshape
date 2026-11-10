@@ -52,6 +52,29 @@ pub struct BlendSpec {
     /// Allow edge overflow on a concave line: past a free end the round runs on and the faces it meets there,
     /// extended, trim it (live c2-hunting-knife's Fillet 2: the round crosses the grind face to the blade's side).
     pub overflow: bool,
+    /// A chamfer OCCT can't build, as sections: `r1` on these faces, `r2` on the others or, with an angle, the chamfer
+    /// at that angle to the `r1` face (its other distance from the angle between the faces at each section).
+    pub reference: Option<ChamferRef>,
+}
+
+/// See [`BlendSpec::reference`].
+#[derive(Clone, Debug)]
+pub struct ChamferRef {
+    pub faces: Vec<usize>,
+    pub angle: Option<f64>,
+    /// The section's constant offsets from the reference face and from the other (live 2441 / 2462: a chamfer is the
+    /// chord between the feet of a point at fixed offsets from both faces, sized so its distances (and angle) are the
+    /// asked ones at the middle of the chain's longest edge): set by [`section_blend`].
+    pub offsets: Option<(f64, f64)>,
+}
+
+/// The offsets from the reference face and the other whose feet lie `d` and `e` from the edge, faces at cos `c`.
+fn feet_offsets(d: f64, e: f64, c: f64) -> FResult<(f64, f64)> {
+    let s = (1.0 - c * c).sqrt();
+    if s < 1e-9 {
+        return Err(fail("the faces at the edge are tangent"));
+    }
+    Ok(((e - d * c) / s, (d - e * c) / s))
 }
 
 /// Face blend sizes (live psb 10-26 b, L brackets at 60°, 90° and 135°): the
@@ -251,6 +274,29 @@ fn frame_at(body: &Shape, faces: [&Shape; 2], p: DVec3, tangent: DVec3, scale: f
 /// says which face is side 1 of a face blend.
 fn setbacks(f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> FResult<(f64, f64)> {
     let half = f.m[0].dot(f.m[1]).clamp(-1.0, 1.0).acos() / 2.0;
+    if let Some(r) = spec.reference.as_ref().filter(|_| spec.section == Section::Chamfer) {
+        if let Some((o_ref, o_other)) = r.offsets {
+            let c = f.u[0].dot(f.u[1]).clamp(-1.0, 1.0);
+            let sn = (1.0 - c * c).sqrt();
+            if sn < 1e-9 {
+                return Err(fail("the faces at the edge are tangent"));
+            }
+            let (on_ref, on_other) = ((o_other + o_ref * c) / sn, (o_ref + o_other * c) / sn);
+            return Ok(if first_is_side1 { (on_ref, on_other) } else { (on_other, on_ref) });
+        }
+        let other = match r.angle {
+            // The triangle edge - r1 point - chamfer's far end: its angle at the edge is the faces' angle.
+            Some(a) => {
+                let between = f.u[0].dot(f.u[1]).clamp(-1.0, 1.0).acos();
+                if a + between >= std::f64::consts::PI - 1e-9 {
+                    return Err(fail("the chamfer's angle doesn't meet the other face"));
+                }
+                spec.r1 * a.sin() / (a + between).sin()
+            }
+            None => spec.r2,
+        };
+        return Ok(if first_is_side1 { (spec.r1, other) } else { (other, spec.r1) });
+    }
     let Some(sides) = &spec.sides else {
         return Ok(match spec.width {
             // A chamfer's distances lie along the faces.
@@ -331,6 +377,8 @@ fn section_face(p: DVec3, f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> 
         Section::Chamfer => k::make_line(t1, t2)?,
         Section::Curvature(m) => curvature_profile(p, t1, t2, m)?,
     };
+    // (A chamfer as sections: its corner out in the air, so the tool's sides needn't lie on free-form faces.)
+    let p = if spec.reference.is_some() && convex { p - (f.m[0] + f.m[1]).normalize() * s1.max(s2) } else { p };
     let edges = [k::make_line(p, t1)?, curve, k::make_line(t2, p)?];
     let wire = k::make_wire(&edges)?;
     let face = k::make_face_from_wire(&wire, true)?;
@@ -588,6 +636,20 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         return Err(fail("empty partial range"));
     }
     // Stations along the chain: the point, its frame, whether its first face is side 1, the chain's tangent.
+    // A chamfer as sections: each edge's frame oriented once, at its middle (classifying points at every section took
+    // half its time); the sections only follow the faces' normals.
+    let edge_frames: Vec<Option<Frame>> = match spec.reference {
+        Some(_) => chain
+            .iter()
+            .map(|c| {
+                let info = c.shape.edge_info().ok()?;
+                let m = 0.5 * (info.first_param + info.last_param);
+                let fs = ef.get(c.index).filter(|f| f.len() == 2)?;
+                frame_at(shape, [&faces[fs[0] as usize], &faces[fs[1] as usize]], c.shape.point_at(m).ok()?, c.shape.tangent_at(m).ok()?.normalize(), scale).ok()
+            })
+            .collect(),
+        None => Vec::new(),
+    };
     let station = |s: f64| -> FResult<(DVec3, Frame, bool, DVec3)> {
         let mut acc = 0.0;
         let last = chain.len() - 1;
@@ -602,9 +664,25 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                     return Err(fail("the edge doesn't have two faces"));
                 }
                 let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
-                let side1_first = spec.sides.as_ref().is_none_or(|sd| sd.side1.contains(&(fs[0] as usize)));
+                let side1_first = match &spec.reference {
+                    Some(r) => r.faces.contains(&(fs[0] as usize)),
+                    None => spec.sides.as_ref().is_none_or(|sd| sd.side1.contains(&(fs[0] as usize))),
+                };
                 let tangent = c.shape.tangent_at(t)?.normalize();
-                let fr = match frame_at(shape, ff, p, tangent, scale) {
+                let oriented = match edge_frames.get(i).and_then(|f| f.as_ref()) {
+                    Some(rf) => {
+                        let mut fr = Frame { u: rf.u, m: rf.m, extent: rf.extent };
+                        for (k, face) in ff.iter().enumerate() {
+                            let n = if face.is_planar() { rf.m[k] } else { face.normal_at_point(p)?.normalize() };
+                            let dir = n.cross(tangent).normalize();
+                            fr.u[k] = if dir.dot(rf.u[k]) < 0.0 { -dir } else { dir };
+                            fr.m[k] = if n.dot(rf.m[k]) < 0.0 { -n } else { n };
+                        }
+                        Some(fr)
+                    }
+                    None => None,
+                };
+                let fr = match oriented.map_or_else(|| frame_at(shape, ff, p, tangent, scale), Ok) {
                     Ok(fr) => fr,
                     // At a free end (a part's corner) the probes fall on the end face: orient from just inside.
                     Err(_) => {
@@ -620,11 +698,57 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                         fr
                     }
                 };
+                // A chamfer as sections measures along the faces' sections, not their tangents (a hollow grind): each
+                // face's direction is the chord to its point at the first distance.
+                let mut fr = fr;
+                if spec.reference.is_some() {
+                    for (i, face) in ff.iter().enumerate().filter(|(_, f)| !f.is_planar()) {
+                        let mut a = p + fr.u[i] * spec.r1;
+                        for _ in 0..2 {
+                            let v = face.project_point(a)?.point - p;
+                            let v = v - tangent * v.dot(tangent);
+                            a = p + v.normalize() * spec.r1;
+                        }
+                        fr.u[i] = (a - p).normalize();
+                    }
+                }
                 return Ok((p, fr, side1_first, tangent));
             }
             acc += c.length;
         }
         Err(fail("empty chain"))
+    };
+    // A chamfer as sections: its offsets from the asked distances at one place, the same all along.
+    let sized;
+    let spec = match spec.reference.as_ref().filter(|r| r.offsets.is_none() && spec.section == Section::Chamfer) {
+        Some(r) => {
+            // (The middle of the chain's longest edge: c2-hunting-knife's Chamfer 1, live 2462.)
+            let (mut acc, mut mid, mut longest) = (0.0f64, (lo + hi) / 2.0, 0.0f64);
+            for c in &chain {
+                if c.length > longest {
+                    (mid, longest) = ((acc + c.length / 2.0).clamp(lo, hi), c.length);
+                }
+                acc += c.length;
+            }
+            // (Only where the faces' angle varies along the chain: elsewhere the offsets are OCCT's distances, and a
+            // chamfer OCCT can't build stays failed: c2-rings-loft's pattern of Chamfer 2.)
+            let mut spread = (f64::INFINITY, f64::NEG_INFINITY);
+            for k in 0..=8 {
+                let (_, fr, _, _) = station(lo + (hi - lo) * k as f64 / 8.0)?;
+                let a = fr.u[0].dot(fr.u[1]).clamp(-1.0, 1.0).acos();
+                spread = (spread.0.min(a), spread.1.max(a));
+            }
+            if spread.1 - spread.0 < 1e-3 {
+                return Err(fail("the faces' angle is the same all along"));
+            }
+            let (_, fr, ref_first, _) = station(mid)?;
+            let (d, e) = setbacks(&fr, spec, ref_first)?;
+            let (d, e) = if ref_first { (d, e) } else { (e, d) };
+            let offsets = feet_offsets(d, e, fr.u[0].dot(fr.u[1]).clamp(-1.0, 1.0))?;
+            sized = BlendSpec { reference: Some(ChamferRef { offsets: Some(offsets), ..r.clone() }), ..spec.clone() };
+            &sized
+        }
+        None => spec,
     };
     let ranges = hold_ranges(spec, lo, hi, scale, &station)?;
     let partial = spec.partial.is_some() || ranges.len() > 1;
@@ -638,43 +762,86 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
     if general || held {
         const N: usize = 64;
         let closed = (chain[0].start - chain[chain.len() - 1].end).length() < 1e-9 && lo <= 1e-12 && hi >= total - 1e-12;
-        let mut secs = Vec::new();
-        let mut starts = Vec::new();
-        let mut convex = false;
-        let count = if closed { N } else { N + 1 };
-        for k in 0..count {
-            // A closed loft starts a quarter of the way round: its own seam
-            // on the edge's (the periodic faces' seam) made OCCT's boolean
-            // with an elliptic boss's whole side come back empty.
-            let f = if closed { (k as f64 / N as f64 + 0.25).fract() } else { k as f64 / N as f64 };
-            let (p, fr, side1_first, tangent) = station(lo + (hi - lo) * f)?;
-            let here = match held {
-                true => held_spec(spec, p, tangent, &fr, scale)?,
-                false => spec.clone(),
+        // A chamfer as sections: one loft (one face) per edge, as live's; others one along the chain.
+        let mut pieces = vec![(lo, hi, 0)];
+        if spec.reference.is_some() && !closed && chain.len() > 1 {
+            pieces.clear();
+            let mut acc = 0.0f64;
+            for (ci, c) in chain.iter().enumerate() {
+                let (a, b) = (acc.max(lo), (acc + c.length).min(hi));
+                acc += c.length;
+                if b > a {
+                    pieces.push((a, b, ci));
+                }
+            }
+        }
+        let last_piece = pieces.len() - 1;
+        for (pi, &(plo, phi, ci)) in pieces.iter().enumerate() {
+            // (A chamfer as sections: a ruled face, fewer sections; its cut took most of its time.)
+            let total_n = if spec.reference.is_some() { 24 } else { N };
+            let n = if pieces.len() > 1 { ((total_n as f64 * (phi - plo) / (hi - lo)).ceil() as usize).max(6) } else { total_n };
+            // (Stations a hair inside a piece: one at its end vertex belongs to its own edge.)
+            let nudge = if pieces.len() > 1 { 1e-9 * total } else { 0.0 };
+            let mut secs = Vec::new();
+            let mut starts = Vec::new();
+            let mut convex = false;
+            let count = if closed { n } else { n + 1 };
+            for k in 0..count {
+                // A closed loft starts a quarter of the way round: its own seam
+                // on the edge's (the periodic faces' seam) made OCCT's boolean
+                // with an elliptic boss's whole side come back empty.
+                let f = if closed { (k as f64 / n as f64 + 0.25).fract() } else { k as f64 / n as f64 };
+                let (p, fr, side1_first, tangent) = station((plo + (phi - plo) * f).clamp(plo + nudge, phi - nudge))?;
+                let here = match held {
+                    true => held_spec(spec, p, tangent, &fr, scale)?,
+                    false => spec.clone(),
+                };
+                let (face, e3, cv) = section_face(p, &fr, &here, side1_first)?;
+                convex = cv;
+                // (Its corner: the edge's point, or out in the air for a chamfer as sections.)
+                let corner = e3[0].edge_info()?.start;
+                // A chamfer as sections runs straight on past a free end of its chain until it is off the part.
+                let run_on = if spec.reference.is_some() && !closed && convex && ((k == 0 && pi == 0) || (k == n && pi == last_piece)) {
+                    let out = if k == 0 { -tangent } else { tangent };
+                    let e = 2.0 * spec.r1.max(spec.r2);
+                    let probe = p + out * e + (fr.u[0] + fr.u[1]) * (0.1 * e);
+                    (!tangent_continues(shape, p, out, usize::MAX) && shape.classify_point(probe, scale * 1e-9)? == k::PointClass::Outside).then_some(out * e)
+                } else {
+                    None
+                };
+                let past = match run_on {
+                    Some(v) => Some((section_face(p + v, &fr, &here, side1_first)?.0, corner + v)),
+                    None => None,
+                };
+                if k == 0 && let Some((f, q)) = &past {
+                    secs.push(f.clone());
+                    starts.push(*q);
+                }
+                secs.push(face);
+                starts.push(corner);
+                if k != 0 && let Some((f, q)) = past {
+                    secs.push(f);
+                    starts.push(q);
+                }
+            }
+            // Every section starts at its corner: a curvature section's B-spline wires twisted otherwise.
+            let tool = k::loft(&secs, &k::LoftOptions { solid: true, closed, start_points: Some(starts), ..Default::default() })?;
+            if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+                eprintln!("section blend: loft of {} sections (closed {closed}, chain {} edges): valid {} volume {:?} faces {}", secs.len(), chain.len(), tool.shape.is_valid(), tool.shape.volume(), tool.shape.count(ShapeType::Face));
+            }
+            // The face touching neither support is the blend face.
+            let ename = body.edges[chain[ci].index].clone();
+            let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
+            let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
+            let supports: Vec<&Shape> = chain.iter().flat_map(|c| ef.get(c.index).cloned().unwrap_or_default()).map(|f| &faces[f as usize]).collect();
+            let on = |f: &Shape, s: &Shape| -> bool {
+                let Some(q) = super::helpers_a::point_on_face(f) else { return false };
+                s.contains_point(q, scale * 1e-6).unwrap_or(false)
             };
-            let (face, _, cv) = section_face(p, &fr, &here, side1_first)?;
-            convex = cv;
-            secs.push(face);
-            starts.push(p);
+            let names: Vec<Name> = tool.shape.faces().iter().map(|f| if (f.is_planar() && secs.iter().any(|s| on(f, s))) || supports.iter().any(|s| on(f, s)) { generated.clone() } else { blend.clone() }).collect();
+            let named = NamedShape::new(tool.shape, names);
+            if convex { cuts.push(named) } else { adds.push(named) }
         }
-        // Every section starts at its edge point (its corner on the edge):
-        // a curvature section's B-spline wires twisted otherwise.
-        let tool = k::loft(&secs, &k::LoftOptions { solid: true, closed, start_points: Some(starts), ..Default::default() })?;
-        if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
-            eprintln!("section blend: loft of {} sections (closed {closed}, chain {} edges): valid {} volume {:?} faces {}", secs.len(), chain.len(), tool.shape.is_valid(), tool.shape.volume(), tool.shape.count(ShapeType::Face));
-        }
-        // The face touching neither support is the blend face.
-        let ename = body.edges[chain[0].index].clone();
-        let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
-        let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
-        let supports: Vec<&Shape> = chain.iter().flat_map(|c| ef.get(c.index).cloned().unwrap_or_default()).map(|f| &faces[f as usize]).collect();
-        let on = |f: &Shape, s: &Shape| -> bool {
-            let Some(q) = super::helpers_a::point_on_face(f) else { return false };
-            s.contains_point(q, scale * 1e-6).unwrap_or(false)
-        };
-        let names: Vec<Name> = tool.shape.faces().iter().map(|f| if (f.is_planar() && secs.iter().any(|s| on(f, s))) || supports.iter().any(|s| on(f, s)) { generated.clone() } else { blend.clone() }).collect();
-        let named = NamedShape::new(tool.shape, names);
-        if convex { cuts.push(named) } else { adds.push(named) }
     }
     let mut at = 0.0;
     for (ci, c) in chain.iter().enumerate().filter(|_| !general && !held) {
@@ -688,7 +855,10 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
             return Err(fail("the edge doesn't have two faces"));
         }
         let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
-        let side1_first = spec.sides.as_ref().is_none_or(|sd| sd.side1.contains(&(fs[0] as usize)));
+        let side1_first = match &spec.reference {
+            Some(r) => r.faces.contains(&(fs[0] as usize)),
+            None => spec.sides.as_ref().is_none_or(|sd| sd.side1.contains(&(fs[0] as usize))),
+        };
         let info = c.shape.edge_info()?;
         let ename = body.edges[c.index].clone();
         let r_ext = 2.0 * spec.r1.max(spec.r2).max(spec.width.unwrap_or(0.0));

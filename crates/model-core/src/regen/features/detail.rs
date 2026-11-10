@@ -338,7 +338,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             } else {
                 Section::Conic(ev.real("rho")?)
             };
-            Some(BlendSpec { section, r1, r2, width: width.then_some(radius * std::f64::consts::SQRT_2), partial, run_on: !ev.bool("tangentPropagation"), cliff: false, sides: None, overflow: false })
+            Some(BlendSpec { section, r1, r2, width: width.then_some(radius * std::f64::consts::SQRT_2), partial, run_on: !ev.bool("tangentPropagation"), cliff: false, sides: None, overflow: false, reference: None })
         } else {
             None
         }
@@ -364,7 +364,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         if width && !single_chain(&body.shape, &chain) {
             return err("Edges must form single chain per part.");
         }
-        let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true, cliff: false, sides: None, overflow: false };
+        let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true, cliff: false, sides: None, overflow: false, reference: None };
         if stops && curved_edge_left_open(&body.shape, &chain) {
             return err("Adjoining edge not filleted.");
         }
@@ -854,7 +854,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
             _ => None,
         };
         if let Some((r1, r2)) = distances {
-            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1, r2, width: None, partial: None, run_on: true, cliff: false, sides: None, overflow: false };
+            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1, r2, width: None, partial: None, run_on: true, cliff: false, sides: None, overflow: false, reference: None };
             super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(|e| blend_failed("Failed to chamfer selections.", e.message))?;
             continue;
         }
@@ -874,7 +874,26 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         {
             continue;
         }
-        let res = k::chamfer_checked(&body.shape, &shapes, spec, &reference).map_err(chamfer_failed)?;
+        let res = match k::chamfer_checked(&body.shape, &shapes, spec, &reference) {
+            Ok(r) => r,
+            // OCCT can't build it (c2-hunting-knife's Chamfer 1: an offset and angle along a blade's B-spline grind
+            // face): as sections along the edges, each from its reference face.
+            Err(e) => {
+                use super::blend_section::{BlendSpec, ChamferRef, Section};
+                let faces = body.shape.faces();
+                let refs: Vec<usize> = reference.iter().filter_map(|r| faces.iter().position(|f| f.is_same(r))).collect();
+                let (r1, r2, angle) = match spec {
+                    k::ChamferSpec::Equal(d) => (d, d, None),
+                    k::ChamferSpec::TwoDistances(a, b) => (a, b, None),
+                    k::ChamferSpec::DistanceAngle(d, a) => (d, d, Some(a)),
+                };
+                let sections = BlendSpec { section: Section::Chamfer, r1, r2, width: None, partial: None, run_on: true, cliff: false, sides: None, overflow: false, reference: Some(ChamferRef { faces: refs, angle, offsets: None }) };
+                if super::blend_section::section_blend(ev, bi, &edges, &sections).is_ok() {
+                    continue;
+                }
+                return Err(chamfer_failed(e));
+            }
+        };
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
         let (shape, face_names) = match joined_edges(&res) {
