@@ -2360,7 +2360,8 @@ Meridian meridian_of(const Revolved& x, const gp_Ax1& ax)
   return Meridian{Meridian::Round, height(t->Location()), 0, 0, t->MajorRadius(), t->MinorRadius()};
 }
 
-// Where two meridians meet in the half-plane: (r, z) with r > 0; none where they touch or are one (OCCT's then).
+// Where two meridians meet in the half-plane: (r, z) with r > 0, one where they touch; none where they are one (OCCT's
+// then).
 std::optional<std::vector<std::pair<double, double>>> meridians_meet(const Meridian& p, const Meridian& q, double tol)
 {
   std::vector<std::pair<double, double>> out;
@@ -2396,13 +2397,16 @@ std::optional<std::vector<std::pair<double, double>>> meridians_meet(const Merid
     const double   b = w.Dot(gp_Vec2d(d)), cc = w.SquareMagnitude() - c.m * c.m, disc = b * b - cc;
     if (disc < -2 * tol * c.m)
       return out;
+    // (Tangent: the one circle they touch along, where OCCT's marching took seconds and broke it into pieces (a
+    // user's 0.4 mm rib rounds inside their cylinder: 4.9 s a pair on Windows, as OCCT's own one curve on Linux).)
     if (disc <= 2 * tol * c.m)
-      return std::nullopt; // (tangent)
-    for (const double sg : {-1.0, 1.0})
-    {
-      const double t = -b + sg * std::sqrt(disc);
-      out.emplace_back(a.X() + t * d.X(), a.Y() + t * d.Y());
-    }
+      out.emplace_back(a.X() - b * d.X(), a.Y() - b * d.Y());
+    else
+      for (const double sg : {-1.0, 1.0})
+      {
+        const double t = -b + sg * std::sqrt(disc);
+        out.emplace_back(a.X() + t * d.X(), a.Y() + t * d.Y());
+      }
   }
   else
   {
@@ -2416,9 +2420,10 @@ std::optional<std::vector<std::pair<double, double>>> meridians_meet(const Merid
     const gp_Vec2d u = gp_Vec2d(a, b) / dd, n(-u.Y(), u.X());
     const gp_Pnt2d mid(a.X() + u.X() * x, a.Y() + u.Y() * x);
     if (y2 <= 2 * tol * std::max(p.m, q.m))
-      return std::nullopt; // (tangent)
-    for (const double sg : {-1.0, 1.0})
-      out.emplace_back(mid.X() + n.X() * sg * std::sqrt(y2), mid.Y() + n.Y() * sg * std::sqrt(y2));
+      out.push_back({mid.X(), mid.Y()}); // (tangent: the one circle, as above)
+    else
+      for (const double sg : {-1.0, 1.0})
+        out.emplace_back(mid.X() + n.X() * sg * std::sqrt(y2), mid.Y() + n.Y() * sg * std::sqrt(y2));
   }
   std::vector<std::pair<double, double>> pos;
   for (const auto& rz : out)
