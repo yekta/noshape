@@ -200,16 +200,31 @@ pub fn rename_in_expr(text: &str, old: &str, new: &str) -> String {
     out
 }
 
-/// `#old` → `#new` in every expression of a Part Studio: feature parameters, suppression expressions, configured
-/// values.
-pub fn rename_refs(ps: &mut PartStudio, old: &str, new: &str) {
-    let fix = |v: &mut ParamValue| {
-        if let ParamValue::Expr(e) = v
-            && e.text.contains(&format!("#{old}"))
-        {
+/// `#old` → `#new` in one parameter value: an expression, every item of an array parameter, a sketch's dimensions.
+fn rename_in_param(v: &mut ParamValue, old: &str, new: &str) {
+    let fix = |e: &mut ExprValue| {
+        if e.text.contains(&format!("#{old}")) {
             *e = ExprValue::new(rename_in_expr(&e.text, old, new));
         }
     };
+    match v {
+        ParamValue::Expr(e) => fix(e),
+        ParamValue::Array(items) => {
+            for item in items {
+                for v in item.0.values_mut() {
+                    rename_in_param(v, old, new);
+                }
+            }
+        }
+        ParamValue::Sketch(data) => data.dimension_exprs.values_mut().for_each(fix),
+        _ => {}
+    }
+}
+
+/// `#old` → `#new` in every expression of a Part Studio: feature parameters (array items and sketch dimensions
+/// included), suppression expressions, configured values.
+pub fn rename_refs(ps: &mut PartStudio, old: &str, new: &str) {
+    let fix = |v: &mut ParamValue| rename_in_param(v, old, new);
     for f in &mut ps.features {
         for v in f.params.0.values_mut() {
             fix(v);
@@ -430,6 +445,28 @@ mod tests {
         assert_eq!(rows(&ps)[1].kind, "MEASURED");
         set_kind(&mut ps, a, "NUMBER", &mm());
         assert_eq!((rows(&ps)[1].kind.as_str(), rows(&ps)[1].value.as_str()), ("NUMBER", "5"));
+    }
+
+    /// A user's agent, 11-10: renaming a variable left the sketch dimensions using it "undefined"; array items too.
+    #[test]
+    fn rename_reaches_sketch_dimensions_and_array_items() {
+        let mut ps = studio();
+        let a = create(&mut ps, "w", "LENGTH", "1 mm", "", None, &mm()).unwrap();
+        let mut data = crate::sketch_feature::SketchData::default();
+        data.dimension_exprs.insert(7, ExprValue::new("#w * 2"));
+        let mut item = crate::params::ParamValues::default();
+        item.set("count", ParamValue::Expr(ExprValue::new("#w / 1 mm")));
+        let mut params = crate::params::ParamValues::default();
+        params.set("sketch", ParamValue::Sketch(Box::new(data)));
+        params.set("instances", ParamValue::Array(vec![item]));
+        let id = FeatureId::new_random();
+        ps.features.push(crate::partstudio::Feature { id, type_id: "newSketch".into(), name: "Sketch 1".into(), suppressed: false, params, folder: None, custom_name: false, hidden: false, suppression_expr: None, sub_features: Vec::new() });
+        rename(&mut ps, a, "width").unwrap();
+        let f = ps.feature(id).unwrap();
+        let Some(ParamValue::Sketch(d)) = f.params.get("sketch") else { panic!("sketch") };
+        assert_eq!(d.dimension_exprs[&7].text, "#width * 2");
+        let Some(ParamValue::Array(items)) = f.params.get("instances") else { panic!("array") };
+        assert_eq!(items[0].expr("count").unwrap().text, "#width / 1 mm");
     }
 
     #[test]
