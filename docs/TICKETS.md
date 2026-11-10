@@ -345,6 +345,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the re-cut of the 2026-11-10 17:00 release (qa list 20:31, checked on watcher green 44e52dafb, 20:03; v0.4.42 from 8d135b0f was cancelled by the lead; the latest release is v0.4.41)
+- **qa 20:31: no blocker on 44e52dafb.** The regression window (main from ~17:30 to bool's 44e52dafb: the OCCT 0028 hook
+  answering plane-against-extrusion pairs, cf-spur-gear 6 of 14 features off) is closed there:
+  - Model suite, full corpus (vibe4, debug as the suite): 77/87 documents, 820/947 features. Per document against the 15:02
+    run on e3a19f63 (before the window): none worse; c2-fan-blade-sweep 41 -> 42, c2-hex-bookcase-derived 15 -> 17/17. The gear
+    documents are at baseline: cf-spur-gear 14/14, cf-part-draft 13/13 (its spur gear), cf-planetary-gears 1/1,
+    cf-drive-train-generator 2/2.
+  - Sweeps on vibe3 (volume sweep 20, cf corpus 13, the 48 ticket documents) = 8038dc03b exactly. They also matched on window
+    green 2f9b1f529, so they don't cover this regression; the model suite does.
+  - Fuzz: v0.4.41 release CLI seeds 9001–9120 ended cleanly (0 deaths); GUI fuzz no new deaths.
+  - Three platforms: the last CI (18:22, 03cc38559) was green but is inside the window; 44e52dafb only changes
+    crates/kernel/cpp/rust_boolean.cpp. The next scheduled CI (21:17) runs on the last green.
+- Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 HAND-DRILL-MATES-OVERDEFINED (parity suite only),
+  P1 T2-ASM-STANDARD-CONTENT-HANG (a T2 bench). Long-running P0s: BLEND-RUST, SHELL-SLOW, REGEN-SPEED.
+
 ## Release blockers for the 2026-11-10 17:00 release (qa list 07:15, checked on green 4f5863a2 = v0.4.41's cut, the newest 3-platform green, CI 42768928011; the latest release is v0.4.41, cut 07:00 without a qa list)
 - **qa 07:15: no blocker.** v0.4.40 = v0.4.39 + the lead's icon fix (23afb1a2e) only. v0.4.41 = 4f5863a26, 56 commits past
   v0.4.39's cut. Its sweeps on vibe3 (volume sweep 20, cf corpus 13, the 48 ticket documents) = green 4e549553 exactly. GUI
