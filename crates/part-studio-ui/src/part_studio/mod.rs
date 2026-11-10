@@ -5320,6 +5320,13 @@ impl PartStudioView {
     /// tools' crosshair (the pattern tools keep the arrow), else none (the
     /// selection cursor shows).
     /// The number on the selection-count cursor (also shown over the navbar).
+    /// Another tab's Switch to Part Studio on one of this studio's parts (an assembly instance): that part selected.
+    pub fn select_part(&mut self, body: noshape_model::reference::BodyId, cx: &mut Context<Self>) {
+        self.selection = vec![Reference::Body(body)];
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
     pub fn selection_cursor_count(&self, cx: &App) -> usize {
         self.viewport.read(cx).selection_count
     }

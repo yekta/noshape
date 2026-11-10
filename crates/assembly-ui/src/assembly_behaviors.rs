@@ -1113,7 +1113,7 @@ impl AssemblyView {
         let mut m: Vec<MenuEntry> = Vec::new();
         // Properties (list only): the part's metadata and the instance's own.
         if !graphics && !multi {
-            if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Standard { .. }) {
+            if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Standard { .. } | InstanceSource::External { body: Some(_), .. }) {
                 m.push(item("Properties…", move |t, w, cx| t.open_instance_metadata(top, w, cx)));
             }
             m.push(item("Instance properties…", move |t, w, cx| t.open_instance_properties(top, w, cx)));
@@ -1274,16 +1274,24 @@ impl AssemblyView {
         if let Some(tab) = switch_tab.filter(|_| !multi)
             && let Some(tname) = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone())
         {
-            edit.push(icon_item(format!("Switch to {tname}"), if is_asm { "assembly" } else { "part-studio" }, move |_, _, cx| cx.emit(AssemblyViewEvent::ActivateTab(tab))));
+            let part = match &inst.source {
+                InstanceSource::Part { body, .. } => Some(body.clone()),
+                _ => None,
+            };
+            edit.push(icon_item(format!("Switch to {tname}"), if is_asm { "assembly" } else { "part-studio" }, move |_, _, cx| match &part {
+                Some(body) => cx.emit(AssemblyViewEvent::ShowPart(tab, body.clone())),
+                None => cx.emit(AssemblyViewEvent::ActivateTab(tab)),
+            }));
         }
-        // From another document: "Open linked document" in that slot (bundle
-        // `switchToImageOwner`), opening the referenced version.
+        // From another document: "Open linked document" (bundle `switchToImageOwner`), opening the referenced version;
+        // live (asm-menu-open-linked-document) lists it after the version row.
+        let mut open_linked = None;
         if !multi
             && let Some(key) = inst.source.external_key().map(|k| k.to_string())
             && let Some(r) = crate::derived::ExternalRef::parse(&key)
         {
             let gpu = self.gpu.clone();
-            edit.push(item("Open linked document", move |_, _, cx| {
+            open_linked = Some(item("Open linked document", move |_, _, cx| {
                 use noshape_model::assembly::eval::ExternalStudios as _;
                 // The referenced version, on the referenced tab.
                 let Ok(handle) = crate::assembly_hooks::open_version_window(r.path.clone(), r.microversion, gpu.clone(), cx) else { return };
@@ -1350,8 +1358,12 @@ impl AssemblyView {
         // (A subassembly of this document too: live asm-menu-dissolve-subassembly.)
         if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Assembly { .. } | InstanceSource::External { .. }) {
             let tg = targets.clone();
-            m.push(icon_item("Change to version…", "change-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
+            // Another document's with a newer version: "Update linked document…" (live asm-menu-open-linked-document).
+            let newer = inst.source.external_key().is_some_and(|k| self.ext_updates.get(k).is_some_and(|v| v.is_some()));
+            let label = if newer { "Update linked document…" } else { "Change to version…" };
+            m.push(icon_item(label, "change-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
         }
+        m.extend(open_linked);
         // Live (asm-instance-suppress-unsuppress): no Export… or Zoom to selection on a suppressed instance.
         if !suppressed {
             m.push(export);
@@ -2437,7 +2449,14 @@ impl AssemblyView {
         if let Some(tab) = tab {
             let tname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
             let is_asm = matches!(inst.source, InstanceSource::Assembly { .. });
-            m.push(icon_item(format!("Switch to {tname}"), if is_asm { "assembly" } else { "part-studio" }, move |_, _, cx| cx.emit(AssemblyViewEvent::ActivateTab(tab))));
+            let part = match &inst.source {
+                InstanceSource::Part { body, .. } => Some(body.clone()),
+                _ => None,
+            };
+            m.push(icon_item(format!("Switch to {tname}"), if is_asm { "assembly" } else { "part-studio" }, move |_, _, cx| match &part {
+                Some(body) => cx.emit(AssemblyViewEvent::ShowPart(tab, body.clone())),
+                None => cx.emit(AssemblyViewEvent::ActivateTab(tab)),
+            }));
         }
         m.push(MenuEntry::Sep);
         let p = path.clone();

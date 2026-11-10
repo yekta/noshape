@@ -641,6 +641,8 @@ impl Render for MetaForm {
                 label("Description", false),
                 if self.configured.contains(&"Description") {
                     configured_box("Description", self.description.read(cx).value().to_string())
+                } else if self.read_only.contains(&"Description") {
+                    gray_box(self.description.read(cx).value().to_string(), false).h(px(56.)).into_any_element()
                 } else {
                     Textarea::new(&self.description).h(px(56.)).text_size(px(14.)).into_any_element()
                 },
@@ -1037,15 +1039,21 @@ pub fn open_part_properties_configured(spec: MetaSpec, reset_to: Option<MetaValu
 /// 10-20); the first editable field has the focus.
 pub fn open_properties_read_only(spec: MetaSpec, read_only: Vec<&'static str>, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
     let on_save: SaveFn = Rc::new(on_save);
-    let name_locked = read_only.contains(&"Name");
+    let (name_locked, number_locked) = (read_only.contains(&"Name"), read_only.contains(&"Part number"));
     let form = cx.new(|cx| {
         let mut f = MetaForm::new(spec, on_save, window, cx);
         f.read_only = read_only;
         f
     });
-    let first = if name_locked { form.read(cx).part_number.clone() } else { form.read(cx).name.clone() };
+    let first = match (name_locked, number_locked) {
+        (false, _) => Some(form.read(cx).name.clone()),
+        (true, false) => Some(form.read(cx).part_number.clone()),
+        (true, true) => None,
+    };
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
-    first.update(cx, |s, cx| s.focus(window, cx));
+    if let Some(f) = first {
+        f.update(cx, |s, cx| s.focus(window, cx));
+    }
 }
 
 /// Instance properties…: a 600 px modal with the instance's name and its
