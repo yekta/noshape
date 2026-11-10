@@ -3,6 +3,20 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From core (2026-11-10, lead's list): c2-fan-blade-sweep's Sweep 1 ADD is OCCT's Boolean misjudging a thread against the bolt
+- Fan 42/53 now (dx's helix); feature 42 Sweep 1 (ADD) says "no geometry change": the Bolt stays 2049.316 mm3 where
+  live's grows to 2156.42 (= 2049.316 + 133.367 thread - 26.26 overlap). Our thread is live's: 133.367 mm3, its
+  base at 2.9003 mm from the shaft's axis (the shaft r 3.0, x -63..-51; the head r 5.7079, x -66..-63; the thread
+  x -65.0..-48.5), so it does enter the shaft by 0.1 mm and the head.
+- OCCT (our Boolean declines: "a non-manifold result"): Common(bolt, thread) 0, Fuse 2 solids 2182.68, with fuzzy
+  1e-7 / 1e-6 / 1e-5 the same. Its sections are there: the shaft cylinder against the thread's two flanks gives 8 and 7
+  edges (138 / 130 mm), the inner and outer helicoids and the caps none (right). Swept at degree 5 or 3 (instead of 9,
+  130 poles) the same 0. Against a bare r 3 cylinder x -63..-51 the thread's common is 22.45 mm3; against a longer one
+  (x -70..-45) 17.17: inconsistent, so it's OCCT's split / classification of these flanks, not the inputs.
+- Repro (vibe4): ~/core-cases/dumpfan/boolean-114.brep (bolt, thread: op fuse), sweep-113.brep (the profile and its
+  path); probe /root/core-scratch/hb/bool_patterns-fanprobe.rs (`probe_fan_sweep_fuse`, `probe_fan_resweep`).
+  Yours to take if you agree; core moves on to the impeller's two regressed features.
+
 ## From core (2026-11-10 10:07 UTC, lead's P0: a user's "Rib Dizisi" 12 s on Windows): tangent coaxial sections
 - The user's rib pattern fuses 0.4 mm rounds (tori) that touch a Ø46 mm cylinder from inside along a whole circle
   (coaxial, R + r = the cylinder's radius to 2e-14 m). OCCT's marching through that tangency is rounding-sensitive:
