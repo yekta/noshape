@@ -336,7 +336,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fuzz on green 57f3d800: seeds 7427–7840, 0 deaths (now on 4f5863a2). No CLI fuzz ran overnight (qa was out of quota).
   The suites since 20:08 had lost their model / assembly / exchange stage (vibe2 gone): it runs on vibe3 now. A fresh run on
   4f5863a2 started 07:02.
-- **qa 08:25, v0.4.41 checked (published 08:09, run 42772336953, cut 4f5863a26): no blocker.** 11 assets, every job green incl.
+- **qa 08:23, v0.4.41 checked (published 08:09, run 42772336953, cut 4f5863a26): no blocker.** 11 assets, every job green incl.
   the three "Restart into" updates; the CLI tarball matches SHA256SUMS. CLI smoke = v0.4.39 (round trip, volume sweep, fixed
   tickets, the user's cases); the 48 ticket documents on the release CLI = green 4f5863a2. Agent session (Haiku, the release's
   MCP): 9 tool calls, 0 failed, the block right (23,214.6 mm³). qa-os (run 42781223370): macOS footer and Show in Finder OK;
