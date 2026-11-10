@@ -9,7 +9,7 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
-## 2026-11-10 14:20 UTC: user P0, two selected parts froze the app 51 s (landed 592fb25a, fc44c384)
+## 2026-11-10 14:18 UTC: user P0, two selected parts froze the app 51 s (landed 592fb25a, fc44c384)
 
 The Part Studio's readout, Measure panel and its lines measured the selection synchronously while drawing
 (`studio_measure`). Now: whole parts (a `Reference::Body` in the selection) aren't measured at all, as live (2463: the
