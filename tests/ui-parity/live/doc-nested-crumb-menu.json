@@ -1,18 +1,18 @@
 {
  "scenario": "doc-nested-crumb-menu",
- "recorded": "2026-11-09T07:54:45.737Z",
+ "recorded": "2026-11-10T19:06:17.949Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-10.4 0a4d2573 + live2 2026-11-10.3"
  },
  "live": {
-  "document": "8bdf484a98d1f95ad0a85335",
-  "workspace": "efd71a0554e760568b4dac40",
-  "element": "38f34ba06a9af7515d71e900",
+  "document": "9c5e9890c331d0ccce766737",
+  "workspace": "9f7a09c3ab9c6a54c1cf8368",
+  "element": "b1c335f17412665f85bf8b87",
   "start": "doc-nested",
-  "startElement": "38f34ba06a9af7515d71e900",
+  "startElement": "b1c335f17412665f85bf8b87",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -134,7 +134,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 111317
+   "t": 133621
   },
   {
    "step": 2,
@@ -194,7 +194,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 115588
+   "t": 149356
   },
   {
    "step": 3,
@@ -254,7 +254,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 118715
+   "t": 164359
   },
   {
    "step": 4,
@@ -322,7 +322,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 121806
+   "t": 179428
   },
   {
    "step": 5,
@@ -334,7 +334,7 @@
    },
    "ok": true,
    "at": [
-    162,
+    150,
     948
    ],
    "state": {
@@ -369,12 +369,17 @@
      "compare": null,
      "tabs": [
       {
-       "name": "Part Studio 3",
+       "name": "Part Studio 2",
        "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Folder 2",
+       "kind": "folder",
        "active": false
       }
      ],
-     "folder": "Folder 3",
+     "folder": "Folder 1",
      "renaming": null,
      "panel": null,
      "switcher": null
@@ -382,7 +387,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 125445
+   "t": 196468
   }
  ]
 }

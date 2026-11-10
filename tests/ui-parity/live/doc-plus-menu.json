@@ -1,19 +1,19 @@
 {
  "scenario": "doc-plus-menu",
- "recorded": "2026-11-09T07:06:02.564Z",
+ "recorded": "2026-11-10T18:42:16.971Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-10.4 0a4d2573 + live2 2026-11-10.3"
  },
  "live": {
-  "document": "f1be1f225b48370d809ebc1a",
-  "workspace": "4418bf2cecc07ee52ed9b1eb",
-  "element": "9c5534b7e7927d4ea6025ef8",
+  "document": "4dca7ca4209ea87668c5a57a",
+  "workspace": "099c4a1b9fcdd4f4e823c484",
+  "element": "c0baf609b1feba8f94ac2dcc",
   "start": "doc-tabs",
-  "startElement": "9c5534b7e7927d4ea6025ef8",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "c0baf609b1feba8f94ac2dcc",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -101,7 +101,9 @@
    "folder": null,
    "renaming": null,
    "panel": null,
-   "switcher": null
+   "switcher": {
+    "items": []
+   }
   },
   "variables": null,
   "featurestudio": null
@@ -141,8 +143,7 @@
       "Create Variable Studio",
       "Create Drawing…",
       "Create folder",
-      "Import…",
-      "Paste tab"
+      "Import…"
      ],
      "highlighted": null,
      "disabled": []
@@ -225,12 +226,14 @@
      "folder": null,
      "renaming": null,
      "panel": null,
-     "switcher": null
+     "switcher": {
+      "items": []
+     }
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 52880
+   "t": 58093
   },
   {
    "step": 2,
@@ -268,8 +271,7 @@
       "Create Variable Studio",
       "Create Drawing…",
       "Create folder",
-      "Import…",
-      "Paste tab"
+      "Import…"
      ],
      "highlighted": null,
      "disabled": []
@@ -352,12 +354,14 @@
      "folder": null,
      "renaming": null,
      "panel": null,
-     "switcher": null
+     "switcher": {
+      "items": []
+     }
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 70428
+   "t": 62028
   }
  ]
 }

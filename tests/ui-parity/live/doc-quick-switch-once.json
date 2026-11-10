@@ -1,18 +1,18 @@
 {
  "scenario": "doc-quick-switch-once",
- "recorded": "2026-11-09T07:46:14.419Z",
+ "recorded": "2026-11-10T18:45:37.192Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-10.4 0a4d2573 + live2 2026-11-10.3"
  },
  "live": {
-  "document": "2953d6881e7e53dd79c3f8ca",
-  "workspace": "1c6e24b263c29f30af35fda1",
-  "element": "a4f1a2993885994f8a593a8e",
+  "document": "4805fb27ab941d53629569f7",
+  "workspace": "e298073ca4429e0b313966dc",
+  "element": "cf339106cc7786afbac6ea3a",
   "start": "doc-tabs",
-  "startElement": "a4f1a2993885994f8a593a8e",
+  "startElement": "cf339106cc7786afbac6ea3a",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -190,7 +190,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 66273
+   "t": 75086
   },
   {
    "step": 2,
@@ -265,12 +265,31 @@
      "folder": null,
      "renaming": null,
      "panel": null,
-     "switcher": null
+     "switcher": {
+      "items": [
+       {
+        "name": "Part Studio 2",
+        "selected": false
+       },
+       {
+        "name": "Part Studio 1",
+        "selected": true
+       },
+       {
+        "name": null,
+        "selected": false
+       },
+       {
+        "name": "Feature Studio 1",
+        "selected": false
+       }
+      ]
+     }
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 70508
+   "t": 88941
   },
   {
    "step": 3,
@@ -369,7 +388,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 75726
+   "t": 94525
   }
  ]
 }

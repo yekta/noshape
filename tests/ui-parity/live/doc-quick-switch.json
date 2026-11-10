@@ -1,18 +1,18 @@
 {
  "scenario": "doc-quick-switch",
- "recorded": "2026-11-09T07:44:21.191Z",
+ "recorded": "2026-11-10T18:47:39.000Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-10.4 0a4d2573 + live2 2026-11-10.3"
  },
  "live": {
-  "document": "66ee422bc17875018d36da0c",
-  "workspace": "f19fcbe06688d0f144e329d3",
-  "element": "a6cc83c7d4f1c9fcb46c6cac",
+  "document": "9558d8a494815979eec8ab51",
+  "workspace": "6d99f4bd6fb826f52c9a29a6",
+  "element": "85a1a70d0144ca2d7906fa65",
   "start": "doc-tabs",
-  "startElement": "a6cc83c7d4f1c9fcb46c6cac",
+  "startElement": "85a1a70d0144ca2d7906fa65",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -190,7 +190,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 66283
+   "t": 70911
   },
   {
    "step": 2,
@@ -302,7 +302,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 73878
+   "t": 76461
   },
   {
    "step": 3,
@@ -404,12 +404,35 @@
      "folder": null,
      "renaming": null,
      "panel": null,
-     "switcher": null
+     "switcher": {
+      "items": [
+       {
+        "name": "Assembly 1",
+        "selected": false
+       },
+       {
+        "name": "Part Studio 2",
+        "selected": true
+       },
+       {
+        "name": "Part Studio 1",
+        "selected": false
+       },
+       {
+        "name": null,
+        "selected": false
+       },
+       {
+        "name": "Feature Studio 1",
+        "selected": false
+       }
+      ]
+     }
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 76495
+   "t": 78950
   },
   {
    "step": 4,
@@ -511,12 +534,35 @@
      "folder": null,
      "renaming": null,
      "panel": null,
-     "switcher": null
+     "switcher": {
+      "items": [
+       {
+        "name": "Assembly 1",
+        "selected": false
+       },
+       {
+        "name": "Part Studio 2",
+        "selected": false
+       },
+       {
+        "name": "Part Studio 1",
+        "selected": true
+       },
+       {
+        "name": null,
+        "selected": false
+       },
+       {
+        "name": "Feature Studio 1",
+        "selected": false
+       }
+      ]
+     }
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 79329
+   "t": 81926
   },
   {
    "step": 5,
@@ -615,7 +661,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 84739
+   "t": 85292
   }
  ]
 }
