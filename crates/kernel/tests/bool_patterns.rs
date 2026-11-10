@@ -1651,3 +1651,24 @@ fn spheres_cut_from_a_curved_part_as_its_points_say() {
         assert_eq!(matches!(r.classify_point(q, 1e-7), Ok(k::PointClass::Inside)), want, "at {:.3?} mm", q * 1e3);
     }
 }
+
+/// A 0.4 mm round touching a Ø46 mm tube's wall from inside all round (a user's rib rounds: a torus coaxial with the
+/// cylinder, R + r its radius to 2e-14 m): the two meet along the one circle they touch, noshape's own section (OCCT's
+/// marching took 4.9 s a pair on Windows there and broke the circle into five pieces). Fused, the tube; cut, the
+/// tube less the round; both valid, as OCCT's own sections give them.
+#[test]
+fn a_round_touching_a_coaxial_tube_meets_it_along_one_circle() {
+    let _ = k::set_working_scale(1000.0);
+    let (r, h, big, small) = (0.023 - 1.7e-14, 0.04, 0.0226, 0.0004);
+    let tube = k::make_cylinder(&k::Plane::new(DVec3::ZERO, DVec3::Y, DVec3::Z), r, h, TAU).unwrap();
+    let round = k::make_torus(&k::Plane::new(DVec3::new(0.0, 0.02, 0.0), DVec3::Y, DVec3::Z), big, small, TAU).unwrap();
+    let tube_v = std::f64::consts::PI * r * r * h;
+    let round_v = 2.0 * std::f64::consts::PI * std::f64::consts::PI * big * small * small;
+    for (op, counts, volume) in [(k::BooleanOp::Fuse, [4, 5, 3], tube_v), (k::BooleanOp::Cut, [5, 6, 3], tube_v - round_v)] {
+        let out = k::boolean(op, std::slice::from_ref(&tube), std::slice::from_ref(&round), &k::BooleanOptions::default()).unwrap().shape;
+        assert!(out.is_valid(), "{op:?}");
+        assert_eq!([k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| out.count(t)), counts, "{op:?}");
+        let v = out.volume().unwrap();
+        assert!((v - volume).abs() <= 1e-6 * volume, "{op:?}: {v} against {volume}");
+    }
+}
