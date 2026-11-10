@@ -255,6 +255,7 @@ mod tests {
             thickness: 2e-3,
             warnings: Vec::new(),
             built_for: None,
+            place: None,
         }
     }
 

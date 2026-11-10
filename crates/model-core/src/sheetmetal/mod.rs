@@ -36,13 +36,43 @@ pub fn part_of_flat(id: &crate::reference::BodyId) -> Option<crate::reference::B
     (id.feature.0 & FLAT_BIT != 0).then_some(crate::reference::BodyId { feature: FeatureId(id.feature.0 & !FLAT_BIT), index: id.index })
 }
 
+/// Face `i` of `part`'s flat body ([`flat_body`]): what a sketch on the flat names as its plane (live 2468: "Face of
+/// <model>" on the flat; its faces are no part's).
+pub fn flat_face_name(part: &crate::reference::BodyId, i: usize) -> TopoName {
+    let face = std::sync::Arc::new(TopoName::face(FeatureId(0), crate::reference::Role::New(i as u32)));
+    TopoName::face(flat_body_id(part).feature, crate::reference::Role::Copy { instance: part.index, of: face })
+}
+
+/// The part and face index a [`flat_face_name`] names.
+pub fn flat_face_of(name: &TopoName) -> Option<(crate::reference::BodyId, usize)> {
+    let TopoName::Face { feature, role: crate::reference::Role::Copy { instance, of } } = name else { return None };
+    let TopoName::Face { role: crate::reference::Role::New(i), .. } = &**of else { return None };
+    let part = part_of_flat(&crate::reference::BodyId { feature: *feature, index: *instance })?;
+    Some((part, *i as usize))
+}
+
+/// A sketch's frame on a flat face ([`flat_face_name`]) in its flat place: its origin the face's own centre (live's
+/// evPlane of a flat face, c2-sm-louver's Sketch 9: not the world origin projected as on a part's face), its x as on
+/// a part's face.
+pub fn flat_face_frame(ctx: &crate::regen::context::Context, name: &TopoName) -> Option<crate::display::PlaneFrame> {
+    let (part, i) = flat_face_of(name)?;
+    let shape = flat_pattern_for(ctx, &part).ok()?.flat_view_solid()?;
+    let face = shape.faces().get(i)?.clone();
+    let pl = face.face_plane().ok()??;
+    let n = pl.unit_normal();
+    let x = ctx.planar_face_x(&pl);
+    let [u0, u1, v0, v1] = face.uv_bounds().ok()?;
+    let origin = face.point_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).ok()?;
+    Some(crate::display::PlaneFrame { origin, x, y: n.cross(x), normal: n })
+}
+
 /// The flat pattern of the part [`flat_body_id`] `id` names, as a body of
 /// `ctx` (the flat view's solid: the sheet in its flat place, its faces
-/// named as [`crate::regen::flat_view_display`]'s), named "Flat pattern of <name>".
+/// named by [`flat_face_name`]), named "Flat pattern of <name>".
 pub fn flat_body(ctx: &crate::regen::context::Context, id: &crate::reference::BodyId, name: &str) -> Option<crate::regen::context::Body> {
     let part = part_of_flat(id)?;
     let shape = flat_pattern_for(ctx, &part).ok()?.flat_view_solid()?;
-    let faces = (0..shape.faces().len()).map(|i| std::sync::Arc::new(TopoName::face(FeatureId(0), crate::reference::Role::New(i as u32)))).collect();
+    let faces = (0..shape.faces().len()).map(|i| std::sync::Arc::new(flat_face_name(&part, i))).collect();
     Some(crate::regen::context::Body::new(id.clone(), format!("Flat pattern of {name}"), crate::display::BodyKind::Solid, shape, faces, 0, FeatureId(0)))
 }
 

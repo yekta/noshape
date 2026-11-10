@@ -98,6 +98,8 @@ struct Definition {
     /// The walls' WALL attribute ids by definition face ("<feature>.<n>",
     /// numbered in the order std made them: a Flange's pick order).
     wall_ids: BTreeMap<usize, String>,
+    /// The MODEL attribute's id (its Sheet metal model feature's: its walls' ids start with it).
+    model_id: Option<String>,
     /// Corner breaks by definition vertex (std's attribute-based ones: the CORNER attribute's cornerBreaks).
     breaks: BTreeMap<usize, CornerBreak>,
 }
@@ -2237,7 +2239,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     }
                 }
             }
-            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids, breaks: corner_breaks(&st, &q, b) });
+            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids, model_id: model.get("attributeId").as_str().map(|s| s.to_string()), breaks: corner_breaks(&st, &q, b) });
             let faces: Vec<Reference> = (0..body.faces.len()).map(|f| q.to_ref(&Ent::Face(b, f))).collect();
             let edges: Vec<Reference> = (0..body.edges.len()).map(|e| q.to_ref(&Ent::Edge(b, e))).collect();
             let vertices: Vec<Reference> = (0..body.vertices.len()).map(|v| q.to_ref(&Ent::Vertex(b, v))).collect();
@@ -2960,7 +2962,22 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
     let mut flat = crate::sheetmetal::flat::flat_from_pieces(frame, &pieces, lines, thickness).ok()?;
     flat.forms = flat_forms;
     flat.heads = heads;
+    flat.place = flat_place(def, topo, &unfolded);
     Some(flat)
+}
+
+/// Live 2468's layout of the flat ([`crate::sheetmetal::flat::FlatPlace`]): its fixed face is the first wall std made
+/// (the first sketch segment's), its definition normal up.
+fn flat_place(def: &Definition, topo: &Topo, unfolded: &Unfolded) -> Option<crate::sheetmetal::flat::FlatPlace> {
+    // (Walls a Flange made number from its own id: the model's own come first.)
+    let made = |w: &usize| def.wall_ids.get(w).and_then(|id| id.rsplit_once('.')).and_then(|(f, n)| Some((def.model_id.as_deref() != Some(f), n.parse::<u64>().ok()?)));
+    let fixed = *unfolded.walls.keys().filter(|w| made(w).is_some()).min_by_key(|w| made(w))?;
+    let w = unfolded.walls.get(&fixed)?;
+    let (p0, n) = face_normal(&topo.faces[fixed]).ok()?;
+    let x = crate::display::PlaneFrame::face_x(n);
+    let y = n.cross(x);
+    let live = glam::DMat4::from_cols(glam::DVec4::new(x.x, y.x, n.x, 0.0), glam::DVec4::new(x.y, y.y, n.y, 0.0), glam::DVec4::new(x.z, y.z, n.z, 0.0), glam::DVec4::new(0.0, 0.0, -p0.dot(n), 1.0));
+    Some(crate::sheetmetal::flat::FlatPlace { view: live * w.inverse(), front: def.front, back: def.back })
 }
 
 struct Unfolded {
@@ -3116,7 +3133,7 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
             let body = &st.ctx.bodies[b];
             let (bends, rips, rolled, rip_styles, joint_ids) = joints(&st, &q, b);
             let k_factor = model.get("k-factor").get("value").as_number().unwrap_or(0.45);
-            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new(), breaks: BTreeMap::new() };
+            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new(), model_id: None, breaks: BTreeMap::new() };
             (e, body.shape.clone(), def, k_factor)
         })
     };

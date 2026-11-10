@@ -553,6 +553,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         };
         let owner = ctx.sketch_copies.iter().find(|(_, c)| *c == s.feature).map_or(s.feature, |(p, _)| *p);
         sd.hidden = studio.feature(owner).is_some_and(|f| f.hidden && rolled_to != Some(owner)) || ctx.hidden_sketches.contains(&s.feature);
+        sd.on_flat = studio.feature(owner).is_some_and(|f| matches!(f.params.query("sketchPlane").first(), Some(crate::reference::Reference::Face(n)) if crate::sheetmetal::flat_face_of(n).is_some()));
         sd.color = studio.appearances.iter().rev().find(|a| !a.suppressed && a.target == crate::partstudio::AppearanceTarget::Feature(s.feature)).map(|a| a.color);
         d.sketches.push(sd);
     }
@@ -707,7 +708,7 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
             Some(crate::display::SketchImageDisplay { id: i.id, corners, data_base64: i.data_base64.clone() })
         })
         .collect();
-    SketchDisplay { feature: s.feature, name: s.name.clone(), frame, curves, points, regions, dimensions: Vec::new(), glyphs: Vec::new(), hidden: false, dof, color: None, images }
+    SketchDisplay { feature: s.feature, name: s.name.clone(), frame, curves, points, regions, dimensions: Vec::new(), glyphs: Vec::new(), hidden: false, on_flat: false, dof, color: None, images }
 }
 
 #[cfg(test)]

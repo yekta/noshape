@@ -28,7 +28,7 @@ pub fn ops() -> Vec<Op> {
             group: "sheetmetal",
             verb: "table",
             summary: "The sheet metal table: a model's bends (radius, angle, direction, K factor) and other joints",
-            description: "The \"Sheet metal table and flat view\" panel: the sheet metal models (the Sheet metal context select), and for `model` its Bends rows in the table's order (name as \"Bend A\" / \"Hem B\", radius, angle, Up / Down from the flat pattern's bend lines, K factor, the bend's face ids) and its Other joints rows (name, style).",
+            description: "The \"Sheet metal table and flat view\" panel: the sheet metal models (the Sheet metal context select), and for `model` its Bends rows in the table's order (name as \"Bend A\" / \"Hem B\", radius, angle, Up / Down from the flat pattern's bend lines, K factor, the bend's face ids) and its Other joints rows (name, style); `flat_faces`: the planar faces of its parts' flats where live lays them out (fixed face on z = 0; part \"Flat pattern of <part>\", area, normal, offset along it), whose ids a sketch can take as its plane (sketch_create: a sketch on the flat, shown only in the flat view).",
             fields: vec![doc_field(), tab_field(), model_field()],
             mutates: false,
             destructive: false,
@@ -181,9 +181,28 @@ fn table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             })
         })
         .collect();
+    // The flat's faces (live 2468: only the flat view shows them; a sketch's plane can be one).
+    let flat_faces: Vec<Value> = r
+        .context
+        .bodies
+        .iter()
+        .filter(|b| r.context.sheet_metal.get(&b.id).is_some_and(|d| d.model == *model))
+        .flat_map(|b| {
+            let shape = noshape_model::sheetmetal::flat_pattern_for(&r.context, &b.id).ok().and_then(|f| f.flat_view_solid());
+            let faces = shape.map(|s| s.faces()).unwrap_or_default();
+            let part = b.name.clone();
+            faces.into_iter().enumerate().filter_map(move |(i, f)| {
+                let pl = f.face_plane().ok().flatten()?;
+                let id = refs::to_id(&noshape_model::reference::Reference::Face(noshape_model::sheetmetal::flat_face_name(&b.id, i)));
+                let n = pl.unit_normal();
+                Some(json!({ "id": id, "part": format!("Flat pattern of {part}"), "area": sm::plain(f.area().unwrap_or(0.0) * k * k), "normal": [sm::plain(n.x), sm::plain(n.y), sm::plain(n.z)], "offset": sm::plain(pl.origin.dot(n) * k) }))
+            })
+        })
+        .collect();
     Ok(json!({
         "models": list.iter().map(|m| json!({ "model": m.0.to_string(), "name": m.1 })).collect::<Vec<_>>(),
         "model": name,
+        "flat_faces": flat_faces,
         "units": { "length": units.length.to_string() },
         "bends": bend_rows,
         "joints": joints.iter().map(|j| json!({ "name": j.name, "style": j.style })).collect::<Vec<_>>(),

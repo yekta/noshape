@@ -3178,7 +3178,39 @@ impl<'a> Translator<'a> {
             dot(fn_, n).abs() > 1.0 - 1e-6 && dot([c[0] - o[0], c[1] - o[1], c[2] - o[2]], n).abs() < 1e-7
         };
         let area = |e: &&Value| e["area"].as_f64().map_or(f64::INFINITY, |a| r.measure.map_or(0.0, |m| (a * k * k - m).abs()));
-        reply["faces"].as_array()?.iter().filter(on).min_by(|a, b| area(a).total_cmp(&area(b))).and_then(|e| e["id"].as_str().map(str::to_string))
+        let part = reply["faces"].as_array()?.iter().filter(on).min_by(|a, b| area(a).total_cmp(&area(b))).cloned();
+        // None of the right size there: a face of a sheet metal flat (live 2468: c2-sm-louver's Sketch 9 on Sheet metal
+        // model 2's flat).
+        let fits = |e: &Value| r.measure.zip(e["area"].as_f64()).is_none_or(|(m, a)| (a * k * k - m).abs() <= 1e-3 * m);
+        if let Some(e) = part.as_ref().filter(|e| fits(e)) {
+            return e["id"].as_str().map(str::to_string);
+        }
+        self.flat_face_on_plane(r).or_else(|| part.and_then(|e| e["id"].as_str().map(str::to_string)))
+    }
+
+    /// The face of a sheet metal flat (sheetmetal_table's `flat_faces`) on live's plane, the nearest to live's area.
+    fn flat_face_on_plane(&mut self, r: &LiveRef) -> Option<String> {
+        let (o, n) = (r.point?, r.normal?);
+        let models = self.call("sheetmetal_table", json!({})).ok()?;
+        let mut best: Option<(f64, String)> = None;
+        for m in models["models"].as_array().cloned().unwrap_or_default() {
+            let Ok(t) = self.call("sheetmetal_table", json!({ "model": m["model"] })) else { continue };
+            let k = per_unit(&t["units"]);
+            let num = |v: &Value| v.as_str().and_then(|x| x.parse::<f64>().ok()).or_else(|| v.as_f64());
+            for f in t["flat_faces"].as_array().cloned().unwrap_or_default() {
+                let (Some(fnx), Some(fny), Some(fnz), Some(off), Some(area)) = (num(&f["normal"][0]), num(&f["normal"][1]), num(&f["normal"][2]), num(&f["offset"]), num(&f["area"])) else { continue };
+                let dot = fnx * n[0] + fny * n[1] + fnz * n[2];
+                let at = o[0] * fnx + o[1] * fny + o[2] * fnz;
+                if dot < 1.0 - 1e-6 || (off * k - at).abs() > 1e-7 {
+                    continue;
+                }
+                let off_area = r.measure.map_or(0.0, |m| (area * k * k - m).abs());
+                if best.as_ref().is_none_or(|b| off_area < b.0) {
+                    best = f["id"].as_str().map(|id| (off_area, id.to_string()));
+                }
+            }
+        }
+        best.map(|b| b.1)
     }
 
     fn nearest(&mut self, kind: &str, r: &LiveRef, part: Option<&str>) -> Option<String> {

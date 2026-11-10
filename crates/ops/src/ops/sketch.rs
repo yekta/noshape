@@ -636,6 +636,10 @@ pub(super) fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: 
     {
         v["message"] = json!(m);
     }
+    // On a sheet metal flat (live 2468): shown only in the flat view.
+    if r.display.sketches.iter().any(|s| s.feature == id && s.on_flat) {
+        v["on_flat"] = json!(true);
+    }
     Ok(v)
 }
 

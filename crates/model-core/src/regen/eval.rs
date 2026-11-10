@@ -657,10 +657,13 @@ impl<'a> EvalCtx<'a> {
             Reference::Plane(DatumPlane::Front) => Some(PlaneFrame::FRONT),
             Reference::Plane(DatumPlane::Right) => Some(PlaneFrame::RIGHT),
             Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => self.ctx.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
-            Reference::Face(_) => {
+            Reference::Face(name) => {
+                // A face of a sheet metal part's flat (live 2468: a sketch on the flat, in the flat's place).
+                if crate::sheetmetal::flat_face_of(name).is_some() {
+                    return crate::sheetmetal::flat_face_frame(&self.ctx, name);
+                }
                 let (bi, fi) = *self.resolve_faces(std::slice::from_ref(r)).first()?;
-                let face = self.face_shape(bi, fi).ok()?;
-                let pl = face.face_plane().ok()??;
+                let pl = self.face_shape(bi, fi).ok()?.face_plane().ok()??;
                 // Sketch origin on a face: world origin projected onto the face plane.
                 let n = pl.unit_normal();
                 let x = self.ctx.planar_face_x(&pl);
