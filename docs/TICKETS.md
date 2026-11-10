@@ -330,8 +330,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
-## Release blockers for the 2026-11-10 17:00 release (qa list 07:20, checked on green 4f5863a2 = v0.4.41's cut, the newest 3-platform green, CI 42768928011; the latest release is v0.4.41, cut 07:00 without a qa list)
-- **qa 07:20: no blocker.** v0.4.40 = v0.4.39 + the lead's icon fix (23afb1a2e) only. v0.4.41 = 4f5863a26, 56 commits past
+## Release blockers for the 2026-11-10 17:00 release (qa list 07:15, checked on green 4f5863a2 = v0.4.41's cut, the newest 3-platform green, CI 42768928011; the latest release is v0.4.41, cut 07:00 without a qa list)
+- **qa 07:15: no blocker.** v0.4.40 = v0.4.39 + the lead's icon fix (23afb1a2e) only. v0.4.41 = 4f5863a26, 56 commits past
   v0.4.39's cut. Its sweeps on vibe3 (volume sweep 20, cf corpus 13, the 48 ticket documents) = green 4e549553 exactly. GUI
   fuzz on green 57f3d800: seeds 7427–7840, 0 deaths (now on 4f5863a2). No CLI fuzz ran overnight (qa was out of quota).
   The suites since 20:08 had lost their model / assembly / exchange stage (vibe2 gone): it runs on vibe3 now. A fresh run on
@@ -339,7 +339,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - v0.4.41 is the first release with dx's 7e7d69f2b (P0 FAN-BLADE-SWEEP-HANG, c2-fan-blade-sweep's Sweep 1 331 s) and with
   core's fix b5da62f83 (192 s -> 0.2 s). The 07:02 suite run times that document on the cut.
 - Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 T2-ASM-STANDARD-CONTENT-HANG (a T2 bench in ops,
-  not the app nor asm: ticket updated 07:30). Long-running P0s: BLEND-RUST, SHELL-SLOW, REGEN-SPEED.
+  not the app nor asm: ticket updated 07:15). Long-running P0s: BLEND-RUST, SHELL-SLOW, REGEN-SPEED.
 
 ## Release blockers for the 2026-11-09 17:00 release (qa list 16:34, cut 1b99f7a95 = green 4e549553's code + qa docs; the latest release is v0.4.38)
 - **qa 16:34: no blocker.** Greens since v0.4.38's cut (62a7e4bc5) with geometry changes swept on vibe3 (volume sweep 20, cf corpus
@@ -3967,7 +3967,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 ## Assemblies (asm)
 - [ ] P1 T2-ASM-STANDARD-CONTENT-HANG (lead / core, was asm; T2 hang) **the nightly T2 never finishes: the spinning test
-  is ops' `regen_profile::bench_edit_latency`, not an assembly test** (qa 2026-11-10 07:30). The process the lead saw
+  is ops' `regen_profile::bench_edit_latency`, not an assembly test** (qa 2026-11-10 07:15). The process the lead saw
   listed `assembly::tests::standard_content_parts_regenerate_with_mate_connectors` first only because t2.sh hands all
   333 T2 names to every test binary and the assembly names come first. On 4f5863a26 (vibe4, debug): that test alone passes in
   25 s (333 catalogue parts, none over 1 s); all 26 assembly T2 tests together pass in 77.5 s; the nightly's own log

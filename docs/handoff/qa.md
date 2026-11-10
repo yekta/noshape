@@ -3,7 +3,7 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-**11-10 07:35 (qa restarted ~07:00, new account):** vibe2 is retired: bin/qa-suites.sh runs its model / assembly / exchange
+**11-10 07:15 (qa restarted ~07:00, new account):** vibe2 is retired: bin/qa-suites.sh runs its model / assembly / exchange
 stage on `QA_SUITES_HOST` (default vibe3) through rb.sh, pauses vibe3's GUI fuzz (/tmp/qa-fz-pause-61) for it and writes the
 host's load before and after to run.log; the runs 20:08 → 06:10 had no model stage (index 49.5 with geometry, assemblies,
 exchange and speed at 0). Fresh run 1110-0702-4f5863a2 started 07:02 (loop pid 1619190 unchanged). Speed from vibe3 now (the
