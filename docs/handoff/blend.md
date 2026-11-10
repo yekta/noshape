@@ -24,6 +24,14 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   the straight one 0.060 (live 0.022): the angle's reading is off on the straight part. Asked live (REQUESTS blend
   11:35) for JZC / JZG's definitions and the edges round them. Patch /root/blend-scratch/patches/chamfer-as-sections-wip.patch,
   probe features_c zz_probe_knife_chamfer1 (ZZ_KNIFE = vibe5 /tmp/blend-knife-c1.brep, Chamfer 1's input).
+- With the WIP, past Chamfer 1 (report.json's differing list, 12:45): Mirror 1 23/64/42 (live 22/60/39: our extra
+  edge doubled, and a face live joins across the mirror plane), Fillet 3 45 faces (live 38, blend's, partly
+  inherited), from Curve pattern 1 the volume -3.8 mm³; later errors are queries / translation (Fillet 5 / 7 no
+  entities, Loft 1 profiles, Extrude 8 / 9 / Revolve 1 no merge scope, Split 4 / Extrude 10 no faces). Chamfer 1
+  takes 1.7 s (live 19 ms): the per-section projections and OCCT's failed attempt first; to speed once its shape is
+  live's.
+- Fillet 2's land: 2nd and 3rd attempts failed on core's OCCT lib sync (the STEP read test 0.5 -> 6.8 s, and a rustc
+  crash); queued again as dfa2b701.
 - The impeller's "Chamfer Stevenrohr Halterung" / "Fillet Stevenrohr zum Halter" failures (qa's 4f5863a2 run): upstream,
   handed to core (core.md 11:01).
 - Asked live 07:58 for the equal-distance chamfer rule (tilted hole, cylinder under a tilted plane): rings-loft waits.
