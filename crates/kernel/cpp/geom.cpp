@@ -61,6 +61,11 @@
 #include <TopLoc_Location.hxx>
 #include <TopoDS_Compound.hxx>
 #include <atomic>
+#include <ElSLib.hxx>
+#include <optional>
+#include <tuple>
+#include <thread>
+#include <set>
 
 namespace noshape {
 
@@ -1587,6 +1592,434 @@ DistanceF min_distance(const OcShape& a, const OcShape& b)
       }
     }
   }
+  return r;
+}
+
+// The minimum distance between two parts (Measure's Min dist): BRepExtrema's, without measuring every pair of their
+// faces (two imported bodies of many B-spline faces that touch: 51 s). Their faces (and free edges and vertices) by
+// their boxes; points on them (coarse meshes' nodes of copies, the edges' samples) give a distance the result can't
+// exceed; of the pairs whose boxes come that close, those whose meshes do too are measured exactly, the nearest by
+// their points first, on all threads in waves, until no box can come closer or two touch.
+static DistanceF part_distance_faces(const OcShape& a, const OcShape& b)
+{
+  require_non_null(a.shape, "first shape");
+  require_non_null(b.shape, "second shape");
+  if (a.shape.ShapeType() == TopAbs_VERTEX || b.shape.ShapeType() == TopAbs_VERTEX)
+    return min_distance(a, b);
+  Bnd_Box all;
+  BRepBndLib::Add(a.shape, all, false);
+  BRepBndLib::Add(b.shape, all, false);
+  if (all.IsVoid())
+    return min_distance(a, b);
+  const double defl = std::max(2e-3 * std::sqrt(all.SquareExtent()), 1e-7);
+  struct Piece
+  {
+    TopoDS_Shape        s;
+    Bnd_Box             box;
+    std::vector<gp_Pnt> pts;
+    bool                meshed = false;
+  };
+  auto pieces = [defl](const TopoDS_Shape& shape) {
+    std::vector<Piece> v;
+    const TopoDS_Shape c = BRepBuilderAPI_Copy(shape, false).Shape();
+    auto add = [&](const TopoDS_Shape& x) {
+      Piece p{x, {}, {}, false};
+      BRepBndLib::Add(x, p.box, false);
+      for (TopExp_Explorer e(x, TopAbs_VERTEX); e.More(); e.Next())
+        p.pts.push_back(BRep_Tool::Pnt(TopoDS::Vertex(e.Current())));
+      if (x.ShapeType() == TopAbs_EDGE && !BRep_Tool::Degenerated(TopoDS::Edge(x)))
+      {
+        const BRepAdaptor_Curve ac(TopoDS::Edge(x));
+        for (int k = 1; k < 8; ++k)
+          p.pts.push_back(ac.Value(ac.FirstParameter() + (ac.LastParameter() - ac.FirstParameter()) * k / 8.0));
+      }
+      v.push_back(std::move(p));
+    };
+    for (TopExp_Explorer x(c, TopAbs_FACE); x.More(); x.Next())
+      add(x.Current());
+    const size_t nf = v.size();
+    for (TopExp_Explorer x(c, TopAbs_EDGE, TopAbs_FACE); x.More(); x.Next())
+      add(x.Current());
+    for (TopExp_Explorer x(c, TopAbs_VERTEX, TopAbs_EDGE); x.More(); x.Next())
+      add(x.Current());
+    // Meshed: faces of up to 32 wires (a plate's face with 1735 holes took 20 s to mesh); the others by their edges'
+    // samples (on the face: still an upper bound), measured exactly.
+    if (nf > 0)
+    {
+      BRep_Builder    bb;
+      TopoDS_Compound some;
+      bb.MakeCompound(some);
+      bool any = false;
+      for (size_t i = 0; i < nf; ++i)
+      {
+        int wires = 0;
+        for (TopoDS_Iterator w(v[i].s); w.More() && wires <= 32; w.Next())
+          ++wires;
+        if (wires <= 32)
+        {
+          bb.Add(some, v[i].s);
+          any = true;
+        }
+        else
+          for (TopExp_Explorer e(v[i].s, TopAbs_EDGE); e.More(); e.Next())
+          {
+            const TopoDS_Edge& ed = TopoDS::Edge(e.Current());
+            if (BRep_Tool::Degenerated(ed))
+              continue;
+            const BRepAdaptor_Curve ac(ed);
+            for (int k = 0; k <= 4; ++k)
+              v[i].pts.push_back(ac.Value(ac.FirstParameter() + (ac.LastParameter() - ac.FirstParameter()) * k / 4.0));
+          }
+      }
+      if (any)
+        BRepMesh_IncrementalMesh(some, defl, false, 0.5, true);
+    }
+    for (size_t i = 0; i < nf; ++i)
+    {
+      TopLoc_Location                       loc;
+      const occ::handle<Poly_Triangulation> t = BRep_Tool::Triangulation(TopoDS::Face(v[i].s), loc);
+      if (t.IsNull())
+        continue;
+      v[i].meshed = true;
+      for (int k = 1; k <= t->NbNodes(); ++k)
+        v[i].pts.push_back(t->Node(k).Transformed(loc.Transformation()));
+    }
+    return v;
+  };
+  const std::vector<Piece> pa = pieces(a.shape), pb = pieces(b.shape);
+  if (pa.size() * pb.size() <= 400)
+    return min_distance(a, b);
+  // (Some of each one's points: an upper bound.)
+  auto near_pts = [](const Piece& p, const Piece& q) {
+    const size_t sp = std::max<size_t>(1, p.pts.size() / 96), sq = std::max<size_t>(1, q.pts.size() / 96);
+    double       d2 = std::numeric_limits<double>::infinity();
+    for (size_t i = 0; i < p.pts.size(); i += sp)
+      for (size_t j = 0; j < q.pts.size(); j += sq)
+        d2 = std::min(d2, p.pts[i].SquareDistance(q.pts[j]));
+    return std::sqrt(d2);
+  };
+  struct Pair
+  {
+    double   bd, est;
+    uint32_t i, j;
+  };
+  std::vector<Pair> pairs;
+  pairs.reserve(pa.size() * pb.size());
+  for (uint32_t i = 0; i < pa.size(); ++i)
+    for (uint32_t j = 0; j < pb.size(); ++j)
+      pairs.push_back({pa[i].box.Distance(pb[j].box), std::numeric_limits<double>::infinity(), i, j});
+  // A planar face's plane is a lower bound too: the other piece's box wholly on one side of it, no nearer than its
+  // nearest corner (two parallel plates: every pair with a plate's face ruled out).
+  auto plane_of = [](const Piece& p) -> std::optional<gp_Pln> {
+    if (p.s.ShapeType() != TopAbs_FACE)
+      return std::nullopt;
+    const BRepAdaptor_Surface sf(TopoDS::Face(p.s), false);
+    if (sf.GetType() != GeomAbs_Plane)
+      return std::nullopt;
+    return sf.Plane();
+  };
+  auto side_gap = [](const gp_Pln& pl, const Bnd_Box& b) {
+    if (b.IsVoid())
+      return 0.0;
+    double x0, y0, z0, x1, y1, z1;
+    b.Get(x0, y0, z0, x1, y1, z1);
+    double lo = std::numeric_limits<double>::infinity(), hi = -lo;
+    const double a[2] = {x0, x1}, bb[2] = {y0, y1}, c[2] = {z0, z1};
+    double A, B, C, D;
+    pl.Coefficients(A, B, C, D);
+    for (double x : a)
+      for (double y : bb)
+        for (double z : c)
+        {
+          const double d = A * x + B * y + C * z + D;
+          lo = std::min(lo, d);
+          hi = std::max(hi, d);
+        }
+    return lo > 0 ? lo : hi < 0 ? -hi : 0.0;
+  };
+  {
+    std::vector<std::optional<gp_Pln>> qa(pa.size()), qb(pb.size());
+    for (size_t i = 0; i < pa.size(); ++i)
+      qa[i] = plane_of(pa[i]);
+    for (size_t j = 0; j < pb.size(); ++j)
+      qb[j] = plane_of(pb[j]);
+    for (Pair& x : pairs)
+    {
+      if (qa[x.i])
+        x.bd = std::max(x.bd, side_gap(*qa[x.i], pb[x.j].box));
+      if (qb[x.j])
+        x.bd = std::max(x.bd, side_gap(*qb[x.j], pa[x.i].box));
+    }
+  }
+  std::sort(pairs.begin(), pairs.end(), [](const Pair& x, const Pair& y) { return std::tie(x.bd, x.i, x.j) < std::tie(y.bd, y.i, y.j); });
+  double upper = std::numeric_limits<double>::infinity();
+  size_t seen  = 0;
+  for (; seen < pairs.size() && pairs[seen].bd <= upper; ++seen)
+  {
+    pairs[seen].est = near_pts(pa[pairs[seen].i], pb[pairs[seen].j]);
+    upper           = std::min(upper, pairs[seen].est);
+  }
+  std::vector<Pair> cand;
+  for (size_t k = 0; k < seen; ++k)
+    if (pairs[k].bd <= upper)
+      cand.push_back(pairs[k]);
+  // Of two meshed faces, only those whose meshes come within `reach` (and the meshes' error): the meshes as a lower
+  // bound.
+  auto near_meshes = [&](std::vector<Pair>& list, double reach) {
+    std::vector<int> ia(pa.size(), -1), ib(pb.size(), -1);
+    BRep_Builder     bb;
+    TopoDS_Compound  ca, cb;
+    bb.MakeCompound(ca);
+    bb.MakeCompound(cb);
+    std::vector<uint32_t> fa, fb;
+    for (const Pair& x : list)
+    {
+      if (pa[x.i].meshed && ia[x.i] < 0)
+      {
+        ia[x.i] = static_cast<int>(fa.size());
+        fa.push_back(x.i);
+        bb.Add(ca, pa[x.i].s);
+      }
+      if (pb[x.j].meshed && ib[x.j] < 0)
+      {
+        ib[x.j] = static_cast<int>(fb.size());
+        fb.push_back(x.j);
+        bb.Add(cb, pb[x.j].s);
+      }
+    }
+    // (Past 2000 pairs the meshes' overlap costs more than it saves: two plates of 1735 holes 0.3 mm apart, 376 s.)
+    if (fa.empty() || fb.empty() || list.size() > 2000)
+      return;
+    BRepExtrema_ShapeProximity prox(ca, cb, reach + 10 * defl);
+    prox.Perform(); // not "done" when no faces overlap
+    std::set<std::pair<uint32_t, uint32_t>> close;
+    for (NCollection_DataMap<int, TColStd_PackedMapOfInteger>::Iterator x(prox.OverlapSubShapes1()); x.More(); x.Next())
+      for (TColStd_PackedMapOfInteger::Iterator y(x.Value()); y.More(); y.Next())
+        close.emplace(fa[static_cast<size_t>(x.Key())], fb[static_cast<size_t>(y.Key())]);
+    std::vector<Pair> kept;
+    for (const Pair& x : list)
+      if (!pa[x.i].meshed || !pb[x.j].meshed || close.count({x.i, x.j}) != 0)
+        kept.push_back(x);
+    list = std::move(kept);
+  };
+  near_meshes(cand, upper);
+  // Order: pairs whose meshes touch first (a contact ends it), of them those of planes, cylinders, cones, spheres
+  // and tori first (BRepExtrema's quick ones), then by their points' distance.
+  std::vector<Pair> touching = cand;
+  if (cand.size() <= 2000)
+    near_meshes(touching, 0.0);
+  else
+    touching.clear();
+  std::set<std::pair<uint32_t, uint32_t>> touch;
+  for (const Pair& x : touching)
+    touch.emplace(x.i, x.j);
+  auto slow = [](const Piece& p) {
+    if (p.s.ShapeType() != TopAbs_FACE)
+      return 0;
+    const GeomAbs_SurfaceType t = BRepAdaptor_Surface(TopoDS::Face(p.s), false).GetType();
+    return t == GeomAbs_Plane || t == GeomAbs_Cylinder || t == GeomAbs_Cone || t == GeomAbs_Sphere || t == GeomAbs_Torus ? 0 : 1;
+  };
+  auto rank = [&](const Pair& x) { return std::make_tuple(touch.count({x.i, x.j}) == 0, slow(pa[x.i]) + slow(pb[x.j]), x.est, x.bd, x.i, x.j); };
+  std::sort(cand.begin(), cand.end(), [&](const Pair& x, const Pair& y) { return rank(x) < rank(y); });
+  struct Found
+  {
+    bool   done = false;
+    double d    = std::numeric_limits<double>::infinity();
+    gp_Pnt p1, p2;
+  };
+  Found      best;
+  const auto threads = static_cast<size_t>(std::max(1u, std::thread::hardware_concurrency()));
+  // Two parallel planar faces: no nearer than their planes' gap, and exactly that where a point of one (a mesh node or
+  // an edge's sample) projects inside the other (two plates of 1735 holes 0.3 mm apart: BRepExtrema took minutes).
+  auto parallel_planes = [](const Piece& p, const Piece& q, Found& out) {
+    if (p.s.ShapeType() != TopAbs_FACE || q.s.ShapeType() != TopAbs_FACE)
+      return false;
+    const BRepAdaptor_Surface sp(TopoDS::Face(p.s), false), sq(TopoDS::Face(q.s), false);
+    if (sp.GetType() != GeomAbs_Plane || sq.GetType() != GeomAbs_Plane)
+      return false;
+    const gp_Pln P = sp.Plane(), Q = sq.Plane();
+    if (!P.Axis().Direction().IsParallel(Q.Axis().Direction(), 1e-12))
+      return false;
+    for (int side = 0; side < 2; ++side)
+    {
+      const Piece&       from = side == 0 ? p : q;
+      const gp_Pln&      onto = side == 0 ? Q : P;
+      const TopoDS_Face& f    = TopoDS::Face(side == 0 ? q.s : p.s);
+      std::optional<BRepTopAdaptor_FClass2d> cls;
+      const size_t step = std::max<size_t>(1, from.pts.size() / 512);
+      for (size_t n = 0; n < from.pts.size(); n += step)
+      {
+        const gp_Pnt& x = from.pts[n];
+        double        u, v;
+        ElSLib::Parameters(onto, x, u, v);
+        if (!cls)
+          cls.emplace(f, 1e-9);
+        const TopAbs_State st = cls->Perform(gp_Pnt2d(u, v));
+        if (st != TopAbs_IN && st != TopAbs_ON)
+          continue;
+        const gp_Pnt y = ElSLib::Value(u, v, onto);
+        out            = Found{true, x.Distance(y), side == 0 ? x : y, side == 0 ? y : x};
+        return true;
+      }
+    }
+    return false;
+  };
+  // A contact first, cheaply: a mesh node of one face (a point on it) on the other's surface and inside it. (Two
+  // planes touching measured through their hundreds of edges: 2.7 s.)
+  {
+    std::vector<Pair> list;
+    for (const Pair& x : cand)
+      if (touch.count({x.i, x.j}) != 0 && pa[x.i].s.ShapeType() == TopAbs_FACE && pb[x.j].s.ShapeType() == TopAbs_FACE)
+        list.push_back(x);
+    // A point of `from` on face `to` (within 1e-9 of its surface, inside it), if any.
+    auto lands = [](const Piece& from, const Piece& to, gp_Pnt& at) {
+      const TopoDS_Face&  f = TopoDS::Face(to.s);
+      BRepAdaptor_Surface sf(f, false);
+      Bnd_Box             near_box = to.box;
+      near_box.Enlarge(1e-9);
+      std::optional<GeomAPI_ProjectPointOnSurf> pr;
+      std::optional<BRepTopAdaptor_FClass2d>    cls;
+      const size_t step = std::max<size_t>(1, from.pts.size() / 256);
+      for (size_t n = 0; n < from.pts.size(); n += step)
+      {
+        const gp_Pnt& p = from.pts[n];
+        if (near_box.IsOut(p))
+          continue;
+        double u, v;
+        if (sf.GetType() == GeomAbs_Plane)
+        {
+          const gp_Pln pl = sf.Plane();
+          if (pl.Distance(p) > 1e-9)
+            continue;
+          ElSLib::Parameters(pl, p, u, v);
+        }
+        else
+        {
+          if (!pr)
+          {
+            pr.emplace();
+            pr->Init(BRep_Tool::Surface(f), sf.FirstUParameter(), sf.LastUParameter(), sf.FirstVParameter(), sf.LastVParameter());
+          }
+          pr->Perform(p);
+          if (!pr->IsDone() || pr->NbPoints() == 0 || pr->LowerDistance() > 1e-9)
+            continue;
+          pr->LowerDistanceParameters(u, v);
+        }
+        if (!cls)
+          cls.emplace(f, 1e-9);
+        const TopAbs_State st = cls->Perform(gp_Pnt2d(u, v));
+        if (st == TopAbs_IN || st == TopAbs_ON)
+        {
+          at = p;
+          return true;
+        }
+      }
+      return false;
+    };
+    for (size_t from = 0, wave = 1; from < list.size(); from += wave, wave = threads)
+    {
+      const size_t        n = std::min(wave, list.size() - from);
+      std::vector<int>    hit(n, 0);
+      std::vector<gp_Pnt> at(n);
+      OSD_Parallel::For(0, static_cast<int>(n), [&](int k) {
+        const Pair& x = list[from + (size_t)k];
+        hit[(size_t)k] = lands(pa[x.i], pb[x.j], at[(size_t)k]) || lands(pb[x.j], pa[x.i], at[(size_t)k]);
+      });
+      for (size_t k = 0; k < n; ++k)
+        if (hit[k] != 0)
+        {
+          DistanceF r{};
+          r.distance = 0.0;
+          r.p1       = from_pnt(at[k]);
+          r.p2       = from_pnt(at[k]);
+          r.count    = 1;
+          return r;
+        }
+    }
+  }
+  // (The likeliest pair alone first: a contact found there ends it in its time, not the slowest of a wave's.)
+  size_t wave_size = 1;
+  while (!cand.empty() && best.d > 1e-9)
+  {
+    const size_t       n = std::min(wave_size, cand.size());
+    std::vector<Found> got(n);
+    OSD_Parallel::For(0, static_cast<int>(n), [&](int k) {
+      if (parallel_planes(pa[cand[(size_t)k].i], pb[cand[(size_t)k].j], got[(size_t)k]))
+        return;
+      BRepExtrema_DistShapeShape d;
+      d.SetFlag(Extrema_ExtFlag_MIN);
+      d.LoadS1(pa[cand[(size_t)k].i].s);
+      d.LoadS2(pb[cand[(size_t)k].j].s);
+      if (d.Perform() && d.NbSolution() > 0)
+        got[(size_t)k] = Found{true, d.Value(), d.PointOnShape1(1), d.PointOnShape2(1)};
+    });
+    const double before = best.d;
+    for (size_t k = 0; k < n; ++k)
+    {
+      // (A pair BRepExtrema couldn't do, that might have been nearer: the whole of them as before.)
+      if (!got[k].done)
+        return min_distance(a, b);
+      if (got[k].d < best.d)
+        best = got[k];
+    }
+    cand.erase(cand.begin(), cand.begin() + static_cast<std::ptrdiff_t>(n));
+    // The rest that can still come nearer: by their boxes, then (once nearer) their meshes.
+    // (Within the boxes' own margin of the best, the shapes' tolerance they were grown by: what such a pair could
+    // still win is below that.)
+    cand.erase(std::remove_if(cand.begin(), cand.end(), [&](const Pair& x) { return x.bd >= best.d - pa[x.i].box.GetGap() - pb[x.j].box.GetGap() - 1e-9; }), cand.end());
+    if (best.d < before && cand.size() > threads)
+      near_meshes(cand, best.d);
+    wave_size = threads;
+  }
+  if (!best.done)
+    return min_distance(a, b);
+  DistanceF r{};
+  r.distance = best.d;
+  r.p1       = from_pnt(best.p1);
+  r.p2       = from_pnt(best.p2);
+  r.count    = 1;
+  return r;
+}
+
+DistanceF part_distance(const OcShape& a, const OcShape& b)
+{
+  require_non_null(a.shape, "first shape");
+  require_non_null(b.shape, "second shape");
+  DistanceF r{};
+  try
+  {
+    r = part_distance_faces(a, b);
+  }
+  catch (const Standard_Failure&)
+  {
+    // (A face without a surface and the like: the whole of them as before.)
+    return min_distance(a, b);
+  }
+  // One solid inside the other: 0, at a vertex of the inner one (BRepExtrema's inner solution), where their
+  // boundaries are apart.
+  if (r.distance > 1e-9)
+    for (int side = 0; side < 2; ++side)
+    {
+      const TopoDS_Shape& in  = side == 0 ? a.shape : b.shape;
+      const TopoDS_Shape& out = side == 0 ? b.shape : a.shape;
+      if (!TopExp_Explorer(out, TopAbs_SOLID).More())
+        continue;
+      TopExp_Explorer v(in, TopAbs_VERTEX);
+      if (!v.More())
+        continue;
+      const gp_Pnt p = BRep_Tool::Pnt(TopoDS::Vertex(v.Current()));
+      for (TopExp_Explorer so(out, TopAbs_SOLID); so.More(); so.Next())
+      {
+        BRepClass3d_SolidClassifier cls(so.Current(), p, 1e-7);
+        if (cls.State() == TopAbs_IN)
+        {
+          r.distance = 0;
+          r.p1 = r.p2 = from_pnt(p);
+          r.count    = 1;
+          return r;
+        }
+      }
+    }
   return r;
 }
 

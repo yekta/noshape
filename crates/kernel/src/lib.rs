@@ -73,7 +73,7 @@ pub use io::{
 pub use mesh::{EdgeRange, FaceRange, MeshOptions, Tessellation, tessellate, tessellate_closed, tessellate_export, tessellate_with};
 pub use mesh_repair::{orient_by_neighbours, repair_folded_faces};
 pub use ops::*;
-pub use props::{Distance, MassProperties, PropsKind, angle_between, distance, linear_properties, mass_properties, mass_property_bounds, surface_properties, touching, volume_properties};
+pub use props::{Distance, MassProperties, PropsKind, angle_between, distance, linear_properties, mass_properties, mass_property_bounds, part_distance, surface_properties, touching, volume_properties};
 pub use shape::{AncestorMap, Orientation, Shape, ShapeType, ShownTopology};
 pub use surfacing::{
     BSplineCurve2dData, BSplineSurfaceData, Developable, Placement2d, SurfaceFit, SurfaceFitOptions, bspline_surface_from_grid, fit_surface,

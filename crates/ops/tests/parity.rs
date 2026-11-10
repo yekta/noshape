@@ -179,6 +179,30 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
                 }
             }
         }
+        // NOSHAPE_MEASURE_CORPUS=<dir>: pairs of each Part Studio's final solid parts (the nearest, a middle and the
+        // farthest by their boxes) as BREP compounds of the two, for the measure replay (kernel measure_replay).
+        if let Some(dir) = std::env::var_os("NOSHAPE_MEASURE_CORPUS") {
+            let _ = std::fs::create_dir_all(&dir);
+            let mut again = noshape_ops::Ctx::new();
+            if let Ok(od) = again.open(&path) {
+                let tabs: Vec<_> = od.doc().ordered_tabs().into_iter().filter(|t| matches!(t.content, noshape_model::document::TabContent::PartStudio(_))).map(|t| t.id).collect();
+                for (k, tab) in tabs.into_iter().enumerate() {
+                    let Ok(r) = od.regenerate(tab, None) else { continue };
+                    let solids: Vec<(noshape_kernel::Shape, noshape_kernel::BoundingBox)> = r.context.bodies.iter().filter(|b| b.shape.count(noshape_kernel::ShapeType::Solid) > 0).filter_map(|b| Some((b.shape.clone(), b.shape.bounding_box(false).ok()?))).take(12).collect();
+                    let gap = |a: &noshape_kernel::BoundingBox, b: &noshape_kernel::BoundingBox| (a.min - b.max).max(b.min - a.max).max(glam::DVec3::ZERO).length();
+                    let mut pairs: Vec<(f64, usize, usize)> = (0..solids.len()).flat_map(|i| (i + 1..solids.len()).map(move |j| (i, j))).map(|(i, j)| (gap(&solids[i].1, &solids[j].1), i, j)).collect();
+                    pairs.sort_by(|x, y| x.0.total_cmp(&y.0).then((x.1, x.2).cmp(&(y.1, y.2))));
+                    let picks: Vec<usize> = if pairs.len() <= 3 { (0..pairs.len()).collect() } else { vec![0, pairs.len() / 2, pairs.len() - 1] };
+                    for (n, &p) in picks.iter().enumerate() {
+                        let (_, i, j) = pairs[p];
+                        let pair = noshape_kernel::Shape::compound(&[solids[i].0.clone(), solids[j].0.clone()]);
+                        if let Ok(bytes) = pair.to_brep_bytes() {
+                            let _ = std::fs::write(Path::new(&dir).join(format!("{name}-{k}-{n}.brep")), bytes);
+                        }
+                    }
+                }
+            }
+        }
         // Its slowest features (the Regeneration times panel's).
         if let Some(Ok(list)) = list {
             res.features_ms = list.value["regen_ms"].as_f64();

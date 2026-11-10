@@ -256,6 +256,28 @@ fn mass_properties_box() {
     assert!(close(d.distance, 3.0, 1e-9));
 }
 
+/// Measure's minimum distance between two parts (part_distance: boxes, coarse meshes, exact pairs) as BRepExtrema's
+/// whole-shape one: face to face, edge to edge, apart, a cylinder lying near a box, a ball off a box's corner, a ring
+/// round a box; the points on their parts and that far apart.
+#[test]
+fn part_distance_as_brepextrema() {
+    let mm = 1e-3;
+    let at = |x: f64, y: f64, z: f64| Plane::new(DVec3::new(x, y, z) * mm, DVec3::Z, DVec3::X);
+    let cube = |x: f64, y: f64, z: f64| make_box(&at(x, y, z), 10.0 * mm, 10.0 * mm, 10.0 * mm).unwrap();
+    let a = cube(0.0, 0.0, 0.0);
+    let rod = make_cylinder(&Plane::new(DVec3::new(2.0, 5.0, 14.0) * mm, DVec3::X, DVec3::Y), 3.0 * mm, 6.0 * mm, 2.0 * PI).unwrap();
+    let ball = make_sphere(&at(14.0, 14.0, 14.0), 3.0 * mm, 2.0 * PI).unwrap();
+    let ring = make_torus(&at(5.0, 5.0, 5.0), 12.0 * mm, 1.5 * mm, 2.0 * PI).unwrap();
+    for (what, b) in [("face", cube(10.0, 2.0, 0.0)), ("edge", cube(10.0, 10.0, 3.0)), ("apart", cube(13.0, 4.0, 2.0)), ("rod", rod), ("ball", ball), ("ring", ring)] {
+        let want = distance(&a, &b).unwrap();
+        let got = part_distance(&a, &b).unwrap();
+        assert!((got.distance - want.distance).abs() <= 1e-9, "{what}: {} against {}", got.distance, want.distance);
+        let on = |p: DVec3, s: &Shape| distance(&make_vertex(p).unwrap(), s).unwrap().distance;
+        assert!(on(got.point_a, &a) <= 1e-9 && on(got.point_b, &b) <= 1e-9, "{what}: points off their parts");
+        assert!(((got.point_b - got.point_a).length() - got.distance).abs() <= 1e-9, "{what}: points not that far apart");
+    }
+}
+
 /// Contact of two parts (Boolean's "touching" check): face to face, along an edge, at a corner, a cylinder lying on a
 /// face and a ball resting on it (contacts inside both faces), and each moved 1 µm away.
 #[test]

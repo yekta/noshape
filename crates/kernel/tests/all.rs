@@ -19,6 +19,7 @@ mod features;
 mod hlr;
 mod hole_orientation;
 mod instances;
+mod measure_replay;
 mod mesh_import;
 mod mesh_repair;
 mod perf;

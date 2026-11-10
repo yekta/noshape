@@ -231,7 +231,7 @@ fn dist_row(label: &str, a: DVec3, b: DVec3) -> (String, Measurement) {
 
 /// The minimum distance between two shapes, as a row.
 fn min_row(a: &Shape, b: &Shape) -> Option<(String, Measurement)> {
-    let d = k::distance(a, b).ok()?;
+    let d = k::part_distance(a, b).ok()?;
     Some(dist_row("Min dist", d.point_a, d.point_b))
 }
 
@@ -875,7 +875,7 @@ pub fn entity_distance(ctx: &Context, a: &Reference, b: &Reference, maximum: boo
         let mut best: Option<EntityDistance> = None;
         for x in &sa {
             for y in &sb {
-                if let Ok(d) = k::distance(x, y)
+                if let Ok(d) = k::part_distance(x, y)
                     && best.is_none_or(|b| d.distance < b.distance)
                 {
                     best = Some(EntityDistance { distance: d.distance, delta: d.point_b - d.point_a });

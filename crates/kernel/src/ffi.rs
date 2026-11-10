@@ -532,6 +532,7 @@ pub(crate) mod ffi {
         fn props_linear(s: &OcShape) -> Result<PropsF>;
         fn props_bounds(s: &OcShape, kind: u8) -> Result<PropsF>;
         fn min_distance(a: &OcShape, b: &OcShape) -> Result<DistanceF>;
+        fn part_distance(a: &OcShape, b: &OcShape) -> Result<DistanceF>;
         fn shapes_touch(a: &OcShape, b: &OcShape, tol: f64) -> Result<bool>;
         fn angle_between(a: &OcShape, b: &OcShape) -> Result<f64>;
         fn classify_point(solid: &OcShape, p: P3, tol: f64) -> Result<i8>;

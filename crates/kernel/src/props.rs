@@ -93,6 +93,13 @@ pub fn distance(a: &Shape, b: &Shape) -> Result<Distance> {
     Ok(Distance { distance: d.distance, point_a: v3(d.p1), point_b: v3(d.p2), solutions: d.count.max(0) as u32 })
 }
 
+/// The minimum distance between two parts with closest points, as [`distance`]'s within its tolerance, without measuring
+/// every pair of their faces (Measure: two bodies of many free-form faces).
+pub fn part_distance(a: &Shape, b: &Shape) -> Result<Distance> {
+    let d = ck(ffi::part_distance(a.raw(), b.raw()))?;
+    Ok(Distance { distance: d.distance, point_a: v3(d.p1), point_b: v3(d.p2), solutions: d.count.max(0) as u32 })
+}
+
 /// Whether two shapes come within `tol` of each other (only the faces whose boxes meet are measured, until the
 /// first that does): a contact test that stays quick on parts far apart in most places.
 pub fn touching(a: &Shape, b: &Shape, tol: f64) -> Result<bool> {
