@@ -365,6 +365,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   passed; CI builds OCCT from patches/occt, not /opt/occt). Since the green CI 297ea7dcb only bool 564260870 and core
   59c60fdb9 touch the kernel (both crates/kernel/cpp/rust_boolean.cpp). The watcher's red 7c88d371b (12:41) had this test
   failing on Linux too, while the libs were being swapped. Needs CI on 7dd64bd82 or later before the cut.
+- **qa 14:53: still no blocker on watcher green 05e8bcde8 (14:28).** Sweeps = 7dd64bd82 except the fuzz ticket document
+  rust-zero-solid-f197, for the better: its Fillet 1 now builds (was "Failed to fillet selections."; blend's 5034e162e, a
+  concave round running off its edge), so Part 1 is 32,264.11 mm³ (was 27,142.42), Fillet 2 "2 missing selections" (was 1).
+  Fuzz: v0.4.41 release CLI 9001–9060 done, 0 deaths (9061– running). Still waiting on the 15:17 CI (on 05e8bcde8) for Windows.
 - v0.4.41 is the first release with dx's 7e7d69f2b (P0 FAN-BLADE-SWEEP-HANG, c2-fan-blade-sweep's Sweep 1 331 s) and with
   core's fix b5da62f83 (192 s -> 0.2 s). The 07:02 suite run times that document on the cut.
 - Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 T2-ASM-STANDARD-CONTENT-HANG (a T2 bench in ops,
