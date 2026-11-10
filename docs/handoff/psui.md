@@ -9,6 +9,18 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## 2026-11-10 14:20 UTC: user P0, two selected parts froze the app 51 s (landed 592fb25a, fc44c384)
+
+The Part Studio's readout, Measure panel and its lines measured the selection synchronously while drawing
+(`studio_measure`). Now: whole parts (a `Reference::Body` in the selection) aren't measured at all, as live (2463: the
+readout stays empty, the panel takes no parts); everything else is measured on a background task keyed by the
+selection (`selection_measurement`, `MeasureCache { selection, results, _task }`), nothing shown until it arrives, the
+panel and lines reading the same result. Test: `a_selections_measurement_doesnt_hold_up_the_frame`. Not done: the
+assembly's Measure (`toggle_measure` / `measure_pick` → `measure_entities`) is still synchronous on a click.
+Also landed today: a standard content instance's Properties… (STANDARD-CONTENT-PROPS-OP filed: no op for its
+properties), Dynamic suppression (Remove expression's message, Escape, Undo off while open), a placed part off a snap
+turns back. ver-merge-compare-base is flaky (1 of 2 runs on one build).
+
 ## 2026-11-10 11:08 UTC: interaction areas' ours-side mismatches (lead: most index points first)
 
 From qa's 22:12 run (cef3fda4), on main e78c8fb7: Feature Studio −0.375 points, Versions −0.335, Assembly −0.30,
