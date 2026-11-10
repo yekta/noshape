@@ -3921,11 +3921,8 @@ const char* brep_body_cached(const OcShape& s, BrepBody& b, double& max_tol) { r
 
 // OCCT patch 0028's hook (IntTools_FaceFace::Perform, every face / face section OCCT makes, its pave filler's too):
 // a round touching a coaxial cylinder, cone, sphere or torus along one circle, that exact circle, where OCCT's marching
-// near the tangency took seconds and broke it into pieces (a user's rib rounds, 4.9 s a pair on Windows); a plane and
-// an extrusion (a surface of linear extrusion, or a B-spline face straight along a direction: an imported wall), the
-// profile moved to the plane or, the plane containing the direction, the rulings there: exact lines, as Parasolid's,
-// where OCCT's marching bowed them (a user's window cut through a Mac mini's corner wall, 10.0012 mm for 10). Any
-// other pair: 0, OCCT's own section as before.
+// near the tangency took seconds and broke it into pieces (a user's rib rounds, 4.9 s a pair on Windows). Any other
+// pair: 0, OCCT's own section as before.
 extern "C" int noshape_face_face(const TopoDS_Face& theF1, const TopoDS_Face& theF2, NCollection_Sequence<IntTools_Curve>& theCurves)
 {
   // (NOSHAPE_BOOL_OWN_FACE_FACE=0: OCCT's own everywhere, to compare.)
@@ -3936,14 +3933,9 @@ extern "C" int noshape_face_face(const TopoDS_Face& theF1, const TopoDS_Face& th
   {
     std::vector<IntTools_Curve> lines;
     bool                        touched = false;
-    bool                        ours    = noshape::coaxial_sections(theF1, theF2, lines, &touched) && touched && !lines.empty();
-    if (!ours)
-    {
-      lines.clear();
-      const bool p1 = !occ::down_cast<Geom_Plane>(BRep_Tool::Surface(theF1)).IsNull(), p2 = !occ::down_cast<Geom_Plane>(BRep_Tool::Surface(theF2)).IsNull();
-      ours = (p1 != p2) && (p1 ? noshape::extruded(theF2) : noshape::extruded(theF1)) && noshape::own_sections(theF1, theF2, lines);
-    }
-    if (!ours)
+    // (Not ours for a plane against an extrusion yet: across one (a gear's end face on its extruded teeth) OCCT's pave
+    // filler built a broken result from our curves, cf-spur-gear's cuts a volume of 2e-14 m3.)
+    if (!noshape::coaxial_sections(theF1, theF2, lines, &touched) || !touched || lines.empty())
       return 0;
     const noshape::KernelTimer timer("occt.own_face_face");
     // (Bounded, as OCCT's own: its pave filler drops a curve without bounds, so a whole circle is a trimmed one; an
