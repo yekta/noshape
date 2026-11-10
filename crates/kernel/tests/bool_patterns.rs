@@ -300,6 +300,37 @@ fn a_shared_corner_by_coplanar_faces_goes_to_occt() {
     assert_eq!(k::bool_corpus::Summary::of(&r).differences(&c.summary), Vec::<String>::new());
 }
 
+/// A plane containing an extrusion's direction cuts it along rulings: noshape's own section, exact lines, as
+/// Parasolid's (OCCT's marching bowed them: a user's window cut through an imported Mac mini's corner wall read 10.0012
+/// mm for 10). A prism on a profile with a B-spline side, cut by a box whose side plane contains the prism's direction
+/// and crosses that side: the cut's edge on it is a line, as tall as the prism.
+#[test]
+fn a_plane_along_an_extrusion_cuts_it_in_straight_lines() {
+    let _ = k::set_working_scale(1000.0);
+    let mm = 1e-3;
+    let p = |x: f64, y: f64| DVec3::new(x, y, 0.0) * mm;
+    let side = k::make_bspline(&[p(0.0, 0.0), p(5.0, 6.0), p(15.0, 6.0), p(20.0, 0.0)], None, &[0.0, 1.0], &[4, 4], 3, false).unwrap();
+    let base = k::make_bspline(&[p(20.0, 0.0), p(0.0, 0.0)], None, &[0.0, 1.0], &[2, 2], 1, false).unwrap();
+    let face = k::make_face_from_wire(&k::make_wire(&[side, base]).unwrap(), true).unwrap();
+    let prism = k::extrude(&face, DVec3::Z * 10.0 * mm).unwrap().shape;
+    let cutter = k::make_box_corners(DVec3::new(8.0, -5.0, -1.0) * mm, DVec3::new(30.0, 10.0, 20.0) * mm).unwrap();
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&prism), std::slice::from_ref(&cutter), &k::BooleanOptions::default());
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let ruling: Vec<k::Shape> = r
+        .shape
+        .edges()
+        .into_iter()
+        .filter(|e| e.edge_info().is_ok_and(|i| (i.start.x - 8.0 * mm).abs() < 1e-9 && (i.end.x - 8.0 * mm).abs() < 1e-9 && i.start.y > 1.0 * mm && (i.start.z - i.end.z).abs() > 5.0 * mm))
+        .collect();
+    assert_eq!(ruling.len(), 1, "the cut's edge on the B-spline side");
+    let info = ruling[0].edge_info().unwrap();
+    assert!(matches!(info.curve, k::Curve::Line { .. }), "{:?}", info.curve);
+    assert!((info.length - 10.0 * mm).abs() <= 1e-12, "{} m", info.length);
+}
+
 /// A sheet metal enclosure's fuse (qa4 S1: the flanges, bends and hem, recorded): noshape's Boolean's result valid and
 /// OCCT's volume. A bend on a trimmed left-handed cylinder came out the other way round: invalid, 7 mm³ more
 /// (RUST-SM-CUT-VOLUME).

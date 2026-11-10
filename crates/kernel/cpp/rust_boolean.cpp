@@ -2152,17 +2152,134 @@ static rust::Vec<uint32_t> occt_moved(rust::Slice<const uint32_t> ids, uint32_t 
 
 namespace
 {
-// A face on an extrusion of a B-spline: the profile (its parameters the face's u), the direction, the face's bounds.
+// A face on an extrusion of a B-spline: the profile, the direction, the profile's range and the distances along the
+// direction the face spans; the face's own parameters at c(u) + d w: (u, at + w per), the two swapped where `swap`
+// (a B-spline face straight along its u). A surface of linear extrusion's are (u, w).
 struct Extruded
 {
   occ::handle<Geom_BSplineCurve> c;
   gp_Dir                         d;
   double                         u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  double                         at = 0, per = 1;
+  bool                           swap = false;
+
+  gp_Pnt2d uv(double u, double w) const
+  {
+    const double s = at + w * per;
+    return swap ? gp_Pnt2d(s, u) : gp_Pnt2d(u, s);
+  }
+  bool plain() const { return !swap && at == 0 && per == 1; }
 };
+
+// The curve on an extrusion's face of its ruling at `u` from distance `w0` on, `sign` the way the 3D curve runs along
+// the direction, the 3D curve's parameters `t0` to `t1`.
+occ::handle<Geom2d_Curve> on_ruling(const Extruded& e, double u, double w0, double sign, double t0, double t1)
+{
+  if (e.plain())
+    return new Geom2d_Line(gp_Pnt2d(u, w0), gp_Dir2d(0, sign));
+  NCollection_Array1<gp_Pnt2d> poles(1, 2);
+  poles(1) = e.uv(u, w0 + sign * t0);
+  poles(2) = e.uv(u, w0 + sign * t1);
+  NCollection_Array1<double> knots(1, 2);
+  knots(1) = t0;
+  knots(2) = t1;
+  NCollection_Array1<int> mults(1, 2);
+  mults.Init(2);
+  return new Geom2d_BSplineCurve(poles, knots, mults, 1);
+}
+
+// The curve on an extrusion's face of its profile moved `w` along the direction (the profile's parameters).
+occ::handle<Geom2d_Curve> on_profile(const Extruded& e, double w)
+{
+  return new Geom2d_Line(e.uv(0, w), e.swap ? gp_Dir2d(0, 1) : gp_Dir2d(1, 0));
+}
+
+// A B-spline face straight along one of its directions: each line of poles that way the first one moved by t_j D, the
+// same t_j for all and the weights the same along it, t_j linear in that way's Greville points (the face's parameter
+// there linear in the distance): an extrusion of the first line of poles across along D (an imported wall).
+std::optional<Extruded> bspline_extruded(const TopoDS_Face& f, const occ::handle<Geom_BSplineSurface>& s)
+{
+  for (const bool along_u : {false, true})
+  {
+    const int ni = along_u ? s->NbVPoles() : s->NbUPoles(), nj = along_u ? s->NbUPoles() : s->NbVPoles();
+    if (nj < 2 || ni < 2 || (along_u ? s->IsUPeriodic() || s->IsVPeriodic() : s->IsVPeriodic() || s->IsUPeriodic()))
+      continue;
+    auto P = [&](int i, int j) { return along_u ? s->Pole(j, i) : s->Pole(i, j); };
+    auto W = [&](int i, int j) { return along_u ? s->Weight(j, i) : s->Weight(i, j); };
+    const gp_Vec D(P(1, 1), P(1, nj));
+    double       size = 0;
+    for (int i = 1; i <= ni; ++i)
+      size = std::max(size, gp_Vec(P(1, 1), P(i, 1)).Magnitude());
+    size = std::max(size, D.Magnitude());
+    const double tol = 1e-12 * std::max(size, 1.0);
+    if (D.Magnitude() <= 1e3 * tol)
+      continue;
+    std::vector<double> t(static_cast<size_t>(nj) + 1);
+    bool                ok = true;
+    for (int j = 1; j <= nj && ok; ++j)
+    {
+      t[(size_t)j] = gp_Vec(P(1, 1), P(1, j)).Dot(D) / D.SquareMagnitude();
+      for (int i = 1; i <= ni && ok; ++i)
+        ok = (gp_Vec(P(i, 1), P(i, j)) - D * t[(size_t)j]).Magnitude() <= tol && (!s->IsURational() && !s->IsVRational() || std::abs(W(i, j) - W(i, 1)) <= 1e-12 * W(i, 1));
+    }
+    if (!ok)
+      continue;
+    // Greville points of the straight way's knots: t_j = a + b xi_j.
+    const int                 q = along_u ? s->UDegree() : s->VDegree();
+    NCollection_Array1<double> flat(1, nj + q + 1);
+    along_u ? s->UKnotSequence(flat) : s->VKnotSequence(flat);
+    std::vector<double> xi(static_cast<size_t>(nj) + 1);
+    for (int j = 1; j <= nj; ++j)
+    {
+      double sum = 0;
+      for (int k = 1; k <= q; ++k)
+        sum += flat(j + k);
+      xi[(size_t)j] = sum / q;
+    }
+    if (std::abs(xi[(size_t)nj] - xi[1]) < 1e-15)
+      continue;
+    const double b = (t[(size_t)nj] - t[1]) / (xi[(size_t)nj] - xi[1]), a = t[1] - b * xi[1];
+    for (int j = 1; j <= nj && ok; ++j)
+      ok = std::abs(t[(size_t)j] - (a + b * xi[(size_t)j])) <= 1e-12;
+    if (!ok || std::abs(b) < 1e-15)
+      continue;
+    // The profile: the first line of poles across, with that way's knots.
+    NCollection_Array1<gp_Pnt> poles(1, ni);
+    NCollection_Array1<double> weights(1, ni);
+    for (int i = 1; i <= ni; ++i)
+    {
+      poles(i)   = P(i, 1);
+      weights(i) = W(i, 1);
+    }
+    const bool rational = along_u ? s->IsVRational() : s->IsURational();
+    occ::handle<Geom_BSplineCurve> c = rational ? new Geom_BSplineCurve(poles, weights, along_u ? s->VKnots() : s->UKnots(), along_u ? s->VMultiplicities() : s->UMultiplicities(), along_u ? s->VDegree() : s->UDegree())
+                                                : new Geom_BSplineCurve(poles, along_u ? s->VKnots() : s->UKnots(), along_u ? s->VMultiplicities() : s->UMultiplicities(), along_u ? s->VDegree() : s->UDegree());
+    // S = c(across) + (a + b straight) D: the distance w = |D| (a + b straight).
+    Extruded x{c, gp_Dir(D)};
+    x.swap = along_u;
+    x.per  = 1 / (b * D.Magnitude());
+    x.at   = -a / b;
+    double fu0, fu1, fv0, fv1;
+    BRepTools::UVBounds(f, fu0, fu1, fv0, fv1);
+    const double c0 = along_u ? fv0 : fu0, c1 = along_u ? fv1 : fu1, s0 = along_u ? fu0 : fv0, s1 = along_u ? fu1 : fv1;
+    x.u0 = std::max(c0, c->FirstParameter());
+    x.u1 = std::min(c1, c->LastParameter());
+    const double w0 = (s0 - x.at) / x.per, w1 = (s1 - x.at) / x.per;
+    x.v0 = std::min(w0, w1);
+    x.v1 = std::max(w0, w1);
+    if (!(x.u0 < x.u1) || !(x.v0 < x.v1))
+      return std::nullopt;
+    return x;
+  }
+  return std::nullopt;
+}
 
 std::optional<Extruded> extruded(const TopoDS_Face& f)
 {
-  const occ::handle<Geom_SurfaceOfLinearExtrusion> e = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(BRep_Tool::Surface(f));
+  const occ::handle<Geom_Surface> sf = BRep_Tool::Surface(f);
+  if (const occ::handle<Geom_BSplineSurface> bs = occ::down_cast<Geom_BSplineSurface>(sf))
+    return bspline_extruded(f, bs);
+  const occ::handle<Geom_SurfaceOfLinearExtrusion> e = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(sf);
   if (e.IsNull())
     return std::nullopt;
   const occ::handle<Geom_BSplineCurve> c = occ::down_cast<Geom_BSplineCurve>(basis_of(e->BasisCurve()));
@@ -2209,7 +2326,7 @@ bool crossings2d(const occ::handle<Geom2d_Curve>& a, const occ::handle<Geom2d_Cu
 IntTools_Curve ruling(const Extruded& e, double u, const occ::handle<Geom2d_Curve>& on_other, bool extrusion_first)
 {
   const occ::handle<Geom_Curve>   line = new Geom_TrimmedCurve(new Geom_Line(e.c->Value(u), e.d), e.v0, e.v1);
-  const occ::handle<Geom2d_Curve> on_e = new Geom2d_Line(gp_Pnt2d(u, 0), gp_Dir2d(0, 1));
+  const occ::handle<Geom2d_Curve> on_e = on_ruling(e, u, 0, 1, e.v0, e.v1);
   IntTools_Curve                  ic(line, extrusion_first ? on_e : on_other, extrusion_first ? on_other : on_e, Precision::Confusion());
   return ic;
 }
@@ -2589,7 +2706,7 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
     IntTools_Curve     ic;
     if (const std::optional<Extruded>& x = g_first ? xa : xb)
     {
-      if (!lifted(K, [&](double u) { return x->c->Value(u); }, x->d, [](double u, double s) { return gp_Pnt2d(u, s); }, x->u0, x->u1, std::max(32, 8 * (x->c->NbKnots() - 1)), g_first, ic))
+      if (!lifted(K, [&](double u) { return x->c->Value(u); }, x->d, [&](double u, double s) { return x->uv(u, s); }, x->u0, x->u1, std::max(32, 8 * (x->c->NbKnots() - 1)), g_first, ic))
         return false;
       out.push_back(ic);
       return true;
@@ -2619,6 +2736,27 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
   {
     const gp_Pln P = pl->Pln();
     const gp_Dir n = P.Axis().Direction();
+    // Along the plane (the direction in it): rulings where the profile, seen along the direction, crosses the plane's
+    // trace (exact lines, as Parasolid's, where OCCT's approximates them: an imported wall's window cut 0.6 um bowed).
+    if (std::abs(n.Dot(e.d)) <= along)
+    {
+      const gp_Vec   w(frame.Location(), P.Location());
+      const gp_Dir   across = n.Crossed(e.d);
+      const gp_Pnt2d o(w.Dot(gp_Vec(frame.XDirection())), w.Dot(gp_Vec(frame.YDirection())));
+      std::vector<std::pair<double, double>> at;
+      if (!crossings2d(new Geom2d_Line(o, gp_Dir2d(across.Dot(frame.XDirection()), across.Dot(frame.YDirection()))), flat(e.c, frame), at))
+        return false;
+      const gp_Dir2d up(e.d.Dot(P.XAxis().Direction()), e.d.Dot(P.YAxis().Direction()));
+      for (const auto& [_, u] : at)
+      {
+        if (u < e.u0 - 1e-9 || u > e.u1 + 1e-9)
+          continue;
+        double pu = 0, pv = 0;
+        ElSLib::Parameters(P, e.c->Value(u), pu, pv);
+        out.push_back(ruling(e, u, new Geom2d_Line(gp_Pnt2d(pu, pv), up), e_first));
+      }
+      return true;
+    }
     if (std::abs(std::abs(n.Dot(e.d)) - 1) > along)
       return false;
     const double h = gp_Vec(e.c->Pole(1).XYZ()).Dot(gp_Vec(e.d));
@@ -2632,7 +2770,7 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
     occ::handle<Geom_BSplineCurve> moved = occ::down_cast<Geom_BSplineCurve>(e.c->Copy());
     moved->Translate(gp_Vec(e.d) * v);
     const occ::handle<Geom_Curve>   curve = new Geom_TrimmedCurve(moved, e.u0, e.u1);
-    const occ::handle<Geom2d_Curve> on_e  = new Geom2d_Line(gp_Pnt2d(0, v), gp_Dir2d(1, 0));
+    const occ::handle<Geom2d_Curve> on_e  = on_profile(e, v);
     const occ::handle<Geom2d_Curve> on_p  = flat(moved, P.Position().Ax2());
     out.emplace_back(curve, e_first ? on_e : on_p, e_first ? on_p : on_e, Precision::Confusion());
     return true;
@@ -2673,7 +2811,7 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
       if (ua < xa->u0 - 1e-9 || ua > xa->u1 + 1e-9 || ub < xb->u0 - 1e-9 || ub > xb->u1 + 1e-9)
         continue;
       const double w0 = gp_Vec(xb->c->Value(ub), xa->c->Value(ua)).Dot(gp_Vec(xb->d));
-      out.push_back(ruling(*xa, ua, new Geom2d_Line(gp_Pnt2d(ub, w0), gp_Dir2d(0, same > 0 ? 1 : -1)), true));
+      out.push_back(ruling(*xa, ua, on_ruling(*xb, ub, w0, same > 0 ? 1 : -1, xa->v0, xa->v1), true));
     }
     return true;
   }
@@ -3783,15 +3921,25 @@ const char* brep_body_cached(const OcShape& s, BrepBody& b, double& max_tol) { r
 
 // OCCT patch 0028's hook (IntTools_FaceFace::Perform, every face / face section OCCT makes, its pave filler's too):
 // a round touching a coaxial cylinder, cone, sphere or torus along one circle, that exact circle, where OCCT's marching
-// near the tangency took seconds and broke it into pieces (a user's rib rounds, 4.9 s a pair on Windows). Any other
-// pair: 0, OCCT's own section as before.
+// near the tangency took seconds and broke it into pieces (a user's rib rounds, 4.9 s a pair on Windows); a plane and
+// an extrusion (a surface of linear extrusion, or a B-spline face straight along a direction: an imported wall), the
+// profile moved to the plane or, the plane containing the direction, the rulings there: exact lines, as Parasolid's,
+// where OCCT's marching bowed them (a user's window cut through a Mac mini's corner wall, 10.0012 mm for 10). Any
+// other pair: 0, OCCT's own section as before.
 extern "C" int noshape_face_face(const TopoDS_Face& theF1, const TopoDS_Face& theF2, NCollection_Sequence<IntTools_Curve>& theCurves)
 {
   try
   {
     std::vector<IntTools_Curve> lines;
     bool                        touched = false;
-    if (!noshape::coaxial_sections(theF1, theF2, lines, &touched) || !touched || lines.empty())
+    bool                        ours    = noshape::coaxial_sections(theF1, theF2, lines, &touched) && touched && !lines.empty();
+    if (!ours)
+    {
+      lines.clear();
+      const bool p1 = !occ::down_cast<Geom_Plane>(BRep_Tool::Surface(theF1)).IsNull(), p2 = !occ::down_cast<Geom_Plane>(BRep_Tool::Surface(theF2)).IsNull();
+      ours = (p1 != p2) && (p1 ? noshape::extruded(theF2) : noshape::extruded(theF1)) && noshape::own_sections(theF1, theF2, lines);
+    }
+    if (!ours)
       return 0;
     const noshape::KernelTimer timer("occt.own_face_face");
     for (const IntTools_Curve& c : lines)
