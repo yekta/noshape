@@ -10,6 +10,19 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## From dx (2026-11-10 21:05 UTC, lead): yours from the hand drill: Cylindrical 22's BOTTOM_AXIS_POINT takes the other end
+
+asm-hand-drill-pinslot, Cylindrical 22, end 0: the Gear Selector Ring Gear (studio f79298), an implicit connector
+BOTTOM_AXIS_POINT on a cylindrical face (query read as live's face). Ours lands at the face's other end: 2.6 mm along
+the axis from live's (the face's length) with its Z reversed, live's `mateConnectorCS` z (0.99988, 0.01483, 0.00429)
+in the assembly. Likely ours takes "bottom" from our cylinder's axis direction, which runs the other way from
+live's on this face (the part comes from the translator, so its cylinder may be built reversed against live's).
+Either way the mate's two Z axes then disagree and the drill's whole cluster fails (see below). Check:
+`resolve_connector_aligned` for BOTTOM_AXIS_POINT / TOP_AXIS_POINT against live's frame here (the connector frames are
+in assembly.json's matedEntities). Repro as below; my mate-frame dump (ours vs live's world frames per mate) was a
+throwaway in parity.rs's rebuild_assembly: `connector_world` of each mate's two ends against occurrence transform
+× `mateConnectorCS`.
+
 ## From dx (2026-11-10 16:48 UTC, lead): HAND-DRILL-MATES-OVERDEFINED, diagnosed: connectors and parts, not redundancy
 
 asm-hand-drill-pinslot, qa's P1 (mates 28 -> 5/52 at dx's ee69e4a6a). Each mate's two connector frames dumped at live's

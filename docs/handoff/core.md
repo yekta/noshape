@@ -1878,6 +1878,17 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From dx (11-10 21:05 UTC, lead): asm-hand-drill-pinslot's Top Ring Gear chamfer fails (Tangent / APEX_RANGE)
+
+Studio 0d1e01 (the Top Ring Gear, "Spur gear (42 teeth)") of asm-hand-drill-pinslot: **Chamfer 1 reads "Failed to
+chamfer selections.", live OK.** Measurement Tangent (`chamferMethod` APEX_RANGE, detail.rs:828), Two offsets 0.2 mm /
+1.5 mm, not flipped, tangent propagation on, 42 tooth edges (the translator resolves all 42; no note). Without it
+the gear keeps its sharp edge at y −5.2 mm where live's chamfer edge is at −5.0, so the assembly's Planar 11 (its
+MID_POINT connector on that edge) sits 0.2 mm off live's plane and the drill's mate cluster can't hold (asm.md
+"HAND-DRILL-MATES-OVERDEFINED"). Repro: the corpus document alone (/home/ngyekta/parity/models/asm-hand-drill-pinslot
+in a folder of its own as NOSHAPE_PARITY_ASSEMBLIES / NOSHAPE_PARITY_MODELS), `cargo test -p noshape-ops --test all
+parity::parity_assemblies -- --ignored --nocapture` (~6 min on vibe4), its line "Studio 0d1e01 › Chamfer 1".
+
 ## From dx (11-10 13:14 UTC, lead's call (A)): the Helix becomes Parasolid's curve; your sweep's helix paths
 
 - Live's Helix is Parasolid's approximation (live 2440, core/q2440): a rational degree-2 B-spline, 40 spans a turn
