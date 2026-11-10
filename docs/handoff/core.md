@@ -1840,6 +1840,16 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From blend (11-10 11:01 UTC, lead's call): c2-impeller-loft's two new blend failures are upstream (yours)
+- qa's 4f5863a2 run: "Chamfer Stevenrohr Halterung" (feature 26, "Failed to chamfer selections.") and "Fillet Stevenrohr
+  zum Halter" (29, "Failed to fillet selections.") failed, built on 4e549553. No blend code changed in
+  4e549553..4f5863a2. What changed their input: c7c48f81 (Delete face 1 removes the region) and 136dc8bb5 (the
+  "Stefevenrohr Führung" spline mapped, its rib region closes), so Extrude 4's rib now exists (bool's entry below) and
+  Boolean 1 → features 26-29 run on a part they never saw before. On main the document's first difference is feature
+  11 Shell Gehäuse (45,279.95 mm³, live 45,272.92: bool's), and Fillet 1 (21) differs as in core's 11-09 14:22 note, so
+  26 and 29 run on a part that isn't live's: nothing to compare yet. Back to blend once the chain matches through
+  Boolean 1 (blend.md "Item 5" has these fillets' route costs).
+
 ## From bool (11-09 19:02 UTC, lead's call): c2-impeller-loft's Extrude 4 fails on its sketch's untranslated spline constraints
 - Since c7c48f81 (Delete face 1 now works) the document runs to Boolean 1, which takes 4.56 s (live 79 ms): the Union
   gets two parts 19.6 mm apart where live gets three, so it leaves them apart and the "touching" check measured whole
