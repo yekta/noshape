@@ -962,12 +962,14 @@ fn stale_drawings_warning(doc: &Entity<DocModel>, stale: &Rc<std::cell::RefCell<
     )
 }
 
-/// The fields as live's recorder reads them: the name unlabelled, the description by its hint.
+/// The fields as live's recorder reads them: Create version's name unlabelled and its description by its hint;
+/// Create workspace's (one form group, live 2418) Name and Description.
 fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, open: Option<Rc<std::cell::Cell<bool>>>, cx: &App) -> AnyElement {
     let pal = p();
     let label = |t: &str| div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(t.to_string());
-    let name_input = os::modal_input(None, name, cx);
-    os::note_modal_input(Some("Description cannot contain HTML."), &desc.read(cx).value());
+    let workspace = open.is_some();
+    let name_input = os::modal_input(workspace.then_some("Name"), name, cx);
+    os::note_modal_input(Some(if workspace { "Description" } else { "Description cannot contain HTML." }), &desc.read(cx).value());
     os::modal_body()
         .gap(px(10.))
         .child(h_flex().gap(px(4.)).child(label("Name:")).child(div().w(px(300.)).child(os::input_h(name_input, 34.).text_size(px(14.)))))

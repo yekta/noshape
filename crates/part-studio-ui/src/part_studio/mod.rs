@@ -510,6 +510,11 @@ impl Focusable for PartStudioView {
 }
 
 impl PartStudioView {
+    /// The Part Studio shows a part (its tab menu's Export… needs one: live 2409).
+    pub fn has_parts(&self) -> bool {
+        self.display.bodies.iter().any(|b| part_section(b) == "parts")
+    }
+
     /// The 3D viewport (smoke test).
     pub fn viewport_entity(&self) -> Entity<Viewport> {
         self.viewport.clone()

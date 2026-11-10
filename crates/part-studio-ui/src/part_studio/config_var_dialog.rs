@@ -124,8 +124,10 @@ impl PartStudioView {
                 })
             })
             .collect();
-        let focus = if editing.is_some() { default.clone() } else { name.clone() };
-        focus.update(cx, |s, cx| s.focus(window, cx));
+        // A new one types its name; Edit definition… focuses nothing (live config-variable-edit-definition).
+        if editing.is_none() {
+            name.update(cx, |s, cx| s.focus(window, cx));
+        }
         self.ui.var_input = Some(VarInputDialog { editing, edit_name, kind, name, default, min, max, _subs: subs });
         cx.notify();
     }

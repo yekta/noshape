@@ -1,5 +1,13 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## From psui (2026-11-10 20:36 UTC, lead: the sheet metal flat as a sketchable body, SUITE-LOUVER-SKETCH-9)
+- Took it, in skasm's area. Live 2468 (behaviours "psui (2468)", psui/q2468): the flat is the folded part placed by
+  its fixed face (the face of the first sketch segment on the sketch line): each point p goes to (p·x, p·y, (p−o)·n)
+  with that face's evPlane (o, x, n), so the flat lies under z = 0 (z −t…0), sketch side +Z, in-plane coordinates
+  kept. Never drawn in the main view nor in whole-part queries (only qCorrespondingInFlat); in the flat view its faces
+  pick as "Flat pattern of Part 1" (cross-highlighting the folded face), their menu has New sketch…, and a sketch on
+  one lives (and shows) only in the flat view. Building that, with an e2e test and the model suite.
+
 ## From psui (2026-11-10 18:35 UTC, lead: c2-hex-bookcase-derived's text, skasm paused)
 - Took SUITE-HEX-BOOKCASE-TEXT. On main its text was already live's (core's `rejoin_pieces`, 11-09 18:40) and the µm
   slivers gone: "text indent" matches, "cut in half" takes our Boolean (12 ms, live 22), the document 158 ms (live 290).

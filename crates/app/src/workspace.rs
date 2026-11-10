@@ -397,6 +397,7 @@ impl Workspace {
             self.recent.retain(|t| *t != prev && *t != tab);
             self.recent.insert(0, prev);
             self.recent.truncate(16);
+            crate::compare_mode::tab_opened(&self.doc, tab, cx);
         }
         self.active = Some(tab);
         // The tab bar shows the folder the tab is in.
@@ -1503,6 +1504,8 @@ impl Workspace {
                 }
                 m.separator().item(I::new("Paste tab").icon_name("paste").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.paste_tab(w, cx))))
             });
+            // Live 2414: Escape leaves it open (a click elsewhere closes it).
+            crate::os_menu::mark_page_dropdown(&menu, cx);
             let h = window.viewport_size().height;
             crate::os_menu::open_anchored(point(px(crate::ui::RAIL_W), h - px(crate::ui::TAB_BAR_H)), Anchor::BottomLeft, menu, window, cx);
         });
@@ -1831,7 +1834,9 @@ impl Workspace {
                             }));
                         // Live (dom/context-menus-partstudio.txt rmb-tab-partstudio / -assembly, TAB-EXPORT-MISSING):
                         // Part Studio, Assembly and Drawing tabs end with Export… (before an Assembly's Release…).
-                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
+                        // (Not a Part Studio without parts: live 2409.)
+                        let partless = matches!(view.read(cx).views.get(&id), Some(TabView::PartStudio(v)) if !v.read(cx).has_parts());
+                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") && !partless { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
                         // Release management (help image Release_highlighted2, live
                         // rmb-tab-assembly / -drawing: the last entry, after Export…):
                         // Release… for Assemblies, Drawings, Variable Studios and files

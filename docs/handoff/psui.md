@@ -719,7 +719,10 @@ unversioned meta `version-part-properties/<mv>`, laid over the version whenever 
 op `assembly_linked_part_properties`; Pin reference / Unpin reference (`Assembly::pinned_references`: updates and the
 Reference manager leave it, pinned icon), op `assembly_pin_reference`. Feature Studio's narrow-window takes (window 1600 / 1280 / 1500, dark theme):
 the toolbar slice re-fits to the window. Next from 2464: the instance menu's Edit in context, Create Drawing of <part>…
-and Release… for another document's part.
+and Release… for another document's part. After the flat pattern (lead 21:00): live 2467, the Feature Studio notices
+panel: a click on a notice's row only folds its stack (caret stays); the stack rows are the links (in-studio line, the
+Part Studio's feature with the panel kept open, std ↗ with "Definition is in a linked reference external to this
+workspace"); live reports 15:13 where ours says 14:12 (1-based line and column).
 
 **11-08 22:09 UTC, speed area (lead: parity index speed 70.8 %, psui and bool first).** The cases: 85 parity
 regenerations + 13 opens (all opens at or under live: 0 lost). Profiled on vibe5 (`NOSHAPE_PARITY_SPLIT=1`

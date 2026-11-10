@@ -214,6 +214,10 @@ def normalize_live(state):
             # reads, sketch-row-copy-paste-onto-front).
             if isinstance(it, dict) and it.get("kind") == "SKETCH_ENTITY" and it.get("owner") is None:
                 it.pop("owner", None)
+    # Ctrl+Space's card: an empty one (its div stays in the page) is none (live 2414).
+    doc = (state or {}).get("document")
+    if isinstance(doc, dict) and isinstance(doc.get("switcher"), dict) and not doc["switcher"].get("items"):
+        doc["switcher"] = None
     # The bubble's close button is part of live's text ("Select a sketch plane × Close").
     if isinstance((state or {}).get("message"), str):
         state["message"] = state["message"].removesuffix("× Close").strip()
@@ -481,6 +485,38 @@ INSERT_FIXED = {"Current document", "Other documents", "Standard content", "Part
 PANELS_READ_SINCE = {"Insert parts and assemblies": "2026-11-09T00:00"}
 
 
+def reference_manager_as_panel(a, b):
+    """Live's recorder reads the Reference manager as a panel of texts in its recordings from 2026-11-10 on (before, as a
+    feature dialog with tabs and fields): ours' dialog put in that form when live's is."""
+    da, db = (a or {}).get("dialog"), (b or {}).get("dialog")
+    if not (isinstance(da, dict) and isinstance(db, dict) and da.get("title") == db.get("title") == "Reference manager"
+            and da.get("kind") == "panel" and db.get("kind") == "feature"):
+        return b
+    text = [t.get("label") for t in db.get("tabs") or []]
+    for f in db.get("fields") or []:
+        if f.get("kind") == "text":
+            text.append(f.get("label"))
+            continue
+        if f.get("kind") == "boolean":
+            text.append("[x] " if f.get("checked") else "[ ] ")
+        text.append(f.get("label"))
+        text += str(f.get("text") or "").split()
+    text.append(db.get("okLabel"))
+    return dict(b, dialog={"kind": "panel", "title": "Reference manager", "text": [t for t in text if t is not None]})
+
+
+def old_workspace_labels(a, b):
+    """The Create workspace modal's fields read before live's 2026-11-10 recorder (live 2418): the name unlabelled and
+    the description by its hint; ours names them as the new one does."""
+    da, db = (a or {}).get("dialog"), (b or {}).get("dialog")
+    if not (isinstance(da, dict) and isinstance(db, dict) and str(da.get("title", "")).startswith("Create workspace from")):
+        return b
+    fa, fb = da.get("fields") or [], db.get("fields") or []
+    old = {None: "Name", "Description cannot contain HTML.": "Description"}
+    fields = [dict(y, label=x.get("label")) if isinstance(x, dict) and isinstance(y, dict) and old.get(x.get("label"), object()) == y.get("label") else y for x, y in zip(fa, fb)] + fb[len(fa):]
+    return dict(b, dialog=dict(db, fields=fields))
+
+
 def insert_panel(state):
     d = (state or {}).get("dialog")
     if isinstance(d, dict) and d.get("kind") == "panel" and d.get("title") == "Insert parts and assemblies":
@@ -496,7 +532,7 @@ def runner_names(state, start, live_side):
     if not (isinstance(d, dict) and d.get("kind") == "panel" and isinstance(d.get("text"), list) and start):
         return state
     def name(t):
-        if live_side and isinstance(t, str) and re.fullmatch(r"noshape ui parity live2-\d+", t):
+        if live_side and isinstance(t, str) and re.fullmatch(r"noshape ui parity live2-\d+[a-z]?", t):
             return "<document>"
         if live_side and t == f"start {start}":
             return "Part Studio 1"
@@ -563,7 +599,7 @@ def compare(live, ours, whole_document=True):
         # with `url`: docs-*, prefs-*) reads it.
         tip_blanked = isinstance(a, dict) and "url" not in a and (step or {}).get("do") != "hover"
         a = insert_panel(runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True))
-        b = insert_panel(runner_names(json.loads(json.dumps(b)), start_name, False))
+        b = insert_panel(runner_names(old_workspace_labels(a, reference_manager_as_panel(a, json.loads(json.dumps(b)))), start_name, False))
         bd = (b or {}).get("dialog")
         if isinstance(bd, dict) and str(live.get("recorded", "")) < PANELS_READ_SINCE.get(bd.get("title"), "") and (a or {}).get("dialog") is None:
             b = dict(b, dialog=None)
@@ -577,6 +613,11 @@ def compare(live, ours, whole_document=True):
         elif a is not None and isinstance(a.get("message"), str) and isinstance((b or {}).get("message"), str) and a["message"] != b["message"] \
                 and t is not None and t - toast_shown.get(b["message"], t) >= TOAST_MS:
             a, b = dict(a, message=None), dict(b, message=None)
+        # Live's runner on an assembly start's Part Studio (the lane's shared start, live 2418) still reads the lane's
+        # assembly: no assembly where ours shows the Part Studio.
+        if isinstance(a, dict) and a.get("assembly") is not None and a.get("partsHeading") is not None and (b or {}).get("assembly") is None \
+                and (b or {}).get("partsHeading") is not None:
+            a = dict(a, assembly=None)
         keys = KEYS + [k for k in LATER_KEYS if k in (a or {}) and (whole_document or k != "document")]
         if (a or {}).get("drawing"):
             keys = [k for k in keys if k not in NOT_IN_DRAWINGS]

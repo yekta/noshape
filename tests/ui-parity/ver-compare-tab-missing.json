@@ -1,6 +1,6 @@
 {
  "name": "ver-compare-tab-missing",
- "about": "A Part Studio made after V1 (+ › Create Part Studio), then Compare V1: \"Can't open tab. The tab does not exist in this document comparison.\"",
+ "about": "A Part Studio made after V1 (+ › Create Part Studio), then Compare V1 with it open: no toast (live 2418; opening a tab one side lacks says \"Can't open tab. The tab does not exist in this document comparison.\")",
  "area": "psui",
  "source": "universe versions (psui 11-09, studios.md Versions list)",
  "start": "doc-versions",

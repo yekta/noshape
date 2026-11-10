@@ -161,16 +161,19 @@ pub fn compare(doc: &Entity<DocModel>, base: (Side, String), target: (Side, Stri
         code_x: Default::default(),
         origin,
     };
-    // Live cmp2-903: the open tab missing from a side.
-    let active = doc.read(cx).session.active_tab;
-    let missing = active.is_some_and(|t| s.base.tab(t).is_none() || s.target.tab(t).is_none());
+    // (The open tab missing from a side says nothing yet: live 2418, opening it does.)
     cx.default_global::<Sessions>().0.insert(doc.entity_id(), s);
     doc.update(cx, |d, _| d.comparing = true);
     changed(doc, cx);
+    Ok(())
+}
+
+/// A tab opened while comparing that one side lacks (live cmp2-903, 2418): "Can't open tab. …".
+pub fn tab_opened(doc: &Entity<DocModel>, tab: TabId, cx: &mut App) {
+    let missing = session(doc, cx).is_some_and(|s| s.base.tab(tab).is_none() || s.target.tab(tab).is_none());
     if missing {
         doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Info("Can't open tab. The tab does not exist in this document comparison.".into())));
     }
-    Ok(())
 }
 
 /// Leave compare mode once the window opens another workspace or history
