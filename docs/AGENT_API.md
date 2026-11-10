@@ -6708,7 +6708,7 @@ Examples:
 
 The sheet metal table: a model's bends (radius, angle, direction, K factor) and other joints.
 
-The "Sheet metal table and flat view" panel: the sheet metal models (the Sheet metal context select), and for `model` its Bends rows in the table's order (name as "Bend A" / "Hem B", radius, angle, Up / Down from the flat pattern's bend lines, K factor, the bend's face ids) and its Other joints rows (name, style).
+The "Sheet metal table and flat view" panel: the sheet metal models (the Sheet metal context select), and for `model` its Bends rows in the table's order (name as "Bend A" / "Hem B", radius, angle, Up / Down from the flat pattern's bend lines, K factor, the bend's face ids) and its Other joints rows (name, style); `flat_faces`: the planar faces of its parts' flats where live lays them out (fixed face on z = 0; part "Flat pattern of <part>", area, normal, offset along it), whose ids a sketch can take as its plane (sketch_create: a sketch on the flat, shown only in the flat view).
 
 Examples:
 
