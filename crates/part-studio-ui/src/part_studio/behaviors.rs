@@ -3278,7 +3278,7 @@ impl PartStudioView {
     /// Measure graphics (Onshape): a dotted line between the closest points
     /// of the measured entities, with its X (red), Y (green) and Z (blue)
     /// components.
-    pub(super) fn measure_overlay(&mut self, cx: &App) -> Vec<noshape_render::Instance> {
+    pub(super) fn measure_overlay(&mut self) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineData, LineSegment};
         // Live (behaviours "ui (10-23 a)"): no measure lines from the
         // selection alone; hovering a distance row of the open Measure panel
@@ -3288,7 +3288,6 @@ impl PartStudioView {
             return Vec::new();
         }
         let sel = self.selection.clone();
-        let Some(ctx) = self.measure_context(&sel, cx) else { return Vec::new() };
         // Uploaded once per selection and row (refresh_scene runs on every hover).
         if let Some((s, h, inst)) = &self.ui.measure_lines
             && *s == sel
@@ -3296,14 +3295,9 @@ impl PartStudioView {
         {
             return inst.iter().cloned().collect();
         }
-        let results = match &self.measure_cache {
-            Some((s, r)) if *s == sel => r.clone(),
-            _ => {
-                let r = super::menus::studio_measure(&ctx, &sel);
-                self.measure_cache = Some((sel, r.clone()));
-                r
-            }
-        };
+        // The panel's measurement (`selection_measurement`, off the UI thread): no line until it arrives, which
+        // refreshes the scene.
+        let Some(results) = self.measure_cache.as_ref().filter(|c| c.selection == sel).and_then(|c| c.results.clone()) else { return Vec::new() };
         let mut l = LineData::default();
         for (label, m) in results {
             if Some(&label) == hover.as_ref()

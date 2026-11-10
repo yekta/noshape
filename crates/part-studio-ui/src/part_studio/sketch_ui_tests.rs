@@ -3476,3 +3476,62 @@ fn a_removed_parts_outline_is_computed_once_off_the_ui_thread(cx: &mut TestAppCo
     let after = cx.update(|cx| view.read(cx).ui.removed_outline.as_ref().map(|(k, o)| (k.clone(), o.is_some())));
     assert_eq!(after, key.map(|k| (k, true)));
 }
+
+/// User P0 (lead 11-10): selecting two big imported parts froze the app for 51 s while the readout measured them on
+/// the UI thread. The measurement is now a background task keyed by the selection: the frame that shows the selection
+/// draws without it (no readout yet), and the readout, the Measure panel and its lines take it when it arrives. Two
+/// many-faced prisms stand in for the user's parts.
+#[gpui::test]
+fn a_selections_measurement_doesnt_hold_up_the_frame(cx: &mut TestAppContext) {
+    // A 96-sided star prism and a copy 50 mm along X: many faces each.
+    let star = |cx0: f64| -> Vec<serde_json::Value> {
+        let pts: Vec<[f64; 2]> = (0..96).map(|i| {
+            let a = i as f64 * std::f64::consts::TAU / 96.0;
+            let r = if i % 2 == 0 { 25.0 } else { 21.0 };
+            [cx0 + r * a.cos(), r * a.sin()]
+        }).collect();
+        (0..96).map(|i| serde_json::json!({ "line": [pts[i], pts[(i + 1) % 96]] })).collect()
+    };
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": star(0.0) },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "30 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": star(50.0) },
+        { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "30 mm", "operationType": "NEW" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "measure-off-thread", Some(start));
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count() == 2);
+    let parts: Vec<Reference> = cx.update(|cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect());
+    assert_eq!(parts.len(), 2, "the two prisms");
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.selection = parts.clone();
+        cx.notify();
+    }));
+    // One frame, the background threads held: it draws with the measurement pending, not computed in it.
+    cx.update_window(window, |_, w, cx| {
+        w.draw(cx).clear(cx);
+    })
+    .unwrap();
+    cx.update(|cx| {
+        let c = view.read(cx).measure_cache.as_ref().expect("the measurement started by the frame");
+        assert!(c.selection == parts && c.results.is_none(), "measured on the UI thread");
+    });
+    // The task runs; the readout takes its result.
+    draw(cx, window);
+    cx.update(|cx| {
+        let c = view.read(cx).measure_cache.as_ref().unwrap();
+        let r = c.results.as_ref().expect("the measurement arrived");
+        assert!(r.iter().any(|(l, _)| l == "Min dist"), "two parts' distance rows: {:?}", r.iter().map(|(l, _)| l).collect::<Vec<_>>());
+    });
+    // Another selection drops the old one's result; its own comes on.
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.selection = vec![parts[0].clone()];
+        cx.notify();
+    }));
+    cx.update_window(window, |_, w, cx| {
+        w.draw(cx).clear(cx);
+    })
+    .unwrap();
+    cx.update(|cx| assert!(view.read(cx).measure_cache.as_ref().is_some_and(|c| c.selection.len() == 1 && c.results.is_none())));
+    draw(cx, window);
+    cx.update(|cx| assert!(view.read(cx).measure_cache.as_ref().is_some_and(|c| c.selection.len() == 1 && c.results.is_some())));
+}

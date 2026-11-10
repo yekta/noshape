@@ -964,14 +964,8 @@ impl PartStudioView {
             let sel = self.selection.clone();
             let sel_count = sel.len();
             let ctx = self.measure_context(&sel, cx)?;
-            let results = match &self.measure_cache {
-                Some((s, r)) if *s == sel => r.clone(),
-                _ => {
-                    let r = studio_measure(&ctx, &sel);
-                    self.measure_cache = Some((sel, r.clone()));
-                    r
-                }
-            };
+            // Nothing until the measurement arrives (two big imported parts take seconds).
+            let results = self.selection_measurement(&sel, ctx, cx)?;
             // Live (psb 10-20 m): the first primary row, plus the distances
             // of a circular context on the same line; nothing for three edges.
             measure::quick_line(&results, sel_count)
@@ -1346,14 +1340,8 @@ impl PartStudioView {
             }
             let sel = self.selection.clone();
             let ctx = self.measure_context(&sel, cx).unwrap_or(ctx);
-            let results = match &self.measure_cache {
-                Some((s, r)) if *s == sel => r.clone(),
-                _ => {
-                    let r = studio_measure(&ctx, &sel);
-                    self.measure_cache = Some((sel, r.clone()));
-                    r
-                }
-            };
+            // The rows fill in when the measurement arrives.
+            let results = self.selection_measurement(&sel, ctx, cx).unwrap_or_default();
             let filter = self.ui.measure_type;
             let units = self.measure_units(cx);
             let f = |q: Quantity| measure_fmt_in(q, &units);
@@ -2165,6 +2153,32 @@ impl PartStudioView {
 /// measure" is empty).
 fn no_material_notice_due(measured: &[BodyId], density: impl Fn(&BodyId) -> Option<f64>) -> bool {
     measured.iter().any(|b| density(b).is_none())
+}
+
+impl PartStudioView {
+    /// The selection's measurements, computed once per selection on a background thread: `None` until they arrive
+    /// (the readout shows nothing meanwhile), then the view redraws with them (readout, panel and lines alike). A
+    /// new selection drops the old task, and a result for a selection no longer current is ignored.
+    pub(super) fn selection_measurement(&mut self, sel: &[noshape_model::reference::Reference], ctx: std::sync::Arc<noshape_model::regen::context::Context>, cx: &mut Context<Self>) -> Option<Vec<(String, measure::Measurement)>> {
+        if let Some(c) = &self.measure_cache
+            && c.selection == sel
+        {
+            return c.results.clone();
+        }
+        let (key, of) = (sel.to_vec(), sel.to_vec());
+        let task = cx.spawn(async move |this, cx| {
+            let results = cx.background_spawn(async move { studio_measure(&ctx, &of) }).await;
+            let _ = this.update(cx, |this, cx| {
+                let Some(c) = this.measure_cache.as_mut().filter(|c| c.selection == key) else { return };
+                c.results = Some(results);
+                this.ui.measure_lines = None;
+                this.refresh_scene(false, cx);
+                cx.notify();
+            });
+        });
+        self.measure_cache = Some(super::MeasureCache { selection: sel.to_vec(), results: None, _task: task });
+        None
+    }
 }
 
 /// The Part Studio's measurements of a selection: no part volume (live, qa5

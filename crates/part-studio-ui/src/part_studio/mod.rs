@@ -356,8 +356,14 @@ fn only_hidden_added(a: &Feature, b: &Feature) -> bool {
         && rest(a) == rest(b)
 }
 
-/// Measurements of the current selection: (selection, labelled results).
-type MeasureCache = (Vec<Reference>, Vec<(String, noshape_model::regen::measure::Measurement)>);
+/// Measurements of a selection (the readout, the Measure panel and its lines): computed off the UI thread
+/// (`selection_measurement`); `results` is `None` until they arrive. Dropping it drops the task (a new selection's
+/// replaces it; a stale result is ignored).
+pub(super) struct MeasureCache {
+    pub(super) selection: Vec<Reference>,
+    pub(super) results: Option<Vec<(String, noshape_model::regen::measure::Measurement)>>,
+    _task: Task<()>,
+}
 
 /// What a new folder from the "Folder name" popup wraps: features (Add
 /// selection to folder…, the header's New folder) or a folder (its row's
@@ -1413,7 +1419,7 @@ impl PartStudioView {
         extra.extend(self.consumed_picks_overlay(&selection, &accent, &changed));
         selection.retain(|r| !changed.contains(r));
         extra.extend(self.select_other_overlay());
-        extra.extend(self.measure_overlay(cx));
+        extra.extend(self.measure_overlay());
         if !on_handle {
             extra.extend(self.midpoint_overlay(cx));
         }
