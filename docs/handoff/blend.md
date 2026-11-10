@@ -5,12 +5,38 @@ ticket BLEND-RUST), OCCT's blend route and its patches, and the blend features i
 (regen/features/detail.rs `fillet` / `chamfer` / `variable_fillet`, blend_section.rs, faceBlend). core keeps the rest
 and reviews blend changes on request. History before 11-07: docs/handoff/core.md ("noshape's own blends",
 "Mixed-radius corners", the 11-07 states).
-Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh ...`), scratch
+Worktree /root/projects/noshape-wt/blend (and blend2 for a second build), builds on vibe3 since 11-10 (lead:
+`NOSHAPE_RB_HOST=vibe3 tools/tiers/rb.sh ...`; suites: /root/blend-scratch/bin/suite-pair.sh / asm-pair.sh <tag> vibe3), scratch
 /root/blend-scratch. Any change in crates/brep passes bool's gate first (handoff/bool.md: every corpus and parity56 at
 0 differences from OCCT).
 
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
+
+## 11-10 22:38 UTC: knife's Chamfer 1 queued (a11be226); the chamfer rule; the impeller's chamfer is a mitre
+- Live 2462 / 2441: a Face offset chamfer is the chord between the feet of a point at fixed offsets from both faces
+  (equal distance: one rolling ball), the offsets sized so the asked distances (and angle) hold at one place: the edge's
+  middle (2441: R = √3 / 1/√3 for a tilted hole / plane), for a chain the middle of its longest edge (2462: sizing at
+  the chain's middle is 0.0017 mm off all along). Where the faces' angle is constant this is OCCT's chamfer.
+- Knife Chamfer 1 (`ChamferRef::offsets`, `feet_offsets`): when OCCT fails and the angle varies along the chain, the
+  sections keep those offsets; strips within 0.0005 mm of live's 34 samples (0.0019 near the tip); 19/51/33, live
+  19/50/32: live has no edge between the strip and the slope at x -7.8, where its strip is still 0.011 mm wide (most
+  likely a Parasolid tolerant vertex, 11 µm against its 10 µm blend tolerance); not copied. Frames oriented once per
+  edge, 24 sections: 3.1 -> 1.3 s (live 19 ms; the cut and OCCT's failed attempt left). A constant-angle chain stays
+  OCCT's (c2-rings-loft's Circular pattern 2 replays Chamfer 2, which OCCT fails on the copies: the fallback made it
+  183 faces, live 103). Model suite 818 = 818, assembly suite unchanged. T1 features_c::a_distance_angle_chamfer_
+  keeps_constant_offsets_as_live.
+- Equal-distance rule (rings-loft), local branch blend-equal (patch /root/blend-scratch/patches/equal-wip-all.patch, not
+  built yet): `rim_chamfer_tool` (ring_blend's chamfer: the ball's touch curves exact from its centres, a closed loft
+  of triangles, corner in the air), `rims_tilted` (tilted rims to ring_blend even when they don't overflow), T1
+  equal_chamfers_on_tilted_rims_roll_one_ball_as_live (live's 97.880 / 52.661 mm²). A whole rim's middle follows
+  Parasolid's ellipse start (the major axis end opposite the cylinder's axis seen on the plane): our cylinder's axis
+  sign may differ in translated documents.
+- The impeller's Chamfer Stevenrohr Halterung (core's hand-off below), on main + the knife change (blend2, vibe3
+  /tmp/blend-imp/chamfer-13): the three edges lie between the holder's x = 5 plane and the arc's cylinder / two thin
+  extrusions, 90° all along; the arc and each 0.31 mm piece meet at an 8.9° kink (not tangent). A 3.5 mm / 20°
+  chamfer (1.27 mm on the other face) ten times wider than the pieces: OCCT fails at the two mitres; live adds three
+  faces. Next: build such a chain as each edge's chamfer region (OCCT per edge works) mitred at the kinks.
 
 ## From core (2026-11-10 19:36 UTC, lead's list): c2-impeller-loft's Chamfer Stevenrohr Halterung (26) and Fillet Stevenrohr zum Halter (29)
 - qa flagged both as regressed (built at 4e549553, ERROR since): they built only while Boolean 1 had failed; core's
