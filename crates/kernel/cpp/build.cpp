@@ -1216,7 +1216,7 @@ std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& in, const OcShapeLis
   TopExp::MapShapesAndAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
   occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
   BRep_Builder                   B;
-  bool                           any = false;
+  std::vector<TopoDS_Edge>       turned;
   for (const TopoDS_Shape& x : edges.items)
   {
     const TopoDS_Edge e = TopoDS::Edge(x.Oriented(TopAbs_FORWARD));
@@ -1278,13 +1278,29 @@ std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& in, const OcShapeLis
       BRepLib::SameParameter(ne, tol);
     }
     rs->Replace(e, ne.Reversed());
-    any = true;
+    turned.push_back(ne);
   }
-  if (!any)
+  if (turned.empty())
     return wrap(s);
   const TopoDS_Shape out = rs->Apply(s);
-  if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+  if (out.IsNull())
     return wrap(s);
+  // Only the faces the turned edges bound are checked (the rest is as it was; the whole shape's check was 6-7 ms of
+  // a 24 ms extrude, stef-radijator's Extrude 2).
+  ShapeAncMap oef;
+  TopExp::MapShapesAndAncestors(out, TopAbs_EDGE, TopAbs_FACE, oef);
+  ShapeIMap checked;
+  for (const TopoDS_Edge& ne : turned)
+  {
+    if (!oef.Contains(ne))
+      return wrap(s);
+    for (ShapeList::Iterator fi(oef.FindFromKey(ne)); fi.More(); fi.Next())
+    {
+      const int seen = checked.Extent();
+      if (checked.Add(fi.Value()) > seen && !BRepCheck_Analyzer(fi.Value()).IsValid())
+        return wrap(s);
+    }
+  }
   return wrap(out);
 }
 
