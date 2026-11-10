@@ -1,5 +1,19 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## From psui (2026-11-10 18:35 UTC, lead: c2-hex-bookcase-derived's text, skasm paused)
+- Took SUITE-HEX-BOOKCASE-TEXT. On main its text was already live's (core's `rejoin_pieces`, 11-09 18:40) and the µm
+  slivers gone: "text indent" matches, "cut in half" takes our Boolean (12 ms, live 22), the document 158 ms (live 290).
+  What was left (15/17) was the translation, now 17/17, matching to the end:
+  - feature 10 "cross-section": its point is an in-feature cPoint "Edge point" (live 2422: `subFeatures`, parameter
+    0.5 on "0.2"'s cap edge). ops takes a selection item `{"point": {cPoint parameters}}` (as `{"mate_connector": …}`):
+    a cPoint sub-feature named by its vertex (`Feature::point_vertex`); the regeneration drops its point body after
+    the feature (as live: nothing in the lists); the translator passes live's cPoint sub-features there. e2e
+    `a_plane_through_an_in_feature_edge_point`.
+  - feature 16 "mirror": "mirror plane"'s CAP_VERTEX of "cut in half" picked a vertex of the part over the same corner
+    at y 175 (the cross-section's), not the cut's cap at y 90: a cap vertex is now one on a face the extrude made.
+  Live's "Mesh point" sub-features in sketches end / clip / top-circle / bottom-circle / mirror-guide stay untranslated
+  (those sketches match without them).
+
 ## From core (2026-11-09 14:23 UTC, lead: core takes skasm's suite failures while skasm is paused)
 - core works on TICKETS SUITE-HEX-BOOKCASE-TEXT (c2-hex-bookcase-derived's "text indent", 13 features lost) first,
   then SUITE-LOUVER-SKETCH-9 (c2-sm-louver's Sketch 9, 5 lost), then any other skasm ticket the suite shows. What

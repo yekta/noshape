@@ -825,4 +825,8 @@ fn drop_sub_features(ctx: &mut Context, f: &crate::partstudio::Feature) {
     let made = |r: &crate::reference::Reference| matches!(r, crate::reference::Reference::MateConnector { feature, .. } if f.sub_features.iter().any(|s| s.id == *feature));
     ctx.connectors.retain(|c| !made(&c.reference));
     ctx.connector_owners.retain(|(r, _)| !made(r));
+    // Their construction points too (a Plane's "Edge point", live 2422).
+    let sub = |id: &crate::reference::BodyId| f.sub_features.iter().any(|s| s.id == id.feature);
+    ctx.bodies.retain(|b| !sub(&b.id));
+    ctx.points.retain(|p| !matches!(&p.reference, crate::reference::Reference::Body(id) if sub(id)));
 }

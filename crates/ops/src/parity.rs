@@ -18,6 +18,8 @@ use std::path::Path;
 
 /// How a translated selection names an in-feature mate connector until its feature is added.
 const SUB_FEATURE: &str = "subfeature:";
+/// An in-feature construction point (cPoint sub-feature) in a translated selection, replaced by `{"point": …}`.
+const SUB_POINT: &str = "subpoint:";
 
 /// A sketch entity live made with Use (PROJECTED): our model reference for it, the shape to draw instead, live's
 /// ends (a curve) or place (a point).
@@ -86,6 +88,8 @@ pub struct Translator<'a> {
     feature_ids: HashMap<String, String>,
     /// In-feature mate connectors translated (live's sub-feature id → our parameters), placed in their feature.
     sub_params: HashMap<String, Map<String, Value>>,
+    /// The feature's in-feature construction points (cPoint sub-features, live 2422) by their live ids.
+    sub_points: HashMap<String, Map<String, Value>>,
     /// (Onshape sketch feature id, sketch entity id) → our entity id
     /// (points as "<id>.start" / ".end" / ".center").
     sketch_entities: HashMap<(String, String), String>,
@@ -320,7 +324,7 @@ impl<'a> Translator<'a> {
             // (A boolean configuration's default is a JSON boolean.)
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -574,12 +578,17 @@ impl<'a> Translator<'a> {
         step.custom = f["namespace"].as_str().is_some_and(|n| !n.is_empty());
         // Mate connectors made inside the feature's dialog (its sub-features): translated here, they go into the
         // feature's selections that name them (`{"mate_connector": …}`, ours in-feature too).
-        for sub in f["subFeatures"].as_array().into_iter().flatten().filter(|s| s["featureType"] == "mateConnector") {
+        // Construction points too (a Plane's "Edge point" on an edge at a parameter, live 2422): `{"point": …}`.
+        for sub in f["subFeatures"].as_array().into_iter().flatten().filter(|s| s["featureType"] == "mateConnector" || s["featureType"] == "cPoint") {
             let mut problems = Vec::new();
             match self.feature_params(k, sub, &mut problems) {
                 Ok((_, params)) => {
                     if let Some(oid) = sub["featureId"].as_str() {
-                        self.sub_params.insert(oid.to_string(), params);
+                        if sub["featureType"] == "cPoint" {
+                            self.sub_points.insert(oid.to_string(), params);
+                        } else {
+                            self.sub_params.insert(oid.to_string(), params);
+                        }
                     }
                 }
                 Err(e) => step.problems.push(format!("its in-feature {}: not translated: {e}", sub["featureType"].as_str().unwrap_or("?"))),
@@ -802,6 +811,8 @@ impl<'a> Translator<'a> {
             Value::String(id) => {
                 if let Some(params) = id.strip_prefix(SUB_FEATURE).and_then(|oid| self.sub_params.get(oid)) {
                     *v = json!({ "mate_connector": params });
+                } else if let Some(params) = id.strip_prefix(SUB_POINT).and_then(|oid| self.sub_points.get(oid)) {
+                    *v = json!({ "point": params });
                 }
             }
             Value::Array(items) => items.iter_mut().for_each(|x| self.place_sub_features(x)),
@@ -1792,6 +1803,10 @@ impl<'a> Translator<'a> {
         if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualCreatedByQuery"))
             && let Some(fid) = q["featureId"].as_str()
         {
+            // The feature's own construction point (its cPoint sub-feature's vertex).
+            if self.sub_points.contains_key(fid) {
+                return Ok(vec![format!("{SUB_POINT}{fid}")]);
+            }
             let ours = self.feature_ids.get(fid).cloned().ok_or_else(|| format!("feature {fid} was not built"))?;
             let kind = q["entityType"].as_str().unwrap_or("BODY");
             if q["bodyType"] == "MATE_CONNECTOR" {
@@ -2881,6 +2896,14 @@ impl<'a> Translator<'a> {
             let at = world(corner);
             let made = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 200 }))?;
             let parts: Vec<String> = made["faces"].as_array().into_iter().flatten().filter_map(|f| f["part"].as_str().map(str::to_string)).collect();
+            // A cap's vertex is on a face the extrude made (another vertex of the part over the same corner isn't:
+            // c2-hex-bookcase-derived's mirror plane on "cut in half"'s cap at y 90, not the cross-section's at 175).
+            let mut capped: std::collections::HashSet<String> = std::collections::HashSet::new();
+            for f in made["faces"].as_array().into_iter().flatten().filter_map(|f| f["id"].as_str()) {
+                if let Ok(v) = self.call("query_entities", json!({ "kind": "vertices", "of": [f], "limit": 1000 })) {
+                    capped.extend(v["vertices"].as_array().into_iter().flatten().filter_map(|v| v["id"].as_str().map(str::to_string)));
+                }
+            }
             let found = self.call("query_entities", json!({ "kind": "vertices", "limit": 100000 }))?;
             let k = per_unit(&found["units"]);
             let on: Vec<(String, f64)> = found["vertices"]
@@ -2892,7 +2915,9 @@ impl<'a> Translator<'a> {
                 .filter(|(_, q)| lateral(*q, at) < 1e-6)
                 .map(|(id, q)| (id, dot(sub(q, o), n).abs()))
                 .collect();
-            let pick = if is_start { on.iter().min_by(|x, y| x.1.total_cmp(&y.1)) } else { on.iter().max_by(|x, y| x.1.total_cmp(&y.1)) };
+            let on_caps: Vec<(String, f64)> = on.iter().filter(|(id, _)| capped.contains(id)).cloned().collect();
+            let on = if on_caps.is_empty() { on } else { on_caps };
+                let pick = if is_start { on.iter().min_by(|x, y| x.1.total_cmp(&y.1)) } else { on.iter().max_by(|x, y| x.1.total_cmp(&y.1)) };
             return pick.map(|x| x.0.clone()).ok_or_else(|| format!("{name} of {op}: no vertex of ours over {:?} mm", mm(at)));
         }
         let (kind, key, at) = match name {

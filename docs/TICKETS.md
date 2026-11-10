@@ -4259,7 +4259,8 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   Boolean's unify for one case (core.md 11-07 19:18).
 
 ## Sketch + assembly (skasm)
-- [ ] P2 SUITE-HEX-BOOKCASE-TEXT (skasm, paused; core 2026-11-08 20:05 UTC from the model suite): c2-hex-bookcase-derived's
+- [x] (psui 11-10 18:35: 17/17, matches to the end: core's rejoin fixed the text on 11-09; the in-feature cPoint and the
+  cap vertex on the extrude's own faces, skasm.md) P2 SUITE-HEX-BOOKCASE-TEXT (skasm, paused; core 2026-11-08 20:05 UTC from the model suite): c2-hex-bookcase-derived's
   "text indent" (extrude of a text sketch's regions) makes "shrunk" 43/111/70 faces/edges/vertices, live 31/87/58: the
   text's glyph regions aren't live's. 13 of 17 features lost behind it.
 - [ ] P2 SUITE-LOUVER-SKETCH-9 (skasm, paused; core 2026-11-08 20:05 UTC): c2-sm-louver's Sketch 9 frame origin [0, 0,

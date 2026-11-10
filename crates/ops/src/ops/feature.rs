@@ -9,7 +9,7 @@ use noshape_model::features::{self, Category};
 use noshape_model::params::{ParamKind, ParamValue};
 use serde_json::{Value, json};
 
-const PARAMS_DOC: &str = "Parameter values by parameter id (see `feature_schema`): booleans; enum option ids (\"BLIND\"); numbers as expression strings with units (\"25 mm\", \"0.5 in\", \"30 deg\", \"#width / 2\", \"2 * #t + 1 mm\"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools (\"region:…\", \"face:…\", \"edge:…\", \"plane:top\", \"body:…\"), where a field takes mate connectors an item `{\"mate_connector\": {Mate connector parameters}}` makes one inside the feature (the field's \"Select mate connectors\" button; no Mate connector feature is added); array parameters as arrays of objects of their item parameters.";
+const PARAMS_DOC: &str = "Parameter values by parameter id (see `feature_schema`): booleans; enum option ids (\"BLIND\"); numbers as expression strings with units (\"25 mm\", \"0.5 in\", \"30 deg\", \"#width / 2\", \"2 * #t + 1 mm\"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools (\"region:…\", \"face:…\", \"edge:…\", \"plane:top\", \"body:…\"), where a field takes mate connectors an item `{\"mate_connector\": {Mate connector parameters}}` makes one inside the feature (the field's \"Select mate connectors\" button; no Mate connector feature is added), and where a field takes a point an item `{\"point\": {cPoint parameters: pointType EDGE_POINT, entities [an edge], parameter 0…1}}` makes a construction point inside the feature (Onshape's in-feature \"Edge point\"); array parameters as arrays of objects of their item parameters.";
 
 pub fn ops() -> Vec<Op> {
     vec![
@@ -670,14 +670,17 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 /// In-feature mate connectors: a selection item `{"mate_connector": {its parameters}}` makes a mate connector inside
 /// the feature (Onshape's subFeatures, made from a field's "Select mate connectors" button) and the item names it.
-/// It starts as Onshape's: no owner part, Move ticked (live 1851).
+/// It starts as Onshape's: no owner part, Move ticked (live 1851). `{"point": {cPoint parameters}}` makes an
+/// in-feature construction point the same way (Onshape's "Edge point" / "Mesh point" sub-features, live 2422) and
+/// names its vertex.
 fn in_feature_connectors(feature: &mut noshape_model::partstudio::Feature, params: &mut serde_json::Map<String, Value>, units: &noshape_units::UnitPrefs, doc: &noshape_model::Document) -> Result<(), OpError> {
-    type Make<'a> = dyn FnMut(&serde_json::Map<String, Value>, &str) -> Result<String, OpError> + 'a;
+    type Make<'a> = dyn FnMut(&str, &serde_json::Map<String, Value>, &str) -> Result<String, OpError> + 'a;
     fn walk(v: &mut Value, path: &str, make: &mut Make) -> Result<(), OpError> {
         match v {
-            Value::Object(o) if o.len() == 1 && o.contains_key("mate_connector") => {
-                let p = o["mate_connector"].as_object().ok_or_else(|| OpError::param(path, "`mate_connector`: an object of Mate connector parameters (feature_schema mateConnector)"))?.clone();
-                *v = Value::String(make(&p, path)?);
+            Value::Object(o) if o.len() == 1 && (o.contains_key("mate_connector") || o.contains_key("point")) => {
+                let kind = if o.contains_key("point") { "point" } else { "mate_connector" };
+                let p = o[kind].as_object().ok_or_else(|| OpError::param(path, &format!("`{kind}`: an object of {} parameters (feature_schema {})", if kind == "point" { "Point" } else { "Mate connector" }, if kind == "point" { "cPoint" } else { "mateConnector" })))?.clone();
+                *v = Value::String(make(kind, &p, path)?);
             }
             Value::Array(items) => {
                 for (i, it) in items.iter_mut().enumerate() {
@@ -694,7 +697,15 @@ fn in_feature_connectors(feature: &mut noshape_model::partstudio::Feature, param
         Ok(())
     }
     let Some(ty) = noshape_model::features::get("mateConnector") else { return Ok(()) };
-    let mut make = |p: &serde_json::Map<String, Value>, path: &str| -> Result<String, OpError> {
+    let mut make = |kind: &str, p: &serde_json::Map<String, Value>, path: &str| -> Result<String, OpError> {
+        if kind == "point" {
+            let pty = noshape_model::features::get("cPoint").ok_or_else(|| OpError::invalid("points are not available"))?;
+            let mut sub = noshape_model::partstudio::Feature::in_feature_point(units).ok_or_else(|| OpError::invalid("points are not available"))?;
+            values::apply(&pty.params, &mut sub.params, p, units, doc).map_err(|e| e.under(&format!("{path}.point")))?;
+            let id = sub.id;
+            feature.sub_features.push(sub);
+            return Ok(crate::refs::to_id(&noshape_model::partstudio::Feature::point_vertex(id)));
+        }
         let mut sub = noshape_model::partstudio::Feature::in_feature_connector(&noshape_model::partstudio::ConnectorOrigin::plain(noshape_model::reference::Reference::Origin), units).ok_or_else(|| OpError::invalid("mate connectors are not available"))?;
         sub.params.set("originQuery", ParamValue::Query(Vec::new()));
         values::apply(&ty.params, &mut sub.params, p, units, doc).map_err(|e| e.under(&format!("{path}.mate_connector")))?;

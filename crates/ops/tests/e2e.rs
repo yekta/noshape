@@ -1202,6 +1202,35 @@ fn a_hole_on_an_in_feature_mate_connector() {
     assert!(g.get("sub_features").is_none(), "{g}");
 }
 
+/// An in-feature construction point (Onshape's "Edge point" sub-feature, live 2422: c2-hex-bookcase-derived's
+/// "cross-section" Plane through a point a quarter along an edge): `{"point": {cPoint parameters}}` in a selection
+/// makes it inside the feature, the plane goes through it, and no point stays in the Part Studio.
+#[test]
+fn a_plane_through_an_in_feature_edge_point() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "plane-in-feature-point.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-20, -15], [20, 15]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    // The top front edge, along x from -20 to 20 mm.
+    let edges = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [1, 0, 0], "near": [0, -15, 10], "limit": 1 }));
+    let edge = edges["edges"][0]["id"].as_str().unwrap().to_string();
+    let point = json!({ "point": { "pointType": "EDGE_POINT", "entities": [edge], "parameter": "0.25" } });
+    let p = call(&mut ctx, "feature_add", json!({ "type": "cPlane", "params": { "cplaneType": "PLANE_POINT", "entities": [point, "plane:right"] } }));
+    assert_eq!(p["feature_status"]["status"], "Ok", "{p}");
+    let g = call(&mut ctx, "feature_get", json!({ "feature": p["feature"] }));
+    let subs = g["sub_features"].as_array().unwrap_or_else(|| panic!("{g}"));
+    assert_eq!((subs.len(), subs[0]["type"].as_str()), (1, Some("cPoint")), "{g}");
+    // Parallel to Right, a quarter along the edge from whichever end it starts: x = ±10 mm.
+    let planes = call(&mut ctx, "query_datums", json!({}))["planes"].clone();
+    let plane = planes.as_array().unwrap().iter().find(|x| x["id"].as_str().is_some_and(|i| i.starts_with("fplane:"))).unwrap_or_else(|| panic!("{planes}"));
+    let x = num(&plane["frame"]["origin"][0]);
+    assert!((x.abs() - 10.0).abs() < 1e-6, "{plane}");
+    // The point was the Plane's own: none left in the Part Studio (the block's 8 vertices only).
+    let v = call(&mut ctx, "query_entities", json!({ "kind": "vertices", "limit": 100 }));
+    assert_eq!(v["vertices"].as_array().unwrap().len(), 8, "{v}");
+}
+
 /// A Hole's Standard through the API does what the dialog does: the Units
 /// tab that shows it and the table's sizes in the fields not given.
 #[test]

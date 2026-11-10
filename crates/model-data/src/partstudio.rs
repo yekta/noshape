@@ -4,7 +4,7 @@
 use crate::configuration::Configuration;
 use crate::features::{self, FeatureType};
 use crate::params::{ParamValue, ParamValues, fill_defaults};
-use crate::reference::{BodyId, FeatureId, Reference};
+use crate::reference::{BodyId, FeatureId, Reference, Source, TopoName};
 use noshape_units::UnitPrefs;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -120,11 +120,36 @@ impl Feature {
         })
     }
 
-    /// Drops the in-feature mate connectors none of its selections names any more (a chip removed).
+    /// An in-feature construction point (`cPoint`, Onshape's "Edge point" / "Mesh point" sub-features: a Plane's
+    /// point made in its own dialog, live 2422), with the type's defaults.
+    pub fn in_feature_point(units: &UnitPrefs) -> Option<Feature> {
+        let ty = features::get("cPoint")?;
+        let mut params = ParamValues::default();
+        fill_defaults(&ty.params, &mut params, units);
+        Some(Feature {
+            id: FeatureId::new_random(),
+            type_id: ty.id.to_string(),
+            name: "Point".into(),
+            suppressed: false,
+            params,
+            folder: None,
+            custom_name: false,
+            hidden: false,
+            suppression_expr: None,
+            sub_features: Vec::new(),
+        })
+    }
+
+    /// The vertex a `cPoint` feature makes (its point body's one vertex).
+    pub fn point_vertex(feature: FeatureId) -> Reference {
+        Reference::Vertex(TopoName::Wire { feature, source: Source::Index(0x8_0000) })
+    }
+
+    /// Drops the in-feature mate connectors and points none of its selections names any more (a chip removed).
     pub fn drop_unused_sub_features(&mut self) {
         fn named(v: &ParamValue, id: FeatureId) -> bool {
             match v {
-                ParamValue::Query(q) => q.iter().any(|r| matches!(r, Reference::MateConnector { feature, .. } if *feature == id)),
+                ParamValue::Query(q) => q.iter().any(|r| matches!(r, Reference::MateConnector { feature, .. } if *feature == id) || *r == Feature::point_vertex(id)),
                 ParamValue::Array(items) => items.iter().any(|it| it.0.values().any(|x| named(x, id))),
                 _ => false,
             }
