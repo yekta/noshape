@@ -1494,7 +1494,7 @@ impl Workspace {
                     .item(I::new("Create Part Studio").icon_name("part-studio").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.add_tab("partstudio", w, cx))))
                     .item(I::new("Create Assembly").icon_name("assembly").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.add_tab("assembly", w, cx))))
                     .item(I::new("Create Variable Studio").icon_name("variable-studio").on_click(move |_, w, cx| v4.update(cx, |t, cx| t.add_tab("variables", w, cx))))
-                    .item(I::new("Create Drawing…").icon_name("drawing").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.open_create_drawing(crate::drawing_create::CreateRequest { source: None, name: None }, w, cx))))
+                    .item(I::new("Create Drawing…").icon_name("drawing").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.open_create_drawing(crate::drawing_create::CreateRequest { external: None, source: None, name: None }, w, cx))))
                     .item(I::new("Create folder").icon_name("folder").on_click(move |_, w, cx| v8.update(cx, |t, cx| t.create_folder(w, cx))))
                     .item(I::new("Import…").icon_name("import-file").on_click(move |_, w, cx| v6.update(cx, |t, cx| t.import(w, cx))));
                 // After a tab's Copy to clipboard: "Paste tab", last (live doc-tab-menu-copy-paste).
@@ -1810,7 +1810,7 @@ impl Workspace {
                             let n = tab_name.clone();
                             menu.item(I::new(format!("Create Drawing of {tab_name}…")).icon_name("menu-create-drawing").on_click(move |_, w, cx| {
                                 let source = Some(noshape_model::drawing::create::DrawingSource { tab: id, part: None, config: Default::default(), sketch: None, flat: false });
-                                let req = crate::drawing_create::CreateRequest { source, name: Some(n.clone()) };
+                                let req = crate::drawing_create::CreateRequest { external: None, source, name: Some(n.clone()) };
                                 v3.update(cx, |t, cx| t.open_create_drawing(req, w, cx));
                             }))
                             .separator()
@@ -2852,6 +2852,7 @@ impl Workspace {
             .collect();
         // A Part Studio with MBD data (Model definitions) gets the dialog's note.
         let mbd = req.source.as_ref().and_then(|s| doc.tab(s.tab)).is_some_and(|t| matches!(&t.content, noshape_model::document::TabContent::PartStudio(ps) if !ps.annotations.is_empty()));
+        let external = req.external.clone();
         let dialog = cx.new(|cx| {
             let mut d = CreateDrawingDialog::new(req, default_name, metric, dwts, window, cx);
             d.mbd = mbd;
@@ -2889,9 +2890,9 @@ impl Workspace {
             let _ = dlg.update(cx, |d, cx| d.add_dwts(more, own, cx));
         })
         .detach();
-        let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &CreateDrawingEvent, window, cx| {
+        let sub = cx.subscribe_in(&dialog, window, move |this: &mut Self, _, ev: &CreateDrawingEvent, window, cx| {
             if let CreateDrawingEvent::Create { name, template, source, suggested, dwt } = ev {
-                this.create_drawing_tab(name.clone(), (*template, dwt.as_deref().cloned()), source.clone(), *suggested, window, cx);
+                this.create_drawing_tab(name.clone(), (*template, dwt.as_deref().cloned()), (source.clone(), external.clone()), *suggested, window, cx);
             }
             this.create_drawing = None;
             cx.notify();
@@ -2906,9 +2907,11 @@ impl Workspace {
     /// bounds (computed in the background); with No views the new drawing
     /// starts placing a view of the source at the cursor.
     /// `template`: a built-in template, and the document's DWT tab chosen
-    /// under Created by me (its formats and properties go over it).
-    fn create_drawing_tab(&mut self, name: String, template: (noshape_model::drawing::templates::DrawingTemplate, Option<crate::drawing_create::DwtTab>), source: Option<noshape_model::drawing::create::DrawingSource>, suggested: bool, window: &mut Window, cx: &mut Context<Self>) {
+    /// under Created by me (its formats and properties go over it). `sources`: this document's, or another document's
+    /// version (Insert view on it).
+    fn create_drawing_tab(&mut self, name: String, template: (noshape_model::drawing::templates::DrawingTemplate, Option<crate::drawing_create::DwtTab>), sources: (Option<noshape_model::drawing::create::DrawingSource>, Option<crate::drawing_create::ExternalSource>), suggested: bool, window: &mut Window, cx: &mut Context<Self>) {
         let (template, dwt) = template;
+        let (source, external) = sources;
         let doc = self.doc.read(cx).session.doc.clone();
         // A Part Studio source its tab shows regenerated: laid out (and drawn) from that.
         let shown = source.as_ref().filter(|_| suggested).and_then(|s| Some((noshape_model::drawing::views::SourceKey { config: s.config.clone(), ..noshape_model::drawing::views::SourceKey::studio(s.tab) }, crate::part_studio::committed_context(&self.doc, s.tab, &s.config, cx)?)));
@@ -2956,6 +2959,11 @@ impl Workspace {
                 });
                 let Some(id) = new_id else { return };
                 this.activate(id, window, cx);
+                // Another document's version: Insert view on it.
+                if let (Some(e), Some(TabView::Drawing(v))) = (&external, this.views.get(&id)) {
+                    v.update(cx, |v, cx| v.choose_external(e.key.clone(), e.tab, e.part.clone(), e.label.clone(), cx));
+                    return;
+                }
                 if let (false, Some(TabView::Drawing(v))) = (suggested, this.views.get(&id)) {
                     match &source {
                         Some(s) => {
@@ -3173,7 +3181,7 @@ pub(crate) fn panel_create_menu(view: Entity<Workspace>, m: crate::os_menu::OsMe
     let m = tab(m, "Part Studio", "part-studio", "partstudio");
     let m = tab(m, "Assembly", "assembly", "assembly");
     let m = tab(m, "Variable Studio", "variable-studio", "variables");
-    let m = m.item(I::new("Drawing…").icon_name("drawing").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.open_create_drawing(crate::drawing_create::CreateRequest { source: None, name: None }, w, cx))));
+    let m = m.item(I::new("Drawing…").icon_name("drawing").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.open_create_drawing(crate::drawing_create::CreateRequest { external: None, source: None, name: None }, w, cx))));
     let m = tab(m, "Feature Studio", "feature-studio", "featurestudio");
     tab(m, "Material Library", "material-library", "materiallibrary")
 }

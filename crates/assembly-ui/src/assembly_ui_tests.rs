@@ -886,3 +886,46 @@ fn assembly_center_of_mass_is_worked_out_off_the_click(cx: &mut TestAppContext) 
     cx.update(|cx| view.update(cx, |v, cx| v.toggle_center_of_mass(Vec::new(), cx)));
     cx.update(|cx| assert!(view.read(cx).ui.com.is_none() && view.read(cx).ui.com_ids.is_none(), "hidden"));
 }
+
+/// Live 2464: another document's part has Update linked document…, Open linked document, Pin reference and Create
+/// Drawing of <part>… in its menu; pinned, the menu says Unpin reference and the Reference manager leaves it on V1.
+#[gpui::test]
+fn another_documents_part_pins_its_reference(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-pin-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let (src, top) = (dir.join("src.noshape"), dir.join("top.noshape"));
+    for p in [&src, &top] {
+        for ext in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{ext}", p.display()));
+        }
+    }
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": src.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"].clone()], "depth": "10 mm", "operationType": "NEW" } }));
+        call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+        call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }));
+        call(&mut ctx, "history_create_version", json!({ "name": "V2" }));
+        call(&mut ctx, "document_create", json!({ "path": top.to_str().unwrap() }));
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1", "document": src.to_str().unwrap(), "version": "V1" }));
+    }
+    let (_window, view) = open_assembly(cx, &top);
+    let p1 = cx.update(|cx| instance(view.read(cx), "Part 1 <1>", cx));
+    let menu = cx.update(|cx| labels(&view.read(cx).instance_menu(p1, false, cx)));
+    let at = |l: &str| menu.iter().position(|x| x == l).unwrap_or_else(|| panic!("{l} in {menu:?}"));
+    assert!(at("Update linked document…") < at("Open linked document") && at("Open linked document") < at("Pin reference"), "{menu:?}");
+    assert!(menu.iter().any(|l| l == "Create Drawing of Part 1…"), "{menu:?}");
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            v.edit("Pin reference", cx, |a| noshape_ops::assembly::set_reference_pinned(a, p1, true));
+        })
+    });
+    let menu = cx.update(|cx| labels(&view.read(cx).instance_menu(p1, false, cx)));
+    assert!(menu.iter().any(|l| l == "Unpin reference") && !menu.iter().any(|l| l == "Pin reference"), "{menu:?}");
+    cx.update(|cx| view.update(cx, |v, cx| v.open_reference_manager(None, cx)));
+    cx.update(|cx| assert!(view.read(cx).ui.ref_manager.as_ref().unwrap().docs.is_empty(), "a pinned reference isn't offered an update"));
+}

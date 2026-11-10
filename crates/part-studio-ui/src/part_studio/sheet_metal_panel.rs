@@ -173,7 +173,7 @@ impl PartStudioView {
                 Box::new(move |this, w, cx| {
                     // Live (dx 10-27): a drawing "Flat pattern of Part 1", Suggested views from its flat view.
                     let source = Some(noshape_model::drawing::create::DrawingSource { tab: this.tab, part: Some(b.clone()), config: Default::default(), sketch: None, flat: true });
-                    crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(format!("Flat pattern of {part}")) }, w, cx);
+                    crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { external: None, source, name: Some(format!("Flat pattern of {part}")) }, w, cx);
                 })
             }))
             .item(item(format!("Export DXF/DWG of Flat pattern of {part}…"), Box::new(move |this, w, cx| this.open_flat_export(b.clone(), w, cx))))
