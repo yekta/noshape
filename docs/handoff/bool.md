@@ -61,6 +61,40 @@ scratch /root/bool-scratch.
   tests 352/352, model and ops Shell tests pass, suite unchanged but for main's own moves, g++-13 builds. The scroll
   wall's offset still doesn't convert (GeomConvert error 0.2885 at 1e-7). The box (6.21 mm) is the query's: core
   (core.md 14:30).
+- **Landed (15:26 UTC 11-10, 8038dc03; lead: P0 then P1: the fast part distance for the Measured variable,
+  query_measure, face pairs): `k::part_distance` (geom.cpp), Measure's min_row / entity_distance on it.** Faces (and free
+  edges / vertices) with boxes and, for planar faces, their planes as lower bounds; coarse meshes of copies (faces of
+  up to 32 wires); an upper bound from mesh nodes / edge samples; candidates within it, filtered by the meshes
+  (BRepExtrema_ShapeProximity, up to 2000 pairs); a contact first (a node on the other face, BRepTopAdaptor_FClass2d);
+  parallel planes exactly; else BRepExtrema MIN per pair in waves, pruned by bound >= best - the boxes' tolerance
+  margins; a solid inside the other 0 (a vertex classified, BRepExtrema's inner solution); OCCT exceptions and up to
+  400 face pairs: BRepExtrema whole, as before. User's Mac mini body / base 96 s -> 0.25 s (vibe3). Corpus (vibe3
+  ~/agents/measure-corpus, 109 pairs from the suite, parity.rs NOSHAPE_MEASURE_CORPUS): 101 compared, the same
+  distance (max difference 0), 7 too big for BRepExtrema (ours alone, cf-fill-pattern's two plates 2.0 s, hours with
+  BRepExtrema), 1 both refusing; 8.1 s against BRepExtrema's 21.5 s; 4 pairs slower than it (fan-blade-sweep-3-0 830
+  vs 370 ms, sm-corner-break-0-2 110 vs 25, hose-routing 252 vs 164, surface-pattern 170 vs 83).
+- **Exact-line sections, queued 16:40 UTC (c0d3f99f; lead: planes containing an extruded / ruled direction, ours and OCCT's;
+  the user's edge 10.000):** worktree bool-ruled (uncommitted). own_sections: B-spline faces straight along a
+  direction (pole lines the first moved by t_j D, t_j linear in Greville points) as extrusions (`bspline_extruded`,
+  face parameters mapped: Extruded::uv / on_ruling / on_profile; the surface-of-extrusion output unchanged), a plane
+  containing the direction cuts rulings (exact lines). OCCT's path: patch 0028's hook (`noshape_face_face`) answers
+  a plane against such an extrusion through own_sections too. The user's eight riser edges come from OCCT's Boolean
+  (ours declines the document's large Booleans: 12 offset-curve edges): with a 0028 libTKBO (my build: vibe4
+  ~/agents/bool-occt/prefix28) all eight are lines of 10.0 mm (were B-splines 10.0006 / 10.0012), the riser's volume
+  -0.0006 mm3, the rest of the document the same. vibe3-5's /opt/occt has NO 0028 (restored 12:4x after main went red;
+  core's 0028 landed since): the hook is idle on the hosts until the lead syncs 0028's libTKBO. T1
+  bool_patterns::a_plane_along_an_extrusion_cuts_it_in_straight_lines (our path). Gate ruled1: corpora + parity56,
+  kg (k10-25 rerun alone: killed under vibe4's load 25 first), shfall as refine1; kt level against OCCT's; model suite
+  (vibe5, against main) features the same, no flip; kernel 357/357, g++-13.
+- **In progress (10:29 UTC 11-10, lead: pipeflange next, then stef-radijator; profile first; a flip counts only if it
+  holds across interleaved runs on a quiet host):** pipeflange-steven ours 224 / live 212 ms (vibe4). Its two cuts on
+  our path, laps in boolean_in: Hole 1's (18c4684c, 4 tools) 9 ms sections, 18 ms placing them on faces; Extrude 3's
+  (5cdc5fd0) 8-11 ms sections, 1.3 placing, 3.6 pieces. Hole 1's 18 ms: 4 of 32 placings take 4.5 ms each (OCCT's
+  cylinder-cylinder sections, 512 spans: length, piece_box, boundary intersections) and par_map ran all 32 on one
+  thread (a thread per 64 items, runs of 16). WIP: `par_map_each` (a thread an item) for the placings; vibe3
+  alternating x5: 18c4684c 52.5 -> 27.2 ms, 5cdc5fd0 37.6 -> 31.9 (XOLD scratch switch); document A/B running
+  (/root/bool-scratch/ab-doc.sh, ab-pf-doc.txt). Next ideas: length / piece_box once per section (both faces), the
+  sections phase (OCCT ahead), Extrude 3's pieces.
 - **Landed (02:12 UTC 11-10, lead: build the shared-shape input; full gate 0 differ, model + assembly suites no document
   worse, knurl/gear times level; report box-dovetail's and hex-bookcase's times against live):** box-dovetail 366 ->
   263 ms (live 360), hex-bookcase 337 (live 290, unchanged); model suite: features as base, times level (fill-pattern

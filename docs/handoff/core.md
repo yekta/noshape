@@ -1874,6 +1874,14 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
   26 and 29 run on a part that isn't live's: nothing to compare yet. Back to blend once the chain matches through
   Boolean 1 (blend.md "Item 5" has these fillets' route costs).
 
+## From bool (11-10 10:59 UTC, lead's speed list): stef-radijator-nlukic's Extrude 2 pays 6-7 ms in reverse_edge_curves
+- The document is x1.03 of live (ours 76, live 74 ms on vibe4); its Extrude 2 is ours 23-24 ms against live's 15, and
+  6.4-7.1 ms of it is `reverse_edge_curves` (build.cpp: the cap edges turned to run as drawn) in two profiled runs
+  (vibe4, NOSHAPE_KERNEL_PROFILE, /root/bool-scratch/flip4/stef-radijator-nlukic.*.log). The function ends with a
+  whole-shape `BRepCheck_Analyzer(out).IsValid()` after the ReShape, likely most of it; checking only the faces next to
+  the turned edges (or none where every turned edge's curves were only reversed) would take that out, and with it the
+  document under live. bool works on the Boolean's share (its result build, 4-5 ms of the 6-7).
+
 ## From bool (11-09 19:02 UTC, lead's call): c2-impeller-loft's Extrude 4 fails on its sketch's untranslated spline constraints
 - Since c7c48f81 (Delete face 1 now works) the document runs to Boolean 1, which takes 4.56 s (live 79 ms): the Union
   gets two parts 19.6 mm apart where live gets three, so it leaves them apart and the "touching" check measured whole
