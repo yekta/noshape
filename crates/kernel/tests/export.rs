@@ -1352,9 +1352,23 @@ fn dump_step_colours() {
 /// edge writes only the part of its B-spline it uses (the helix was split
 /// into 20 edges of one 848-pole curve: 4 MB, now 0.66 MB), and the file
 /// declares the part's own tolerance (at Onshape's 1e-8 m readers healed it
-/// again at that precision: 20 s, now 0.5 s).
+/// again at that precision: 20 s, now 0.5 s; the time is T2's
+/// `step_reads_the_used_part_of_long_splines_back_quickly`).
 #[test]
 fn step_writes_the_used_part_of_long_splines() {
+    screw_written_and_read_back();
+}
+
+/// The same file read back within 5 s (a wall-clock budget: T2, a busy host misses it).
+#[test]
+#[ignore = "T2: a wall-clock budget"]
+fn step_reads_the_used_part_of_long_splines_back_quickly() {
+    let read = screw_written_and_read_back();
+    assert!(read.as_secs_f64() < 5.0, "read back in {read:?}");
+}
+
+/// The cap screw written and read back, checked; the time its reading took.
+fn screw_written_and_read_back() -> std::time::Duration {
     let nist = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf/nist-mtc-crada-assembly.step");
     let ((_, parts, _), _) = read_step_assembly_nested(&nist, LengthUnit::Millimeter).unwrap().unwrap();
     let screw = parts.into_iter().find(|p| p.name.as_deref().is_some_and(|n| n.starts_with("91274A141"))).expect("the cap screw").shape;
@@ -1373,10 +1387,10 @@ fn step_writes_the_used_part_of_long_splines() {
     assert!((got - want).abs() < want * 3e-4, "volume {got} vs {want}");
     assert_eq!(back[0].shape.count(ShapeType::Face), screw.count(ShapeType::Face));
     assert!(back[0].shape.is_valid());
-    assert!(read.as_secs_f64() < 5.0, "read back in {read:?}");
     // The document's shape keeps its own curves (the export works on a copy).
     assert!((volume_properties(&screw).unwrap().mass - want).abs() < 1e-9);
     let _ = std::fs::remove_dir_all(&dir);
+    read
 }
 
 /// NIST's cap screw, healed on import, written as Parasolid: an edge whose
