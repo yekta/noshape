@@ -6,6 +6,7 @@
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <Geom_BSplineCurve.hxx>
+#include <Geom_BSplineSurface.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <Geom2d_BSplineCurve.hxx>
@@ -284,6 +285,65 @@ occ::handle<Geom2d_Curve> snapped_to_iso(const occ::handle<Geom2d_Curve>& c, con
       return occ::handle<Geom2d_Curve>(out);
     }
   return {};
+}
+
+// A STEP file without p-curves (Onshape's own, ours): the reader projects each edge onto its face loosely, 3.6 µm
+// off on cf-spur-gear's involute flanks (surfaces of extrusion), and the faces bounded by them lose area (the
+// 32-tooth gear -0.3 mm², live's file -1.0). On free-form faces an edge whose p-curve strays from it is projected
+// again, a thousand times tighter; kept when twice as close.
+void refine_freeform_pcurves(const std::vector<TopoDS_Shape>& shapes)
+{
+  ShapeIMap faces;
+  for (const TopoDS_Shape& s : shapes)
+    TopExp::MapShapes(s, TopAbs_FACE, faces);
+  BRep_Builder B;
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    const TopoDS_Face f = TopoDS::Face(faces(i).Oriented(TopAbs_FORWARD));
+    switch (BRepAdaptor_Surface(f, false).GetType())
+    {
+      case GeomAbs_BSplineSurface:
+      case GeomAbs_BezierSurface:
+      case GeomAbs_SurfaceOfExtrusion:
+      case GeomAbs_SurfaceOfRevolution:
+      case GeomAbs_OffsetSurface:
+        break;
+      default:
+        continue;
+    }
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> S = BRep_Tool::Surface(f, loc);
+    if (S.IsNull())
+      continue;
+    // (A small face: projecting onto NIST's healed cap screw's 1300-pole thread surfaces takes 0.15-0.25 s an edge
+    // and brings nothing closer; the gear's surfaces have up to 155.)
+    if (const auto bs = occ::down_cast<Geom_BSplineSurface>(S); !bs.IsNull() && bs->NbUPoles() * bs->NbVPoles() > 200)
+      continue;
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge ed = TopoDS::Edge(e.Current());
+      TopLoc_Location   cl;
+      double            c0, c1;
+      if (BRep_Tool::Degenerated(ed) || BRep_Tool::IsClosed(ed, f) || BRep_Tool::Curve(ed, cl, c0, c1).IsNull())
+        continue;
+      // (Not a long spline: projecting NIST's healed cap screw's 848-pole thread edges again takes 0.1-0.3 s each and
+      // doesn't bring them closer; the gear's involutes have 67 poles.)
+      if (const auto bs = occ::down_cast<Geom_BSplineCurve>(BRep_Tool::Curve(ed, cl, c0, c1)); !bs.IsNull() && bs->NbPoles() > 200)
+        continue;
+      const double before = pcurve_deviation(ed, f);
+      if (!(before > 1e-7))
+        continue;
+      double                          a, b;
+      const occ::handle<Geom2d_Curve> old = BRep_Tool::CurveOnSurface(ed, f, a, b);
+      B.UpdateEdge(ed, occ::handle<Geom2d_Curve>(), S, loc, 0.);
+      ShapeFix_Edge fx;
+      if (!fx.FixAddPCurve(ed, f, false, before / 1000) || !(pcurve_deviation(ed, f) < before / 2))
+      {
+        B.UpdateEdge(ed, old, S, loc, 0.);
+        B.Range(ed, S, loc, a, b);
+      }
+    }
+  }
 }
 
 // STEP files carry no pcurves for most edges and OCCT's projection goes
@@ -585,6 +645,7 @@ StepImport read_step(rust::Str path)
   if (out.shapes->items.empty())
     fail_io("STEP file contains no shapes: " + p);
   fix_pole_pcurves(out.shapes->items);
+  refine_freeform_pcurves(out.shapes->items);
   clock.lap("step pole pcurves");
   return out;
 }
@@ -802,6 +863,7 @@ StepTree read_step_tree(rust::Str path)
   app->Close(doc);
   clock.lap("step tree close");
   fix_pole_pcurves(out.parts.shapes->items);
+  refine_freeform_pcurves(out.parts.shapes->items);
   clock.lap("step tree pole pcurves");
   return out;
 }
@@ -1056,6 +1118,7 @@ std::unique_ptr<OcShape> read_iges(rust::Str path)
   TopoDS_Shape s = r.OneShape();
   if (s.IsNull())
     fail_io("IGES file contains no shapes: " + p);
+  refine_freeform_pcurves({s});
   return wrap(s);
 }
 
@@ -1217,6 +1280,7 @@ StepTree read_iges_tree(rust::Str path)
     }
   }
   app->Close(doc);
+  refine_freeform_pcurves(out.parts.shapes->items);
   return out;
 }
 
