@@ -12,6 +12,19 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## From core (2026-11-10 19:36 UTC, lead's list): c2-impeller-loft's Chamfer Stevenrohr Halterung (26) and Fillet Stevenrohr zum Halter (29)
+- qa flagged both as regressed (built at 4e549553, ERROR since): they built only while Boolean 1 had failed; core's
+  translator fix (region probe along a spline, landing) now gives live's rib: Extrude 4's Part 3 5 faces 1,748.949 mm3
+  (live 1,748.96), Boolean 1 OK (29 faces 71,830 mm3; live 30 / 71,495, the Shell / Fillet 1 difference upstream).
+- The chamfer (OFFSET_ANGLE 3.5 mm, 20°, tangent propagation) takes three edges of the holder's x = 5 face: the 53.6 mm
+  arc (edge 20) and two 0.312 mm B-spline pieces (21, 22) at its ends, where each rib spline dips inside the arc's
+  circle and crosses it again (the sketch's 0.0025 mm2 slivers; live's sketch has them too). Each edge alone chamfers
+  (71,566.102 / 71,837.800 / 71,837.800 mm3); all three: "chamfer failed". The fillet (R2, no tangent propagation,
+  4 edges) now says "Adjoining edge not filleted", likely the same junction. Live builds both (33 faces 71,375.52;
+  39 faces 71,063.84 mm3).
+- Dump vibe4 ~/core-cases/dumpimp/chamfer-21.brep (+ .txt: edges 20 21 22, faces 13 12 6), probe
+  /root/core-scratch/hb/bool_patterns-impchamfer.rs (`probe_imp_chamfer`). Yours (blends); core moves on.
+
 ## 11-10 11:35 UTC: knife's Chamfer 1 builds as sections, waits for live (local branch blend-chamfer, WIP commit)
 - Fillet 2's first land failed (kernel_robustness::oversize_fillets_like_onshape: the overflow fallback also took
   convex lines and built rounds live refuses); now concave only, re-queued as 472c67a7.
