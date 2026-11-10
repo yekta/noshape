@@ -1699,11 +1699,13 @@ impl PartStudioView {
         let (mode, up) = (self.opts.display_mode, self.gpu.uploader());
         let owner = crate::compare_graphics::Owner::<Self> { get: |this: &mut Self| &mut this.compare_gfx, then: |this, cx| this.refresh_scene(false, cx) };
         let statics = built.static_instances;
+        // (The parts' picks only: Compare shows no planes, origin or sketches.)
+        let part_pick = |i: &noshape_render::Instance| built.picks.get(i.pick_base).is_some_and(|t| matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex));
         match self.compare_gfx.scene(&self.doc, self.tab, mode, up, owner, cx) {
             // Live (ver-compare-hover-part): a face is picked, lit and selected in Compare as outside it when the base
             // is the open model: its picks ride along undrawn, its highlights drawn over both sides.
             Some(mut compare) if self.compare_base_is_open(cx) => {
-                compare.instances.extend(scene.instances.into_iter().enumerate().filter(|(k, i)| *k >= statics || i.pickable).map(|(k, mut i)| {
+                compare.instances.extend(scene.instances.into_iter().enumerate().filter(|(k, i)| *k >= statics || (i.pickable && part_pick(i))).map(|(k, mut i)| {
                     i.pick_only |= k < statics;
                     i
                 }));
