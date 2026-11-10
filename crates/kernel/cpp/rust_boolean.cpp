@@ -3781,25 +3781,11 @@ const char* brep_body_cached(const OcShape& s, BrepBody& b, double& max_tol) { r
 
 } // namespace noshape
 
-// OCCT patch 0028's hook (IntTools_FaceFace::Perform, every face / face section OCCT makes, its pave filler's too):
-// a round touching a coaxial cylinder, cone, sphere or torus along one circle, that exact circle, where OCCT's marching
-// near the tangency took seconds and broke it into pieces (a user's rib rounds, 4.9 s a pair on Windows). Any other
-// pair: 0, OCCT's own section as before.
-extern "C" int noshape_face_face(const TopoDS_Face& theF1, const TopoDS_Face& theF2, NCollection_Sequence<IntTools_Curve>& theCurves)
+// OCCT patch 0028's hook (IntTools_FaceFace::Perform, every face / face section OCCT makes): off for now, OCCT's own
+// section everywhere. Answering a round touching a coaxial cylinder with its circle left OCCT's pave filler keeping
+// the round's torus whole where it splits it along that circle (as live: model kernel_robustness::
+// a_full_round_of_a_bore_or_a_boss_is_a_half_torus, 7 faces); our own Boolean still makes such sections exactly.
+extern "C" int noshape_face_face(const TopoDS_Face&, const TopoDS_Face&, NCollection_Sequence<IntTools_Curve>&)
 {
-  try
-  {
-    std::vector<IntTools_Curve> lines;
-    bool                        touched = false;
-    if (!noshape::coaxial_sections(theF1, theF2, lines, &touched) || !touched || lines.empty())
-      return 0;
-    const noshape::KernelTimer timer("occt.own_face_face");
-    for (const IntTools_Curve& c : lines)
-      theCurves.Append(c);
-    return 1;
-  }
-  catch (...)
-  {
-    return 0;
-  }
+  return 0;
 }
