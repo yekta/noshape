@@ -1075,7 +1075,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     whole suite gives 1260/1731 occurrences, 172/346 mates; the only change against dc4b1a012 is asm-hand-drill-pinslot's
     mates 5 -> 6/52: Pin slot 7 no longer "Mate overdefines the assembly." (now as live), and Studio e53bba's Extrude 6 and
     Chamfer 1 now translate. Its parent's translator commit (core 730d6f28c) gives 5/52 with both still failing, so it is
-    dx's f8378048c (qa-scratch/recut/hd-730d6f28.log). No occurrence moved.
+    dx's f8378048c: its parent f577aac93 (with bool's 44e52dafb) also gives 5/52 (qa-scratch/recut/hd-*.log). No occurrence moved.
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
