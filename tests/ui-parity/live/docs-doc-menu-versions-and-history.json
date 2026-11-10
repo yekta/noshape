@@ -1,11 +1,11 @@
 {
  "scenario": "docs-doc-menu-versions-and-history",
- "recorded": "2026-11-09T12:37:39.129Z",
+ "recorded": "2026-11-10T07:40:32.969Z",
  "app": {
   "name": "live",
-  "version": "1.223.92697.90c317e616c3",
+  "version": "1.223.93118.b7e399f9a55f",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 3dedc795"
+  "recorder": "2026-11-10.1 3dedc795"
  },
  "live": {
   "page": "documents"
@@ -49,7 +49,7 @@
    "ok": true,
    "at": [
     407,
-    871
+    874
    ],
    "state": {
     "focus": {
@@ -96,7 +96,7 @@
     },
     "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
    },
-   "t": 13522
+   "t": 600691
   },
   {
    "step": 2,
@@ -109,7 +109,7 @@
    "ok": true,
    "at": [
     494,
-    746
+    749
    ],
    "state": {
     "focus": {
@@ -146,9 +146,48 @@
      "panel": null,
      "switcher": null
     },
+    "versionsPage": {
+     "title": "Versions and history of uip Bracket",
+     "document": "uip Bracket",
+     "search": "",
+     "columns": [
+      "Name",
+      "Description",
+      "Modified",
+      "Modified by"
+     ],
+     "rows": [
+      {
+       "name": "Main",
+       "kind": "workspace",
+       "description": "",
+       "modified": "12:47 AM Nov 8",
+       "modifiedBy": "Loopelf Loopelf",
+       "changes": "Show changes…",
+       "selected": true
+      },
+      {
+       "name": "Start",
+       "kind": "version",
+       "description": "",
+       "modified": "12:47 AM Nov 8",
+       "modifiedBy": "Loopelf Loopelf",
+       "changes": null,
+       "selected": false
+      }
+     ],
+     "legend": [
+      "Workspace",
+      "Version",
+      "Change",
+      "Release candidate",
+      "Release",
+      "Contains obsoletion"
+     ]
+    },
     "url": "/documents/8314e3a39f233abde0cccb64/versionsAndHistory"
    },
-   "t": 136485
+   "t": 724379
   }
  ],
  "tabsOpened": 12

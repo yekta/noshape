@@ -1,18 +1,18 @@
 {
  "scenario": "doc-units-angle-radian",
- "recorded": "2026-11-09T05:06:38.813Z",
+ "recorded": "2026-11-10T07:19:58.119Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "68fda8a2dfa28e8d975c50f1",
-  "workspace": "f347428db900e5a6f3964116",
-  "element": "01bfab22d8342b9ec8dd3103",
+  "document": "630bb14fe5da8608cba3e7e6",
+  "workspace": "a7078e27fa1f34cf97713271",
+  "element": "3dc9545d1096c0a7e3dde601",
   "start": "doc-tabs",
-  "startElement": "01bfab22d8342b9ec8dd3103",
+  "startElement": "3dc9545d1096c0a7e3dde601",
   "runner": "live2 "
  },
  "start": {
@@ -90,11 +90,6 @@
     {
      "name": "Feature Studio 1",
      "kind": "featurestudio",
-     "active": false
-    },
-    {
-     "name": "Part Studio 3",
-     "kind": "partstudio",
      "active": false
     },
     {
@@ -258,11 +253,6 @@
        "active": false
       },
       {
-       "name": "Part Studio 3",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
        "name": "Folder 1",
        "kind": "folder",
        "active": false
@@ -276,7 +266,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 181601
+   "t": 79559
   },
   {
    "step": 2,
@@ -406,11 +396,6 @@
        "active": false
       },
       {
-       "name": "Part Studio 3",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
        "name": "Folder 1",
        "kind": "folder",
        "active": false
@@ -424,7 +409,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 185371
+   "t": 82838
   },
   {
    "step": 3,
@@ -556,11 +541,6 @@
        "active": false
       },
       {
-       "name": "Part Studio 3",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
        "name": "Folder 1",
        "kind": "folder",
        "active": false
@@ -574,7 +554,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 189437
+   "t": 85571
   },
   {
    "step": 4,
@@ -667,11 +647,6 @@
        "active": false
       },
       {
-       "name": "Part Studio 3",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
        "name": "Folder 1",
        "kind": "folder",
        "active": false
@@ -685,7 +660,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 197908
+   "t": 91078
   },
   {
    "step": 5,
@@ -833,11 +808,6 @@
        "active": false
       },
       {
-       "name": "Part Studio 3",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
        "name": "Folder 1",
        "kind": "folder",
        "active": false
@@ -851,7 +821,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 202824
+   "t": 94493
   },
   {
    "step": 6,
@@ -981,11 +951,6 @@
        "active": false
       },
       {
-       "name": "Part Studio 3",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
        "name": "Folder 1",
        "kind": "folder",
        "active": false
@@ -999,7 +964,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 218384
+   "t": 97360
   }
  ]
 }

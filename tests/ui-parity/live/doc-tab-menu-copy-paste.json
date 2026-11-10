@@ -1,18 +1,18 @@
 {
  "scenario": "doc-tab-menu-copy-paste",
- "recorded": "2026-11-09T04:37:06.867Z",
+ "recorded": "2026-11-10T07:22:45.152Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "2f8102df6154064b0b76cc88",
-  "workspace": "129d0ae0123625e0c660b826",
-  "element": "5c548b00bd003e2c5835863a",
+  "document": "1bd1248cf53fc6aa0d41304e",
+  "workspace": "e4e0caa200744c9138398526",
+  "element": "aac076c59211dc2c3fcb94fa",
   "start": "doc-tabs",
-  "startElement": "5c548b00bd003e2c5835863a",
+  "startElement": "aac076c59211dc2c3fcb94fa",
   "runner": "live2 "
  },
  "start": {
@@ -206,7 +206,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 79947
+   "t": 88567
   },
   {
    "step": 2,
@@ -328,7 +328,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 82192
+   "t": 90863
   },
   {
    "step": 3,
@@ -434,7 +434,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 84428
+   "t": 93235
   },
   {
    "step": 4,
@@ -561,7 +561,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 86706
+   "t": 95460
   },
   {
    "step": 5,
@@ -634,6 +634,11 @@
        "active": true
       },
       {
+       "name": "Part Studio 2 Copy 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
        "name": "Assembly 1",
        "kind": "assembly",
        "active": false
@@ -667,7 +672,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 88955
+   "t": 101439
   }
  ]
 }
