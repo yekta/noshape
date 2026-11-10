@@ -557,6 +557,15 @@ fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64, failures_
         let d = (a - b).abs();
         let inside = own[o].volume_band.is_some_and(|[lo, hi]| b >= lo && b <= hi);
         if inside {
+            // Its area may still be off the model's (cf-spur-gear's Ø0.1 mm construction pin in live's STL: 0.32879 mm²
+            // for 0.32987): held to the model as close as live's own.
+            if let (Some(x), Some(y), Some([lo, hi])) = (own[o].area, model[m].area, own[o].area_band)
+                && !(lo..=hi).contains(&y)
+            {
+                let e = (x - y).abs() * slack;
+                out[o].area = Some(y);
+                out[o].area_band = Some([y - e, y + e]);
+            }
             continue;
         }
         // An STL of live's off its model by over 1 % (cf-spur-gear's 65-tooth gear: 5601 mm³ for 5915.7, live's
@@ -586,6 +595,17 @@ fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64, failures_
         }
     }
     out
+}
+
+/// A mesh whose volume is within live's band but whose area isn't: its area held to the model's, as close as live's own.
+#[test]
+fn a_mesh_area_off_the_model_is_held_to_it() {
+    let part = |volume: f64, area: f64, band: f64| PartState { name: "Part 2".into(), volume: Some(volume), volume_band: Some([volume - 1e-13, volume + 1e-13]), area: Some(area), area_band: Some([area - band, area + band]), ..Default::default() };
+    let held = held_to_model(vec![part(7.7646e-12, 3.28792e-7, 2e-10)], &[part(7.854e-12, 3.29867e-7, 2e-10)], 2.0, true);
+    let [lo, hi] = held[0].area_band.expect("band");
+    assert!((lo..=hi).contains(&3.29748e-7), "ours, nearer the model than live's own STL");
+    assert!(!(lo..=hi).contains(&3.26e-7), "off the model by more than twice live's own");
+    assert_eq!(held[0].volume, Some(7.7646e-12), "the volume within live's band stays live's");
 }
 
 /// A part live reads off its model is held to the model, as close as live's own import of the file.

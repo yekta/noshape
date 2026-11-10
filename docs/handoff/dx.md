@@ -18,6 +18,27 @@ test only took profiles in a plane through the axis, so OCCT's self-intersection
 tilted profiles too: Sweep 1 0.23 s, the document 0.87 s. Your 7e7d69f2b stays; the tilt (feature 41's frame) is
 yours to finish.
 
+## 11-10 07:49 UTC: fan's Helix 1 is float noise (live asked), exchange 42 -> 43/48
+
+- **c2-fan-blade-sweep's Extrude 8 / the extra Ø6.8 cylinder:** gone on main. The derived STEP import (third part
+  3/2/0) and the source studio both match (2/2, 23/23). The fan is at 41/53, regenerates in 0.82 s (live 1.42 s).
+  The TMPDBG merge prints are dropped.
+- **Feature 41, threadprofile:** Helix 1's end point lies on its axis. Our end vector is (2.8e-17, 2.3e-17) m, so
+  atan2 of noise gives 10.108 turns. Live 2421 says an exact on-axis point gives 0° (10.0 turns here), and the fan's
+  9.5 is live's own noise. Even with 9.5 forced (fan-half.log), our frame's normal x is 0.086236 (the exact helix's
+  tangent) where live's is 0.086059. Live's helix length (179.687 mm) doesn't fit a uniform helix with that tangent
+  either (179.740 at 9.5 turns), so live's helix looks approximated. Asked live for the curve definition, the end
+  tangents and the end vector's exact numbers (REQUESTS 07:20). There is no principled fix until that answer comes.
+- **Exchange (vibe4):** ours imports live's 46/48, live imports ours 42 -> 43/48, ours reads ours back 43/48.
+  cf-spur-gear STL: the Ø0.1 mm construction pin's volume is within live's band, so the runner kept live's own coarser
+  STL area (0.32879 mm² for the model's 0.32987); ours (0.32975) is nearer the model. held_to_model now holds such an
+  area to the model as close as live's own (T1 parity::a_mesh_area_off_the_model_is_held_to_it).
+  Left: hose x_t (our split walls, 22 faces for 12: a smooth periodic refit of the degree-12 sections would be needed),
+  sheet metal STEP / IGES (core's SHEETMETAL-COPLANAR-WALLS), sheet metal STL (bend facets coarser), spur gear STEP
+  (live's own STEP is +9.7 mm³ off its model on the 32-tooth gear, ours +10.7; the 65-tooth area -0.17 mm²).
+- **Drawings:** drw-export-formats' DWG "2018" for our "2000" is live's account memory (Export remembers each
+  format's last options per user, behaviours 35207), not ours: a re-record on reset options is needed.
+
 ## 11-09 07:20 UTC (psui, lead: dx on exchange): the three Feature Studio differences taken by psui
 
 - **Compare on a Feature Studio** (fs-compare, matches): its panes show the committed source (live: Main without the
