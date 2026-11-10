@@ -10,6 +10,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## From qa (2026-11-10 12:26 UTC, lead's bisect): asm-hand-drill-pinslot's mates 28 -> 5/52 from your ee69e4a6a
+
+Your translator change makes Studio 4bed3f / e0abe1 build as live, and then Ball 5 / Cylindrical 12 / 13 resolve and our
+solver calls 14 mates "Mate overdefines the assembly." (live: all OK). Still so on main b2c82787f with 297ea7dcb. Please
+check those three mates' connectors against live's; if they match, it goes to asm (paused until Wednesday). Details and
+repro: TICKETS P1 HAND-DRILL-MATES-OVERDEFINED.
 
 ## From core (2026-11-09 20:45 UTC, lead's P0): c2-fan-blade-sweep's Sweep 1 hang fixed in the sweep, nothing reverted
 Since 7e7d69f2b the document reaches Sweep 1 with its thread profile 4.6° off the helix's axis plane (threadprofile's

@@ -5,6 +5,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa, 2026-11-10
+- [ ] P1 HAND-DRILL-MATES-OVERDEFINED (dx first, then asm; qa 2026-11-10 12:26, lead's bisect) **asm-hand-drill-pinslot's mates
+  as live 28 -> 5/52 since dx's ee69e4a6a** (parity translator: a construction Use stays construction, an imprint face's
+  region in the last imprinting sketch). Bisected on vibe4 (debug as the suite, the document alone; corpus unchanged since
+  11-07): 75f529a64 28, ee69e4a6a 5; main b2c82787f (with dx's 297ea7dcb) still 5 (only Studio 4bed3f / e0abe1's "Plane 1:
+  Point-Plane requires a point and a plane." gone). What changed: Studio 4bed3f (and e0abe1) now builds as live (its 11
+  extrudes' / Sweep 1's "do not intersect" / "no geometry change" Infos gone; new: Fillet 4 "Failed to fillet selections."),
+  so Ball 5 and Cylindrical 12 / 13 resolve their connectors (before: "Mate cannot resolve mate connectors.") and then our
+  solver reports "Mate overdefines the assembly." on Ball 1–6, Cylindrical 10–14, 22, 23, all OK in live; Part 1 <2> moved
+  0.258 mm by our mates (0.037 before). Occurrences 38/41 unchanged. dx: check the three mates' connectors against live's
+  (assembly.json) on the newly built studio (a connector off would overdefine); if they are live's, it is asm's solver
+  (redundant mates live accepts; asm is paused until Wednesday). Logs: qa-scratch/bisect/hd-<sha>.log; repro: a folder
+  with just asm-hand-drill-pinslot as NOSHAPE_PARITY_ASSEMBLIES and NOSHAPE_PARITY_MODELS, `cargo test -q -p noshape-ops
+  --test all parity::parity_assemblies -- --ignored --nocapture` (~10 min on vibe4; vibe4 ~/qa-bisect/hd).
+
 ## psui, 2026-11-09
 - [x] (verified by qa 2026-11-10 on green 4f5863a2 = v0.4.41, core b5da62f83: c2-fan-blade-sweep regenerates in 1.56 s on vibe3, live 1.42 s) P0 FAN-BLADE-SWEEP-HANG (dx, speed regression; found by psui's re-measure 11-09 19:40): c2-fan-blade-sweep's
   **Sweep 1 takes 331 s** (live 58 ms; the whole document 332.9 s, live 1.4 s: qa's 18:11 model run on vibe2,
@@ -999,7 +1014,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   79.4 → 84.3 %, 60 of 97 at or under live, now measured on vibe3). Flags:
   - core / blend: c2-impeller-loft's "Chamfer Stevenrohr Halterung" ("Failed to chamfer selections.") and "Fillet Stevenrohr
     zum Halter" ("Failed to fillet selections.") now fail (built before).
-  - asm: asm-hand-drill-pinslot's mates 28 → 5/52 as live (occurrences 38/41 unchanged); asm-tvc-mount 9 → 8/43 occurrences
+  - dx / asm: asm-hand-drill-pinslot's mates 28 → 5/52 as live (occurrences 38/41 unchanged): bisected to dx's ee69e4a6a,
+    P1 HAND-DRILL-MATES-OVERDEFINED; asm-tvc-mount 9 → 8/43 occurrences
     (mates 1/4 → 3/6). Assembly results 1262 → 1261/1731.
   - psui (recording, not code): doc-tab-properties-drawing step 2 `.dialog.fields[10].value` live "11/09/2026", ours
     "11/10/2026": the field shows today's date, so the scenario differs on every day after live recorded it.
