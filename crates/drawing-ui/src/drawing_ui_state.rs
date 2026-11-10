@@ -316,6 +316,10 @@ impl DrawingEditor {
             Tool::BrokenOut { parent: Some(v), done: true, .. } => selection.push(("EDGE".into(), self.ui_view_name(*v))),
             _ => {}
         }
+        // The edge an Edge condition symbol is put on (drw-edge-condition).
+        if let Some(Sel::Edge(v, _)) = self.lit_tool_edge() {
+            selection.push(("EDGE".into(), self.ui_view_name(v)));
+        }
         // A crop profile drawn and closed, waiting for ✓, is orange in its view, and the view under it no longer
         // framed (drw-crop-spline, drw-crop-edit); a picked existing profile isn't (drw-crop-existing-profile).
         if let Some((v, _)) = self.crop_dlg.as_ref().filter(|d| d.picked.is_none()).and_then(|d| d.pending.as_ref()) {

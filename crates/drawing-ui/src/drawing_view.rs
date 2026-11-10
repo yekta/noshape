@@ -507,6 +507,9 @@ pub struct DrawingEditor {
     /// A title block field edited in place: its cell's text is hidden.
     pub inplace_field: Option<String>,
     pub panel_highlight: Option<Sel>,
+    /// The edge the Edge condition symbol tool's first click picked, drawn selected until its next click (live
+    /// drw-edge-condition; Weld symbol's isn't). See [`Self::lit_tool_edge`].
+    pub tool_edge: Option<Sel>,
     pub insp_table: crate::drawing_panels::InspectionTableUi,
     /// Inserted image textures (see `drawing_images`).
     pub image_cache: crate::drawing_images::ImageCache,
@@ -765,6 +768,7 @@ impl DrawingEditor {
             inplace_cell: None,
             inplace_field: None,
             panel_highlight: None,
+            tool_edge: None,
             insp_table: Default::default(),
             measure: None,
             status: None,
@@ -1401,6 +1405,17 @@ impl DrawingEditor {
         self.pk().picks_of(sel)
     }
 
+    /// The view edge under the pointer, if any.
+    pub fn hovered_edge_sel(&self) -> Option<Sel> {
+        let h = self.built.as_ref()?.hit(self.cursor, self.pk().tol_mm(5.0))?;
+        self.sel_of_pick(h).filter(|s| matches!(s, Sel::Edge(..)))
+    }
+
+    /// [`Self::tool_edge`] while the tool is still waiting for the symbol's place.
+    pub fn lit_tool_edge(&self) -> Option<Sel> {
+        self.tool_edge.filter(|_| matches!(self.tool, Tool::EdgeCondition) && self.edge_condition_dlg.as_ref().is_some_and(|d| d.target.is_some()))
+    }
+
     /// The selectable entity a pick id belongs to.
     pub fn sel_of_pick(&self, pick: u32) -> Option<Sel> {
         self.pk().sel_of_pick(pick)
@@ -1452,7 +1467,7 @@ impl DrawingEditor {
             // A selected view label has its own look (push_label_highlights),
             // and so does a selected datum (push_datum_selection).
             let datums = self.datum_selection_picks();
-            for s in self.selection.iter().chain(self.panel_highlight.iter()).filter(|s| !matches!(s, Sel::ViewLabel(_))) {
+            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).filter(|s| !matches!(s, Sel::ViewLabel(_))) {
                 for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p)) {
                     scene.add_flag(p, state::SELECTED);
                 }

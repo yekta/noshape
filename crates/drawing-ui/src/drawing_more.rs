@@ -569,6 +569,9 @@ impl DrawingEditor {
         let depth = self.input(&format::format_number(blind / u.meters(), None, 4), window, cx);
         Self::focus_input(&depth, window, cx);
         let offset = (b.offset != 0.0).then(|| self.input(&format::format_number(b.offset / u.meters(), None, 4), window, cx));
+        // The view's selection goes (Esc then leaves nothing selected, as after Edit crop / Edit section: live
+        // drw-broken-out-edit); the profile being edited is what shows orange.
+        self.selection.clear();
         self.panel = Some(Panel::BrokenOut { view, edit: Some(index), profile: b.profile, spline: b.spline, up_to: b.depth_ref.is_some(), depth, depth_ref: b.depth_ref, offset, exclude: b.exclude, picking: false, add_point: false });
         cx.notify();
     }

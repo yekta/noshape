@@ -636,6 +636,10 @@ def compare(live, ours, whole_document=True):
                     i["owner"] = new_asm(i["owner"])
         # Both runners name the start's assembly after it ("start pin-block asm Copy 2" / "start pin-block-asm-drawing asm").
         for side in (a, b):
+            # (Its root row in the assembly's list too: drw-bom-switch-to-bom.)
+            for r in ((side.get("features") or {}).get("rows") or []):
+                if isinstance(r.get("name"), str):
+                    r["name"] = re.sub(r"^start \S+ asm( Copy \d+)?$", "start asm", r["name"])
             d = side.get("dialog")
             if isinstance(d, dict) and d.get("kind") == "drawing-panel":
                 # Live's DOM text keeps its no-break spaces ("Part\u00a01"); a document's name is each side's own. (First:
@@ -655,6 +659,12 @@ def compare(live, ours, whole_document=True):
                 dr["tab"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)? ", "Part Studio 1 ", dr["tab"])
                 # A tab name live's lane document already had gets " (1)" (live2 drw-detail-view).
                 dr["tab"] = re.sub(r" \(\d+\)$", "", dr["tab"])
+        # Live's pixel reader lists what is drawn selected in its own scan order ([Top, Detail] for a detail view and its
+        # boundary in the parent, drw-view-rotate-*): compared as a set.
+        for side in (a, b):
+            dr = side.get("drawing")
+            if isinstance(dr, dict) and isinstance(dr.get("selection"), list):
+                dr["selection"] = sorted(dr["selection"], key=lambda s: json.dumps(s, sort_keys=True))
         # Live's recorder can't read a table's cells (its text is null there).
         anns = [((side.get("drawing") or {}).get("annotations") or []) for side in (a, b)]
         if any(x.get("kind") == "table" and x.get("text") is None for x in anns[0]):

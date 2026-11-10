@@ -18,6 +18,31 @@ test only took profiles in a plane through the axis, so OCCT's self-intersection
 tilted profiles too: Sweep 1 0.23 s, the document 0.87 s. Your 7e7d69f2b stays; the tilt (feature 41's frame) is
 yours to finish.
 
+## 11-10 08:34 UTC: drawings 143/176 -> 150/172 (lead: drawings before the hose); live batch 08:12 filed
+
+- **Fixed in ours:** Edge condition symbol keeps its picked edge drawn selected until the symbol's place
+  (`tool_edge`, not Weld symbol: live's weld take reads nothing); Edit section of a broken-out section drops the
+  view's selection, so Esc leaves nothing selected (as crop / section / aux edits); a right-click on a section line
+  leaves the selection alone; a right-click on a BOM's Sheets panel row selects the table (as on the sheet); Add
+  stacked callouts frames the callout's view until the dialog closes.
+- **Runner:** `drawing.selection` compared as a set (live's pixel reader lists in scan order); the start
+  assembly's root row in a feature list folded to "start asm" as the dialogs' texts were. The four drw-revision-*
+  recordings fail at live's step 1 (Free plan, 2239) and are dropped (172 scenarios).
+- **Tried and dropped:** hovered edge as EDGE under any tool (35 scenarios worse: live reads no hover after a tool
+  click); a selected view's edges counted in another view's box (no effect on drw-view-rotate-*); a datum target's
+  edge lit (the matching datum-target takes broke).
+- **Waiting on live (REQUESTS 08:12):** drw-export-formats (account's Export memory, reset steps given),
+  drw-copy-annotation-drag (Alt not held), drw-detail-edit (old runner), drw-centermark (recorders disagree),
+  drw-sketch-point (listed at Esc?), questions for drw-view-rotate-* (what lights Top), drw-sheet-properties /
+  -rename (row and menu boxes), drw-callout-remove-from-group (no Group in live's menu).
+- **Left, reader noise:** drw-view-align-horizontally / -vertically (the same click reads VIEW in one take, nothing
+  in the other), drw-note-move-to-title-block, drw-max-min-*, drw-crop/detail-existing-profile step 4,
+  drw-dimension-3-point-angular, drw-dimension-foreshorten step 9, drw-format-painter step 10 (ours doesn't show
+  the source after the pick: open), drw-centermark-align, drw-datum-target-hide-dim.
+- **Hose x_t (next):** live's own hose walls are periodic, rational, degree 3 with two spans (u knot multiplicities
+  4, 3, 4); the 04:07 file live dropped had single-span degree-12 periodic walls (13, 13). Plan: a probe pair for
+  live first (one cylinder wall written single-span, one with an exact knot inserted to two spans) before the hose.
+
 ## 11-10 07:49 UTC: fan's Helix 1 is float noise (live asked), exchange 42 -> 43/48
 
 - **c2-fan-blade-sweep's Extrude 8 / the extra Ø6.8 cylinder:** gone on main. The derived STEP import (third part

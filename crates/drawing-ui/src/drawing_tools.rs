@@ -223,6 +223,7 @@ impl DrawingEditor {
             return;
         }
         if self.stack_dlg.take().is_some() {
+            self.selection.clear();
             cx.notify();
             return;
         }
@@ -1967,7 +1968,10 @@ impl DrawingEditor {
             return;
         }
         let sel = self.sel_at(pick, self.cursor);
+        // A section line's menu leaves the selection as it was (live drw-section-flip-direction: nothing orange).
+        let on_cut_line = pick.and_then(|p| self.built.as_ref()?.picks.get(p as usize)).is_some_and(|t| matches!(t, PickTarget::SectionLine(_)));
         if let Some(s) = sel
+            && !on_cut_line
             && !self.selection.contains(&s)
         {
             self.selection = vec![s];

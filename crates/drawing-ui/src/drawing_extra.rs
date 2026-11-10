@@ -438,6 +438,9 @@ impl DrawingEditor {
                     if this.sheet != sheet_i {
                         this.switch_sheet(sheet_i, cx);
                     }
+                    // The table selected, as a right-click on it on the sheet (live drw-bom-row-replace: orange).
+                    this.selection = vec![Sel::Table(id)];
+                    this.redraw(cx);
                     // Live 2240: Properties..., Replace..., Switch to BOM, Delete.
                     let mut entries = vec![MenuEntry::item("Properties...", move |t, _, cx| t.open_table_props(id, cx))];
                     if let Some(tab) = source {

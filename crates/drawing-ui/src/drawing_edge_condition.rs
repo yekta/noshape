@@ -92,6 +92,7 @@ impl DrawingEditor {
         let c = self.cursor;
         match self.edge_condition_dlg.as_ref().and_then(|d| d.target) {
             None => {
+                self.tool_edge = self.hovered_edge_sel();
                 let t = self.pk().weld_target(c);
                 if let Some(d) = &mut self.edge_condition_dlg {
                     d.target = Some(t);

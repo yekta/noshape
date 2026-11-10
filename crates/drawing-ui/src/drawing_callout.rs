@@ -367,6 +367,9 @@ impl DrawingEditor {
         let bodies: Vec<noshape_model::BodyId> = callout.stacked.iter().filter_map(|s| s.body.clone()).collect();
         let name = |b: &noshape_model::BodyId| self.callout_source(id).and_then(|s| s.part(Some(b))).map(|p| p.name.clone()).unwrap_or_default();
         let picks = bodies.iter().map(|b| (name(b), b.clone())).collect();
+        // Its view framed while the dialog is open, the instances picked there (live drw-callout-stacked-add).
+        let view = self.current_sheet().annotations.iter().find(|a| a.id == id).and_then(|a| a.kind.view());
+        self.selection = view.map(Sel::View).into_iter().collect();
         self.stack_dlg = Some(StackDlg { id, picks, from_bom: false, reorder: false });
         self.tool = Tool::Select;
         cx.notify();
@@ -410,6 +413,7 @@ impl DrawingEditor {
 
     fn close_stack_dlg(&mut self, ok: bool, cx: &mut Context<Self>) {
         let Some(d) = self.stack_dlg.take() else { return };
+        self.selection.clear();
         if ok {
             let stacked: Vec<noshape_model::drawing::StackedCallout> = d.picks.iter().map(|(_, b)| noshape_model::drawing::StackedCallout { text: String::new(), body: Some(b.clone()) }).collect();
             self.edit_sheet("Add stacked callouts", cx, |s| {
