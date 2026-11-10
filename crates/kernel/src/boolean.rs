@@ -138,11 +138,20 @@ impl DeclineScope {
 /// (BRepAlgoAPI_Fuse/Cut/Common with SetArguments/SetTools, non-destructive).
 /// History args: objects in order, then tools.
 pub fn boolean(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &BooleanOptions) -> Result<OpResult> {
-    let Some(DeclineScope(memo, kind)) = DeclineScope::current() else { return boolean_once(op, objects, tools, opts) };
+    let Some(DeclineScope(memo, kind)) = DeclineScope::current() else {
+        let r = boolean_once(op, objects, tools, opts);
+        if std::env::var_os("NOSHAPE_AHEAD_TRACE").is_some() {
+            eprintln!("BOOL {op:?} {} objects {} tools: path {} decline {}", objects.len(), tools.len(), crate::last_boolean_path(), crate::last_rust_decline());
+        }
+        return r;
+    };
     let key = (kind, op, objects.len());
     let skip = memo.0.lock().is_ok_and(|v| v.contains(&key));
     if !skip {
         let r = boolean_once(op, objects, tools, opts);
+        if std::env::var_os("NOSHAPE_AHEAD_TRACE").is_some() {
+            eprintln!("BOOL {op:?} {} objects {} tools: path {} decline {}", objects.len(), tools.len(), crate::last_boolean_path(), crate::last_rust_decline());
+        }
         if crate::last_boolean_path() != "rust" && LATE_DECLINES.contains(&crate::last_rust_decline().as_str())
             && let Ok(mut v) = memo.0.lock()
         {
