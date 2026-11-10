@@ -12,7 +12,32 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
-## c2-hunting-knife's Fillet 2 (11-10 07:56 UTC, not landed: local branch blend-runon, WIP commit)
+## 11-10 10:29 UTC: knife's Fillet 2 as live (queued 965ea1f1), Chamfer 1 next; fillet fallback costs
+- Fillet 2: `BlendSpec::overflow` (a fallback after OCCT's fillet fails, overflow on, all lines): a concave line's
+  section runs on 2R past its free ends; the faces its run-on pieces touch (supports aside) trim it, planes extended
+  by `k::extend_face`, a B-spline by the new `k::extend_face_over` (only the sides the run-on's points over the
+  body lie beyond, by what they need: a long all-sides extension of the 4 x 6 grind spline broke OCCT's
+  intersections). The body's face is rebuilt on that extension first (`k::reface_on`), so the round's piece on it
+  merges in the unify; `k::join_edges_at` then joins the old line edge and the straight section running on from it
+  (OCCT's unify won't join a line and an approximated B-spline). 17/46/30, +0.3954 mm³ (live 17/46/30, +0.3955),
+  grind face to x -3.1588 (live -3.1588). T1 features_c::a_round_running_off_its_edge_meets_the_grind_face_
+  extended_as_live (data/knife-fillet2-input.brep). Model suite 816 -> 817 (only the knife, 14 -> 15/52),
+  assembly suite unchanged (4/24, 1261/1731, 170/345), g++-13 clean.
+- Knife's next difference, feature 15 Chamfer 1 (offset 0.45 mm, angle 22.5°, opposite on, the two edges where the
+  grind face meets the cutting edge's strips: a B-spline along the curved part and a line along the straight part,
+  tangent at (-49.99, -0.25, -19.13)): OCCT's distance-angle chamfer fails on them together, each alone, either
+  reference face, and on the body before Fillet 2 too (not the rebuilt grind face). Live: two faces, 35.79 and
+  22.13 mm². Probes /root/blend-scratch/patches/knife-chamfer-probes.patch (dump vibe4 NOSHAPE_DUMP_OPS chamfer-5).
+- Item 5 (fillet fallbacks, kernel profile of the whole model suite, vibe4, /root/blend-scratch/prof-suite.log,
+  bin/fallbacks.py): 8 blends per regeneration take a fallback after OCCT's whole set fails; the failed as-is +
+  scaled attempts cost ~1.9 s in all, 1.5 s of it the impeller's Fillet Ansaugflansch zum Gehaeuse (as is 70 +
+  scaled 630-700 ms) and Fillet Bohrungssitz Ansaugflasch (75 + 480), whose by_groups then costs 1.5-2.0 s more;
+  the rest: Fillet 4 / Fillet Stevenrohr zum Halter (impeller, 160-240 ms failed), the knife's Fillet 2 (73), two
+  Fillet 1 / Fillet 2 of 50-90. by_groups rounds each vertex-connected group alone and takes their common: OCCT
+  fails the set where separate groups' rounds meet. Candidate test: two groups whose edges' boxes, grown by their
+  radii, overlap → groups first (and the scaled retry skipped).
+
+## c2-hunting-knife's Fillet 2 (11-10 07:56 UTC: superseded by the 10:29 entry)
 - The edge: a 0.95 mm concave line (x -4, z -14.43, y -0.95..0) between the floor and a 55° slope, R 3, overflow
   on. Its y -0.95 end is where the blade's grind face (a 4 x 6 B-spline) cuts in. Live: the round runs straight on
   past that end across the whole half-blade (y -2..0), trimmed by the grind face extended below the floor (the
