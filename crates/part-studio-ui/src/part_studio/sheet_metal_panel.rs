@@ -119,13 +119,10 @@ impl PartStudioView {
         let Some(model) = self.sheet_metal_context(&models) else { return };
         let model_name = models.iter().find(|(f, _)| *f == model).map(|(_, n)| n.clone()).unwrap_or_default();
         let Some(body) = self.sm_joints(model).map(|j| j.first) else { return };
-        // New sketch…: on the base wall's face on the flat's side (live
-        // request 1605: "Face of Sheet metal 1", while the model is active).
-        let sketch_face = self.context.as_ref().and_then(|c| c.sheet_metal.get(&body)).filter(|d| d.active).and_then(|d| {
-            let w = d.walls.iter().find(|w| !w.is_virtual())?;
-            let side = if d.view_back { &w.back } else { &w.faces };
-            side.first().map(|n| noshape_model::reference::Reference::Face((**n).clone()))
-        });
+        // New sketch…: on the flat face right-clicked (live 2468: "Face of <model>", the sketch lives on the flat;
+        // request 1605: while the model is active).
+        let picked = self.flat_view.as_ref().and_then(|f| f.read(cx).picked_face());
+        let sketch_face = self.context.as_ref().and_then(|c| c.sheet_metal.get(&body)).filter(|d| d.active).and(picked).map(|i| Reference::Face(noshape_model::sheetmetal::flat_face_name(&body, i)));
         let part = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
         let sketch = self.studio(cx).and_then(|s| s.feature(model).and_then(|f| noshape_model::interaction::source_sketch(&s.features, f)).and_then(|id| s.feature(id).map(|f| (id, f.name.clone()))));
         let (view, fv) = (cx.entity(), self.flat_view.clone());
@@ -433,11 +430,53 @@ impl PartStudioView {
         noshape_model::sheetmetal::models_of(self.context.as_ref()?).first().copied()
     }
 
-    /// The flat's face selected in the flat view: the model face selected.
+    /// The flat's face selected in the flat view (live 2468: the face of "Flat pattern of <part>"; the main view
+    /// lights the part's face it shows, [`Self::flat_cross_selection`]).
     fn select_flat_face(&mut self, side: Option<bool>, cx: &mut Context<Self>) {
-        self.selection = side.and_then(|s| self.flat_model_face(s)).into_iter().collect();
+        let picked = self.flat_view.as_ref().and_then(|f| f.read(cx).picked_face());
+        let part = self.ui.sm_context.or(self.sheet_metal_models_ctx()).and_then(|m| self.sm_joints(m)).map(|j| j.first);
+        self.selection = side.and(picked).zip(part).map(|(i, b)| Reference::Face(noshape_model::sheetmetal::flat_face_name(&b, i))).into_iter().collect();
         self.refresh_scene(false, cx);
         cx.notify();
+    }
+
+    /// An open sketch on a part's flat (sketched in the main view): the flat drawn there under it, not pickable.
+    pub(super) fn flat_backdrop(&mut self, cx: &App) -> Vec<noshape_render::Instance> {
+        let part = self.sketch.as_ref().and_then(|_| match self.edit.as_ref()?.dialog.read(cx).feature.params.query("sketchPlane").first() {
+            Some(Reference::Face(n)) => noshape_model::sheetmetal::flat_face_of(n).map(|(p, _)| p),
+            _ => None,
+        });
+        let flat = part.as_ref().and_then(|b| self.flat_cache.as_ref()?.parts.iter().find(|(id, _)| id == b).and_then(|(_, f)| f.as_ref().ok().cloned()));
+        let (Some(part), Some(flat)) = (part, flat) else {
+            self.ui.flat_backdrop = None;
+            return Vec::new();
+        };
+        let key = (part.clone(), Arc::as_ptr(&flat) as usize);
+        if let Some((k, shown)) = &self.ui.flat_backdrop
+            && *k == key
+        {
+            return shown.clone();
+        }
+        let color = self.display.body(&part).map(|b| b.color).unwrap_or([0.6, 0.75, 0.85, 1.0]);
+        let Some(display) = noshape_model::regen::flat_view_display(&flat, color) else { return Vec::new() };
+        let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: false, show_origin: false, ..Default::default() };
+        let built = crate::scene_builder::build(&display, &opts, &mut Default::default(), self.gpu.uploader());
+        let shown: Vec<noshape_render::Instance> = built.scene.instances.into_iter().map(|i| i.unpickable()).collect();
+        self.ui.flat_backdrop = Some((key, shown.clone()));
+        shown
+    }
+
+    /// The part's faces the selected flat faces show (the reference side's or the back's base wall face).
+    pub(super) fn flat_cross_selection(&self, cx: &App) -> Vec<Reference> {
+        let Some(fv) = self.flat_view.as_ref() else { return Vec::new() };
+        self.selection
+            .iter()
+            .filter_map(|r| {
+                let Reference::Face(n) = r else { return None };
+                let (_, i) = noshape_model::sheetmetal::flat_face_of(n)?;
+                self.flat_model_face(fv.read(cx).side_of(i)?)
+            })
+            .collect()
     }
 
     /// The active model's stored Bends row order.
@@ -977,23 +1016,45 @@ impl PartStudioView {
         let sketch_frame = self.sketch.as_ref().zip(flat.as_ref()).zip(self.context.as_ref()).and_then(|((_, f), ctx)| {
             let feature = &self.edit.as_ref()?.dialog.read(cx).feature;
             let Some(noshape_model::params::ParamValue::Query(plane)) = feature.params.get("sketchPlane") else { return None };
-            let faces: Vec<_> = plane.iter().flat_map(|r| noshape_model::regen::measure::resolve_shapes(ctx, r)).collect();
-            let b = faces.first()?.bounding_box(false).ok()?;
-            let on: Vec<glam::DVec3> = (0..8).map(|k| f.to_flat_view(glam::DVec3::new([b.min.x, b.max.x][k & 1], [b.min.y, b.max.y][(k >> 1) & 1], [b.min.z, b.max.z][(k >> 2) & 1]))).collect();
-            // Only a face lying on the flat's sheet (its top or bottom).
-            let on_sheet = |z: f64| z.abs() < 1e-6 || (z.abs() - f.thickness).abs() < 1e-6;
-            if !on.iter().all(|c| on_sheet(c.z)) {
-                return None;
-            }
+            // A face of the flat itself (live 2468) is in the flat's place already; a part's face is moved there.
+            let flat_face = plane.iter().find_map(|r| match r {
+                Reference::Face(n) => noshape_model::sheetmetal::flat_face_of(n),
+                _ => None,
+            });
+            let on: Vec<glam::DVec3> = match flat_face {
+                Some((_, i)) => {
+                    let b = f.flat_view_solid()?.faces().get(i)?.bounding_box(false).ok()?;
+                    (0..4).map(|k| glam::DVec3::new([b.min.x, b.max.x][k & 1], [b.min.y, b.max.y][(k >> 1) & 1], b.max.z)).collect()
+                }
+                None => {
+                    let faces: Vec<_> = plane.iter().flat_map(|r| noshape_model::regen::measure::resolve_shapes(ctx, r)).collect();
+                    let b = faces.first()?.bounding_box(false).ok()?;
+                    let on: Vec<glam::DVec3> = (0..8).map(|k| f.to_flat_view(glam::DVec3::new([b.min.x, b.max.x][k & 1], [b.min.y, b.max.y][(k >> 1) & 1], [b.min.z, b.max.z][(k >> 2) & 1]))).collect();
+                    // Only a face lying on the flat's sheet (its top or bottom).
+                    let on_sheet = |z: f64| z.abs() < 1e-6 || (z.abs() - f.thickness).abs() < 1e-6;
+                    if !on.iter().all(|c| on_sheet(c.z)) {
+                        return None;
+                    }
+                    on
+                }
+            };
             let (lo, hi) = on.iter().fold((glam::DVec2::splat(f64::INFINITY), glam::DVec2::splat(f64::NEG_INFINITY)), |(lo, hi), c| (lo.min(c.truncate()), hi.max(c.truncate())));
             let m = 0.06 * (hi - lo).max_element();
             let (lo, hi) = (lo - glam::DVec2::splat(m), hi + glam::DVec2::splat(m));
-            let at = |x: f64, y: f64| glam::DVec3::new(x, y, 0.0);
+            let top = on.iter().map(|c| c.z).fold(f64::NEG_INFINITY, f64::max);
+            let at = |x: f64, y: f64| glam::DVec3::new(x, y, top);
             let asc = 0.045 * (hi.y - lo.y);
             Some(super::flat_view::SketchFrame { corners: [at(lo.x, lo.y), at(hi.x, lo.y), at(hi.x, hi.y), at(lo.x, hi.y)], name_at: at(lo.x + 0.3 * asc, hi.y - 0.3 * asc), x: glam::DVec3::X, y: glam::DVec3::Y, name: feature.name.clone() })
         });
+        // The sketches on this flat (live 2468: drawn here only).
+        let flat_part = bodies.first().map(|(b, _)| b.clone());
+        let plane_part = |f: FeatureId| match self.studio(cx)?.feature(f)?.params.query("sketchPlane").first() {
+            Some(Reference::Face(n)) => noshape_model::sheetmetal::flat_face_of(n).map(|(p, _)| p),
+            _ => None,
+        };
+        let on_flat: Vec<noshape_model::display::SketchDisplay> = self.display.sketches.iter().filter(|s| s.on_flat && !s.hidden && flat_part.is_some() && plane_part(s.feature) == flat_part).cloned().collect();
         fv.update(cx, |v, cx| {
-            v.show(flat.as_ref(), color, highlight, hovered, cx);
+            v.show(flat.as_ref(), color, highlight, hovered, on_flat, cx);
             v.show_sketch_frame(sketch_frame, cx);
         });
 

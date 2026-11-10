@@ -510,6 +510,9 @@ pub struct UiState {
     /// The bend (index into the model's bends) whose line is selected in the
     /// flat view: Shift+C analyses it (live request 1622).
     pub sm_flat_bend: Option<usize>,
+    /// While a sketch on a part's flat is open in the main view: that flat drawn under it (its part and the flat's
+    /// identity, the instances).
+    pub flat_backdrop: Option<((noshape_model::reference::BodyId, usize), Vec<noshape_render::Instance>)>,
     /// The flat view's Select other list (live 1605 / 1622: the titled popup).
     pub sm_select_other: Option<super::sheet_metal_panel::FlatSelectOther>,
     /// The Bends cell being edited (row, column 2 Radius / 5 K Factor), and
@@ -831,6 +834,7 @@ impl UiState {
             sm_bends_scroll: ScrollHandle::new(),
             sm_hover: None,
             sm_flat_bend: None,
+            flat_backdrop: None,
             sm_select_other: None,
             sm_edit: None,
             sm_edit_focus: false,
