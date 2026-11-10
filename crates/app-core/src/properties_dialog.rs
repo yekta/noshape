@@ -434,6 +434,49 @@ fn text_field(st: &Entity<InputState>) -> AnyElement {
     Input::new(st).h(px(34.)).text_size(px(14.)).into_any_element()
 }
 
+/// A tab's Properties fields after Name, Description and Category, in the modal's order, as (label, kind, value) with kind
+/// "input", "select" or "checkbox": what a version's Properties tree shows, read-only, for a tab picked in it (live
+/// ver-version-properties-tree). The same fields by category as the tab's own modal.
+pub fn tab_fields(spec: &MetaSpec) -> Vec<(&'static str, &'static str, String)> {
+    let kind = spec.category;
+    let (v, m) = (&spec.values, &spec.values.meta);
+    let text = |s: &Option<String>| s.clone().unwrap_or_default();
+    let mut out = Vec::new();
+    if !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio") {
+        let state = m.state.clone().unwrap_or_else(|| RELEASE_STATES[0].to_string());
+        out.extend([("Part number", "input", v.part_number.clone()), ("Revision", "input", v.revision.clone()), ("State *", "select", state)]);
+    }
+    if !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio" | "Onshape Drawing") {
+        out.extend([("Vendor", "input", text(&m.vendor)), ("Project", "input", text(&m.project)), ("Product line", "input", text(&m.product_line))]);
+    }
+    if kind != "Onshape Feature Studio" {
+        out.extend([("Title 1", "input", text(&m.title1)), ("Title 2", "input", text(&m.title2)), ("Title 3", "input", text(&m.title3))]);
+        if let Some(d) = &v.drawing {
+            out.extend(DRAWING_FIELDS.iter().zip(d.iter()).map(|(l, x)| (*l, "input", x.clone())));
+        }
+        out.push(("Not revision managed", "checkbox", m.not_revision_managed.to_string()));
+        if let Some(info) = &spec.drawing_info {
+            out.extend(DRAWING_INFO.iter().zip(info.iter()).map(|(l, x)| (*l, "input", x.clone())));
+        }
+    }
+    if !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio" | "Onshape File" | "Onshape Drawing") {
+        out.push(("Exclude from all BOMs", "checkbox", m.exclude_from_bom.to_string()));
+        out.push(("Unit of measure", "select", m.unit_of_measure.clone().unwrap_or_else(|| DEFAULT_UNIT.to_string())));
+        if let Some(options) = &spec.bom_options {
+            out.push(("Override", "checkbox", v.mass_override.is_some().to_string()));
+            out.push(("Mass", "input", v.mass_override.clone().unwrap_or_default()));
+            out.push(("Subassembly BOM behavior *", "select", options.get(v.bom).cloned().unwrap_or_default()));
+        }
+    }
+    out
+}
+
+/// A read-only checkbox row (a version's Properties tree).
+pub fn readonly_check(text: impl Into<SharedString>, on: bool) -> AnyElement {
+    let text: SharedString = text.into();
+    check_row(SharedString::from(format!("ro-check-{text}")), text, on).cursor_default().opacity(0.6).into_any_element()
+}
+
 /// A configured field: disabled, grey, with the hover note (live psb
 /// 10-20 q, 645–646).
 fn configured_box(field: &'static str, value: String) -> AnyElement {
@@ -1119,3 +1162,34 @@ pub fn resizable_props(dialog: gpui_kit::component::dialog::Dialog) -> gpui_kit:
     )
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::{MetaSpec, MetaValues, tab_fields};
+
+    fn spec(category: &'static str, bom_options: Option<Vec<String>>) -> MetaSpec {
+        let mut values = MetaValues { name: "T".into(), ..Default::default() };
+        values.meta.title2 = Some("t2".into());
+        MetaSpec { category, material: None, computed_mass: None, bom_options, drawing_info: None, values }
+    }
+
+    fn labels(s: &MetaSpec) -> Vec<&'static str> {
+        tab_fields(s).into_iter().map(|f| f.0).collect()
+    }
+
+    /// Live ver-version-properties-tree: a Part Studio picked in a version's tree shows Title 1–3 and Not revision
+    /// managed after Category, as its own Properties modal does; a Feature Studio has none; an assembly has them all.
+    #[test]
+    fn a_tabs_fields_follow_its_category() {
+        let ps = spec("Onshape Part Studio", None);
+        assert_eq!(labels(&ps), ["Title 1", "Title 2", "Title 3", "Not revision managed"]);
+        assert_eq!(tab_fields(&ps)[1], ("Title 2", "input", "t2".to_string()));
+        assert_eq!(tab_fields(&ps)[3], ("Not revision managed", "checkbox", "false".to_string()));
+        assert!(labels(&spec("Onshape Feature Studio", None)).is_empty());
+        let asm = spec("Onshape Assembly", Some(vec!["Detailed".into()]));
+        assert_eq!(
+            labels(&asm),
+            ["Part number", "Revision", "State *", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3", "Not revision managed", "Exclude from all BOMs", "Unit of measure", "Override", "Mass", "Subassembly BOM behavior *"]
+        );
+    }
+}

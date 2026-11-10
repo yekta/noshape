@@ -67,6 +67,43 @@ fn open_assembly(cx: &mut TestAppContext, path: &std::path::Path) -> (AnyWindowH
     (window, view)
 }
 
+/// The workspace's drawing of an assembly tab: the view, and its front layer (the left dialogs) over it.
+struct FrontHost {
+    view: Entity<AssemblyView>,
+    front: gpui_kit::AnyView,
+}
+
+impl gpui_kit::Render for FrontHost {
+    fn render(&mut self, _: &mut gpui_kit::Window, _: &mut gpui_kit::Context<Self>) -> impl gpui_kit::IntoElement {
+        use gpui_kit::{ParentElement as _, Styled as _};
+        gpui_kit::div().relative().size_full().child(self.view.clone()).child(gpui_kit::div().absolute().top(px(crate::ui::TOOLBAR_H)).left_0().right_0().bottom_0().child(self.front.clone()))
+    }
+}
+
+/// [`open_assembly`] with the front layer drawn, so the left dialogs can be clicked.
+fn open_assembly_with_front(cx: &mut TestAppContext, path: &std::path::Path) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    let session = crate::session::Session::open(path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::Assembly(_))).unwrap().id;
+    let gpu = Gpu::headless().unwrap();
+    let (window, view) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
+        let mut view = None;
+        let (w, _) = crate::os_menu::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| AssemblyView::new(doc, tab, gpu, window, cx));
+            let front = v.update(cx, |v, cx| v.front_host(cx).0);
+            view = Some(v.clone());
+            cx.new(|_| FrontHost { view: v, front })
+        })
+        .unwrap();
+        (w, view.unwrap())
+    });
+    cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    (window, view)
+}
+
 /// A block (Part 1) and a pin (Part 2) in "Sub", whose instance "Sub <1>"
 /// is Assembly 1's only instance.
 fn sub_assembly(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<AssemblyView>) {
@@ -536,4 +573,123 @@ fn a_mate_connector_pick_is_selected_and_undone_in_the_dialog(cx: &mut TestAppCo
         });
     })
     .unwrap();
+}
+
+/// Live ver-linked-selective-update (behaviours "Change to version…" 295–296): Selective update's ⎇ swaps the panel
+/// for the document's Version graph (Main, V2, V1, Start, the latest picked); a pick ticks the row and goes back;
+/// Update selected moves the instance and says nothing (Update all's toast is its own).
+#[gpui::test]
+fn selective_updates_version_graph_picks_and_ticks_the_row(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-version-graph-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let (src, top) = (dir.join("src.noshape"), dir.join("top.noshape"));
+    for p in [&src, &top] {
+        for ext in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{ext}", p.display()));
+        }
+    }
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": src.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"].clone()], "depth": "10 mm", "operationType": "NEW" } }));
+        call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+        call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }));
+        call(&mut ctx, "history_create_version", json!({ "name": "V2" }));
+        call(&mut ctx, "document_create", json!({ "path": top.to_str().unwrap() }));
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1", "document": src.to_str().unwrap(), "version": "V1" }));
+    }
+    let (window, view) = open_assembly_with_front(cx, &top);
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            v.open_reference_manager(None, cx);
+            if let Some(m) = &mut v.ui.ref_manager {
+                m.tab = 1;
+            }
+        })
+    });
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let m = v.ui.ref_manager.as_ref().unwrap();
+        assert_eq!(m.docs.iter().map(|d| (d.name.clone(), d.current.clone(), d.newer)).collect::<Vec<_>>(), [("src".to_string(), "V1".to_string(), true)]);
+    });
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let graph = vcx.debug_bounds("rm-graph-0").expect("the row's Version graph button");
+    vcx.simulate_click(graph.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    let list = crate::ui_script::open_list().expect("the Version graph's rows");
+    assert_eq!(list["kind"], "list", "{list}");
+    assert_eq!(list["rows"], json!(["Main", "V2", "V1", "Start"]), "{list}");
+    assert_eq!(list["highlighted"], 1, "the latest version picked: {list}");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let v2 = vcx.debug_bounds("rm-picker-1").expect("the V2 row");
+    vcx.simulate_click(v2.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    assert!(crate::ui_script::open_list().is_none(), "back to the list");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let m = v.ui.ref_manager.as_ref().unwrap();
+        assert!(m.picking.is_none() && m.checked.contains(&0), "the pick ticked the row");
+        assert_eq!(m.docs[0].pick_label(m.chosen[&0]), "V2");
+    });
+    cx.update(|cx| view.update(cx, |v, cx| v.apply_reference_manager(cx)));
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.message.is_none(), "Update selected says nothing: {:?}", v.message);
+        let m = v.ui.ref_manager.as_ref().unwrap();
+        assert_eq!((m.docs[0].current.as_str(), m.docs[0].newer), ("V2", false), "the row stays, V2 ⇨ V2");
+    });
+}
+
+/// Live asm-pattern-field-configure: in a configured assembly, a right-click on a new Linear pattern's Instance count
+/// opens only Configure (not the text field's Cut / Copy / Paste menu, which kept the next clicks), and Configure says
+/// "Linear pattern 1 Instance count added to Configuration" and closes the menu.
+#[gpui::test]
+fn a_pattern_fields_configure_takes_the_click(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-pattern-configure-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("asm.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"].clone()], "depth": "10 mm", "operationType": "NEW" } }));
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(&mut ctx, "config_add_input", json!({ "tab": "Assembly 1", "kind": "list", "name": "Configuration" }));
+    }
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_pattern(super::panels::PatternDialogKind::Linear, w, cx))).unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let count = vcx.debug_bounds("pat-cfg-count").expect("Instance count");
+    // On the field's text, at its right (where the input sits): the input's own Cut / Copy / Paste menu stays shut.
+    let at = gpui_kit::point(count.right() - px(20.), count.center().y);
+    vcx.simulate_mouse_down(at, gpui_kit::MouseButton::Right, gpui_kit::Modifiers::default());
+    vcx.simulate_mouse_up(at, gpui_kit::MouseButton::Right, gpui_kit::Modifiers::default());
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| crate::os_menu::open_labels(cx)), ["Configure"], "only the field's Configure menu");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let row = vcx.debug_bounds("menu:Configure").expect("Configure");
+    vcx.simulate_click(row.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    assert!(!cx.update(|cx| crate::os_menu::is_open(cx)), "the menu closed");
+    cx.update(|cx| assert_eq!(view.read(cx).ui.cfg_toast.as_deref(), Some("Linear pattern 1 Instance count added to Configuration")));
+    // Escape cancels the pattern, its Configure and the toast with it (live).
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.on_cancel(&crate::actions::Cancel, w, cx))).unwrap();
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.pattern.is_none() && v.ui.cfg_toast.is_none(), "the pattern and its toast gone");
+    });
 }

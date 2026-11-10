@@ -15,7 +15,7 @@ use crate::actions::*;
 use crate::assembly_mate_dialog::{ConnectorLabeler, MateDialog, MateDialogEvent, mate_icon};
 use crate::assembly_scene::{self, AsmBuilt, AsmGpuCache, AsmPickTarget, AsmSceneOptions, Highlights, ManipHandle, OverlayPick, Triad};
 use crate::assets::icon_path;
-use crate::os_menu::{OsContextMenuExt as _, OsMenuItem};
+use crate::os_menu::OsContextMenuExt as _;
 use crate::doc_model::{DocEvent, DocModel};
 use crate::gpu::Gpu;
 use crate::navigation::{self as nav, RotateDir};
@@ -6435,6 +6435,10 @@ impl AssemblyView {
             self.ui.mass = None;
             cx.notify();
         } else if let Some(p) = self.pattern.take() {
+            // Its Configure goes with it, and the toast that said so (live asm-pattern-field-configure).
+            if !p.cfg_pending.is_empty() {
+                self.ui.cfg_toast = None;
+            }
             // Live: cancelling an edit leaves nothing selected (nor its row).
             if p.editing.is_some() {
                 self.selected.clear();

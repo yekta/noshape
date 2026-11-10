@@ -1075,6 +1075,30 @@ pub trait OsContextMenuExt: InteractiveElement + Sized {
         })
     }
 
+    /// [`os_context_menu`](Self::os_context_menu) over a text field: the right-click is taken before the field, whose
+    /// own Cut / Copy / Paste menu would open under this one and keep the next clicks; `field` is focused with its text
+    /// selected, as live's (asm-pattern-field-configure).
+    fn os_context_menu_over_field(self, field: Option<Entity<gpui_kit::component::input::InputState>>, f: impl Fn(OsMenu, &mut Window, &mut Context<OsMenu>) -> OsMenu + 'static) -> Self {
+        let f = Rc::new(f);
+        self.capture_any_mouse_down(move |e, window, cx| {
+            if e.button != MouseButton::Right {
+                return;
+            }
+            cx.stop_propagation();
+            if let Some(st) = &field {
+                st.update(cx, |s, cx| {
+                    s.focus(window, cx);
+                    s.select_all(window, cx);
+                });
+            }
+            let f = f.clone();
+            let menu = OsMenu::build(window, cx, move |m, window, cx| f(m, window, cx));
+            if !menu.read(cx).is_empty() {
+                open(e.position + point(px(0.), px(2.)), menu, window, cx);
+            }
+        })
+    }
+
     /// [`os_context_menu`](Self::os_context_menu) that a Ctrl+click opens too (live: a feature-list row's Ctrl+click
     /// opens its menu on Linux as on macOS, behaviours "ui-parity runner (2026-11-03, P1 request 1844)").
     fn os_context_menu_ctrl_click(self, f: impl Fn(OsMenu, &mut Window, &mut Context<OsMenu>) -> OsMenu + 'static) -> Self {

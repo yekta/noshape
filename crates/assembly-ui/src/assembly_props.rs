@@ -519,6 +519,27 @@ pub struct RefDoc {
     /// A newer version is there (the "Newer versions available for n documents" count): not this document's own
     /// row (Change to version…), nor one just updated (it stays listed, live ver-linked-selective-update).
     pub newer: bool,
+    /// Another document's Main as it is now (the Version graph's Main row pins it); `None` for this document's own
+    /// workspace references, which are on Main already.
+    pub main: Option<noshape_store::MicroversionId>,
+}
+
+/// The Version graph's Main row as a pick (the other picks index `RefDoc::versions`).
+pub const PICK_MAIN: usize = usize::MAX;
+
+impl RefDoc {
+    /// What a pick reads as ("Main", "V2", "Start").
+    pub fn pick_label(&self, pick: usize) -> String {
+        if pick == PICK_MAIN {
+            return "Main".into();
+        }
+        self.versions.get(pick).map(|v| v.label.clone()).unwrap_or_default()
+    }
+
+    /// The Version graph's rows: Main, then the versions newest first and Start.
+    pub fn picker_rows(&self) -> Vec<String> {
+        std::iter::once("Main".to_string()).chain(self.versions.iter().map(|v| v.label.clone())).collect()
+    }
 }
 
 /// The open Reference manager: tab (0 Update to latest, 1 Selective
@@ -530,6 +551,8 @@ pub struct RefManager {
     pub docs: Vec<RefDoc>,
     pub checked: HashSet<usize>,
     pub chosen: HashMap<usize, usize>,
+    /// The document whose Version graph is open (Selective update's ⎇).
+    pub picking: Option<usize>,
 }
 
 impl AssemblyView {
@@ -551,7 +574,7 @@ impl AssemblyView {
             }
             if !versions.is_empty() {
                 let thumbnail = dm.session.store.get_meta("thumbnail").ok().flatten().as_deref().and_then(crate::library::decode_thumbnail);
-                out.push(RefDoc { name: dm.name(), current: dm.session.store.branch(dm.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()), versions, keys: Vec::new(), path: dm.session.path.clone(), thumbnail, newer: false });
+                out.push(RefDoc { name: dm.name(), current: dm.session.store.branch(dm.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()), versions, keys: Vec::new(), path: dm.session.path.clone(), thumbnail, newer: false, main: None });
             }
         }
         // Other documents (and this one pinned to a version).
@@ -570,13 +593,18 @@ impl AssemblyView {
         }
         for (path, keys, mv) in by_path {
             let Ok(info) = crate::derived::external_doc_info(&path) else { continue };
-            let versions: Vec<crate::derived::VersionChoice> = info.versions.iter().filter(|v| v.label != "Current state").cloned().collect();
+            let head = info.versions.iter().find(|v| v.label == "Current state").map(|v| v.microversion);
+            let mut versions: Vec<crate::derived::VersionChoice> = info.versions.iter().filter(|v| v.label != "Current state").cloned().collect();
             if versions.first().is_none_or(|v| v.microversion == mv) {
                 continue;
             }
-            let current = versions.iter().find(|v| v.microversion == mv).map(|v| v.label.clone()).unwrap_or_else(|| format!("state {}", mv.short()));
+            let current = versions.iter().find(|v| v.microversion == mv).map(|v| v.label.clone()).or_else(|| (head == Some(mv)).then(|| "Main".to_string())).unwrap_or_else(|| format!("state {}", mv.short()));
+            // The Version graph ends at the document's Start (live ver-linked-selective-update).
+            if let Some(start) = info.start {
+                versions.push(crate::derived::VersionChoice { label: "Start".into(), microversion: start });
+            }
             let thumbnail = crate::assembly_hooks::file_thumbnail(&path);
-            out.push(RefDoc { name: info.name, current, versions, keys, path, thumbnail, newer: true });
+            out.push(RefDoc { name: info.name, current, versions, keys, path, thumbnail, newer: true, main: head });
         }
         out
     }
@@ -590,7 +618,7 @@ impl AssemblyView {
         // Change to version… on this document's own parts opens on Selective update (live asm-menu-change-to-version);
         // with a newer version of a linked document, on Update to latest (live 604–607).
         let tab = u8::from(scope.is_some() && docs.iter().all(|d| !d.newer));
-        self.ui.ref_manager = Some(RefManager { scope, tab, docs, checked: HashSet::new(), chosen: HashMap::new() });
+        self.ui.ref_manager = Some(RefManager { scope, tab, docs, checked: HashSet::new(), chosen: HashMap::new(), picking: None });
         cx.notify();
     }
 
@@ -603,7 +631,15 @@ impl AssemblyView {
 
     /// Move one document's references to `version` (index into its versions).
     fn update_reference(&mut self, d: &RefDoc, version: usize, scope: Option<&[InstanceId]>, cx: &mut Context<Self>) -> usize {
-        let Some(to) = d.versions.get(version).cloned() else { return 0 };
+        let to = match (version, d.main) {
+            // This document's workspace references are on Main already.
+            (PICK_MAIN, None) => return 0,
+            (PICK_MAIN, Some(head)) => crate::derived::VersionChoice { label: "Main".into(), microversion: head },
+            _ => match d.versions.get(version) {
+                Some(v) => v.clone(),
+                None => return 0,
+            },
+        };
         let scope: Option<Vec<InstanceId>> = scope.map(|s| s.to_vec());
         if d.keys.is_empty() {
             // Workspace references of this document become version references.
@@ -622,22 +658,23 @@ impl AssemblyView {
 
     /// Update all / Update selected: no message; the dialog stays open and
     /// lists what is still out of date (live 606–607).
-    fn apply_reference_manager(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn apply_reference_manager(&mut self, cx: &mut Context<Self>) {
         let Some(m) = self.ui.ref_manager.take() else { return };
         let mut updated: Vec<(String, String)> = Vec::new();
         for (i, d) in m.docs.iter().enumerate() {
             if m.tab == 1 && !m.checked.contains(&i) {
                 continue;
             }
-            let to = d.versions.get(m.chosen.get(&i).copied().unwrap_or(0)).map(|v| v.label.clone()).unwrap_or_default();
+            let to = d.pick_label(m.chosen.get(&i).copied().unwrap_or(0));
             // The instances it moves (named in the toast, live ver-linked-update-all).
             let names: Vec<String> = self.assembly(cx).map(|a| a.instances.iter().filter(|x| m.scope.as_ref().is_none_or(|s| s.contains(&x.id)) && x.source.external_key().is_some_and(|k| d.keys.iter().any(|dk| dk == k))).map(|x| x.name.clone()).collect()).unwrap_or_default();
             if self.update_reference(d, m.chosen.get(&i).copied().unwrap_or(0), m.scope.as_deref(), cx) > 0 {
                 updated.extend(names.into_iter().map(|n| (n, to.clone())));
             }
         }
-        // Live: "Version of Part 1 <1> updated to V2."
-        if !updated.is_empty() {
+        // Live: "Version of Part 1 <1> updated to V2." after Update all (ver-linked-update-all); Update selected says
+        // nothing (ver-linked-selective-update).
+        if m.tab == 0 && !updated.is_empty() {
             let to = updated[0].1.clone();
             let names: Vec<String> = updated.into_iter().map(|(n, _)| n).collect();
             self.message = Some((false, format!("Version of {} updated to {to}.", names.join(", "))));
@@ -647,11 +684,11 @@ impl AssemblyView {
         // ver-linked-selective-update); Update to latest drops it (ver-linked-update-all).
         for (i, d) in m.docs.into_iter().enumerate() {
             if m.tab == 1 && m.checked.contains(&i) && d.newer && !docs.iter().any(|x| x.path == d.path) {
-                let to = d.versions.get(m.chosen.get(&i).copied().unwrap_or(0)).map(|v| v.label.clone()).unwrap_or_default();
+                let to = d.pick_label(m.chosen.get(&i).copied().unwrap_or(0));
                 docs.push(RefDoc { current: to, newer: false, ..d });
             }
         }
-        self.ui.ref_manager = Some(RefManager { scope: m.scope, tab: m.tab, docs, checked: HashSet::new(), chosen: HashMap::new() });
+        self.ui.ref_manager = Some(RefManager { scope: m.scope, tab: m.tab, docs, checked: HashSet::new(), chosen: HashMap::new(), picking: None });
         self.check_external_updates(cx);
         self.refresh_scene(true, cx);
         cx.notify();
@@ -681,9 +718,8 @@ impl AssemblyView {
         let mut list = v_flex().flex_1().min_h_0();
         for (i, d) in m.docs.iter().enumerate() {
             let chosen = m.chosen.get(&i).copied().unwrap_or(0);
-            let newest = d.versions.get(chosen).map(|v| v.label.clone()).unwrap_or_default();
+            let newest = d.pick_label(chosen);
             let checked = m.checked.contains(&i);
-            let versions: Vec<String> = d.versions.iter().map(|v| v.label.clone()).collect();
             list = list.child(
                 h_flex()
                     .h(px(40.))
@@ -727,6 +763,7 @@ impl AssemblyView {
                         r.child(
                             div()
                                 .id(SharedString::from(format!("rm-graph-{i}")))
+                                .debug_selector(move || format!("rm-graph-{i}"))
                                 .map(|e| crate::ui_script::mark(e, || format!("button:Version graph:{}", d.name)))
                                 .mr(px(21.))
                                 .size(px(30.))
@@ -739,25 +776,12 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .tooltip(crate::ui::tooltip("Version graph"))
                                 .child(crate::ui::glyph("version-graph", 20., rgb(0x333333)))
-                                .on_click(cx.listener(move |_this, ev: &ClickEvent, window, cx| {
-                                    let view = cx.entity();
-                                    let versions = versions.clone();
-                                    let menu = crate::os_menu::OsMenu::build(window, cx, move |mut menu, _, _| {
-                                        for (vi, label) in versions.iter().enumerate() {
-                                            let v = view.clone();
-                                            menu = menu.item(OsMenuItem::new(label.clone()).checked(vi == chosen).on_click(move |_, _, cx| {
-                                                v.update(cx, |this, cx| {
-                                                    if let Some(m) = &mut this.ui.ref_manager {
-                                                        m.chosen.insert(i, vi);
-                                                        m.checked.insert(i);
-                                                    }
-                                                    cx.notify();
-                                                })
-                                            }));
-                                        }
-                                        menu
-                                    });
-                                    crate::os_menu::open_anchored(ev.position(), Anchor::TopLeft, menu, window, cx);
+                                // The panel's body becomes the document's Version graph (live 295).
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    if let Some(m) = &mut this.ui.ref_manager {
+                                        m.picking = Some(i);
+                                    }
+                                    cx.notify();
                                 })),
                         )
                     }),
@@ -769,6 +793,58 @@ impl AssemblyView {
         let newer = m.docs.iter().filter(|d| d.newer).count();
         let enabled = if tab == 0 { newer > 0 } else { !m.checked.is_empty() };
         let info = format!("Newer versions available for {newer} document{}", if newer == 1 { "" } else { "s" });
+        let body = match m.picking.and_then(|i| m.docs.get(i).map(|d| (i, d))) {
+            Some((i, d)) => {
+                let chosen = m.chosen.get(&i).copied().unwrap_or(0);
+                let picked = if chosen == PICK_MAIN { 0 } else { chosen + 1 };
+                let (back, pick) = (cx.entity(), cx.entity());
+                let picker = crate::version_picker::version_picker(
+                    &d.name,
+                    &d.picker_rows(),
+                    picked,
+                    move |_, cx| {
+                        back.update(cx, |this, cx| {
+                            if let Some(m) = &mut this.ui.ref_manager {
+                                m.picking = None;
+                            }
+                            crate::ui_script::note_list(None);
+                            cx.notify();
+                        })
+                    },
+                    // A pick ticks the row and goes back to the list (live 296).
+                    move |k, _, cx| {
+                        pick.update(cx, |this, cx| {
+                            if let Some(m) = &mut this.ui.ref_manager {
+                                m.chosen.insert(i, if k == 0 { PICK_MAIN } else { k - 1 });
+                                m.checked.insert(i);
+                                m.picking = None;
+                            }
+                            crate::ui_script::note_list(None);
+                            cx.notify();
+                        })
+                    },
+                    cx,
+                );
+                div().flex_1().min_h_0().bg(rgb(0xffffff)).child(picker).into_any_element()
+            }
+            None => v_flex()
+                .flex_1()
+                .min_h_0()
+                .bg(rgb(0xffffff))
+                .pt(px(6.))
+                .child(
+                    h_flex()
+                        .h(px(30.))
+                        .px(px(3.))
+                        .border_b_1()
+                        .border_color(rgb(0xeaeaea))
+                        // Live dialog-reference-manager: the two-tone 20 px icon, text right after it.
+                        .child(crate::assets::icon(&icon_path("inserted-version-update"), 20., cx))
+                        .child(div().text_size(px(12.)).text_color(rgb(0x333333)).child(info)),
+                )
+                .child(list)
+                .into_any_element(),
+        };
         Some(
             v_flex()
                 .w(px(330.))
@@ -794,7 +870,9 @@ impl AssemblyView {
                                 // Bootstrap `btn-close` (live 111: an 11 px ✕).
                                 .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CLOSE, 20., rgb(0x000000)))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    this.ui.ref_manager = None;
+                                    if this.ui.ref_manager.take().is_some_and(|m| m.picking.is_some()) {
+                                        crate::ui_script::note_list(None);
+                                    }
                                     cx.notify();
                                 })),
                         ),
@@ -817,24 +895,7 @@ impl AssemblyView {
                             cx.notify();
                         }))),
                 )
-                .child(
-                    v_flex()
-                        .flex_1()
-                        .min_h_0()
-                        .bg(rgb(0xffffff))
-                        .pt(px(6.))
-                        .child(
-                            h_flex()
-                                .h(px(30.))
-                                .px(px(3.))
-                                .border_b_1()
-                                .border_color(rgb(0xeaeaea))
-                                // Live dialog-reference-manager: the two-tone 20 px icon, text right after it.
-                                .child(crate::assets::icon(&icon_path("inserted-version-update"), 20., cx))
-                                .child(div().text_size(px(12.)).text_color(rgb(0x333333)).child(info)),
-                        )
-                        .child(list),
-                )
+                .child(body)
                 .child(
                     h_flex().h(px(46.)).px(px(5.)).justify_end().border_t_1().border_b_1().border_color(rgb(0xeaeaea)).child(
                         div()

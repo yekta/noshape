@@ -361,7 +361,7 @@ impl AssemblyView {
             "dialog": dialog,
             "dialogs": dialogs,
             // An open menu (a row's, the graphics area's): its rows, as the Part Studio's.
-            "list": crate::os_menu::ui_state(cx).or_else(|| self.ui.ctx_menu.as_ref().and_then(|(_, m, _)| crate::os_menu::menu_state(m, cx))),
+            "list": crate::os_menu::ui_state(cx).or_else(|| self.ui.ctx_menu.as_ref().and_then(|(_, m, _)| crate::os_menu::menu_state(m, cx))).or_else(crate::ui_script::open_list),
             "selection": { "count": items.len(), "items": items },
             "features": { "rows": rows, "rollbackAfter": null },
             "parts": [],
@@ -669,8 +669,12 @@ impl AssemblyView {
             let mut fields = vec![json!({ "label": format!("Newer versions available for {n} document{}", if n == 1 { "" } else { "s" }), "kind": "text", "text": "" })];
             for (i, d) in r.docs.iter().enumerate() {
                 let chosen = r.chosen.get(&i).copied().unwrap_or(0);
-                let text = format!("{} ⇨ {}", d.current, d.versions.get(chosen).map(|v| v.label.as_str()).unwrap_or(""));
+                let text = format!("{} ⇨ {}", d.current, d.pick_label(chosen));
                 fields.push(if r.tab == 1 { json!({ "label": d.name, "kind": "boolean", "checked": r.checked.contains(&i), "text": text }) } else { json!({ "label": d.name, "kind": "string", "text": text }) });
+            }
+            // The open Version graph's header: the document over "⎇ <picked>" (live ver-linked-selective-update).
+            if let Some(d) = r.picking.and_then(|i| r.docs.get(i).map(|d| (i, d))).map(|(i, d)| (d, r.chosen.get(&i).copied().unwrap_or(0))) {
+                fields.push(json!({ "label": d.0.name, "kind": "string", "text": d.0.pick_label(d.1) }));
             }
             let enabled = if r.tab == 0 { n > 0 } else { !r.checked.is_empty() };
             out.push(json!({ "title": "Reference manager", "kind": "feature", "tabs": [{ "label": "Update to latest", "selected": r.tab == 0 }, { "label": "Selective update", "selected": r.tab == 1 }], "fields": fields, "error": null, "ok": if enabled { "enabled" } else { "disabled" }, "okLabel": if r.tab == 0 { "Update all" } else { "Update selected" } }));

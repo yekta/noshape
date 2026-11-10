@@ -31,12 +31,14 @@ pub enum Item {
 
 type Listener = Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 
-/// A tab of the document at the item: id, name, type name, icon.
+/// A tab of the document at the item: id, name, type name, icon, and its Properties' description and other fields.
 struct TabRow {
     id: TabId,
     name: String,
     kind: String,
     icon: &'static str,
+    description: String,
+    fields: Vec<(&'static str, &'static str, String)>,
 }
 
 pub struct ItemProperties {
@@ -82,6 +84,54 @@ pub fn open(doc: Entity<DocModel>, item: Item, window: &mut Window, cx: &mut App
         // Enter in a field must not close the modal and drop the edit (qa4 R6
         // #9; Onshape keeps Enter as a field commit): only Apply / Save save.
         .on_ok(|_, _, _| false));
+}
+
+/// A tab's Properties as Tab › Properties… reads them: a drawing's and an assembly's from the tab, the other kinds'
+/// from the store (doc_dialogs::tab_properties). Drawn on the document at the item.
+fn tab_spec(t: &noshape_model::document::Tab, store: &noshape_store::Document) -> crate::properties_dialog::MetaSpec {
+    use crate::properties_dialog::{MetaSpec, MetaValues};
+    let name = t.name.clone();
+    let spec = |category, values| MetaSpec { category, material: None, computed_mass: None, bom_options: None, drawing_info: None, values };
+    match &t.content {
+        TabContent::Drawing(dr) => {
+            let m = &dr.meta;
+            let us = |iso: &str| match iso.split('-').collect::<Vec<_>>().as_slice() {
+                [y, mo, d] => format!("{mo}/{d}/{y}"),
+                _ => iso.to_string(),
+            };
+            let mut meta = m.item.clone();
+            (meta.title1, meta.title2, meta.title3) = (Some(m.title1.clone()), Some(m.title2.clone()), Some(m.title3.clone()));
+            let drawing = [dr.drawn_by.clone().unwrap_or_default(), m.approver.clone(), m.created.as_deref().map(us).unwrap_or_default(), m.approved.as_deref().map(us).unwrap_or_default()];
+            spec("Onshape Drawing", MetaValues { name, description: m.description.clone(), part_number: m.number.clone(), revision: m.revision.clone(), meta, drawing: Some(drawing), ..Default::default() })
+        }
+        TabContent::Assembly(a) => {
+            use noshape_model::assembly::BomBehavior;
+            let p = &a.properties;
+            let values = MetaValues {
+                name,
+                description: p.description.clone().unwrap_or_default(),
+                part_number: p.part_number.clone().unwrap_or_default(),
+                revision: p.revision.clone().unwrap_or_default(),
+                meta: p.meta.clone(),
+                mass_override: p.mass_override.map(|m| format!("{m} kg")),
+                bom: BomBehavior::ALL.iter().position(|b| *b == p.bom_behavior).unwrap_or(0),
+                drawing: None,
+            };
+            MetaSpec { bom_options: Some(BomBehavior::ALL.iter().map(|b| b.label().to_string()).collect()), ..spec("Onshape Assembly", values) }
+        }
+        c => {
+            let category = match c {
+                TabContent::PartStudio(_) => "Onshape Part Studio",
+                TabContent::VariableStudio(_) => "Onshape Variable Studio",
+                TabContent::FeatureStudio(_) => "Onshape Feature Studio",
+                _ => "Onshape File",
+            };
+            let text = |k: &str| store.get_meta(&format!("{k}:{}", t.id.0)).ok().flatten().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default();
+            let mut meta: noshape_model::partstudio::ItemMeta = serde_json::from_str(&text("tab_item_meta")).unwrap_or_default();
+            meta.not_revision_managed = text("tab_not_revision_managed") == "1";
+            spec(category, MetaValues { name, description: text("tab_description"), part_number: text("tab_part_number"), revision: text("tab_revision"), meta, ..Default::default() })
+        }
+    }
 }
 
 fn tab_kind(c: &TabContent) -> (String, &'static str) {
@@ -145,12 +195,14 @@ impl ItemProperties {
     /// The tabs of the document at the item, and their pictures (Part
     /// Studios, Assemblies and Drawings, rendered off the UI thread).
     fn load_tabs(&mut self, at: Document, cx: &mut Context<Self>) {
+        let store = &self.doc.read(cx).session.store;
         self.tabs = at
             .ordered_tabs()
             .into_iter()
             .map(|t| {
                 let (kind, icon) = tab_kind(&t.content);
-                TabRow { id: t.id, name: t.name.clone(), kind, icon }
+                let spec = tab_spec(t, store);
+                TabRow { id: t.id, name: t.name.clone(), kind, icon, description: spec.values.description.clone(), fields: crate::properties_dialog::tab_fields(&spec) }
             })
             .collect();
         let todo: Vec<(TabId, bool)> = at
@@ -339,10 +391,15 @@ impl Render for ItemProperties {
         }
         // A tab: its name and type, read-only here.
         let tab = self.selected.and_then(|id| self.tabs.iter().find(|t| t.id == id));
-        // Live's reader: the name, Category's (empty) typeahead, no Description; Undo and Redo are icon buttons.
+        // Live's reader: the name, Category's (empty) typeahead, no Description, then a picked tab's own fields; Undo
+        // and Redo are icon buttons.
         crate::ui_script::note_dialog(|| {
             let name = tab.map(|t| t.name.clone()).unwrap_or_else(|| self.name.read(cx).value().to_string());
-            let fields = serde_json::json!([{ "label": "Name *", "kind": "input", "value": name }, { "label": "Category", "kind": "input", "value": "" }]);
+            let mut fields = vec![serde_json::json!({ "label": "Name *", "kind": "input", "value": name }), serde_json::json!({ "label": "Category", "kind": "input", "value": "" })];
+            for (label, kind, value) in tab.map(|t| t.fields.as_slice()).unwrap_or_default() {
+                let value = if *kind == "checkbox" { serde_json::json!(value == "true") } else { serde_json::json!(value) };
+                fields.push(serde_json::json!({ "label": label, "kind": kind, "value": value }));
+            }
             serde_json::json!({ "kind": "modal", "title": "Properties", "fields": fields, "buttons": ["", "", "Apply", "Save", "Close"] })
         });
         let heading = tab.map(|t| t.name.clone()).unwrap_or_else(|| self.saved.0.clone());
@@ -351,8 +408,12 @@ impl Render for ItemProperties {
                 .w_full()
                 .gap(px(15.))
                 .child(group(label("Name", true), gray_box(t.name.clone(), false).into_any_element()))
-                .child(group(label("Description", false), gray_box(String::new(), false).h(px(56.)).into_any_element()))
-                .child(group(label("Category", false), gray_box(format!("Onshape {}", t.kind), true).into_any_element())),
+                .child(group(label("Description", false), gray_box(t.description.clone(), false).h(px(56.)).into_any_element()))
+                .child(group(label("Category", false), gray_box(format!("Onshape {}", t.kind), true).into_any_element()))
+                .children(t.fields.iter().map(|(l, kind, value)| match *kind {
+                    "checkbox" => crate::properties_dialog::readonly_check(*l, value == "true"),
+                    _ => group(label(l.trim_end_matches(" *"), l.ends_with(" *")), gray_box(value.clone(), *kind == "select").into_any_element()).into_any_element(),
+                })),
             None => v_flex()
                 .w_full()
                 .gap(px(15.))

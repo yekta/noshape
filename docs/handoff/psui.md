@@ -9,6 +9,26 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## 2026-11-10 11:08 UTC: interaction areas' ours-side mismatches (lead: most index points first)
+
+From qa's 22:12 run (cef3fda4), on main e78c8fb7: Feature Studio −0.375 points, Versions −0.335, Assembly −0.30,
+Part Studio −0.29, Documents −0.32 before 304/313. Most of the Versions and Feature Studio differences were already asked
+(REQUESTS 11-09 10:30, live2 claimed): reader labels, "Unknown of Sketch" from live's whole-document start builder,
+remembered Size / Form defaults, header read while Properties is open. Fixed on ours:
+- A tab picked in a version's (or workspace's) Properties tree shows its own Properties fields, read-only (Title 1–3,
+  Not revision managed, …; `properties_dialog::tab_fields`, the same rules as Tab › Properties…).
+- Reference manager › Selective update › ⎇: live's in-panel Version graph (Main, the versions newest first, Start; the
+  latest picked; a pick ticks the row and goes back), `app-core::version_picker` (the drawing's Reference manager still
+  opens a menu: dx can switch to it). Main pins another document at its current state. Update selected says nothing;
+  Update all keeps "Version of … updated to …". `ExternalDocInfo.start`.
+- An assembly dialog's field right-click (pattern, mate connector Configure) is taken before the text field
+  (`os_context_menu_over_field`): the input's own Cut / Copy / Paste menu opened under ours and kept every later click
+  and Escape (asm-pattern-field-configure stopped at step 4). Cancelling a pattern drops its Configure toast.
+- run.py: dialog dates as MM/DD/YYYY (qa: doc-tab-properties-drawing).
+Open, for asm: live adds a pattern field's configured column at once (an undo step, "Default | 2", gone on cancel);
+ours adds it on ✓ (from live 2209). The assembly state reports no focused number field (live: the right-clicked field).
+asm-*/ver-*: 236/261, 1160/1206 states, none worse (ver-protection-enable 6 → 5/10 was already so on e78c8fb7).
+
 ## 2026-11-09 22:11 UTC: the added feature's menu, and dialog open's p95
 
 **The added custom feature's menu** (▾ entry and face): Open linked document · Remove · Customize toolbar… · Hide /
