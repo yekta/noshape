@@ -1,4 +1,4 @@
-# One-off (lead, 11-09): times a user's document on macOS and Windows with the v0.4.39 CLI. The document comes
+# One-off (lead, 11-09): times a user's document on macOS and Windows with the v0.4.41 CLI. The document comes
 # encrypted from a short-lived private share (secrets DOCK_PROBE_URL / DOCK_PROBE_KEY); nothing is uploaded or kept.
 name: dock-probe
 on:
@@ -29,7 +29,7 @@ jobs:
         run: |
           set +e +o pipefail
           w="$RUNNER_TEMP/p"; mkdir -p "$w"; cd "$w"
-          gh release download v0.4.39 -R "$GITHUB_REPOSITORY" -p "noshape-cli-0.4.39-${{ matrix.asset }}.${{ matrix.ext }}"
+          gh release download v0.4.41 -R "$GITHUB_REPOSITORY" -p "noshape-cli-0.4.41-${{ matrix.asset }}.${{ matrix.ext }}"
           if [ "${{ matrix.ext }}" = zip ]; then unzip -q *.zip; else tar xzf *.tar.gz; fi
           C=$(find . -type f \( -name noshape-cli -o -name noshape-cli.exe \) | head -1); echo "cli $C"
           curl -fsSL "$URL" -o d.enc
