@@ -2358,7 +2358,7 @@ Meridian meridian_of(const Revolved& x, const gp_Ax1& ax)
 
 // Where two meridians meet in the half-plane: (r, z) with r > 0, one where they touch; none where they are one (OCCT's
 // then).
-std::optional<std::vector<std::pair<double, double>>> meridians_meet(const Meridian& p, const Meridian& q, double tol)
+std::optional<std::vector<std::pair<double, double>>> meridians_meet(const Meridian& p, const Meridian& q, double tol, bool* touched = nullptr)
 {
   std::vector<std::pair<double, double>> out;
   auto as_line = [](const Meridian& m, gp_Pnt2d& at, gp_Dir2d& d) {
@@ -2396,7 +2396,11 @@ std::optional<std::vector<std::pair<double, double>>> meridians_meet(const Merid
     // (Tangent: the one circle they touch along, where OCCT's marching took seconds and broke it into pieces (a
     // user's 0.4 mm rib rounds inside their cylinder: 4.9 s a pair on Windows, as OCCT's own one curve on Linux).)
     if (disc <= 2 * tol * c.m)
+    {
       out.emplace_back(a.X() - b * d.X(), a.Y() - b * d.Y());
+      if (touched != nullptr)
+        *touched = true;
+    }
     else
       for (const double sg : {-1.0, 1.0})
       {
@@ -2416,7 +2420,11 @@ std::optional<std::vector<std::pair<double, double>>> meridians_meet(const Merid
     const gp_Vec2d u = gp_Vec2d(a, b) / dd, n(-u.Y(), u.X());
     const gp_Pnt2d mid(a.X() + u.X() * x, a.Y() + u.Y() * x);
     if (y2 <= 2 * tol * std::max(p.m, q.m))
+    {
       out.push_back({mid.X(), mid.Y()}); // (tangent: the one circle, as above)
+      if (touched != nullptr)
+        *touched = true;
+    }
     else
       for (const double sg : {-1.0, 1.0})
         out.emplace_back(mid.X() + n.X() * sg * std::sqrt(y2), mid.Y() + n.Y() * sg * std::sqrt(y2));
@@ -2463,7 +2471,7 @@ occ::handle<Geom2d_Curve> circle_on(const occ::handle<Geom_Surface>& s, const oc
 
 // Two surfaces of revolution about one axis (planes across it, cylinders, cones, spheres, tori) meet in circles
 // where their meridians cross: those, exact. False where they aren't (another axis, coincident surfaces).
-bool coaxial_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+bool coaxial_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out, bool* touched = nullptr)
 {
   const std::optional<Revolved> a = revolved(fa), b = revolved(fb);
   if (!a || !b)
@@ -2484,7 +2492,7 @@ bool coaxial_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<
       return false;
   }
   const Meridian ma = meridian_of(*a, *ax), mb = meridian_of(*b, *ax);
-  const std::optional<std::vector<std::pair<double, double>>> rz = meridians_meet(ma, mb, tol);
+  const std::optional<std::vector<std::pair<double, double>>> rz = meridians_meet(ma, mb, tol, touched);
   if (!rz)
     return false;
   // (Each circle starts where the sphere's or torus's angles do, its seam, as OCCT's; else anywhere.)
@@ -3772,3 +3780,26 @@ bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bo
 const char* brep_body_cached(const OcShape& s, BrepBody& b, double& max_tol) { return cached_body(s, b, max_tol); }
 
 } // namespace noshape
+
+// OCCT patch 0028's hook (IntTools_FaceFace::Perform, every face / face section OCCT makes, its pave filler's too):
+// a round touching a coaxial cylinder, cone, sphere or torus along one circle, that exact circle, where OCCT's marching
+// near the tangency took seconds and broke it into pieces (a user's rib rounds, 4.9 s a pair on Windows). Any other
+// pair: 0, OCCT's own section as before.
+extern "C" int noshape_face_face(const TopoDS_Face& theF1, const TopoDS_Face& theF2, NCollection_Sequence<IntTools_Curve>& theCurves)
+{
+  try
+  {
+    std::vector<IntTools_Curve> lines;
+    bool                        touched = false;
+    if (!noshape::coaxial_sections(theF1, theF2, lines, &touched) || !touched || lines.empty())
+      return 0;
+    const noshape::KernelTimer timer("occt.own_face_face");
+    for (const IntTools_Curve& c : lines)
+      theCurves.Append(c);
+    return 1;
+  }
+  catch (...)
+  {
+    return 0;
+  }
+}

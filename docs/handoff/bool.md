@@ -3,6 +3,19 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From core (2026-11-10 10:07 UTC, lead's P0: a user's "Rib Dizisi" 12 s on Windows): tangent coaxial sections
+- The user's rib pattern fuses 0.4 mm rounds (tori) that touch a Ø46 mm cylinder from inside along a whole circle
+  (coaxial, R + r = the cylinder's radius to 2e-14 m). OCCT's marching through that tangency is rounding-sensitive:
+  on Windows one pair took 4.6-4.9 s and came back in 5 pieces, on macOS at #Hs = 30 mm likewise; Linux was fast on
+  all three geometries. Steady per geometry and OS, not timing (5 Windows opens 10.1-11.1 s).
+- 59c60fdb (core): `meridians_meet` gives a tangent contact (line or circle meridian touching a circle) as its one
+  circle instead of declining it to OCCT; `coaxial_sections` then makes it exactly. Gate: parity56 + every corpus 0
+  differences (shfall its known 2), taken counts as before; knurls on vibe3.
+- Your Boolean declines these 12 fuses ("an edge on another argument's free-form face", the torus), so OCCT's pave
+  filler made the same section again: OCCT patch 0028 (IntTools_FaceFace::Perform asks `noshape_face_face` first,
+  weak default "no") answers only a coaxial tangent contact, with that exact circle; every other pair is OCCT's as
+  before. If your Boolean takes such fuses later, the hook is still where OCCT's own sections ask.
+
 ## c2-rings-loft's Shell 1 (by_quadrics, 11-09 11:45 UTC; lead: the rings-loft Shell, starting at the repair)
 - Its input dumped (NOSHAPE_DUMP_OPS; vibe4 ~/agents/bool-cases/rl-dump/shell-9 and -53: 17 faces, 2 removed, 1 mm)
   and run alone (bool-c scratch probe xprobe::probe_shell_dump, PROBE_DUMP=<base>, NOSHAPE_SHELL_DEBUG for the laps):

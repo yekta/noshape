@@ -33,6 +33,30 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-10 14:58 UTC: the Windows "Rib Dizisi" P0 (lead): tangent coaxial sections, ours and OCCT's (patch 0028).**
+- Cause: a user's rib pattern fuses 0.4 mm rounds (tori) touching a Ø46 mm cylinder from inside along a circle
+  (coaxial, R + r = its radius to 2e-14 m). OCCT's marching through the tangency is rounding-sensitive: one pair
+  4.6-4.9 s and 5 pieces on Windows (macOS at #Hs = 30 mm), Linux fast. Steady per geometry and OS, not timing.
+  Found with xperf (our PDB built on the runner) and a per-pair trace on the probe (branch lead-dock-probe, job
+  build-profile; core-dock-trace is the probe-only trace branch).
+- 59c60fdb (landed): `meridians_meet` gives a tangent contact as its one circle (was: declined to OCCT).
+- 0028 (this land): OCCT patch: IntTools_FaceFace::Perform asks `noshape_face_face` first (weak default 0), which
+  answers only a coaxial tangent contact with the exact circle; our Boolean declines these fuses ("an edge on another
+  argument's free-form face"), so OCCT's pave filler made the section again. libTKBO.a (0001-0028, GCC 15 x86-64) in
+  /root/occt and vibe3-5's /opt/occt (md5 7a5907e1...; the old one /root/core-scratch/occt-lib-backup/
+  libTKBO.a.pre0028). Rib Dizisi with both, three opens: Windows 544-556 ms (v0.4.41 12,293), macOS 419-466 (961),
+  Linux 870-912 (1,261); E1-30's open on Windows 15.4 -> 1.9 s; #Hs edits 1.6-1.8 s Windows, 1.1-1.2 s macOS.
+- Checks: kernel 354 (T1 bool_patterns::a_round_touching_a_coaxial_tube_meets_it_along_one_circle), model suite
+  816/947 unchanged, g++-13 build, bool's gate (corpora + parity56) 0 differences with and without the hook; the
+  NIST screw's STEP read-back 0.40 s with either library (with or without the hook; under T1 load too). Knurls (kall,
+  vibe3 then vibe4): 12 of 15 the same with the hook as without (cd1c58431ab4a62c's unify and the recorded OCCT
+  failures 5099e897 / k25x2 that ours builds, all as before the tangent change); 0488ccf3 / 324c79d1 / fac6ef04 (74-tool
+  cuts OCCT failed when recorded) now need 52-54 GB even with the stock library: vibe3 OOM-kills them, vibe4's
+  earlyoom SIGTERMs them, so they weren't run with the hook. bool_replay (OCCT's own path) with / without
+  the hook: one parity56 cut (ce4e3c990925a7c0) keeps a tool torus whole where OCCT split it in two halves along its
+  tangent circle with the 8 mm bore (same volume and area; unify merges the halves, so the suite doesn't see it).
+- The Windows exit crash 0xC0000409 (E2) was ours: 0ea9bbb7 (landed).
+
 **State 11-09 20:36 UTC: fan-blade's Sweep 1 (P0, lead) landed; the impeller's rib sketch translated; hex text rejoin waits.**
 - Landed b5da62f8: c2-fan-blade-sweep's Sweep 1 (272 s on main) was one OCCT self-intersection check
   (BOPAlgo_ArgumentAnalyzer) on its thread. `helical_sweep_clear` now takes any planar profile, not only one in a plane

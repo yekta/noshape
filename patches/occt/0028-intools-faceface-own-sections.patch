@@ -1,0 +1,39 @@
+--- a/src/ModelingAlgorithms/TKBO/IntTools/IntTools_FaceFace.cxx
++++ b/src/ModelingAlgorithms/TKBO/IntTools/IntTools_FaceFace.cxx
+@@ -67,6 +67,22 @@
+ }
+ #endif
+ 
++// noshape (patch 0028): its own section of two faces where it has one (noshape's kernel, rust_boolean.cpp): a round
++// tangent to a coaxial cylinder, cone, sphere or torus along one circle, whose marching below can take seconds near
++// the tangency and break the circle into pieces (a user's rib rounds: 4.9 s a pair on Windows). Non-zero: theCurves
++// is the section (curves on theF1, then theF2). Weak default: never.
++extern "C" int noshape_face_face(const TopoDS_Face&                    theF1,
++                                 const TopoDS_Face&                    theF2,
++                                 NCollection_Sequence<IntTools_Curve>& theCurves);
++#if defined(__GNUC__)
++extern "C" __attribute__((weak)) int noshape_face_face(const TopoDS_Face&,
++                                                       const TopoDS_Face&,
++                                                       NCollection_Sequence<IntTools_Curve>&)
++{
++  return 0;
++}
++#endif
++
+ static void Parameters(const occ::handle<GeomAdaptor_Surface>&,
+                        const occ::handle<GeomAdaptor_Surface>&,
+                        const gp_Pnt&,
+@@ -357,6 +373,13 @@
+   myFace1 = aF1;
+   myFace2 = aF2;
+ 
++  if (noshape_face_face(aF1, aF2, mySeqOfCurve) != 0)
++  {
++    myIsDone       = true;
++    myTangentFaces = false;
++    return;
++  }
++
+   const BRepAdaptor_Surface& aBAS1  = myContext->SurfaceAdaptor(myFace1);
+   const BRepAdaptor_Surface& aBAS2  = myContext->SurfaceAdaptor(myFace2);
+   GeomAbs_SurfaceType        aType1 = aBAS1.GetType();
