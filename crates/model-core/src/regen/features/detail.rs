@@ -338,7 +338,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             } else {
                 Section::Conic(ev.real("rho")?)
             };
-            Some(BlendSpec { section, r1, r2, width: width.then_some(radius * std::f64::consts::SQRT_2), partial, run_on: !ev.bool("tangentPropagation"), cliff: false, sides: None })
+            Some(BlendSpec { section, r1, r2, width: width.then_some(radius * std::f64::consts::SQRT_2), partial, run_on: !ev.bool("tangentPropagation"), cliff: false, sides: None, overflow: false })
         } else {
             None
         }
@@ -364,7 +364,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         if width && !single_chain(&body.shape, &chain) {
             return err("Edges must form single chain per part.");
         }
-        let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true, cliff: false, sides: None };
+        let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true, cliff: false, sides: None, overflow: false };
         if stops && curved_edge_left_open(&body.shape, &chain) {
             return err("Adjoining edge not filleted.");
         }
@@ -460,6 +460,9 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             // can still be filleted by booleans (F3: R4 after R2/R3 stopped at their edges).
             Err(_) if !propagate && edges.len() == 1 && super::blend_section::section_blend(ev, bi, &edges, &unpropagated(radius)).is_ok() => continue,
             Err(_) if !overflow && rims.as_ref().is_some_and(|r| ring_blend(ev, bi, r, &edges, &radii, RimBlend::Round).is_ok()) => continue,
+            // Concave lines whose round runs off their ends over other faces, overflow on: run on, trimmed by those
+            // faces extended (c2-hunting-knife's Fillet 2, where OCCT's patch over the grind face leaves a bad solid).
+            Err(_) if !width && ev.bool("allowEdgeOverflow") && all_lines(&shapes) && super::blend_section::section_blend(ev, bi, &edges, &super::blend_section::BlendSpec { overflow: true, ..unpropagated(radius) }).is_ok() => continue,
             Err(e) => return Err(fillet_failed(e)),
         };
         let t1 = std::time::Instant::now();
@@ -483,6 +486,11 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         log::debug!("fillet: kernel {:?}, naming {:?}, body {:?} (history records {})", t1 - t0, t2 - t1, t2.elapsed(), res.history.records.len());
     }
     Ok(())
+}
+
+/// Whether every edge is a straight line.
+fn all_lines(edges: &[k::Shape]) -> bool {
+    edges.iter().all(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, k::Curve::Line { .. })))
 }
 
 /// Edges and their radii.
@@ -846,7 +854,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
             _ => None,
         };
         if let Some((r1, r2)) = distances {
-            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1, r2, width: None, partial: None, run_on: true, cliff: false, sides: None };
+            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1, r2, width: None, partial: None, run_on: true, cliff: false, sides: None, overflow: false };
             super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(|e| blend_failed("Failed to chamfer selections.", e.message))?;
             continue;
         }

@@ -112,6 +112,7 @@
 #include <math.hxx>
 #include <math_Vector.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
+#include <ShapeFix_Edge.hxx>
 #include <BRep_Builder.hxx>
 #include <TColStd_PackedMapOfInteger.hxx>
 #include <NCollection_DataMap.hxx>
@@ -8467,6 +8468,80 @@ OpOut op_unify_edges(const OcShape& s)
   if (!BRepCheck_Analyzer(u.Shape()).IsValid())
     return make_result({s.shape}, s.shape, nullptr);
   HHist hist = new BRepTools_History();
+  if (!u.History().IsNull())
+    hist->Merge(u.History());
+  return make_result({s.shape}, u.Shape(), hist.get());
+}
+
+// Edges between the same two faces joined where they meet tangentially at a vertex near one of `pts`, their curves
+// concatenated (a line and the B-spline section running on from it); every other vertex kept.
+OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double tol)
+{
+  require_non_null(s.shape, "shape");
+  if (pts.size() % 3 != 0)
+    fail_invalid("points must be triples");
+  ShapeIMap vs;
+  TopExp::MapShapes(s.shape, TopAbs_VERTEX, vs);
+  std::vector<bool> free(vs.Extent() + 1, false);
+  for (int i = 1; i <= vs.Extent(); ++i)
+  {
+    const gp_Pnt p = BRep_Tool::Pnt(TopoDS::Vertex(vs(i)));
+    for (size_t j = 0; j < pts.size() && !free[i]; j += 3)
+      free[i] = p.Distance(gp_Pnt(pts[j], pts[j + 1], pts[j + 2])) <= tol;
+  }
+  // A straight section (an approximation, so not "linear" to OCCT's unify) running on from a line there: a line.
+  NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ve, ef;
+  TopExp::MapShapesAndUniqueAncestors(s.shape, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  TopExp::MapShapesAndUniqueAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  bool                           straightened = false;
+  for (int i = 1; i <= vs.Extent(); ++i)
+  {
+    const NCollection_List<TopoDS_Shape>* es = free[i] ? ve.Seek(vs(i)) : nullptr;
+    if (es == nullptr || es->Extent() != 2)
+      continue;
+    TopoDS_Edge a = TopoDS::Edge(es->First()), b = TopoDS::Edge(es->Last());
+    if (BRepAdaptor_Curve(b).GetType() == GeomAbs_Line)
+      std::swap(a, b);
+    BRepAdaptor_Curve ca(a), cb(b);
+    if (ca.GetType() != GeomAbs_Line || cb.GetType() == GeomAbs_Line || BRep_Tool::Degenerated(b))
+      continue;
+    TopoDS_Vertex b0, b1;
+    TopExp::Vertices(b, b0, b1);
+    const gp_Pnt p0 = BRep_Tool::Pnt(b0), p1 = BRep_Tool::Pnt(b1);
+    if (p0.Distance(p1) <= tol || gp_Vec(p0, p1).Angle(gp_Vec(ca.Line().Direction())) > 1e-4 && gp_Vec(p0, p1).Angle(-gp_Vec(ca.Line().Direction())) > 1e-4)
+      continue;
+    const gp_Lin chord(p0, gp_Dir(gp_Vec(p0, p1)));
+    const double dev = std::max(tol, BRep_Tool::Tolerance(b));
+    bool         straight = true;
+    for (int k = 1; k < 16 && straight; ++k)
+      straight = chord.Distance(cb.Value(cb.FirstParameter() + (cb.LastParameter() - cb.FirstParameter()) * k / 16.0)) <= dev;
+    const NCollection_List<TopoDS_Shape>* fs = ef.Seek(b);
+    if (!straight || fs == nullptr)
+      continue;
+    BRepBuilderAPI_MakeEdge mk(TopoDS::Vertex(b0.Oriented(TopAbs_FORWARD)), TopoDS::Vertex(b1.Oriented(TopAbs_FORWARD)));
+    if (!mk.IsDone())
+      continue;
+    TopoDS_Edge line = mk.Edge();
+    for (NCollection_List<TopoDS_Shape>::Iterator f(*fs); f.More(); f.Next())
+      ShapeFix_Edge().FixAddPCurve(line, TopoDS::Face(f.Value()), false, dev);
+    BRep_Builder().UpdateEdge(line, dev);
+    rs->Replace(b.Oriented(TopAbs_FORWARD), line);
+    straightened = true;
+  }
+  const TopoDS_Shape in = straightened ? rs->Apply(s.shape) : s.shape;
+  ShapeUpgrade_UnifySameDomain u(in, true, false, false);
+  for (int i = 1; i <= vs.Extent(); ++i)
+    if (!free[i])
+      u.KeepShape(vs(i));
+  keep_marked_edges(u, in);
+  u.Build();
+  carry_kept_marks(in, u);
+  if (!BRepCheck_Analyzer(u.Shape()).IsValid())
+    return make_result({s.shape}, s.shape, nullptr);
+  HHist hist = new BRepTools_History();
+  if (straightened && !rs->History().IsNull())
+    hist->Merge(rs->History());
   if (!u.History().IsNull())
     hist->Merge(u.History());
   return make_result({s.shape}, u.Shape(), hist.get());

@@ -445,6 +445,13 @@ pub fn unify_edges(shape: &Shape) -> Result<OpResult> {
     Ok(OpResult::from_ffi(ck(ffi::op_unify_edges(shape.raw()))?))
 }
 
+/// Edges between the same two faces joined where they meet tangentially at a vertex within `tol` of one of `points`
+/// (their curves concatenated: a line and the B-spline section running on from it), every other vertex kept.
+pub fn join_edges_at(shape: &Shape, points: &[DVec3], tol: f64) -> Result<OpResult> {
+    let flat: Vec<f64> = points.iter().flat_map(|p| [p.x, p.y, p.z]).collect();
+    Ok(OpResult::from_ffi(ck(ffi::op_join_edges_at(shape.raw(), &flat, tol))?))
+}
+
 /// A sheet's free edges split where an up-to `target`'s seam crossed them joined into one edge again, through a
 /// straight piece too where the pieces meet tangentially (Parasolid's intersection with a periodic face is one curve).
 pub fn join_target_seam_splits(sheet: &Shape, target: &Shape) -> Result<OpResult> {

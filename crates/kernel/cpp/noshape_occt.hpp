@@ -875,6 +875,8 @@ std::unique_ptr<OcShape> make_face_on_plane(const PlaneF& plane, const OcShape& 
 std::unique_ptr<OcShape> make_face_from_wire(const OcShape& wire, bool only_plane);
 std::unique_ptr<OcShape> make_face_on(const OcShape& on, const OcShape& wire);
 std::unique_ptr<OcShape> extend_face(const OcShape& on, double len);
+std::unique_ptr<OcShape> extend_face_over(const OcShape& on, rust::Slice<const double> pts, double margin);
+std::unique_ptr<OcShape> reface_on(const OcShape& in, uint32_t index, const OcShape& on);
 std::unique_ptr<OcShape> drop_open_wires(const OcShape& shape);
 std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& shape, const OcShapeList& edges);
 std::unique_ptr<OcShape> face_patches(const OcShape& face, uint32_t spans);
@@ -992,6 +994,7 @@ OpOut op_unify(const OcShape& s);
 MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic);
 OpOut op_join_edges(const OcShape& s);
 OpOut op_unify_edges(const OcShape& s);
+OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double tol);
 OpOut op_join_target_seam_splits(const OcShape& sheet, const OcShape& target);
 rust::String brep_body_of(const OcShape& s, BrepBody& out);
 struct BrepSections;

@@ -5,6 +5,7 @@
 #include <ElSLib.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <NCollection_DataMap.hxx>
+#include <ShapeFix_Edge.hxx>
 #include <ShapeFix_Face.hxx>
 // Construction: vertices, edges and wires from 2D sketch data and 3D data,
 // planar faces, primitives.
@@ -1381,6 +1382,88 @@ std::unique_ptr<OcShape> extend_face(const OcShape& on, double len)
   }
   if (f.Orientation() == TopAbs_REVERSED)
     out.Reverse();
+  return wrap(out);
+}
+
+std::unique_ptr<OcShape> extend_face_over(const OcShape& on, rust::Slice<const double> pts, double margin)
+{
+  const TopoDS_Face& f = as_face(on.shape, "face");
+  if (pts.size() % 3 != 0 || !(margin >= 0))
+    fail_invalid("points must be triples and the margin not negative");
+  occ::handle<Geom_Surface> s = BRep_Tool::Surface(f);
+  if (const auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(s); !t.IsNull())
+    s = t->BasisSurface();
+  occ::handle<Geom_BSplineSurface> bs = occ::down_cast<Geom_BSplineSurface>(s->Copy());
+  if (bs.IsNull())
+    fail_invalid("the face is not a B-spline");
+  double u0, u1, v0, v1;
+  bs->Bounds(u0, u1, v0, v1);
+  // Each side's need: the farthest point whose nearest surface point is on that side's boundary.
+  ShapeAnalysis_Surface sas(bs);
+  double                need[4] = {0, 0, 0, 0};
+  const double          eu = 1e-6 * (u1 - u0), ev = 1e-6 * (v1 - v0);
+  for (size_t i = 0; i < pts.size(); i += 3)
+  {
+    const gp_Pnt   q(pts[i], pts[i + 1], pts[i + 2]);
+    const gp_Pnt2d uv = sas.ValueOfUV(q, Precision::Confusion());
+    const double   d  = q.Distance(bs->Value(uv.X(), uv.Y()));
+    if (uv.X() <= u0 + eu)
+      need[0] = std::max(need[0], d);
+    if (uv.X() >= u1 - eu)
+      need[1] = std::max(need[1], d);
+    if (uv.Y() <= v0 + ev)
+      need[2] = std::max(need[2], d);
+    if (uv.Y() >= v1 - ev)
+      need[3] = std::max(need[3], d);
+  }
+  occ::handle<Geom_BoundedSurface> b = bs;
+  for (int side = 0; side < 4; ++side)
+  {
+    const bool in_u = side < 2, after = side % 2 == 1;
+    if (need[side] <= 0 || (in_u ? (bs->IsUPeriodic() || bs->IsUClosed()) : (bs->IsVPeriodic() || bs->IsVClosed())))
+      continue;
+    GeomLib::ExtendSurfByLength(b, 1.25 * need[side] + margin, 1, in_u, after);
+  }
+  BRepBuilderAPI_MakeFace mk(b, 1e-7);
+  if (!mk.IsDone())
+    fail_op("could not build the extended face");
+  TopoDS_Face out = mk.Face();
+  if (f.Orientation() == TopAbs_REVERSED)
+    out.Reverse();
+  return wrap(out);
+}
+
+std::unique_ptr<OcShape> reface_on(const OcShape& in, uint32_t index, const OcShape& on)
+{
+  BRepBuilderAPI_Copy cp(in.shape, true, false);
+  const TopoDS_Shape  s = cp.Shape();
+  ShapeIMap           faces;
+  TopExp::MapShapes(s, TopAbs_FACE, faces);
+  if (index >= (uint32_t)faces.Extent())
+    fail_invalid("no such face");
+  const TopoDS_Face               f = TopoDS::Face(faces((int)index + 1));
+  TopLoc_Location                 loc;
+  const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(as_face(on.shape, "face"), loc);
+  const double                    tol  = BRep_Tool::Tolerance(f);
+  BRep_Builder                    B;
+  TopoDS_Face                     g;
+  B.MakeFace(g, surf, loc, tol);
+  for (TopoDS_Iterator it(f.Oriented(TopAbs_FORWARD)); it.More(); it.Next())
+    B.Add(g, it.Value());
+  // (The surface's own orientation: the face keeps the side it had when the new surface's normal agrees.)
+  g.Orientation(f.Orientation());
+  for (TopExp_Explorer ex(g, TopAbs_EDGE); ex.More(); ex.Next())
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(ex.Current());
+    ShapeFix_Edge      sfe;
+    sfe.FixAddPCurve(e, g, BRep_Tool::IsClosed(e, f), tol);
+  }
+  BRepLib::SameParameter(g, tol, true);
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  rs->Replace(f, g);
+  const TopoDS_Shape out = rs->Apply(s);
+  if (!BRepCheck_Analyzer(out).IsValid())
+    fail_op("the face rebuilt on the extended surface is invalid");
   return wrap(out);
 }
 

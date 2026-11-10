@@ -239,6 +239,19 @@ pub fn extend_face(face: &Shape, len: f64) -> Result<Shape> {
     Shape::from_res(ffi::extend_face(face.raw(), len))
 }
 
+/// A B-spline `face`'s whole surface carried past only the sides `points` lie beyond, each by what its farthest point
+/// needs (a quarter more) plus `margin`: a face a blend runs onto, extended to trim it (a long extension of every side
+/// of a dense B-spline makes a surface OCCT's intersections fail on).
+pub fn extend_face_over(face: &Shape, points: &[DVec3], margin: f64) -> Result<Shape> {
+    Shape::from_res(ffi::extend_face_over(face.raw(), &flat(points), margin))
+}
+
+/// `shape` (copied) with its face `index` rebuilt on `on`'s surface (one [`extend_face_over`] made of it): the same
+/// edges, so the faces a Boolean then puts on that surface merge with it.
+pub fn reface_on(shape: &Shape, index: usize, on: &Shape) -> Result<Shape> {
+    Shape::from_res(ffi::reface_on(shape.raw(), index as u32, on.raw()))
+}
+
 /// A rectangular planar face on `plane` covering `[umin, umax] x [vmin, vmax]`.
 pub fn make_plane_face(plane: &Plane, umin: f64, umax: f64, vmin: f64, vmax: f64) -> Result<Shape> {
     Shape::from_res(ffi::make_plane_face(&plane.ffi(), umin, umax, vmin, vmax))

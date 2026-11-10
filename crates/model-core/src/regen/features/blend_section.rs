@@ -49,6 +49,9 @@ pub struct BlendSpec {
     pub cliff: bool,
     /// Face blend: the radii are offsets of side 1 and side 2 (see [`Sides`]).
     pub sides: Option<Sides>,
+    /// Allow edge overflow on a concave line: past a free end the round runs on and the faces it meets there,
+    /// extended, trim it (live c2-hunting-knife's Fillet 2: the round crosses the grind face to the blade's side).
+    pub overflow: bool,
 }
 
 /// Face blend sizes (live psb 10-26 b, L brackets at 60°, 90° and 135°): the
@@ -400,6 +403,68 @@ fn tool_names(feature: crate::reference::FeatureId, tool: &k::OpResult, profile:
     (0..n as u32).map(|i| if curve_faces.contains(&i) { blend.clone() } else { generated.clone() }).collect()
 }
 
+/// A run-on round's pieces to fuse, and the faces to rebuild on their extensions first (index, extended face).
+type RunOn = (Vec<NamedShape>, Vec<(usize, Shape)>);
+
+/// A concave round's tool run on past its edge's free ends ([`BlendSpec::overflow`]): the pieces of it inside every
+/// face its run-on pieces meet (supports aside), each face extended, named as the tool's faces they lie on; and the
+/// free-form faces among those, each extended only where the run-on needs it (its index, the extended face): the body's
+/// face is rebuilt on that before the fuse, so the round's piece on it merges with it (live extends the face the
+/// round runs onto: c2-hunting-knife's grind face).
+fn trimmed_run_on(shape: &Shape, supports: [usize; 2], (tool, names): (Shape, Vec<Name>), generated: &Name, run_on: &[Shape], len: f64, scale: f64) -> FResult<RunOn> {
+    let tol = scale * 1e-7;
+    let bb = shape.bounding_box(false)?;
+    // The run-on's points over the body (beyond its box another face trims it).
+    let mut points = Vec::new();
+    for piece in run_on {
+        for e in piece.edges() {
+            let info = e.edge_info()?;
+            for i in 0..=16 {
+                let q = e.point_at(info.first_param + (info.last_param - info.first_param) * i as f64 / 16.0)?;
+                if q.cmpge(bb.min - DVec3::splat(tol)).all() && q.cmple(bb.max + DVec3::splat(tol)).all() {
+                    points.push(q);
+                }
+            }
+        }
+    }
+    let mut walls = Vec::new();
+    let mut refaced = Vec::new();
+    for (i, f) in shape.faces().iter().enumerate() {
+        if supports.contains(&i) || !run_on.iter().any(|p| k::distance(f, p).is_ok_and(|d| d.distance <= tol)) {
+            continue;
+        }
+        if matches!(f.face_surface()?, k::Surface::BSpline { .. }) {
+            let ext = k::extend_face_over(f, &points, 0.05 * len)?;
+            refaced.push((i, ext.clone()));
+            walls.push(ext);
+        } else {
+            walls.push(k::extend_face(f, 2.0 * len)?);
+        }
+    }
+    if walls.is_empty() {
+        return Ok((vec![NamedShape::new(tool, names)], refaced));
+    }
+    let pieces = k::split(std::slice::from_ref(&tool), &walls, &k::BooleanOptions::default())?.shape.solids();
+    let inside = |q: DVec3| walls.iter().all(|w| w.project_point(q).is_ok_and(|pr| w.normal_at_point(q).is_ok_and(|n| (q - pr.point).dot(n) < 0.0)));
+    let faces = tool.faces();
+    let on = |f: &Shape| -> Name {
+        let q = super::helpers_a::point_on_face(f);
+        q.and_then(|q| faces.iter().zip(&names).find(|(t, _)| t.contains_point(q, scale * 1e-6).unwrap_or(false))).map_or_else(|| generated.clone(), |(_, n)| n.clone())
+    };
+    let mut kept = Vec::new();
+    for piece in pieces {
+        if !inside(piece.centroid()?) {
+            continue;
+        }
+        let piece_names = piece.faces().iter().map(on).collect();
+        kept.push(NamedShape::new(piece, piece_names));
+    }
+    if kept.is_empty() {
+        return Err(fail("nothing of the round is inside the faces past its ends"));
+    }
+    Ok((kept, refaced))
+}
+
 /// Whether an edge end continues tangentially into another edge of the body.
 fn tangent_continues(body: &Shape, at: DVec3, dir: DVec3, skip: usize) -> bool {
     body.edges().iter().enumerate().any(|(j, e)| {
@@ -568,6 +633,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
     let general = chain.iter().any(|c| c.shape.edge_info().is_ok_and(|i| !matches!(i.curve, k::Curve::Line { .. } | k::Curve::Circle { .. })));
     let feature = ev.feature;
     let (mut cuts, mut adds) = (Vec::new(), Vec::new());
+    let mut refaced: Vec<(usize, Shape)> = Vec::new();
     for &(lo, hi, held) in &ranges {
     if general || held {
         const N: usize = 64;
@@ -642,9 +708,9 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
             let mid = c.shape.point_at(mid_prm)?;
             let fr = frame_at(shape, ff, mid, c.shape.tangent_at(mid_prm)?.normalize(), scale)?;
             // A concave edge's section is added: running on past the part's
-            // end would stick out of it.
+            // end would stick out of it (with overflow, what does is trimmed).
             if fr.u[0].dot(fr.m[1]) <= 0.0 {
-                return Ok(0.0);
+                return Ok(if spec.overflow && matches!(info.curve, k::Curve::Line { .. }) { r_ext } else { 0.0 });
             }
             let probe = p + out * (r_ext * 0.5) + (fr.u[0] + fr.u[1]) * (r_ext * 0.05);
             Ok(if shape.classify_point(probe, scale * 1e-9)? == k::PointClass::Outside { r_ext } else { 0.0 })
@@ -684,8 +750,24 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                 let (e0, e1) = (reach(c.start + d * a, -d, e0)?, reach(c.start + d * b, d, e1)?);
                 let p0 = c.start + d * (a - e0);
                 let (face, edges3, convex) = section_face(p0, &fr, spec, side1_first)?;
+                // (Overflow's run-on is a concave round's; a convex one past its faces fails, as live's.)
+                if spec.overflow && convex {
+                    return Err(fail("a convex edge's round with overflow"));
+                }
                 let tool = k::extrude(&face, d * (b - a + e0 + e1))?;
                 let names = tool_names(feature, &tool, &face, &edges3[1], &ename);
+                if spec.overflow && !convex && e0 + e1 > 0.0 {
+                    let run_on = [(c.start + d * (a - e0), e0), (c.start + d * b, e1)]
+                        .into_iter()
+                        .filter(|(_, e)| *e > 0.0)
+                        .map(|(q, e)| k::extrude(&section_face(q, &fr, spec, side1_first)?.0, d * e).map(|t| t.shape).map_err(FeatureError::from))
+                        .collect::<FResult<Vec<_>>>()?;
+                    let generated = Arc::new(TopoName::face(feature, Role::Generated(ename.clone())));
+                    let (kept, faces_on) = trimmed_run_on(shape, [fs[0] as usize, fs[1] as usize], (tool.shape, names), &generated, &run_on, r_ext, scale)?;
+                    adds.extend(kept);
+                    refaced.extend(faces_on);
+                    continue;
+                }
                 (tool.shape, names, convex)
             }
             k::Curve::Circle { center, axis, radius, .. } => {
@@ -725,6 +807,9 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
     }
     }
     let mut named = body_named(&body);
+    for (i, on) in &refaced {
+        named.shape = k::reface_on(&named.shape, *i, on)?;
+    }
     for (op, tools) in [(k::BooleanOp::Cut, cuts), (k::BooleanOp::Fuse, adds)] {
         if tools.is_empty() {
             continue;
@@ -738,11 +823,19 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
     if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
         eprintln!("section blend: boolean valid {} solids {}, unified valid {} solids {}", named.shape.is_valid(), named.shape.count(ShapeType::Solid), un.shape.is_valid(), un.shape.count(ShapeType::Solid));
     }
-    let names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
-    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+    let mut names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    let mut shape = un.shape;
+    // A face extended to meet the round: its old edge and the new piece running on from it one edge, as live's.
+    if !refaced.is_empty() {
+        let corners: Vec<DVec3> = refaced.iter().flat_map(|(i, _)| faces[*i].vertices()).filter_map(|v| v.vertex_point().ok()).collect();
+        let joined = k::join_edges_at(&shape, &corners, scale * 1e-7)?;
+        names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &joined.history, &joined.shape, &BTreeMap::new(), None);
+        shape = joined.shape;
+    }
+    if !shape.is_valid() || shape.count(ShapeType::Solid) != 1 {
         return Err(fail("the result is not one valid solid"));
     }
-    ev.replace_body(bi, un.shape, names);
+    ev.replace_body(bi, shape, names);
     Ok(())
 }
 

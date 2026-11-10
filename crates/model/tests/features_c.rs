@@ -3942,3 +3942,33 @@ fn a_chamfer_on_a_round_face_measures_as_live() {
         }
     }
 }
+
+/// c2-hunting-knife's Fillet 2 on the blade as Extrude 2 leaves it (live's numbers): R3 on a 0.95 mm concave line
+/// whose end meets the grind face, overflow on. The round runs on past that end across the half-blade to its side
+/// (y -2) and the grind face is extended below the floor to meet it, one face: 17/46/30, +0.396 mm³, the grind face
+/// out to x -3.1588 (OCCT's own patch there left an invalid solid: "Failed to fillet selections.").
+#[test]
+fn a_round_running_off_its_edge_meets_the_grind_face_extended_as_live() {
+    let brep = include_str!("data/knife-fillet2-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let before = volume(&r, 0) * 1e9;
+    let b = &r.context.bodies[0];
+    let e = b.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| near(i.length, mm(0.951580), 1e-6) && near(i.start.x, mm(-4.0), 1e-9))).expect("the edge");
+    let edge = Reference::Edge((*b.edges[e]).clone());
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(vec![edge]));
+        p.set("radius", expr("3 mm"));
+        p.set("allowEdgeOverflow", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    let shown = shape.shown_topology().unwrap();
+    assert_eq!((shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (17, 46, 30));
+    let added = volume(&r, 0) * 1e9 - before;
+    assert!((0.385..0.405).contains(&added), "{added} mm³ (live 0.3955)");
+    let grind = shape.faces().into_iter().find(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::BSpline { .. }))).expect("the grind face");
+    let x_max = grind.bounding_box(true).unwrap().max.x / mm(1.0);
+    assert!((x_max - -3.1588).abs() < 2e-3, "grind face to x {x_max} (live -3.1588)");
+}

@@ -551,6 +551,8 @@ pub(crate) mod ffi {
         fn make_face_from_wire(wire: &OcShape, only_plane: bool) -> Result<UniquePtr<OcShape>>;
         fn make_face_on(on: &OcShape, wire: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn extend_face(on: &OcShape, len: f64) -> Result<UniquePtr<OcShape>>;
+        fn extend_face_over(on: &OcShape, pts: &[f64], margin: f64) -> Result<UniquePtr<OcShape>>;
+        fn reface_on(shape: &OcShape, index: u32, on: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn drop_open_wires(shape: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn reverse_edge_curves(shape: &OcShape, edges: &OcShapeList) -> Result<UniquePtr<OcShape>>;
         fn face_patches(face: &OcShape, spans: u32) -> Result<UniquePtr<OcShape>>;
@@ -758,6 +760,7 @@ pub(crate) mod ffi {
         fn merge_same_surface_faces(s: &OcShape, periodic: bool) -> Result<MergedFaces>;
         fn op_join_edges(s: &OcShape) -> Result<OpOut>;
         fn op_unify_edges(s: &OcShape) -> Result<OpOut>;
+        fn op_join_edges_at(s: &OcShape, pts: &[f64], tol: f64) -> Result<OpOut>;
         fn op_join_target_seam_splits(sheet: &OcShape, target: &OcShape) -> Result<OpOut>;
         /// The flat body noshape's own Boolean would get for `s` (tests): "" or why it can't.
         fn brep_body_of(s: &OcShape, out: &mut BrepBody) -> String;
