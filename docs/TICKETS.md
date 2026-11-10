@@ -371,7 +371,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Sweeps on vibe3 (volume sweep 20, cf corpus 13, the 48 ticket documents) = 8038dc03b exactly. Fuzz: v0.4.41 release CLI
   9001–9120, 0 deaths; GUI fuzz no new deaths. The newer green b73d2fece (23:14) adds bool's e557b15ea (a Boolean
   classification change): checked next.
-- **qa 23:48: no blocker on watcher green b73d2fece (23:14) either** (5213afac4 + bool's e557b15ea): model suite 77/87,
+- **qa 23:47: no blocker on watcher green b73d2fece (23:14) either** (5213afac4 + bool's e557b15ea): model suite 77/87,
   820/947, every document = 5213afac4 (gear documents at baseline); sweeps = 5213afac4 exactly. Its first model run failed
   at rb.sh's sync: vibe4's disk at 98 % (9.7 GB free).
 - Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 HAND-DRILL-MATES-OVERDEFINED (parity suite only),
