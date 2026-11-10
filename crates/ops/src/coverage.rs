@@ -336,6 +336,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("assembly:Add to named positions…", Op("assembly_add_to_named_positions")),
     ("assembly:Unpack folder", Op("assembly_unpack_folder")),
     ("assembly:Unsuppress", Op("assembly_set_state")),
+    ("assembly:Update linked document…", Op("assembly_change_to_version")),
     ("assembly:Update named position", Op("assembly_named_position")),
     ("assembly:View normal to", Op("view_camera")),
     ("assembly:Visibility conditions…", Op("config_visibility")),

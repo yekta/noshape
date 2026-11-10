@@ -1360,8 +1360,8 @@ impl AssemblyView {
             let tg = targets.clone();
             // Another document's with a newer version: "Update linked document…" (live asm-menu-open-linked-document).
             let newer = inst.source.external_key().is_some_and(|k| self.ext_updates.get(k).is_some_and(|v| v.is_some()));
-            let label = if newer { "Update linked document…" } else { "Change to version…" };
-            m.push(icon_item(label, "change-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
+            let open = move |t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| t.open_reference_manager(Some(tg.clone()), cx);
+            m.push(if newer { icon_item("Update linked document…", "change-version", open) } else { icon_item("Change to version…", "change-version", open) });
         }
         m.extend(open_linked);
         // Live (asm-instance-suppress-unsuppress): no Export… or Zoom to selection on a suppressed instance.
