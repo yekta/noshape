@@ -48,6 +48,22 @@ scratch /root/bool-scratch.
   tests 352/352, model and ops Shell tests pass, suite unchanged but for main's own moves, g++-13 builds. The scroll
   wall's offset still doesn't convert (GeomConvert error 0.2885 at 1e-7). The box (6.21 mm) is the query's: core
   (core.md 14:30).
+- **Landed (02:12 UTC 11-10, lead: build the shared-shape input; full gate 0 differ, model + assembly suites no document
+  worse, knurl/gear times level; report box-dovetail's and hex-bookcase's times against live):** box-dovetail 366 ->
+  263 ms (live 360), hex-bookcase 337 (live 290, unchanged); model suite: features as base, times level (fill-pattern
+  +3% was noise: alone 4.0-4.9 s both); assembly suite as base. rust_boolean.cpp: the preflight decline replaced by a
+  list of shared vertices, edges and faces (kind, argument, index -> the first argument's), passed through
+  brep_boolean's new `shared` slice to brep as `noshape_brep::with_shared` (lib.rs `Shared`); boolean.rs's output
+  takes inputs that are one shape as one origin (vertex_same / edge_same; Origin::Same the first argument's, so the
+  C++ build reuses the shape and the history says Kept; a shared face's twin unrecorded when the kept one is Same).
+  Which shared shapes OCCT keeps: everything at them shared -> Kept (aliased); two other arguments' faces on different
+  planes meet one -> OCCT remakes it (a new tolerance: it never changes an input) -> not aliased, ours remakes it;
+  only faces on one plane, or other surfaces -> OCCT's rounding decides (corpus2 1b2319a3: one corner remade, its
+  mirror image kept; 4006f865 kept) -> declined "a shared shape OCCT may keep or remake". Gate shared3: corpora +
+  parity56 as refine1 (0 differ, same taken), kg same, kt level (k25-15 1.13 s, k25-25 5.4 s, spur gear 1.66 s),
+  shfall same; kernel 355/355 (T1 bool_patterns::arguments_sharing_sub_shapes_keep_them_as_occt (dovetail
+  dc62e056) and a_shared_corner_by_coplanar_faces_goes_to_occt (corpus2 4006f865)), brep 58/58, g++-13 builds.
+  box-dovetail's corpus 23/24 ours (was 15), 0 differ; hex's shared cut a7e821c7 stays OCCT (ambiguous).
 - **In progress (21:10 UTC, lead: option 2 not now; the speed cases closest to flipping, cheapest first):** documents
   at x1-2 of live, single runs on idle vibe4 with the kernel profile (/root/bool-scratch/flip4, flip-tot.py; Boolean =
   op_boolean + op_unify): stef-radijator-nlukic x1.03 gap 2 ms, Boolean 18 ms; pipeflange-steven x1.06 gap 12, B 58;

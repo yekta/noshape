@@ -431,7 +431,8 @@ pub(crate) mod ffi {
         /// declines (`last_rust_decline` says why).
         /// `touching_only`: declines unless the arguments only touch (a pattern's checked glue).
         /// `scaled_inputs`: OCCT's path would cut scaled copies (its history: the object's entities all Modified).
-        fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, fuzzy: f64, touching_only: bool, scaled_inputs: bool, out: &mut BrepResult) -> bool;
+        /// `flags`: 1 touching only, 2 scaled inputs. `shared`: (kind, argument, index, the first argument's argument, index).
+        fn brep_boolean(op: u8, args: &[BrepBody], shared: &[u32], tol: f64, fuzzy: f64, flags: u8, out: &mut BrepResult) -> bool;
         /// Notes why the C++ side declined (for `last_rust_decline`).
         fn brep_blend(body: &BrepBody, spec: &[f64], tol: f64, out: &mut BrepResult) -> bool;
         fn brep_blend_enabled() -> bool;

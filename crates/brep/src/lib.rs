@@ -61,6 +61,43 @@ pub(crate) fn scaled_inputs() -> bool {
     SCALED_INPUTS.with(|f| f.get())
 }
 
+/// Entities of different arguments that are one shape (the kernel's arguments sharing sub-shapes): each later
+/// argument's (argument, index) to the first argument's it is, by kind.
+#[derive(Clone, Debug, Default)]
+pub struct Shared {
+    pub vertices: std::collections::HashMap<(u32, u32), (u32, u32)>,
+    pub edges: std::collections::HashMap<(u32, u32), (u32, u32)>,
+    pub faces: std::collections::HashMap<(u32, u32), (u32, u32)>,
+}
+
+impl Shared {
+    /// The first argument's entity that `x` is (itself where none).
+    pub(crate) fn vertex(&self, x: (u32, u32)) -> (u32, u32) {
+        self.vertices.get(&x).copied().unwrap_or(x)
+    }
+    pub(crate) fn edge(&self, x: (u32, u32)) -> (u32, u32) {
+        self.edges.get(&x).copied().unwrap_or(x)
+    }
+    pub(crate) fn face(&self, x: (u32, u32)) -> (u32, u32) {
+        self.faces.get(&x).copied().unwrap_or(x)
+    }
+}
+
+std::thread_local!(static SHARED: std::cell::RefCell<std::sync::Arc<Shared>> = std::cell::RefCell::new(std::sync::Arc::new(Shared::default())));
+
+/// Runs `run` with the arguments' shared entities `shared`: each comes out as it was (Kept) where the result has it
+/// unchanged, as OCCT's Boolean keeps sub-shapes its arguments share.
+pub fn with_shared<T>(shared: Shared, run: impl FnOnce() -> T) -> T {
+    let before = SHARED.with(|s| s.replace(std::sync::Arc::new(shared)));
+    let r = run();
+    SHARED.with(|s| *s.borrow_mut() = before);
+    r
+}
+
+pub(crate) fn shared() -> std::sync::Arc<Shared> {
+    SHARED.with(|s| s.borrow().clone())
+}
+
 /// This thread's cancel flag (the address of an `AtomicBool`, 0 none; the kernel's `with_cancel` sets it): once
 /// set, a running Boolean stops at its next check and declines "cancelled" (a stale regeneration's worker is free
 /// within ~100 ms). The Boolean's worker threads take their caller's.

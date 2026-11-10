@@ -266,6 +266,40 @@ fn edges_ending_inside_a_face_stay_in_it() {
     assert!(inner > 0, "no INTERNAL edge");
 }
 
+/// Arguments sharing sub-shapes (cf-box-dovetail-joint's Box Joint: a common of the part and a tool made from its
+/// faces, recorded): noshape's Boolean takes it, keeping what they share and nothing else meets as it was and remaking
+/// what the other argument's faces meet: OCCT's result and history (each shared vertex, edge and face Kept or Modified
+/// as OCCT's).
+#[test]
+fn arguments_sharing_sub_shapes_keep_them_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "dc62e056b997b78b").expect("the recorded common");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert_eq!(k::bool_corpus::Summary::of(&r).differences(&c.summary), Vec::<String>::new());
+}
+
+/// Arguments sharing a corner where only faces on one plane of each meet it (a recorded fuse): OCCT keeps or remakes
+/// such a shape as its rounding falls (here keeps; at the mirror image of another such corner it remakes), so
+/// noshape's Boolean declines and OCCT's runs.
+#[test]
+fn a_shared_corner_by_coplanar_faces_goes_to_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "4006f865627b319d").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    assert!(r.is_err() && why == "a shared shape OCCT may keep or remake", "{why}");
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+    assert_eq!(k::bool_corpus::Summary::of(&r).differences(&c.summary), Vec::<String>::new());
+}
+
 /// A sheet metal enclosure's fuse (qa4 S1: the flanges, bends and hem, recorded): noshape's Boolean's result valid and
 /// OCCT's volume. A bend on a trimmed left-handed cylinder came out the other way round: invalid, 7 mm³ more
 /// (RUST-SM-CUT-VOLUME).

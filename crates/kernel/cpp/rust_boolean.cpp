@@ -13,6 +13,7 @@
 #include <cstdlib>
 
 #include <BRepAlgoAPI_Common.hxx>
+#include <NCollection_DataMap.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRep_Builder.hxx>
@@ -3281,19 +3282,117 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   }
   if (max_tol > kMaxTol)
     return decline("a tolerant input");
-  // Arguments sharing sub-shapes: OCCT keeps the shared ones as they are. (One map of every argument's vertices
-  // so far: a pattern's thousand instances against each other took seconds.)
+  // Arguments sharing sub-shapes (a joint's tools made from the part's faces): each shared vertex, edge and face of a
+  // later argument named with the first one's it is (kind 0 vertex, 1 edge, 2 face; argument, index; the first's
+  // argument, index), so ours keeps it as it is (OCCT's Kept). (One map of every argument's so far: a pattern's
+  // thousand instances against each other took seconds pair by pair.)
+  std::vector<uint32_t> shared;
   {
-    ShapeIMap seen;
+    const TopAbs_ShapeEnum kinds[] = {TopAbs_VERTEX, TopAbs_EDGE, TopAbs_FACE};
+    for (uint32_t kind = 0; kind < 3; ++kind)
+    {
+      NCollection_DataMap<TopoDS_Shape, std::pair<uint32_t, uint32_t>, TopTools_ShapeMapHasher> first;
+      for (size_t i = 0; i < args.size(); ++i)
+      {
+        const ShapeIMap& m = srcs[i]->map(kinds[kind]);
+        for (int k = 1; k <= m.Extent(); ++k)
+        {
+          if (const std::pair<uint32_t, uint32_t>* at = first.Seek(m(k)))
+          {
+            if (at->first != i)
+              shared.insert(shared.end(), {kind, static_cast<uint32_t>(i), static_cast<uint32_t>(k - 1), at->first, at->second});
+          }
+          else
+            first.Bind(m(k), {static_cast<uint32_t>(i), static_cast<uint32_t>(k - 1)});
+        }
+      }
+    }
+  }
+  // Kept as they are where everything at them is shared (an edge whose faces are all shared, in every argument, its
+  // vertices with only such edges; a face with only such edges): OCCT keeps those. Where two other arguments' faces
+  // on different planes meet one, their section reaches it and OCCT remakes it (Modified, at the same place: it never
+  // changes an input's tolerance), with the edges and faces on it: ours remakes it too. Where only faces on one plane
+  // meet it, OCCT keeps or remakes it as its rounding falls (corpus2 4006f865 kept, 1b2319a3 one corner remade, its
+  // mirror image kept), and other surfaces aren't read here: declined.
+  if (!shared.empty())
+  {
+    NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> in_args;
+    for (size_t i = 0; i < args.size(); ++i)
+      for (const TopAbs_ShapeEnum t : {TopAbs_VERTEX, TopAbs_EDGE, TopAbs_FACE})
+      {
+        const ShapeIMap& m = srcs[i]->map(t);
+        for (int k = 1; k <= m.Extent(); ++k)
+          if (int* n = in_args.ChangeSeek(m(k)))
+            ++*n;
+          else
+            in_args.Bind(m(k), 1);
+      }
+    auto is_shared = [&](const TopoDS_Shape& x) {
+      const int* n = in_args.Seek(x);
+      return n != nullptr && *n > 1;
+    };
+    std::vector<TopTools_IndexedDataMapOfShapeListOfShape> ef(args.size()), vf(args.size()), ve(args.size());
     for (size_t i = 0; i < args.size(); ++i)
     {
-      const ShapeIMap& vi = srcs[i]->map(TopAbs_VERTEX);
-      for (int k = 1; k <= vi.Extent(); ++k)
-        if (seen.Contains(vi(k)))
-          return decline("arguments share vertices");
-      for (int k = 1; k <= vi.Extent(); ++k)
-        seen.Add(vi(k));
+      TopExp::MapShapesAndAncestors(args[i], TopAbs_EDGE, TopAbs_FACE, ef[i]);
+      TopExp::MapShapesAndAncestors(args[i], TopAbs_VERTEX, TopAbs_FACE, vf[i]);
+      TopExp::MapShapesAndAncestors(args[i], TopAbs_VERTEX, TopAbs_EDGE, ve[i]);
     }
+    auto all_of = [&](const std::vector<TopTools_IndexedDataMapOfShapeListOfShape>& anc, const TopoDS_Shape& x, const auto& ok) {
+      for (const TopTools_IndexedDataMapOfShapeListOfShape& m : anc)
+        if (const NCollection_List<TopoDS_Shape>* l = m.Seek(x))
+          for (const TopoDS_Shape& y : *l)
+            if (!ok(y))
+              return false;
+      return true;
+    };
+    auto faces_shared = [&](const TopoDS_Shape& e) { return is_shared(e) && all_of(ef, e, is_shared); };
+    auto vertex_kept  = [&](const TopoDS_Shape& v) { return is_shared(v) && all_of(ve, v, faces_shared); };
+    auto edge_kept    = [&](const TopoDS_Shape& e) {
+      TopoDS_Vertex v0, v1;
+      TopExp::Vertices(TopoDS::Edge(e), v0, v1);
+      return faces_shared(e) && (v0.IsNull() || vertex_kept(v0)) && (v1.IsNull() || vertex_kept(v1));
+    };
+    auto face_kept = [&](const TopoDS_Shape& f) {
+      for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+        if (!edge_kept(x.Current()))
+          return false;
+      return true;
+    };
+    // 1: on one plane; 0: not; -1: other surfaces.
+    auto one_plane = [](const TopoDS_Face& a, const TopoDS_Face& b) {
+      const BRepAdaptor_Surface sa(a, false), sb(b, false);
+      if (sa.GetType() != GeomAbs_Plane || sb.GetType() != GeomAbs_Plane)
+        return -1;
+      const gp_Pln pa = sa.Plane(), pb = sb.Plane();
+      return pa.Axis().Direction().IsParallel(pb.Axis().Direction(), 1e-9) && pa.Distance(pb.Location()) <= 1e-7 ? 1 : 0;
+    };
+    // 1: no section reaches it; 0: one may; -1: unknown.
+    auto quiet = [&](const TopoDS_Shape& x, bool vertex) {
+      std::vector<std::pair<size_t, TopoDS_Face>> own;
+      for (size_t i = 0; i < args.size(); ++i)
+        if (const NCollection_List<TopoDS_Shape>* l = (vertex ? vf[i] : ef[i]).Seek(x))
+          for (const TopoDS_Shape& f : *l)
+            if (!is_shared(f))
+              own.emplace_back(i, TopoDS::Face(f));
+      int r = 1;
+      for (size_t a = 0; a < own.size(); ++a)
+        for (size_t b = a + 1; b < own.size(); ++b)
+          if (own[a].first != own[b].first)
+            r = std::min(r, one_plane(own[a].second, own[b].second));
+      return r;
+    };
+    const TopAbs_ShapeEnum kinds[] = {TopAbs_VERTEX, TopAbs_EDGE, TopAbs_FACE};
+    std::vector<uint32_t> steady;
+    for (size_t k = 0; k + 4 < shared.size(); k += 5)
+    {
+      const TopoDS_Shape& x = input(srcs, shared[k + 1], kinds[shared[k]], shared[k + 2]);
+      if (shared[k] == 0 ? vertex_kept(x) : shared[k] == 1 ? edge_kept(x) : face_kept(x))
+        steady.insert(steady.end(), shared.begin() + static_cast<std::ptrdiff_t>(k), shared.begin() + static_cast<std::ptrdiff_t>(k + 5));
+      else if (shared[k] < 2 && quiet(x, shared[k] == 0) != 0)
+        return decline("a shared shape OCCT may keep or remake");
+    }
+    shared = std::move(steady);
   }
   // Two points are one within both their tolerances (OCCT's rule; a fuzzy Boolean adds its value to each).
   const double tol = 2 * (std::max(max_tol, 1e-7) + fuzzy);
@@ -3309,7 +3408,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   {
     const KernelTimer     timer("boolean.rust.brep");
     const RustMemoryWatch watch;
-    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, fuzzy, touching_only, scaled_inputs, r))
+    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), rust::Slice<const uint32_t>(shared.data(), shared.size()), tol, fuzzy, static_cast<uint8_t>((touching_only ? 1 : 0) | (scaled_inputs ? 2 : 0)), r))
     {
       // (Declined "cancelled": stopped, not handed to OCCT; so past the memory budget, with OCCT's error.)
       stop();

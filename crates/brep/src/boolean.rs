@@ -3798,6 +3798,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // ScaledInputs: every input entity Modified; 64 tools or more, a fill pattern's region less its 1735 disks, or
     // asked for, cf-snap-hook's rounds' glued fuse), else Kept.)
     let rebuilt = (sheet_cut && args.len() > 64) || crate::scaled_inputs();
+    // (Entities of different arguments that are one shape: one origin, kept as it is where unchanged.)
+    let shared = crate::shared();
     if op == Op::Common && args.len() == 2 && args.iter().all(|b| b.solids.is_empty() && !b.faces.is_empty()) && !sheet_common {
         let mut out = Output::default();
         for (a, b) in args.iter().enumerate() {
@@ -5924,22 +5926,28 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     let mut used_v: Vec<u32> = used_s.iter().flat_map(|&s| sedges[s].seg.v).collect();
     used_v.sort_unstable();
     used_v.dedup();
-    let vertex_same = |w: u32| cx.pool.inputs[w as usize].len() == 1 && !touched[w as usize];
+    let vertex_same = |w: u32| match cx.pool.inputs[w as usize].as_slice() {
+        [first, rest @ ..] => !touched[w as usize] && rest.iter().all(|&x| shared.vertex(x) == shared.vertex(*first)),
+        [] => false,
+    };
     for &w in &used_v {
         vmap.insert(w as usize, out.body.vertices.len() as u32);
         out.body.vertices.push(cx.pool.p[w as usize]);
         // (Its tolerance where an input's or merged ones' was more than the Boolean's: the C++ build keeps it.)
         out.body.vertex_tol.push(cx.pool.t[w as usize]);
-        out.vertex_origin.push(match cx.pool.inputs[w as usize].as_slice() {
-            [(0, i)] if vertex_same(w) && rebuilt => Origin::Piece { arg: 0, index: *i },
-            [(a, i)] if vertex_same(w) => Origin::Same { arg: *a, index: *i },
+        out.vertex_origin.push(match cx.pool.inputs[w as usize].first() {
+            Some(&x) if vertex_same(w) => match shared.vertex(x) {
+                (0, index) if rebuilt => Origin::Piece { arg: 0, index },
+                (arg, index) => Origin::Same { arg, index },
+            },
             _ => Origin::New,
         });
     }
     let edge_same: Vec<bool> = (0..sedges.len())
         .map(|s| {
             let x = &sedges[s];
-            x.origins.len() == 1 && edge_pieces[x.origins[0]].len() == 1 && vertex_same(x.seg.v[0]) && vertex_same(x.seg.v[1])
+            let one = |e: usize| shared.edge((cx.edges[e].arg, cx.edges[e].index));
+            !x.origins.is_empty() && x.origins.iter().all(|&e| one(e) == one(x.origins[0]) && edge_pieces[e].len() == 1) && vertex_same(x.seg.v[0]) && vertex_same(x.seg.v[1])
         })
         .collect();
     let mut sedge_flip = vec![false; sedges.len()];
@@ -5999,12 +6007,15 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             None => Origin::New,
             Some(&e) => {
                 let g = &cx.edges[e];
-                if edge_same[s] && !(rebuilt && g.arg == 0) { Origin::Same { arg: g.arg, index: g.index } } else { Origin::Piece { arg: g.arg, index: g.index } }
+                let (arg, index) = shared.edge((g.arg, g.index));
+                if edge_same[s] && !(rebuilt && arg == 0) { Origin::Same { arg, index } } else { Origin::Piece { arg: g.arg, index: g.index } }
             }
         });
     }
     let mut piece_out = Dense::new(pieces.len());
     let mut face_same = vec![false; cx.faces.len()];
+    // (Of faces that are one shape in several arguments, the one kept unchanged: theirs too.)
+    let mut same_faces: HashSet<(u32, u32)> = HashSet::default();
     for &p in &kept {
         let f = pieces[p].face;
         let flip = keep[p] == Some(true);
@@ -6066,7 +6077,13 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         out.body.faces.push(Face { surface, reversed: src.reversed ^ flip, loops });
         // (An unchanged face is the input's own, its edges inside it with it.)
         out.face_internal.push(if same { Vec::new() } else { pieces[p].inner.iter().map(|&s| Use { edge: emap[s], reversed: false }).collect() });
-        out.face_origin.push(if same { Origin::Same { arg: g.arg, index: g.index } } else { Origin::Piece { arg: g.arg, index: g.index } });
+        out.face_origin.push(if same {
+            let (arg, index) = shared.face((g.arg, g.index));
+            same_faces.insert((arg, index));
+            Origin::Same { arg, index }
+        } else {
+            Origin::Piece { arg: g.arg, index: g.index }
+        });
     }
     // Solids, one per shell, outward (a sheet's result: faces alone).
     let mut shell_of: HashMap<usize, usize> = HashMap::default();
@@ -6138,7 +6155,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 outs.push(o);
             }
         }
-        if face_same[f] {
+        if face_same[f] || (outs.len() == 1 && same_faces.contains(&shared.face((g.arg, g.index)))) {
             continue;
         }
         if outs.is_empty() {
