@@ -73,7 +73,7 @@ scratch /root/bool-scratch.
   distance (max difference 0), 7 too big for BRepExtrema (ours alone, cf-fill-pattern's two plates 2.0 s, hours with
   BRepExtrema), 1 both refusing; 8.1 s against BRepExtrema's 21.5 s; 4 pairs slower than it (fan-blade-sweep-3-0 830
   vs 370 ms, sm-corner-break-0-2 110 vs 25, hose-routing 252 vs 164, surface-pattern 170 vs 83).
-- **Exact-line sections, queued 16:40 UTC (c0d3f99f; lead: planes containing an extruded / ruled direction, ours and OCCT's;
+- **Exact-line sections, landed 17:08 UTC (08bd7f2d; lead: planes containing an extruded / ruled direction, ours and OCCT's;
   the user's edge 10.000):** worktree bool-ruled (uncommitted). own_sections: B-spline faces straight along a
   direction (pole lines the first moved by t_j D, t_j linear in Greville points) as extrusions (`bspline_extruded`,
   face parameters mapped: Extruded::uv / on_ruling / on_profile; the surface-of-extrusion output unchanged), a plane
@@ -86,7 +86,15 @@ scratch /root/bool-scratch.
   bool_patterns::a_plane_along_an_extrusion_cuts_it_in_straight_lines (our path). Gate ruled1: corpora + parity56,
   kg (k10-25 rerun alone: killed under vibe4's load 25 first), shfall as refine1; kt level against OCCT's; model suite
   (vibe5, against main) features the same, no flip; kernel 357/357, g++-13.
-- **In progress (10:29 UTC 11-10, lead: pipeflange next, then stef-radijator; profile first; a flip counts only if it
+  17:50: with 0028's libTKBO now in vibe3-5's /opt/occt (core), main's own CLI (built on vibe5, 7c60236c) gives the
+  user's eight edges as lines of 10.0 mm, midpoints at z 45.0; parts as before but the riser's volume (-0.0006 mm3).
+- **Landed 17:25 UTC (7c60236c): the sections' places on faces a thread an item (`par_map_each`).** Pipeflange's Hole 1
+  40 -> 24 ms (vibe4, alternating); the document ~214 against live's 212 ms: not a flip. Gate each1 as refine1; model
+  suite (vibe5 against main) features the same, the heavy documents faster (impeller 14.7 -> 12.2 s, sm-louver 5.0 ->
+  3.9 s (live 5.0), fill-pattern 3.7 -> 2.5 s): flips there to be counted only by interleaved runs on a quiet host;
+  knurl / gear alternating with main on vibe5, medians k25-15 827 / 808 ms, k25-25 3922 / 4001, spur gear 1171 / 1055.
+
+- **Earlier (10:29 UTC 11-10, lead: pipeflange next, then stef-radijator; profile first; a flip counts only if it
   holds across interleaved runs on a quiet host):** pipeflange-steven ours 224 / live 212 ms (vibe4). Its two cuts on
   our path, laps in boolean_in: Hole 1's (18c4684c, 4 tools) 9 ms sections, 18 ms placing them on faces; Extrude 3's
   (5cdc5fd0) 8-11 ms sections, 1.3 placing, 3.6 pieces. Hole 1's 18 ms: 4 of 32 placings take 4.5 ms each (OCCT's
