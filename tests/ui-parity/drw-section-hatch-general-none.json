@@ -1,6 +1,6 @@
 {
   "name": "drw-section-hatch-general-none",
-  "about": "Edit hatch section... on a section view, pick its hatch, the General tab, Pattern ▾ None (live behaviours (4): General starts with None; Scale, Angle and Color go), then Escape",
+  "about": "Edit hatch section... on a section view, pick its hatch, the General tab, Pattern ▾ None (live behaviours (4), live2 2272: General opens on None already; Scale, Angle and Color go), then Escape",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-08: the remaining drawing menu items)",
@@ -71,7 +71,7 @@
     {
       "do": "click",
       "on": {
-        "dropdown": "Solid",
+        "dropdown": "None",
         "pick": "None"
       }
     },

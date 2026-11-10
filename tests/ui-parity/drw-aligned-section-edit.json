@@ -1,6 +1,6 @@
 {
   "name": "drw-aligned-section-edit",
-  "about": "Aligned section view of Top (centre on the hole, legs along +x and +y) placed at sheet (150, 60), then the Section view's menu › Edit aligned section...",
+  "about": "Aligned section view of Top: Center a point on the hole's circle, the viewing leg on the plate's right edge, the revolved leg on its top edge (live2 2251: live takes points on edges only), placed at sheet (150, 60), then the Section view's menu › Edit aligned section...",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-07: the remaining drawing menu items)",
@@ -20,10 +20,23 @@
     {
       "do": "click",
       "on": {
-        "view_point": {
+        "view_edge": {
           "view": "Top",
           "at": [
-            0,
+            3.5355,
+            3.5355,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Top",
+          "at": [
+            20,
             0,
             20
           ]
@@ -33,24 +46,11 @@
     {
       "do": "click",
       "on": {
-        "view_point": {
-          "view": "Top",
-          "at": [
-            15,
-            0,
-            20
-          ]
-        }
-      }
-    },
-    {
-      "do": "click",
-      "on": {
-        "view_point": {
+        "view_edge": {
           "view": "Top",
           "at": [
             0,
-            15,
+            20,
             20
           ]
         }
