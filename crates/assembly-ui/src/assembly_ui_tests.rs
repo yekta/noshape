@@ -819,3 +819,41 @@ fn assembly_mass_properties_dont_hold_up_the_frame(cx: &mut TestAppContext) {
     draw(cx, window);
     cx.update(|cx| assert!(view.read(cx).ui.mass_job.as_ref().and_then(|j| j.value.clone()).and_then(|(m, _)| m).is_some(), "the values arrived"));
 }
+
+/// Live asm-menu-switch-to-part-studio: an instance's Switch to Part Studio opens that Part Studio with its part
+/// selected (the event carries the part).
+#[gpui::test]
+fn switch_to_part_studio_carries_the_part(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "switch-part");
+    let got: std::rc::Rc<std::cell::RefCell<Vec<String>>> = Default::default();
+    let g = got.clone();
+    let _sub = cx.update(|cx| {
+        cx.subscribe(&view, move |_, ev: &super::AssemblyViewEvent, _| {
+            g.borrow_mut().push(match ev {
+                super::AssemblyViewEvent::ShowPart(_, body) => format!("show {body:?}"),
+                super::AssemblyViewEvent::ActivateTab(_) => "activate".into(),
+                super::AssemblyViewEvent::EditInContext(..) => "context".into(),
+            })
+        })
+    });
+    let body = cx.update(|cx| {
+        let v = view.read(cx);
+        let id = instance(v, "Part 2 <1>", cx);
+        match &v.assembly(cx).unwrap().instance(id).unwrap().source {
+            noshape_model::assembly::InstanceSource::Part { body, .. } => body.clone(),
+            s => panic!("{s:?}"),
+        }
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let id = instance(v, "Part 2 <1>", cx);
+            let menu = v.instance_menu(id, false, cx);
+            let Some(super::behaviors::MenuEntry::Item { act, .. }) = menu.iter().find(|e| matches!(e, super::behaviors::MenuEntry::Item { label, .. } if label == "Switch to Part Studio 1")) else { panic!("Switch to Part Studio 1") };
+            let act = act.clone();
+            act(v, w, cx);
+        })
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert_eq!(*got.borrow(), [format!("show {body:?}")]);
+}

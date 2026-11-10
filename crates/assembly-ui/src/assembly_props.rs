@@ -83,6 +83,22 @@ impl AssemblyView {
                     cx,
                 );
             }
+            // A part of another document at a version: its properties there, shown, not edited (a version is fixed).
+            InstanceSource::External { key, body: Some(body), .. } => {
+                use crate::properties_dialog::{MetaSpec, MetaValues};
+                let props = crate::derived::ExternalRef::parse(&key)
+                    .and_then(|r| crate::derived::external_snapshot(&r.path, r.microversion).ok().map(|d| (d, r.tab)))
+                    .and_then(|(d, tab)| match d.tabs.iter().find(|t| t.id.to_string() == tab).map(|t| &t.content) {
+                        Some(TabContent::PartStudio(ps)) => ps.part_properties.get(&body).cloned(),
+                        _ => None,
+                    })
+                    .unwrap_or_default();
+                let name = self.result.occurrences.iter().find(|o| o.path.starts_with(&path) && o.body == body).map(|o| o.body_name.clone()).unwrap_or_else(|| inst.name.rsplit_once(" <").map(|(b, _)| b.to_string()).unwrap_or(inst.name.clone()));
+                let values = MetaValues { name, description: props.description.clone().unwrap_or_default(), part_number: props.part_number.clone().unwrap_or_default(), revision: props.revision.clone().unwrap_or_default(), ..Default::default() };
+                let meta = MetaSpec { category: "Onshape Part", material: Some(props.material.clone().unwrap_or_else(|| "Unassigned".into())), computed_mass: None, bom_options: None, drawing_info: None, values };
+                let fixed = vec!["Name", "Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3"];
+                crate::properties_dialog::open_properties_read_only(meta, fixed, |_, _, _| {}, window, cx);
+            }
             // A standard content part (live skb 10-20): Name and Material shown, Part number and Description its
             // own, kept user wide for its configuration as the Insert panel's pencil keeps them.
             InstanceSource::Standard { spec } => {

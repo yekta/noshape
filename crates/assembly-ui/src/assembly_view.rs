@@ -435,6 +435,9 @@ pub struct AssemblyView {
 pub enum AssemblyViewEvent {
     /// Switch to another tab (instance menu > Switch to Part Studio / Assembly).
     ActivateTab(TabId),
+    /// Instance menu › Switch to Part Studio on a part: that Part Studio with the part selected (live
+    /// asm-menu-switch-to-part-studio).
+    ShowPart(TabId, noshape_model::reference::BodyId),
     /// Instance menu › Edit in context: open the Part Studio with the
     /// assembly as context graphics.
     EditInContext(TabId, Box<crate::assembly_context::AssemblyContext>),

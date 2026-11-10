@@ -310,6 +310,12 @@ impl Workspace {
                 // "Switch to Part Studio / Assembly" from the instance context menu.
                 self._subs.push(cx.subscribe_in(&v, window, |this: &mut Self, _, ev: &crate::assembly_view::AssemblyViewEvent, window, cx| match ev {
                     crate::assembly_view::AssemblyViewEvent::ActivateTab(t) => this.activate(*t, window, cx),
+                    crate::assembly_view::AssemblyViewEvent::ShowPart(t, body) => {
+                        this.activate(*t, window, cx);
+                        if let Some(TabView::PartStudio(v)) = this.views.get(t) {
+                            v.update(cx, |v, cx| v.select_part(body.clone(), cx));
+                        }
+                    }
                     crate::assembly_view::AssemblyViewEvent::EditInContext(t, ctx) => {
                         this.activate(*t, window, cx);
                         if let Some(TabView::PartStudio(v)) = this.views.get(t) {
