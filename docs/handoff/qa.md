@@ -3,7 +3,7 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-**11-10 12:35 (lead):** main red 11:44 from core's unlanded OCCT patch 0028 libs synced into /opt/occt on vibe3–5 (12:00
+**11-10 12:28 (lead):** main red 11:44 from core's unlanded OCCT patch 0028 libs synced into /opt/occt on vibe3–5 (12:00
 libTKBO.a; kernel export::step_writes_the_used_part_of_long_splines), not a commit; core restores the old lib. The 11:02 suite
 run (b612e762) was stopped 12:28 in its remote stage (built on those libs, bool-measure's parity_models beside it): STOPPED file
 in its folder, index left at 10:59's 90.4. qa-suites.sh now waits for other agents' parity runs on the host (up to 90 min),
