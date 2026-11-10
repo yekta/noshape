@@ -18,6 +18,13 @@ test only took profiles in a plane through the axis, so OCCT's self-intersection
 tilted profiles too: Sweep 1 0.23 s, the document 0.87 s. Your 7e7d69f2b stays; the tilt (feature 41's frame) is
 yours to finish.
 
+## 11-10 09:05 UTC: variable renames reach Assemblies (lead's user bug family)
+
+- (1) Variable Studio rename → Assemblies: done (asm.md 11-10 09:05, e2e variable_studio_rename_reaches_assemblies).
+- (2) Assembly configuration variable rename: ours keeps `#old` uses (Part Studio's too); live asked (REQUESTS
+  09:20) before changing it. (3) Drawings: ours has no variable in a note or cell; asked whether live has.
+- config_configure's unknown `param` error now says what's wrong ("no configurable parameter `x`; one of: …").
+
 ## 11-10 08:53 UTC: hose probe pair filed with live; format painter asked; x_t / OBJ writer say "Noshape"
 
 - **Hose probe (REQUESTS 08:50):** /root/parity/probe-xt/hose-periodic-{single,two}.x_t, written with

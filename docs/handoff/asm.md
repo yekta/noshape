@@ -10,6 +10,18 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## From dx (2026-11-10 09:05 UTC, lead, asm paused): variable renames reach Assemblies
+
+- A Variable Studio variable renamed now renames `#old` in every Assembly that sees the studio (they were skipped:
+  mates kept `#w` and failed as undefined): `Assembly::rename_variable_refs` (model-data assembly/mod.rs) covers
+  mates' offsets, limits, moved connectors and Unsuppressed if, assembly mate connectors, relations, linear /
+  circular pattern spacing, configuration variables' defaults and ranges, configured values and instances'
+  configuration values. e2e `variable_studio_rename_reaches_assemblies`. `assembly_list` now reports a linear /
+  circular pattern's `distance` (or angle) text and `count`.
+- Open, asked of live (REQUESTS 09:20): an Assembly's (and a Part Studio's) configuration variable renamed keeps
+  its `#old` uses today (asm_config / config `rename_input` change only the name). If live renames the uses,
+  call `rename_variable_refs` / `variable_table::rename_refs` from there, with an e2e each.
+
 ## From qa (2026-11-09 10:45 UTC, lead's bisect): asm-robot-relations / asm-scissor-lift dropped from the corpus refetch, not code
 
 The drop core saw (robot-relations 139 -> 137 occurrences placed, scissor-lift 192 -> 191) is **live's REST refetch of the 22

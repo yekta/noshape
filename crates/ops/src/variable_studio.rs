@@ -54,7 +54,7 @@ pub fn tabs_seeing(doc: &noshape_model::Document, studio: noshape_model::documen
 
 /// The Name cell ("Rename variable") as live does it: a taken name becomes `<name>_0` (`taken` true), and `#old`
 /// follows in every tab that sees the studio ([`tabs_seeing`]: Part Studios' features and configured values,
-/// inserting Variable Studios' values). Returns (the new name, whether it was taken, the tabs), None for no such row.
+/// Assemblies' mates, patterns and configured values, inserting Variable Studios' values). Returns (the new name, whether it was taken, the tabs), None for no such row.
 pub fn rename_everywhere(doc: &mut noshape_model::Document, studio: noshape_model::document::TabId, i: usize, name: &str) -> Option<(String, bool, Vec<noshape_model::document::TabId>)> {
     use noshape_model::TabContent;
     let tabs = tabs_seeing(doc, studio);
@@ -76,6 +76,7 @@ pub fn rename_everywhere(doc: &mut noshape_model::Document, studio: noshape_mode
                 }
             }
             TabContent::PartStudio(ps) => noshape_model::variable_table::rename_refs(ps, &old, &new),
+            TabContent::Assembly(a) => a.rename_variable_refs(&old, &new),
             _ => {}
         }
     }

@@ -973,6 +973,45 @@ fn hidden_parameters_are_reported_as_ignored() {
     assert_eq!(back["ignored"][0]["param"], "hasOffset", "{back}");
 }
 
+/// A Variable Studio variable renamed (user report): every Assembly that sees the studio follows too, its mates'
+/// offsets, patterns' spacing and configured values (they kept `#w` and failed as undefined).
+#[test]
+fn variable_studio_rename_reaches_assemblies() {
+    let mut ctx = Ctx::new();
+    let path = scratch("vs-rename-asm.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"]], "depth": "10 mm" } }));
+    call(&mut ctx, "variable_create_studio", json!({}));
+    call(&mut ctx, "variable_create", json!({ "tab": "Variable Studio 1", "name": "w", "value": "5 mm" }));
+    let asm = json!("Assembly 1");
+    call(&mut ctx, "assembly_insert", json!({ "tab": asm, "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": asm, "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_set_state", json!({ "tab": asm, "instances": ["Part 1 <1>"], "fixed": true }));
+    let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0]["id"].clone();
+    let (top, bottom) = (face(&mut ctx, "Part 1 <1>", 1.0), face(&mut ctx, "Part 1 <2>", -1.0));
+    call(&mut ctx, "assembly_mate", json!({ "tab": asm, "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": top }, "b": { "instance": "Part 1 <2>", "entity": bottom }, "offset": { "z": "#w" } }));
+    let edges = call(&mut ctx, "assembly_entities", json!({ "tab": asm, "instance": "Part 1 <1>", "kind": "edges" }));
+    let x_edge = edges["edges"].as_array().unwrap().iter().find(|e| e["curve"] == "line" && num(&e["direction"][0]).abs() > 0.99).unwrap()["id"].clone();
+    call(&mut ctx, "assembly_pattern", json!({ "tab": asm, "kind": "linear", "seeds": ["Part 1 <2>"], "direction": { "instance": "Part 1 <1>", "entity": x_edge }, "distance": "#w * 20" }));
+    let input = call(&mut ctx, "config_add_input", json!({ "tab": asm, "kind": "list" }))["input"].as_str().unwrap().to_string();
+    call(&mut ctx, "config_add_option", json!({ "tab": asm, "input": input, "name": "Far" }));
+    call(&mut ctx, "config_configure", json!({ "tab": asm, "mate": "Fastened 1", "param": "offset_z", "input": input }));
+    call(&mut ctx, "config_set_value", json!({ "tab": asm, "mate": "Fastened 1", "param": "offset_z", "configuration": "Far", "value": "#w * 2" }));
+
+    let r = call(&mut ctx, "variable_set", json!({ "tab": "Variable Studio 1", "variable": "w", "new_name": "gap" }));
+    assert_eq!(r["message"], "Renamed variable 'w' to 'gap' in 3 tabs in this workspace.", "{r}");
+    let l = call(&mut ctx, "assembly_list", json!({ "tab": asm }));
+    let mate = l["mates"].as_array().unwrap().iter().find(|m| m["name"] == "Fastened 1").unwrap();
+    assert_eq!((mate["offset"]["z"].as_str(), mate["ok"].as_bool()), (Some("#gap"), Some(true)), "{mate}");
+    assert_eq!(l["patterns"][0]["distance"], "#gap * 20", "{l}");
+    let c = call(&mut ctx, "config_list", json!({ "tab": asm }));
+    let configured = &c["configured"][0]["values"];
+    assert!(configured.as_object().unwrap().values().any(|v| v == "#gap * 2"), "{c}");
+    assert!(!c.to_string().contains("#w"), "no #w left: {c}");
+}
+
 /// Variable Studio tables in a Part Studio's Variable table: create, insert,
 /// reorder (the later table's variable wins), remove, settings.
 #[test]

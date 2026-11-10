@@ -305,7 +305,7 @@ pub(super) fn edit_option(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::Op
 /// The configured target and parameter of config_configure / set_value.
 fn column(a: &Assembly, args: &Args) -> Result<(ConfigTarget, &'static str), OpError> {
     let p = args.str("param")?;
-    let pid = PARAMS.iter().find(|x| x.0 == p).map(|x| x.1).ok_or_else(|| OpError::param("param", &PARAMS.iter().map(|x| x.0).collect::<Vec<_>>().join(", ")))?;
+    let pid = PARAMS.iter().find(|x| x.0 == p).map(|x| x.1).ok_or_else(|| OpError::param("param", &format!("no configurable parameter `{p}`; one of: {}", PARAMS.iter().map(|x| x.0).collect::<Vec<_>>().join(", "))))?;
     let by = |name: &str, id: MateId, k: &str, prefix: &str| name == k || format!("{prefix}:{}", id.0) == k || id.0.to_string() == k;
     let t = match (args.opt_str("instance")?, args.opt_str("mate")?, args.opt_str("pattern")?, args.opt_str("connector")?) {
         (Some(i), None, None, None) => {

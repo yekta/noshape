@@ -201,7 +201,7 @@ pub fn rename_in_expr(text: &str, old: &str, new: &str) -> String {
 }
 
 /// `#old` → `#new` in one parameter value: an expression, every item of an array parameter, a sketch's dimensions.
-fn rename_in_param(v: &mut ParamValue, old: &str, new: &str) {
+pub fn rename_in_param(v: &mut ParamValue, old: &str, new: &str) {
     let fix = |e: &mut ExprValue| {
         if e.text.contains(&format!("#{old}")) {
             *e = ExprValue::new(rename_in_expr(&e.text, old, new));

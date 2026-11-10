@@ -980,6 +980,94 @@ pub struct OccurrenceState {
 }
 
 impl Assembly {
+    /// `#old` → `#new` in every expression of the assembly (a renamed Variable Studio variable or configuration
+    /// variable): mates' offsets, limits and moved connectors, assembly mate connectors, relations, patterns,
+    /// "Unsuppressed if" conditions, configuration variables, configured values and instances' configurations.
+    pub fn rename_variable_refs(&mut self, old: &str, new: &str) {
+        use crate::variable_table::{rename_in_expr, rename_in_param};
+        let needle = format!("#{old}");
+        let expr = |e: &mut ExprValue| {
+            if e.text.contains(&needle) {
+                *e = ExprValue::new(rename_in_expr(&e.text, old, new));
+            }
+        };
+        let opt = |e: &mut Option<ExprValue>| {
+            if let Some(e) = e {
+                expr(e);
+            }
+        };
+        let text = |t: &mut String| {
+            if t.contains(&needle) {
+                *t = rename_in_expr(t, old, new);
+            }
+        };
+        let moved = |r: &mut MateConnectorRef| {
+            if let Some(m) = &mut r.moved {
+                m.translation.iter_mut().for_each(opt);
+                opt(&mut m.rotation);
+            }
+        };
+        for i in &mut self.instances {
+            if let Some(t) = &mut i.unsuppressed_if {
+                text(t);
+            }
+            if let Some(c) = i.source.config_mut() {
+                c.0.values_mut().for_each(text);
+            }
+        }
+        for m in &mut self.mates {
+            for e in [&mut m.offset_x, &mut m.offset_y, &mut m.offset_z, &mut m.rotation] {
+                opt(e);
+            }
+            for (_, l) in &mut m.limits {
+                opt(&mut l.min);
+                opt(&mut l.max);
+            }
+            if let Some(t) = &mut m.unsuppressed_if {
+                text(t);
+            }
+            moved(&mut m.a);
+            moved(&mut m.b);
+            m.extra.iter_mut().for_each(moved);
+        }
+        for c in &mut self.connectors {
+            c.translation.iter_mut().for_each(opt);
+            opt(&mut c.rotation);
+            moved(&mut c.on);
+        }
+        for r in &mut self.relations {
+            expr(&mut r.ratio);
+        }
+        for p in &mut self.patterns {
+            match &mut p.kind {
+                PatternKind::Linear { distance, second, third, .. } => {
+                    expr(distance);
+                    if let Some(d) = second {
+                        expr(&mut d.distance);
+                    }
+                    if let Some(d) = third {
+                        expr(&mut d.distance);
+                    }
+                }
+                PatternKind::Circular { angle, .. } => expr(angle),
+                PatternKind::Mirror { .. } | PatternKind::PartPattern { .. } | PatternKind::Replicate { .. } => {}
+            }
+        }
+        self.unsuppressed_if.values_mut().for_each(text);
+        for i in &mut self.configuration.inputs {
+            if let crate::configuration::ConfigInputKind::Variable { default, min, max, .. } = &mut i.kind {
+                expr(default);
+                opt(min);
+                opt(max);
+            }
+        }
+        for c in &mut self.configuration.configured {
+            c.values.values_mut().for_each(|v| rename_in_param(v, old, new));
+        }
+    }
+}
+
+impl Assembly {
     /// The state set on the occurrence at `path` (default when none).
     pub fn occurrence(&self, path: &[InstanceId]) -> OccurrenceState {
         self.occurrences.iter().find(|(p, _)| p == path).map(|(_, s)| s.clone()).unwrap_or_default()

@@ -236,6 +236,12 @@ pub(super) fn patterns_json(a: &Assembly) -> Vec<Value> {
                 "instances": p.generated.iter().map(|g| format!("inst:{}", g.instance.0)).collect::<Vec<_>>(),
                 "suppressed": p.suppressed,
             });
+            // The spacing and count as assembly_pattern takes them.
+            match &p.kind {
+                PatternKind::Linear { distance, count, .. } => (v["distance"], v["count"]) = (json!(distance.text), json!(count)),
+                PatternKind::Circular { angle, count, .. } => (v["distance"], v["count"]) = (json!(angle.text), json!(count)),
+                PatternKind::Mirror { .. } | PatternKind::PartPattern { .. } | PatternKind::Replicate { .. } => {}
+            }
             if let PatternKind::Mirror { handed, derived, placement, .. } = &p.kind {
                 v["strategy"] = json!(p
                     .seeds
