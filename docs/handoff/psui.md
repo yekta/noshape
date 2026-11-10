@@ -713,6 +713,14 @@ REQUESTS 20:20). Where the slowest go (preview regeneration):
 
 ## In progress
 
+**11-10 19:58 UTC, live 2464 / 2466.** Another document's part in an assembly: Properties… is editable except Name,
+Not revision managed and the Mass override; Save writes into the version the instance uses (the source file's
+unversioned meta `version-part-properties/<mv>`, laid over the version whenever it is read: `derived::external_snapshot`),
+op `assembly_linked_part_properties`; Pin reference / Unpin reference (`Assembly::pinned_references`: updates and the
+Reference manager leave it, pinned icon), op `assembly_pin_reference`. Feature Studio's narrow-window takes (window 1600 / 1280 / 1500, dark theme):
+the toolbar slice re-fits to the window. Next from 2464: the instance menu's Edit in context, Create Drawing of <part>…
+and Release… for another document's part.
+
 **11-08 22:09 UTC, speed area (lead: parity index speed 70.8 %, psui and bool first).** The cases: 85 parity
 regenerations + 13 opens (all opens at or under live: 0 lost). Profiled on vibe5 (`NOSHAPE_PARITY_SPLIT=1`
 parity::parity_models: open / feature_list / query_parts, then each Part Studio's features against its display):

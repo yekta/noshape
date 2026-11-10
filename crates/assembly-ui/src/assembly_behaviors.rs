@@ -1364,12 +1364,21 @@ impl AssemblyView {
         // (A subassembly of this document too: live asm-menu-dissolve-subassembly.)
         if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Assembly { .. } | InstanceSource::External { .. }) {
             let tg = targets.clone();
-            // Another document's with a newer version: "Update linked document…" (live asm-menu-open-linked-document).
-            let newer = inst.source.external_key().is_some_and(|k| self.ext_updates.get(k).is_some_and(|v| v.is_some()));
+            // Another document's: "Update linked document…", also once it is up to date (live 2464; it opens the
+            // Reference manager).
+            let other = inst.source.external_key().is_some();
             let open = move |t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| t.open_reference_manager(Some(tg.clone()), cx);
-            m.push(if newer { icon_item("Update linked document…", "change-version", open) } else { icon_item("Change to version…", "change-version", open) });
+            m.push(if other { icon_item("Update linked document…", "change-version", open) } else { icon_item("Change to version…", "change-version", open) });
         }
         m.extend(open_linked);
+        // Live 2464: Pin reference (no dialog, no toast); pinned, "Unpin reference" and no Edit in context.
+        if !multi && inst.source.external_key().is_some() {
+            let pinned = asm.pinned_references.contains(&top);
+            let pin = move |t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| {
+                t.edit(noshape_ops::assembly::pin_reference_description(!pinned), cx, |a| noshape_ops::assembly::set_reference_pinned(a, top, !pinned));
+            };
+            m.push(if pinned { item("Unpin reference", pin) } else { item("Pin reference", pin) });
+        }
         // Live (asm-instance-suppress-unsuppress): no Export… or Zoom to selection on a suppressed instance.
         if !suppressed {
             m.push(export);

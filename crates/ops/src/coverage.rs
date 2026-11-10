@@ -480,6 +480,8 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Spline point", Op("drawing_crop_view")),
     ("drawing:Switch to BOM", Op("drawing_switch_to_reference")),
     ("drawing:Switch to reference", Op("drawing_switch_to_reference")),
+    ("assembly:Pin reference", Op("assembly_pin_reference")),
+    ("assembly:Unpin reference", Op("assembly_pin_reference")),
     ("drawing:Pin reference", Op("drawing_pin_reference")),
     ("drawing:Unpin reference", Op("drawing_pin_reference")),
     ("drawing:Update linked document...", Op("drawing_update_references")),

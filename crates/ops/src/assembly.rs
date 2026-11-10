@@ -196,6 +196,7 @@ pub fn delete_instances(a: &mut Assembly, ids: &[InstanceId]) {
     for id in ids {
         a.remove_instance(*id);
     }
+    a.pinned_references.retain(|x| !ids.contains(x));
     a.prune_configured();
 }
 
@@ -683,7 +684,8 @@ pub fn solver_values_for(a: &noshape_model::assembly::solver::Frame, b: &noshape
 /// Reference manager › Update: instances (in `scope`, else all) referencing `key` re-pointed at `new_key`. The count.
 pub fn repoint_external(a: &mut Assembly, key: &str, new_key: &str, scope: Option<&[InstanceId]>) -> usize {
     let mut n = 0;
-    for i in a.instances.iter_mut().filter(|i| scope.is_none_or(|s| s.contains(&i.id))) {
+    let pinned = &a.pinned_references;
+    for i in a.instances.iter_mut().filter(|i| scope.is_none_or(|s| s.contains(&i.id)) && !pinned.contains(&i.id)) {
         if let InstanceSource::External { key: k, .. } = &mut i.source
             && k == key
         {
@@ -935,6 +937,18 @@ pub fn set_best_tessellation(a: &mut Assembly, ids: &[InstanceId], on: bool) {
 }
 
 pub const INSTANCE_PROPERTIES_DESCRIPTION: &str = "Instance properties";
+
+/// Pin reference / Unpin reference of an instance of another document's version (live 2464: no dialog, no toast).
+pub fn set_reference_pinned(a: &mut Assembly, id: InstanceId, on: bool) {
+    a.pinned_references.retain(|x| *x != id);
+    if on {
+        a.pinned_references.push(id);
+    }
+}
+
+pub fn pin_reference_description(on: bool) -> &'static str {
+    if on { "Pin reference" } else { "Unpin reference" }
+}
 
 /// Instance properties…: the Reference designator (empty clears it).
 pub fn set_reference_designator(a: &mut Assembly, id: InstanceId, value: &str) {

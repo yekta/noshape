@@ -957,6 +957,10 @@ pub struct Assembly {
     /// `#name`s in mates. A stored assembly has none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_config: Option<crate::configuration::ConfigValues>,
+    /// Instances of another document's version whose reference is pinned (live 2464: Pin reference): updates
+    /// leave them on their version, and Edit in context isn't offered.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pinned_references: Vec<InstanceId>,
 }
 
 /// Isolated / transparent occurrences: paths from a top-level instance (a

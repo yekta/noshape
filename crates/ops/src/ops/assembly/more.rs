@@ -88,6 +88,29 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "assembly",
+            verb: "linked_part_properties",
+            summary: "Properties… of an instance of another document's part (at a version)",
+            description: "Without fields, replies with the part's properties at the version the instance uses. Description, part number, revision, vendor, project, product line, titles, Exclude from all BOMs, Unit of measure and custom properties are saved into that version of the other document (every instance of it at that version shows them; its workspace keeps its own); Name, Not revision managed and the mass are greyed in the dialog and can't be set here. State is set by releases.",
+            fields: vec![doc_field(), asm_field(), req("instance", s(), "An instance of another document's part, id or name."), opt("description", s(), "Description."), opt("part_number", s(), "Part number."), opt("revision", s(), "Revision.")]
+                .into_iter()
+                .chain(crate::ops::parts::meta_fields().into_iter().filter(|f| f.name != "not_revision_managed"))
+                .collect(),
+            mutates: true,
+            destructive: false,
+            run: linked_part_properties,
+        },
+        Op {
+            group: "assembly",
+            verb: "pin_reference",
+            summary: "Pin reference / Unpin reference of an instance of another document's version",
+            description: "The instance menu's Pin reference: the instance stays on its version when references are updated (update_references and the Reference manager leave it), its row shows the pinned icon, and Edit in context isn't offered; `pinned: false` is Unpin reference. One edit (\"Pin reference\" / \"Unpin reference\").",
+            fields: vec![doc_field(), asm_field(), req("instance", s(), "An instance of another document's version, id or name."), opt("pinned", json!({ "type": "boolean" }), "false: Unpin reference (default true).")],
+            mutates: true,
+            destructive: false,
+            run: pin_reference,
+        },
+        Op {
+            group: "assembly",
             verb: "pattern",
             summary: "Pattern instances: linear, circular, mirror, part pattern or replicate",
             description: "The Linear / Circular pattern, Mirror, Part pattern and Replicate dialogs. Linear copies the seeds along a direction (an edge, a face's normal or a mate connector's Z axis), optionally in a second direction; circular copies them about an axis; mirror copies them across a plane. Part pattern re-creates the seed's mate on every copy of its target made by a Part Studio pattern; replicate re-creates it on all matching geometry (every hole of the same size). Give `edit` to change an existing pattern: fields left out keep their values. One edit (\"Insert : Linear pattern 1\").",
@@ -731,6 +754,58 @@ fn properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         })?;
     }
     Ok(json!({ "properties": properties_json(&name, &p) }).into())
+}
+
+fn linked_part_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let asm = assembly(od, tab)?;
+    let id = find_instance(asm, a.str("instance")?, "instance")?;
+    let inst = asm.instance(id).ok_or_else(|| OpError::param("instance", "no such instance"))?;
+    let (InstanceSource::External { key, body: Some(body), .. }, name) = (&inst.source, inst.name.clone()) else {
+        return Err(OpError::param("instance", "not an instance of another document's part"));
+    };
+    let r = crate::derived::ExternalRef::parse(key).ok_or_else(|| OpError::param("instance", "its reference can't be read"))?;
+    let snap = crate::derived::external_snapshot(&r.path, r.microversion).map_err(|e| OpError::param("instance", &format!("the other document can't be read: {e:#}")))?;
+    let before = match snap.tabs.iter().find(|t| t.id.to_string() == r.tab).map(|t| &t.content) {
+        Some(TabContent::PartStudio(ps)) => ps.part_properties.get(body).cloned().unwrap_or_default(),
+        _ => return Err(OpError::param("instance", "its Part Studio is not in that version")),
+    };
+    let mut p = before.clone();
+    let text = |k: &str| -> Result<Option<String>, OpError> { Ok(a.opt_str(k)?.map(|x| x.trim().to_string())) };
+    for (k, f) in [("description", &mut p.description), ("part_number", &mut p.part_number), ("revision", &mut p.revision)] {
+        if let Some(x) = text(k)? {
+            *f = Some(x).filter(|s| !s.is_empty());
+        }
+    }
+    crate::ops::parts::apply_meta(a, &mut p.meta)?;
+    if p != before {
+        crate::derived::save_version_part_properties(&r, body, p.clone()).map_err(|e| OpError::invalid(format!("the other document can't be written: {e:#}")))?;
+    }
+    let part = name.rsplit_once(" <").map(|(b, _)| b.to_string()).unwrap_or(name);
+    Ok(json!({ "instance": format!("inst:{}", id.0), "properties": json!({
+        "name": p.name.clone().unwrap_or(part),
+        "description": p.description, "part_number": p.part_number, "revision": p.revision,
+        "state": p.meta.state(), "vendor": p.meta.vendor, "project": p.meta.project, "product_line": p.meta.product_line,
+        "title1": p.meta.title1, "title2": p.meta.title2, "title3": p.meta.title3,
+        "not_revision_managed": p.meta.not_revision_managed, "exclude_from_bom": p.meta.exclude_from_bom,
+        "unit_of_measure": p.meta.unit_of_measure.clone().unwrap_or_else(|| noshape_model::configured_properties::UNITS_OF_MEASURE[0].into()),
+        "mass_override": p.mass_override, "custom": p.meta.custom,
+    }) }).into())
+}
+
+fn pin_reference(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let asm = assembly(od, tab)?;
+    let id = find_instance(asm, a.str("instance")?, "instance")?;
+    if asm.instance(id).and_then(|i| i.source.external_key()).is_none() {
+        return Err(OpError::param("instance", "not an instance of another document's version"));
+    }
+    let on = a.bool_or("pinned", true)?;
+    if asm.pinned_references.contains(&id) != on {
+        let r = solve(od, tab, &SolveOptions::default())?;
+        commit(od, tab, sa::pin_reference_description(on), &r, |x| sa::set_reference_pinned(x, id, on))?;
+    }
+    Ok(json!({ "instance": format!("inst:{}", id.0), "pinned": on }).into())
 }
 
 fn measure(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

@@ -5137,6 +5137,36 @@ fn assembly_inserts_another_documents_assembly_at_a_version() {
     assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Insert : Part Studio 1 (other document)", "{hist}");
 }
 
+/// Properties… of another document's part (live 2464): saved into the version the instance uses, so every use of
+/// that version shows them, while the source's workspace keeps its own; Name and Not revision managed stay as they are.
+#[test]
+fn a_linked_parts_properties_save_into_its_version() {
+    let mut ctx = Ctx::new();
+    two_part_assembly(&mut ctx, "linked-props-lib.noshape");
+    let lib = std::env::temp_dir().join(format!("noshape-ops-e2e-{}", std::process::id())).join("linked-props-lib.noshape");
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let top = scratch("linked-props-top.noshape");
+    call(&mut ctx, "document_create", json!({ "path": top.to_str().unwrap() }));
+    let own = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1" }));
+    let e = try_call(&mut ctx, "assembly_linked_part_properties", json!({ "instance": own["instance"], "part_number": "X" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("instance"), "{e:?}");
+    let p = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2", "document": lib.to_str().unwrap(), "version": "V1" }));
+    let r = call(&mut ctx, "assembly_linked_part_properties", json!({ "instance": p["instance"], "part_number": "Q2464", "vendor": "Acme" }));
+    assert_eq!(r["properties"]["part_number"], "Q2464", "{r}");
+    assert_eq!(r["properties"]["name"], "Part 2", "{r}");
+    let e = try_call(&mut ctx, "assembly_linked_part_properties", json!({ "instance": p["instance"], "not_revision_managed": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("not_revision_managed"), "{e:?}");
+    // A second instance of that version shows them too.
+    let q = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2", "document": lib.to_str().unwrap(), "version": "V1" }));
+    let r = call(&mut ctx, "assembly_linked_part_properties", json!({ "instance": q["instance"] }));
+    assert_eq!((r["properties"]["part_number"].as_str(), r["properties"]["vendor"].as_str()), (Some("Q2464"), Some("Acme")), "{r}");
+    // The source's workspace keeps its own (none).
+    call(&mut ctx, "document_open", json!({ "path": lib.to_str().unwrap() }));
+    let a = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    let bom = call(&mut ctx, "assembly_bom", json!({ "type": "flattened" }));
+    assert!(!bom.to_string().contains("Q2464"), "{a} {bom}");
+}
+
 /// A callout on a part's silhouette is that part's, not the part of an edge
 /// a little way off (qa BALLOON-WRONG-ITEM: a click on a pin's silhouette
 /// near the plate's edge showed the plate's item).
@@ -7575,6 +7605,16 @@ fn assembly_update_references_moves_versions() {
     assert_eq!(mv(&mut ctx), v1, "back to V1");
     let e = try_call(&mut ctx, "assembly_update_references", json!({ "doc": tops, "version": "V9" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+    // Pin reference (live 2464): updates leave it on V1 until Unpin reference.
+    let p = call(&mut ctx, "assembly_pin_reference", json!({ "doc": tops, "instance": inst }));
+    assert_eq!(p["pinned"], true, "{p}");
+    let listed = call(&mut ctx, "assembly_list", json!({ "doc": tops }))["instances"].as_array().unwrap().iter().find(|i| i["id"] == inst).unwrap()["reference_pinned"].clone();
+    assert_eq!(listed, true);
+    let u = call(&mut ctx, "assembly_update_references", json!({ "doc": tops }));
+    assert_eq!((u["updated"].clone(), mv(&mut ctx)), (json!(0), v1.clone()), "pinned stays on V1: {u}");
+    call(&mut ctx, "assembly_pin_reference", json!({ "doc": tops, "instance": inst, "pinned": false }));
+    let u = call(&mut ctx, "assembly_update_references", json!({ "doc": tops }));
+    assert_eq!(u["updated"], 1, "unpinned, it moves: {u}");
 }
 
 /// ASM-STD-AUTOSIZE-HOLE (live 2204): Auto-size into a tapped Hole sizes by its thread: M6 coarse (Ø5 tap drill)

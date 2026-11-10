@@ -305,6 +305,9 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
                 "dof": r.solved.instance_dof.get(&i.id),
             });
             instance_extras(&mut v, i);
+            if a.pinned_references.contains(&i.id) {
+                v["reference_pinned"] = json!(true);
+            }
             v
         })
         .collect();

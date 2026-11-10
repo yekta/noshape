@@ -674,10 +674,16 @@ impl Render for MetaForm {
                     form = form.child(group(label(*l, false), self.field(l, st, cx)));
                 }
             }
-            form = form.child(check_row("meta-nrm", "Not revision managed", self.not_revision_managed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.not_revision_managed = !this.not_revision_managed;
-                this.changed(cx);
-            })));
+            form = form.child(if self.read_only.contains(&"Not revision managed") {
+                readonly_check("Not revision managed", self.not_revision_managed)
+            } else {
+                check_row("meta-nrm", "Not revision managed", self.not_revision_managed)
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.not_revision_managed = !this.not_revision_managed;
+                        this.changed(cx);
+                    }))
+                    .into_any_element()
+            });
             if let Some(info) = self.drawing_info.clone() {
                 for (l, v) in DRAWING_INFO.iter().zip(info) {
                     form = form.child(group(label(*l, false), gray_box(v, false).into_any_element()));
@@ -718,14 +724,19 @@ impl Render for MetaForm {
                             .child(svg().path(crate::assets::icon_path("function")).size(px(14.)).text_color(rgb(0x333333)))
                             .when(self.mass_failed, |d| d.child(div().text_size(px(14.)).text_color(rgb(0xaa252d)).child("Computation failed")))
                             .child(div().w(px(10.)))
-                            .child(
-                                check_row("meta-mass", "Override", mass_on).font_weight(FontWeight::NORMAL).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    this.mass_on = !this.mass_on;
-                                    let on = this.mass_on;
-                                    this.mass.update(cx, |s, cx| s.set_disabled(!on, cx));
-                                    this.changed(cx);
-                                })),
-                            ),
+                            .child(if self.read_only.contains(&"Override") {
+                                readonly_check("Override", mass_on)
+                            } else {
+                                check_row("meta-mass", "Override", mass_on)
+                                    .font_weight(FontWeight::NORMAL)
+                                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                        this.mass_on = !this.mass_on;
+                                        let on = this.mass_on;
+                                        this.mass.update(cx, |s, cx| s.set_disabled(!on, cx));
+                                        this.changed(cx);
+                                    }))
+                                    .into_any_element()
+                            }),
                     )
                     // Live (assembly/132): one 34 px group, the grey field
                     // (#ccc outline, square right corners) running into the

@@ -126,9 +126,39 @@ pub fn external_snapshot(path: &std::path::Path, mv: noshape_store::Microversion
         return Ok(d.clone());
     }
     let store = noshape_store::Document::open_read_only(path)?;
-    let doc = Arc::new(Document::from_blobs(&store.read_all(mv)?)?);
+    let mut doc = Document::from_blobs(&store.read_all(mv)?)?;
+    for (tab, body, props) in version_part_properties(&store, mv) {
+        if let Some(TabContent::PartStudio(ps)) = doc.tabs.iter_mut().find(|t| t.id.to_string() == tab).map(|t| &mut t.content) {
+            ps.part_properties.insert(body, props);
+        }
+    }
+    let doc = Arc::new(doc);
     SNAPSHOTS.lock().insert(key, doc.clone());
     Ok(doc)
+}
+
+/// A version's part metadata edited from another document (live 2464: Properties… on an instance of a part at a
+/// version saves into that version, not the source's workspace): kept outside the version's (immutable) state, in the
+/// source file's unversioned metadata, and laid over the version whenever it is read.
+type VersionPartProps = Vec<(String, noshape_model::reference::BodyId, noshape_model::partstudio::PartProperties)>;
+
+fn version_part_props_key(mv: noshape_store::MicroversionId) -> String {
+    format!("version-part-properties/{mv}")
+}
+
+fn version_part_properties(store: &noshape_store::Document, mv: noshape_store::MicroversionId) -> VersionPartProps {
+    store.get_meta(&version_part_props_key(mv)).ok().flatten().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+}
+
+/// Saves a part's metadata at the version `r` pins (its whole Properties, as the dialog's Save writes them).
+pub fn save_version_part_properties(r: &ExternalRef, body: &noshape_model::reference::BodyId, props: noshape_model::partstudio::PartProperties) -> anyhow::Result<()> {
+    let mut store = noshape_store::Document::open(&r.path)?;
+    let mut all = version_part_properties(&store, r.microversion);
+    all.retain(|(tab, b, _)| !(*tab == r.tab && b == body));
+    all.push((r.tab.clone(), body.clone(), props));
+    store.set_meta(&version_part_props_key(r.microversion), Some(&serde_json::to_vec(&all)?))?;
+    SNAPSHOTS.lock().remove(&(r.path.clone(), r.microversion));
+    Ok(())
 }
 
 /// Document files by document id ([`document_id`]), found by scanning the

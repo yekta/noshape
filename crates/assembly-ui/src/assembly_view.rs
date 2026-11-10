@@ -3639,7 +3639,9 @@ impl AssemblyView {
         // other document", a blue badge once the other document has a newer version.
         let own_path = self.doc.read(cx).session.path.clone();
         let versioned = ext_key.as_ref().and_then(|k| crate::derived::ExternalRef::parse(k)).map(|r| r.path == own_path);
-        let newer_badge = update.is_some() && versioned == Some(false);
+        // Pinned (live 2464): the pinned icon, "Pinned versioned part from other document", no newer badge.
+        let pinned = is_top && self.assembly(cx).is_some_and(|a| a.pinned_references.contains(&top));
+        let newer_badge = update.is_some() && versioned == Some(false) && !pinned;
         let dof = if is_top { node.and_then(|n| n.dof) } else { None };
         // An open Group dialog's instances are highlighted (live 1681).
         let selected = is_top && (self.selected.contains(&top) || self.chip_mc_owner() == Some(top) || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&top)));
@@ -3744,7 +3746,9 @@ impl AssemblyView {
             .when_some(versioned.filter(|_| is_top), |d, own| {
                 // Another document's Assembly (live 1742 (B)): "Versioned assembly from other document".
                 let noun = if node.is_some_and(|n| n.linked.is_some()) { "assembly" } else { "part" };
-                let tip: SharedString = if newer_badge {
+                let tip: SharedString = if pinned {
+                    format!("Pinned versioned {noun} from other document")
+                } else if newer_badge {
                     format!("Versioned {noun} from other document with newer version")
                 } else if own {
                     format!("Versioned {noun} from current document")
@@ -3756,7 +3760,7 @@ impl AssemblyView {
                     div()
                         .id(SharedString::from(format!("ver-{}", top.0)))
                         .flex_none()
-                        .child(crate::assets::icon(&icon_path(if newer_badge { "inserted-version-update" } else { "list-versioned" }), 14., cx))
+                        .child(crate::assets::icon(&icon_path(if pinned { "inserted-version-pin" } else if newer_badge { "inserted-version-update" } else { "list-versioned" }), 14., cx))
                         .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(w, cx)),
                 )
             })

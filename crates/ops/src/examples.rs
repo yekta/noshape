@@ -246,6 +246,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("assembly_reorder", &[r##"{"feature": "Revolute 2", "before": "Fastened 1"}"##]),
     ("assembly_mate_value", &[r##"{"mate": "Revolute 1", "dof": "rz", "value": "30 deg"}"##]),
     ("assembly_properties", &[r##"{}"##, r##"{"part_number": "FR-1", "bom_behavior": "Show Assembly only"}"##]),
+    ("assembly_pin_reference", &[r##"{"instance": "Part 1 <1>"}"##, r##"{"instance": "Part 1 <1>", "pinned": false}"##]),
+    ("assembly_linked_part_properties", &[r##"{"instance": "Part 1 <1>"}"##, r##"{"instance": "Part 1 <1>", "part_number": "BRK-200", "vendor": "Acme"}"##]),
     ("assembly_exploded_view", &[r##"{"action": "add", "name": "Exploded 1"}"##, r##"{"action": "move", "view": "Exploded 1", "step": 3, "to": 1}"##]),
     ("assembly_explode_step", &[r##"{"view": "Exploded 1", "instances": ["Cover <1>"], "direction": {"instance": "Cover <1>", "entity": "face:…"}, "distance": "40 mm"}"##]),
     ("assembly_move_to_subassembly", &[r##"{"instances": ["Wheel <1>", "Axle <1>"]}"##]),
