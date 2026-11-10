@@ -3596,3 +3596,20 @@ fn center_of_mass_is_worked_out_off_the_click(cx: &mut TestAppContext) {
     draw(cx, window);
     cx.update(|cx| assert!(view.read(cx).ui.com.is_none(), "taken back"));
 }
+
+/// The curvature map (lead 11-10): its colours over every mesh are worked out off the UI thread; the plain shading
+/// shows until they arrive, then the scene takes them.
+#[gpui::test]
+fn the_curvature_map_is_worked_out_off_the_frame(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "curvature-off-thread");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_analysis(crate::part_studio::analysis::Analysis::Curvature, w, cx))).unwrap();
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.ui.curvature_job.is_some() && v.opts.vertex_colors.is_none(), "plain shading while it is worked out");
+    });
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.ui.curvature_job.is_none() && v.opts.vertex_colors.is_some(), "the curvature colours in the scene");
+    });
+}

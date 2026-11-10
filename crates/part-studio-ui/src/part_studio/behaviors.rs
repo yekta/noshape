@@ -356,6 +356,8 @@ pub struct UiState {
     pub analysis: Option<super::analysis::Analysis>,
     /// Per-vertex colors for the current display: (key, colors).
     pub vcolor_cache: Option<((usize, String), Option<super::appearance::VertexColors>)>,
+    /// The curvature map's colours being worked out off the UI thread, for that key.
+    pub curvature_job: Option<((usize, String), Task<()>)>,
     /// View in high quality (Shift+R).
     pub high_quality: bool,
     /// View in high quality was on in this session: Onshape keeps the Very
@@ -757,6 +759,7 @@ impl UiState {
             appearance_hover: Vec::new(),
             analysis: None,
             vcolor_cache: None,
+            curvature_job: None,
             high_quality: false,
             high_quality_seen: false,
             create_selection: None,

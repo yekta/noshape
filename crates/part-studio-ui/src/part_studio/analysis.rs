@@ -76,11 +76,13 @@ pub fn analysis_colors(b: &BodyDisplay, a: &Analysis) -> Vec<[u8; 4]> {
 /// the bar's outside colors); vertices where nothing curves keep the part's
 /// color. Returns the colors and the data range (display units).
 /// Per-vertex colors of each body.
+/// The curvature map's choices that make its colours: what it shows, its palette, the bar's bounds.
+pub type CurvatureLook = (noshape_model::analysis::CurvatureKind, usize, [Option<f64>; 2]);
+
 pub type BodyColors = std::collections::HashMap<noshape_model::BodyId, std::sync::Arc<Vec<[u8; 4]>>>;
 
-pub fn curvature_colors(bodies: &[BodyDisplay], map: Option<&super::thickness::CurvatureMap>, meters_per_unit: f64) -> (BodyColors, Option<(f64, f64)>) {
+pub fn curvature_colors(bodies: &[BodyDisplay], (kind, palette, bounds): CurvatureLook, meters_per_unit: f64) -> (BodyColors, Option<(f64, f64)>) {
     use super::thickness::{CURVATURE_PALETTES, palette_color_in};
-    let kind = map.map(|m| m.kind).unwrap_or_default();
     let values: Vec<(&BodyDisplay, Vec<Option<f64>>)> = bodies
         .iter()
         .filter(|b| !b.hidden)
@@ -95,8 +97,6 @@ pub fn curvature_colors(bodies: &[BodyDisplay], map: Option<&super::thickness::C
         hi = hi.max(*v);
     }
     let range = (lo <= hi).then_some((lo, hi));
-    let bounds = map.map(|m| m.bar.bounds).unwrap_or([None; 2]);
-    let palette = map.map(|m| m.bar.palette).unwrap_or(0);
     let (blo, bhi) = (bounds[0].unwrap_or(lo), bounds[1].unwrap_or(hi));
     let rgba = |c: u32| [(c >> 16) as u8, (c >> 8) as u8, c as u8, 255];
     let colors = values

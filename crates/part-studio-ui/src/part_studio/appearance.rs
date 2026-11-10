@@ -173,7 +173,7 @@ impl PartStudioView {
 
     /// Per-vertex colors for the scene: an active analysis map, otherwise
     /// face/feature appearances. Cached per display and inputs.
-    pub(super) fn vertex_colors(&mut self, cx: &App) -> Option<VertexColors> {
+    pub(super) fn vertex_colors(&mut self, cx: &mut Context<Self>) -> Option<VertexColors> {
         let appearances = self.studio(cx).map(|s| s.appearances.clone()).unwrap_or_default();
         let own: std::collections::HashSet<FeatureId> = self.studio(cx).map(|s| s.features.iter().map(|f| f.id).collect()).unwrap_or_default();
         let curvature = self.ui.curvature_map.as_ref().map(|c| (c.kind, c.bar.palette, c.bar.bounds));
@@ -185,15 +185,30 @@ impl PartStudioView {
         }
         let mut map: HashMap<BodyId, Arc<Vec<[u8; 4]>>> = HashMap::new();
         if matches!(self.ui.analysis, Some(super::analysis::Analysis::Curvature)) {
-            let m = self.doc.read(cx).session.doc.settings.units.length.meters();
-            let (colors, range) = super::analysis::curvature_colors(&self.display.bodies, self.ui.curvature_map.as_ref(), m);
-            if let Some(c) = &mut self.ui.curvature_map {
-                c.range = range;
+            // Worked out off the UI thread over every mesh (big parts take seconds): the plain shading until then.
+            if self.ui.curvature_job.as_ref().is_some_and(|(k, _)| *k == key) {
+                return None;
             }
-            map = colors;
-            let v = (!map.is_empty()).then(|| Arc::new(map));
-            self.ui.vcolor_cache = Some((key, v.clone()));
-            return v;
+            let m = self.doc.read(cx).session.doc.settings.units.length.meters();
+            let look = curvature.unwrap_or_default();
+            let (display, k) = (self.display.clone(), key.clone());
+            let task = cx.spawn(async move |this, cx| {
+                let (colors, range) = cx.background_spawn(async move { super::analysis::curvature_colors(&display.bodies, look, m) }).await;
+                let _ = this.update(cx, |this, cx| {
+                    if this.ui.curvature_job.as_ref().is_none_or(|(j, _)| *j != k) {
+                        return;
+                    }
+                    this.ui.curvature_job = None;
+                    if let Some(c) = &mut this.ui.curvature_map {
+                        c.range = range;
+                    }
+                    this.ui.vcolor_cache = Some((k, (!colors.is_empty()).then(|| Arc::new(colors))));
+                    this.rebuild_scene(cx);
+                    cx.notify();
+                });
+            });
+            self.ui.curvature_job = Some((key, task));
+            return None;
         }
         for b in self.display.bodies.iter().filter(|b| !b.hidden) {
             let colors = match &self.ui.analysis {
