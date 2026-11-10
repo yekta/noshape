@@ -846,6 +846,7 @@ rust::Vec<double>        face_d2_at_uvs(const OcShape& face, rust::Slice<const d
 P3    edge_point_at(const OcShape& edge, double t);
 P3    edge_tangent_at(const OcShape& edge, double t);
 rust::Vec<double> edge_derivatives_at(const OcShape& edge, double t);
+rust::Vec<double> edge_helix_fit(const OcShape& edge);
 P3    vertex_point(const OcShape& v);
 rust::Vec<double>        bounding_box(const OcShape& s, bool optimal);
 PlaneQ                   find_plane(const OcShape& s, double tolerance);

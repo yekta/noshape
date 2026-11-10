@@ -155,6 +155,18 @@ pub enum Surface {
     Other,
 }
 
+/// See [`Shape::helix_fit`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HelixFit {
+    pub origin: DVec3,
+    pub axis: DVec3,
+    pub x: DVec3,
+    pub radius: f64,
+    pub pitch: f64,
+    pub height: f64,
+    pub left_handed: bool,
+}
+
 /// Geometry of an edge's underlying curve.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Curve {
@@ -434,6 +446,14 @@ impl Shape {
         let v = ck(ffi::edge_derivatives_at(self.raw(), t))?;
         let d = |i: usize| DVec3::new(v[3 * i], v[3 * i + 1], v[3 * i + 2]);
         Ok([d(0), d(1), d(2), d(3)])
+    }
+
+    /// The helix an edge winds along (Onshape's 9° arcs or an exact one), fitted: its start on the axis, the axis the
+    /// way it rises, the start's direction from it, radius, pitch, height and whether it turns left about the axis.
+    pub fn helix_fit(&self) -> Result<Option<HelixFit>> {
+        let v = ck(ffi::edge_helix_fit(self.raw()))?;
+        let d = |i: usize| DVec3::new(v[i], v[i + 1], v[i + 2]);
+        Ok((v.len() == 13).then(|| HelixFit { origin: d(0), axis: d(3), x: d(6), radius: v[9], pitch: v[10], height: v[11], left_handed: v[12] > 0.5 }))
     }
 
     /// True if an edge's start and end vertex are the same (closed curve);

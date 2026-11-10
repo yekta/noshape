@@ -1600,18 +1600,10 @@ std::unique_ptr<OcShape> make_bspline_3d(rust::Slice<const double> poles,
   return wrap(BRepBuilderAPI_MakeEdge(c).Edge());
 }
 
-std::unique_ptr<OcShape> make_helix(const PlaneF& frame, double radius, double pitch,
-                                    double height, bool left_handed, double taper_angle)
+// An exact helix: a sloped line on a cylinder (or cone, `taper_angle`) round `ax`'s Z, its 3D curve fitted to it
+// (degree 8). The swept path stands in for Onshape's helix (make_helix's 9° arcs, 8 nm off it) in a sweep.
+TopoDS_Edge helix_on_surface(const gp_Ax3& ax, double radius, double pitch, double height, bool left_handed, double taper_angle)
 {
-  if (!(radius > 1e-9))
-    fail_invalid("helix radius must be positive");
-  if (!(std::abs(pitch) > 1e-9))
-    fail_invalid("helix pitch must be non-zero");
-  if (!(height > 1e-9))
-    fail_invalid("helix height must be positive");
-  if (!(std::abs(taper_angle) < M_PI / 2.0 - 1e-6))
-    fail_invalid("helix taper angle must be within (-90, 90) degrees");
-  gp_Ax3                    ax    = to_ax3(frame);
   const double              turns = height / std::abs(pitch);
   occ::handle<Geom_Surface> surf;
   double                    dv; // v advance per turn
@@ -1639,10 +1631,68 @@ std::unique_ptr<OcShape> make_helix(const PlaneF& frame, double radius, double p
   // wobble across the cylinder and break the boolean that adds it.
   if (!BRepLib::BuildCurves3d(e, std::max(1e-12, radius * 1e-8), GeomAbs_C2, 8, nseg))
     fail_op("helix 3D curve approximation failed");
+  return e;
+}
+
+std::unique_ptr<OcShape> make_helix(const PlaneF& frame, double radius, double pitch,
+                                    double height, bool left_handed, double taper_angle)
+{
+  if (!(radius > 1e-9))
+    fail_invalid("helix radius must be positive");
+  if (!(std::abs(pitch) > 1e-9))
+    fail_invalid("helix pitch must be non-zero");
+  if (!(height > 1e-9))
+    fail_invalid("helix height must be positive");
+  if (!(std::abs(taper_angle) < M_PI / 2.0 - 1e-6))
+    fail_invalid("helix taper angle must be within (-90, 90) degrees");
+  gp_Ax3                    ax    = to_ax3(frame);
+  const double              turns = height / std::abs(pitch);
+  // (A helix of one arc, under 1/40 turn (a helical gear's tooth), keeps the exact construction: one planar arc lies
+  // on two mirrored helices, so a sweep along it can't be told which, and its own frame twists the tooth.)
+  if (std::abs(taper_angle) < 1e-12 && turns > 1.0 / 40 + 1e-9)
+  {
+    // Onshape's helix (Parasolid's, live 2440): a rational quadratic arc every 9° (40 a turn), weights cos 4.5° at the
+    // arcs' middles, the control points rising evenly; its tangents, length and ends are live's (the fan's Helix 1:
+    // start tangent 0.0860594, the exact helix's 0.086236).
+    const int    n   = std::max(1, (int)std::ceil(turns * 40.0 - 1e-9));
+    const double dth = (left_handed ? -2.0 : 2.0) * M_PI * turns / n;
+    const double dz  = height / n;
+    const double rm  = radius / std::cos(dth / 2.0);
+    const gp_Pnt o   = ax.Location();
+    const gp_Dir X = ax.XDirection(), Y = ax.YDirection(), Z = ax.Direction();
+    auto at = [&](double rr, double a, double h) {
+      return gp_Pnt(o.XYZ() + X.XYZ() * (rr * std::cos(a)) + Y.XYZ() * (rr * std::sin(a)) + Z.XYZ() * h);
+    };
+    NCollection_Array1<gp_Pnt> P(1, 2 * n + 1);
+    NCollection_Array1<double> W(1, 2 * n + 1);
+    NCollection_Array1<double> K(1, n + 1);
+    NCollection_Array1<int>    M(1, n + 1);
+    for (int k = 0; k <= n; ++k)
+    {
+      P(2 * k + 1) = at(radius, k * dth, k * dz);
+      W(2 * k + 1) = 1.0;
+      K(k + 1)     = (double)k / n;
+      M(k + 1)     = (k == 0 || k == n) ? 3 : 2;
+      if (k < n)
+      {
+        P(2 * k + 2) = at(rm, (k + 0.5) * dth, (k + 0.5) * dz);
+        W(2 * k + 2) = std::cos(dth / 2.0);
+      }
+    }
+    occ::handle<Geom_BSplineCurve> c = new Geom_BSplineCurve(P, W, K, M, 2);
+    BRepBuilderAPI_MakeEdge        mk(c);
+    if (!mk.IsDone())
+      fail_op("could not build helix edge");
+    BRep_Builder b;
+    TopoDS_Wire  w;
+    b.MakeWire(w);
+    b.Add(w, mk.Edge());
+    return wrap(w);
+  }
   BRep_Builder b;
   TopoDS_Wire  w;
   b.MakeWire(w);
-  b.Add(w, e);
+  b.Add(w, helix_on_surface(ax, radius, pitch, height, left_handed, taper_angle));
   return wrap(w);
 }
 

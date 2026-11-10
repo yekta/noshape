@@ -1114,8 +1114,156 @@ OpOut op_pipe(const OcShape& profile, const OcShape& spine)
   return hb.finish();
 }
 
+// Onshape's helix curve by its form (make_helix's): degree 2, rational, double knots between its 9° arcs, weights 1
+// at the arcs' ends and one weight below 1 in their middles. A helix too short to fit (a helical gear's tooth: a
+// small part of a turn, one arc) is known by it.
+static bool helix_arcs(const TopoDS_Edge& e)
+{
+  double                          f, l;
+  const occ::handle<Geom_Curve>   c = BRep_Tool::Curve(e, f, l);
+  occ::handle<Geom_BSplineCurve>  b = occ::down_cast<Geom_BSplineCurve>(c);
+  if (b.IsNull())
+    if (auto t = occ::down_cast<Geom_TrimmedCurve>(c))
+      b = occ::down_cast<Geom_BSplineCurve>(t->BasisCurve());
+  if (b.IsNull() || b->Degree() != 2 || !b->IsRational() || b->NbPoles() != 2 * b->NbKnots() - 1)
+    return false;
+  for (int k = 2; k < b->NbKnots(); ++k)
+    if (b->Multiplicity(k) != 2)
+      return false;
+  const double w = b->Weight(2);
+  if (!(w < 1.0 - 1e-12))
+    return false;
+  for (int i = 1; i <= b->NbPoles(); ++i)
+    if (std::abs(b->Weight(i) - (i % 2 == 1 ? 1.0 : w)) > 1e-12)
+      return false;
+  return true;
+}
+
+// A curve that winds round one axis at one radius, rising evenly with the angle: a helix in 3D (Onshape's,
+// Parasolid's 9° rational arcs as make_helix builds a cylindrical one: 8 nm off the exact helix in height, its
+// tangent's slope varying 2.6e-4 within an arc). Its start, axis frame (Z the way it rises), radius, pitch, height
+// and turning sense, or nothing.
+struct HelixFit
+{
+  gp_Ax3 ax;
+  double radius = 0, pitch = 0, height = 0;
+  bool   left = false;
+};
+
+static std::optional<HelixFit> helix_like_edge(const TopoDS_Edge& e)
+{
+  double f, l;
+  if (BRep_Tool::Curve(e, f, l).IsNull())
+    return std::nullopt;
+  BRepAdaptor_Curve c(e);
+  // Sampled at a B-spline's knots when it has enough or is Onshape's helix (the arcs' ends, where the tangent's
+  // slope is the helix's).
+  std::vector<double> at;
+  if (c.GetType() == GeomAbs_BSplineCurve)
+  {
+    const occ::handle<Geom_BSplineCurve> b  = c.BSpline();
+    const int                            nk = b->NbKnots();
+    // (Every knot, up to 4000 spans: 9° apart, never half a turn, as the turned angle is unwrapped.)
+    if (nk >= 25 || (nk >= 3 && helix_arcs(e)))
+    {
+      const int m = std::min(nk - 1, 4000);
+      for (int i = 0; i <= m; ++i)
+        at.push_back(b->Knot(1 + (int)std::lround((double)(nk - 1) * i / m)));
+    }
+  }
+  if (at.empty())
+    for (int i = 0; i <= 96; ++i)
+      at.push_back(f + (l - f) * i / 96);
+  const int           n = (int)at.size() - 1;
+  std::vector<gp_Pnt> p(n + 1);
+  std::vector<gp_Vec> t(n + 1);
+  for (int i = 0; i <= n; ++i)
+  {
+    c.D1(at[(size_t)i], p[i], t[i]);
+    if (t[i].Magnitude() < 1e-12)
+      return std::nullopt;
+    t[i].Normalize();
+  }
+  // The axis: the tangents make one angle with it (three of them, apart).
+  if (n < 2)
+    return std::nullopt;
+  const int i1 = std::max(1, n / 3), i2 = std::max(i1 + 1, 2 * n / 3);
+  gp_Vec    axis = (t[i1] - t[0]).Crossed(t[i2] - t[0]);
+  if (axis.Magnitude() < 1e-12)
+    return std::nullopt;
+  axis.Normalize();
+  const double c0 = t[0].Dot(axis);
+  if (std::abs(c0) < 1e-9 || std::abs(c0) > 1 - 1e-9)
+    return std::nullopt;
+  for (const gp_Vec& v : t)
+    if (std::abs(v.Dot(axis) - c0) > 1e-3)
+      return std::nullopt;
+  // The centre: the points' projections across the axis lie on one circle.
+  auto flat = [&](const gp_Pnt& q) { return gp_Vec(q.XYZ()) - axis * gp_Vec(q.XYZ()).Dot(axis); };
+  const gp_Vec a = flat(p[0]), b = flat(p[i1]), cc = flat(p[i2]);
+  const gp_Vec ab = b - a, ac = cc - a, wv = ab.Crossed(ac);
+  if (wv.SquareMagnitude() < 1e-30)
+    return std::nullopt;
+  const gp_Vec centre = a + (wv.Crossed(ab) * ac.SquareMagnitude() + ac.Crossed(wv) * ab.SquareMagnitude()) / (2 * wv.SquareMagnitude());
+  const double r = (a - centre).Magnitude();
+  for (const gp_Pnt& q : p)
+    if (std::abs((flat(q) - centre).Magnitude() - r) > 1e-6 * std::max(r, 1e-3))
+      return std::nullopt;
+  // Height linear in the turned angle.
+  const gp_Vec e1 = (a - centre) / r, e2 = axis.Crossed(e1);
+  auto angle = [&](const gp_Pnt& q) {
+    const gp_Vec d = flat(q) - centre;
+    return std::atan2(d.Dot(e2), d.Dot(e1));
+  };
+  std::vector<double> phi{0.0};
+  for (int i = 1; i <= n; ++i)
+  {
+    double d = angle(p[i]) - angle(p[i - 1]);
+    d -= std::round(d / (2 * M_PI)) * 2 * M_PI;
+    phi.push_back(phi.back() + d);
+  }
+  if (std::abs(phi.back()) < 1e-9)
+    return std::nullopt;
+  const double h0 = gp_Vec(p[0].XYZ()).Dot(axis), rise = (gp_Vec(p[n].XYZ()).Dot(axis) - h0) / phi.back();
+  const double tol = 1e-6 * std::max(r, 1e-3) + 1e-5 * std::abs(rise) * 2 * M_PI;
+  for (int i = 0; i <= n; ++i)
+    if (std::abs(gp_Vec(p[i].XYZ()).Dot(axis) - h0 - rise * phi[i]) > tol)
+      return std::nullopt;
+  if (std::abs(rise) < 1e-12)
+    return std::nullopt;
+  // Z the way it rises; turning about it left (clockwise seen from its tip) or right.
+  const bool   up = rise * phi.back() > 0;
+  const gp_Dir Z(up ? axis : -axis);
+  const gp_Pnt o(centre.XYZ() + axis.XYZ() * h0);
+  HelixFit h;
+  h.ax     = gp_Ax3(o, Z, gp_Dir(e1));
+  h.radius = r;
+  h.pitch  = std::abs(rise) * 2 * M_PI;
+  h.height = std::abs(rise * phi.back());
+  h.left   = (up ? phi.back() : -phi.back()) < 0;
+  return h;
+}
+
+// [`helix_like_edge`] for Rust: start (on the axis), Z, X, radius, pitch, height, left (1 / 0); empty for no helix.
+rust::Vec<double> edge_helix_fit(const OcShape& es)
+{
+  rust::Vec<double> r;
+  const auto        h = helix_like_edge(as_edge(es.shape, "shape"));
+  if (!h)
+    return r;
+  for (const gp_XYZ& x : {h->ax.Location().XYZ(), h->ax.Direction().XYZ(), h->ax.XDirection().XYZ()})
+  {
+    r.push_back(x.X());
+    r.push_back(x.Y());
+    r.push_back(x.Z());
+  }
+  for (double v : {h->radius, h->pitch, h->height, h->left ? 1.0 : 0.0})
+    r.push_back(v);
+  return r;
+}
+
 // Whether every edge of the path is a helix: a straight, sloped line on a
-// cylindrical or conical surface (as make_helix builds it).
+// cylindrical or conical surface (as make_helix builds a conical one), or a helix in 3D (a cylindrical one).
 static bool is_helix_path(const TopoDS_Wire& w)
 {
   bool any = false;
@@ -1126,6 +1274,11 @@ static bool is_helix_path(const TopoDS_Wire& w)
     TopLoc_Location           loc;
     double                    f, l;
     BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Current()), pc, sf, loc, f, l);
+    if ((pc.IsNull() || sf.IsNull()) && (helix_arcs(TopoDS::Edge(e.Current())) || helix_like_edge(TopoDS::Edge(e.Current()))))
+    {
+      any = true;
+      continue;
+    }
     if (pc.IsNull() || sf.IsNull())
       return false;
     occ::handle<Geom2d_Line> line = occ::down_cast<Geom2d_Line>(pc);
@@ -1149,6 +1302,31 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
   // keeps its angle to the axis and ends as it started (a knurl's grooves end
   // flush with the part, live 224 faces). OCCT's corrected Frenet tilts it.
   const int mode = o.mode == 0 && is_helix_path(sw) ? 1 : o.mode;
+  // Along Onshape's helix (make_helix's 380-odd 9° arcs), the exact helix it lies 8 nm from: OCCT's sweep along
+  // the arcs built a far heavier surface and its thread's Boolean failed (kernel thread tests: 6 s -> 40 s, no solid).
+  // The names come from the profile's history and the caps, not the path's.
+  if (TopExp_Explorer one(sw, TopAbs_EDGE); one.More())
+  {
+    const TopoDS_Edge e0 = TopoDS::Edge(one.Current());
+    one.Next();
+    occ::handle<Geom2d_Curve> pc;
+    occ::handle<Geom_Surface> sf;
+    TopLoc_Location           ploc;
+    double                    pf, pl;
+    BRep_Tool::CurveOnSurface(e0, pc, sf, ploc, pf, pl);
+    if (!one.More() && pc.IsNull())
+      if (const auto h = helix_like_edge(e0))
+      {
+        // (Travelled as the path's edge is: reversed in its wire, from its end.)
+        TopoDS_Edge ex = helix_on_surface(h->ax, h->radius, h->pitch, h->height, h->left, 0.0);
+        ex.Orientation(e0.Orientation());
+        BRep_Builder b;
+        TopoDS_Wire  w;
+        b.MakeWire(w);
+        b.Add(w, ex);
+        sw = w;
+      }
+  }
 
   // A single face profile with holes: use BRepOffsetAPI_MakePipe (supports faces).
   if (profiles.items.size() == 1 && profiles.items[0].ShapeType() == TopAbs_FACE &&

@@ -42,3 +42,21 @@ fn helical_teeth_add_to_the_core() {
     let expected = std::f64::consts::PI * 4.7f64.powi(2) * 20.0 + 20.0 * std::f64::consts::TAU * 0.723;
     assert!((v - expected).abs() < 0.01, "{v} vs {expected}");
 }
+
+/// Onshape's helix is Parasolid's curve (live 2440, a Ø6 helix of 9.5 turns over 15.5 mm, std helix() read with
+/// /featurescript): a rational quadratic arc every 9°. Its start tangent's slope and its length are live's.
+#[test]
+fn a_helix_is_onshapes_curve() {
+    let frame = Plane::from_normal(DVec3::ZERO, DVec3::Z);
+    let helix = make_helix(&frame, 0.003, 0.0155 / 9.5, 0.0155, false, 0.0).unwrap();
+    let edge = helix.edges().into_iter().next().unwrap();
+    let start = edge.tangent_at(0.0).unwrap();
+    assert!((start.z - 0.08605943162649814).abs() < 1e-12, "start tangent's slope {}", start.z);
+    let end = edge.tangent_at(1.0).unwrap();
+    assert!((end.z - 0.08605943162649814).abs() < 1e-12, "end tangent's slope {}", end.z);
+    let length = edge.length().unwrap();
+    assert!((length - 0.179740319485531).abs() < 1e-6 * 0.179740319485531, "length {} mm", length * 1e3);
+    // 380 arcs: 761 control points, as live's.
+    let Ok(Curve::BSpline { degree, nb_poles, rational, .. }) = edge.edge_curve() else { panic!("{:?}", edge.edge_curve()) };
+    assert_eq!((degree, nb_poles, rational), (2, 761, true));
+}

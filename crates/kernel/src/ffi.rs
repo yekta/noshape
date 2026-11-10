@@ -523,6 +523,7 @@ pub(crate) mod ffi {
         fn edge_point_at(edge: &OcShape, t: f64) -> Result<P3>;
         fn edge_tangent_at(edge: &OcShape, t: f64) -> Result<P3>;
         fn edge_derivatives_at(edge: &OcShape, t: f64) -> Result<Vec<f64>>;
+        fn edge_helix_fit(edge: &OcShape) -> Result<Vec<f64>>;
         fn vertex_point(v: &OcShape) -> Result<P3>;
         fn bounding_box(s: &OcShape, optimal: bool) -> Result<Vec<f64>>;
         fn find_plane(s: &OcShape, tolerance: f64) -> Result<PlaneQ>;

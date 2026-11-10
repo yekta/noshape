@@ -937,7 +937,8 @@ fn boundary_routing_edit_isoparametric() {
         p.set("axis", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
         p.set("startRadius", expr("10 mm"));
         p.set("height", expr("20 mm"));
-        p.set("revolutions", expr("2"));
+        // (One turn: Onshape's helix has 80 control points a turn, and Edit curve takes 100 at most.)
+        p.set("revolutions", expr("1"));
     });
     s.add("editCurve", move |p| {
         p.set("wire", ParamValue::Query(vec![Reference::Body(BodyId { feature: helix, index: 0 })]));

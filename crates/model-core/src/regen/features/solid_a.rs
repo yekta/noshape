@@ -88,7 +88,12 @@ fn may_self_intersect(profile: &Shape, path: &Shape, tool: &Shape, scale: f64) -
         (a > 1e-12).then(|| w[0].0.distance(w[1].0) / a)
     }).fold(f64::INFINITY, f64::min);
     let normal = profile.find_plane(1e-7).ok().flatten().map(|p| p.unit_normal());
-    if normal.and_then(|n| helical_sweep_clear(&edge_pts, n, &path_pts, tool)).is_some() {
+    // (A path of one helix edge: its axis and centre as the kernel fits them, at its arcs' ends.)
+    let fit = match path.edges().as_slice() {
+        [e] => e.helix_fit().ok().flatten(),
+        _ => None,
+    };
+    if normal.and_then(|n| helical_sweep_clear(&edge_pts, n, &path_pts, fit, tool)).is_some() {
         return false;
     }
     if reach.is_nan() || reach >= 0.9 * tightest {
@@ -124,17 +129,22 @@ fn may_self_intersect(profile: &Shape, path: &Shape, tool: &Shape, scale: f64) -
 /// number of pitches, or where the profile's own (r, w) image folds. Some where neither can happen: the profile within
 /// a quarter turn, its w less than a pitch apart, crossed by the screw everywhere the same way and its (r, w) outline
 /// not crossing itself. None when the path isn't a helix or the profile isn't so (the general test decides).
-fn helical_sweep_clear(edges: &[Vec<DVec3>], normal: DVec3, path: &[(DVec3, DVec3, f64)], tool: &Shape) -> Option<()> {
+fn helical_sweep_clear(edges: &[Vec<DVec3>], normal: DVec3, path: &[(DVec3, DVec3, f64)], fit: Option<k::HelixFit>, tool: &Shape) -> Option<()> {
     let profile: Vec<DVec3> = edges.iter().flatten().copied().collect();
     let n = path.len();
     if n < 8 {
         return None;
     }
     let t = |i: usize| path[i].1;
-    // The axis: the tangents of a helix make one angle with it.
-    let axis = (t(n / 3) - t(0)).cross(t(2 * n / 3) - t(0)).try_normalize()?;
+    // The axis: the tangents of a helix make one angle with it (Onshape's helix: as fitted at its arcs' ends, whose
+    // tangents mid-arc tilt this estimate 1e-4).
+    let axis = match fit {
+        Some(f) => f.axis.try_normalize()?,
+        None => (t(n / 3) - t(0)).cross(t(2 * n / 3) - t(0)).try_normalize()?,
+    };
     let cos = t(0).dot(axis);
-    if path.iter().any(|q| (q.1.dot(axis) - cos).abs() > 1e-6) {
+    // (Onshape's helix, Parasolid's 9° rational arcs: its tangent's slope varies 2.6e-4 within an arc.)
+    if path.iter().any(|q| (q.1.dot(axis) - cos).abs() > 1e-3) {
         return None;
     }
     // The centre: the points' projections across the axis lie on a circle.
@@ -145,7 +155,10 @@ fn helical_sweep_clear(edges: &[Vec<DVec3>], normal: DVec3, path: &[(DVec3, DVec
     if w.length_squared() < 1e-30 {
         return None;
     }
-    let centre = a + (w.cross(ab) * ac.length_squared() + ac.cross(w) * ab.length_squared()) / (2.0 * w.length_squared());
+    let centre = match fit {
+        Some(f) => flat(f.origin),
+        None => a + (w.cross(ab) * ac.length_squared() + ac.cross(w) * ab.length_squared()) / (2.0 * w.length_squared()),
+    };
     let r = (a - centre).length();
     let tol = 1e-6 * r.max(1e-3);
     if path.iter().any(|q| ((flat(q.0) - centre).length() - r).abs() > tol) {
@@ -170,7 +183,9 @@ fn helical_sweep_clear(edges: &[Vec<DVec3>], normal: DVec3, path: &[(DVec3, DVec
     }
     let h0 = path[0].0.dot(axis);
     let rise = (path[n - 1].0.dot(axis) - h0) / total;
-    if path.iter().zip(&phi).any(|(q, f)| (q.0.dot(axis) - h0 - rise * f).abs() > tol) {
+    // (Onshape's helix lies 8 nm off the exact one in height on a 1.63 mm pitch: a hundred-thousandth of its pitch.)
+    let tol_h = tol + 1e-5 * (rise * std::f64::consts::TAU).abs();
+    if path.iter().zip(&phi).any(|(q, f)| (q.0.dot(axis) - h0 - rise * f).abs() > tol_h) {
         return None;
     }
     let pitch = (rise * std::f64::consts::TAU).abs();

@@ -24,6 +24,29 @@ test only took profiles in a plane through the axis, so OCCT's self-intersection
 tilted profiles too: Sweep 1 0.23 s, the document 0.87 s. Your 7e7d69f2b stays; the tilt (feature 41's frame) is
 yours to finish.
 
+## 11-10 14:45 UTC: the Helix as Parasolid's curve (lead's (A)); landed 16:05 after the suite
+
+- **Curve (kernel build.cpp `make_helix`, cylindrical):** a rational quadratic arc every 9° (n = ceil(turns·40)),
+  weights cos(Δ/2) mid-arc, control points rising evenly. Criterion met: start/end tangent slope 0.08605943162649814
+  (live's, within 1e-12) and length 179.740319 mm within 1e-6 (T1 kernel thread::a_helix_is_onshapes_curve); the
+  fan's threadprofile now matches (41 -> 42/53). Conical helices stay the old exact construction (live's form
+  unknown). 179.687 mm in live.jsonl is a tessellation length (PARITY-SUITES.md).
+- **Sweeps (core.md 13:14 / 14:22):** a one-edge helix path is swept along the exact helix it lies 8 nm from
+  (`helix_like_edge` fits it at its knots; `helix_on_surface` builds it; orientation kept; Z the way it rises, sense
+  about that Z: an early version took the sign of the rise per radian and sent the coil spring's cut off the tube).
+  Core's `helical_sweep_clear` takes the kernel's fit (`Shape::helix_fit`) and wider tolerances: the fan's Sweep 1
+  290 ms. Kernel 357/357, model 426/426 (Edit curve test now on a one-turn helix: 80 control points a turn and
+  editCurve's 100-point limit, as live's own helix would hit).
+- **Fan's next difference (core / bool, predates this):** Sweep 1's ADD reports no geometry change; the thread
+  (133.4 mm³) is absorbed by the Bolt (2049.316, as live) where live grows to 2156.42.
+- **Short helices:** a helix of one arc (under 1/40 turn: cf-spur-gear's helical tooth) keeps the exact construction:
+  one planar arc lies on two mirrored helices, so its sweep can't recover the axis, and the gear went 14 -> 4/14 with
+  it. Paths of Onshape's form are swept with the Frenet frame (`helix_arcs`), fitted at every knot (up to 4000).
+- **Suite (16:05, vibe4):** 76/87, 817/947 (suite-r3 816), custom 103/107 as before; no document worse; fan 41 -> 42;
+  c2-helical-sweep, cf-multi-plane, cf-spur-gear, cf-wave-spring, c2-extension-spring match as before (cf-thread-creator
+  unscored on both); times level (fan 2112 -> 2026 ms, helical sweep 224 -> 236, spur gear 2023 -> 2133, wave spring
+  545 -> 460, extension spring 335 -> 335, a loaded host). Kernel 357/357, model 426/426.
+
 ## 11-10 12:50 UTC: drawings 150 -> 156/172 with live2's 2442 re-records; the fan's helix turns as live's
 
 - **Drawings (b16, vibe5):** 156/172 scenarios, 1346/1372 states. New: a callout gets no Group with its view (live's

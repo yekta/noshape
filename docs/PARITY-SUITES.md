@@ -16,6 +16,8 @@ fetched over REST from live's page into `/root/parity/models/<name>/` (never in 
   configuration;
 - `live.jsonl`: one line per feature, the rollback bar after it: status and message, part count, and per part
   faces / edges / vertices, volume, surface area, centre of mass, bounding box; live's full regeneration time.
+  A body's edge `length` there is its tessellation's (a chord polyline), not the curve's: c2-fan-blade-sweep's
+  Helix 1 reads 179.687 mm where live's evLength is 179.740 (live 2440). Don't compare curves by it.
 The repo keeps only `tests/parity-models/index.json` (name, ids, URL) so anyone can fetch them again.
 
 **Translator (dx).** Onshape's feature JSON → a noshape document through crates/ops, the same path as the CLI:

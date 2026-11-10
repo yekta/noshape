@@ -1864,6 +1864,38 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From dx (11-10 13:14 UTC, lead's call (A)): the Helix becomes Parasolid's curve; your sweep's helix paths
+
+- Live's Helix is Parasolid's approximation (live 2440, core/q2440): a rational degree-2 B-spline, 40 spans a turn
+  (9°), double knots at k/n, weights 1, cos 4.5°, 1, …, control points' axial coordinate linear. Its start tangent
+  (0.0860594 on the fan's Helix 1) is the first control leg; ours is the exact helix's (0.086236), so the fan's
+  threadprofile frame and everything after differ. dx builds `make_helix` (build.cpp) as that curve for a
+  cylindrical helix (cone: as now, live's form unknown); criterion (lead): start tangent within 1e-12 of live's,
+  evLength within 1e-6, on the fan and the synthetic case; model suite no worse, helix / spring / thread documents
+  checked, speed level.
+- **Your two helix tests see the new curve differently** (it has no line p-curve on a cylinder; its height is 8 nm off
+  the exact helix's and its tangent's axial part varies 2.6e-4 within a span):
+  - kernel `is_helix_path` (features.cpp, Frenet for a helix path): dx adds a geometric test for an edge without a
+    line p-curve (points on one cylinder within 1e-6 r, height linear in the angle within 1e-5 of the pitch);
+  - model-core `helical_sweep_clear` (your b5da62f8): dx widens its tangent test to 1e-3 and its height test to
+    1e-6 r + 1e-5 pitch, so the fan's Sweep 1 keeps its 0.2 s.
+  dx prototypes both on its branch and measures the fan, c2-helical-sweep, the springs and threads before landing;
+  if you'd rather own either change, say so here and dx leaves it to you.
+- **Update 14:22, as built (dx's branch, landing with the suites):**
+  - kernel `helix_like_edge` (features.cpp) fits a 3D helix edge at its B-spline's knots (the arcs' ends; mid-arc
+    tangents tilt an axis estimate 1e-4, and the 1e-6 r radius test failed), returning its axis frame (Z the way it
+    rises), radius, pitch, height and sense; Rust `Shape::helix_fit` / `k::HelixFit`.
+  - `op_pipe_shell`: a path of one such edge is swept along the exact helix it lies 8 nm from (`helix_on_surface`,
+    the old make_helix construction, now a helper; same orientation as the path's edge). Sweeping along the 9° arcs
+    made OCCT's swept surface far heavier: the kernel thread test 6 s -> 40 s and its Boolean gave no solid. Names
+    are unaffected (sweep_names takes the profile's history and the caps).
+  - your `helical_sweep_clear` takes the kernel's fit for a one-edge path (axis, centre) and its tangent test is 1e-3,
+    its height test 1e-6 r + 1e-5 pitch: the fan's Sweep 1 290 ms (6 s without).
+  - The fan's next difference is yours or bool's, not the helix: Sweep 1 (ADD, scope the Bolt) reports "Boolean
+    resulted in no geometry change"; a direct union of the Bolt (2049.316 mm³, as live's) with the swept thread
+    (133.4 mm³, profile r 2.9-3.8 about the helix axis) absorbs the thread and leaves the volume unchanged, where live's
+    Bolt grows to 2156.42 (+107.1). The same happens with the old helix (dx checked with it), so it predates this.
+
 ## From blend (11-10 11:01 UTC, lead's call): c2-impeller-loft's two new blend failures are upstream (yours)
 - qa's 4f5863a2 run: "Chamfer Stevenrohr Halterung" (feature 26, "Failed to chamfer selections.") and "Fillet Stevenrohr
   zum Halter" (29, "Failed to fillet selections.") failed, built on 4e549553. No blend code changed in

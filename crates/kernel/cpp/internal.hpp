@@ -73,6 +73,8 @@ const TopoDS_Face&   as_face(const TopoDS_Shape& s, const char* what);
 const TopoDS_Edge&   as_edge(const TopoDS_Shape& s, const char* what);
 const TopoDS_Vertex& as_vertex(const TopoDS_Shape& s, const char* what);
 TopoDS_Wire          as_wire(const TopoDS_Shape& s, const char* what); // edge -> wire allowed
+// An exact helix round `ax`'s Z (build.cpp): a sweep's stand-in for Onshape's helix curve.
+TopoDS_Edge helix_on_surface(const gp_Ax3& ax, double radius, double pitch, double height, bool left_handed, double taper_angle);
 
 std::vector<TopoDS_Shape> to_vec(const OcShapeList& l);
 ShapeList                 to_list(const std::vector<TopoDS_Shape>& v);
