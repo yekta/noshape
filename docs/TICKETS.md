@@ -1070,7 +1070,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - psui (dc4b1a012, in-feature points in the translator for c2-hex-bookcase-derived): asm-scissor-lift 191 -> 190/242
     occurrences, mates 12/12 -> 13/13; new translator note "Studio eed029 › Sketch 7 (newSketch): its in-feature cPoint:
     entities: query not mapped (no live geometry for it)". Its parent c4b86cba4 gives 191 / 12 alone, 44e52dafb 190 / 13
-    (vibe4, the document alone; logs qa-scratch/recut/sl-*.log). dx's translator change is not on main yet.
+    (vibe4, the document alone; logs qa-scratch/recut/sl-*.log).
+  - dx (f8378048c, 20:58: an assembly connector's edge centre / midpoint where live's frame puts it): on main f8378048c the
+    whole suite gives 1260/1731 occurrences, 172/346 mates; the only change against dc4b1a012 is asm-hand-drill-pinslot's
+    Ball 1 now as live (mates 5 -> 6/52; HAND-DRILL-MATES-OVERDEFINED otherwise unchanged). No occurrence moved.
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
