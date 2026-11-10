@@ -86,7 +86,7 @@ scratch /root/bool-scratch.
   bool_patterns::a_plane_along_an_extrusion_cuts_it_in_straight_lines (our path). Gate ruled1: corpora + parity56,
   kg (k10-25 rerun alone: killed under vibe4's load 25 first), shfall as refine1; kt level against OCCT's; model suite
   (vibe5, against main) features the same, no flip; kernel 357/357, g++-13.
-  17:50: with 0028's libTKBO now in vibe3-5's /opt/occt (core), main's own CLI (built on vibe5, 7c60236c) gives the
+  17:44: with 0028's libTKBO now in vibe3-5's /opt/occt (core), main's own CLI (built on vibe5, 7c60236c) gives the
   user's eight edges as lines of 10.0 mm, midpoints at z 45.0; parts as before but the riser's volume (-0.0006 mm3).
 - **Landed 17:25 UTC (7c60236c): the sections' places on faces a thread an item (`par_map_each`).** Pipeflange's Hole 1
   40 -> 24 ms (vibe4, alternating); the document ~214 against live's 212 ms: not a flip. Gate each1 as refine1; model
