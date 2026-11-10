@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## psui, 2026-11-09
-- [ ] P0 FAN-BLADE-SWEEP-HANG (dx, speed regression; found by psui's re-measure 11-09 19:40): c2-fan-blade-sweep's
+- [x] (verified by qa 2026-11-10 on green 4f5863a2 = v0.4.41, core b5da62f83: c2-fan-blade-sweep regenerates in 1.56 s on vibe3, live 1.42 s) P0 FAN-BLADE-SWEEP-HANG (dx, speed regression; found by psui's re-measure 11-09 19:40): c2-fan-blade-sweep's
   **Sweep 1 takes 331 s** (live 58 ms; the whole document 332.9 s, live 1.4 s: qa's 18:11 model run on vibe2,
   `speed: … ×234.8`), 1.25 s in qa's 12:21 run (4e549553). The app opening it shows no model for minutes, the CLI
   too. Stack (vibe5, release main 9c5206e7): `sweep` (model-core regen/features/solid_a.rs:554, the tight-bend check
@@ -994,6 +994,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Speed flags (c2-fan-blade-sweep 0.6 → 2.3 s, cf-fill-pattern 7.2 → 11.0, cf-surface-pattern 14.0 → 19.4, c2-sm-corner-break,
   cf-sheet-metal-shaped-flange, c2-hunting-knife ×1.4–1.6) ran beside tonight's T2 hang copy on vibe2, still alive at 16:25 (14 h):
   re-measuring on vibe2 at load 1.0 (from 16:26).
+  **qa 11:00, the 07:02 run (green 4f5863a2 = v0.4.41) against the 12:21 one (4e549553; the 16:25–06:10 runs had no model
+  stage: vibe2 gone):** models 76/87, features 787 → 816/947, scenarios 1336/1435 → 1354/1445, parity index 88.7 → 90.4 (speed
+  79.4 → 84.3 %, 60 of 97 at or under live, now measured on vibe3). Flags:
+  - core / blend: c2-impeller-loft's "Chamfer Stevenrohr Halterung" ("Failed to chamfer selections.") and "Fillet Stevenrohr
+    zum Halter" ("Failed to fillet selections.") now fail (built before).
+  - asm: asm-hand-drill-pinslot's mates 28 → 5/52 as live (occurrences 38/41 unchanged); asm-tvc-mount 9 → 8/43 occurrences
+    (mates 1/4 → 3/6). Assembly results 1262 → 1261/1731.
+  - psui (recording, not code): doc-tab-properties-drawing step 2 `.dialog.fields[10].value` live "11/09/2026", ours
+    "11/10/2026": the field shows today's date, so the scenario differs on every day after live recorded it.
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):

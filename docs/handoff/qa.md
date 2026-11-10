@@ -3,6 +3,12 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**11-10 11:00: the first full run on vibe3 (1110-0702-4f5863a2, green = v0.4.41): index 90.4** (geometry 86.2, speed 84.3 %
+on vibe3, 60 of 97 cases). SCORE row and SUITE-REGRESSIONS-1108 flags written (impeller chamfer / fillet, asm-hand-drill-pinslot
+mates 28 → 5, doc-tab-properties-drawing's date). The loop's own worse.txt compared with the 04:25 run (no models): compare by
+hand with the last run that has models.log (bin/suites-diff.py <old> <new>). v0.4.41 checked 08:23: no blocker.
+FAN-BLADE-SWEEP-HANG verified. Remote stage ~2 h 20 min on vibe3 (assemblies 90 min of it).
+
 **11-10 07:15 (qa restarted ~07:00, new account):** vibe2 is retired: bin/qa-suites.sh runs its model / assembly / exchange
 stage on `QA_SUITES_HOST` (default vibe3) through rb.sh, pauses vibe3's GUI fuzz (/tmp/qa-fz-pause-61) for it and writes the
 host's load before and after to run.log; the runs 20:08 → 06:10 had no model stage (index 49.5 with geometry, assemblies,
