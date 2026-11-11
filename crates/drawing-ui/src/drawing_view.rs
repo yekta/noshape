@@ -533,6 +533,8 @@ pub struct DrawingEditor {
     pub tool_points: Vec<noshape_sketch::EntityId>,
     /// The newest sketch entity and annotation ids when the tool started (what it made is newer).
     pub tool_start: (u32, u64),
+    /// The selected datum target whose hidden dimensions the preview shows.
+    pub target_dims_shown: Option<u64>,
     pub insp_table: crate::drawing_panels::InspectionTableUi,
     /// Inserted image textures (see `drawing_images`).
     pub image_cache: crate::drawing_images::ImageCache,
@@ -794,6 +796,7 @@ impl DrawingEditor {
             tool_edge: None,
             tool_points: Vec::new(),
             tool_start: (0, 0),
+            target_dims_shown: None,
             insp_table: Default::default(),
             measure: None,
             status: None,
@@ -1785,6 +1788,7 @@ impl DrawingEditor {
         }
         self.sync_section_dlg(window, cx);
         self.sync_aligned_dlg(window, cx);
+        self.sync_target_dims_preview(cx);
         self.sync_sf_panel(window, cx);
         self.sync_break_dlg(window, cx);
         self.sync_aux_dlg(window, cx);
