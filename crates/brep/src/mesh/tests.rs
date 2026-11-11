@@ -409,3 +409,82 @@ fn an_elliptical_edge_is_split_on_its_ellipse_within_the_deflections() {
         assert!(((w[0] + w[1]) * 0.5 - at(0.5 * (t[0] + t[1]))).length() <= defl.linear, "sag at t {}", t[0]);
     }
 }
+
+/// A dome: a profile from the axis down to a 12 mm circle, revolved round z (hat8's Mac mini feet, from a STEP): its
+/// loop starts at the pole's degenerate edge (along u, its own parameters 0 to 2π), then down the seam, round the
+/// rim, up the seam. Read on by continuity round the unbounded revolution the rim ends a turn on, so the pole's nodes
+/// go between the seam's two uses, not at their own 0 to 2π (there the loop crossed itself and the face went to
+/// BRepMesh with every face beside it). Meshed, every triangle within the deflection of the surface.
+#[test]
+fn a_revolved_dome_whose_loop_starts_at_its_pole_is_meshed() {
+    use crate::nurbs::NurbsCurve;
+    use std::f64::consts::TAU;
+    let (h, r) = (0.02, 0.012);
+    let profile = NurbsCurve { degree: 2, knots: vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0], poles: vec![DVec3::new(0.0, 0.0, h), DVec3::new(r, 0.0, h), DVec3::new(r, 0.0, 0.0)], weights: Vec::new(), spans: Default::default() };
+    let v = vec![DVec3::new(0.0, 0.0, h), DVec3::new(r, 0.0, 0.0)];
+    let e = vec![
+        MeshEdge { curve: Some(Curve::Degenerate), v: [0, 0], t0: 0.0, t1: TAU },
+        MeshEdge { curve: Some(Curve::Nurbs { index: 0, t0: 0.0, t1: 1.0 }), v: [0, 1], t0: 0.0, t1: 1.0 },
+        MeshEdge { curve: Some(Curve::Circle { center: DVec3::ZERO, normal: DVec3::Z, xdir: DVec3::X, radius: r }), v: [1, 1], t0: 0.0, t1: TAU },
+    ];
+    let face = MeshFace {
+        surface: MeshSurface::Revolution { curve: 0, origin: DVec3::ZERO, axis: DVec3::Z },
+        loops: vec![vec![Use { edge: 0, reversed: false }, Use { edge: 1, reversed: false }, Use { edge: 2, reversed: false }, Use { edge: 1, reversed: true }]],
+    };
+    let defl = Deflection { linear: 1e-5, angular: 0.3 };
+    let curves = [profile];
+    let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &[], face_pcurves: &[] });
+    let m = out.faces[0].as_ref().expect("the dome meshed here");
+    for t in &m.triangles {
+        let c = (m.points[t[0] as usize] + m.points[t[1] as usize] + m.points[t[2] as usize]) / 3.0;
+        // On the dome: its distance from the axis against the profile's at that height (x(z) = r·sqrt(1 - ((z-h)/h)²)
+        // for this quadratic's ellipse-like arc is not exact: within the deflection of the meshed profile instead).
+        let (rho, z) = (c.truncate().length(), c.z);
+        assert!(rho <= r + 1e-9 && (0.0..=h + 1e-9).contains(&z), "a triangle's centre {c:?} off the dome");
+    }
+    assert!(m.triangles.len() > 20, "{} triangles", m.triangles.len());
+}
+
+/// A revolved band with a hole at 200° round (hat8's Mac mini vent band: 107 holes): the hole's ring reads on from its
+/// own first node, where the angle round the axis is negative, while the outer loop runs 0 to 2π: moved a whole turn
+/// into the outer loop's span, the face meshes (it was refused, and BRepMesh took it with its neighbours).
+#[test]
+fn a_revolved_band_with_a_hole_past_half_a_turn_is_meshed() {
+    use crate::nurbs::NurbsCurve;
+    use std::f64::consts::TAU;
+    let (r, h) = (0.01, 0.03);
+    let profile = NurbsCurve { degree: 1, knots: vec![0.0, 0.0, 1.0, 1.0], poles: vec![DVec3::new(r, 0.0, 0.0), DVec3::new(r, 0.0, h)], weights: Vec::new(), spans: Default::default() };
+    let at = |deg: f64, z: f64| DVec3::new(r * deg.to_radians().cos(), r * deg.to_radians().sin(), z);
+    let mut v = vec![DVec3::new(r, 0.0, 0.0), DVec3::new(r, 0.0, h)];
+    let mut e = vec![
+        MeshEdge { curve: Some(Curve::Circle { center: DVec3::ZERO, normal: DVec3::Z, xdir: DVec3::X, radius: r }), v: [0, 0], t0: 0.0, t1: TAU },
+        MeshEdge { curve: Some(Curve::Nurbs { index: 0, t0: 0.0, t1: 1.0 }), v: [0, 1], t0: 0.0, t1: 1.0 },
+        MeshEdge { curve: Some(Curve::Circle { center: DVec3::new(0.0, 0.0, h), normal: DVec3::Z, xdir: DVec3::X, radius: r }), v: [1, 1], t0: 0.0, t1: TAU },
+    ];
+    // The hole: a hexagon round (200°, 15 mm), its corners on the band, clockwise seen from outside.
+    let corners: Vec<DVec3> = (0..6).map(|k| {
+        let a = -(k as f64) * TAU / 6.0;
+        at(200.0 + 12.0 * a.cos(), 0.015 + 0.004 * a.sin())
+    }).collect();
+    let first = v.len() as u32;
+    v.extend(corners);
+    let mut hole = Vec::new();
+    for k in 0..6u32 {
+        e.push(MeshEdge { curve: Some(Curve::Line), v: [first + k, first + (k + 1) % 6], t0: 0.0, t1: 1.0 });
+        hole.push(Use { edge: e.len() as u32 - 1, reversed: false });
+    }
+    let face = MeshFace {
+        surface: MeshSurface::Revolution { curve: 0, origin: DVec3::ZERO, axis: DVec3::Z },
+        loops: vec![vec![Use { edge: 0, reversed: false }, Use { edge: 1, reversed: false }, Use { edge: 2, reversed: true }, Use { edge: 1, reversed: true }], hole],
+    };
+    let defl = Deflection { linear: 1e-5, angular: 0.3 };
+    let curves = [profile];
+    let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &[], face_pcurves: &[] });
+    let m = out.faces[0].as_ref().expect("the band meshed here");
+    // None of it inside the hole: no triangle's centre within the hexagon's angles and heights.
+    for t in &m.triangles {
+        let c = (m.points[t[0] as usize] + m.points[t[1] as usize] + m.points[t[2] as usize]) / 3.0;
+        let deg = c.y.atan2(c.x).to_degrees().rem_euclid(360.0);
+        assert!(!((195.0..205.0).contains(&deg) && (0.014..0.016).contains(&c.z)), "a triangle in the hole at {deg}°, z {}", c.z);
+    }
+}

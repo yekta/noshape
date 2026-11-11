@@ -60,6 +60,9 @@ pub struct RegenOptions {
     /// picks its Boolean from them, std booleanStepEditLogic); the others skip that probe, as live runs it only in
     /// the dialog (cf-spur-gear's Extrude 2: 100 ms of exact distances, live 5 ms).
     pub touch_probe: Option<FeatureId>,
+    /// Only the context (the parts as shapes) and the features' states, no display: what a Derived feature takes from
+    /// its source (hat8's Mac mini was meshed again inside its Derived feature: 3.5-6.2 s of each open).
+    pub context_only: bool,
 }
 
 /// Stops a running regeneration that a newer edit made stale (live
@@ -132,7 +135,7 @@ impl RegenCancel {
 
 impl Default for RegenOptions {
     fn default() -> Self {
-        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None, custom_features: None, cancel: None, touch_probe: None }
+        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None, custom_features: None, cancel: None, touch_probe: None, context_only: false }
     }
 }
 
@@ -680,6 +683,10 @@ impl Regenerator {
         self.entries.retain(|id, _| live.contains(id) || gone.iter().any(|(_, g)| g == id));
         if opts.cancel.as_ref().is_some_and(RegenCancel::superseded) {
             return cancelled();
+        }
+        if opts.context_only {
+            let display = crate::display::StudioDisplay { features: states, variables: ctx.variables.clone(), regen_ms: t0.elapsed().as_secs_f32() * 1000.0, ..Default::default() };
+            return RegenResult { display, needs_refine: false, context: ctx, cancelled: false, evaluated };
         }
         if display::perf_enabled() {
             log::info!(target: "perf", "regen: {} features evaluated, {cached} cached, {:.0} ms (preview meshes {})", evaluated.len(), t0.elapsed().as_secs_f64() * 1e3, opts.preview_meshes);

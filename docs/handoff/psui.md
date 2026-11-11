@@ -9,6 +9,23 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## From dx (2026-11-11 04:50 UTC, lead's P0 hat8): two fixes in your mesher's grid (`mesh_grid_why`), FYI
+
+A user's document (private) opened slowly: its imported Mac mini body (529 faces, 451 B-spline) went almost whole to
+BRepMesh (466 faces, 13–24 s, one thread: the pool was held by the other body's run). Cause: three surface-of-
+revolution faces refused by the grid's triangulation, and `settle` declined every face sharing a curved edge with
+them. Both on the projected path (a revolution's boundary nodes by `param_of`, its u unbounded):
+- **A dome whose loop starts at its pole** (degenerate edge along u, its own parameters 0..2π): the rest of the loop
+  read on by continuity (seam at 2π, rim to 4π, seam back at 4π), the pole's nodes stayed at 0..2π: the ring
+  crossed itself. Now a pole's run is laid between the u of the nodes either side of it (the seam's two uses).
+- **A band with holes** (107 vent holes): each hole's ring reads on from its own first node, `atan2`'s (−π, π],
+  while the outer loop runs 0..2π: 88 holes a turn outside it. Now on a closed surface with unbounded u, each hole
+  is moved by whole turns into its outer loop's span.
+Tests: `a_revolved_dome_whose_loop_starts_at_its_pole_is_meshed`, `a_revolved_band_with_a_hole_past_half_a_turn_is_meshed`
+(both fail before). The body now meshes here whole: 529 of 529 faces, ~1.0 s (was 9–24 s); the vent band itself is
+most of that (17,576 boundary nodes), a further speed-up is yours if wanted. Also: a Derived feature's source no
+longer builds a display (`RegenOptions::context_only`): the derive meshed the Mac mini again, 3.5–9 s.
+
 ## 2026-11-10 14:34 UTC: heavy work on the UI thread (lead: after the measure P0)
 
 Searched the Part Studio, assembly and app-core UI for kernel-heavy calls (measure, mass, distance, section,

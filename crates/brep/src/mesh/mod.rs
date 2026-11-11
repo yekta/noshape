@@ -1430,6 +1430,59 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
             }
         }
     }
+    // A pole's run of nodes (a dome's apex, its degenerate edge along u) from the u of the node before it to the u of
+    // the node after it, the two uses of the seam it joins, by its edge's parameters: those are another period's
+    // where the loop read on by continuity round an unbounded revolution (hat8's Mac mini domes: the ring crossed
+    // itself, and the faces beside them went to BRepMesh, 13 s).
+    if !from_curves_used && s.degenerate_edges_run_along_u() {
+        for r in &rings {
+            let n = r.len();
+            let Some(first) = (0..n).find(|&j| pole_u[r[j]].is_none()) else { continue };
+            let at = |j: usize| r[(first + j) % n];
+            let mut j = 0;
+            while j < n {
+                if pole_u[at(j)].is_none() {
+                    j += 1;
+                    continue;
+                }
+                let start = j;
+                while j < n && pole_u[at(j)].is_some() {
+                    j += 1;
+                }
+                let run: Vec<usize> = (start..j).map(at).collect();
+                let (before, after) = (uv[at(start + n - 1)].x, uv[at(j)].x);
+                let (Some(t0), Some(t1)) = (pole_u[run[0]], pole_u[run[run.len() - 1]]) else { continue };
+                let off = (uv[run[0]].x - before).abs() > 1e-9 || (uv[run[run.len() - 1]].x - after).abs() > 1e-9;
+                if run.len() >= 2 && t1 != t0 && off {
+                    for &i in &run {
+                        let f = (pole_u[i].unwrap_or(t0) - t0) / (t1 - t0);
+                        uv[i].x = before + (after - before) * f;
+                    }
+                }
+            }
+        }
+    }
+    // A closed surface without a bounded u (a revolution): each hole by whole turns into its outer loop's span (each
+    // loop reads on from its own first node: 88 of 107 holes of hat8's Mac mini vent band came out a turn before it,
+    // and the triangulation refused the face).
+    if !from_curves_used && s.closed() && !periodic && rings.len() > 1 {
+        let span = |r: &Vec<usize>, uv: &[DVec2]| r.iter().fold((f64::MAX, f64::MIN), |(a, b), &i| (a.min(uv[i].x), b.max(uv[i].x)));
+        if let Some(outer) = (0..rings.len()).max_by(|&a, &b| {
+            let (sa, sb) = (span(&rings[a], &uv), span(&rings[b], &uv));
+            (sa.1 - sa.0).total_cmp(&(sb.1 - sb.0))
+        }) {
+            let (o0, o1) = span(&rings[outer], &uv);
+            for r in rings.iter().enumerate().filter(|(k, _)| *k != outer).map(|(_, r)| r) {
+                let (a, b) = span(r, &uv);
+                let turns = if b < o0 { ((o0 - a) / TAU).ceil() } else if a > o1 { -((b - o1) / TAU).ceil() } else { 0.0 };
+                if turns != 0.0 && b - a < TAU {
+                    for &i in r {
+                        uv[i].x += turns * TAU;
+                    }
+                }
+            }
+        }
+    }
     // Each loop closes on the parameter plane (none round a closed surface's period).
     for r in &rings {
         // (A pole's u is its edge's, not its point's.)

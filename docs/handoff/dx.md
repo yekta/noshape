@@ -10,6 +10,18 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-11 04:55 UTC: hat8 opens slowly (lead's P0): the import's display mesh, three times
+
+Not the STEP: the Mac mini body's display mesh. Three revolution faces our grid refused (a dome whose loop starts at
+its pole; a vent band with 107 holes a turn off) sent 466 of its 529 faces to BRepMesh with `settle`, one thread
+(9–24 s); and a Derived feature regenerated its source with the display, meshing it again. Fixed in brep's
+`mesh_grid_why` (pole run between the seam's uses; holes by whole turns into the outer span) and `RegenOptions::
+context_only` for the derived provider. One run, alternated on vibe4 (load ~40, fresh private copies): the
+Mac-mini-2024 tab 8.0–10.4 s → 1.5–1.6 s (display 7.4–9.2 → 1.0 s); the hat tab 56–62 s → 42–46 s (displays
+12.8–16.3 → 0.5–1.0 s, the derive 6.0–9.0 → 0.2–0.27 s); the rest is the union (bool) and the chamfers (blend).
+Gates: brep 60, kernel rust_mesh 19, planar_face_mesh, mesh_pixels, derive tests, corpus triangle counts (ours
+0.65× BRepMesh's). psui.md has the mesher note. Windows Rhino flake: still probing (dx-rhino-probe-c, 25 runs).
+
 ## 11-10 19:45 UTC: STL zig-zag on an extruded B-spline wall (lead's user P1); hand drill diagnosed
 
 - **STL (user's "Fan Riser", private, vibe3:~/lead-private):** the curved tab is a SurfaceOfExtrusion (a STEP

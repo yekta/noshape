@@ -295,6 +295,7 @@ impl DocStudios {
             document_variables: self.doc.tabs.iter().find(|t| t.id.to_string() == tab).map(|t| noshape_model::variables::element_variables(&self.doc, t.id)).unwrap_or_default(),
             derived: Some(Arc::new(DocStudios { doc: self.doc.clone(), cache: self.cache.clone(), active: self.active.clone() })),
             custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&self.doc)),
+            context_only: true,
             ..Default::default()
         };
         let mut values = studio.configuration.defaults();
@@ -359,6 +360,7 @@ impl DerivedProvider for DocStudios {
             document_variables: self.doc.tabs.iter().find(|t| t.id.to_string() == tab).map(|t| noshape_model::variables::element_variables(&self.doc, t.id)).unwrap_or_default(),
             derived: Some(Arc::new(DocStudios { doc: self.doc.clone(), cache: self.cache.clone(), active: self.active.clone() })),
             custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&self.doc)),
+            context_only: true,
             ..Default::default()
         };
         let mut reg = self.cache.lock().remove(tab).unwrap_or_default();
@@ -382,6 +384,7 @@ impl DerivedProvider for DocStudios {
             document_variables: self.doc.tabs.iter().find(|t| t.id.to_string() == tab).map(|t| noshape_model::variables::element_variables(&self.doc, t.id)).unwrap_or_default(),
             derived: Some(Arc::new(DocStudios { doc: self.doc.clone(), cache: self.cache.clone(), active: self.active.clone() })),
             custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&self.doc)),
+            context_only: true,
             ..Default::default()
         };
         let mut config = studio.configuration.defaults();
