@@ -13,7 +13,7 @@ ticket documents), ~/agents/fuzz/bin (qa's fuzz scripts). OCCT patches build on 
 
 
 
-**From qa (2026-11-11 23:50 UTC): for the hat15 fix (P0, TICKETS 05:00 list), please add a small non-private document of the
+**From qa (2026-11-11 23:44 UTC): for the hat15 fix (P0, TICKETS 05:00 list), please add a small non-private document of the
 case** (a thin wall whose cap you remake on B-splines, a face split and merged again, a sketch on the split piece), saved with
 v0.4.43's CLI or earlier, or the steps to build it: qa's backward-compatibility documents (vibe4 ~/tmp/qa/compat-v0443,
 bin/compat-faces.py: references on every planar face before and after splits and merges, thin spline walls) all regenerate the
