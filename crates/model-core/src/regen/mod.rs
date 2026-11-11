@@ -73,6 +73,14 @@ pub struct RegenOptions {
 pub trait ResultStore: Send + Sync + std::fmt::Debug {
     fn get(&self, key: RegenKey) -> Option<Vec<u8>>;
     fn put(&self, key: RegenKey, bytes: Vec<u8>);
+    /// Shapes kept once by their content's hash, shared by the features' entries (none: entries aren't kept).
+    fn get_blob(&self, _hash: &[u8; 16]) -> Option<Vec<u8>> {
+        None
+    }
+    fn put_blob(&self, _hash: &[u8; 16], _bytes: Vec<u8>) {}
+    fn has_blob(&self, _hash: &[u8; 16]) -> bool {
+        false
+    }
 }
 
 /// Stops a running regeneration that a newer edit made stale (live
@@ -168,6 +176,8 @@ pub struct RegenResult {
     pub result_key: Option<RegenKey>,
     /// Read from the [`ResultStore`]: no feature was evaluated.
     pub from_store: bool,
+    /// The features this run evaluated (or reused): their keys, contexts and states, for a [`ResultStore`].
+    pub fresh: Vec<(RegenKey, Arc<Context>, FeatureState)>,
 }
 
 #[derive(Clone)]
@@ -345,7 +355,7 @@ fn kernel_profiling() -> bool {
 /// document content only (the same in every run of a build; a persistent result cache looks results up by it).
 pub type RegenKey = u128;
 
-fn hash_bytes(prev: RegenKey, data: &[u8]) -> RegenKey {
+pub(crate) fn hash_bytes(prev: RegenKey, data: &[u8]) -> RegenKey {
     let mut h = blake3::Hasher::new();
     h.update(&prev.to_le_bytes());
     h.update(data);
@@ -411,6 +421,7 @@ impl Regenerator {
         let mut live: Vec<FeatureId> = Vec::new();
         let (mut evaluated, mut cached): (Vec<FeatureId>, usize) = (Vec::new(), 0);
         let mut keys: Vec<(FeatureId, RegenKey)> = Vec::new();
+        let mut fresh: Vec<(RegenKey, Arc<Context>, FeatureState)> = Vec::new();
         self.run += 1;
         let run = self.run;
         // Effective features (configuration applied), visible to evaluators
@@ -524,6 +535,21 @@ impl Regenerator {
                 cached += 1;
                 continue;
             }
+            // Kept across sessions: this feature's result from the store (an edit after reopening runs from the edit on).
+            let storable = studio.contexts.is_empty() && !probing;
+            if storable
+                && let Some(store) = &opts.store
+                && let Some((stored, state)) = store.get(persist::feature_key(ekey)).and_then(|b| persist::decode_feature(store.clone(), &b))
+                && state.id == f.id
+            {
+                ctx = Arc::new(stored);
+                let versions = self.entries.entry(f.id).or_default();
+                versions.insert(0, CacheEntry { key: ekey, ctx: ctx.clone(), state: state.clone(), last_run: run, local: elocal, input: None, reads: None });
+                versions.truncate(VERSIONS);
+                states.push(state);
+                cached += 1;
+                continue;
+            }
             if reusable
                 && expr_error.is_none()
                 && let Some(versions) = self.entries.get_mut(&f.id)
@@ -544,6 +570,9 @@ impl Regenerator {
                 ctx = Arc::new(out);
                 versions.insert(0, CacheEntry { key: ekey, ctx: ctx.clone(), state: state.clone(), last_run: run, local: elocal, input: Some(input), reads });
                 versions.truncate(VERSIONS);
+                if storable {
+                    fresh.push((ekey, ctx.clone(), state.clone()));
+                }
                 states.push(state);
                 cached += 1;
                 continue;
@@ -725,6 +754,9 @@ impl Regenerator {
             let versions = self.entries.entry(f.id).or_default();
             versions.insert(0, CacheEntry { key: ekey, ctx: ctx.clone(), state: state.clone(), last_run: run, local: elocal, input: Some(input), reads });
             versions.truncate(VERSIONS);
+            if storable {
+                fresh.push((ekey, ctx.clone(), state.clone()));
+            }
             states.push(state);
         }
         // Features gone from this run: the most recently used few stay a while.
@@ -738,7 +770,7 @@ impl Regenerator {
         }
         if opts.context_only {
             let display = crate::display::StudioDisplay { features: states, variables: ctx.variables.clone(), regen_ms: t0.elapsed().as_secs_f32() * 1000.0, ..Default::default() };
-            return RegenResult { display, needs_refine: false, context: ctx, cancelled: false, evaluated, keys, result_key: None, from_store: false };
+            return RegenResult { display, needs_refine: false, context: ctx, cancelled: false, evaluated, keys, result_key: None, from_store: false, fresh };
         }
         if display::perf_enabled() {
             log::info!(target: "perf", "regen: {} features evaluated, {cached} cached, {:.0} ms (preview meshes {})", evaluated.len(), t0.elapsed().as_secs_f64() * 1e3, opts.preview_meshes);
@@ -759,7 +791,7 @@ impl Regenerator {
         display.features = states;
         display.variables = ctx.variables.clone();
         display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
-        let result = RegenResult { display, needs_refine, context: ctx, cancelled: false, evaluated, keys, result_key: result_key.filter(|_| !opts.context_only), from_store: false };
+        let result = RegenResult { display, needs_refine, context: ctx, cancelled: false, evaluated, keys, result_key: result_key.filter(|_| !opts.context_only), from_store: false, fresh };
         // (Full results only: a preview can't serve a full run, and the dialog's previews as values are typed would
         // push out the states undo goes back to.)
         if let Some(k) = result_key.filter(|_| !result.needs_refine) {

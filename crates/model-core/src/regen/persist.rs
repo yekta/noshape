@@ -115,6 +115,13 @@ impl DirStore {
     }
 }
 
+impl DirStore {
+    fn blob_path(&self, hash: &[u8; 16]) -> std::path::PathBuf {
+        let hex: String = hash.iter().map(|b| format!("{b:02x}")).collect();
+        self.dir.join(format!("{hex}-{}.brep", self.build))
+    }
+}
+
 impl super::ResultStore for DirStore {
     fn get(&self, key: super::RegenKey) -> Option<Vec<u8>> {
         let p = self.path(key);
@@ -136,18 +143,198 @@ impl super::ResultStore for DirStore {
             let _ = std::fs::remove_file(&tmp);
         }
     }
+
+    fn get_blob(&self, hash: &[u8; 16]) -> Option<Vec<u8>> {
+        let p = self.blob_path(hash);
+        let bytes = std::fs::read(&p).ok()?;
+        if let Ok(f) = std::fs::File::options().write(true).open(&p) {
+            let _ = f.set_modified(std::time::SystemTime::now());
+        }
+        Some(bytes)
+    }
+
+    fn put_blob(&self, hash: &[u8; 16], bytes: Vec<u8>) {
+        if std::fs::create_dir_all(&self.dir).is_err() {
+            return;
+        }
+        let hex: String = hash.iter().map(|b| format!("{b:02x}")).collect();
+        let tmp = self.dir.join(format!("{hex}.tmp{}", std::process::id()));
+        if std::fs::write(&tmp, &bytes).is_ok() && std::fs::rename(&tmp, self.blob_path(hash)).is_ok() {
+            self.evict();
+        } else {
+            let _ = std::fs::remove_file(&tmp);
+        }
+    }
+
+    fn has_blob(&self, hash: &[u8; 16]) -> bool {
+        self.blob_path(hash).exists()
+    }
 }
 
-/// Keeps a full regeneration's result in `store` on a background thread (encoding a big part takes a while).
-pub fn keep(store: std::sync::Arc<dyn super::ResultStore>, result: &super::RegenResult) {
-    let (Some(key), false, false) = (result.result_key, result.from_store, result.cancelled) else { return };
-    let (ctx, states) = (result.context.clone(), result.display.features.clone());
-    std::thread::Builder::new()
-        .name("noshape-keep-result".into())
-        .spawn(move || {
-            if let Some(bytes) = encode_result(&ctx, &states) {
-                store.put(key, bytes);
+
+/// The key a feature's entry is kept under: its chain key, apart from whole results' keys.
+pub fn feature_key(key: super::RegenKey) -> super::RegenKey {
+    super::hash_bytes(key, b"feature entry")
+}
+
+/// What starts a feature's entry.
+const FEATURE_MAGIC: &[u8; 8] = b"NSFEA001";
+
+fn content_hash(bytes: &[u8]) -> [u8; 16] {
+    let mut h = [0u8; 16];
+    h.copy_from_slice(&blake3::hash(bytes).as_bytes()[..16]);
+    h
+}
+
+/// Shapes written once across a writer's entries: by identity (OCCT's IsSame hash, then IsEqual), their content hash.
+#[derive(Default)]
+pub struct ShapeMemo(std::collections::HashMap<u64, Vec<(noshape_kernel::Shape, [u8; 16])>>);
+
+/// Writing: each shape a number into the entry's list of content hashes, its bytes put in the store once.
+struct BlobWriter {
+    store: std::sync::Arc<dyn super::ResultStore>,
+    memo: ShapeMemo,
+    hashes: Vec<[u8; 16]>,
+}
+
+impl noshape_kernel::ShapeCodec for BlobWriter {
+    fn put(&mut self, shape: &noshape_kernel::Shape) -> Result<u64, String> {
+        let id = shape.hash_code();
+        let known = self.memo.0.get(&id).and_then(|v| v.iter().find(|(s, _)| s.is_equal(shape)).map(|(_, h)| *h));
+        let hash = match known {
+            Some(h) => h,
+            None => {
+                let bytes = if shape.is_null() { Vec::new() } else { shape.to_bin_bytes(false).map_err(|e| e.to_string())? };
+                let h = content_hash(&bytes);
+                if !self.store.has_blob(&h) {
+                    self.store.put_blob(&h, bytes);
+                }
+                self.memo.0.entry(id).or_default().push((shape.clone(), h));
+                h
             }
-        })
-        .ok();
+        };
+        let at = match self.hashes.iter().position(|x| *x == hash) {
+            Some(i) => i,
+            None => {
+                self.hashes.push(hash);
+                self.hashes.len() - 1
+            }
+        };
+        Ok(at as u64)
+    }
+    fn get(&mut self, _at: u64) -> Result<noshape_kernel::Shape, String> {
+        Err("a writer reads nothing".into())
+    }
+}
+
+/// Shapes read back, by content hash (shared bodies decode once a session).
+fn read_cache() -> &'static parking_lot::Mutex<std::collections::HashMap<[u8; 16], noshape_kernel::Shape>> {
+    static C: std::sync::OnceLock<parking_lot::Mutex<std::collections::HashMap<[u8; 16], noshape_kernel::Shape>>> = std::sync::OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+/// Reading: each number an entry's content hash, its shape from the cache or the store (the bytes checked against it).
+struct BlobReader {
+    store: std::sync::Arc<dyn super::ResultStore>,
+    hashes: Vec<[u8; 16]>,
+}
+
+impl noshape_kernel::ShapeCodec for BlobReader {
+    fn put(&mut self, _shape: &noshape_kernel::Shape) -> Result<u64, String> {
+        Err("a reader writes nothing".into())
+    }
+    fn get(&mut self, at: u64) -> Result<noshape_kernel::Shape, String> {
+        let hash = *self.hashes.get(at as usize).ok_or("no such shape")?;
+        if let Some(s) = read_cache().lock().get(&hash) {
+            return Ok(s.clone());
+        }
+        let bytes = self.store.get_blob(&hash).ok_or("shape not kept")?;
+        if content_hash(&bytes) != hash {
+            return Err("shape changed".into());
+        }
+        let shape = if bytes.is_empty() { noshape_kernel::Shape::null() } else { noshape_kernel::Shape::from_bin_bytes(&bytes).map_err(|e| e.to_string())? };
+        let mut c = read_cache().lock();
+        if c.len() > 8192 {
+            c.clear();
+        }
+        c.insert(hash, shape.clone());
+        Ok(shape)
+    }
+}
+
+/// A feature's state and context as its entry, its shapes put in `store` (once, `memo` across a writer's entries).
+pub fn encode_feature(store: std::sync::Arc<dyn super::ResultStore>, memo: &mut ShapeMemo, state: &FeatureState, ctx: &Context) -> Option<Vec<u8>> {
+    if !storable(ctx) {
+        return None;
+    }
+    let writer = BlobWriter { store, memo: std::mem::take(memo), hashes: Vec::new() };
+    let (json, codec) = noshape_kernel::with_shape_codec(Box::new(writer), || serde_json::to_vec(&(state, ctx)));
+    let any: Box<dyn std::any::Any> = codec;
+    let writer = any.downcast::<BlobWriter>().ok()?;
+    *memo = writer.memo;
+    let json = zstd::encode_all(&json.ok()?[..], 3).ok()?;
+    let mut out = Vec::with_capacity(json.len() + 16 * writer.hashes.len() + 48);
+    out.extend_from_slice(FEATURE_MAGIC);
+    out.extend_from_slice(&(json.len() as u64).to_le_bytes());
+    out.extend_from_slice(&json);
+    out.extend_from_slice(&(writer.hashes.len() as u64).to_le_bytes());
+    for h in &writer.hashes {
+        out.extend_from_slice(h);
+    }
+    out.extend_from_slice(&blake3::hash(&out).as_bytes()[..16]);
+    Some(out)
+}
+
+/// What [`encode_feature`] wrote, its shapes from `store`; `None` for anything missing, cut short or changed.
+pub fn decode_feature(store: std::sync::Arc<dyn super::ResultStore>, bytes: &[u8]) -> Option<(Context, FeatureState)> {
+    let (body, sum) = bytes.split_at_checked(bytes.len().checked_sub(16)?)?;
+    if blake3::hash(body).as_bytes()[..16] != *sum {
+        return None;
+    }
+    let mut r = body.strip_prefix(FEATURE_MAGIC.as_slice())?;
+    let mut take = |n: usize| -> Option<&[u8]> {
+        let (a, b) = r.split_at_checked(n)?;
+        r = b;
+        Some(a)
+    };
+    let n = u64::from_le_bytes(take(8)?.try_into().ok()?) as usize;
+    let json = zstd::decode_all(take(n)?).ok()?;
+    let count = u64::from_le_bytes(take(8)?.try_into().ok()?) as usize;
+    let mut hashes = Vec::with_capacity(count.min(1 << 16));
+    for _ in 0..count {
+        hashes.push(take(16)?.try_into().ok()?);
+    }
+    let reader = BlobReader { store, hashes };
+    let (value, _) = noshape_kernel::with_shape_codec(Box::new(reader), || serde_json::from_slice::<(FeatureState, Context)>(&json));
+    let (state, ctx) = value.ok()?;
+    Some((ctx, state))
+}
+
+/// Keeps a full regeneration's result, and each feature it evaluated, in `store` on a background thread (encoding
+/// big parts takes a while).
+pub fn keep(store: std::sync::Arc<dyn super::ResultStore>, result: &super::RegenResult) {
+    if result.cancelled || (result.fresh.is_empty() && (result.result_key.is_none() || result.from_store)) {
+        return;
+    }
+    let result = result.clone();
+    std::thread::Builder::new().name("noshape-keep-result".into()).spawn(move || keep_now(store, &result)).ok();
+}
+
+/// [`keep`] on this thread.
+pub fn keep_now(store: std::sync::Arc<dyn super::ResultStore>, result: &super::RegenResult) {
+    if result.cancelled {
+        return;
+    }
+    // (The whole result first: a reopen needs only it.)
+    if let Some(key) = result.result_key.filter(|_| !result.from_store)
+        && let Some(bytes) = encode_result(&result.context, &result.display.features)
+    {
+        store.put(key, bytes);
+    }
+    let mut memo = ShapeMemo::default();
+    for (key, ctx, state) in &result.fresh {
+        if let Some(bytes) = encode_feature(store.clone(), &mut memo, state, ctx) {
+            store.put(feature_key(*key), bytes);
+        }
+    }
 }

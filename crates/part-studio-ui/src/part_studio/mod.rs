@@ -825,8 +825,9 @@ impl PartStudioView {
                 *seed.lock() = Some(held.snapshot());
             }
             drop(held);
-            // Kept across sessions once final (a preview's coarse meshes refine first).
-            if let Some(store) = opts.store.clone().filter(|_| !r.needs_refine) {
+            // Kept across sessions: what this run evaluated, and the whole result (its context and states: the
+            // meshes are made again on reading, so a preview's are as good as a refined run's).
+            if let Some(store) = opts.store.clone() {
                 noshape_app_core::result_store::keep(store, &r);
             }
             (r, studio, config, units, upto, editing_sketch, doc_vars, target)
@@ -909,9 +910,6 @@ impl PartStudioView {
                             *seed2.lock() = Some(held.snapshot());
                         }
                         drop(held);
-                        if let Some(store) = opts.store.clone() {
-                            noshape_app_core::result_store::keep(store, &r);
-                        }
                         (r, studio, config)
                     })
                     .await;

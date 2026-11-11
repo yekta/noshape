@@ -941,32 +941,25 @@ pub fn write_obj(shape: &Shape, path: &Path, deflection: f64) -> Result<()> {
 }
 
 /// A shape stored as OCCT's binary B-rep (no meshes): a persistent regeneration cache's bodies. Inside
-/// [`with_shape_blobs`] each shape is a number into a side table of those bytes (a self-describing format such as JSON
-/// then carries no B-rep); elsewhere, the bytes themselves. An empty shape is no bytes.
+/// [`with_shape_codec`] each shape is a number the codec gives it (a self-describing format such as JSON then carries
+/// no B-rep); elsewhere, the bytes themselves. An empty shape is no bytes.
 impl Serialize for Shape {
     fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
-        let bytes = if self.is_null() { Vec::new() } else { self.to_bin_bytes(false).map_err(serde::ser::Error::custom)? };
-        let at = BLOBS.with(|b| {
-            b.borrow_mut().as_mut().map(|v: &mut Vec<Vec<u8>>| {
-                v.push(bytes.clone());
-                v.len() - 1
-            })
-        });
-        match at {
-            Some(i) => s.serialize_u64(i as u64),
-            None => s.serialize_bytes(&bytes),
+        if let Some(at) = CODEC.with(|c| c.borrow_mut().as_mut().map(|c| c.put(self))) {
+            return s.serialize_u64(at.map_err(serde::ser::Error::custom)?);
         }
+        let bytes = if self.is_null() { Vec::new() } else { self.to_bin_bytes(false).map_err(serde::ser::Error::custom)? };
+        s.serialize_bytes(&bytes)
     }
 }
 
 impl<'de> Deserialize<'de> for Shape {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Shape, D::Error> {
-        let bytes = if BLOBS.with(|b| b.borrow().is_some()) {
-            let i = u64::deserialize(d)? as usize;
-            BLOBS.with(|b| b.borrow().as_ref().and_then(|v| v.get(i).cloned())).ok_or_else(|| serde::de::Error::custom("no such shape"))?
-        } else {
-            serde_bytes_compat::deserialize(d)?
-        };
+        if CODEC.with(|c| c.borrow().is_some()) {
+            let i = u64::deserialize(d)?;
+            return CODEC.with(|c| c.borrow_mut().as_mut().map(|c| c.get(i))).unwrap_or_else(|| Err("no codec".into())).map_err(serde::de::Error::custom);
+        }
+        let bytes = serde_bytes_compat::deserialize(d)?;
         if bytes.is_empty() {
             return Ok(Shape::null());
         }
@@ -974,17 +967,50 @@ impl<'de> Deserialize<'de> for Shape {
     }
 }
 
+/// Where shapes go while (de)serializing inside [`with_shape_codec`]: each shape as a number.
+pub trait ShapeCodec: std::any::Any {
+    fn put(&mut self, shape: &Shape) -> std::result::Result<u64, String>;
+    fn get(&mut self, at: u64) -> std::result::Result<Shape, String>;
+}
+
 thread_local! {
-    static BLOBS: std::cell::RefCell<Option<Vec<Vec<u8>>>> = const { std::cell::RefCell::new(None) };
+    static CODEC: std::cell::RefCell<Option<Box<dyn ShapeCodec>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `f` with shapes (de)serialized through `codec`; gives the codec back.
+pub fn with_shape_codec<R>(codec: Box<dyn ShapeCodec>, f: impl FnOnce() -> R) -> (R, Box<dyn ShapeCodec>) {
+    let before = CODEC.with(|c| c.borrow_mut().replace(codec));
+    let r = f();
+    let codec = CODEC.with(|c| std::mem::replace(&mut *c.borrow_mut(), before)).expect("the codec put in above");
+    (r, codec)
+}
+
+/// A table of the shapes' bytes: filled while serializing, read while deserializing.
+struct BlobTable(Vec<Vec<u8>>);
+
+impl ShapeCodec for BlobTable {
+    fn put(&mut self, shape: &Shape) -> std::result::Result<u64, String> {
+        let bytes = if shape.is_null() { Vec::new() } else { shape.to_bin_bytes(false).map_err(|e| e.to_string())? };
+        self.0.push(bytes);
+        Ok(self.0.len() as u64 - 1)
+    }
+    fn get(&mut self, at: u64) -> std::result::Result<Shape, String> {
+        let bytes = self.0.get(at as usize).ok_or("no such shape")?;
+        if bytes.is_empty() {
+            return Ok(Shape::null());
+        }
+        Shape::from_bin_bytes(bytes).map_err(|e| e.to_string())
+    }
 }
 
 /// Runs `f` with shapes (de)serialized as numbers into `blobs`: filled while serializing, read while deserializing.
 /// Returns `f`'s result and the table.
 pub fn with_shape_blobs<R>(blobs: Vec<Vec<u8>>, f: impl FnOnce() -> R) -> (R, Vec<Vec<u8>>) {
-    let before = BLOBS.with(|b| b.borrow_mut().replace(blobs));
-    let r = f();
-    let blobs = BLOBS.with(|b| std::mem::replace(&mut *b.borrow_mut(), before)).unwrap_or_default();
-    (r, blobs)
+    let (r, codec) = with_shape_codec(Box::new(BlobTable(blobs)), f);
+    // (Ours: the table back.)
+    let any: Box<dyn std::any::Any> = codec;
+    let table = any.downcast::<BlobTable>().map(|t| t.0).unwrap_or_default();
+    (r, table)
 }
 
 /// Bytes as `serialize_bytes` wrote them, for formats that keep them as bytes (bincode) or as a sequence (JSON).

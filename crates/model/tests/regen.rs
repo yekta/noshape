@@ -266,6 +266,15 @@ impl noshape_model::regen::ResultStore for MemStore {
     fn put(&self, key: noshape_model::regen::RegenKey, bytes: Vec<u8>) {
         self.0.lock().unwrap().insert(key, bytes);
     }
+    fn get_blob(&self, hash: &[u8; 16]) -> Option<Vec<u8>> {
+        self.0.lock().unwrap().get(&u128::from_le_bytes(*hash)).cloned()
+    }
+    fn put_blob(&self, hash: &[u8; 16], bytes: Vec<u8>) {
+        self.0.lock().unwrap().insert(u128::from_le_bytes(*hash), bytes);
+    }
+    fn has_blob(&self, hash: &[u8; 16]) -> bool {
+        self.0.lock().unwrap().contains_key(&u128::from_le_bytes(*hash))
+    }
 }
 
 /// A regeneration kept in a [`ResultStore`] reopens from it without evaluating a feature, with the same parts and
@@ -331,4 +340,41 @@ fn a_directory_store_keeps_results_per_build_within_its_cap() {
     assert!(small.get(7).is_none(), "the older entry went");
     assert_eq!(small.get(8), Some(vec![4, 5, 6]));
     let _ = std::fs::remove_dir_all(&d);
+}
+
+/// After a reopen from the store, an edit evaluates only the edited feature and those after it: the ones before come
+/// from their kept entries (their shapes kept once, by content). A damaged entry or shape is never used.
+#[test]
+fn an_edit_after_reopening_runs_from_the_edit_on() {
+    use noshape_model::regen::persist;
+    let (ps, units) = studio_with_block();
+    let store = std::sync::Arc::new(MemStore::default());
+    let opts = RegenOptions { store: Some(store.clone()), ..Default::default() };
+    let first = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+    assert_eq!(first.fresh.len(), 2);
+    persist::keep_now(store.clone(), &first);
+    let mut edited = ps.clone();
+    edited.features[1].params.set("depth", ParamValue::Expr(ExprValue::new("30 mm")));
+    let parts = |r: &noshape_model::regen::RegenResult| {
+        r.context.bodies.untracked().iter().map(|b| (b.id.clone(), b.faces.clone(), (b.shape.volume().unwrap() * 1e12).round())).collect::<Vec<_>>()
+    };
+    let fresh = Regenerator::new().regenerate(&edited, &ConfigValues::default(), &units, &RegenOptions::default());
+    // A new session: the sketch from its entry, only the extrude evaluated.
+    let r = Regenerator::new().regenerate(&edited, &ConfigValues::default(), &units, &opts);
+    assert_eq!(r.evaluated, vec![edited.features[1].id]);
+    assert_eq!(parts(&r), parts(&fresh));
+    assert_eq!(r.display.features.iter().map(|s| s.status).collect::<Vec<_>>(), fresh.display.features.iter().map(|s| s.status).collect::<Vec<_>>());
+    // Every kept entry and shape damaged: everything evaluated again, the same parts.
+    let keys: Vec<_> = store.0.lock().unwrap().keys().copied().collect();
+    for k in keys {
+        if let Some(v) = store.0.lock().unwrap().get_mut(&k) {
+            let n = v.len() / 2;
+            if n > 0 {
+                v[n] ^= 1;
+            }
+        }
+    }
+    let r = Regenerator::new().regenerate(&edited, &ConfigValues::default(), &units, &opts);
+    assert_eq!(r.evaluated.len(), 2);
+    assert_eq!(parts(&r), parts(&fresh));
 }

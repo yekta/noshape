@@ -125,8 +125,9 @@ impl OpenDoc {
         let studio = studio(&self.session.doc, tab)?;
         let reg = self.regens.entry(tab).or_default();
         let r = reg.regenerate(studio, &values, &units, &opts);
+        // (Here, not on a thread: an agent's process ends with its call.)
         if let Some(store) = opts.store.clone() {
-            noshape_model::regen::persist::keep(store, &r);
+            noshape_model::regen::persist::keep_now(store, &r);
         }
         Ok(r)
     }

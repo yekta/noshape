@@ -33,6 +33,22 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-11 08:47 UTC: the persistent regeneration cache, stages 1-4.**
+- Keys (stage 1, aecbfddf): `RegenKey`, a 128-bit blake3 chain from document content only; `result_key` covers the
+  studio, settings, Variable Studio values, derived sources (`DocStudios::version`), Feature Studios, File tabs'
+  bytes (`files_version`, 44ec247a); ops `result_keys` tests each outside input.
+- Contexts as bytes (stage 2): serde on `Context` and what it holds; shapes as OCCT binary through a `ShapeCodec`
+  (kernel io.rs); a context holding FeatureScript attributes or variables isn't kept (std sheet metal still
+  regenerates).
+- Whole results (stage 3, 7468469f): `ResultStore` on `RegenOptions`; app `result_store` (user cache dir, per build,
+  2 GB LRU), ops `NOSHAPE_RESULT_STORE` (written synchronously: a CLI process ends with its call).
+- Per feature (stage 4): each evaluated feature's entry under `persist::feature_key(chain key)`, shapes once as
+  content-hashed blobs (checked on read), so an edit after a reopen runs from the edit on.
+- hat8 (vibe3, copy of the original): first open 18.3 s writing 20 MB; reopen 1.3 s; reopen + rename of the last
+  feature 7.9 s; all 137 features as the original.
+- Next: entries of earlier features decode one after another (136 for hat8's last feature): a lazy context would
+  read only the one before the edit.
+
 **State 11-11 06:12 UTC: hat8 (lead's P0): thin caps valid, merged faces keep their oldest name.**
 - hat8's thin extrudes ("Riser legs", "Seat lip"; thin.rs closed_wall) made caps OCCT finds invalid: its 2D offset of
   a B-spline is an offset curve and BRepCheck reads its curve on the plane off it (InvalidCurveOnSurface; exact pcurves
