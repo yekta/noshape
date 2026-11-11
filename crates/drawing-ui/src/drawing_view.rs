@@ -1256,6 +1256,8 @@ impl DrawingEditor {
         self.computing = true;
         self.compute_task = Some(cx.spawn(async move |this, cx| {
             cx.background_spawn(async move {
+                // Below the UI thread and the frames (threads.rs).
+                noshape_render::threads::lower_priority();
                 if let Some(s) = d.sheets.get(si) {
                     views::compute_sheet_views(&d, s, &sources, &cache, exact);
                 }

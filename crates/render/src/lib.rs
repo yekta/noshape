@@ -14,6 +14,7 @@ pub mod perf;
 pub mod primitives;
 pub mod renderer;
 pub mod scene;
+pub mod threads;
 mod section_caps;
 pub mod worker;
 

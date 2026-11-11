@@ -524,6 +524,20 @@ fn main() {
         // Updates: checked at launch and every 5 minutes, a card floating at the bottom of every window.
         updates::init(cx);
         noshape_render::perf::milestone("app initialized");
+        // NOSHAPE_PERF: a 50 ms tick on the UI thread; one late by more than 100 ms is the UI thread busy (no click or
+        // orbit gets an answer meanwhile).
+        if noshape_render::perf::enabled() {
+            cx.spawn(async move |cx| loop {
+                let (t, cpu) = (std::time::Instant::now(), noshape_render::perf::thread_cpu_ms());
+                cx.background_executor().timer(std::time::Duration::from_millis(50)).await;
+                let late = t.elapsed().as_secs_f64() * 1000.0 - 50.0;
+                if late > 100.0 {
+                    // (Its own CPU meanwhile: near the stall, the UI thread was working; far under, it waited for a core.)
+                    noshape_render::perf::milestone(&format!("ui stall {late:.0} ms (ui cpu {:.0} ms)", noshape_render::perf::thread_cpu_ms() - cpu));
+                }
+            })
+            .detach();
+        }
         if let Some(message) = update_failed.filter(|m| !m.is_empty()) {
             updates::note(&format!("update failed: {message}"));
             start_window::show_with_error(message, cx);

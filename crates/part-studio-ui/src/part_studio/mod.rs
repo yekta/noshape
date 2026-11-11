@@ -799,6 +799,7 @@ impl PartStudioView {
         // after the open asked on the macOS runners, behind the window's first frames).
         let executor = cx.background_executor().clone();
         let work = cx.background_spawn(async move {
+            noshape_render::threads::lower_priority();
             if burst {
                 executor.timer(Duration::from_millis(12)).await;
             }
@@ -900,6 +901,7 @@ impl PartStudioView {
                 let regen2 = regen2;
                 let fine = cx
                     .background_spawn(async move {
+                        noshape_render::threads::lower_priority();
                         let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, relative_deflection: deflection, derived: Some(derived2), custom_features: Some(custom2), cancel: Some(cancel2), touch_probe, store: noshape_app_core::result_store::store(), ..Default::default() };
                         let Some(target) = regenerator_for(&regen2, true, opts.cancel.as_ref(), &seed2) else {
                             return (noshape_model::regen::RegenResult { cancelled: true, ..Default::default() }, studio, config);

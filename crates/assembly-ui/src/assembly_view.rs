@@ -769,6 +769,8 @@ impl AssemblyView {
             cx.background_executor().timer(Duration::from_millis(10)).await;
             let (result, catalog) = cx
                 .background_spawn(async move {
+                    // Below the UI thread and the frames (threads.rs).
+                    noshape_render::threads::lower_priority();
                     let mut ev = evaluator.lock();
                     ev.retain_tabs(&doc);
                     // `NOSHAPE_PERF`: a.eval (evaluate after an edit), a.eval_catalog

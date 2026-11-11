@@ -19,6 +19,19 @@ pub fn enabled() -> bool {
     *ON.get_or_init(|| std::env::var("NOSHAPE_PERF").is_ok_and(|v| v != "0" && !v.is_empty()))
 }
 
+/// This thread's CPU time (ms; 0 where it can't be read): a busy thread from a starved one.
+pub fn thread_cpu_ms() -> f64 {
+    #[cfg(unix)]
+    {
+        let mut t = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+        // SAFETY: a valid timespec for the call to fill.
+        if unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut t) } == 0 {
+            return t.tv_sec as f64 * 1e3 + t.tv_nsec as f64 * 1e-6;
+        }
+    }
+    0.0
+}
+
 /// Process start reference for "time since launch" logs.
 pub fn process_start() -> Instant {
     static T0: OnceLock<Instant> = OnceLock::new();
