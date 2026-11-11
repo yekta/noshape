@@ -33,6 +33,23 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-11 06:12 UTC: hat8 (lead's P0): thin caps valid, merged faces keep their oldest name.**
+- hat8's thin extrudes ("Riser legs", "Seat lip"; thin.rs closed_wall) made caps OCCT finds invalid: its 2D offset of
+  a B-spline is an offset curve and BRepCheck reads its curve on the plane off it (InvalidCurveOnSurface; exact pcurves
+  and SameParameter didn't fix it). An invalid cap is now made again on `offset_curves_as_bsplines` (each offset edge a
+  B-spline within 1e-9, between the same vertices); a valid one stays as it was. Converting every offset (even at
+  1e-9) moved a coplanar merge's name in "SSD side bridge (-X)" and the SSD pad sketches lost their plane.
+- Valid caps made the chamfers fast (vibe3, load 25-40): Riser feet chamfers 7.0 -> ~1.0 s, Seat lip 45° chamfer 4.0 ->
+  0.13 s, Merge seat lip into riser 2.7 -> 0.9-1.3 s, Riser legs grip 7.0 -> 2.6-3.6 s, the union 77 -> 44-48 s (bool's).
+- Naming (eval.rs `name_unified`): faces a unify merges after a boolean keep their oldest parent (the target's over a
+  tool's, then the one whose feature comes first: `Features::order_of`, not a read), not the boolean result's order.
+- hat8 against the user's original (md5 8230224b, run 01:13): all 137 features the same status. Determinism: 4 runs
+  under load, the same at every feature (T2 ops `regen_determinism`, NOSHAPE_PROBE_DOC / _TAB / _RUNS, on a mode-700
+  scratch copy).
+- Riser legs grip: OCCT's offset still refuses ("Offset with no C1 Surface", a surface it extends itself); the
+  Boolean fallback no longer takes a precise volume of a single piece (0.8 s).
+- Lesson (core, 02:55): a CLI batch with feature_rollback saves the document. Private documents: query a copy.
+
 **Design 11-11 02:10 UTC (lead's P0, hat8 "Mac mini hat": open 108 s, regen 92 s): a persistent regeneration cache.
 Not built: for the lead's go.**
 - Today: `Regenerator` caches per-feature results in memory (`CacheEntry`: the context after the feature, its state),

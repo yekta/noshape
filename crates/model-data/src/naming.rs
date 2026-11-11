@@ -63,6 +63,9 @@ fn key_cmp(a: &GeoKey, b: &GeoKey) -> std::cmp::Ordering {
     std::cmp::Ordering::Equal
 }
 
+/// A parent name's rank (lower first) where it has one: [`FaceNamingInput::parent_rank`].
+pub type ParentRank<'a> = dyn Fn(&Name) -> Option<(u32, u32)> + 'a;
+
 pub struct FaceNamingInput<'a> {
     pub feature: FeatureId,
     pub args: &'a [&'a ShapeNames],
@@ -78,6 +81,9 @@ pub struct FaceNamingInput<'a> {
     /// How to name a face generated from an input edge/vertex
     /// (default: `Role::Generated(edge name)`).
     pub generated_role: Option<&'a dyn Fn(&Name) -> Role>,
+    /// Ranks parent names ahead of their (argument, face) order (the faces a unify merges after a boolean: by where
+    /// they were in the boolean's arguments, not where its result put them).
+    pub parent_rank: Option<&'a ParentRank<'a>>,
 }
 
 /// Name every output face.
@@ -145,7 +151,8 @@ pub fn name_faces(input: &FaceNamingInput) -> Vec<Name> {
         let mut face_parents: Vec<&Name> = ps.iter().filter(|(r, _)| *r != Relation::Generated).map(|(_, n)| n).collect();
         face_parents.sort_by(|a, b| {
             let at = |n: &Name| parent_key.get(&Arc::as_ptr(n)).copied().unwrap_or((u32::MAX, u32::MAX));
-            at(a).cmp(&at(b)).then_with(|| a.cmp(b))
+            let rank = |n: &Name| input.parent_rank.and_then(|r| r(n)).unwrap_or((u32::MAX, u32::MAX));
+            rank(a).cmp(&rank(b)).then_with(|| at(a).cmp(&at(b))).then_with(|| a.cmp(b))
         });
         if let Some(p) = face_parents.first() {
             let p = (*p).clone();
@@ -291,7 +298,7 @@ mod tests {
         ];
         let keys = [[0.0; 4], [2.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 1.0]];
         let roles = BTreeMap::new();
-        let names = name_faces(&FaceNamingInput { feature: FeatureId(9), args: &args, records: &records, out_count: keys.len(), out_face_key: &|i| keys[i], roles: &roles, generated_role: None });
+        let names = name_faces(&FaceNamingInput { feature: FeatureId(9), args: &args, records: &records, out_count: keys.len(), out_face_key: &|i| keys[i], roles: &roles, generated_role: None, parent_rank: None });
         assert_eq!(names[0], a);
         // Face 2 has the smaller key -> ordinal 0.
         assert_eq!(*names[2], TopoName::Split { parent: b.clone(), by: FeatureId(9), ordinal: 0 });
@@ -313,7 +320,7 @@ mod tests {
             TopoName::Wire { source, .. } => Role::Side(source.clone()),
             _ => Role::Generated(n.clone()),
         };
-        let names = name_faces(&FaceNamingInput { feature: FeatureId(3), args: &args, records: &records, out_count: keys.len(), out_face_key: &|i| keys[i], roles: &roles, generated_role: Some(&side) });
+        let names = name_faces(&FaceNamingInput { feature: FeatureId(3), args: &args, records: &records, out_count: keys.len(), out_face_key: &|i| keys[i], roles: &roles, generated_role: Some(&side), parent_rank: None });
         assert_eq!(*names[0], TopoName::face(FeatureId(3), Role::CapStart(None)));
         assert_eq!(*names[1], TopoName::face(FeatureId(3), Role::Side(side_src(5))));
         assert_eq!(*names[2], TopoName::face(FeatureId(3), Role::New(0)));

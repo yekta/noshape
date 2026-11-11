@@ -602,6 +602,7 @@ pub(crate) mod ffi {
             left_handed: bool,
             taper_angle: f64,
         ) -> Result<UniquePtr<OcShape>>;
+        fn offset_curves_as_bsplines(s: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn offset_wire_2d(
             wire_or_face: &OcShape,
             distance: f64,

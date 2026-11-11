@@ -10,7 +10,7 @@ use glam::{DMat4, DVec2, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
 use noshape_units::{Dim, LayeredScope, Quantity, UnitPrefs, VariableScope};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -117,6 +117,11 @@ pub struct Features<'a> {
 impl<'a> Features<'a> {
     pub fn new(list: &'a [EffectiveFeature], reads: Option<&'a BodyReads>) -> Self {
         Features { list, reads }
+    }
+    /// Where feature `id` is in the list (not a read: only naming asks, of the features that made the faces of bodies
+    /// it reads, which change with any reorder upstream).
+    pub fn order_of(self, id: FeatureId) -> Option<usize> {
+        self.list.iter().position(|f| f.id == id)
     }
     /// The list, for as long as the Part Studio lives (a read, as `Deref`).
     pub fn list(self) -> &'a [EffectiveFeature] {
@@ -910,27 +915,43 @@ impl<'a> EvalCtx<'a> {
 
     /// Name the faces of an operation result.
     pub fn name_result(&self, args: &[&ShapeNames], hist: &k::History, out: &Shape, roles: &BTreeMap<u32, Role>, generated: Option<&dyn Fn(&Name) -> Role>) -> Vec<Name> {
-        let records: Vec<HistRecord> = hist
-            .records
-            .iter()
-            .filter_map(|r| {
-                let kind = |t: ShapeType| match t {
-                    ShapeType::Face => Some(Kind::Face),
-                    ShapeType::Edge => Some(Kind::Edge),
-                    ShapeType::Vertex => Some(Kind::Vertex),
-                    _ => None,
-                };
-                let relation = match r.relation {
-                    k::Relation::Modified => Relation::Modified,
-                    k::Relation::Kept => Relation::Same,
-                    k::Relation::Generated => Relation::Generated,
-                    k::Relation::First | k::Relation::Last | k::Relation::Deleted => return None,
-                };
-                Some(HistRecord { arg: r.arg, in_kind: kind(r.input_kind)?, in_index: r.input_index, relation, out_kind: kind(r.output_kind)?, out_index: r.output_index })
-            })
-            .collect();
+        let records = hist_records(hist);
         let count = out.count(ShapeType::Face);
-        name_faces(&FaceNamingInput { feature: self.feature, args, records: &records, out_count: count, out_face_key: &|i| face_key(out, i), roles, generated_role: generated })
+        name_faces(&FaceNamingInput { feature: self.feature, args, records: &records, out_count: count, out_face_key: &|i| face_key(out, i), roles, generated_role: generated, parent_rank: None })
+    }
+
+    /// Names after the unify that follows a boolean: a merged face keeps its oldest parent, the target's face over a
+    /// tool's and then the one made first (as Parasolid keeps a part's faces), not whichever the boolean's result
+    /// happened to put first (that moved with a tool's curve kinds: hat8's SSD pad sketches lost their plane).
+    fn name_unified(&self, args: &[&ShapeNames], face_names: Vec<Name>, unified: &k::OpResult) -> Vec<Name> {
+        // By argument, then the oldest: three faces of the target merged keep the one whose feature comes first (hat8's
+        // SSD pads sketch on SSD corner stops' face, merged with Converter corner stops' by a later bridge); the
+        // boolean result's order (which moved with a tool's curve kinds) only between faces of one feature.
+        let features = self.features;
+        let mut at: HashMap<&TopoName, u32> = HashMap::new();
+        for (a, n) in args.iter().enumerate() {
+            for f in &n.faces {
+                at.entry(&**f).or_insert(a as u32);
+            }
+        }
+        // (A face the boolean split: its parent's argument, through every split.)
+        let rank = |n: &Name| {
+            let mut cur: &TopoName = n;
+            loop {
+                if let Some(&a) = at.get(cur) {
+                    let age = n.creator().and_then(|f| features.order_of(f)).map_or(u32::MAX, |i| i as u32);
+                    return Some((a, age));
+                }
+                match cur {
+                    TopoName::Split { parent, .. } => cur = parent,
+                    _ => return None,
+                }
+            }
+        };
+        let before = unify_input_names(face_names);
+        let records = hist_records(&unified.history);
+        let out = &unified.shape;
+        name_faces(&FaceNamingInput { feature: self.feature, args: &[&before], records: &records, out_count: out.count(ShapeType::Face), out_face_key: &|i| face_key(out, i), roles: &BTreeMap::new(), generated_role: None, parent_rank: Some(&rank) })
     }
 
     /// Bounding diagonal of everything (for "through all").
@@ -1044,8 +1065,7 @@ impl<'a> EvalCtx<'a> {
         // faces, no seam).
         let unified = k::unify_same_domain(&res.shape)?;
         if unify_merged(&res.shape, &unified.shape) {
-            let before = unify_input_names(face_names);
-            let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
+            let names = self.name_unified(&names, face_names, &unified);
             return Ok(split_solids(&unified.shape, &names, Some(self.feature)));
         }
         Ok(split_solids(&res.shape, &face_names, Some(self.feature)))
@@ -1176,8 +1196,7 @@ impl<'a> EvalCtx<'a> {
             let unified = k::unify_same_domain(&res.shape)?;
             let t_unified = t0.elapsed();
             let (res, face_names) = if unify_merged(&res.shape, &unified.shape) {
-                let before = unify_input_names(face_names);
-                let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
+                let names = self.name_unified(&arg_refs, face_names, &unified);
                 (unified, names)
             } else {
                 (res, face_names)
@@ -1280,8 +1299,7 @@ impl<'a> EvalCtx<'a> {
         let face_names = self.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
         let unified = k::unify_same_domain(&res.shape)?;
         let (shape, face_names) = if unify_merged(&res.shape, &unified.shape) {
-            let before = unify_input_names(face_names);
-            let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
+            let names = self.name_unified(&arg_refs, face_names, &unified);
             (unified.shape, names)
         } else {
             (res.shape, face_names)
@@ -1366,6 +1384,28 @@ impl NamedShape {
 /// unify's history takes faces to faces (merge_planar, UnifySameDomain), so
 /// the edge and vertex names, which cost two ancestor maps of the whole part
 /// (the 1600-face fin plate: ~30 ms), would go unread.
+/// A kernel history's face, edge and vertex records as naming reads them.
+fn hist_records(hist: &k::History) -> Vec<HistRecord> {
+    hist.records
+        .iter()
+        .filter_map(|r| {
+            let kind = |t: ShapeType| match t {
+                ShapeType::Face => Some(Kind::Face),
+                ShapeType::Edge => Some(Kind::Edge),
+                ShapeType::Vertex => Some(Kind::Vertex),
+                _ => None,
+            };
+            let relation = match r.relation {
+                k::Relation::Modified => Relation::Modified,
+                k::Relation::Kept => Relation::Same,
+                k::Relation::Generated => Relation::Generated,
+                k::Relation::First | k::Relation::Last | k::Relation::Deleted => return None,
+            };
+            Some(HistRecord { arg: r.arg, in_kind: kind(r.input_kind)?, in_index: r.input_index, relation, out_kind: kind(r.output_kind)?, out_index: r.output_index })
+        })
+        .collect()
+}
+
 fn unify_input_names(faces: Vec<Name>) -> ShapeNames {
     ShapeNames { faces, edges: Vec::new(), vertices: Vec::new() }
 }

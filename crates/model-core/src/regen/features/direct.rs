@@ -461,10 +461,19 @@ fn offset_by_booleans(ev: &mut EvalCtx, bi: usize, faces: &[usize], dist: f64) -
     let un = k::unify_same_domain(&shape)?;
     let names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &un.history, &un.shape, &BTreeMap::new(), None);
     let volume = |s: &Shape| k::volume_properties(s).map(|m| m.mass).unwrap_or(0.0);
-    // The face moved through the far side: the cut leaves an empty solid.
-    let mut pieces: Vec<_> = crate::regen::eval::split_solids(&un.shape, &names, Some(ev.feature)).into_iter().filter(|p| volume(&p.shape) > 0.0).collect();
+    // The face moved through the far side: the cut leaves an empty solid. (One piece: its volume isn't needed, a big
+    // part's took 0.8 s.)
+    let mut pieces: Vec<_> = crate::regen::eval::split_solids(&un.shape, &names, Some(ev.feature)).into_iter().filter(|p| !p.shape.faces().is_empty()).collect();
+    if pieces.len() > 1 {
+        pieces.retain(|p| volume(&p.shape) > 0.0);
+    }
     if pieces.is_empty() {
         return err("Could not offset selected faces as requested.");
+    }
+    if pieces.len() == 1 {
+        let piece = pieces.swap_remove(0);
+        ev.replace_body(bi, piece.shape, piece.names.faces);
+        return Ok(());
     }
     let key = |p: &crate::regen::eval::NamedShape| -> (f64, [f64; 3]) {
         let v = volume(&p.shape);

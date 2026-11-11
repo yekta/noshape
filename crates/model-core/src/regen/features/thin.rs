@@ -243,8 +243,18 @@ pub fn wall_loops(w: &Shape, t_out: f64, t_in: f64) -> FResult<(Shape, Shape)> {
 
 /// Thin wall around a closed loop.
 fn closed_wall(frame: &PlaneFrame, w: &Shape, sources: &[SourcedEdge], t_out: f64, t_in: f64, key: Source) -> FResult<Profile> {
-    let (outer, inner) = wall_loops(w, t_out, t_in)?;
-    let face = k::make_face(&kernel_plane(frame), &outer, std::slice::from_ref(&inner)).map_err(kerr("Failed to create sheet body from source and offset wire."))?;
+    let (mut outer, mut inner) = wall_loops(w, t_out, t_in)?;
+    let mut face = k::make_face(&kernel_plane(frame), &outer, std::slice::from_ref(&inner)).map_err(kerr("Failed to create sheet body from source and offset wire."))?;
+    // A cap the offset left invalid (its offset curves: hat8's "Riser legs", whose chamfers then took seconds) is
+    // made again on B-splines within 1e-9 of them; a valid one stays as it is (other parts' faces lying on it).
+    if !face.is_valid() {
+        let (o, i) = (k::offset_curves_as_bsplines(&outer)?, k::offset_curves_as_bsplines(&inner)?);
+        if let Ok(f) = k::make_face(&kernel_plane(frame), &o, std::slice::from_ref(&i))
+            && f.is_valid()
+        {
+            (outer, inner, face) = (o, i, f);
+        }
+    }
     let edge_sources = tag_sources(&face, &outer, &inner, sources, None);
     Ok(Profile { shape: face, frame: *frame, edge_sources, key, from_face: false })
 }

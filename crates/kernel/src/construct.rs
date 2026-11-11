@@ -338,6 +338,13 @@ pub fn offset_wire_2d(wire_or_face: &Shape, distance: f64, join: JoinType, open_
     Shape::from_res(ffi::offset_wire_2d(wire_or_face.raw(), distance, join.code(), open_result))
 }
 
+/// `s` with each edge on an offset curve (an [`offset_wire_2d`] of a B-spline) on a B-spline within 1e-9 of it instead,
+/// between the same vertices: a planar face bounded by offset curves can be invalid (their curves on the plane are
+/// made again by projection), one bounded by these isn't.
+pub fn offset_curves_as_bsplines(s: &Shape) -> Result<Shape> {
+    Shape::from_res(ffi::offset_curves_as_bsplines(s.raw()))
+}
+
 /// Connect loose edges into wires (ShapeAnalysis_FreeBounds).
 pub fn edges_to_wires(edges: &Shape, tolerance: f64) -> Result<Vec<Shape>> {
     let l = ck(ffi::edges_to_wires(edges.raw(), tolerance))?;

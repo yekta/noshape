@@ -968,3 +968,163 @@ fn a_guided_surface_loft_as_live() {
         assert!(faces[0].is_valid(), "{case}");
     }
 }
+
+/// Probe: an offset-faces dump (NOSHAPE_DUMP_OPS's offsetfaces-N.brep / .txt, the path in NOSHAPE_PROBE_OFFSET without
+/// its extension): the faces' surfaces and OCCT's offset of them, timed.
+#[test]
+#[ignore = "T2: probe"]
+fn offset_faces_dump_probe() {
+    let Ok(base) = std::env::var("NOSHAPE_PROBE_OFFSET") else { return };
+    let s = read_brep(std::path::Path::new(&format!("{base}.brep"))).unwrap();
+    let txt = std::fs::read_to_string(format!("{base}.txt")).unwrap();
+    let faces = s.faces();
+    let picked: Vec<Shape> = txt.lines().filter_map(|l| l.strip_prefix("face ")).filter_map(|i| i.trim().parse::<usize>().ok()).map(|i| faces[i].clone()).collect();
+    let d: f64 = txt.lines().find_map(|l| l.strip_prefix("offset ")).and_then(|v| v.trim().parse().ok()).unwrap();
+    let mut kinds = std::collections::BTreeMap::new();
+    for f in &faces {
+        *kinds.entry(format!("{:?}", f.face_surface().map(|s| format!("{s:?}").split([' ', '{', '(']).next().unwrap_or("").to_string()))).or_insert(0) += 1;
+    }
+    println!("{} faces {kinds:?}, solids {}, valid {}", faces.len(), s.count(ShapeType::Solid), s.is_valid());
+    for (i, f) in faces.iter().enumerate() {
+        if !f.is_valid() {
+            println!("   invalid face {i}: {:?} area {:.3e}", f.face_surface().map(|s| format!("{s:?}").chars().take(90).collect::<String>()), f.area().unwrap_or(0.0));
+        }
+    }
+    let bad_edges = s.edges().iter().filter(|e| !e.is_valid()).count();
+    println!("   invalid edges {bad_edges} of {}", s.edges().len());
+    for f in &picked {
+        println!("moved: {:?} area {:.6e}", f.face_surface().map(|s| format!("{s:?}").chars().take(160).collect::<String>()), f.area().unwrap_or(0.0));
+        for e in f.edges() {
+            let Ok(i) = e.edge_info() else { continue };
+            if let Ok(b) = e.edge_bspline() {
+                let tan = |u: f64| e.tangent_at(u).map(|t| t.normalize()).unwrap_or_default();
+                let joins: Vec<String> = b.knots.iter().zip(&b.mults).filter(|(_, m)| **m as i32 >= b.degree as i32).map(|(k, m)| format!("{k:.4}x{m} {:.2e}", (tan(*k - 1e-9) - tan(*k + 1e-9)).length())).collect();
+                println!("   edge {:?}: degree {} poles {} knots {} C0 joins {:?}", i.curve, b.degree, b.poles.len(), b.knots.len(), joins);
+            }
+        }
+    }
+    for dist in [d, -d] {
+        let t = std::time::Instant::now();
+        let r = offset_faces(&s, &picked, dist);
+        println!("offset {dist}: {:?} in {:?}", r.as_ref().map(|r| (r.shape.is_valid(), r.shape.count(ShapeType::Solid), r.shape.faces().len())).map_err(|e| e.to_string()), t.elapsed());
+    }
+}
+
+/// Probe: each B-rep in NOSHAPE_PROBE_BREPS (a NOSHAPE_DUMP_OPS directory): its binary size and how long writing and
+/// reading it back takes (a persistent regeneration cache's cost per body).
+#[test]
+#[ignore = "T2: probe"]
+fn brep_bytes_cost_probe() {
+    let Ok(dir) = std::env::var("NOSHAPE_PROBE_BREPS") else { return };
+    let mut paths: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().is_some_and(|x| x == "brep")).collect();
+    paths.sort();
+    for p in paths {
+        let Ok(s) = read_brep(&p) else { continue };
+        let t = std::time::Instant::now();
+        let bytes = s.to_bin_bytes(false).unwrap();
+        let w = t.elapsed();
+        let t = std::time::Instant::now();
+        let back = Shape::from_bin_bytes(&bytes).unwrap();
+        let r = t.elapsed();
+        println!("{} faces {} valid {} binary {} KB write {:?} read {:?} (faces back {})", p.file_name().unwrap().to_string_lossy(), s.faces().len(), s.is_valid(), bytes.len() / 1024, w, r, back.faces().len());
+    }
+}
+
+/// Probe: a dumped tool's invalid faces (NOSHAPE_PROBE_TOOL, a .brep): each face's wires, their edges' kinds and
+/// whether the wire or the face crosses itself.
+#[test]
+#[ignore = "T2: probe"]
+fn invalid_face_probe() {
+    let Ok(path) = std::env::var("NOSHAPE_PROBE_TOOL") else { return };
+    let s = read_brep(std::path::Path::new(&path)).unwrap();
+    println!("valid {} faces {}", s.is_valid(), s.faces().len());
+    for (i, f) in s.faces().iter().enumerate() {
+        if f.is_valid() {
+            continue;
+        }
+        println!("face {i}: area {:.3} mm2, self-intersects {}", f.area().unwrap_or(0.0) * 1e6, f.self_intersects());
+        let ws = f.wires();
+        if ws.len() == 2 {
+            let d = distance(&ws[0], &ws[1]).unwrap();
+            println!("  wires {:.6} mm apart at {:?} / {:?}", d.distance * 1e3, d.point_a * 1e3, d.point_b * 1e3);
+            // Each wire's edges, pairwise distances to the other wire's, the closest few.
+            let mut pairs: Vec<(f64, usize, usize)> = Vec::new();
+            for (a, ea) in ws[0].edges().iter().enumerate() {
+                for (b, eb) in ws[1].edges().iter().enumerate() {
+                    if let Ok(x) = distance(ea, eb) {
+                        pairs.push((x.distance * 1e3, a, b));
+                    }
+                }
+            }
+            pairs.sort_by(|x, y| x.0.total_cmp(&y.0));
+            println!("  closest edge pairs (mm, outer, inner): {:?}", &pairs[..pairs.len().min(5)]);
+            let pl = f.face_plane().unwrap().unwrap();
+            // The sketch loop (the inner wire) offset again by the wall's thickness, as the thin extrude does.
+            for t in [d_wall(&ws[0], &ws[1]), -d_wall(&ws[0], &ws[1])] {
+                let Ok(o) = offset_wire_2d(&ws[1], t, JoinType::Intersection, false) else { continue };
+                let kinds: Vec<String> = o.edges().iter().filter_map(|e| e.edge_info().ok()).map(|i| format!("{:?}", i.curve).split([' ', '{']).next().unwrap_or("").to_string()).collect();
+                println!("  offset {:.3} mm: {:?} -> face {:?}", t * 1e3, kinds, make_face(&pl, &o, &[]).map(|g| (g.is_valid(), g.area().unwrap_or(0.0) * 1e6)).map_err(|e| e.to_string()));
+            }
+            for (name, o, h) in [("as is", ws[0].clone(), ws[1].clone()), ("hole reversed", ws[0].clone(), ws[1].reversed().unwrap()), ("outer alone", ws[0].clone(), Shape::compound(&[])), ("inner alone", ws[1].clone(), Shape::compound(&[]))] {
+                let holes: Vec<Shape> = if h.faces().is_empty() && h.edges().is_empty() { vec![] } else { vec![h] };
+                match make_face(&pl, &o, &holes) {
+                    Ok(g) => println!("  rebuilt {name}: valid {}, area {:.3} mm2", g.is_valid(), g.area().unwrap_or(0.0) * 1e6),
+                    Err(e) => println!("  rebuilt {name}: {e}"),
+                }
+            }
+        }
+        for (k, w) in f.wires().iter().enumerate() {
+            let kinds: Vec<String> = w.edges().iter().filter_map(|e| e.edge_info().ok()).map(|i| format!("{:?}", i.curve).split([' ', '{']).next().unwrap_or("").to_string()).collect();
+            println!("  wire {k}: valid {}, closed {:?}, self-intersects {}, {} edges {:?}", w.is_valid(), w.is_closed(), w.self_intersects(), kinds.len(), kinds);
+            for e in w.edges() {
+                if !e.is_valid() {
+                    println!("    invalid edge {:?}", e.edge_info().map(|i| (i.curve, i.start, i.end)));
+                }
+            }
+        }
+    }
+}
+
+fn d_wall(a: &Shape, b: &Shape) -> f64 {
+    distance(a, b).map(|d| d.distance).unwrap_or(0.0)
+}
+
+/// A planar loop with B-spline corners offset in its plane (a thin feature's wall) gives offset curves; on B-splines
+/// within 1e-9 of them (hat8's thin "Riser legs": its caps were invalid on the offset curves) the same face comes out
+/// valid, its area unchanged.
+#[test]
+fn offset_curves_become_bsplines_on_them() {
+    let corner = |a: (f64, f64), m: (f64, f64), b: (f64, f64)| Segment2d::BSpline {
+        poles: vec![DVec2::new(a.0, a.1), DVec2::new(m.0, m.1), DVec2::new(b.0, b.1)],
+        weights: None,
+        knots: vec![0.0, 1.0],
+        mults: vec![3, 3],
+        degree: 2,
+        periodic: false,
+    };
+    let l = |a: (f64, f64), b: (f64, f64)| Segment2d::Line { a: DVec2::new(a.0, a.1), b: DVec2::new(b.0, b.1) };
+    let loop_ = [
+        l((4.0, 0.0), (36.0, 0.0)),
+        corner((36.0, 0.0), (40.0, 0.0), (40.0, 4.0)),
+        l((40.0, 4.0), (40.0, 16.0)),
+        corner((40.0, 16.0), (40.0, 20.0), (36.0, 20.0)),
+        l((36.0, 20.0), (4.0, 20.0)),
+        corner((4.0, 20.0), (0.0, 20.0), (0.0, 16.0)),
+        l((0.0, 16.0), (0.0, 4.0)),
+        corner((0.0, 4.0), (0.0, 0.0), (4.0, 0.0)),
+    ];
+    let plane = Plane::xy();
+    let w = make_wire_2d(&plane, &loop_).unwrap();
+    let kinds = |s: &Shape| s.edges().iter().filter_map(|e| e.edge_info().ok()).filter(|i| matches!(i.curve, Curve::Offset)).count();
+    for d in [1.0, -1.0] {
+        let o = offset_wire_2d(&w, d, JoinType::Intersection, false).unwrap();
+        assert!(kinds(&o) > 0, "the offset has offset curves");
+        let b = offset_curves_as_bsplines(&o).unwrap();
+        assert_eq!(kinds(&b), 0);
+        assert_eq!(b.edges().len(), o.edges().len());
+        let (fo, fb) = (make_face(&plane, &o, &[]).unwrap(), make_face(&plane, &b, &[]).unwrap());
+        assert!(fb.is_valid());
+        let (ao, ab) = (fo.area().unwrap(), fb.area().unwrap());
+        assert!((ao - ab).abs() < 1e-9 * ao, "{ao} vs {ab}");
+    }
+}

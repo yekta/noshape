@@ -20,6 +20,7 @@ mod mesh_pixels;
 mod notices;
 mod parity;
 mod planar_face_mesh;
+mod regen_determinism;
 mod regen_profile;
 mod sketch_open_perf;
 mod sketch_recursion;

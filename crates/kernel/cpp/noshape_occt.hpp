@@ -905,6 +905,7 @@ std::unique_ptr<OcShape> make_bspline_3d(rust::Slice<const double> poles,
                                          bool periodic);
 std::unique_ptr<OcShape> make_helix(const PlaneF& frame, double radius, double pitch,
                                     double height, bool left_handed, double taper_angle);
+std::unique_ptr<OcShape> offset_curves_as_bsplines(const OcShape& s);
 std::unique_ptr<OcShape> offset_wire_2d(const OcShape& wire_or_face, double distance,
                                         uint8_t join, bool open_result);
 std::unique_ptr<OcShape> make_box(const PlaneF& frame, double dx, double dy, double dz);

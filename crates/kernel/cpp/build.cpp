@@ -66,6 +66,8 @@
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Ellipse.hxx>
 #include <Geom_TrimmedCurve.hxx>
+#include <Geom_OffsetCurve.hxx>
+#include <GeomConvert_ApproxCurve.hxx>
 #include <NCollection_Array1.hxx>
 #include <NCollection_HArray1.hxx>
 #include <NCollection_HSequence.hxx>
@@ -1710,6 +1712,48 @@ std::unique_ptr<OcShape> make_helix(const PlaneF& frame, double radius, double p
   b.MakeWire(w);
   b.Add(w, helix_on_surface(ax, radius, pitch, height, left_handed, taper_angle));
   return wrap(w);
+}
+
+// The offset of a B-spline is an offset curve; a face built on a plane from some was invalid (hat8's thin "Riser legs"
+// caps: BRepCheck InvalidCurveOnSurface, their curves on the plane made again by projection). Each such edge of `s`
+// becomes a B-spline within 1e-9 of it, between the same vertices.
+static TopoDS_Shape offset_curves_as_bsplines_in(const TopoDS_Shape& s)
+{
+  BRepTools_ReShape rs;
+  bool              any = false;
+  ShapeIMap         edges;
+  TopExp::MapShapes(s, TopAbs_EDGE, edges);
+  for (int i = 1; i <= edges.Extent(); ++i)
+  {
+    const TopoDS_Edge e = TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD));
+    double            f, l;
+    occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
+    occ::handle<Geom_Curve> base = c;
+    while (!base.IsNull() && base->IsKind(STANDARD_TYPE(Geom_TrimmedCurve)))
+      base = occ::down_cast<Geom_TrimmedCurve>(base)->BasisCurve();
+    if (base.IsNull() || !base->IsKind(STANDARD_TYPE(Geom_OffsetCurve)))
+      continue;
+    const occ::handle<Geom_Curve> piece(new Geom_TrimmedCurve(c, f, l));
+    // (Well inside the Booleans' 1e-7: a face lying on another's stays on it, no sliver split between them.)
+    GeomConvert_ApproxCurve approx(piece, 1e-9, GeomAbs_C2, 400, 9);
+    if (!approx.IsDone() || !approx.HasResult() || approx.MaxError() > 1e-9)
+      continue;
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    const occ::handle<Geom_BSplineCurve> b = approx.Curve();
+    BRepBuilderAPI_MakeEdge              me(b, v0, v1, b->FirstParameter(), b->LastParameter());
+    if (!me.IsDone())
+      continue;
+    rs.Replace(e, me.Edge());
+    any = true;
+  }
+  return any ? rs.Apply(s) : s;
+}
+
+std::unique_ptr<OcShape> offset_curves_as_bsplines(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  return wrap(offset_curves_as_bsplines_in(s.shape));
 }
 
 std::unique_ptr<OcShape> offset_wire_2d(const OcShape& wire_or_face, double distance,
