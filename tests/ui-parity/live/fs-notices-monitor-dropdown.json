@@ -1,19 +1,19 @@
 {
  "scenario": "fs-notices-monitor-dropdown",
- "recorded": "2026-11-08T19:28:56.488Z",
+ "recorded": "2026-11-11T02:32:47.196Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
  },
  "live": {
-  "document": "aebfdc1962dc86081a25153f",
-  "workspace": "1fe002cf2c1df4bd42404dc3",
-  "element": "44d06e98a3f1815169975e83",
+  "document": "c11a496e6613f0221f39fef1",
+  "workspace": "a6c702bccc61eeee0c6968e9",
+  "element": "3b1ba00aecb48df024db3899",
   "start": "fs-custom",
-  "startElement": "44d06e98a3f1815169975e83",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "3b1ba00aecb48df024db3899",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -172,7 +172,7 @@
      "notices": 0
     }
    },
-   "t": 58022
+   "t": 55381
   },
   {
    "step": 2,
@@ -259,7 +259,7 @@
      "notices": 0
     }
    },
-   "t": 64105
+   "t": 70536
   },
   {
    "step": 3,
@@ -354,21 +354,31 @@
      "notices": 0
     }
    },
-   "t": 69290
+   "t": 84992
   },
   {
    "step": 4,
    "do": {
     "do": "click",
     "on": {
-     "menu": "Monitor Part Studio 1"
+     "menu": "Monitor"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Monitor Part Studio 1\"}",
+   "ok": true,
+   "at": [
+    1829,
+    605
+   ],
    "state": {
     "focus": {
-     "kind": "none"
+     "kind": "other",
+     "tag": "textarea",
+     "text": "FeatureScript 3112;\n\n",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
     },
     "dialog": null,
     "dialogs": [],
@@ -376,7 +386,7 @@
      {
       "id": "element-details-pane",
       "title": null,
-      "text": "FeatureScript notices Monitor Monitor Profile Part Studio 1 Result: Regeneration complete",
+      "text": "FeatureScript notices Monitoring Part Studio 1 Result: Regeneration complete",
       "inputs": [
        {
         "placeholder": "Filter notices",
@@ -385,15 +395,7 @@
       ]
      }
     ],
-    "list": {
-     "kind": "menu",
-     "rows": [
-      "Monitor",
-      "Profile"
-     ],
-     "highlighted": null,
-     "disabled": []
-    },
+    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -446,7 +448,7 @@
      "notices": 0
     }
    },
-   "t": 71212
+   "t": 102248
   }
  ]
 }
