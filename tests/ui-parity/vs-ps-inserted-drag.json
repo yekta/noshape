@@ -1,6 +1,6 @@
 {
  "name": "vs-ps-inserted-drag",
- "about": "Part Studio 1's Variable table: insert Variable Studio 2, then drag its title above Variable Studio 1's",
+ "about": "Part Studio 1's Variable table: insert Variable Studio 2, then drag its header by its empty part above Variable Studio 1's (live 2487: the title is the name's field; the table moves)",
  "area": "psui",
  "source": "universe variable-studio (psui 11-08, studios' coverage list)",
  "start": "vs-two",
@@ -38,10 +38,10 @@
   {
    "do": "drag",
    "from": {
-    "table_title": "Variable Studio 2"
+    "table_header": "Variable Studio 2"
    },
    "to": {
-    "table_title": "Variable Studio 1",
+    "table_header": "Variable Studio 1",
     "edge": "top"
    }
   }

@@ -1,0 +1,49 @@
+{
+ "name": "vs-ps-inserted-title-click",
+ "about": "Part Studio 1's Variable table with Variable Studio 2 inserted: a click on Variable Studio 1's title opens its name field, all selected; Esc keeps the name (live 2487)",
+ "area": "psui",
+ "source": "live 2487 (psui 11-11)",
+ "start": "vs-two",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "panel_row": "Variable Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "table_title": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

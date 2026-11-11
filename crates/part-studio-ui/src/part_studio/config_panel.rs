@@ -948,23 +948,24 @@ impl PartStudioView {
                 let (doc, host, s) = (self.doc.clone(), self.tab, r.studio);
                 self.ui.var_tables.entry(s).or_insert_with(|| crate::part_studio_hooks::variable_table(doc, s, host, window, cx)).clone().into_any_element()
             };
-            // The header's title area is the drag handle (between the fold
-            // chevron and ⋯, which stay clickable).
+            // Another document's table: its header's title area is the drag handle (between the fold chevron and ⋯,
+            // which stay clickable). Ours drag by their header's empty part (variable_studio.rs: the title is the
+            // name's field, live 2487).
             let name: SharedString = self.doc.read(cx).session.doc.tabs.iter().find(|t| t.id == r.studio).map(|t| t.name.clone()).unwrap_or_default().into();
-            let handle = var_table_drag_source(div().id(SharedString::from(format!("var-table-drag-{k}"))).absolute().top_0().left(px(24.)).right(px(48.)).h(px(35.)), r.studio, name);
+            let handle = r.external.is_some().then(|| crate::ui::var_table_drag_source(div().id(SharedString::from(format!("var-table-drag-{k}"))).absolute().top_0().left(px(24.)).right(px(48.)).h(px(35.)), r.studio, name));
             tables.push(
                 div()
                     .id(SharedString::from(format!("var-table-{k}")))
                     .relative()
                     .pb(px(10.))
                     .child(body)
-                    .child(handle)
+                    .children(handle)
                     // Between tables (the first table's at its top edge, which
                     // the panel would clip above).
                     .when(drop_at == Some(k), |d| d.child(line(blue, Some(if k == 0 { 0. } else { -6. }))))
                     .when(drop_at == Some(k + 1) && k + 1 == refs.len(), |d| d.child(line(blue, None)))
                     // Over the upper half: before this table; the lower: after.
-                    .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<VarTableDrag>, _, cx| {
+                    .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<crate::ui::VarTableDrag>, _, cx| {
                         if !e.bounds.contains(&e.event.position) {
                             return;
                         }
@@ -975,7 +976,7 @@ impl PartStudioView {
                             cx.notify();
                         }
                     }))
-                    .on_drop(cx.listener(move |this, d: &VarTableDrag, _, cx| {
+                    .on_drop(cx.listener(move |this, d: &crate::ui::VarTableDrag, _, cx| {
                         let to = this.ui.var_drop.take().unwrap_or(k);
                         this.move_var_table(d.studio, to, cx);
                     }))
@@ -1005,13 +1006,13 @@ impl PartStudioView {
                 cx.notify();
             }))
             .when(refused, |d| d.child(line(gpui_kit::rgb(0xd52b1e), None)))
-            .on_drag_move(cx.listener(|this, e: &DragMoveEvent<VarTableDrag>, _, cx| {
+            .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::ui::VarTableDrag>, _, cx| {
                 if e.bounds.contains(&e.event.position) && this.ui.var_drop != Some(usize::MAX) {
                     this.ui.var_drop = Some(usize::MAX);
                     cx.notify();
                 }
             }))
-            .on_drop(cx.listener(|this, _: &VarTableDrag, _, cx| {
+            .on_drop(cx.listener(|this, _: &crate::ui::VarTableDrag, _, cx| {
                 this.ui.var_drop = None;
                 cx.notify();
             }));
@@ -3380,24 +3381,6 @@ impl PartStudioView {
     }
 }
 
-/// A Variable Studio table being dragged by its header (live psb 10-20 t,
-/// cursors/672): the ghost is the reorder pill with the table name, lighter
-/// than the Configurations panel's (`#1651b0` at 60 %, the table showing
-/// through), and the pointer shows `grabbing` meanwhile.
-#[derive(Clone)]
-struct VarTableDrag {
-    studio: noshape_model::document::TabId,
-    name: SharedString,
-    /// Where the header was grabbed: the pill sits at the pointer instead.
-    offset: Point<Pixels>,
-}
-
-impl Render for VarTableDrag {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        crate::ui::name_pill_on(self.name.clone(), self.offset, gpui_kit::rgba(0x1651b099))
-    }
-}
-
 /// A variable's value as the table shows it while not being edited (live 11-02: "2 * (#h + #w)" reads
 /// "120 mm", "40mm" reads "40 mm"; an angle "45 deg" as in fields).
 pub(super) fn shown_value(q: noshape_units::Quantity, units: &noshape_units::UnitPrefs) -> String {
@@ -3426,12 +3409,6 @@ impl Render for VarRowDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         crate::ui::name_pill_on(self.name.clone(), self.offset, gpui_kit::rgb(0x1651b0))
     }
-}
-
-/// Make `el` (over an inserted table's header) the drag handle for
-/// reordering.
-fn var_table_drag_source<E: StatefulInteractiveElement>(el: E, studio: noshape_model::document::TabId, name: SharedString) -> E {
-    el.on_drag(VarTableDrag { studio, name, offset: Point::default() }, |d, offset, _, cx| cx.new(|_| VarTableDrag { offset, ..d.clone() }))
 }
 
 /// `text` with the workspace unit when it is a plain number for a field of dimension `dim` ("40" → "40 mm"); any

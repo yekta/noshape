@@ -1506,3 +1506,26 @@ mod tests {
         assert_eq!(snap_panel(rect(900., -50., 200., 100.), area, &[]), point(px(800.), px(0.)));
     }
 }
+
+/// A Variable Studio table being dragged by its header (live psb 10-20 t,
+/// cursors/672): the ghost is the reorder pill with the table name, lighter
+/// than the Configurations panel's (`#1651b0` at 60 %, the table showing
+/// through), and the pointer shows `grabbing` meanwhile.
+#[derive(Clone)]
+pub struct VarTableDrag {
+    pub studio: noshape_model::document::TabId,
+    pub name: SharedString,
+    /// Where the header was grabbed: the pill sits at the pointer instead.
+    pub offset: Point<Pixels>,
+}
+
+impl Render for VarTableDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        name_pill_on(self.name.clone(), self.offset, gpui_kit::rgba(0x1651b099))
+    }
+}
+
+/// Make `el` (an inserted table's header, its empty part) the drag handle for reordering the tables.
+pub fn var_table_drag_source<E: StatefulInteractiveElement>(el: E, studio: noshape_model::document::TabId, name: SharedString) -> E {
+    el.on_drag(VarTableDrag { studio, name, offset: Point::default() }, |d, offset, _, cx| cx.new(|_| VarTableDrag { offset, ..d.clone() }))
+}

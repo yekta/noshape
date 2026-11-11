@@ -1189,6 +1189,7 @@ impl VariableStudioView {
         });
         let group = self.group();
         let (collapse_mark, menu_mark) = (format!("button:Collapse:{title}"), format!("button:Table menu:{title}"));
+        let drag_name = title.to_string();
         // In a panel the title row spans the panel (live, part-studio/77).
         let in_panel = self.host.is_some();
         let own_tab = !in_panel;
@@ -1251,7 +1252,13 @@ impl VariableStudioView {
                                 cx.notify();
                             })),
                     )
-                    .child(div().flex_1())
+                    // An inserted table's header drags by its empty part, the table moving among the inserted ones
+                        // (live 2487: a blue pill with its name, a blue line where it lands).
+                    .child(if in_panel {
+                        crate::ui::var_table_drag_source(div().id("vs-header-drag").flex_1().h_full().map(|d| crate::ui_script::mark(d, || format!("table_header:{drag_name}"))), self.tab, drag_name.clone().into()).into_any_element()
+                    } else {
+                        div().flex_1().into_any_element()
+                    })
                     .child(
                         Button::new("vs-more")
                             .map(|d| crate::ui_script::mark(d, || menu_mark))

@@ -1318,7 +1318,7 @@
      {
       "do": "drag",
       "on": {
-       "table_title": "*"
+       "table_header": "*"
       }
      }
     ]
