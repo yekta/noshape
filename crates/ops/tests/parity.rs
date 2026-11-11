@@ -975,6 +975,35 @@ fn block_model() -> (Value, Vec<Value>, String) {
     (features, live, refs)
 }
 
+/// Live's selected regions as pieces of one of ours (the sketch's face split by edges we don't have, asm-isaac-ball):
+/// the circle's region live reports as 30 % and 70 % of it, both selected, is ours whole.
+#[test]
+fn live_regions_that_are_pieces_of_ours_select_ours_whole() {
+    let area = std::f64::consts::PI * 0.005 * 0.005;
+    let face = |id: &str, a: f64| json!({ "id": id, "area": a, "box": { "min": [-0.005, -0.005, 0.0], "max": [0.005, 0.005, 0.0] }, "surface": { "type": "PLANE", "origin": [0.0, 0.0, 0.0], "normal": [0.0, 0.0, 1.0] } });
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.005, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "deterministicIds": ["JA1", "JA2"], "featureId": "FS1" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "10 mm" }] }
+    ] });
+    let sketches = json!({ "sketches": [{ "featureId": "FS1", "bodies": [{ "id": "JB", "type": "SKETCH", "faces": [face("JA1", 0.3 * area), face("JA2", 0.7 * area)], "edges": [], "vertices": [] }] }] });
+    let refs = refs_from_sketches(&sketches, features["features"].as_array().unwrap());
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("region-pieces.noshape"), &features, refs).unwrap();
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok"), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+    }
+    let parts = t.call("query_parts", json!({})).unwrap();
+    assert_eq!(parts["parts"].as_array().map(Vec::len), Some(1), "{parts}");
+}
+
 /// A sketch on an in-context face (Onshape's "In context entity" sub-feature, its blob not fetched; asm-isaac-ball):
 /// built on a face at live's sketch frame, here tilted 30° off Top; the stand-in is deleted after the last feature,
 /// so the studio's parts are live's.
