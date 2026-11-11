@@ -1101,8 +1101,12 @@ impl FeatureStudioView {
         let Some((name, _)) = self.symbol_at_cursor(cx) else { return };
         let text = self.editor.read(cx).value().to_string();
         let Some(to) = definition_of(&text, &name) else {
-            // Live: a std symbol opens the std document, read-only, at its export.
+            // Live: a std symbol opens the std document, read-only, at its export; the caret here stays where it was
+            // (fs-ed-ctrl-click-std).
             if let Some((module, line, column)) = crate::std_source::std_definition(&name) {
+                if let Some(before) = self.caret_before_click.take() {
+                    self.move_cursor(before, window, cx);
+                }
                 cx.emit(FeatureStudioEvent::OpenStd { module: module.to_string(), line, column });
             }
             return;
