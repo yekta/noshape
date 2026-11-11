@@ -30,6 +30,16 @@ new); most are the selection after a step (`.drawing.selection.length` live 1 / 
 - drw-view-align-vertically: step 1 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (4/6 states)
 - drw-view-replicate-annotations: step 8 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (8/10 states)
 
+## 11-11 15:53 UTC: asm-tvc-mount 8 -> 39/43 (STEP names); asm-xdev-subs diagnosed
+- asm-tvc-mount: its servo STEP failed to import whole (a raw 0x87 in a PRODUCT name, not UTF-8): names now decode
+  0x80-0x9F as Windows-1252 as live ("Pe‡a"), the rest as Unicode (was "?"). 8 -> 39/43 occurrences.
+- asm-xdev-subs (-85): 20 are suppressed instances whose subassemblies live didn't fetch; 15 inserts fail (a part
+  not in its studio's list, ...); ~50 are parts of nested subassemblies (Sub 3227f2 › Sub b86fa9, Sub bc884e › 97c290
+  › 97f2f5) off by one level's placement although every subassembly mate solves in ours: a connector resolved to a
+  similar entity (next: compare subassembly connectors with live's). Studio 62b37d's Transform 3 has empty in-feature
+  connector queries. Asked live (REQUESTS) for the missing definitions, the Transform's queries and 4 connectors'
+  frames. The suite now lists subassembly mates that fail in ours where live's are OK (untranslated, not scored).
+
 ## 11-11 15:26 UTC: assembly suite 1298 -> 1320/1731 occurrences, mates 199 -> 243 (vibe4, all 24, none worse)
 - In-context entities (Onshape's frozen assembly geometry, blobs not fetched): a sketch on one is built on a face at
   live's sketch frame, the stand-in deleted after the last feature; live's selected regions that are pieces of one of
