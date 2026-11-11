@@ -1663,8 +1663,10 @@ fn a_ring_thinner_than_its_wall_shells_as_live() {
 /// c2-impeller-loft's Shell Gehäuse (3 mm inward, both planar faces removed) on live's loft (REQUESTS 2228: two
 /// B-spline faces from a circle to a D, the inlet's tangent to the D's plane at x = 10): live's 6 faces, 16 edges and
 /// 12 vertices. The inlet's wall runs on past its edge until it meets the opening's plane (its own polynomials curl
-/// short of it: the tangent extension), and the offsets of the circle's three arcs and of the D's three edges are one
-/// edge each. Volume within 2e-4 of live's 45,272.92 mm³ (ours 45,280.5: the corners on the opening 34 µm from live's).
+/// short of it), the offset of its surface extended linearly in its own parameters, S(u, 1) + (v - 1) S_v(u, 1), as
+/// live's (2482; GeomLib's tangent extension put the rim's corners 34 µm off), and the offsets of the circle's three
+/// arcs and of the D's three edges are one edge each. The rim's corners on the opening within 1 µm of live's (2275);
+/// volume within 2e-4 of live's 45,272.92 mm³.
 #[test]
 fn an_impeller_lofts_shell_as_live() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell/impeller-loft-live.step");
@@ -1681,4 +1683,8 @@ fn an_impeller_lofts_shell_as_live() {
     // surface's whole parameter rectangle reached 6.2 mm above the part.
     let bb = r.bounding_box(true).unwrap();
     assert!(bb.max.z < 1e-6, "box top {} mm", bb.max.z * 1e3);
+    for live in [DVec3::new(14.44767691, 26.6655098, 0.0), DVec3::new(14.447851953, -26.664326982, 0.0)] {
+        let near = r.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(|p| (p * 1e3 - live).length()).fold(f64::INFINITY, f64::min);
+        assert!(near < 1e-3, "the rim's corner by live's {live:?}: {near} mm off");
+    }
 }
