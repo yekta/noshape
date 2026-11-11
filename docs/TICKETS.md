@@ -427,6 +427,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - qa 16:09, the next candidate f324e41f0 (watcher green 15:44: 44ff040aa + core's reopen reading kept features' states only):
     the result store's corpus 87 / 87 (no store = cold = warm), the six mutations equal, corruption 13 / 13 on both documents;
     feature_list over all tabs 70.3 s without, 73.6 cold, 32.0 warm (vibe5 under load).
+    Its sweeps on vibe3 = 44ff040aa exactly; its model suite (vibe4) 77/87, 826/947, every document = 44ff040aa (a first run
+    lost 73 documents to vibe4's disk filling for a while: "database or disk is full"; rerun 16:41). So f324e41f0 is ready as
+    the 05:00 candidate if the cut moves; CI re-run every 30 min (bin/ci-rerun-loop.sh): failed again 16:39 (apt DNS), re-run.
 - Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 HAND-DRILL-MATES-OVERDEFINED (parity only).
 
 ## Release blockers for the 2026-11-11 05:00 release, candidate e2c8da0f9 (qa list 04:50; watcher GREEN 03:57, CI 3-platform success; the latest release is v0.4.41, v0.4.42 from b73d2fece in its release CI)
