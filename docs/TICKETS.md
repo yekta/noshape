@@ -364,6 +364,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-11 05:00 release, candidate e2c8da0f9 (qa list 04:51; watcher GREEN 03:57, CI 3-platform success; the latest release is v0.4.41, v0.4.42 from b73d2fece in its release CI)
+- **qa 04:51: no blocker found; the gear documents' model run on e2c8da0f9 is still running (results to follow).**
+  - Since 6364f3c47 (checked 00:49): bool's 53812f2a0 / 08e5c8647 (the 0028 hook answers a plane containing an extrusion's
+    direction with the exact rulings again: the pair 44e52dafb had turned off), core's d06b20de1 (a circle about a revolved
+    surface's axis as its iso-line) and 2d50ff580 (Delete face of a prism's rounds), dx's 03ad6d6fa (translator), skasm's
+    312323353 and psui's flat-view / Compare commits (UI).
+  - Sweeps on vibe3 (volume sweep 20, cf corpus 13, the 48 ticket documents) = 6364f3c47 exactly; so blend's 12b1d8a6f's
+    three fuzz-document changes (00:49 list) stand, nothing new.
+  - Model suite, full corpus, on e2c8da0f9: started 04:31 on vibe4 (load 30–35), 15 of 87 documents by 04:50; the gear
+    documents (cf-spur-gear 14/14, cf-part-draft 13/13 on 6364f3c47) are what bool's rulings change could move: pending.
+  - Clean speed (qa's 02:00 vibe5 window, load 1.0–2.6 per document, debug): 91.3 % on e3a19f63 and on green 6364f3c47
+    (release build 91.6 %); index 91.4.
+  - Fuzz: v0.4.41 release CLI 9001–9120, 0 deaths; GUI fuzz no new deaths.
+- Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 HAND-DRILL-MATES-OVERDEFINED (parity suite only).
+
 ## Release blockers for the 2026-11-11 05:00 release (qa list 00:49, checked on watcher green 6364f3c47, 23:55; v0.4.42 in its release CI from b73d2fece)
 - **qa 00:49: no blocker on 6364f3c47** (b73d2fece + blend's 12b1d8a6f: a chamfer OCCT can't build built as sections of
   constant offsets; core's 2d50ff580: Delete face of a prism's rounds). Model suite, full corpus (vibe4): 77/87, 820/947, every
