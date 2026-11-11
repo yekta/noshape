@@ -4525,6 +4525,39 @@ std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> faces_apart(const TopoDS_Shap
   return out;
 }
 
+// Two faces of one cylinder or cone meeting only along straight lines of it (along the axis, through a cone's apex)
+// whose turns about the axis add up past a full one: joined they'd wrap more than once, which no face can.
+bool wraps_past_a_turn(const TopoDS_Face& a, const TopoDS_Face& b)
+{
+  BRepAdaptor_Surface sa(a, false);
+  if (sa.GetType() != GeomAbs_Cylinder && sa.GetType() != GeomAbs_Cone)
+    return false;
+  const gp_Ax1 axis = sa.GetType() == GeomAbs_Cylinder ? sa.Cylinder().Axis() : sa.Cone().Axis();
+  int shared = 0;
+  for (TopExp_Explorer x(a, TopAbs_EDGE); x.More(); x.Next())
+  {
+    bool both = false;
+    for (TopExp_Explorer y(b, TopAbs_EDGE); y.More() && !both; y.Next())
+      both = x.Current().IsSame(y.Current());
+    if (!both)
+      continue;
+    ++shared;
+    BRepAdaptor_Curve c(TopoDS::Edge(x.Current()));
+    if (c.GetType() != GeomAbs_Line)
+      return false;
+    const gp_Lin l = c.Line();
+    if (sa.GetType() == GeomAbs_Cylinder ? !l.Direction().IsParallel(axis.Direction(), 1e-9) : l.Distance(sa.Cone().Apex()) > 1e-9 * std::max(1.0, sa.Cone().RefRadius()))
+      return false;
+  }
+  if (shared == 0)
+    return false;
+  double u0, u1, v0, v1, w0, w1, z0, z1;
+  BRepTools::UVBounds(a, u0, u1, v0, v1);
+  BRepTools::UVBounds(b, w0, w1, z0, z1);
+  // (Exactly a full turn may still merge: c2-valve-config's conical seat, a 3/4 and a 1/4 turn, closes with a seam.)
+  return (u1 - u0) + (w1 - w0) > 2 * M_PI + 1e-9;
+}
+
 bool cylinder_faces_apart(const TopoDS_Shape& s)
 {
   return !faces_apart(s, false).empty();
@@ -4677,7 +4710,13 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
   TopoDS_Shape r      = unify_seams_in(s0, hist, sc, clean);
   // (Not for an invalid input (c2-sm-louver's fuse): a reordered try is kept only valid, and it gives none, after
   // three more passes.)
-  const std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> apart = may && !r.IsSame(s0) ? faces_apart(r, true) : std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>>();
+  std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> apart = may && !r.IsSame(s0) ? faces_apart(r, true) : std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>>();
+  // (Not the pairs no order can merge: two faces meeting only along lines of their surface, whose turns about the axis
+  // add up past a full one: c2-helical-sweep's thread strips, a turn each, 77 ms of retries.)
+  // (NOSHAPE_UNIFY_RETRY_ALL=1: every pair retried, as before, to compare.)
+  static const bool retry_all = std::getenv("NOSHAPE_UNIFY_RETRY_ALL") != nullptr;
+  if (!retry_all)
+    apart.erase(std::remove_if(apart.begin(), apart.end(), [](const std::pair<TopoDS_Shape, TopoDS_Shape>& p) { return wraps_past_a_turn(TopoDS::Face(p.first), TopoDS::Face(p.second)); }), apart.end());
   if (!apart.empty() && !stuck_pairs().all_known(apart) && BRepCheck_Analyzer(s0).IsValid())
   {
     const KernelTimer timer("unify.reordered");

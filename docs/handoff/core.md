@@ -38,6 +38,18 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-11 10:30 UTC: the speed items (lead 09:25: unify's retries and what the features ask for are core's).**
+- unify (boolean.cpp `unify_in`): pairs no face order can merge (two faces of a cylinder / cone meeting only along
+  lines of it, their turns adding up past a full one: c2-helical-sweep's thread strips) no longer trigger the retries:
+  that unify 92 -> 15 ms. Exactly a full turn along one line DOES merge in a retry (c2-valve-config's conical seat,
+  3/4 + 1/4 turn, 38 -> 37 faces), so those stay. The suite times a second regeneration in the same process, where
+  `stuck_pairs` already skipped them: the gain is a first open's.
+- Mirror 1 (knife): glue doesn't help: our Boolean ignores it (207-215 ms) and OCCT's glued fuse is slower (484-568
+  ms). Reverted. Circular pattern 1 (valve-config) already fuses its tools in one Boolean: the one-by-one is inside
+  ours (bool's).
+- Part Draft 2: OCCT deleting every round of non-convex planar parts (20-180 ms a call); a general in-place rewrite
+  held by the lead (11-11 09:25). Probe: kernel `features::defeature_dump_probe`.
+
 **State 11-11 08:47 UTC: the persistent regeneration cache, stages 1-4.**
 - Keys (stage 1, aecbfddf): `RegenKey`, a 128-bit blake3 chain from document content only; `result_key` covers the
   studio, settings, Variable Studio values, derived sources (`DocStudios::version`), Feature Studios, File tabs'

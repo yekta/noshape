@@ -1128,3 +1128,101 @@ fn offset_curves_become_bsplines_on_them() {
         assert!((ao - ab).abs() < 1e-9 * ao, "{ao} vs {ab}");
     }
 }
+
+/// Probe: a delete-face dump (NOSHAPE_DUMP_OPS's defeature-N.brep / .txt, NOSHAPE_PROBE_DEFEATURE without the
+/// extension): the body's and the deleted faces' surface kinds, their neighbours, and the delete timed.
+#[test]
+#[ignore = "T2: probe"]
+fn defeature_dump_probe() {
+    let Ok(base) = std::env::var("NOSHAPE_PROBE_DEFEATURE") else { return };
+    let s = read_brep(std::path::Path::new(&format!("{base}.brep"))).unwrap();
+    let txt = std::fs::read_to_string(format!("{base}.txt")).unwrap();
+    let faces = s.faces();
+    let picked: Vec<usize> = txt.lines().filter_map(|l| l.strip_prefix("face ")).filter_map(|i| i.trim().parse().ok()).collect();
+    let kind = |f: &Shape| f.face_surface().map(|s| format!("{s:?}").split([' ', '{', '(']).next().unwrap_or("").to_string()).unwrap_or_default();
+    let mut all = std::collections::BTreeMap::new();
+    for f in &faces {
+        *all.entry(kind(f)).or_insert(0) += 1;
+    }
+    let mut del = std::collections::BTreeMap::new();
+    for &i in &picked {
+        *del.entry(kind(&faces[i])).or_insert(0) += 1;
+    }
+    println!("{} faces {all:?}, solids {}, valid {}; deleting {} {del:?}", faces.len(), s.count(ShapeType::Solid), s.is_valid(), picked.len());
+    let ef = s.edge_faces().unwrap();
+    let mut neighbours = std::collections::BTreeMap::new();
+    for fs in &ef {
+        if fs.len() == 2 {
+            for (a, b) in [(fs[0] as usize, fs[1] as usize), (fs[1] as usize, fs[0] as usize)] {
+                if picked.contains(&a) && !picked.contains(&b) {
+                    *neighbours.entry(kind(&faces[b])).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+    println!("kept neighbours of deleted faces (by edge): {neighbours:?}");
+    let shapes: Vec<Shape> = picked.iter().map(|&i| faces[i].clone()).collect();
+    for _ in 0..2 {
+        let t = std::time::Instant::now();
+        let r = delete_faces(&s, &shapes);
+        println!("delete: {:?} in {:?}", r.as_ref().map(|r| (r.shape.is_valid(), r.shape.faces().len(), r.shape.volume().unwrap_or(0.0))).map_err(|e| e.to_string()), t.elapsed());
+    }
+}
+
+/// Probe: a unify dump (NOSHAPE_DUMP_OPS's unify-N.brep, NOSHAPE_PROBE_UNIFY): unify timed, then the result's faces
+/// left apart on one cylinder: their shared edges and what else meets there.
+#[test]
+#[ignore = "T2: probe"]
+fn unify_apart_probe() {
+    let Ok(path) = std::env::var("NOSHAPE_PROBE_UNIFY") else { return };
+    let s = read_brep(std::path::Path::new(&path)).unwrap();
+    let t = std::time::Instant::now();
+    let r = unify_same_domain(&s).unwrap();
+    println!("{} faces -> {} in {:?}", s.faces().len(), r.shape.faces().len(), t.elapsed());
+    let faces = r.shape.faces();
+    let cyl = |i: usize| match faces[i].face_surface() {
+        Ok(Surface::Cylinder { origin, axis, radius, .. }) => Some((origin, axis, radius)),
+        _ => None,
+    };
+    let ef = r.shape.edge_faces().unwrap();
+    let edges = r.shape.edges();
+    for (ei, fs) in ef.iter().enumerate() {
+        if fs.len() != 2 || fs[0] == fs[1] {
+            continue;
+        }
+        let (a, b) = (fs[0] as usize, fs[1] as usize);
+        let cone = |i: usize| match faces[i].face_surface() {
+            Ok(Surface::Cone { apex, axis, half_angle, .. }) => Some((apex, axis, half_angle)),
+            _ => None,
+        };
+        let same = match (cyl(a), cyl(b), cone(a), cone(b)) {
+            (Some((oa, da, ra)), Some((ob, db, rb)), ..) => (ra - rb).abs() < 1e-9 * ra.max(1.0) && da.cross(db).length() < 1e-9 && (ob - oa).cross(da).length() < 1e-9 * ra.max(1.0),
+            (_, _, Some((pa, da, ha)), Some((pb, db, hb))) => (ha - hb).abs() < 1e-12 && pa.distance(pb) < 1e-9 && da.cross(db).length() < 1e-9,
+            _ => false,
+        };
+        if !same {
+            continue;
+        }
+        let info = edges[ei].edge_info().unwrap();
+        let span = |i: usize| faces[i].uv_bounds().map(|b| b[1] - b[0]).unwrap_or(0.0);
+        println!("   u spans {:.4} / {:.4} (2π {:.4})", span(a), span(b), 2.0 * PI);
+        println!("apart: faces {a} ({:.3e} m2, {} edges) / {b} ({:.3e} m2, {} edges), edge {ei} {:?} length {:.4e} closed {} from {:?} to {:?}", faces[a].area().unwrap(), faces[a].edges().len(), faces[b].area().unwrap(), faces[b].edges().len(), info.curve, info.length, info.closed, info.start, info.end);
+    }
+}
+
+/// Probe: a shape's shown faces before and after OCCT's binary round trip (the result store's), NOSHAPE_PROBE_SHAPE a
+/// .brep (unified first).
+#[test]
+#[ignore = "T2: probe"]
+fn binary_round_trip_shown_faces_probe() {
+    let Ok(path) = std::env::var("NOSHAPE_PROBE_SHAPE") else { return };
+    let s = unify_same_domain(&read_brep(std::path::Path::new(&path)).unwrap()).unwrap().shape;
+    let back = s.to_bin_bytes(false).and_then(|b| Shape::from_bin_bytes(&b));
+    let text = s.to_brep_bytes().and_then(|b| Shape::from_brep_bytes(&b));
+    println!("binary {:?} text {:?}", back.as_ref().err(), text.as_ref().err());
+    let (back, text) = (back.unwrap_or_else(|_| s.clone()), text.unwrap_or_else(|_| s.clone()));
+    for (name, x) in [("in memory", &s), ("binary", &back), ("text", &text)] {
+        let t = x.shown_topology().unwrap();
+        println!("{name}: {} faces, shown {}", x.faces().len(), t.face_count());
+    }
+}
