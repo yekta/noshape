@@ -23,6 +23,15 @@ Part Studio in a configuration (a library form at the sheet's thickness) was reg
 (`derived::external_context_configured`). Test: crates/ops/tests/prefs.rs `forms_library`. Not done: whether the other
 four libraries' folders also change icon / menu once set (only sheet metal forms seen live); the picker's search box.
 
+**21:21 UTC (lead's list after SETLIB):** fillet-chip-clear-missing and fillet-chip-edit-healthy-moment match: a dialog pick that
+no longer resolves reads as the feature that made it (`unresolved_pick_creator`; a deleted one's name from
+`UiState::feature_names`) and selects that feature's row instead of lighting it (`picked_features`, `RowCtx::picked`);
+the sketch right above an edited feature shows (`rolled_to`; live: 37 states, all a sketch right above the rollback
+point); Clear missing references / Edit healthy moment leave the keyboard nowhere, as Clear all. Part Studio + sketch
+ui-parity on vibe5 (release, 8 shards): 568/574, the 6 left all known live-side. UIP-ASM-FASTENED-FLAKY closed (6/6).
+The Form picker's search box: after Frame's (D134), the name / document / folder matched, Enter or a click jumps the
+levels and fills the field; asked live for screenshots (REQUESTS 21:13).
+
 **Done today (landed):** SAVED-SKETCH-PLANE-LOST closed (not a regression), REGION-UNION-ARC closed, SHEETMETAL-COPLANAR-WALLS
 narrowed (the Up to Part wall's three fitted caps: core's), sketch topology in FeatureScript as live (abb741da: curve end
 vertices; 2087f44e: a wire body per curve, a point body per point, one sheet; delete / transform / pattern of one body =

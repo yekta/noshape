@@ -187,6 +187,8 @@ pub struct SelectItemPanel {
     lib_levels: Vec<(Entity<crate::os_select::OsSelect>, Subscription)>,
     /// The library documents whose forms' pictures were asked for.
     lib_pictured: HashSet<PathBuf>,
+    /// The forms' search box ("Search by name, folder, or configuration").
+    form_search: Option<(Entity<InputState>, Subscription)>,
     _subs: Vec<Subscription>,
 }
 
@@ -358,6 +360,7 @@ impl SelectItemPanel {
             lib_path: from_user.unwrap_or_default(),
             lib_levels: Vec::new(),
             lib_pictured: HashSet::new(),
+            form_search: None,
             focus: cx.focus_handle(),
             _subs: subs,
         };
@@ -1092,6 +1095,123 @@ impl SelectItemPanel {
     /// forms" first, then Onshape's), the levels under it (Onshape's: Type; the user's: its folder tree, a folder a
     /// Standard, a document a Type), then Form ▾ and the form's inputs.
     fn render_forms_libraries(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let search = match &self.form_search {
+            Some((s, _)) => s.clone(),
+            None => {
+                let s = cx.new(|cx| InputState::new(window, cx));
+                let sub = cx.subscribe_in(&s, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
+                    // Enter takes the first match (as Frame's library, live D134).
+                    InputEvent::PressEnter { .. } => {
+                        if let Some(hit) = this.form_hits(&st.read(cx).value()).into_iter().next() {
+                            this.jump_form(hit, window, cx);
+                        }
+                    }
+                    InputEvent::Change => cx.notify(),
+                    _ => {}
+                });
+                self.form_search = Some((s.clone(), sub));
+                s
+            }
+        };
+        let query = search.read(cx).value().to_string();
+        let search_box = h_flex().h(px(38.)).flex_none().px(px(6.)).pt(px(4.)).child(
+            div()
+                .flex_1()
+                .relative()
+                .h(px(30.))
+                .rounded(px(3.))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xcccccc))
+                .child(crate::ui::input_with_placeholder(&search, "Search by name, folder, or configuration", cx).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)).pl(px(5.))),
+        );
+        // The matches over the levels, as Frame's (live D134 f23): a round picture, the name with the match in bold,
+        // "<library> - <document>" grey and italic under it.
+        let hits = self.form_hits(&query);
+        let results = (!hits.is_empty()).then(|| {
+            let q = query.trim().to_lowercase();
+            let mut list = v_flex().id("sel-form-results").absolute().top(px(38.)).left(px(6.)).right(px(6.)).max_h(px(330.)).overflow_y_scroll().bg(pal.panel).border_1().border_color(gpui_kit::rgb(0xcccccc)).shadow_md();
+            for (i, hit) in hits.into_iter().enumerate() {
+                let name = hit.name.clone();
+                let (a, m, b) = match name.to_lowercase().find(&q) {
+                    Some(at) if name.is_char_boundary(at) && name.is_char_boundary(at + q.len()) => (name[..at].to_string(), name[at..at + q.len()].to_string(), name[at + q.len()..].to_string()),
+                    _ => (name.clone(), String::new(), String::new()),
+                };
+                let thumb = self.thumbs.get(&hit.key).cloned();
+                let under = format!("{} - {}", hit.library, hit.document);
+                list = list.child(
+                    h_flex()
+                        .id(("sel-form-hit", i))
+                        .h(px(55.))
+                        .flex_none()
+                        .px(px(10.))
+                        .gap(px(14.))
+                        .cursor_pointer()
+                        .when(i == 0, |d| d.bg(gpui_kit::rgb(0xdef1fb)))
+                        .hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)))
+                        .child(div().size(px(44.)).flex_none().rounded_full().bg(gpui_kit::rgb(0xf3f3f3)).flex().items_center().justify_center().overflow_hidden().children(thumb.map(|t| gpui_kit::img(t).w(px(40.)).h(px(40.)).object_fit(ObjectFit::Contain))))
+                        .child(
+                            v_flex()
+                                .flex_1()
+                                .min_w_0()
+                                .child(h_flex().text_size(px(14.)).child(a).child(div().font_weight(FontWeight::BOLD).child(m)).child(b))
+                                .child(div().truncate().italic().text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(under)),
+                        )
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.jump_form(hit.clone(), window, cx))),
+                );
+            }
+            list
+        });
+        let levels = self.render_forms_levels(window, cx);
+        v_flex().flex_1().min_h_0().relative().child(search_box).child(levels).children(results).into_any_element()
+    }
+
+    /// The forms whose name, document or folder holds `query` (case aside), the name's matches first, then by name.
+    fn form_hits(&self, query: &str) -> Vec<FormHit> {
+        let q = query.trim().to_lowercase();
+        if q.is_empty() {
+            return Vec::new();
+        }
+        let onshape = "Onshape sheet metal forms";
+        let mut hits: Vec<(usize, FormHit)> = Vec::new();
+        for s in library_sources() {
+            let rank = s.name.to_lowercase().find(&q).or_else(|| "onshape form library".find(&q).map(|_| usize::MAX));
+            if let Some(rank) = rank {
+                hits.push((rank, FormHit { key: s.tab.clone(), name: s.name.clone(), library: onshape.into(), document: "Onshape form library".into(), user: false, path: Vec::new() }));
+            }
+        }
+        if let Some(lib) = &self.forms_lib {
+            let title = noshape_ops::forms_library::title();
+            for d in &lib.documents {
+                let around = d.folders.iter().chain([&d.name]).any(|n| n.to_lowercase().contains(&q));
+                let path: Vec<String> = d.folders.iter().map(|f| format!("f:{f}")).chain([format!("d:{}", d.name)]).collect();
+                for f in &d.forms {
+                    let rank = f.name.to_lowercase().find(&q).or(around.then_some(usize::MAX));
+                    if let Some(rank) = rank {
+                        hits.push((rank, FormHit { key: d.value(&f.tab), name: f.name.clone(), library: title.clone(), document: d.name.clone(), user: true, path: path.clone() }));
+                    }
+                }
+            }
+        }
+        hits.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.name.cmp(&b.1.name)).then_with(|| a.1.document.cmp(&b.1.document)));
+        hits.into_iter().map(|(_, h)| h).collect()
+    }
+
+    /// A search result (or Enter on the first): the levels jump to its form and the field shows it (as Frame's, live
+    /// D134).
+    fn jump_form(&mut self, hit: FormHit, window: &mut Window, cx: &mut Context<Self>) {
+        self.lib_user = Some(hit.user);
+        self.lib_path = hit.path;
+        self.lib_form = Some(hit.key.clone());
+        self.cfg_edit.remove(&hit.key);
+        self.lib_generated.remove(&hit.key);
+        if let Some((st, _)) = &self.form_search {
+            st.update(cx, |s, cx| s.set_value("", window, cx));
+        }
+        self.pick(hit.key, cx);
+    }
+
+    fn render_forms_levels(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let mut items: Vec<(SharedString, SharedString)> = Vec::new();
         if self.forms_lib.is_some() {
             items.push(("user".into(), noshape_ops::forms_library::title().into()));
@@ -1711,6 +1831,17 @@ impl SelectItemPanel {
 /// round 4 S4-c).
 fn picked_studio_exists(picked: &str, sources: &[RefSource]) -> bool {
     !picked.is_empty() && (picked.starts_with("ext:") || sources.iter().any(|s| s.tab == picked))
+}
+
+/// A match of the forms' search: the form's value and name, its library and document, and the levels to it.
+#[derive(Clone)]
+struct FormHit {
+    key: String,
+    name: String,
+    library: String,
+    document: String,
+    user: bool,
+    path: Vec<String>,
 }
 
 /// The Libraries tab's Select (live 2497: bootstrap btn-secondary), pale while a changed input waits for Generate preview.

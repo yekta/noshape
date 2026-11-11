@@ -4557,7 +4557,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   skasm 11-06 (lead: P1): done on local branch skasm/screen-reach, held until our default view's scale matches live's
   (live request 15:39): the three scenarios' clicks sit 0.1-1.6 % inside the 10 px edge at our runner's zoom
   (0.275 mm / px at 1919 x 992); handoff/skasm.md "11-06 afternoon".
-- [ ] P2 UIP-ASM-FASTENED-FLAKY (skasm) the ui-parity scenario asm-fastened-undo-picks differs 1 run in 4 (vibe5, release
+- [x] (psui 2026-11-11 21:21: 6 of 6 runs match 9/9 on vibe5's release build while 8 ui-parity shards loaded it; matched in qa's 15:57 and 19:57 suites too) P2 UIP-ASM-FASTENED-FLAKY (skasm) the ui-parity scenario asm-fastened-undo-picks differs 1 run in 4 (vibe5, release
   build of main 08:30, run alone four times with `tools/ui-parity/run.py`): at step 4 the Fastened dialog's second query
   field ("Mate connectors") holds one item ("Mate connector of Part 2 <1>") where live's has none, then the selection
   count, the feature rows' `related` and Undo follow (6/9 states). The other three runs match 9/9. A pick or hover

@@ -445,6 +445,9 @@ pub struct UiState {
     /// the model before the edited feature.
     pub preview_opacity: f32,
     pub preview_before: Option<Arc<StudioDisplay>>,
+    /// Every feature name this view has shown, a deleted feature's too (a missing pick reads as the feature that made
+    /// it, live fillet-chip-clear-missing: "Extrude 1" after Extrude 1 was deleted).
+    pub feature_names: std::collections::HashMap<FeatureId, String>,
     /// The outline of a part the open feature removes, over its preview: for the model before it (by address) and
     /// those faces; `None` inside while a background task computes it (20-28 ms for a whole part: refresh_scene ran
     /// it on every hover, c2-bottle-split's Split 1).
@@ -807,6 +810,7 @@ impl UiState {
             message_timed: None,
             preview_opacity: crate::feature_dialog::PREVIEW_REST,
             preview_before: None,
+            feature_names: Default::default(),
             removed_outline: None,
             before_context: None,
             decal_sized: None,
@@ -1115,7 +1119,38 @@ impl PartStudioView {
                 }
             }
         }
+        // A pick that no longer resolves selects its feature's row instead.
+        for f in self.picked_features(cx) {
+            out.remove(&f);
+        }
         out
+    }
+
+    /// A dialog pick that no longer resolves (its creator rolled back, deleted or failed) reads as the feature that
+    /// made it: live's selection names that feature (fillet-chip-clear-missing) and selects its row
+    /// (fillet-chip-edit-healthy-moment: Extrude 1 selected, not lit as related).
+    pub(super) fn unresolved_pick_creator(&self, r: &Reference) -> Option<FeatureId> {
+        use noshape_model::reference::TopoName;
+        let n = match r {
+            Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => n,
+            _ => return None,
+        };
+        let before = self.ui.preview_before.as_deref();
+        if std::iter::once(&*self.display).chain(before).any(|d| noshape_ops::studio::body_of(d, r).is_some_and(|b| d.body(&b).is_some())) {
+            return None;
+        }
+        // (An edge or vertex: its first face's creator.)
+        match n {
+            TopoName::Edge { faces, .. } => faces[0].creator(),
+            TopoName::Vertex { faces, .. } => faces.first().and_then(|f| f.creator()),
+            n => n.creator(),
+        }
+    }
+
+    /// The features the open dialog's active field picked something of that no longer resolves.
+    pub(super) fn picked_features(&self, cx: &App) -> HashSet<FeatureId> {
+        let Some(e) = self.edit.as_ref() else { return HashSet::new() };
+        e.dialog.read(cx).active_refs().iter().filter_map(|r| self.unresolved_pick_creator(r)).collect()
     }
 
     // ------------------------------------------------------------ picking

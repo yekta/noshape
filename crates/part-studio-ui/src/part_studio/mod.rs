@@ -1079,6 +1079,9 @@ impl PartStudioView {
     fn apply_display_begin(&mut self, display: Arc<StudioDisplay>, window: &mut Window, cx: &mut Context<Self>) -> (bool, SceneJob) {
         self.display_seq += 1;
         self.scene_gen += 1;
+        if let Some(studio) = self.doc.read(cx).studio(self.tab) {
+            self.ui.feature_names.extend(studio.features.iter().map(|f| (f.id, f.name.clone())));
+        }
         let geometry_changed = !Arc::ptr_eq(&self.display, &display);
         // A shown center of mass follows its part (gone with it).
         if geometry_changed && let Some((b, _)) = self.ui.com.take() {
@@ -3775,6 +3778,7 @@ impl PartStudioView {
             rollback,
             editing_id,
             related: self.related_features(cx),
+            picked: self.picked_features(cx),
             // A Derived's bodies keep their source's face names: it makes the
             // bodies it creates (live qa5 DER14: "Add appearance to feature…").
             makes_faces: d.bodies.iter().flat_map(|b| b.face_refs.iter().filter_map(|r| r.depends_on()).chain([b.id.feature])).collect(),
@@ -4477,7 +4481,7 @@ impl PartStudioView {
             format!("{:?}", self.current_config(s)).hash(&mut h);
         }
         // The selection's size only shows on a selected row (its drag pill's "2 items").
-        let selected = self.selected_features.contains(&id);
+        let selected = self.selected_features.contains(&id) || self.row_ctx.picked.contains(&id);
         (i >= self.row_ctx.rollback, self.rolled_to(id, cx), selected, selected.then_some(self.selected_features.len())).hash(&mut h);
         (self.row_ctx.related.contains(&id), self.row_ctx.pending.contains(&id), self.ui.derived_open.contains(&id)).hash(&mut h);
         // The open dialog shows in a row only through these two (the edited row itself is drawn inline).
@@ -5428,8 +5432,13 @@ impl PartStudioView {
     /// Feature `id` is the sketch right above a rollback bar the user moved up: live shows it, hidden or not
     /// (behaviours request 1844; `regen::display` draws it).
     fn rolled_to(&self, id: FeatureId, cx: &App) -> bool {
+        // Editing a feature rolls the model back to it: the sketch right above it shows (live
+        // fillet-chip-edit-healthy-moment: Sketch 1 above the edited Fillet 1, its Extrude 1 rolled back).
+        if let Some(e) = self.edit.as_ref().filter(|e| !e.is_new) {
+            return e.index > 0 && self.studio(cx).and_then(|s| s.features.get(e.index - 1)).is_some_and(|f| f.id == id && f.type_id == "sketch");
+        }
         // Also while a feature added at the bar is open (live ui-parity rollback-then-add-feature).
-        self.edit.as_ref().is_none_or(|e| e.is_new) && self.studio(cx).and_then(|s| s.rolled_to_sketch()) == Some(id)
+        self.studio(cx).and_then(|s| s.rolled_to_sketch()) == Some(id)
     }
 
     /// The existing feature being edited uses feature `id` (its sketch, a plane): rolled back to before it, the
@@ -5540,7 +5549,7 @@ impl PartStudioView {
         let name = self.shown_feature_name(f, cx);
         let state = self.display.feature_state(f.id);
         let status = if editing && self.edit_invalid(cx) { FeatureStatus::Error } else { state.map(|s| s.status).unwrap_or(FeatureStatus::Ok) };
-        let selected = self.selected_features.contains(&f.id);
+        let selected = self.selected_features.contains(&f.id) || self.row_ctx.picked.contains(&f.id);
         // Onshape (§3.4): rolled back = italic #ccc, suppressed = #999 struck
         // through, error = #aa252d; everything else (sketches included) #333.
         // Suppressed directly, or by a configuration / expression (the
@@ -6594,6 +6603,8 @@ struct RowCtx {
     rollback: usize,
     editing_id: Option<FeatureId>,
     related: std::collections::HashSet<FeatureId>,
+    /// Rows selected by the open dialog's pick that no longer resolves (`picked_features`).
+    picked: std::collections::HashSet<FeatureId>,
     /// Gathered once per list instead of per row (each was a scan of the
     /// display or the model): features whose faces are in a part, sketches,
     /// features with a plane, features with an appearance.

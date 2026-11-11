@@ -3167,7 +3167,8 @@ impl FeatureDialog {
                                     if any_missing {
                                         let v = view.clone();
                                         let pc = p3.clone();
-                                        m = m.item(crate::os_menu::OsMenuItem::new("Clear missing references").on_click(move |_, _, cx| {
+                                        // Like Clear all, it leaves the keyboard nowhere (live fillet-chip-clear-missing).
+                                        m = m.item(crate::os_menu::OsMenuItem::new("Clear missing references").on_click(move |_, window, cx| {
                                             v.update(cx, |this, cx| {
                                                 let missing = this.missing.clone();
                                                 if let Some((vals, id)) = this.values_for_path_mut(&pc) {
@@ -3176,14 +3177,17 @@ impl FeatureDialog {
                                                 this.user_set.insert(pc.clone());
                                                 this.changed(cx);
                                                 cx.notify();
-                                            })
+                                            });
+                                            Self::leave_keyboard_after_menu(&v, window, cx);
                                         }));
                                     }
                                     if let Some(hr) = healthy_ref.clone() {
                                         let v = view.clone();
-                                        m = m.item(crate::os_menu::OsMenuItem::new("Edit healthy moment").on_click(move |_, _, cx| {
+                                        m = m.item(crate::os_menu::OsMenuItem::new("Edit healthy moment").on_click(move |_, window, cx| {
                                             let hr = hr.clone();
                                             v.update(cx, |_, cx| cx.emit(DialogEvent::EditHealthyMoment(hr)));
+                                            // (Live fillet-chip-edit-healthy-moment: the keyboard nowhere after.)
+                                            Self::leave_keyboard_after_menu(&v, window, cx);
                                         }));
                                     }
                                     match &pick_configure {

@@ -146,6 +146,7 @@ impl PartStudioView {
                 let (items, rollback) = self.list_items(s, cx);
                 let editing = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
                 let related = self.related_features(cx);
+                let picked_rows = self.picked_features(cx);
                 let index = |id: FeatureId| s.features.iter().position(|f| f.id == id);
                 let mut rows: Vec<Value> = Vec::new();
                 let mut after = None;
@@ -173,7 +174,7 @@ impl PartStudioView {
                                 Some(t) => format!("{} {}", crate::ui::feature_initials(t.name), self.shown_feature_name(f, cx)),
                                 None => self.shown_feature_name(f, cx),
                             };
-                            rows.push(json!({ "name": name, "state": state, "selected": self.selected_features.contains(&f.id) || editing == Some(f.id), "editing": editing == Some(f.id), "related": related.contains(&f.id), "hidden": f.hidden && state != "rolled-back" && !(editing == Some(f.id) || self.edit_uses(f.id, cx) || self.rolled_to(f.id, cx)) }));
+                            rows.push(json!({ "name": name, "state": state, "selected": self.selected_features.contains(&f.id) || editing == Some(f.id) || picked_rows.contains(&f.id), "editing": editing == Some(f.id), "related": related.contains(&f.id), "hidden": f.hidden && state != "rolled-back" && !(editing == Some(f.id) || self.edit_uses(f.id, cx) || self.rolled_to(f.id, cx)) }));
                         }
                         // A new feature's row while its dialog is open (red while it fails, as drawn).
                         super::ListItem::Placeholder => {
@@ -434,7 +435,7 @@ impl PartStudioView {
 
     /// A selected entity's kind and owner as the parity state names them (an inferred point: its entity's).
     fn selection_kind_owner(&self, r: &Reference, cx: &App) -> (&'static str, String) {
-        let feature_name = |id: FeatureId| self.studio(cx).and_then(|s| s.feature(id).map(|f| f.name.clone())).unwrap_or_default();
+        let feature_name = |id: FeatureId| self.studio(cx).and_then(|s| s.feature(id).map(|f| f.name.clone())).or_else(|| self.ui.feature_names.get(&id).cloned()).unwrap_or_default();
         // The preview may have consumed the entity: then the model before the edited feature has it.
         let body = |r: &Reference| {
             let before = self.ui.preview_before.as_deref();
@@ -442,18 +443,9 @@ impl PartStudioView {
         };
         // A pick that no longer resolves (a missing chip): live's selection names the feature that made it
         // (fillet-chip-edit-healthy-moment: FEATURE, "Extrude 1").
-        let topo = |kind: &'static str, n: &noshape_model::reference::TopoName| {
-            let owner = body(r);
-            // (An edge or vertex: its first face's creator.)
-            let creator = match n {
-                noshape_model::reference::TopoName::Edge { faces, .. } => faces[0].creator(),
-                noshape_model::reference::TopoName::Vertex { faces, .. } => faces.first().and_then(|f| f.creator()),
-                n => n.creator(),
-            };
-            match creator.filter(|_| owner.is_empty()) {
-                Some(f) => ("FEATURE", feature_name(f)),
-                None => (kind, owner),
-            }
+        let topo = |kind: &'static str, _: &noshape_model::reference::TopoName| match self.unresolved_pick_creator(r) {
+            Some(f) => ("FEATURE", feature_name(f)),
+            None => (kind, body(r)),
         };
         match r {
             Reference::Face(n) => topo("FACE", n),
