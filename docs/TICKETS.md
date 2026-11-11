@@ -365,7 +365,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-11 05:00 release, candidate e2c8da0f9 (qa list 04:50; watcher GREEN 03:57, CI 3-platform success; the latest release is v0.4.41, v0.4.42 from b73d2fece in its release CI)
-- **qa 04:50: no blocker found; the gear documents' model run on e2c8da0f9 is still running (results to follow).**
+- **qa 04:58: no blocker on e2c8da0f9.** Model suite, full corpus (vibe4): 77/87, 821/947; against 6364f3c47 only
+  c2-sm-louver 31 -> 32 (better); the gear documents unchanged with bool's rulings back: cf-spur-gear 14/14, cf-part-draft
+  13/13, cf-planetary-gears 1/1, cf-drive-train-generator 2/2.
+- qa 04:50: no blocker found; the gear documents' model run was still running then.
   - Since 6364f3c47 (checked 00:49): bool's 53812f2a0 / 08e5c8647 (the 0028 hook answers a plane containing an extrusion's
     direction with the exact rulings again: the pair 44e52dafb had turned off), core's d06b20de1 (a circle about a revolved
     surface's axis as its iso-line) and 2d50ff580 (Delete face of a prism's rounds), dx's 03ad6d6fa (translator), skasm's
