@@ -1,19 +1,19 @@
 {
  "scenario": "drw-view-rotate-horizontal-to",
- "recorded": "2026-11-07T18:50:39.552Z",
+ "recorded": "2026-11-11T09:51:26.750Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.10"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "df489cc9d5f35b7caab7e1e3",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "a64cba760bc755448f9e873e",
   "start": "hole-plate-drawing",
-  "startElement": "ac3109d7c4982f44b949727b",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "e14cce55628fbf2ae4425d70",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -176,7 +176,7 @@
      "selection": []
     }
    },
-   "t": 215910
+   "t": 227277
   },
   {
    "step": 2,
@@ -279,7 +279,7 @@
      "selection": []
     }
    },
-   "t": 230692
+   "t": 253827
   },
   {
    "step": 3,
@@ -382,7 +382,7 @@
      "selection": []
     }
    },
-   "t": 245736
+   "t": 280061
   },
   {
    "step": 4,
@@ -478,7 +478,7 @@
      "selection": []
     }
    },
-   "t": 261178
+   "t": 308322
   },
   {
    "step": 5,
@@ -487,6 +487,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     793,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -565,7 +573,7 @@
      "selection": []
     }
    },
-   "t": 275960
+   "t": 334541
   },
   {
    "step": 6,
@@ -667,7 +675,7 @@
      ]
     }
    },
-   "t": 290410
+   "t": 359426
   },
   {
    "step": 7,
@@ -770,7 +778,7 @@
      ]
     }
    },
-   "t": 304377
+   "t": 384012
   },
   {
    "step": 8,
@@ -863,7 +871,7 @@
      "selection": []
     }
    },
-   "t": 318080
+   "t": 409995
   },
   {
    "step": 9,
@@ -960,19 +968,10 @@
        "text": "DETAIL A SCALE 2:1"
       }
      ],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Top"
-      },
-      {
-       "kind": "VIEW",
-       "owner": "Detail"
-      }
-     ]
+     "selection": []
     }
    },
-   "t": 332739
+   "t": 436058
   },
   {
    "step": 10,
@@ -981,6 +980,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     793,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -1059,7 +1066,7 @@
      "selection": []
     }
    },
-   "t": 348502
+   "t": 464443
   }
  ]
 }
