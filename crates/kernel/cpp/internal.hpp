@@ -48,6 +48,9 @@
 
 namespace noshape {
 
+// openNURBS' one-time set-up (rhino.cpp; openNURBS builds only), for the Rhino writer and reader.
+void opennurbs_begin();
+
 inline gp_Pnt to_pnt(const P3& p) { return gp_Pnt(p.x, p.y, p.z); }
 inline gp_Vec to_vec(const P3& p) { return gp_Vec(p.x, p.y, p.z); }
 gp_Dir        to_dir(const P3& p, const char* what);

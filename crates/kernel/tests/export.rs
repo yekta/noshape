@@ -1445,7 +1445,7 @@ fn imported_nist_parts_write_to_rhino_and_pvz() {
                 rhino_ok.push(name.clone());
             }
             Err(e) if e.to_string().contains("needs openNURBS") => rhino_built = false,
-            Err(_) => {}
+            Err(e) => wrong.push(format!("rhino {name}: {e}")),
         }
         let path = dir.join("part.pvz");
         match write_pvz(&path, &shapes, LengthUnit::Meter).and_then(|_| read_pvz(&path, LengthUnit::Meter)) {

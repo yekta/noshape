@@ -37,14 +37,17 @@
 
 namespace noshape {
 
-namespace {
-
-void on_begin()
+// openNURBS' one-time set-up for the writer and the reader alike: ON::Begin() isn't safe to run twice at once, and
+// with a flag each a test writing Rhino and another reading it set it up together (Windows CI dropped a part's write
+// now and then: the NIST nut, the first written).
+void opennurbs_begin()
 {
   static std::once_flag once;
   const LockedSection locked_section_43;
   std::call_once(once, [] { ON::Begin(); });
 }
+
+namespace {
 
 // OCCT flat knots (cv + order of them) without the outermost two: openNURBS' knot vector.
 template <class Flat>
@@ -338,7 +341,7 @@ ON_Brep* to_brep(const TopoDS_Shape& in, bool split_closed = false)
 
 void write_rhino(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Str path, uint32_t version)
 {
-  on_begin();
+  opennurbs_begin();
   ONX_Model model;
   model.m_settings.m_ModelUnitsAndTolerances.m_unit_system      = ON_UnitSystem(ON::LengthUnitSystem::Millimeters);
   model.m_settings.m_ModelUnitsAndTolerances.m_absolute_tolerance = 0.001;
@@ -385,7 +388,7 @@ void write_rhino(const OcShapeList& shapes, rust::Slice<const rust::String> name
 
 uint32_t rhino_valid_breps(rust::Str path)
 {
-  on_begin();
+  opennurbs_begin();
   ONX_Model  model;
   ON_wString err;
   ON_TextLog log(err);

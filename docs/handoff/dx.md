@@ -10,6 +10,19 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-11 06:20 UTC: Windows CI's Rhino flake (lead's P1), what is known
+
+kernel `export::imported_nist_parts_write_to_rhino_and_pvz` lost one part on Windows CI now and then: always the
+NIST hex nut, the first part the test writes. Probes (branches dx-rhino-probe-a…d, workflow dx-rhino-probe.yml):
+caught once in ~75 full kernel runs on windows-latest (CI saw 2 in ~3): **the read back of the file just written
+failed** ("rhino: cannot read …"), not the write. The nut written 600 times beside the kernel's tests, each read
+back at once: no failure; the writes are byte for byte the same but for a header timestamp. So not the file's
+content; most likely the fresh file held a moment (a scanner), not proven. Landed: a failed Rhino read is retried
+three times (100 / 200 / 400 ms), its final error says whether the file opened (the OS's reason) and what openNURBS
+logged; the test reports a part's Rhino error instead of dropping it; one openNURBS set-up for the writer and
+the reader (two flags could run ON::Begin at once). macOS / Windows kernel build (kernel-os 42964161631) and a
+5-run Windows probe green. If CI still fails, the error now says why.
+
 ## 11-11 04:55 UTC: hat8 opens slowly (lead's P0): the import's display mesh, three times
 
 Not the STEP: the Mac mini body's display mesh. Three revolution faces our grid refused (a dome whose loop starts at

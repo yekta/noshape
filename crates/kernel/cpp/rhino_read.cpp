@@ -19,18 +19,17 @@
 
 #include "opennurbs.h"
 
+#include <cerrno>
+#include <chrono>
+#include <cstdio>
 #include <map>
 #include <mutex>
+#include <system_error>
+#include <thread>
 
 namespace noshape {
 
 namespace {
-
-void on_begin_read()
-{
-  static std::once_flag once;
-  std::call_once(once, [] { ON::Begin(); });
-}
 
 // openNURBS knots (count = cv + order - 2) -> OCCT distinct knots and multiplicities.
 void occt_knots(const double* k, int n, int order, std::vector<double>& knots, std::vector<int>& mults)
@@ -306,12 +305,29 @@ TopoDS_Shape mesh_shape_of(const ON_Mesh& m, double scale)
 
 std::vector<XtPart> read_rhino_parts(const std::string& path)
 {
-  on_begin_read();
+  opennurbs_begin();
   ONX_Model  model;
   ON_wString err;
   ON_TextLog log(err);
-  if (!model.Read(path.c_str(), &log))
-    fail_io("rhino: cannot read " + path);
+  // A file just written may be held a moment: Windows CI read its own fresh export back as unreadable now and then
+  // (the first a test wrote; byte for byte the same as the ones it read). Read again after a pause, three times; then
+  // the error says whether the file opened and what openNURBS made of it.
+  for (int attempt = 0; !model.Read(path.c_str(), &log); ++attempt)
+  {
+    if (attempt == 3)
+    {
+      std::FILE* f      = std::fopen(path.c_str(), "rb");
+      const int  opened = f != nullptr ? 0 : errno;
+      if (f != nullptr)
+        std::fclose(f);
+      const std::string why = ON_String(err).Array() ? ON_String(err).Array() : "";
+      fail_io("rhino: cannot read " + path + (opened != 0 ? ": it doesn't open (" + std::generic_category().message(opened) + ")" : std::string()) +
+              (why.empty() ? std::string() : ": " + why.substr(0, 500)));
+    }
+    model.Reset();
+    err.Empty();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100 << attempt));
+  }
   const double scale = ON::UnitScale(model.m_settings.m_ModelUnitsAndTolerances.m_unit_system, ON::LengthUnitSystem::Meters);
   const double tol   = std::max(1e-7, model.m_settings.m_ModelUnitsAndTolerances.m_absolute_tolerance * scale * 0.1);
   std::vector<XtPart> out;
