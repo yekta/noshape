@@ -3,6 +3,35 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## hat8's "Mac mini body + base union" (11-11 04:47 UTC; lead P0: the user's document opens slowly)
+- **What touches:** the body (258 faces, z >= 6.9 mm) on its base (529 faces, 432 of them ~3 mm B-spline grip faces,
+  z <= 6.9). 1076 face pairs' boxes meet, every one only in the z = 6.9 slab; 1296 were the body's flat bottom faces
+  against grip faces whose top edges lie in them, each 60 ms of OCCT's marching (IntTools_FaceFace). Our Boolean
+  declined after 14 s ("two edges leave a vertex in one direction": the base's bottom round, a torus 0.1 mm high, had
+  a box of samples grown by a tenth (12 mm) reaching the body, so it was re-arranged and its seam tripped), then OCCT
+  did it all again (~55 s).
+- **Change (landing):** our Boolean's own sections (`boolean_sections`, not the 0028 hook's): after `own_sections`,
+  a curved face resting on a plane (on one side by its exact box, its edges in the plane) gives those edges; faces
+  whose boxes meet only in an axis slab no thicker than their tolerances give none (unless an edge of each runs along
+  one curve there or a face touches the slab inside); both only with a free-form face in the pair (OCCT's analytic
+  sections are quick: cf-fill-pattern's holes paid +4 % for the exact boxes before). A free-form face's box is cut to its control points' hull over
+  its parameters (NURBS by its spans' poles, tori and spheres by their v range, extrusions and revolutions by their
+  curve's part). T1 bool_patterns::a_body_standing_on_a_curved_base_fused_as_occt.
+- **Numbers:** the recorded union (vibe3, load ~45): ours 5.6 s, OCCT 50.5 s in the same run, 0 differences. hat8 on
+  vibe3, alternating, a fresh copy each run (load 23-32): union 42.5 / 43.7 s -> 3.86 / 4.34 s, regen 73.0 / 74.9 ->
+  34.9 / 34.2 s, open (wall) 86.6 / 87.6 -> 48.6 / 47.7 s; 6 parts all OK both ways.
+- **Gate (vibe4, vibe5 was qa's 02-04):** corpora + parity56 taken counts as before, 0 differences; sp-cut's one
+  difference is main's too (OCCT's recorded result invalid); knurl / gear the same, times level (k25-15 10.3 / 11.0x
+  OCCT, k25-25 19.8 / 18.6x, cf-spur-gear 7.6 / 7.5x); shfall 55 taken (54), its 2 known; model suite 77/87, 821/947,
+  every document's result the same; alternating on vibe5 (main's paths by a switch, 3-4 rounds) cf-drive-train,
+  cf-snap-hook, c2-sm-louver, cf-fill-pattern, cf-butt-joint, cf-box-dovetail level (fill pattern 2438-2462 /
+  2442-2453 ms). Re-gated after the free-form condition: corpora + parity56 the same.
+- **Next in hat8 (mine):** six more Booleans declined "a curved edge": Move face's offset curves (the corners offset
+  3.15 mm in-plane). A B-spline through the curve at its own parameters, fitted per span of its basis (C1 there),
+  takes two of them (bool-main2, gate pending); the others then decline "a shared shape OCCT may keep or remake"
+  (Riser legs grip's 4.1 s tree), "a non-manifold result" (Merge seat lip into riser, 1.2-1.7 s), "a tiny arc" (two),
+  "a section OCCT makes as a conic". Left in hat8 at load 45: import 17.4 s (dx), the chamfers 5.8 + 3.0 s (blend).
+
 ## From psui (2026-11-10 19:12 UTC, lead): does the bookcase's "cut in half" Boolean run on ours now?
 c2-hex-bookcase-derived matches live to the end since dc4b1a01 (17/17; the text's µm slivers were already gone after
 core's `rejoin_pieces`, 11-09). In my parity runs on vibe5 "cut in half" (d1f02bed in your corpus) took 12-20 ms (your

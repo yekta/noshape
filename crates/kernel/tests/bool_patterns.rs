@@ -1795,3 +1795,32 @@ fn a_round_touching_a_coaxial_tube_meets_it_along_one_circle() {
         assert!((v - volume).abs() <= 1e-6 * volume, "{op:?}: {v} against {volume}");
     }
 }
+
+/// A body standing on a base of revolution (a Mac mini body on its base): the base's bottom round, a torus 1 mm high,
+/// stays as it was, though a box of its samples grown by a tenth of its size reached the body 5 mm above (it declined
+/// "no point inside a face piece"; a curved face's box is now within its control points' hull): noshape's Boolean takes
+/// the fuse, OCCT's result.
+#[test]
+fn a_body_standing_on_a_curved_base_fused_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let mm = 1e-3;
+    let p = |r: f64, z: f64| DVec3::new(r, 0.0, z) * mm;
+    let line = |a: DVec3, b: DVec3| k::make_bspline(&[a, b], None, &[0.0, 1.0], &[2, 2], 1, false).unwrap();
+    let side = k::make_bspline(&[p(20.0, 0.0), p(26.0, 2.0), p(22.0, 4.0), p(15.0, 5.0)], None, &[0.0, 1.0], &[4, 4], 3, false).unwrap();
+    let wire = k::make_wire(&[line(p(0.0, 0.0), p(20.0, 0.0)), side, line(p(15.0, 5.0), p(0.0, 5.0)), line(p(0.0, 5.0), p(0.0, 0.0))]).unwrap();
+    let base = k::revolve(&k::make_face_from_wire(&wire, true).unwrap(), DVec3::ZERO, DVec3::Z, TAU).unwrap().shape;
+    let bottom: Vec<k::Shape> = base.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, k::Curve::Circle { radius, .. } if (radius - 20.0 * mm).abs() < 1e-9))).collect();
+    assert_eq!(bottom.len(), 1, "the base's bottom edge");
+    let base = k::fillet(&base, &bottom, 1.0 * mm).unwrap().shape;
+    let body = k::make_box_corners(DVec3::new(-30.0, -30.0, 5.0) * mm, DVec3::new(30.0, 30.0, 15.0) * mm).unwrap();
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&body), std::slice::from_ref(&base), &k::BooleanOptions::default());
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&body), std::slice::from_ref(&base), &k::BooleanOptions::default()).unwrap();
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid());
+    assert_eq!(k::bool_corpus::Summary::of(&r).differences(&k::bool_corpus::Summary::of(&o)), Vec::<String>::new());
+}

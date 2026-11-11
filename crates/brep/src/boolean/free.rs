@@ -371,7 +371,9 @@ pub(super) fn face_box(g: &GFace) -> Option<(DVec3, DVec3)> {
         }
     }
     let grow = DVec3::splat(0.1 * (hi - lo).length());
-    Some((lo - grow, hi + grow))
+    // (Within its control points' hull: a 124 mm ring 0.1 mm high grew 12 mm up, past another solid it never meets.)
+    let Some((hl, hh)) = ns.hull_box((u0, u1), (v0, v1)) else { return Some((lo - grow, hi + grow)) };
+    Some(((lo - grow).max(hl), (hi + grow).min(hh)))
 }
 
 /// Where a 3D curve crosses the angle `th0` of the cylinders and cones among `faces` (a full one's seam, a part's

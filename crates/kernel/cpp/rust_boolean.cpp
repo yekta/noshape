@@ -23,6 +23,8 @@
 #include <BRepTools_WireExplorer.hxx>
 #include <BRepLib.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepTopAdaptor_FClass2d.hxx>
+#include <GeomAPI.hxx>
 #include <GProp_GProps.hxx>
 #include <BRepGProp.hxx>
 #include <ShapeAnalysis_Surface.hxx>
@@ -2684,6 +2686,175 @@ bool coaxial_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<
   return true;
 }
 
+// Faces whose boxes overlap only in a slab across an axis no thicker than their tolerances (a Mac mini body's walls
+// on the z = 6.9 mm top of its base's 432 grip faces, each pair 60 ms of OCCT's marching to a curve outside the wall):
+// they meet only in that slab, so along a curve only where an edge of each lies there along one curve, or a face
+// touches it inside. Neither: no section (their touching points are the edges' own). True with none then.
+static bool apart_across_slab(const TopoDS_Face& fa, const TopoDS_Face& fb)
+{
+  Bnd_Box ba, bb;
+  BRepBndLib::Add(fa, ba, false);
+  BRepBndLib::Add(fb, bb, false);
+  if (ba.IsVoid() || bb.IsVoid())
+    return false;
+  double a[6], b[6];
+  ba.Get(a[0], a[1], a[2], a[3], a[4], a[5]);
+  bb.Get(b[0], b[1], b[2], b[3], b[4], b[5]);
+  // (Coarse boxes first (a B-spline's overshoots by its poles); then the faces' own extents, without tolerances.)
+  int axis = -1;
+  for (int k = 0; k < 3; ++k)
+    if (std::min(a[k + 3], b[k + 3]) - std::max(a[k], b[k]) <= ba.GetGap() + bb.GetGap() + 1e-5)
+      axis = k;
+  if (axis < 0)
+    return false;
+  ba.SetVoid();
+  bb.SetVoid();
+  BRepBndLib::AddOptimal(fa, ba, false, false);
+  BRepBndLib::AddOptimal(fb, bb, false, false);
+  ba.Get(a[0], a[1], a[2], a[3], a[4], a[5]);
+  bb.Get(b[0], b[1], b[2], b[3], b[4], b[5]);
+  const double tol = BRep_Tool::MaxTolerance(fa, TopAbs_EDGE) + BRep_Tool::MaxTolerance(fb, TopAbs_EDGE) + Precision::Confusion();
+  const double overlap = std::min(a[axis + 3], b[axis + 3]) - std::max(a[axis], b[axis]);
+  // (Apart by more than their tolerances: nothing.)
+  if (overlap < -tol)
+    return true;
+  // (A face flat in the slab: the other's edges on it are sections.)
+  if (overlap > tol || a[axis + 3] - a[axis] <= 2 * tol || b[axis + 3] - b[axis] <= 2 * tol)
+    return false;
+  const double lo = std::max(a[axis], b[axis]) - tol, hi = std::min(a[axis + 3], b[axis + 3]) + tol;
+  const auto   in_slab = [&](const gp_Pnt& p) { return p.Coord(axis + 1) >= lo && p.Coord(axis + 1) <= hi; };
+  // Each face's edges in the slab (their curves), none inside it.
+  const auto in_it = [&](const TopoDS_Face& f, std::vector<std::pair<occ::handle<Geom_Curve>, std::array<double, 3>>>& edges) {
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+      if (BRep_Tool::Degenerated(e))
+        continue;
+      double                        c0 = 0, c1 = 0;
+      const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, c0, c1);
+      if (c.IsNull())
+        return false;
+      int in = 0;
+      for (int k = 1; k < 16; ++k)
+        in += in_slab(c->Value(c0 + (c1 - c0) * k / 16));
+      if (in > 0)
+        edges.push_back({c, {c0, c1, BRep_Tool::Tolerance(e)}});
+    }
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    const occ::handle<Geom_Surface>        s = BRep_Tool::Surface(f);
+    std::optional<BRepTopAdaptor_FClass2d> cls;
+    for (int i = 1; i < 8; ++i)
+      for (int j = 1; j < 8; ++j)
+      {
+        const gp_Pnt2d uv(u0 + (u1 - u0) * i / 8, v0 + (v1 - v0) * j / 8);
+        if (!in_slab(s->Value(uv.X(), uv.Y())))
+          continue;
+        if (!cls)
+          cls.emplace(f, Precision::PConfusion());
+        if (cls->Perform(uv) == TopAbs_IN)
+          return false;
+      }
+    return true;
+  };
+  std::vector<std::pair<occ::handle<Geom_Curve>, std::array<double, 3>>> ea, eb;
+  if (!in_it(fa, ea) || !in_it(fb, eb))
+    return false;
+  // (Two edges along one curve: a common stretch, OCCT's to find.)
+  for (const auto& [ca, ra] : ea)
+    for (const auto& [cb, rb] : eb)
+    {
+      int near_both = 0;
+      for (int k = 1; k < 16 && near_both < 2; ++k)
+      {
+        GeomAPI_ProjectPointOnCurve pr(ca->Value(ra[0] + (ra[1] - ra[0]) * k / 16), cb, rb[0], rb[1]);
+        near_both = pr.NbPoints() > 0 && pr.LowerDistance() <= ra[2] + rb[2] + tol ? near_both + 1 : 0;
+      }
+      if (near_both >= 2)
+        return false;
+    }
+  return true;
+}
+
+// A curved face resting on a plane: on one side of it, touching it along edges of its own (a Mac mini base's 432 grip
+// faces under the body's bottom, each 60 ms of OCCT's marching): those edges, exact. False where the face's box reaches
+// across the plane, no edge lies in it, or a point inside the face comes within tolerance (OCCT's then).
+static bool resting_on_plane(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+{
+  const occ::handle<Geom_Plane> pa = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fa)), pb = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fb));
+  if (pa.IsNull() == pb.IsNull())
+    return false;
+  const bool         p_first = !pa.IsNull();
+  const TopoDS_Face& f       = p_first ? fb : fa;
+  const gp_Pln       P       = (p_first ? pa : pb)->Pln();
+  const double       t       = std::max(BRep_Tool::Tolerance(p_first ? fa : fb), Precision::Confusion());
+  const occ::handle<Geom_Surface> sf = BRep_Tool::Surface(f);
+  std::vector<IntTools_Curve>     found;
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge& e  = TopoDS::Edge(x.Current());
+    const double       te = std::max(t, BRep_Tool::Tolerance(e));
+    double             c0 = 0, c1 = 0, q0 = 0, q1 = 0;
+    if (BRep_Tool::Degenerated(e))
+      continue;
+    const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, c0, c1);
+    if (c.IsNull())
+      return false;
+    // (Its ends aside: an edge down to the plane touches it at one.)
+    int in = 0;
+    for (int k = 1; k < 16; ++k)
+      in += std::abs(P.Distance(c->Value(c0 + (c1 - c0) * k / 16))) <= te;
+    if (in == 0)
+      continue;
+    // (Partly in it: a touch OCCT's sections decide.)
+    const occ::handle<Geom2d_Curve> on = BRep_Tool::CurveOnSurface(e, f, q0, q1);
+    if (in < 15 || on.IsNull() || std::abs(q0 - c0) > 1e-12 || std::abs(q1 - c1) > 1e-12)
+      return false;
+    const occ::handle<Geom2d_Curve> on_p = GeomAPI::To2d(c, P);
+    if (on_p.IsNull())
+      return false;
+    found.emplace_back(new Geom_TrimmedCurve(c, c0, c1), p_first ? on_p : on, p_first ? on : on_p, te);
+  }
+  if (found.empty())
+    return false;
+  // (On one side of it, by its own extent without tolerances: a B-spline's box by its poles reached 3.5 mm over a
+  // grip face's plane.)
+  Bnd_Box box;
+  BRepBndLib::AddOptimal(f, box, false, false);
+  if (box.IsVoid())
+    return false;
+  double x0, y0, z0, x1, y1, z1;
+  box.Get(x0, y0, z0, x1, y1, z1);
+  double lo = RealLast(), hi = RealFirst();
+  for (int k = 0; k < 8; ++k)
+  {
+    const double d = P.SignedDistance(gp_Pnt(k & 1 ? x1 : x0, k & 2 ? y1 : y0, k & 4 ? z1 : z0));
+    lo = std::min(lo, d);
+    hi = std::max(hi, d);
+  }
+  const double slack = t + BRep_Tool::MaxTolerance(f, TopAbs_EDGE);
+  const bool   above = std::abs(lo) <= slack, below = std::abs(hi) <= slack;
+  if (above == below)
+    return false;
+  // (Inside the face, away from its edges: a bump touching the plane there would be a section of its own.)
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  std::optional<BRepTopAdaptor_FClass2d> cls;
+  for (int i = 1; i < 8; ++i)
+    for (int j = 1; j < 8; ++j)
+    {
+      const gp_Pnt2d uv(u0 + (u1 - u0) * i / 8, v0 + (v1 - v0) * j / 8);
+      if (std::abs(P.Distance(sf->Value(uv.X(), uv.Y()))) > 2 * slack)
+        continue;
+      if (!cls)
+        cls.emplace(f, Precision::PConfusion());
+      if (cls->Perform(uv) == TopAbs_IN)
+        return false;
+    }
+  out.insert(out.end(), found.begin(), found.end());
+  return true;
+}
+
 // noshape's own sections of faces `fa` and `fb`, as OCCT's IntTools_Curve gives them (the curve, its curves on `fa` and
 // `fb` in their own parameters (the same parameter), its tolerance): an extrusion against a plane across its
 // direction (the profile moved there), a cylinder along it or another extrusion along it (rulings where the profiles
@@ -2816,6 +2987,19 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
     return true;
   }
   return false;
+}
+
+// Our Boolean's own sections: own_sections, else a face resting on a plane or faces meeting only in a slab (not OCCT's
+// hook: its pave filler takes those cases' curves untried).
+static bool boolean_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+{
+  if (own_sections(fa, fb, out))
+    return true;
+  out.clear();
+  // (Only with a free-form face: OCCT's sections of planes, cylinders, cones and spheres are analytic and quick (a plate's
+  // holes paid the exact boxes for nothing).)
+  const auto free_form = [](const TopoDS_Face& f) { return BRepAdaptor_Surface(f, false).GetType() > GeomAbs_Sphere; };
+  return (free_form(fa) || free_form(fb)) && (resting_on_plane(fa, fb, out) || apart_across_slab(fa, fb));
 }
 
 // OCCT's section of two faces, one of them free-form, brought onto both surfaces where its approximation is coarse
@@ -2966,7 +3150,7 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
       return;
     try
     {
-      if (own_sections(jobs[k].fa, jobs[k].fb, jobs[k].lines))
+      if (boolean_sections(jobs[k].fa, jobs[k].fb, jobs[k].lines))
       {
         jobs[k].done = true;
         return;
@@ -3073,7 +3257,7 @@ static rust::String occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_ar
   // (Kept for the Boolean's later rounds (boolean_with: again with vertices merged), whose input faces are these.)
   else if (made != t_free->ahead.end())
     lines = made->second;
-  else if (own_sections(fa, fb, lines))
+  else if (boolean_sections(fa, fb, lines))
     t_free->ahead.emplace(swap ? std::array<uint32_t, 4>{b_arg, b_face, a_arg, a_face} : std::array<uint32_t, 4>{a_arg, a_face, b_arg, b_face}, lines);
   else
   {

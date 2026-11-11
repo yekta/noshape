@@ -108,6 +108,50 @@ impl FreeSurface {
         }
     }
 
+    /// A box holding it over [u.0, u.1] × [v.0, v.1], from its control points' hull (None where a weight isn't
+    /// positive).
+    pub fn hull_box(&self, u: (f64, f64), v: (f64, f64)) -> Option<(DVec3, DVec3)> {
+        let poles = |p: &[DVec3], w: &[f64]| -> Option<(DVec3, DVec3)> {
+            if w.iter().any(|&w| w <= 0.0) {
+                return None;
+            }
+            Some(p.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(l, h), &q| (l.min(q), h.max(q))))
+        };
+        match self {
+            FreeSurface::Nurbs(s) => s.hull_box(u, v),
+            // (Over v: from the axis at most major + minor cos v, along it minor sin v, as a ring of revolution.)
+            &FreeSurface::Sphere { o, z, r, .. } => {
+                let (c, s) = cos_sin_ranges(v);
+                Some(ring_box(o, z, (r * s.0, r * s.1), r * c.0.abs().max(c.1.abs())))
+            }
+            &FreeSurface::Torus { o, z, major, minor, .. } => {
+                let (c, s) = cos_sin_ranges(v);
+                let (h0, h1) = if minor >= 0.0 { (minor * s.0, minor * s.1) } else { (minor * s.1, minor * s.0) };
+                Some(ring_box(o, z, (h0, h1), (major + minor * c.0).abs().max((major + minor * c.1).abs())))
+            }
+            FreeSurface::Extrusion { c, d } => {
+                if !v.0.is_finite() || !v.1.is_finite() {
+                    return None;
+                }
+                let (l, h) = c.part_box(u.0, u.1).or_else(|| poles(&c.poles, &c.weights))?;
+                Some(((l + *d * v.0).min(l + *d * v.1), (h + *d * v.0).max(h + *d * v.1)))
+            }
+            FreeSurface::Revolution { c, o, a } => {
+                // (Along the axis, its part's hull's range; across it, the hull's farthest corner from it.)
+                let (l, h) = c.part_box(v.0, v.1).or_else(|| poles(&c.poles, &c.weights))?;
+                let (mut h0, mut h1, mut r) = (f64::INFINITY, f64::NEG_INFINITY, 0.0f64);
+                for q in (0..8).map(|k| DVec3::new(if k & 1 == 0 { l.x } else { h.x }, if k & 2 == 0 { l.y } else { h.y }, if k & 4 == 0 { l.z } else { h.z })) {
+                    let rel = q - *o;
+                    let h = rel.dot(*a);
+                    h0 = h0.min(h);
+                    h1 = h1.max(h);
+                    r = r.max((rel - *a * h).length());
+                }
+                Some(ring_box(*o, *a, (h0, h1), r))
+            }
+        }
+    }
+
     pub fn at(&self, u: f64, v: f64) -> DVec3 {
         match self {
             FreeSurface::Nurbs(s) => s.at(u, v),
@@ -200,6 +244,33 @@ impl FreeSurface {
         }
         (q, (self.at(q.x, q.y) - p).length())
     }
+}
+
+/// The box of points within `r` of the axis (o, a) (a unit) and from `h.0` to `h.1` along it.
+fn ring_box(o: DVec3, a: DVec3, h: (f64, f64), r: f64) -> (DVec3, DVec3) {
+    let (e0, e1) = (o + a * h.0, o + a * h.1);
+    let across = DVec3::new((1.0 - a.x * a.x).max(0.0).sqrt(), (1.0 - a.y * a.y).max(0.0).sqrt(), (1.0 - a.z * a.z).max(0.0).sqrt()) * r;
+    (e0.min(e1) - across, e0.max(e1) + across)
+}
+
+/// The ranges of cos and of sin over [v.0, v.1] (all of [-1, 1] over a turn or an unbounded range).
+fn cos_sin_ranges(v: (f64, f64)) -> ((f64, f64), (f64, f64)) {
+    if !(v.0.is_finite() && v.1.is_finite()) || v.1 - v.0 >= TAU {
+        return ((-1.0, 1.0), (-1.0, 1.0));
+    }
+    let (mut c, mut s) = ((v.0.cos().min(v.1.cos()), v.0.cos().max(v.1.cos())), (v.0.sin().min(v.1.sin()), v.0.sin().max(v.1.sin())));
+    // (The quarter turns inside it: cos and sin at ±1 there.)
+    let mut k = (v.0 / std::f64::consts::FRAC_PI_2).ceil();
+    while k * std::f64::consts::FRAC_PI_2 <= v.1 {
+        match (k as i64).rem_euclid(4) {
+            0 => c.1 = 1.0,
+            1 => s.1 = 1.0,
+            2 => c.0 = -1.0,
+            _ => s.0 = -1.0,
+        }
+        k += 1.0;
+    }
+    (c, s)
 }
 
 #[cfg(test)]

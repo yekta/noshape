@@ -679,6 +679,26 @@ impl NurbsSurface {
         [s[0][0], s[1][0], s[0][1], s[2][0], s[1][1], s[0][2]]
     }
 
+    /// A box holding it over [u.0, u.1] × [v.0, v.1]: the hull of the control points of the knot spans there (None
+    /// where a weight isn't positive).
+    pub fn hull_box(&self, u: (f64, f64), v: (f64, f64)) -> Option<(DVec3, DVec3)> {
+        if self.weights.iter().any(|&w| w <= 0.0) {
+            return None;
+        }
+        let (p, q) = (self.udegree, self.vdegree);
+        let within = |t: (f64, f64), knots: &[f64], d: usize, n: usize| t.0 <= t.1 && t.0 >= knots[d] && t.1 <= knots[n];
+        let (i0, i1) = if within(u, &self.uknots, p, self.nu) { (span(&self.uknots, p, self.nu, u.0) - p, span(&self.uknots, p, self.nu, u.1)) } else { (0, self.nu - 1) };
+        let (j0, j1) = if within(v, &self.vknots, q, self.nv) { (span(&self.vknots, q, self.nv, v.0) - q, span(&self.vknots, q, self.nv, v.1)) } else { (0, self.nv - 1) };
+        let (mut lo, mut hi) = (DVec3::INFINITY, DVec3::NEG_INFINITY);
+        for i in i0..=i1 {
+            for &x in &self.poles[i * self.nv + j0..=i * self.nv + j1] {
+                lo = lo.min(x);
+                hi = hi.max(x);
+            }
+        }
+        Some((lo, hi))
+    }
+
     pub fn at(&self, u: f64, v: f64) -> DVec3 {
         let (p, q) = (self.udegree, self.vdegree);
         let (su, sv) = (span(&self.uknots, p, self.nu, u), span(&self.vknots, q, self.nv, v));
