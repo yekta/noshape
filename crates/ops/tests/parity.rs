@@ -975,6 +975,44 @@ fn block_model() -> (Value, Vec<Value>, String) {
     (features, live, refs)
 }
 
+/// A sketch on an in-context face (Onshape's "In context entity" sub-feature, its blob not fetched; asm-isaac-ball):
+/// built on a face at live's sketch frame, here tilted 30° off Top; the stand-in is deleted after the last feature,
+/// so the studio's parts are live's.
+#[test]
+fn a_sketch_on_an_in_context_face_is_built_on_live_frame() {
+    let (o, x, y) = ([0.01, 0.02, 0.03], [1.0, 0.0, 0.0], [0.0, 30f64.to_radians().cos(), 30f64.to_radians().sin()]);
+    let n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+    let matrix = json!([x[0], y[0], n[0], o[0], x[1], y[1], n[1], o[1], x[2], y[2], n[2], o[2], 0.0, 0.0, 0.0, 1.0]);
+    let doc = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "deterministicIds": ["JFC"], "entityType": "FACE", "featureId": "FIC" }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.005, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [],
+          "subFeatures": [{ "btType": "BTMFeature-134", "featureType": "importForeign", "featureId": "FIC", "name": "In context entity",
+                            "parameters": [{ "btType": "BTMParameterBoolean-144", "parameterId": "isInContext", "value": true }] }] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "10 mm" }] }
+    ], "sketches": { "sketches": [{ "featureId": "FS1", "transformMatrix": matrix }] } });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("in-context-sketch.noshape"), &doc, Default::default()).unwrap();
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok"), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+    }
+    assert!(t.finish().is_empty());
+    let parts = t.call("query_parts", json!({})).unwrap();
+    let kinds: Vec<&str> = parts["parts"].as_array().unwrap().iter().filter_map(|p| p["kind"].as_str()).collect();
+    assert_eq!(kinds, ["Solid"], "the stand-in face is gone: {parts}");
+    // The far cap 10 mm along live's sketch normal.
+    let faces = t.call("query_entities", json!({ "kind": "faces", "surface": "plane" })).unwrap();
+    let cap: Vec<f64> = (0..3).map(|i| (o[i] + n[i] * 0.01) * 1000.0).collect();
+    let near = |c: &Value| (0..3).all(|i| (c[i].as_f64().unwrap() - cap[i]).abs() < 1e-3);
+    assert!(faces["faces"].as_array().unwrap().iter().any(|f| near(&f["centroid"])), "no cap at {cap:?}: {faces}");
+}
+
 /// A Derived feature from a Part Studio fetched beside the document (derived/<element>/): that studio built in a
 /// tab of ours first, the feature taking our part for live's part id (cf-sheet-metal-hem's Derived 1).
 #[test]

@@ -90,6 +90,8 @@ pub struct Translator<'a> {
     sub_params: HashMap<String, Map<String, Value>>,
     /// The feature's in-feature construction points (cPoint sub-features, live 2422) by their live ids.
     sub_points: HashMap<String, Map<String, Value>>,
+    /// Our stand-ins for in-context entities (their faces' Import features), deleted after the last feature.
+    context_helpers: Vec<String>,
     /// (Onshape sketch feature id, sketch entity id) → our entity id
     /// (points as "<id>.start" / ".end" / ".center").
     sketch_entities: HashMap<(String, String), String>,
@@ -324,7 +326,7 @@ impl<'a> Translator<'a> {
             // (A boolean configuration's default is a JSON boolean.)
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -603,6 +605,22 @@ impl<'a> Translator<'a> {
             }
             step.problems.extend(problems.into_iter().map(|p| format!("its in-feature {}: {p}", sub["featureType"].as_str().unwrap_or("?"))));
         }
+        // A sketch on an in-context face (Onshape's frozen copy of the assembly's geometry; its blob isn't fetched):
+        // a face on live's sketch frame imported in its place (asm-isaac-ball's 35 sketches).
+        if f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")) {
+            let in_context = |s: &&Value| s["featureType"] == "importForeign" && s["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "isInContext" && p["value"] == true);
+            for sub in f["subFeatures"].as_array().into_iter().flatten().filter(in_context) {
+                match self.in_context_face(f["featureId"].as_str().unwrap_or("")) {
+                    Ok(id) => {
+                        if let Some(oid) = sub["featureId"].as_str() {
+                            self.feature_ids.insert(oid.to_string(), id.clone());
+                        }
+                        self.context_helpers.push(id);
+                    }
+                    Err(e) => step.problems.push(format!("its in-context entity: {e}")),
+                }
+            }
+        }
         let made = if f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")) {
             self.sketch(k, &f, &mut step.problems)
         } else if f["featureType"] == "importForeign" {
@@ -630,6 +648,44 @@ impl<'a> Translator<'a> {
             Err(e) => step.problems.insert(0, format!("not built: {e}")),
         }
         step
+    }
+
+    /// An in-context entity under sketch `sketch`: a face on live's sketch frame (its normal the sketch's), imported
+    /// as an Import feature.
+    fn in_context_face(&mut self, sketch: &str) -> Result<String, String> {
+        use glam::{DVec2, DVec3};
+        use noshape_kernel as k;
+        let [o, x, y] = *self.frames.get(sketch).ok_or("live's sketch frame wasn't fetched")?;
+        let (o, x, y) = (DVec3::from(o), DVec3::from(x), DVec3::from(y));
+        let corners = [DVec2::new(-0.5, -0.5), DVec2::new(0.5, -0.5), DVec2::new(0.5, 0.5), DVec2::new(-0.5, 0.5)];
+        let square: Vec<k::Segment2d> = (0..4).map(|i| k::Segment2d::Line { a: corners[i], b: corners[(i + 1) % 4] }).collect();
+        let face = k::make_face_2d(&k::Plane::new(o, x.cross(y), x), &square, &[]).map_err(|e| e.to_string())?;
+        let brep = String::from_utf8(face.to_brep_bytes().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        let r = self.call("feature_add", json!({ "type": "importForeign", "name": "In context entity", "params": { "blobData": brep, "isInContext": true } }))?;
+        r["feature"].as_str().map(str::to_string).ok_or_else(|| "feature_add gave no id".into())
+    }
+
+    /// After the last feature: the in-context entities' stand-ins deleted (Onshape's are no parts).
+    pub fn finish(&mut self) -> Vec<String> {
+        if self.context_helpers.is_empty() {
+            return Vec::new();
+        }
+        let mut bodies: Vec<String> = Vec::new();
+        for f in self.context_helpers.clone() {
+            let r = match self.call("query_entities", json!({ "kind": "faces", "created_by": f, "limit": 100 })) {
+                Ok(r) => r,
+                Err(e) => return vec![format!("in-context entities: {e}")],
+            };
+            for b in r["faces"].as_array().into_iter().flatten().filter_map(|e| e["part"].as_str()) {
+                if !bodies.iter().any(|x| x == b) {
+                    bodies.push(b.to_string());
+                }
+            }
+        }
+        match self.call("feature_add", json!({ "type": "deleteBodies", "name": "In context entities", "params": { "entities": bodies } })) {
+            Ok(_) => Vec::new(),
+            Err(e) => vec![format!("in-context entities not deleted: {e}")],
+        }
     }
 
     /// An Import feature: live's file imported as the Import dialog does (a
@@ -938,6 +994,7 @@ impl<'a> Translator<'a> {
                 problems.extend(step.problems.iter().map(|p| format!("its source's {}: {p}", step.name)));
             }
         }
+        problems.extend(t.finish().into_iter().map(|p| format!("its source: {p}")));
         let tab = t.tab.clone().ok_or("Derived: the source's tab")?;
         let last = lines.iter().rfind(|l| l.get("index").is_some()).cloned().unwrap_or(Value::Null);
         let mut parts = HashMap::new();
@@ -5728,6 +5785,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 res.differences.push(format!("{name} › {}: {} ({})", step.name, step.status.as_deref().unwrap_or(""), step.message.as_deref().unwrap_or("")));
             }
         }
+        res.untranslated.extend(t.finish().into_iter().map(|p| format!("{name}: {p}")));
         for (key, (path, inference, q)) in &connectors {
             if path.last().and_then(|i| element_of.get(i)) != Some(element) {
                 continue;
