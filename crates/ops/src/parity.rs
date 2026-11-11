@@ -6163,6 +6163,37 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             res.differences.push(format!("{name}: not moved to live's place after the mates: {e}"));
         }
     }
+    // Inside each subassembly instance its instances where live has that one's (a flexible subassembly's instances
+    // differ): set in the tab holding the subassembly instance, relative to that tab's occurrence; a subassembly
+    // used more than once there takes its first occurrence's.
+    let mut placed_inside: HashSet<(String, String)> = HashSet::new();
+    for o in &occurrences {
+        let p = ids(&o["path"]);
+        if p.len() < 2 {
+            continue;
+        }
+        let (outer, inner) = p.split_at(p.len() - 2);
+        let level = outer.last().map_or(Some(String::new()), |id| element_of.get(id).cloned());
+        let Some(level) = level else { continue };
+        let Some(tab) = levels.iter().find(|l| l.element == level).map(|l| l.tab.clone()) else { continue };
+        let Some(sub) = ours.get(&(level.clone(), inner[0].clone())) else { continue };
+        let Some(child) = element_of.get(&inner[0]).and_then(|e| ours.get(&(e.clone(), inner[1].clone()))) else { continue };
+        let name = format!("{sub} > {child}");
+        if !placed_inside.insert((tab.clone(), name.clone())) {
+            continue;
+        }
+        let m = match (transform_of(&p).and_then(|m| mat(&m)), outer.is_empty()) {
+            (Some(m), true) => m,
+            (Some(m), false) => match transform_of(outer).and_then(|m| mat(&m)) {
+                Some(frame) => frame.inverse() * m,
+                None => continue,
+            },
+            _ => continue,
+        };
+        if let Err(e) = placer.place(&tab, &name, &row_major(m)) {
+            res.differences.push(format!("{tab} › {name}: not moved to live's place: {e}"));
+        }
+    }
     trace("comparing");
     // Compared with live: each occurrence's place (a top-level instance by its placement, a part inside a
     // subassembly by assembly_list's occurrences; a subassembly inside another is placed by its parts), each mate's

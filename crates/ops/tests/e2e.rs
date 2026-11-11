@@ -7408,6 +7408,13 @@ fn a_flexible_subassembly_instances_part_moves_in_its_parent_only() {
     assert!(near(&(0..3).map(|i| num(&sub["instances"][0]["translation"][i])).collect::<Vec<_>>(), [0.0, 0.0, 0.0]), "the subassembly itself stays: {sub}");
     let e = try_call(&mut ctx, "assembly_transform", json!({ "tab": "Assembly 1", "instance": "Sub <1> > Part 1 <1> > Part 2 <1>", "translation": [0, 0, 0] })).unwrap_err().to_json();
     assert_eq!(e["param"], "instance", "{e}");
+    // One level up, the positions come along: Assembly 1 inside another assembly.
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Top" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Top", "source": "Assembly 1" }));
+    let top = call(&mut ctx, "assembly_list", json!({ "tab": "Top" }));
+    let at = |p: &str| -> Vec<f64> { top["occurrences"].as_array().unwrap().iter().find(|o| o["path"] == p).map(|o| (0..3).map(|i| num(&o["translation"][i])).collect()).unwrap_or_else(|| panic!("no occurrence {p}: {top}")) };
+    assert!(near(&at("Assembly 1 <1> > Sub <2> > Part 1 <1>"), [30.0, 120.0, 5.0]), "moved in Top: {:?}", at("Assembly 1 <1> > Sub <2> > Part 1 <1>"));
+    assert!(near(&at("Assembly 1 <1> > Sub <1> > Part 1 <1>"), [0.0, 0.0, 0.0]), "the other instance in Top: {:?}", at("Assembly 1 <1> > Sub <1> > Part 1 <1>"));
 }
 
 /// A mate to a part inside a subassembly, as the app makes one: the part named by its occurrence path

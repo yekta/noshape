@@ -20,8 +20,15 @@ placed them once, in the subassembly's tab. How it works now (`crates/ops/src/op
 - Refused by `instance`: a locked (rigid) subassembly instance; paths deeper than two (nested flexible subassemblies
   are solved rigid, so a grandchild moves with its subassembly).
 - Test: e2e `a_flexible_subassembly_instances_part_moves_in_its_parent_only`.
-dx does the translator side next (each instance's children at live's occurrence transforms). Still open for asm: the
-UI drag of a part inside a flexible subassembly instance writing the same `nested` entry, if it doesn't already.
+- It works in any assembly tab, and one level up the positions come along (a subassembly's own sub-instance's
+  `nested` seeds its solve when the subassembly is expanded in its parent: `prepare_subassembly`).
+- The parity translator (dx) now places every occurrence two or more levels deep this way, in the tab holding its
+  subassembly instance, relative to that tab's occurrence (asm-xdev-subs 201 -> 239/286, asm-welding-config 41 -> 75/81).
+- Not representable yet: different positions three levels down per occurrence (xdev-subs' "Sub b86fa9 <1>" and "<2>"
+  each holding Sub b79114 at its own place; ~12 occurrences): `nested` holds direct children only, so the first
+  occurrence wins. Keying `nested` by a path would cover it, if Onshape's per-occurrence drags need it.
+Still open for asm: the UI drag of a part inside a flexible subassembly instance writing the same `nested` entry, if it
+doesn't already.
 
 ## From psui (2026-11-11 09:41 UTC, lead: asm-* UI misses while asm is away), FYI
 

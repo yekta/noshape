@@ -30,6 +30,16 @@ new); most are the selection after a step (`.drawing.selection.length` live 1 / 
 - drw-view-align-vertically: step 1 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (4/6 states)
 - drw-view-replicate-annotations: step 8 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (8/10 states)
 
+## 11-11 18:47 UTC: flexible subassemblies per instance: assembly suite 1320 -> 1450/1731 occurrences (none worse)
+- `assembly_transform` takes an occurrence path ("Sub <2> > Part 1 <1>"): a flexible subassembly instance's child
+  placed in its parent, written to that instance's `nested` (asm.md has how it works; the lead gave it to dx).
+- The translator places every occurrence two or more levels deep at live's transform, in the tab holding its
+  subassembly instance. vibe5, all 24: welding-config 41 -> 75/81, xdev-subs 201 -> 239/286, pinslot 25 -> 37/42,
+  scissor-lift 191 -> 201/242, infento-subs 108 -> 111/167 (tvc-mount 41/43 with the STEP names); mates 243 -> 244.
+- Left: welding-config's 6 are its root Fastened 4-8 ("Mate cannot resolve mate connectors", live OK) pulling the
+  subassemblies; xdev-subs' 47 are 35 not inserted (definitions, REQUESTS 2494) and ~12 four levels deep under a
+  subassembly used twice with different inner positions (`nested` holds direct children only).
+
 ## 11-11 15:53 UTC: asm-tvc-mount 8 -> 39/43 (STEP names); asm-xdev-subs diagnosed
 - asm-tvc-mount: its servo STEP failed to import whole (a raw 0x87 in a PRODUCT name, not UTF-8): names now decode
   0x80-0x9F as Windows-1252 as live ("Pe‡a"), the rest as Unicode (was "?"). 8 -> 39/43 occurrences.
