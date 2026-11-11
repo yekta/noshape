@@ -81,19 +81,15 @@ pub fn last() -> Option<FormsLibrary> {
 pub fn build(folder: &Path) -> Result<FormsLibrary, Vec<String>> {
     let mut docs = Vec::new();
     collect(folder, &mut Vec::new(), &mut docs);
+    if docs.is_empty() {
+        return Err(vec![empty_folder(folder)]);
+    }
     let mut problems = Vec::new();
     let mut documents = Vec::new();
     for (folders, path) in docs {
-        let Ok(info) = crate::derived::external_doc_info(&path) else {
+        let Some((info, version, microversion)) = latest(&path) else {
             problems.push(format!("Document \"{}\" could not be read.", path.file_stem().unwrap_or_default().to_string_lossy()));
             continue;
-        };
-        let (version, microversion) = match info.versions.iter().find(|v| v.label != "Current state") {
-            Some(v) => (v.label.clone(), v.microversion),
-            None => match info.start {
-                Some(mv) => ("Start".to_string(), mv),
-                None => continue,
-            },
         };
         let Ok(doc) = crate::derived::external_snapshot(&path, microversion) else {
             problems.push(format!("Document \"{}\" could not be read at its latest version \"{version}\".", info.name));
@@ -120,6 +116,52 @@ pub fn build(folder: &Path) -> Result<FormsLibrary, Vec<String>> {
     }
     let version = load().filter(|l| l.folder == folder).map_or(1, |l| l.version + 1);
     Ok(FormsLibrary { folder: folder.to_path_buf(), version, documents })
+}
+
+/// Live 2508: a library folder with no document.
+fn empty_folder(folder: &Path) -> String {
+    format!("Folder \"{}\" is empty.", folder.file_name().unwrap_or_default().to_string_lossy())
+}
+
+/// The newest named version of a document, else its first state ("Start").
+fn latest(path: &Path) -> Option<(crate::derived::ExternalDocInfo, String, noshape_store::MicroversionId)> {
+    let info = crate::derived::external_doc_info(path).ok()?;
+    let (label, mv) = match info.versions.iter().find(|v| v.label != "Current state") {
+        Some(v) => (v.label.clone(), v.microversion),
+        None => ("Start".to_string(), info.start?),
+    };
+    Some((info, label, mv))
+}
+
+/// Checks a folder set as one of the other libraries (live 2508): it must hold a document; My images needs a
+/// versioned image in each ("Document "…" has 0 versioned images. One versioned image is required.").
+pub fn check_folder(key: &str, folder: &Path) -> Result<(), Vec<String>> {
+    let mut docs = Vec::new();
+    collect(folder, &mut Vec::new(), &mut docs);
+    if docs.is_empty() {
+        return Err(vec![empty_folder(folder)]);
+    }
+    if key != "images" {
+        return Ok(());
+    }
+    let image = |n: &str| matches!(Path::new(n).extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref(), Some("png" | "jpg" | "jpeg" | "gif" | "bmp" | "tif" | "tiff" | "svg" | "webp"));
+    let problems: Vec<String> = docs
+        .iter()
+        .filter_map(|(_, path)| {
+            let (info, label, mv) = latest(path)?;
+            let doc = (label != "Start").then(|| crate::derived::external_snapshot(path, mv).ok()).flatten();
+            let n = doc.map_or(0, |d| d.tabs.iter().filter(|t| matches!(&t.content, TabContent::File(f) if image(&f.file_name))).count());
+            (n == 0).then(|| format!("Document \"{}\" has 0 versioned images. One versioned image is required.", info.name))
+        })
+        .collect();
+    if problems.is_empty() { Ok(()) } else { Err(problems) }
+}
+
+impl FormsLibrary {
+    /// Built from the same documents at the same versions (Update my library: "already up to date").
+    pub fn same_as(&self, other: &FormsLibrary) -> bool {
+        self.folder == other.folder && self.documents.len() == other.documents.len() && self.documents.iter().zip(&other.documents).all(|(a, b)| a.path == b.path && a.microversion == b.microversion)
+    }
 }
 
 /// Saves a built library as the user's.

@@ -82,12 +82,19 @@ fn graphics_preferences_toolbar_and_shortcuts_read_set_and_kept() {
 fn libraries(ctx: &mut Ctx, dir: &std::path::Path) {
     let profiles = dir.join("Profiles");
     std::fs::create_dir_all(&profiles).unwrap();
+    // An empty folder is no library (live 2508).
+    let e = call(ctx, "documents_set_library", json!({ "library": "frame_profiles", "folder": profiles.to_str().unwrap() })).unwrap_err();
+    assert_eq!(e.message, "Failed to update the library\n\nFolder \"Profiles\" is empty.");
+    call(&mut Ctx::new(), "document_create", json!({ "path": profiles.join("profile doc.noshape").to_str().unwrap() })).unwrap();
     let l = call(ctx, "documents_set_library", json!({ "library": "My frame profiles library", "folder": profiles.to_str().unwrap() })).unwrap();
     assert_eq!(l["libraries"]["frame_profiles"], profiles.to_str().unwrap(), "{l}");
-    let l = call(&mut Ctx::new(), "documents_set_library", json!({ "library": "images", "folder": profiles.to_str().unwrap() })).unwrap();
+    // My images needs a versioned image in each document.
+    let e = call(&mut Ctx::new(), "documents_set_library", json!({ "library": "images", "folder": profiles.to_str().unwrap() })).unwrap_err();
+    assert_eq!(e.message, "Failed to update the library\n\nDocument \"profile doc\" has 0 versioned images. One versioned image is required.");
+    let l = call(&mut Ctx::new(), "documents_set_library", json!({ "library": "tolerances", "folder": profiles.to_str().unwrap() })).unwrap();
     assert_eq!(l["libraries"].as_object().unwrap().len(), 2, "{l}");
-    let l = call(ctx, "documents_set_library", json!({ "library": "images", "clear": true })).unwrap();
-    assert!(l["libraries"]["images"].is_null(), "{l}");
+    let l = call(ctx, "documents_set_library", json!({ "library": "tolerances", "clear": true })).unwrap();
+    assert!(l["libraries"]["tolerances"].is_null(), "{l}");
     let e = call(ctx, "documents_set_library", json!({ "library": "nope", "folder": profiles.to_str().unwrap() })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("library"), "{e:?}");
     let e = call(ctx, "documents_set_library", json!({ "library": "images", "folder": dir.join("none").to_str().unwrap() })).unwrap_err();
@@ -157,8 +164,16 @@ fn forms_library(ctx: &mut Ctx, dir: &std::path::Path) {
     assert!(docs[0]["forms"][0]["value"].as_str().unwrap().starts_with("ext:"), "a form is its Part Studio at the library's version: {lib}");
     library_form_on_a_plate(&dir.join("plate.noshape"), docs[0]["forms"][0]["value"].as_str().unwrap());
 
+    // Nothing changed: "already up to date" (live 2508), the library as it was; a new version of a document builds V2.
     let u = call(ctx, "documents_set_library", json!({ "library": "sheet_metal_forms", "update": true })).unwrap();
-    assert_eq!(u["forms_library"]["version"], "V2", "{u}");
+    assert_eq!((u["up_to_date"].clone(), u["forms_library"]["version"].clone()), (json!(true), json!("V1")), "{u}");
+    let mut a = Ctx::new();
+    call(&mut a, "document_open", json!({ "path": forms.join("uip form A.noshape").to_str().unwrap() })).unwrap();
+    call(&mut a, "document_set_units", json!({ "length_unit": "in" })).unwrap();
+    call(&mut a, "history_create_version", json!({ "name": "V2" })).unwrap();
+    drop(a);
+    let u = call(ctx, "documents_set_library", json!({ "library": "sheet_metal_forms", "update": true })).unwrap();
+    assert_eq!((u["up_to_date"].clone(), u["forms_library"]["version"].clone(), u["forms_library"]["documents"][0]["version"].clone()), (json!(false), json!("V2"), json!("V2")), "{u}");
     call(ctx, "documents_set_library", json!({ "library": "sheet_metal_forms", "clear": true })).unwrap();
     assert_eq!(call(ctx, "documents_forms_library", json!({})).unwrap()["forms_library"], Value::Null);
     let e = call(ctx, "documents_set_library", json!({ "library": "sheet_metal_forms", "update": true })).unwrap_err();

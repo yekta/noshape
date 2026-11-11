@@ -301,8 +301,9 @@ pub struct StartView {
     /// bar (see `crate::cached_slice`); the search notifies it.
     body: Option<Entity<crate::cached_slice::Slice<StartView>>>,
     library: Library,
-    /// The folder set as My sheet metal forms: its icon is the library's, its menu Sheet metal form library ▸.
-    forms_library: Option<PathBuf>,
+    /// The folders set as the user's libraries (library key → folder): their icon is the library's, their menu
+    /// ‹Type› library ▸ (live 2497, 2508).
+    libraries: std::collections::BTreeMap<String, PathBuf>,
     docs: Vec<DocEntry>,
     loaded: bool,
     folders: Vec<PathBuf>,
@@ -516,7 +517,7 @@ impl StartView {
         let mut this = Self {
             focus: cx.focus_handle(),
             shortcut_sheet: None,
-            forms_library: noshape_ops::prefs::LibraryFolders::load().0.get("sheet_metal_forms").cloned(),
+            libraries: noshape_ops::prefs::LibraryFolders::load().0,
             create_focus,
             create_press: false,
             body: None,
@@ -1291,7 +1292,7 @@ impl StartView {
         }
         let v = view.clone();
         let f2 = f.clone();
-        let forms_library = view.read(cx).forms_library.as_ref() == Some(&f);
+        let library = view.read(cx).library_of(&f);
         let v3 = view.clone();
         // Live's "Open in new browser tab": another documents window, at the folder.
         let menu = menu
@@ -1299,12 +1300,13 @@ impl StartView {
             .item(item("Open in new browser tab", &f, |_, f, _, cx| open_new(Some(Source::Folder(f)), cx)))
             .item(item("Rename", &f, |t, f, w, cx| t.rename_folder(f, w, cx)))
             .item(item("Details", &f, |t, f, _, cx| t.show_folder_details(f, cx)));
-        // The folder set as My sheet metal forms (live 2497): no Move to… or Send to trash, its library's submenu.
-        if forms_library {
+        // A folder set as a library (live 2497, 2508): no Move to… or Send to trash, its library's submenu.
+        if let Some(key) = library {
             let (v1, v2) = (view.clone(), view);
-            return menu.text_inset(31.).submenu_with_icon(Some("form"), "Sheet metal form library", window, cx, move |m, _, _| {
-                m.item(OsMenuItem::new("Update my library").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.set_forms_library(None, window, cx))))
-                    .item(OsMenuItem::new("Unset my library").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.unset_forms_library(window, cx))))
+            let (_, label, icon) = library_texts(key);
+            return menu.text_inset(31.).submenu_with_icon(Some(icon), label, window, cx, move |m, _, _| {
+                m.item(OsMenuItem::new("Update my library").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.set_library(key, None, window, cx))))
+                    .item(OsMenuItem::new("Unset my library").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.unset_library(key, window, cx))))
             });
         }
         menu.item(item("Move to…", &f, |t, f, w, cx| t.move_folder(f, w, cx)))
@@ -1316,50 +1318,38 @@ impl StartView {
     }
 
     /// Set library ▸: the folder becomes one of the user's libraries (op `documents_set_library`), ✓ the ones it is.
-    /// My sheet metal forms is built from the folder's documents first (live 2497).
     fn library_menu(view: Entity<StartView>, folder: PathBuf, menu: OsMenu) -> OsMenu {
         let set = noshape_ops::prefs::LibraryFolders::load();
-        noshape_ops::prefs::LIBRARIES.iter().fold(menu, |m, (key, label)| {
+        noshape_ops::prefs::LIBRARIES.iter().fold(menu, |m, &(key, label)| {
             let (folder, view) = (folder.clone(), view.clone());
-            let icon = match *key {
-                "frame_profiles" => "frame",
-                "sheet_metal_forms" => "form",
-                "tolerances" => "tolerance",
-                "images" => "image",
-                _ => "standard-content",
-            };
-            m.item(OsMenuItem::new(*label).icon_name(icon).checked(set.0.get(*key) == Some(&folder)).on_click(move |_, window, cx| {
-                if *key == "sheet_metal_forms" {
-                    view.update(cx, |t, cx| t.set_forms_library(Some(folder.clone()), window, cx));
-                    return;
-                }
-                let mut libs = noshape_ops::prefs::LibraryFolders::load();
-                libs.0.insert(key.to_string(), folder.clone());
-                let _ = libs.save();
+            m.item(OsMenuItem::new(label).icon_name(library_texts(key).2).checked(set.0.get(key) == Some(&folder)).on_click(move |_, window, cx| {
+                view.update(cx, |t, cx| t.set_library(key, Some(folder.clone()), window, cx));
             }))
         })
     }
 
-    /// My sheet metal forms (`folder`) or Update my library (`None`): built on a background thread (every Part
-    /// Studio of the folder's documents checked), "Updating…" until then; a failure is live's "Failed to update the
-    /// library" with a paragraph per problem.
-    fn set_forms_library(&mut self, folder: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
-        Self::notify(window, cx, AlertKind::Info, "Updating your sheet metal forms library…");
+    /// Set library ▸ (`folder`) or ‹Type› library ▸ Update my library (`None`): checked on a background thread (a
+    /// forms library's every Part Studio), "Updating your … library..." until then; a failure is live's "Failed to
+    /// update the library" with a paragraph per problem (live 2497, 2508).
+    fn set_library(&mut self, key: &'static str, folder: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
+        let (kind, _, _) = library_texts(key);
+        Self::notify(window, cx, AlertKind::Info, format!("Updating your{kind} library..."));
         let args = match &folder {
-            Some(f) => serde_json::json!({ "library": "sheet_metal_forms", "folder": f }),
-            None => serde_json::json!({ "library": "sheet_metal_forms", "update": true }),
+            Some(f) => serde_json::json!({ "library": key, "folder": f }),
+            None => serde_json::json!({ "library": key, "update": true }),
         };
         let run = cx.background_spawn(async move {
             let op = noshape_ops::registry::by_tool_name("documents_set_library").expect("documents_set_library");
-            noshape_ops::registry::run(&mut noshape_ops::Ctx::new(), op, &args).map(|_| ()).map_err(|e| e.message)
+            noshape_ops::registry::run(&mut noshape_ops::Ctx::new(), op, &args).map(|o| o.value["up_to_date"] == true).map_err(|e| e.message)
         });
         cx.spawn_in(window, async move |this, cx| {
             let result = run.await;
             let _ = this.update_in(cx, |t, window, cx| {
                 match result {
-                    Ok(()) => {
-                        t.forms_library = noshape_ops::prefs::LibraryFolders::load().0.get("sheet_metal_forms").cloned();
-                        Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text: "Successfully updated your sheet metal forms library.".into(), restore: None, brief: false });
+                    Ok(same) => {
+                        t.libraries = noshape_ops::prefs::LibraryFolders::load().0;
+                        let text = if same { format!("Your{kind} library is already up to date.") } else { format!("Successfully updated your{kind} library.") };
+                        Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text, restore: None, brief: false });
                     }
                     Err(message) => {
                         cx.default_global::<StartToast>().0 = None;
@@ -1385,22 +1375,28 @@ impl StartView {
         });
     }
 
-    /// Sheet metal form library ▸ Unset my library.
-    fn unset_forms_library(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// ‹Type› library ▸ Unset my library.
+    fn unset_library(&mut self, key: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         let op = noshape_ops::registry::by_tool_name("documents_set_library").expect("documents_set_library");
-        let unset = noshape_ops::registry::run(&mut noshape_ops::Ctx::new(), op, &serde_json::json!({ "library": "sheet_metal_forms", "clear": true }));
+        let unset = noshape_ops::registry::run(&mut noshape_ops::Ctx::new(), op, &serde_json::json!({ "library": key, "clear": true }));
         if let Err(e) = unset {
             Self::notify(window, cx, AlertKind::Error, e.message);
             return;
         }
-        self.forms_library = None;
-        Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text: "Successfully unset your sheet metal forms library.".into(), restore: None, brief: false });
+        self.libraries.remove(key);
+        let (kind, _, _) = library_texts(key);
+        Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text: format!("Successfully unset your{kind} library."), restore: None, brief: false });
         cx.notify();
     }
 
-    /// A folder's icon: the library's for the one set as My sheet metal forms (live 2497 21).
+    /// The library `f` is set as, if any.
+    fn library_of(&self, f: &Path) -> Option<&'static str> {
+        noshape_ops::prefs::LIBRARIES.iter().map(|(k, _)| *k).find(|k| self.libraries.get(*k).is_some_and(|p| p == f))
+    }
+
+    /// A folder's icon: the library's for one set as a library (live 2497 21, 2508).
     fn folder_glyph(&self, f: &Path) -> &'static [u8] {
-        if self.forms_library.as_deref() == Some(f) { os::GLYPH_FOLDER_LIBRARY } else { os::GLYPH_FOLDER }
+        if self.library_of(f).is_some() { os::GLYPH_FOLDER_LIBRARY } else { os::GLYPH_FOLDER }
     }
 
     /// The selected folder tile: (name, created, modified) in unix ms.
@@ -4096,6 +4092,18 @@ fn history_change_matches(f: &noshape_ops::history_filter::HistoryFilter, c: &li
         return true;
     }
     c.tabs.iter().any(|t| f.tab.is_none_or(|ft| ft == *t) && (f.kinds.is_empty() || tabs.iter().any(|(id, _, k)| id == t && f.kinds.contains(k))))
+}
+
+/// A library type's words (live 2508, the web client's libraryName): its part of the toasts ("Updating your images
+/// library..."), its submenu once set and its icon.
+fn library_texts(key: &str) -> (&'static str, &'static str, &'static str) {
+    match key {
+        "frame_profiles" => (" frame profiles", "Frame profile library", "frame"),
+        "sheet_metal_forms" => (" sheet metal forms", "Sheet metal form library", "form"),
+        "tolerances" => (" default tolerances", "Default tolerance library", "tolerance"),
+        "images" => (" images", "Image library", "image"),
+        _ => (" standard content", "Standard content library", "standard-content"),
+    }
 }
 
 fn folder_label(f: &Path) -> String {

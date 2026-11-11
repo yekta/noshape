@@ -147,7 +147,7 @@ pub fn ops() -> Vec<Op> {
             group: "documents",
             verb: "set_library",
             summary: "Set a folder as one of your libraries (Documents › a folder's Set library ▸)",
-            description: "The folder becomes the user's library of that kind: My frame profiles library, My sheet metal forms, My default tolerances, My images or My standard content (one folder each; setting another replaces it). `clear` unsets the kind (the set folder's Unset my library). My sheet metal forms checks every Part Studio of every document in the folder and its subfolders, at its latest version (a length configuration variable \"thickness\", a solid marked positive or negative by a Form Tag): one that fails stops the whole library, with live's \"Failed to update the library\" problems; `update` builds the set one again from the documents' latest versions (Sheet metal form library ▸ Update my library). The reply lists every library set (and the forms library built, as documents_forms_library lists it).",
+            description: "The folder becomes the user's library of that kind: My frame profiles library, My sheet metal forms, My default tolerances, My images or My standard content (one folder each; setting another replaces it). `clear` unsets the kind (the set folder's Unset my library). Every library needs a document in the folder or its subfolders (\"Folder \"…\" is empty.\"); My images a versioned image in each document; My sheet metal forms checks every Part Studio of every document at its latest version (a length configuration variable \"thickness\", a solid marked positive or negative by a Form Tag): one that fails stops the whole library, with live's \"Failed to update the library\" problems. `update` builds the set one again from the documents' latest versions (‹Type› library ▸ Update my library); `up_to_date` says nothing changed since (\"Your … library is already up to date.\"). The reply lists every library set (and the forms library built, as documents_forms_library lists it).",
             fields: vec![
                 req("library", json!({ "type": "string", "enum": crate::prefs::LIBRARIES.iter().map(|(k, _)| *k).collect::<Vec<_>>() }), "Which library (its key; the menu's row also works)."),
                 opt("folder", s(), "The folder's path (required unless `clear` or `update`)."),
@@ -444,6 +444,7 @@ fn set_library(_ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     let mut libs = crate::prefs::LibraryFolders::load();
     let mut forms = None;
+    let mut up_to_date = false;
     if a.bool_or("clear", false)? {
         libs.0.remove(key);
     } else {
@@ -455,16 +456,25 @@ fn set_library(_ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         if !folder.is_dir() {
             return Err(OpError::invalid(format!("{} isn't a folder", folder.display())).with_param("folder"));
         }
-        // My sheet metal forms: every Part Studio must be a form, or the library isn't made (live 2497).
+        let failed = |p: Vec<String>| OpError::invalid(format!("Failed to update the library\n\n{}", p.join("\n\n")));
+        // My sheet metal forms: every Part Studio must be a form, or the library isn't made (live 2497); the others
+        // need a document (images a versioned image, live 2508).
         if key == "sheet_metal_forms" {
-            let lib = crate::forms_library::build(&folder).map_err(|p| OpError::invalid(format!("Failed to update the library\n\n{}", p.join("\n\n"))))?;
+            let mut lib = crate::forms_library::build(&folder).map_err(failed)?;
+            let before = crate::forms_library::load().filter(|l| l.folder == folder);
+            if let Some(b) = before.filter(|b| b.same_as(&lib)) {
+                up_to_date = true;
+                lib = b;
+            }
             crate::forms_library::save(&lib).map_err(|e| OpError::new("io", format!("saving the library: {e}")))?;
             forms = Some(lib);
+        } else {
+            crate::forms_library::check_folder(key, &folder).map_err(failed)?;
         }
         libs.0.insert(key.to_string(), folder);
     }
     libs.save().map_err(|e| OpError::new("io", format!("saving the libraries: {e}")))?;
-    let mut out = json!({ "libraries": libs.0 });
+    let mut out = json!({ "libraries": libs.0, "up_to_date": up_to_date });
     if let Some(lib) = forms {
         out["forms_library"] = forms_library_json(&lib);
     }

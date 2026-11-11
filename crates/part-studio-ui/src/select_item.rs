@@ -189,6 +189,8 @@ pub struct SelectItemPanel {
     lib_pictured: HashSet<PathBuf>,
     /// The forms' search box ("Search by name, folder, or configuration").
     form_search: Option<(Entity<InputState>, Subscription)>,
+    /// The search's list closed by a pick, until the text changes (live 2512: the text stays).
+    form_search_closed: bool,
     _subs: Vec<Subscription>,
 }
 
@@ -361,6 +363,7 @@ impl SelectItemPanel {
             lib_levels: Vec::new(),
             lib_pictured: HashSet::new(),
             form_search: None,
+            form_search_closed: false,
             focus: cx.focus_handle(),
             _subs: subs,
         };
@@ -922,7 +925,7 @@ impl SelectItemPanel {
         let hits = frame_library::search(&query);
         let results = (!hits.is_empty()).then(|| {
             let q = query.trim().to_lowercase();
-            let mut list = v_flex().id("sel-frame-results").absolute().top(px(38.)).left(px(6.)).right(px(6.)).max_h(px(330.)).overflow_y_scroll().bg(pal.panel).border_1().border_color(gpui_kit::rgb(0xcccccc)).shadow_md();
+            let mut list = v_flex().id("sel-frame-results").occlude().absolute().top(px(38.)).left(px(6.)).right(px(6.)).max_h(px(330.)).overflow_y_scroll().bg(pal.panel).border_1().border_color(gpui_kit::rgb(0xcccccc)).shadow_md();
             for (i, (s, p)) in hits.iter().copied().enumerate() {
                 let at = p.to_lowercase().find(&q).unwrap_or(0);
                 let (a, m, b) = (p[..at].to_string(), p[at..at + q.len()].to_string(), p[at + q.len()..].to_string());
@@ -1100,14 +1103,17 @@ impl SelectItemPanel {
             Some((s, _)) => s.clone(),
             None => {
                 let s = cx.new(|cx| InputState::new(window, cx));
-                let sub = cx.subscribe_in(&s, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
+                let sub = cx.subscribe_in(&s, window, |this: &mut Self, st, ev: &InputEvent, _, cx| match ev {
                     // Enter takes the first match (as Frame's library, live D134).
                     InputEvent::PressEnter { .. } => {
                         if let Some(hit) = this.form_hits(&st.read(cx).value()).into_iter().next() {
-                            this.jump_form(hit, window, cx);
+                            this.jump_form(hit, cx);
                         }
                     }
-                    InputEvent::Change => cx.notify(),
+                    InputEvent::Change => {
+                        this.form_search_closed = false;
+                        cx.notify();
+                    }
                     _ => {}
                 });
                 self.form_search = Some((s.clone(), sub));
@@ -1125,12 +1131,13 @@ impl SelectItemPanel {
                 .border_color(gpui_kit::rgb(0xcccccc))
                 .child(crate::ui::input_with_placeholder(&search, "Search by name, folder, or configuration", cx).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)).pl(px(5.))),
         );
-        // The matches over the levels, as Frame's (live D134 f23): a round picture, the name with the match in bold,
-        // "<library> - <document>" grey and italic under it.
-        let hits = self.form_hits(&query);
+        // The matches over the levels (live 2512): 55 px rows, a 70 × 40 picture, the name with the match in bold, the
+        // library's root folder and the document's crumbs grey and italic under it (the crumbs cut from the left); the
+        // first row active.
+        let hits = if self.form_search_closed { Vec::new() } else { self.form_hits(&query) };
         let results = (!hits.is_empty()).then(|| {
             let q = query.trim().to_lowercase();
-            let mut list = v_flex().id("sel-form-results").absolute().top(px(38.)).left(px(6.)).right(px(6.)).max_h(px(330.)).overflow_y_scroll().bg(pal.panel).border_1().border_color(gpui_kit::rgb(0xcccccc)).shadow_md();
+            let mut list = v_flex().id("sel-form-results").occlude().absolute().top(px(38.)).left(px(6.)).right(px(6.)).max_h(px(330.)).overflow_y_scroll().bg(pal.panel).border_1().border_color(gpui_kit::rgb(0xcccccc)).shadow_md();
             for (i, hit) in hits.into_iter().enumerate() {
                 let name = hit.name.clone();
                 let (a, m, b) = match name.to_lowercase().find(&q) {
@@ -1138,26 +1145,37 @@ impl SelectItemPanel {
                     _ => (name.clone(), String::new(), String::new()),
                 };
                 let thumb = self.thumbs.get(&hit.key).cloned();
-                let under = format!("{} - {}", hit.library, hit.document);
+                // (About 30 characters fit: the crumbs keep their end, as live's text-truncate-reverse.)
+                let room = 30usize.saturating_sub(hit.root.chars().count() + 1);
+                let crumbs = format!("- {}", hit.crumbs);
+                let crumbs = match crumbs.chars().count() {
+                    n if n > room && room > 1 => format!("…{}", crumbs.chars().skip(n - room + 1).collect::<String>()),
+                    _ => crumbs,
+                };
+                let active = i == 0;
+                let (ink, grey) = if active { (gpui_kit::rgb(0xffffff), gpui_kit::rgb(0xb9c7dc)) } else { (pal.text, gpui_kit::rgb(0x999999)) };
                 list = list.child(
                     h_flex()
                         .id(("sel-form-hit", i))
                         .h(px(55.))
                         .flex_none()
                         .px(px(10.))
-                        .gap(px(14.))
+                        .gap(px(10.))
                         .cursor_pointer()
-                        .when(i == 0, |d| d.bg(gpui_kit::rgb(0xdef1fb)))
-                        .hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)))
-                        .child(div().size(px(44.)).flex_none().rounded_full().bg(gpui_kit::rgb(0xf3f3f3)).flex().items_center().justify_center().overflow_hidden().children(thumb.map(|t| gpui_kit::img(t).w(px(40.)).h(px(40.)).object_fit(ObjectFit::Contain))))
+                        .when(active, |d| d.bg(pal.accent))
+                        .when(!active, |d| d.hover(|d| d.bg(gpui_kit::rgb(0xdef1fb))))
+                        .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(match thumb {
+                            Some(t) => gpui_kit::img(t).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
+                            None => crate::assets::icon("form", 20., cx),
+                        }))
                         .child(
                             v_flex()
                                 .flex_1()
                                 .min_w_0()
-                                .child(h_flex().text_size(px(14.)).child(a).child(div().font_weight(FontWeight::BOLD).child(m)).child(b))
-                                .child(div().truncate().italic().text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(under)),
+                                .child(h_flex().text_size(px(14.)).text_color(ink).child(a).child(div().font_weight(FontWeight::BOLD).child(m)).child(b))
+                                .child(h_flex().gap(px(4.)).italic().text_size(px(13.)).text_color(grey).whitespace_nowrap().overflow_hidden().child(div().flex_none().child(hit.root.clone())).child(div().flex_none().child(crumbs))),
                         )
-                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.jump_form(hit.clone(), window, cx))),
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.jump_form(hit.clone(), cx))),
                 );
             }
             list
@@ -1172,23 +1190,22 @@ impl SelectItemPanel {
         if q.is_empty() {
             return Vec::new();
         }
-        let onshape = "Onshape sheet metal forms";
         let mut hits: Vec<(usize, FormHit)> = Vec::new();
         for s in library_sources() {
             let rank = s.name.to_lowercase().find(&q).or_else(|| "onshape form library".find(&q).map(|_| usize::MAX));
             if let Some(rank) = rank {
-                hits.push((rank, FormHit { key: s.tab.clone(), name: s.name.clone(), library: onshape.into(), document: "Onshape form library".into(), user: false, path: Vec::new() }));
+                hits.push((rank, FormHit { key: s.tab.clone(), name: s.name.clone(), root: "Onshape form tools".into(), crumbs: "Onshape form library".into(), document: "Onshape form library".into(), user: false, path: Vec::new() }));
             }
         }
         if let Some(lib) = &self.forms_lib {
-            let title = noshape_ops::forms_library::title();
+            let root = lib.folder.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
             for d in &lib.documents {
                 let around = d.folders.iter().chain([&d.name]).any(|n| n.to_lowercase().contains(&q));
                 let path: Vec<String> = d.folders.iter().map(|f| format!("f:{f}")).chain([format!("d:{}", d.name)]).collect();
                 for f in &d.forms {
                     let rank = f.name.to_lowercase().find(&q).or(around.then_some(usize::MAX));
                     if let Some(rank) = rank {
-                        hits.push((rank, FormHit { key: d.value(&f.tab), name: f.name.clone(), library: title.clone(), document: d.name.clone(), user: true, path: path.clone() }));
+                        hits.push((rank, FormHit { key: d.value(&f.tab), name: f.name.clone(), root: root.clone(), crumbs: d.folders.iter().chain([&d.name]).cloned().collect::<Vec<_>>().join(" - "), document: d.name.clone(), user: true, path: path.clone() }));
                     }
                 }
             }
@@ -1197,17 +1214,16 @@ impl SelectItemPanel {
         hits.into_iter().map(|(_, h)| h).collect()
     }
 
-    /// A search result (or Enter on the first): the levels jump to its form and the field shows it (as Frame's, live
-    /// D134).
-    fn jump_form(&mut self, hit: FormHit, window: &mut Window, cx: &mut Context<Self>) {
+    /// A search result (or Enter on the first): the levels jump to its form and the field shows it at once, the list
+    /// closes and the text stays (live 2512).
+    fn jump_form(&mut self, hit: FormHit, cx: &mut Context<Self>) {
         self.lib_user = Some(hit.user);
         self.lib_path = hit.path;
         self.lib_form = Some(hit.key.clone());
         self.cfg_edit.remove(&hit.key);
         self.lib_generated.remove(&hit.key);
-        if let Some((st, _)) = &self.form_search {
-            st.update(cx, |s, cx| s.set_value("", window, cx));
-        }
+        // The list closes, the text stays (live 2512).
+        self.form_search_closed = true;
         self.pick(hit.key, cx);
     }
 
@@ -1347,6 +1363,8 @@ impl SelectItemPanel {
             this.cfg_edit.remove(&key);
             this.lib_generated.remove(&key);
             this.pick(join_value(&key, &editing), cx);
+            // Select closes the picker (live 2512).
+            cx.emit(SelectItemEvent::Close);
         }));
         v_flex().flex_1().min_h_0().child(col).child(library_footer(select_button)).into_any_element()
     }
@@ -1838,7 +1856,9 @@ fn picked_studio_exists(picked: &str, sources: &[RefSource]) -> bool {
 struct FormHit {
     key: String,
     name: String,
-    library: String,
+    /// The library's root folder ("Onshape form tools", the user's folder) and the folders and document below it.
+    root: String,
+    crumbs: String,
     document: String,
     user: bool,
     path: Vec<String>,
