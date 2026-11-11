@@ -95,6 +95,35 @@ impl DrawingEditor {
         }
     }
 
+    /// A datum target selected alone shows its hidden dimensions, in the selection colour (live
+    /// drw-datum-target-hide-dim: its ".394" orange before Show dimensions): drawn from a preview with them shown.
+    pub fn sync_target_dims_preview(&mut self, cx: &mut Context<Self>) {
+        // (Another preview, or ours cleared by someone else.)
+        if self.target_dims_shown.is_some() && self.preview.is_none() {
+            self.target_dims_shown = None;
+        }
+        if self.preview.is_some() && self.target_dims_shown.is_none() {
+            return;
+        }
+        let hidden = |a: &Annotation| matches!(a.kind, AnnotationKind::DatumTarget { .. }) && a.target.as_ref().is_some_and(|o| o.origin.is_some() && o.hide_dims);
+        let want = match (&self.tool, self.selection.as_slice()) {
+            (Tool::Select, [Sel::Annotation(id)]) => self.drawing_sheet().annotations.iter().find(|a| a.id == *id).filter(|a| hidden(a)).map(|a| a.id),
+            _ => None,
+        };
+        if want == self.target_dims_shown {
+            return;
+        }
+        self.target_dims_shown = want;
+        let shown = want.map(|id| {
+            let mut d = self.drawing.clone();
+            if let Some(o) = d.sheets.get_mut(self.sheet).and_then(|s| s.annotations.iter_mut().find(|a| a.id == id)).and_then(|a| a.target.as_mut()) {
+                o.hide_dims = false;
+            }
+            d
+        });
+        self.set_preview(shown, cx);
+    }
+
     /// The label for a new datum (the dialog's, else the next free letter).
     pub fn datum_dialog_label(&self) -> String {
         self.datum_dlg.as_ref().map(|d| d.label_text.clone()).filter(|s| !s.is_empty()).unwrap_or_else(|| self.next_datum_label())

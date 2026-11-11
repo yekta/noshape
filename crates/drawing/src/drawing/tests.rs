@@ -2481,6 +2481,24 @@ fn dimension_labels_draw_above_below_and_oval() {
 }
 
 #[test]
+fn a_datum_target_straight_above_its_origin_has_its_dimension_on_their_line() {
+    let (doc, mut drawing) = demo();
+    let vid = drawing.sheets[0].views[0].id;
+    let target = DatumTargetOpts { origin: Some([0.01, -0.01]), hide_dims: false, ..Default::default() };
+    drawing.sheets[0].annotations.push(Annotation { id: 903, kind: AnnotationKind::DatumTarget { view: vid, anchor: [0.01, 0.005], label: "A1".into(), area: DatumTargetArea::Point }, position: [300.0, 200.0], target: Some(Box::new(target)), ..Default::default() });
+    let sources = regenerate_sources(&doc, &drawing);
+    let b = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    let at = b.placement(vid).unwrap().to_sheet([0.01, 0.005]);
+    // Live (drw-datum-target-hide-dim): only the 15 mm, on the line through target and origin.
+    let texts: Vec<_> = b.geometry.texts.iter().filter(|t| t.text == "15" || t.text == "0").collect();
+    assert_eq!(texts.len(), 1, "{texts:?}");
+    let xs: Vec<f64> = font::text_box(texts[0]).iter().map(|p| p[0]).collect();
+    let mid = (xs.iter().copied().fold(f64::MAX, f64::min) + xs.iter().copied().fold(f64::MIN, f64::max)) / 2.0;
+    // (This drawing is ISO: the value beside the line, a text height off it; it was 8 mm to the side.)
+    assert!((mid - at[0]).abs() <= texts[0].height, "{mid} vs {at:?}");
+}
+
+#[test]
 fn datum_target_origin_dimensions_show_and_hide() {
     let (doc, mut drawing) = demo();
     let vid = drawing.sheets[0].views[0].id;
