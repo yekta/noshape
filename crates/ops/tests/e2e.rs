@@ -7381,6 +7381,35 @@ fn suggested_views_scale_to_the_exact_extent() {
     assert_eq!(scales, [1.0; 4], "{d}");
 }
 
+/// A part of a flexible subassembly instance moved in its parent (assembly_transform with the occurrence path, as the
+/// parity translator places live's per-instance positions): that instance's part moves, the subassembly's other
+/// instance and the subassembly itself don't; a locked instance's parts and deeper paths are refused by name.
+#[test]
+fn a_flexible_subassembly_instances_part_moves_in_its_parent_only() {
+    let mut ctx = Ctx::new();
+    let path = scratch("nested-move.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Sub" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Sub" }));
+    call(&mut ctx, "assembly_transform", json!({ "tab": "Assembly 1", "instance": "Sub <2>", "translation": ["0 mm", "100 mm", "0 mm"] }));
+    call(&mut ctx, "assembly_transform", json!({ "tab": "Assembly 1", "instance": "Sub <2> > Part 1 <1>", "translation": ["30 mm", "120 mm", "5 mm"], "axis": [0, 0, 1], "angle": "90 deg" }));
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    let at = |p: &str| -> Vec<f64> { list["occurrences"].as_array().unwrap().iter().find(|o| o["path"] == p).map(|o| (0..3).map(|i| num(&o["translation"][i])).collect()).unwrap_or_else(|| panic!("no occurrence {p}: {list}")) };
+    let near = |a: &[f64], b: [f64; 3]| (0..3).all(|i| (a[i] - b[i]).abs() < 1e-6);
+    assert!(near(&at("Sub <2> > Part 1 <1>"), [30.0, 120.0, 5.0]), "moved: {:?}", at("Sub <2> > Part 1 <1>"));
+    assert!(near(&at("Sub <1> > Part 1 <1>"), [0.0, 0.0, 0.0]), "the other instance stays: {:?}", at("Sub <1> > Part 1 <1>"));
+    let sub = call(&mut ctx, "assembly_list", json!({ "tab": "Sub" }));
+    assert!(near(&(0..3).map(|i| num(&sub["instances"][0]["translation"][i])).collect::<Vec<_>>(), [0.0, 0.0, 0.0]), "the subassembly itself stays: {sub}");
+    let e = try_call(&mut ctx, "assembly_transform", json!({ "tab": "Assembly 1", "instance": "Sub <1> > Part 1 <1> > Part 2 <1>", "translation": [0, 0, 0] })).unwrap_err().to_json();
+    assert_eq!(e["param"], "instance", "{e}");
+}
+
 /// A mate to a part inside a subassembly, as the app makes one: the part named by its occurrence path
 /// ("Sub <1> > Part 1 <1>", Onshape's notation) in assembly_entities, assembly_connectors and assembly_mate. The top
 /// block's top face Fastened to the nested block's bottom face lifts the subassembly onto it.

@@ -137,7 +137,7 @@ pub fn ops() -> Vec<Op> {
             fields: vec![
                 doc_field(),
                 asm_field(),
-                req("instance", s(), "Instance id or name."),
+                req("instance", s(), "Instance id or name; an instance of a flexible subassembly instance by its path, \"Sub <1> > Part 1 <1>\" (placed in this assembly, the subassembly untouched)."),
                 req("translation", json!({ "type": "array", "items": { "type": ["number", "string"] }, "minItems": 3, "maxItems": 3 }), "[x, y, z]."),
                 opt("axis", json!({ "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }), "Rotation axis."),
                 opt("angle", json!({ "type": ["number", "string"] }), "Rotation angle (\"90 deg\")."),
@@ -966,8 +966,7 @@ fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
     let units = od.doc().settings.units;
     let asm = assembly(od, tab)?;
-    let inst = find_instance(asm, a.str("instance")?, "instance")?;
-    let name = asm.instance(inst).map(|i| i.name.clone()).unwrap_or_default();
+    let path = find_occurrence(od.doc(), asm, a.str("instance")?, "instance")?;
     let t = a.array("translation")?;
     let mut xyz = [0.0; 3];
     for (i, v) in t.iter().take(3).enumerate() {
@@ -988,14 +987,49 @@ fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         _ => None,
     };
     let result = solve(od, tab, &SolveOptions::default())?;
-    commit(od, tab, &format!("Move : {name}"), &result, |a| {
-        if let Some(i) = a.instance_mut(inst) {
-            i.placement.translation = xyz;
-            if let Some(r) = rotation {
-                i.placement.rotation = r;
-            }
+    let asm = assembly(od, tab)?;
+    match path.as_slice() {
+        [inst] => {
+            let inst = *inst;
+            let name = asm.instance(inst).map(|i| i.name.clone()).unwrap_or_default();
+            commit(od, tab, &format!("Move : {name}"), &result, |a| {
+                if let Some(i) = a.instance_mut(inst) {
+                    i.placement.translation = xyz;
+                    if let Some(r) = rotation {
+                        i.placement.rotation = r;
+                    }
+                }
+            })?;
         }
-    })?;
+        // An instance of a flexible subassembly instance: placed in this assembly (the instance's own `nested`
+        // position, where its subassembly's solve starts), as dragging it does; the subassembly is untouched.
+        [sub, child] => {
+            let (sub, child) = (*sub, *child);
+            let top = asm.instance(sub).ok_or_else(|| OpError::param("instance", "no such subassembly instance"))?;
+            let InstanceSource::Assembly { assembly: def, .. } = top.source else { return Err(OpError::param("instance", "its first part is not a subassembly instance")) };
+            if !top.lock.is_flexible() {
+                return Err(OpError::param("instance", "the subassembly instance is locked: only a flexible one's instances move in this assembly"));
+            }
+            let own = match od.doc().tab(def).map(|t| &t.content) {
+                Some(TabContent::Assembly(d)) => d.instance(child).map(|i| (i.name.clone(), i.placement)),
+                _ => None,
+            };
+            let (child_name, own) = own.ok_or_else(|| OpError::param("instance", "no such instance in the subassembly"))?;
+            let top_m = top.placement.to_dmat4();
+            let start = top.nested.iter().find(|(c, _)| *c == child).map(|(_, q)| *q).or_else(|| result.solved.nested.get(&(sub, child)).copied()).unwrap_or(own);
+            let world_rotation = rotation.unwrap_or_else(|| Placement::from_dmat4(&(top_m * start.to_dmat4())).rotation);
+            let world = Placement { translation: xyz, rotation: world_rotation };
+            let q = Placement::from_dmat4(&(top_m.inverse() * world.to_dmat4()));
+            let name = format!("{} > {child_name}", top.name);
+            commit(od, tab, &format!("Move : {name}"), &result, |a| {
+                if let Some(i) = a.instance_mut(sub) {
+                    i.nested.retain(|(c, _)| *c != child);
+                    i.nested.push((child, q));
+                }
+            })?;
+        }
+        _ => return Err(OpError::param("instance", "an instance, or an instance of a flexible subassembly instance (\"Sub <1> > Part 1 <1>\"); deeper ones move with their subassembly")),
+    }
     Ok(describe(od, tab)?.into())
 }
 

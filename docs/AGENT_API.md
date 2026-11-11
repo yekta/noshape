@@ -2743,7 +2743,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
-| `instance` | string | required | Instance id or name. |
+| `instance` | string | required | Instance id or name; an instance of a flexible subassembly instance by its path, "Sub <1> > Part 1 <1>" (placed in this assembly, the subassembly untouched). |
 | `translation` | array of number or string | required | [x, y, z]. |
 | `axis` | array of number |  | Rotation axis. |
 | `angle` | number or string |  | Rotation angle ("90 deg"). |

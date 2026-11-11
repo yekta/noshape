@@ -8,18 +8,20 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
-## From dx (11-11 15:55 UTC, lead's assembly ranking): flexible subassemblies need per-instance start positions
-asm-welding-config (-40 occurrences) and asm-xdev-subs (~-50) lose parts inside **flexible** subassemblies
-(`isRigid: false`): live's occurrences give each instance of a subassembly its own internal positions (welding's
-"Assembly 2 <1..4>", all default configuration: Part 1 at y 25.4 in one, -533.4 in another), while the parity
-translator places a subassembly's parts once, in the subassembly's own tab, relative to its first occurrence. So every
-instance comes out like the first. Our model has the place for it (`Instance::nested`, the solver's `nested_start`),
-but no op sets a nested occurrence's placement: `assembly_transform` takes a top-level instance only. Proposal: let
-`assembly_transform` take an occurrence path ("Assembly 2 <2> > Part 1 <1>") inside a flexible subassembly instance,
-writing that instance's `nested` (as dragging the part does in the UI, if it does); then the translator places each
-instance's parts at live's occurrence transforms, as it does the root's. Every subassembly mate solves in ours there
-(the suite now lists subassembly mates that fail where live's are OK; none in xdev-subs), so the start is what differs.
-dx can take the translator side; the op is yours, or dx's if the lead says so.
+## From dx (11-11 17:18 UTC): occurrence-path assembly_transform for flexible subassemblies is dx's (built, lead)
+Don't redo it. asm-welding-config (-40 occurrences) and asm-xdev-subs (~-50) lose parts inside **flexible**
+subassemblies (`isRigid: false`): live gives each instance of a subassembly its own internal positions, the translator
+placed them once, in the subassembly's tab. How it works now (`crates/ops/src/ops/assembly.rs` `transform`):
+- `instance` takes an occurrence path. One element: the top-level instance, as before. Two, "Sub <2> > Part 1 <1>": a
+  direct child of a flexible subassembly instance; its world `translation` (and `axis`/`angle`, else its current world
+  rotation) is turned into the subassembly instance's frame and written to that instance's `Instance::nested`
+  (replacing the child's entry), the start the solver already reads (`nested_start`, keyed into the cache). The
+  subassembly's tab and its other instances don't change. History: "Move : <name>".
+- Refused by `instance`: a locked (rigid) subassembly instance; paths deeper than two (nested flexible subassemblies
+  are solved rigid, so a grandchild moves with its subassembly).
+- Test: e2e `a_flexible_subassembly_instances_part_moves_in_its_parent_only`.
+dx does the translator side next (each instance's children at live's occurrence transforms). Still open for asm: the
+UI drag of a part inside a flexible subassembly instance writing the same `nested` entry, if it doesn't already.
 
 ## From psui (2026-11-11 09:41 UTC, lead: asm-* UI misses while asm is away), FYI
 
