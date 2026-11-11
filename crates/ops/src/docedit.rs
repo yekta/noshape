@@ -86,10 +86,16 @@ pub fn duplicate_tab_description(name: &str) -> String {
 /// TABS2) right after the original.
 pub fn duplicate_tab(d: &mut Document, tab: TabId) -> Option<TabId> {
     let t = d.tab(tab)?.clone();
-    let name = (1..).map(|n| format!("{} Copy {n}", t.name)).find(|n| !d.tabs.iter().any(|t| t.name == *n)).expect("a free number");
+    let name = copy_name(d, &t.name);
     let id = d.add_tab(&name, t.content);
     place_after(d, id, Some(tab));
     Some(id)
+}
+
+/// A copy's tab name: "<name> Copy <n>", the first free number (Duplicate; Paste tab where the name is taken, live
+/// doc-tab-menu-copy-paste).
+pub fn copy_name(d: &Document, name: &str) -> String {
+    (1..).map(|n| format!("{name} Copy {n}")).find(|n| !d.tabs.iter().any(|t| t.name == *n)).expect("a free number")
 }
 
 /// "Delete tab : <name>" (not undoable, as in Onshape).

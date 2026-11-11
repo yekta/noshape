@@ -615,6 +615,10 @@ def compare(live, ours, whole_document=True):
         elif a is not None and isinstance(a.get("message"), str) and isinstance((b or {}).get("message"), str) and a["message"] != b["message"] \
                 and t is not None and t - toast_shown.get(b["message"], t) >= TOAST_MS:
             a, b = dict(a, message=None), dict(b, message=None)
+        # A page (documents, preferences, help: live's state has its `url`) has no parts list: live's reader gives [], ours
+        # null (prefs-units-learn-more).
+        if isinstance(a, dict) and "url" in a and a.get("parts") == [] and isinstance(b, dict) and b.get("parts") is None:
+            b = dict(b, parts=[])
         # A toast of ours raised at a step live's runner took longer than a toast lives (its 12 s steps: live 2477's
         # vs-cfg-value-unconfigure) was gone before live read the page: not compared there nor after, unless live shows it.
         if isinstance(a, dict) and isinstance((b or {}).get("message"), str) and t is not None:
