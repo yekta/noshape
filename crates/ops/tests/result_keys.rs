@@ -148,3 +148,27 @@ fn a_file_tabs_bytes_change_the_key() {
     d.edit(|doc| doc.tabs.iter_mut().find(|t| t.id == img).unwrap().content = TabContent::File(file(b"other image")));
     assert_ne!(k0, d.key(ps), "the File tab's bytes");
 }
+
+/// Probe: a document's parts' shown faces in memory, after OCCT's binary round trip, and after the result store's
+/// encode / decode (NOSHAPE_PROBE_DOC: a document copied to a scratch dir first).
+#[test]
+#[ignore = "T2: probe"]
+fn shown_faces_through_the_store_probe() {
+    let Ok(path) = std::env::var("NOSHAPE_PROBE_DOC") else { return };
+    let dir = std::env::temp_dir().join(format!("noshape-store-probe-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::copy(&path, dir.join("d.noshape")).unwrap();
+    let mut open = OpenDoc::new(Session::open(dir.join("d.noshape")).unwrap());
+    let tabs: Vec<TabId> = open.doc().tabs.iter().filter(|t| matches!(t.content, TabContent::PartStudio(_))).map(|t| t.id).collect();
+    let shown = |s: &noshape_kernel::Shape| s.shown_topology().map(|t| t.face_count()).unwrap_or(0);
+    for tab in tabs {
+        let r = open.regenerate(tab, None).unwrap();
+        let bytes = noshape_model::regen::persist::encode_result(&r.context, &r.display.features).unwrap();
+        let (back, _) = noshape_model::regen::persist::decode_result(&bytes).unwrap();
+        for (b, d) in r.context.bodies.untracked().iter().zip(back.bodies.untracked()) {
+            let bin = noshape_kernel::Shape::from_bin_bytes(&b.shape.to_bin_bytes(false).unwrap()).unwrap();
+            println!("{}: {} faces, shown {} in memory, {} after binary, {} after the store ({} faces)", b.name, b.shape.faces().len(), shown(&b.shape), shown(&bin), shown(&d.shape), d.shape.faces().len());
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -3605,6 +3605,12 @@ fn a_threaded_rods_helical_strip_is_one_face() {
     let strip = Reference::Face((*b.faces[pieces[0]]).clone());
     let Reference::Face(n) = &strip else { unreachable!() };
     assert_eq!(b.find_faces(n), pieces);
+    // Kept in the result store and read back (a reopen, an edit after one): still one name, found whole.
+    let back = noshape_model::regen::persist::decode(&noshape_model::regen::persist::encode(&r.context).unwrap()).unwrap();
+    let kept = back.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+    assert!(pieces.iter().all(|&i| std::sync::Arc::ptr_eq(&kept.faces[i], &kept.faces[pieces[0]])), "one name read back");
+    assert_eq!(kept.find_faces(n), pieces);
+    assert_eq!(kept.faces, b.faces);
     let total: f64 = pieces.iter().map(|&i| b.shape.faces()[i].area().unwrap()).sum();
     let m = noshape_model::regen::measure::measure(&r.context, std::slice::from_ref(&strip));
     assert!(m.iter().any(|(l, x)| l == "Area" && matches!(x, noshape_model::regen::measure::Measurement::Area(a) if near(*a, total, 1e-12))), "{m:?}");

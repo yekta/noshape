@@ -17,8 +17,11 @@ pub struct Body {
     pub name: String,
     pub kind: BodyKind,
     pub shape: Shape,
+    #[serde(with = "shared_names")]
     pub faces: Vec<Name>,
+    #[serde(with = "shared_names")]
     pub edges: Vec<Name>,
+    #[serde(with = "shared_names")]
     pub vertices: Vec<Name>,
     /// Index into the part color palette.
     pub color: usize,
@@ -901,6 +904,41 @@ impl Context {
     /// World bounds of all bodies.
     pub fn bounds(&self) -> Option<(DVec3, DVec3)> {
         self.bodies.bounds()
+    }
+}
+
+/// A body's names as stored: the pieces shown as one face share one Arc ([`join_face_names`], found by `Arc::ptr_eq`), so
+/// each name is written once and a piece sharing an earlier one's as its index.
+mod shared_names {
+    use super::{Name, TopoName};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::sync::Arc;
+
+    #[derive(Serialize, Deserialize)]
+    enum Entry<T> {
+        Name(T),
+        Same(u32),
+    }
+
+    pub fn serialize<S: Serializer>(names: &[Name], s: S) -> Result<S::Ok, S::Error> {
+        let mut first = std::collections::HashMap::with_capacity(names.len());
+        s.collect_seq(names.iter().enumerate().map(|(i, n)| match *first.entry(Arc::as_ptr(n)).or_insert(i as u32) {
+            j if j as usize == i => Entry::Name(&**n),
+            j => Entry::Same(j),
+        }))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<Name>, D::Error> {
+        let entries = Vec::<Entry<TopoName>>::deserialize(d)?;
+        let mut out: Vec<Name> = Vec::with_capacity(entries.len());
+        for e in entries {
+            let n = match e {
+                Entry::Name(n) => Arc::new(n),
+                Entry::Same(j) => out.get(j as usize).cloned().ok_or_else(|| serde::de::Error::custom("a shared name before its first"))?,
+            };
+            out.push(n);
+        }
+        Ok(out)
     }
 }
 
