@@ -30,6 +30,19 @@ new); most are the selection after a step (`.drawing.selection.length` live 1 / 
 - drw-view-align-vertically: step 1 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (4/6 states)
 - drw-view-replicate-annotations: step 8 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (8/10 states)
 
+## 11-11 15:26 UTC: assembly suite 1298 -> 1320/1731 occurrences, mates 199 -> 243 (vibe4, all 24, none worse)
+- In-context entities (Onshape's frozen assembly geometry, blobs not fetched): a sketch on one is built on a face at
+  live's sketch frame, the stand-in deleted after the last feature; live's selected regions that are pieces of one of
+  ours (the real face's edges split them) take ours whole. asm-isaac-ball 79 -> 100/121, mates 14 -> 58.
+- ISO hole lookups from older documents' paths (standard as a level, "type", no tap type, pitch without "(Coarse)";
+  thread engagement noted): 34 lookups were dropped; no assembly moved (asm-xdev-subs' holes fail for other reasons).
+- Export dialog (lead P1, live qexport): STEP custom units without Yard, starting on Centimeter; a part's file name cut
+  before "<". A UI test assumed Meter: fixed forward after 00895eef's failed land.
+- Next by loss: asm-xdev-subs (-85 occ: 62b37d's Transform 3 has an empty in-feature mate connector query in live's
+  fetch; 340657's chain starts at Sketch 2's missing external references), asm-infento-subs (-59 occ / -80 mates,
+  1dc32b's Boolean 2 non-manifold: core/bool), asm-scissor-lift (-51), asm-welding-config (-40), asm-corexy (-36:
+  in-context cylinder faces, Transform 1), asm-tvc-mount (-35: 7bc9d8's Plane 2 angle reference).
+
 ## 11-11 10:27 UTC: live's 2486 answers used; drawing still 161/173, 1367/1384
 - Radius value dropped inside its circle: centred on it (ca7c6e94); foreshorten's step 9 stays: after Foreshorten ours
   draws the jogged form (text up-left, not under the menu), live's shot still shows the plain centred one.
