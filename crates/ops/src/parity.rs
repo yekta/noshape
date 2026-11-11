@@ -1647,12 +1647,37 @@ impl<'a> Translator<'a> {
                     _ => return Ok(Some(p["value"].clone())),
                 };
                 let by_level = p["value"].as_object().ok_or("lookup path without a value")?;
-                let mut path: Vec<String> = Vec::new();
-                while let Some(level) = noshape_model::features::hole_tables::table_level_key(table, &path) {
-                    let Some(v) = by_level.get(&level).and_then(Value::as_str) else { break };
-                    path.push(v.to_string());
+                // Live's paths name the standard (ours: one table each, so "ISO" in an ISO table is no level) and
+                // call the hole type "type" (ours `holeType`; asm-xdev-subs' M3 tapped holes).
+                let own = if table.contains("iso") { "ISO" } else { "ANSI" };
+                if by_level.get("standard").and_then(Value::as_str).is_some_and(|st| st != own) {
+                    return Err(format!("lookup path {}: standard not in noshape's {table}", Value::Object(by_level.clone())));
                 }
-                if path.len() < by_level.len() {
+                // Older documents' paths come from an older table: a level they don't name takes our default (ISO
+                // tapped's "Straight tap"), a value ours spells longer is its option ("0.50 mm" → "0.50 mm
+                // (Coarse)"), a level ours lacks (their thread "engagement") is noted.
+                use noshape_model::features::hole_tables as ht;
+                let mut path: Vec<String> = Vec::new();
+                let mut used: Vec<String> = vec!["standard".into()];
+                while let Some(level) = ht::table_level_key(table, &path) {
+                    let key = if level == "holeType" && !by_level.contains_key("holeType") { "type" } else { level.as_str() };
+                    // (A key taken already, ISO tapped's "type" for the hole type: not this level's.)
+                    let pick = match by_level.get(key).and_then(Value::as_str).filter(|_| !used.iter().any(|u| u == key)) {
+                        Some(v) => {
+                            used.push(key.to_string());
+                            let options = ht::table_levels(table, &path);
+                            options.iter().find(|o| o.0 == v || o.1 == v).or_else(|| options.iter().find(|o| o.0.starts_with(&format!("{v} ")))).map(|o| o.0.clone())
+                        }
+                        None => ht::table_level_default(table, &path),
+                    };
+                    let Some(pick) = pick else { break };
+                    path.push(pick);
+                }
+                let unused: Vec<&str> = by_level.keys().filter(|k| !used.contains(k)).map(String::as_str).collect();
+                if ht::table_level_key(table, &path).is_none() && !unused.is_empty() {
+                    self.notes.push(format!("lookup path {}: {} not in noshape's {table}, taken as {}", Value::Object(by_level.clone()), unused.join(", "), path.join(" › ")));
+                }
+                if ht::table_level_key(table, &path).is_some() {
                     return Err(format!("lookup path {} only partly in noshape's {table} ({})", Value::Object(by_level.clone()), path.join(" › ")));
                 }
                 Some(json!(path))
