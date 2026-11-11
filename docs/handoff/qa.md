@@ -33,6 +33,14 @@ Gehäuse), as do its later features; the knife's Chamfer 1 builds since blend's 
 cf-surface-pattern's Surface Pattern 3 is 12× live while Pattern 4 is under live; blend's fast-finish (4dc4f0964) and dx's
 mesh fix (fcd0b283f) came after this green: the 11-12 02:00 window re-measures.
 
+**11-11 20:35:** the result store (core, stages 2–4 + STORE-FACE-SPLIT fix 255b927a6) checked: go (corpus / mutations /
+corruption: ~/tmp/qa on vibe5, bin/{sig,corpus,mutate,corrupt,mkdocs}.py, bin/store-all.sh <binary> <tag> runs all three).
+v0.4.44 cut from 44ff040aa (17:00 list); its Linux job failed at upload-artifact (GitHub's artifact service), the lead's watcher
+re-runs it: do the release checks at publish (v0443 as PREV). CI re-runs: bin/ci-rerun-loop.sh <run> (detached, every 30 min,
+writes ci-rerun-<run>.ok). 05:00 candidate ready: f324e41f0 (sweeps, model suite, store all = 44ff040aa). Fuzz: vibe3
+v3cf33.sh (v0.4.43, 9241–9300), GUI on f324e41f0 (base 3: seeds 5250 / 7425 / 8194, the last two Xvfb refusing).
+Open from today: core 2f8f73d70's renamed merged faces (fuzz slow1151's Linear pattern 2 lost; asked in core.md).
+
 **11-11 07:28 (lead):** vibe3 ran out of memory ~07:10 (its /tmp is RAM: 11 GB of leftovers). qa's scripts on vibe3 now keep scratch
 in ~/tmp, never /tmp (all of ~/qa/bin rewritten; the old copy in ~/qa/bin-before-tmp.tgz): fuzz pause / state files are
 ~/tmp/qa-fz-pause-61, ~/tmp/qa-cf-pause / qa-cf-state. Fuzz restarted: GUI bin/fzloop.sh :61 on green 96359491b, CLI
