@@ -13,6 +13,25 @@ Worktree /root/projects/noshape-wt/blend (and blend2 for a second build), builds
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## 11-11 23:23 UTC: rings-loft's pattern tips done without crates/brep (17 -> 19 of 32)
+- Landed: blend-lcm, blend-filletspeed, the knife's sliver end (af254976; knife 15 -> 16 of 52).
+- **Circular pattern 2 as live 2513** (blend-ringtips, queued 1b11b8f6): a feature pattern of an Add and the chamfer or fillet of
+  what it made (every reference on the Add's own faces) runs the blend on each copy's New body alone (pattern.rs
+  `reapply_as_tools`: the blend after its Add in one scratch, its references moved onto the copy), then adds the
+  chamfered bosses in one Boolean. No blend through a neighbour's tip is needed: the tips are a union. The pattern's
+  8 tools went to OCCT's glued fuse (noshape's declines "a face lost"), which merged nothing (ring + 8 bosses apart,
+  96 faces) and passed the volume check (apart, the volumes add up): `volumes_add_up` now also wants the solids a glue
+  left apart not to touch (boxes, then BRepExtrema), else the fuse runs unglued. Result 103 faces, volume 1140.909137
+  (live 1140.909064). T1 `engine::reapplied_chamfered_bosses_that_overlap_are_each_chamfered_alone` (main 2673.333,
+  live's rule 2652.0 mm³). Gates: model suite 827 -> 829 (no document worse), the 67 recorded glued fuses of the bool
+  corpora identical and no slower (alternated), g++-13 builds; assembly pair identical (24/24). polygon_chamfer (blend-parity WIP)
+  and the Split-aware `instance_references` (6bbfc3d13) dropped: not needed.
+- Speed: Circular pattern 2 now ~1.2 s (live 201 ms): the glued attempt (~0.4 s) then the plain fuse. noshape's Boolean
+  declining "a face lost" on this case is bool's (case: vibe4 ~/tmp/blend/case1, from f33de9517baf6402).
+- Next difference: **Extrude 5** (an engraving 0.5 deep across the ring's bottom), 342/213 edges/vertices, live
+  335/206: our edges split at the revolved ring's seam (y = 0, z < 0; 4 B-spline and 3 ellipse edges in two pieces
+  each); Parasolid has no seams. Not blend's (core's unify / seam placement).
+
 ## 11-11 20:44 UTC: rings-loft's pattern tips (lead: exact, in crates/brep, till end of 11-12); RABC parked
 - Landed today: blend-cliff (362b57e0, the impeller's Fillet 1), the knife's Chamfer 1 speed (11b4acf2). Queued:
   blend-lcm, blend-filletspeed (both gated: model suite =, assemblies = (asm-infento-subs 108 on both sides, four
