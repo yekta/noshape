@@ -483,7 +483,10 @@ impl DrawingEditor {
         let pat = if none { "None" } else { hatch_pat::pattern(standard, pattern).map(|p| p.name).unwrap_or("") };
         let pattern_btn = {
             let ed = ed.clone();
-            Button::new("hd-pattern")
+            // (Found by the shown pattern, as live's select: `dropdown: None` on General.)
+            let shown = pat.to_string();
+            let field = div().id("hd-pattern-field").map(move |d| crate::ui_script::mark(d, move || format!("dropdown:{shown}")));
+            let btn = Button::new("hd-pattern")
                 .ghost()
                 .xsmall()
                 .w(px(188.))
@@ -505,8 +508,8 @@ impl DrawingEditor {
                         m = m.item(crate::os_menu::OsMenuItem::new(p.name).icon_name(&hatch_pat::icon_name(standard, i)).checked(i == pattern).on_click(move |_, _, cx| e.update(cx, |t, cx| t.set_hatch(|d| d.pattern = i, cx))));
                     }
                     m
-                })
-                .into_any_element()
+                });
+            field.child(btn).into_any_element()
         };
         // Scale / Angle: editable boxes with a list.
         let combo = |id: &'static str, input: &Entity<InputState>, items: Vec<String>| -> AnyElement {
