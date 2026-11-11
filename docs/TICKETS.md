@@ -419,6 +419,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - **qa 23:47: no blocker on watcher green b73d2fece (23:14) either** (5213afac4 + bool's e557b15ea): model suite 77/87,
   820/947, every document = 5213afac4 (gear documents at baseline); sweeps = 5213afac4 exactly. Its first model run failed
   at rb.sh's sync: vibe4's disk at 98 % (9.7 GB free).
+- **qa 05:16, v0.4.42 checked (published 02:30, run 42935206203, e892e4dda = b73d2fece + the version): no blocker.** 11 assets,
+  every job green incl. the three "Restart into" updates; the Linux tarballs and .deb match SHA256SUMS. CLI smoke = v0.4.41
+  (round trip, volume sweep, fixed tickets, the user's cases); the 48 ticket documents on the release CLI = green b73d2fece.
+  Agent session (Haiku, the release's MCP): 21 tool calls, 1 failed (sketch_constrain symmetric about a point; the error says
+  how to centre a shape instead), the block right (23,214.6 mm³, 7 faces). qa-os (run 42962794441): macOS footer and Show in
+  Finder OK; Windows footer OK, Show in Explorer still fails (WIN-SHOW-IN-EXPLORER, not new).
 - Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 HAND-DRILL-MATES-OVERDEFINED (parity suite only),
   P1 T2-ASM-STANDARD-CONTENT-HANG (a T2 bench). Long-running P0s: BLEND-RUST, SHELL-SLOW, REGEN-SPEED.
 
