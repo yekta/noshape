@@ -431,6 +431,10 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         if !ev.bool("allowEdgeOverflow") && super::blend_section::cliff_rim_blend(ev, bi, &edges, &radii)? {
             continue;
         }
+        // A tube's round whose ball would touch it past its end: over the end's rim, as live's.
+        if !ev.bool("allowEdgeOverflow") && !width && super::blend_section::cliff_end_round(ev, bi, &edges, radius)? {
+            continue;
+        }
         // Whole circles between faces of revolution about them, a torus or sphere among them: exact toroidal rounds.
         if !width && super::blend_section::coaxial_round(ev, bi, &edges, radius)? {
             continue;

@@ -12,7 +12,7 @@
 use crate::naming::Name;
 use crate::reference::{Role, TopoName};
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, NamedShape};
-use glam::DVec3;
+use glam::{DVec2, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
 use std::collections::BTreeMap;
@@ -1952,6 +1952,303 @@ pub fn coaxial_round(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) -> FR
     if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
         return Err(fail("the result is not one valid solid"));
     }
+    let names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
+    Ok(true)
+}
+
+/// A round of a closed edge where a cylinder (a tube) meets another face (a wall), overflow off, whose ball would
+/// touch the tube past its end: there the ball rolls over the tube's end rim instead, touching the wall and the rim
+/// edge (live c2-impeller-loft's Fillet 1: R10 where its stern tube meets the housing, face JWO between the round and
+/// the rim). Built as OCCT's round on the part with the tube run on past its end, less what lies between the two balls
+/// that touch the tube exactly at the rim, and there a loft of the rim balls' sections. `Ok(false)` (nothing done)
+/// unless the edge is such a loop and some ball has to roll over the rim.
+pub fn cliff_end_round(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) -> FResult<bool> {
+    let &[e] = edges else { return Ok(false) };
+    let body = ev.ctx.bodies[bi].clone();
+    let shape = &body.shape;
+    let faces = shape.faces();
+    let ef = shape.edge_faces()?;
+    let edge = shape.sub_shape(ShapeType::Edge, e)?;
+    if !edge.edge_info()?.closed {
+        return Ok(false);
+    }
+    let Some(&[f0, f1]) = ef.get(e).map(|f| f.as_slice()) else { return Ok(false) };
+    let (tube_i, wall_i) = match (faces[f0 as usize].face_surface()?, faces[f1 as usize].face_surface()?) {
+        (k::Surface::Cylinder { .. }, k::Surface::Cylinder { .. }) => return Ok(false),
+        (k::Surface::Cylinder { .. }, _) => (f0 as usize, f1 as usize),
+        (_, k::Surface::Cylinder { .. }) => (f1 as usize, f0 as usize),
+        _ => return Ok(false),
+    };
+    let k::Surface::Cylinder { axis, radius: rt, .. } = faces[tube_i].face_surface()? else { return Ok(false) };
+    let axis = axis.normalize();
+    let wall = faces[wall_i].clone();
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    // The tube's end rim: a whole circle of it between it and a plane across the axis.
+    let rim = ef.iter().enumerate().find_map(|(i, fs)| {
+        if i == e || !fs.contains(&(tube_i as u32)) || fs.len() != 2 {
+            return None;
+        }
+        let cap = fs.iter().copied().find(|&f| f as usize != tube_i)? as usize;
+        let k::Surface::Plane(pl) = faces[cap].face_surface().ok()? else { return None };
+        let info = shape.sub_shape(ShapeType::Edge, i).ok()?.edge_info().ok()?;
+        let k::Curve::Circle { center, .. } = info.curve else { return None };
+        (pl.normal.normalize().dot(axis).abs() > 1.0 - 1e-9 && info.closed).then_some((center, cap))
+    });
+    let Some((rim_center, cap_i)) = rim else { return Ok(false) };
+    // Out of the tube's end: the cap's outward normal.
+    let out = if faces[cap_i].normal_at_point(rim_center)?.dot(axis) >= 0.0 { axis } else { -axis };
+    let x_dir = axis.any_orthonormal_vector();
+    let y_dir = axis.cross(x_dir);
+    // The wall's nearest point and normal: Newton steps on its parameters from the last answer (the balls move a
+    // little at a time), OCCT's projection where they don't settle (~1.7 ms on the impeller's 111-pole wall).
+    let bounds = wall.uv_bounds()?;
+    let hint = std::cell::Cell::new(None::<DVec2>);
+    // (The wall read once as NURBS where it is a B-spline: its normal's side is the face's, checked at the first foot.)
+    let nurbs = wall.face_nurbs()?;
+    let side = std::cell::Cell::new(0.0f64);
+    // [S, Su, Sv, Suu, Suv, Svv, the face's normal].
+    let eval = |uv: DVec2| -> FResult<[DVec3; 7]> {
+        match (&nurbs, side.get()) {
+            (Some(ns), sg) if sg != 0.0 => {
+                let [s0, su, sv, suu, suv, svv] = ns.derivs(uv.x, uv.y);
+                Ok([s0, su, sv, suu, suv, svv, su.cross(sv) * sg])
+            }
+            _ => {
+                let [su, sv, suu, suv, svv, n] = wall.d2_at_uvs(&[uv])?[0];
+                Ok([wall.point_at_uv(uv.x, uv.y)?, su, sv, suu, suv, svv, n])
+            }
+        }
+    };
+    let foot_on = |p: DVec3, check: bool| -> FResult<(DVec3, DVec3)> {
+        if let Some(mut uv) = hint.get() {
+            for _ in 0..16 {
+                let [s0, su, sv, suu, suv, svv, n] = eval(uv)?;
+                let d = p - s0;
+                let (a, b, c) = (su.dot(su) - d.dot(suu), su.dot(sv) - d.dot(suv), sv.dot(sv) - d.dot(svv));
+                let det = a * c - b * b;
+                if det.abs() < 1e-300 {
+                    break;
+                }
+                let (r1, r2) = (su.dot(d), sv.dot(d));
+                let step = DVec2::new((r1 * c - r2 * b) / det, (a * r2 - b * r1) / det);
+                uv = DVec2::new((uv.x + step.x).clamp(bounds[0], bounds[1]), (uv.y + step.y).clamp(bounds[2], bounds[3]));
+                if (su * step.x + sv * step.y).length() < scale * 1e-9 {
+                    let s1 = eval(uv)?[0];
+                    let n = n.normalize();
+                    // (A foot inside the face's parameters, the offset along its normal.)
+                    let along = (p - s1).cross(n).length() <= scale * 1e-9;
+                    if along && (!check || wall.contains_point(s1, scale * 1e-7).unwrap_or(false)) {
+                        hint.set(Some(uv));
+                        return Ok((s1, n));
+                    }
+                    break;
+                }
+            }
+        }
+        let pr = wall.project_point(p)?;
+        if side.get() == 0.0 && nurbs.is_some() {
+            let [_, su, sv, ..] = nurbs.as_ref().map(|ns| ns.derivs(pr.u, pr.v)).unwrap_or([DVec3::ZERO; 6]);
+            let n = wall.normal_at_uv(pr.u, pr.v)?;
+            side.set(if su.cross(sv).dot(n) >= 0.0 { 1.0 } else { -1.0 });
+        }
+        hint.set(Some(DVec2::new(pr.u, pr.v)));
+        Ok((pr.point, wall.normal_at_uv(pr.u, pr.v)?.normalize()))
+    };
+    // (On the face checked only for the touches: the solvers' steps may look a little past its edge.)
+    let foot = |p: DVec3| foot_on(p, false);
+    let touch = |p: DVec3| -> FResult<DVec3> { Ok(foot_on(p, true)?.0) };
+    // Signed distance from the wall's surface: positive in the air.
+    let sd = |p: DVec3| -> FResult<f64> {
+        let (q, n) = foot(p)?;
+        Ok((p - q).dot(n))
+    };
+    // The ball touching the rim at angle `a` and the wall: its tilt past the rim plane (0: it touches the tube at the
+    // rim), centre, touch points on the rim and the wall. None where no such ball reaches the wall. (Secant steps: each
+    // step projects onto the wall, ~ms on a dense spline.)
+    let ball = |a: f64| -> FResult<Option<(f64, DVec3, DVec3, DVec3)>> {
+        let u = x_dir * a.cos() + y_dir * a.sin();
+        let kp = rim_center + u * rt;
+        let f = |psi: f64| -> FResult<f64> { Ok(sd(kp + (u * psi.cos() + out * psi.sin()) * r)? - r) };
+        let (mut x0, mut x1) = (0.0f64, 0.5f64);
+        let (mut f0, mut f1) = (f(x0)?, f(x1)?);
+        for _ in 0..30 {
+            if (f1 - f0).abs() < 1e-300 {
+                break;
+            }
+            let x2 = (x1 - f1 * (x1 - x0) / (f1 - f0)).clamp(-1.2, 1.5);
+            (x0, f0) = (x1, f1);
+            x1 = x2;
+            f1 = f(x1)?;
+            if f1.abs() < scale * 1e-10 {
+                break;
+            }
+        }
+        if !f1.is_finite() || f1.abs() > scale * 1e-7 {
+            return Ok(None);
+        }
+        let c = kp + (u * x1.cos() + out * x1.sin()) * r;
+        Ok(Some((x1, c, kp, touch(c)?)))
+    };
+    // The rim angles whose ball tilts past the rim plane: one run of them, its ends where the tilt is 0.
+    const N: usize = 36;
+    let step = std::f64::consts::TAU / N as f64;
+    let tilts: Vec<Option<f64>> = (0..N).map(|k| ball(k as f64 * step).map(|b| b.map(|b| b.0))).collect::<FResult<_>>()?;
+    let past = |k: usize| tilts[k % N].is_some_and(|t| t > 0.0);
+    let Some(start) = (0..N).find(|&k| past(k) && !past(k + N - 1)) else { return Ok(false) };
+    let len = (0..N).take_while(|&j| past(start + j)).count();
+    if len >= N - 1 || (0..N).filter(|&k| past(k)).count() != len {
+        return Ok(false);
+    }
+    // The tilt's zero between an angle not past (`lo`) and one past (`hi`): secant steps on the tilt.
+    let edge_at = |lo: f64, hi: f64| -> FResult<f64> {
+        let tilt = |a: f64| -> FResult<Option<f64>> { Ok(ball(a)?.map(|b| b.0)) };
+        let (Some(mut t0), Some(mut t1)) = (tilt(lo)?, tilt(hi)?) else { return Ok(0.5 * (lo + hi)) };
+        let (mut x0, mut x1) = (lo, hi);
+        for _ in 0..20 {
+            if (t1 - t0).abs() < 1e-300 {
+                break;
+            }
+            let x2 = (x1 - t1 * (x1 - x0) / (t1 - t0)).clamp(lo.min(hi), lo.max(hi));
+            (x0, t0) = (x1, t1);
+            x1 = x2;
+            let Some(t) = tilt(x1)? else { break };
+            t1 = t;
+            if t1.abs() < 1e-10 {
+                break;
+            }
+        }
+        Ok(x1)
+    };
+    let a0 = edge_at((start as f64 - 1.0) * step, start as f64 * step)?;
+    let a1 = edge_at((start + len) as f64 * step, (start + len - 1) as f64 * step)?;
+    // The balls all round by their angle about the tube's axis: on the tube (centre rt + r from the axis, the wall r
+    // away) except over the rim's band [a0, a1], where they roll over the rim (`ball`).
+    let dir = |a: f64| x_dir * a.cos() + y_dir * a.sin();
+    let tube_ball = |a: f64, guess: f64| -> FResult<Option<(DVec3, DVec3, DVec3)>> {
+        let u = dir(a);
+        let f = |s: f64| -> FResult<f64> { Ok(sd(rim_center + out * s + u * (rt + r))? - r) };
+        let (mut x0, mut x1) = (guess, guess - 0.1 * r);
+        let (mut f0, mut f1) = (f(x0)?, f(x1)?);
+        for _ in 0..40 {
+            if (f1 - f0).abs() < 1e-300 {
+                break;
+            }
+            let x2 = x1 - f1 * (x1 - x0) / (f1 - f0);
+            (x0, f0) = (x1, f1);
+            x1 = x2;
+            f1 = f(x1)?;
+            if f1.abs() < scale * 1e-11 {
+                break;
+            }
+        }
+        if !f1.is_finite() || f1.abs() > scale * 1e-8 {
+            return Ok(None);
+        }
+        let c = rim_center + out * x1 + u * (rt + r);
+        Ok(Some((c, rim_center + out * x1 + u * rt, touch(c)?)))
+    };
+    // The balls' arcs from the tube (or rim) to the wall: over the rim (live's JWO) from a0 to a1, on the tube (JWK)
+    // from a1 round to a0, each run of arcs lofted into its face.
+    let arc = |(c, kp, tw): (DVec3, DVec3, DVec3)| -> FResult<Shape> {
+        Ok(k::make_wire(&[k::make_arc_3pts(kp, c + (0.5 * (kp + tw) - c).normalize() * r, tw)?])?)
+    };
+    // Sections ~3° apart, and one at the tube's seam (where its face and the rim are split: the faces' edges must pass
+    // through that point to sew).
+    let seam = faces[tube_i].edges().into_iter().find_map(|x| {
+        let i = x.edge_info().ok()?;
+        let k::Curve::Line { .. } = i.curve else { return None };
+        let v = i.start - rim_center;
+        Some(v.dot(y_dir).atan2(v.dot(x_dir)))
+    });
+    let angles = |from: f64, to: f64| -> Vec<f64> {
+        let n = ((to - from) / 3f64.to_radians()).ceil().max(2.0) as usize;
+        let mut v: Vec<f64> = (0..=n).map(|j| from + (to - from) * j as f64 / n as f64).collect();
+        if let Some(s) = seam {
+            let s = from + (s - from).rem_euclid(std::f64::consts::TAU);
+            let step = (to - from) / n as f64;
+            if s > from + 0.05 * step && s < to - 0.05 * step && !v.iter().any(|a| (a - s).abs() < 1e-9) {
+                v.retain(|a| (a - s).abs() > 0.3 * step || *a == from || *a == to);
+                v.push(s);
+                v.sort_by(f64::total_cmp);
+            }
+        }
+        v
+    };
+    let (mut over, mut on) = (Vec::new(), Vec::new());
+    for a in angles(a0, a1) {
+        let Some((_, c, kp, tw)) = ball(a)? else { return Err(fail("a rim ball doesn't reach the wall")) };
+        over.push((a, c, kp, tw));
+    }
+    let last = over.len() - 1;
+    on.push(over[last]);
+    let mut guess = (over[last].2 - rim_center).dot(out);
+    let around = angles(a1, a0 + std::f64::consts::TAU);
+    for &a in &around[1..around.len() - 1] {
+        let Some((c, kp, tw)) = tube_ball(a, guess)? else { return Err(fail("a ball on the tube doesn't reach the wall")) };
+        guess = (kp - rim_center).dot(out);
+        on.push((a, c, kp, tw));
+    }
+    on.push(over[0]);
+    let face_of = |run: &[(f64, DVec3, DVec3, DVec3)]| -> FResult<Shape> {
+        let arcs: Vec<Shape> = run.iter().map(|&(_, c, kp, tw)| arc((c, kp, tw))).collect::<FResult<_>>()?;
+        Ok(k::loft(&arcs, &k::LoftOptions { solid: false, ..Default::default() })?.shape)
+    };
+    let (jwo, jwk) = (face_of(&over)?, face_of(&on)?);
+    // Their edges along the touches (not the end arcs): the wall's (through the wall touches) and the tube's.
+    let along = |f: &Shape, run: &[(f64, DVec3, DVec3, DVec3)], pick: fn(&(f64, DVec3, DVec3, DVec3)) -> DVec3| -> FResult<Shape> {
+        let mid = pick(&run[run.len() / 2]);
+        let v = k::make_vertex(mid)?;
+        f.edges().into_iter().min_by(|x, y| k::distance(x, &v).map_or(f64::INFINITY, |d| d.distance).total_cmp(&k::distance(y, &v).map_or(f64::INFINITY, |d| d.distance))).ok_or_else(|| fail("a blend face without edges"))
+    };
+    let wall_curves = [along(&jwo, &over, |b| b.3)?, along(&jwk, &on, |b| b.3)?];
+    let tube_curve = along(&jwk, &on, |b| b.2)?;
+    // The wall, the tube and the end's cap split by the faces' touch edges as they are (they lie on them within the
+    // loft's tolerance, and the blend faces sew to the same curves; the three together, so the rim they share splits
+    // alike; only these: the whole part's split checked the curves against every face, 0.6 s on the impeller). The
+    // wall's and the tube's pieces along the edge (between it and the touches) are under the round.
+    let part_names = body.shape_names();
+    let trio = Shape::compound(&[wall.clone(), faces[tube_i].clone(), faces[cap_i].clone()]);
+    let trio_names = crate::regen::eval::names_for(&trio, vec![part_names.faces[wall_i].clone(), part_names.faces[tube_i].clone(), part_names.faces[cap_i].clone()]);
+    let split = k::imprint(&trio, &[wall_curves[0].clone(), wall_curves[1].clone(), tube_curve])?;
+    let split_names = ev.name_result(&[&trio_names], &split.history, &split.shape, &BTreeMap::new(), None);
+    let on_edge = |f: &Shape| {
+        f.edges().iter().any(|x| {
+            let Ok(i) = x.edge_info() else { return false };
+            x.point_at(0.5 * (i.first_param + i.last_param)).is_ok_and(|q| k::make_vertex(q).and_then(|v| k::distance(&v, &edge)).is_ok_and(|d| d.distance < scale * 1e-7))
+        })
+    };
+    let (mut kept, mut kept_names) = (Vec::new(), Vec::new());
+    for (f, n) in split.shape.faces().into_iter().zip(split_names) {
+        if !on_edge(&f) {
+            kept.push(f);
+            kept_names.push(n);
+        }
+    }
+    for (i, f) in faces.iter().enumerate() {
+        if i != wall_i && i != tube_i && i != cap_i {
+            kept.push(f.clone());
+            kept_names.push(part_names.faces[i].clone());
+        }
+    }
+    if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+        eprintln!("cliff end: angles {:.2}..{:.2} deg; JWO {:.3} mm2, JWK {:.3} mm2; split {} faces, kept {} of the part's {}", a0.to_degrees(), a1.to_degrees(), jwo.area()? * 1e6, jwk.area()? * 1e6, split.shape.faces().len(), kept.len(), faces.len());
+    }
+    let kept_shape = Shape::compound(&kept);
+    let kept_names = crate::regen::eval::names_for(&kept_shape, kept_names);
+    let blend = Arc::new(TopoName::face(ev.feature, Role::Blend(body.edges[e].clone())));
+    let blends = Shape::compound(&[jwo, jwk]);
+    let blend_names = crate::regen::eval::names_for(&blends, vec![blend.clone(), blend]);
+    let sewn = k::sew(&[kept_shape, blends], scale * 1e-6, true)?;
+    let sewn_names = ev.name_result(&[&kept_names, &blend_names], &sewn.history, &sewn.shape, &BTreeMap::new(), None);
+    let un = k::unify_same_domain(&sewn.shape)?;
+    if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+        eprintln!("cliff end: sewn valid {} faces {} volume {:?} (was {:?}); unified valid {} faces {}", sewn.shape.is_valid(), sewn.shape.faces().len(), sewn.shape.volume().map(|v| v * 1e9), shape.volume().map(|v| v * 1e9), un.shape.is_valid(), un.shape.faces().len());
+    }
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+        return Err(fail("the round over the rim is not one valid solid"));
+    }
+    let named = NamedShape::new(sewn.shape, sewn_names);
     let names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
     ev.replace_body(bi, un.shape, names);
     Ok(true)
