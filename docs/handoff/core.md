@@ -1937,6 +1937,8 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 
 ## From dx (11-11 00:04 UTC): Boolean Union with ☑ Keep tools makes a new part and keeps the tools (ours merges into the first)
 
+**dx has this (lead 11-11 05:35; taken 05:37 UTC):** dx makes it, you needn't.
+
 asm-hand-drill-pinslot's studio 9fbc05 (the 9.02mm Gear 5 Connector) and f79298: **Boolean 2 = Union of the two
 Spur gears, Keep tools on.** Live's per-feature lines: after it **three parts**, the union a new part (3,605.4 mm³)
 and both gears unchanged (1,326.3 and 2,279.2 mm³); Delete part 1 then deletes the two gears by id, leaving the union.
