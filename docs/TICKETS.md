@@ -1476,7 +1476,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P3 UIS-RCLICK-WINDOWS (studios / psui: the UI script) **the UI script's `rclick` on a documents page row opens no menu on
   Windows** (macOS and Linux open it; a real right-click on Windows does): qa-os.yml's show-in / details steps fail with "menu:…
   is not shown", so .github/qa/footer.py right-clicks with mouse_event on Windows instead. (qa 2026-11-08 07:37)
-- [ ] P1 SAVED-SKETCH-PLANE-LOST (blend; core's 6941806b7 / a38465541 are in the same green) **since green 4fee814c a saved
+- [x] P1 SAVED-SKETCH-PLANE-LOST (blend; core's 6941806b7 / a38465541 are in the same green) **since green 4fee814c a saved
   document's two sketches lose their planes**: qa's ticket document cli-fillet2-segv (vibe3 ~/qa/tickets) on 24829a72 → 4fee814c:
   its Fillet 1 (after Extrude 1, Chamfer 1, Linear pattern 1, Shell 1) changes by a hair (Part 1 45580.502 → 45580.636 mm³,
   Part 2 44489.854 → 44489.774, 11 / 16 faces both), then **Sketch 3 and Sketch 5 "Select a sketch plane."** (Ok before),
@@ -1487,6 +1487,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cli-suppress-stall (Shell 7 and Fillet 11 now Ok: Part 1 91042.77 → 7871.36, Part 6 91238.11 → 7896.46) and cli-draft-hang
   (Part 1 and its copies 20705.7244 → 20705.755); 42ae0d85 the same. Repro: `python3 bin/featstat.py <cli> tickets/cli-fillet2-segv.noshape`
   (features and parts), bin/rollstat.py <cli> <doc> <feature>... (parts after each feature). (qa 2026-11-08 03:02)
+  **Closed, not a regression (psui 2026-11-11 16:07):** both sketches sit on faces of Fillet 1 that are 0.1 mm-radius
+  cylinders, before 4fee814c too (v0.4.35's query_entities: "surface": "cylinder", radius 0.1, the same names). They passed
+  as planes only because OCCT's far-off corners left their edges' tolerances loose, and `find_plane`'s BRepLib_FindSurface
+  fits a plane within the edges' tolerances (the old frames are the cylinders' mid tangent planes). With the fillet built
+  right they are cylinders again, and Onshape never takes a cylinder as a sketch plane: "Select a sketch plane." is right.
+  The names still resolve (Part 1 face 2, Part 5 face 10). Sketch 4's plane names a feature the document doesn't have
+  (failed in v0.4.35 too).
 - [ ] P3 SAVED-BRIDGE-FACE-CHANGE (core) **b113528b (a blend that consumes a face a hair smaller: the zero-width bridge cut
   out and the faces sewn) changes a saved document's faces**: qa-scratch/tickets/cli-fillet-segv.noshape Part 4 33 → 34 faces,
   volume the same (43710.5082 mm³). Likely right (live has no zero-width bridge), but saved documents change on open with
