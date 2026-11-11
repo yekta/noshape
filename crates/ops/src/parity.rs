@@ -5979,6 +5979,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     }
     order.push(0);
     let mut mate_names: Vec<(String, String)> = Vec::new();
+    let mut sub_mates: Vec<(usize, String, String)> = Vec::new();
     for &k in &order {
         let l = &levels[k];
         if k != 0
@@ -6135,6 +6136,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 Ok(_) => {
                     if k == 0 {
                         mate_names.push((f["featureId"].as_str().unwrap_or("").to_string(), name));
+                    } else {
+                        sub_mates.push((k, f["featureId"].as_str().unwrap_or("").to_string(), name));
                     }
                 }
                 Err(e) => res.untranslated.push(format!("{name}: {e}")),
@@ -6224,6 +6227,24 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             res.mates_matching += 1;
         } else {
             res.differences.push(format!("{name}: {}, live {}", if ok { "OK".to_string() } else { format!("error ({})", m["message"].as_str().unwrap_or("")) }, states[id.as_str()]["featureStatus"].as_str().unwrap_or("?")));
+        }
+    }
+    // Inside the subassemblies (not scored, their mates' placements are the occurrences'): ours that fail where
+    // live's are OK, to tell why a subassembly's parts are off (asm-xdev-subs' nested ones).
+    let mut lists: HashMap<usize, Value> = HashMap::new();
+    for (lk, id, name) in &sub_mates {
+        let l = &levels[*lk];
+        if !lists.contains_key(lk) {
+            let Ok(list) = placer.call("assembly_list", json!({ "tab": l.tab })) else { continue };
+            lists.insert(*lk, list);
+        }
+        let list = &lists[lk];
+        let live = asm["subAssemblyFeatures"][l.element.as_str()]["featureStates"][id.as_str()]["featureStatus"].as_str().unwrap_or("OK");
+        if let Some(m) = list["mates"].as_array().into_iter().flatten().find(|m| m["name"] == name.as_str())
+            && m["ok"] != true
+            && live == "OK"
+        {
+            res.untranslated.push(format!("{} › {name}: error ({}), live OK", l.tab, m["message"].as_str().unwrap_or("")));
         }
     }
     let at = |l: &Value, name: &str| l["instances"].as_array().into_iter().flatten().find(|i| i["name"] == name).map(|i| (0..3).map(|j| i["translation"][j].as_f64().unwrap_or(f64::NAN) * k).collect::<Vec<_>>());
