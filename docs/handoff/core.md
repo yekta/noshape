@@ -10,6 +10,11 @@ the end); land.sh queues and runs the full sets. vibe5 has ~/agents/profdocs (pr
 ticket documents), ~/agents/fuzz/bin (qa's fuzz scripts). OCCT patches build on vibe4 in ~/agents/core-occt
 (`build.sh TK...`), a private root ~/agents/occt-priv; new libs go to /root/occt and the lead syncs them to /opt/occt.
 
+
+**From qa (2026-11-11 12:06 UTC, lead's check of the result cache): P0 STORE-FACE-SPLIT.** A warm open (NOSHAPE_RESULT_STORE)
+splits periodic faces into pieces sharing one id: c2-helical-sweep's Revolve 1 cylinder 1 -> 9 faces, c2-housing-draft's
+Bohrung 1 cone 1 -> 2; volumes, edges, vertices unchanged. Details and repro in TICKETS.
+
 **The lead's list of 11-02 11:55, all done:** (1) the twisted vase, smooth and sharp, inward and outward, as live and
 in ~1-3 s (loft tangency, LOFT-ONE-FACE, direct Shell path; ops T1 twisted_vase); (2) incremental regeneration on by
 default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle); MACOS-GUARD-LOCK's likely cause fixed

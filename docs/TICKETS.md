@@ -5,6 +5,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa, 2026-11-11
+- [ ] P0 STORE-FACE-SPLIT (core; qa 2026-11-11 12:06, the lead's result-cache check) **a part read back from the persistent
+  result cache has a periodic face split into pieces that share one id**: green 1bfbaacdb, NOSHAPE_RESULT_STORE set, the same
+  document opened twice (cold writes, warm reads). c2-helical-sweep (corpus, saved copy): no store and cold, Part 1 has 6 faces;
+  warm, 14: Revolve 1's cylinder face (7,959.07 mm²) comes back as 9 faces with one id (1,363.88 + 134.68 + 921.34 + 6 ×
+  923.20 mm²); edges (10), vertices (6), volume and area unchanged. c2-housing-draft: Bohrung 1's cone face (45.33 mm²) as
+  two faces with one id (34.35 + 10.98); 36 -> 37 faces. So the store's shape round trip (OCCT binary, ShapeCodec / blobs)
+  splits a face (at its seam or periodic range?) on read: picks, ids and face counts change between an open and a reopen.
+  Repro (vibe5 ~/tmp/qa, mode-700): `NOSHAPE_RESULT_STORE=<empty dir> noshape feature list --doc <copy>` twice, then
+  `query entities --kind faces --part <Part 1>` with and without the store (qa's sig.py / corpus.py there). The whole-corpus
+  check (no store / cold / warm) is still running; more cases follow here.
+
 ## qa, 2026-11-10
 - [ ] P1 HAND-DRILL-MATES-OVERDEFINED (dx first, then asm; qa 2026-11-10 12:26, lead's bisect) **asm-hand-drill-pinslot's mates
   as live 28 -> 5/52 since dx's ee69e4a6a** (parity translator: a construction Use stays construction, an imprint face's
