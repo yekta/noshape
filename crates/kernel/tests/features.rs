@@ -1288,3 +1288,16 @@ fn extrusion_faces_probe() {
         println!("face {i}: dir {direction:.6} uv {b:.6?} area {:.4}\n  corners {corners:.4?}\n  normal mid {:.4}", f.area().unwrap(), f.normal_at_uv((b[0] + b[1]) / 2.0, (b[2] + b[3]) / 2.0).unwrap());
     }
 }
+
+/// Probe: a shape's faces by surface type and size (NOSHAPE_PROBE_SHAPE, a .brep).
+#[test]
+#[ignore = "T2: probe"]
+fn shape_faces_probe() {
+    let Ok(path) = std::env::var("NOSHAPE_PROBE_SHAPE") else { return };
+    let s = read_brep(std::path::Path::new(&path)).unwrap();
+    println!("{} faces, {} edges, solids {}", s.faces().len(), s.edges().len(), s.count(ShapeType::Solid));
+    for (i, f) in s.faces().iter().enumerate() {
+        let b = f.bounding_box(false).unwrap();
+        println!("face {i}: {} area {:.3} mm² box {:.2?} {:.2?}", format!("{:?}", f.face_surface().unwrap()).chars().take(60).collect::<String>(), f.area().unwrap() * 1e6, b.min * 1e3, b.max * 1e3);
+    }
+}

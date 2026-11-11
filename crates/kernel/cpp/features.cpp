@@ -867,8 +867,31 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   // seated, a boss up to a cylinder lying along x put its seam on the
   // cylinder's seam line and the fuse lost 0.035 mm³ of it (kernel_robustness
   // patterns_match_onshape M3).
-  // Through-all length: generous multiple of the combined bounding box.
-  const double          len = 2.0 * bbox_diag({base, until.shape}) + 1.0;
+  // Long enough to pass the target: from the profile's nearest point to the target's farthest along the direction
+  // (a prism 20 times longer made the split's intersections cost: c2-valve-config's Extrude 3, a 3 mm logo run onto
+  // a 110 mm dome, 1.3 m).
+  double len = 0;
+  {
+    Bnd_Box bb, bt;
+    BRepBndLib::Add(base, bb, false);
+    BRepBndLib::Add(until.shape, bt, false);
+    auto along = [&](const Bnd_Box& b, bool top) {
+      double x0, y0, z0, x1, y1, z1;
+      b.Get(x0, y0, z0, x1, y1, z1);
+      double best = top ? -1e300 : 1e300;
+      for (const double x : {x0, x1})
+        for (const double y : {y0, y1})
+          for (const double z : {z0, z1})
+          {
+            const double d = gp_XYZ(x, y, z).Dot(dir.XYZ());
+            best           = top ? std::max(best, d) : std::min(best, d);
+          }
+      return best;
+    };
+    const double reach = bb.IsVoid() || bt.IsVoid() ? 0 : along(bt, true) - along(bb, false);
+    const double diag  = bbox_diag({base, until.shape});
+    len                = reach > 0 ? reach + 0.05 * diag + 1e-6 : 1.1 * diag + 1e-6;
+  }
   BRepPrimAPI_MakePrism prism(base, gp_Vec(dir) * len, false, true);
   if (!prism.IsDone())
     fail_op("extrude failed");
