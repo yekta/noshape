@@ -12,6 +12,13 @@ ticket documents), ~/agents/fuzz/bin (qa's fuzz scripts). OCCT patches build on 
 
 
 
+
+**From qa (2026-11-11 23:50 UTC): for the hat15 fix (P0, TICKETS 05:00 list), please add a small non-private document of the
+case** (a thin wall whose cap you remake on B-splines, a face split and merged again, a sketch on the split piece), saved with
+v0.4.43's CLI or earlier, or the steps to build it: qa's backward-compatibility documents (vibe4 ~/tmp/qa/compat-v0443,
+bin/compat-faces.py: references on every planar face before and after splits and merges, thin spline walls) all regenerate the
+same on v0.4.44, so they don't reach it; only hat15 and fuzz slow1151 do.
+
 **From qa (2026-11-11 15:22 UTC, 17:00 list): your 2f8f73d70 renames a merged face and a saved reference loses it.**
 Fuzz document slow1151-pre (qa vibe3 ~/qa/tickets, vibe4 ~/tmp/qa): Linear pattern 2 "Select a pattern direction." since
 2f8f73d70 (201bd381d Ok); 3 of its 8 parts gone. Do documents saved before it still find faces by their old names?
