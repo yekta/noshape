@@ -30,6 +30,23 @@ new); most are the selection after a step (`.drawing.selection.length` live 1 / 
 - drw-view-align-vertically: step 1 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (4/6 states)
 - drw-view-replicate-annotations: step 8 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (8/10 states)
 
+## 11-11 21:44 UTC: welding-config's Fastened 4-8 solve (assembly mates 244 -> 249/464, none worse)
+- Part Studio List and Checkbox configurations translate: the inputs under live's ids and options (from the studio's
+  `configuration`, else read from its configured values and its instances), configured feature parameters and sketch
+  dimensions with every configuration's value (the default keeps the feature's own; reading the others leaves no
+  trace on later features), instances inserted at their configuration (plain "List_x=Circle1in" too).
+- A connector is found with its studio in its instance's configuration; a CENTER / MID_POINT one whose query read as
+  an entity with nothing at live's point takes the entity at live's point on the instance's own part (welding's Part
+  8 cap edge read as another part's hole).
+- Left in welding-config: 6 occurrences inside its subassemblies, moved by its root Fastened 13-16 between them
+  (their connectors on Part 4 sit at different live points on one entity with no offset: not understood yet).
+- asm-rack-pinion (-21 occ): Studio 1689e3's Import file (`foreignId` 6970ec…) wasn't fetched: REQUESTS for live.
+- asm-scissor-lift (-41): 38 inserts whose live part has no volume match in ours: 11 studios each failing at their
+  own first feature (Delete / Move / Replace face, Boolean tools, Transform, a Spur gear's centre). A long tail.
+- asm-hand-drill-pinslot (21/67 mates): 16 "cannot resolve" are all on Chuck to Gearbox Shaft (7ed710: Split 1 by
+  Plane 2 doesn't cut live's 0.29 mm³ thread-end sliver; Sketch 13's plane, Extrude 1's cap, reads as a side face as
+  Extrude 8 covers it in ours); 30 "overdefines" have the Gearbox Housing in 29 (asm.md).
+
 ## 11-11 18:47 UTC: flexible subassemblies per instance: assembly suite 1320 -> 1450/1731 occurrences (none worse)
 - `assembly_transform` takes an occurrence path ("Sub <2> > Part 1 <1>"): a flexible subassembly instance's child
   placed in its parent, written to that instance's `nested` (asm.md has how it works; the lead gave it to dx).

@@ -35,6 +35,12 @@ Studio f79298 (Gear Selector Ring Gear) built alone (vibe3 ~/agents/asm/ps-ring/
   mate of a conflicting Fastened/Revolute loop (behaviours "request 1798" a2, a3, f79), so they are likely its
   collateral (and Planar 11's chamfer); recheck once the ring gear is live's.
 
+## From dx (11-11 21:44 UTC): asm-hand-drill-pinslot's 30 "Mate overdefines the assembly" (live OK), FYI
+29 of them have the Gearbox Housing (studio e0abe1, which builds without a feature error) at one end, 12 a 4mm
+Bearing Pin, 6 a 4mm Ball Bearing: Cylindrical / Planar / Pin slot / Ball mates that live solves. Either our solver
+refuses redundant mates that agree (live keeps them) or their connectors are off by a little; dx hasn't compared the
+frames. Yours if it is the solver.
+
 ## From dx (11-11 17:18 UTC): occurrence-path assembly_transform for flexible subassemblies is dx's (built, lead)
 Don't redo it. asm-welding-config (-40 occurrences) and asm-xdev-subs (~-50) lose parts inside **flexible**
 subassemblies (`isRigid: false`): live gives each instance of a subassembly its own internal positions, the translator

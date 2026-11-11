@@ -1042,6 +1042,41 @@ fn a_sketch_on_an_in_context_face_is_built_on_live_frame() {
     assert!(faces["faces"].as_array().unwrap().iter().any(|f| near(&f["centroid"])), "no cap at {cap:?}: {faces}");
 }
 
+/// A List configuration input with its configured values (an Extrude's depth, a sketch's diameter): built under
+/// live's ids, the default as live's, each configuration's values set (asm-welding-config's Part 8 instances at
+/// Circle1in…: their mates' connectors are on the configured circle).
+#[test]
+fn a_list_configuration_and_its_configured_values_are_built() {
+    let configured = |id: &str, values: &[(&str, &str)]| {
+        json!({ "btType": "BTMParameterConfigured-2222", "parameterId": id, "configurationParameterId": "List_abc",
+            "values": values.iter().map(|(o, v)| json!({ "btType": "BTMConfiguredValueByEnum-1923", "enumName": "List_abc_conf", "enumValue": o,
+                "value": { "btType": "BTMParameterQuantity-147", "parameterId": "", "expression": v } })).collect::<Vec<_>>() })
+    };
+    let doc = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"], "queryString": "query=qCompressed(1.0,\"%B5$QueryM4S…TopplaneOp…\",id);" }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.005, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "DIAMETER", "parameters": [{ "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "c1" }, configured("length", &[("Default", "10 mm"), ("Long", "20 mm")])] }] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            configured("depth", &[("Default", "10 mm"), ("Long", "30 mm")])] }
+    ], "configuration": { "configurationParameters": [{ "btType": "BTMConfigurationParameterEnum-105", "parameterId": "List_abc", "parameterName": "Size", "defaultValue": "Default",
+        "options": [{ "option": "Default", "optionName": "Default" }, { "option": "Long", "optionName": "Long one" }] }] } });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("list-configuration.noshape"), &doc, Default::default()).unwrap();
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok") && s.problems.is_empty(), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+    }
+    let volume = |t: &mut Translator| t.call("query_parts", json!({})).unwrap()["parts"][0]["volume"].as_f64().unwrap();
+    let pi = std::f64::consts::PI;
+    assert!((volume(&mut t) - pi * 25.0 * 10.0).abs() < 1e-3, "Default: Ø10 × 10 mm");
+    t.call("config_activate", json!({ "values": { "List_abc": "Long" } })).unwrap();
+    assert!((volume(&mut t) - pi * 100.0 * 30.0).abs() < 1e-3, "Long: Ø20 × 30 mm");
+}
+
 /// A Derived feature from a Part Studio fetched beside the document (derived/<element>/): that studio built in a
 /// tab of ours first, the feature taking our part for live's part id (cf-sheet-metal-hem's Derived 1).
 #[test]

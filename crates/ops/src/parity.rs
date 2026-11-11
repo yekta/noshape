@@ -107,6 +107,8 @@ pub struct Translator<'a> {
     construction: std::collections::HashSet<(String, String)>,
     /// Configuration inputs' default options (`configuration` of features.json).
     config_defaults: HashMap<String, String>,
+    /// Live's List and Checkbox inputs built in ours (under live's ids): their configured values are configured too.
+    config_inputs: HashSet<String>,
     /// Edits the current sketch's constraints and dimensions made (to undo).
     sketch_edits: usize,
     /// A spline's end handle (Onshape's `<spline>.startHandle` / `.endHandle` construction lines): our spline's end point
@@ -326,7 +328,7 @@ impl<'a> Translator<'a> {
             // (A boolean configuration's default is a JSON boolean.)
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -474,6 +476,15 @@ impl<'a> Translator<'a> {
     fn config_input(&mut self, c: &Value) {
         let id = c["parameterId"].as_str().unwrap_or("");
         let ty = c["btType"].as_str().unwrap_or("");
+        if ty.starts_with("BTMConfigurationParameterEnum") || ty.starts_with("BTMConfigurationParameterBoolean") {
+            match self.config_choice_input(c) {
+                Ok(()) => {
+                    self.config_inputs.insert(id.to_string());
+                }
+                Err(e) => self.notes.push(format!("configuration input {id}: only its default is built ({e})")),
+            }
+            return;
+        }
         if !ty.starts_with("BTMConfigurationParameterQuantity") {
             let kind = ty.trim_start_matches("BTMConfigurationParameter").split('-').next().unwrap_or(ty);
             self.notes.push(format!("configuration input {id} ({kind}): only its default is built"));
@@ -502,6 +513,93 @@ impl<'a> Translator<'a> {
         if let Err(e) = self.call("config_add_input", args) {
             self.notes.push(format!("configuration variable {id}: {e}"));
         }
+    }
+
+    /// A List (its configurations in live's order, live's default) or a Checkbox, under live's ids.
+    fn config_choice_input(&mut self, c: &Value) -> Result<(), String> {
+        let id = c["parameterId"].as_str().ok_or("no id")?;
+        let name = c["parameterName"].as_str().filter(|n| !n.is_empty()).unwrap_or(id);
+        if c["btType"].as_str().is_some_and(|t| t.starts_with("BTMConfigurationParameterBoolean")) {
+            let r = self.call("config_add_input", json!({ "kind": "checkbox", "name": name, "default": c["defaultValue"] == true }))?;
+            let ours = r["input"].as_str().ok_or("no input id")?.to_string();
+            if ours != id {
+                self.call("config_edit_ids", json!({ "input": ours, "id": id }))?;
+            }
+            return Ok(());
+        }
+        let options: Vec<(String, String)> = c["options"].as_array().into_iter().flatten().filter_map(|o| Some((o["option"].as_str()?.to_string(), o["optionName"].as_str().or(o["option"].as_str())?.to_string()))).collect();
+        let Some((_, first)) = options.first() else { return Err("a List without configurations".into()) };
+        let r = self.call("config_add_input", json!({ "kind": "list", "name": name }))?;
+        let ours = r["input"].as_str().ok_or("no input id")?.to_string();
+        if first != "Default" {
+            self.call("config_edit_option", json!({ "input": ours, "option": "Default", "name": first }))?;
+        }
+        let mut ids = serde_json::Map::new();
+        for (k, (option, label)) in options.iter().enumerate() {
+            if k > 0 {
+                self.call("config_add_option", json!({ "input": ours, "name": label }))?;
+            }
+            ids.insert(label.clone(), json!(option));
+        }
+        self.call("config_edit_ids", json!({ "input": ours, "id": id, "options": ids }))?;
+        if let Some(d) = c["defaultValue"].as_str().filter(|d| *d != options[0].0) {
+            self.call("config_edit_option", json!({ "input": id, "option": d, "set_default": true }))?;
+        }
+        Ok(())
+    }
+
+    /// Feature `id`'s configured parameters (live's `BTMParameterConfigured` at its top level) configured by their
+    /// input, each configuration's value set.
+    fn configure_params(&mut self, k: usize, f: &Value, id: &str, problems: &mut Vec<String>) {
+        for p in f["parameters"].as_array().into_iter().flatten().filter(|p| p["btType"].as_str().is_some_and(|t| t.starts_with("BTMParameterConfigured"))) {
+            let (Some(param), Some(input)) = (p["parameterId"].as_str(), p["configurationParameterId"].as_str()) else { continue };
+            if !self.config_inputs.contains(input) {
+                continue;
+            }
+            if let Err(e) = self.configure_values(k, json!({ "feature": id, "param": param }), input, p) {
+                problems.push(format!("{param}: not configured ({e})"));
+            }
+        }
+    }
+
+    /// `target` (config_configure's feature and param) configured by `input` with live's values (`p["values"]`).
+    fn configure_values(&mut self, k: usize, target: Value, input: &str, p: &Value) -> Result<(), String> {
+        let mut args = target.clone();
+        args["input"] = json!(input);
+        if target["param"].as_str().is_some_and(|t| !t.starts_with(noshape_model::regen::features::sketch::CONFIGURED_DIMENSION_PREFIX)) {
+            self.call("config_configure", args)?;
+        }
+        // The default configuration keeps the feature's own value (config_configure copied it); the others' queries
+        // are read without leaving a trace on the features after (which entities were taken).
+        let default = self.config_defaults.get(input).cloned().unwrap_or_else(|| "Default".into());
+        let (picked, used) = (self.picked.clone(), self.used.clone());
+        let mut result = Ok(());
+        for v in p["values"].as_array().into_iter().flatten() {
+            let configuration = match (&v["enumValue"], &v["booleanValue"]) {
+                (Value::String(o), _) if *o != default => json!(o),
+                (_, Value::Bool(b)) if b.to_string() != default => json!(b),
+                _ => continue,
+            };
+            let value = match v["value"]["expression"].as_str() {
+                Some(e) if target["param"].as_str().is_some_and(|t| t.starts_with(noshape_model::regen::features::sketch::CONFIGURED_DIMENSION_PREFIX)) => json!(e),
+                _ => match self.param(k, &v["value"]) {
+                    Ok(Some(x)) => x,
+                    Ok(None) => continue,
+                    Err(e) => {
+                        result = Err(format!("{configuration}: {e}"));
+                        continue;
+                    }
+                },
+            };
+            let mut set = target.clone();
+            set["configuration"] = configuration.clone();
+            set["value"] = value;
+            if let Err(e) = self.call("config_set_value", set) {
+                result = Err(format!("{configuration}: {e}"));
+            }
+        }
+        (self.picked, self.used) = (picked, used);
+        result
     }
 
     pub fn len(&self) -> usize {
@@ -632,6 +730,9 @@ impl<'a> Translator<'a> {
             Ok((id, status, message)) => {
                 if let Some(oid) = f["featureId"].as_str() {
                     self.feature_ids.insert(oid.to_string(), id.clone());
+                }
+                if !self.config_inputs.is_empty() {
+                    self.configure_params(k, &f, &id, &mut step.problems);
                 }
                 if f["suppressed"].as_bool() == Some(true)
                     && let Err(e) = self.call("feature_suppress", json!({ "features": [id.clone()], "suppressed": true }))
@@ -4273,7 +4374,17 @@ impl<'a> Translator<'a> {
                 _ => continue,
             };
             let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned();
-            let value = ["length", "angle"].iter().find_map(|n| par(n)).and_then(|p| p["expression"].as_str().map(str::to_string));
+            let measure = ["length", "angle"].iter().find_map(|n| par(n));
+            // A configured dimension: the default configuration's value, configured once made.
+            let configured = measure.as_ref().filter(|p| p["btType"].as_str().is_some_and(|t| t.starts_with("BTMParameterConfigured"))).cloned();
+            let value = match &configured {
+                Some(p) => {
+                    let want = p["configurationParameterId"].as_str().and_then(|c| self.config_defaults.get(c)).map(String::as_str).unwrap_or("Default");
+                    let values = p["values"].as_array().map(Vec::as_slice).unwrap_or_default();
+                    values.iter().find(|v| v["enumValue"] == want || v["booleanValue"].as_bool().is_some_and(|b| b.to_string() == want)).or(values.first()).and_then(|v| v["value"]["expression"].as_str().map(str::to_string))
+                }
+                None => measure.and_then(|p| p["expression"].as_str().map(str::to_string)),
+            };
             let mut entities = Vec::new();
             let mut missing = false;
             let mut handle: Option<[String; 2]> = None;
@@ -4351,6 +4462,20 @@ impl<'a> Translator<'a> {
                     // Onshape's driven (reference) dimension; and a driving one
                     // that over-defines the sketch stays driving, as stored
                     // (ours added it driven, as the Dimension tool does).
+                    if let (Some(p), Some(d)) = (&configured, r["dimension"].as_str())
+                        && let Some(input) = p["configurationParameterId"].as_str().filter(|i| self.config_inputs.contains(*i))
+                    {
+                        let made = self.call("sketch_dimension_options", json!({ "sketch": id, "dimension": d, "configure": input }));
+                        match made.as_ref().map(|m| m["configured_param"].clone()) {
+                            Ok(Value::String(key)) => {
+                                if let Err(e) = self.configure_values(k, json!({ "feature": id, "param": key }), input, p) {
+                                    problems.push(format!("{ty} dimension: not configured ({e})"));
+                                }
+                            }
+                            Ok(_) => problems.push(format!("{ty} dimension: configured without a key")),
+                            Err(e) => problems.push(format!("{ty} dimension: not configured ({e})")),
+                        }
+                    }
                     let over = r.get("warning").is_some();
                     if driven != over
                         && let Some(d) = r["dimension"].as_str()
@@ -5572,10 +5697,16 @@ fn ids(v: &Value) -> Vec<String> {
 
 /// `asm`: live's assembly.json (the assembly definition with "features", and "subAssemblyFeatures": element id →
 /// that subassembly's features body); `studios`: element id → (features.json of that Part Studio, its parts list).
-/// An instance's configuration as Onshape encodes a standard-content-like one (base-64 of
-/// "%40scp=…;Pitch=7.9248E-4+meter;…"): its variables (name, value, unit), in order.
-fn instance_config_values(i: &Value) -> Vec<(String, f64, String)> {
+/// An instance's configuration, input id → value: plain ("List_x=Circle1in;…") or as Onshape encodes a
+/// standard-content-like one (base-64 of "%40scp=…;Pitch=7.9248E-4+meter;…"), in order; `@` entries left out.
+fn instance_config_entries(i: &Value) -> Vec<(String, String)> {
     let Some(enc) = i["configuration"].as_str().filter(|c| *c != "default") else { return Vec::new() };
+    let plain = enc.trim_end_matches('=').contains('=');
+    let text = if plain { enc.to_string() } else { decode_config(enc).unwrap_or_default() };
+    text.split(';').filter_map(|kv| kv.split_once('=')).filter(|(k, _)| !k.starts_with('@') && !k.is_empty()).map(|(k, v)| (k.to_string(), v.to_string())).collect()
+}
+
+fn decode_config(enc: &str) -> Option<String> {
     const B: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut bytes = Vec::new();
     let (mut acc, mut bits) = (0u32, 0);
@@ -5589,7 +5720,7 @@ fn instance_config_values(i: &Value) -> Vec<(String, f64, String)> {
             acc &= (1 << bits) - 1;
         }
     }
-    let Ok(text) = String::from_utf8(bytes) else { return Vec::new() };
+    let text = String::from_utf8(bytes).ok()?;
     let mut decoded = Vec::new();
     let b = text.as_bytes();
     let mut k = 0;
@@ -5602,15 +5733,73 @@ fn instance_config_values(i: &Value) -> Vec<(String, f64, String)> {
             k += 1;
         }
     }
-    let text = String::from_utf8_lossy(&decoded).to_string();
-    text.split(';')
-        .filter_map(|kv| {
-            let (k, v) = kv.split_once('=')?;
-            if k.starts_with('@') {
-                return None;
+    Some(String::from_utf8_lossy(&decoded).to_string())
+}
+
+/// A Part Studio's List and Checkbox inputs as live's `configurationParameters`, read from its configured values
+/// (`BTMParameterConfigured` anywhere in `features`) and the configurations its `instances` use.
+fn choice_inputs<'v>(features: &Value, instances: impl Iterator<Item = &'v Value>) -> Vec<Value> {
+    fn walk(v: &Value, out: &mut Vec<(String, bool, Vec<String>)>) {
+        match v {
+            Value::Object(m) => {
+                if m.get("btType").and_then(Value::as_str).is_some_and(|t| t.starts_with("BTMParameterConfigured"))
+                    && let Some(id) = m.get("configurationParameterId").and_then(Value::as_str)
+                {
+                    let values = m.get("values").and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
+                    let checkbox = values.iter().any(|x| x["booleanValue"].is_boolean());
+                    let k = match out.iter().position(|(i, ..)| i == id) {
+                        Some(k) => k,
+                        None => {
+                            out.push((id.to_string(), checkbox, Vec::new()));
+                            out.len() - 1
+                        }
+                    };
+                    for o in values.iter().filter_map(|x| x["enumValue"].as_str()) {
+                        if !out[k].2.iter().any(|x| x == o) {
+                            out[k].2.push(o.to_string());
+                        }
+                    }
+                }
+                m.values().for_each(|x| walk(x, out));
             }
-            let (num, unit) = v.split_once('+').unwrap_or((v, ""));
-            Some((k.to_string(), num.parse().ok()?, unit.to_string()))
+            Value::Array(a) => a.iter().for_each(|x| walk(x, out)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    walk(features, &mut found);
+    for i in instances {
+        for (id, v) in instance_config_entries(i) {
+            if let Some((_, false, options)) = found.iter_mut().find(|(x, ..)| *x == id)
+                && !options.contains(&v)
+            {
+                options.push(v);
+            }
+        }
+    }
+    found
+        .into_iter()
+        .map(|(id, checkbox, mut options)| {
+            if checkbox {
+                return json!({ "btType": "BTMConfigurationParameterBoolean-2550", "parameterId": id, "parameterName": id, "defaultValue": false });
+            }
+            if let Some(k) = options.iter().position(|o| o == "Default") {
+                let d = options.remove(k);
+                options.insert(0, d);
+            }
+            let default = options.first().cloned().unwrap_or_else(|| "Default".into());
+            json!({ "btType": "BTMConfigurationParameterEnum-105", "parameterId": id, "parameterName": id, "defaultValue": default, "options": options.iter().map(|o| json!({ "option": o, "optionName": o })).collect::<Vec<_>>() })
+        })
+        .collect()
+}
+
+/// An instance's configuration variables (name, value, unit): its entries with a number.
+fn instance_config_values(i: &Value) -> Vec<(String, f64, String)> {
+    instance_config_entries(i)
+        .into_iter()
+        .filter_map(|(k, v)| {
+            let (num, unit) = v.split_once('+').unwrap_or((&v, ""));
+            Some((k, num.parse().ok()?, unit.to_string()))
         })
         .collect()
 }
@@ -5746,10 +5935,14 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
         }
     }
+    let instance_of: HashMap<String, &Value> = levels.iter().flat_map(|l| l.instances.iter()).filter_map(|i| Some((i["id"].as_str()?.to_string(), *i))).collect();
     // Mate connectors (implicit ones live in their mate's `mateConnectors`): (level, feature id) → (occurrence path in
     // that level, inference, the entity query).
     type Key = (String, String);
-    let mut connectors: HashMap<Key, (Vec<String>, String, Value)> = HashMap::new();
+    type Connector = (Vec<String>, String, Value);
+    // A connector to find: its key, live's query, its instance's configuration choices.
+    type ToFind<'k> = (&'k Key, &'k Connector, Vec<(String, String)>);
+    let mut connectors: HashMap<Key, Connector> = HashMap::new();
     let mut connector_origins: HashMap<Key, [f64; 3]> = HashMap::new();
     for l in &levels {
         for f in &l.features {
@@ -5777,6 +5970,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     }
     // Each Part Studio into its own tab; the connectors' entities resolved on the part at their path's end.
     let mut tabs: HashMap<String, String> = HashMap::new();
+    // Each studio's List and Checkbox inputs built in ours (live's ids), which its instances' configurations choose.
+    let mut choice_ids: HashMap<String, HashSet<String>> = HashMap::new();
     let mut part_names: HashMap<(String, String), String> = HashMap::new();
     let mut entities: HashMap<Key, String> = HashMap::new();
     // A studio whose sketch another's Frame takes as its profile first.
@@ -5818,6 +6013,14 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 .collect();
             studio["configuration"] = json!({ "configurationParameters": params });
         }
+        // Without its configuration, its List and Checkbox inputs from the configured values (their configurations
+        // in the order the values list them, then those only instances name; "Default" the default).
+        if studio["configuration"]["configurationParameters"].as_array().is_none_or(|p| p.is_empty()) {
+            let inputs = choice_inputs(&studio["features"], levels.iter().flat_map(|l| l.instances.iter().copied()).filter(|i| i["elementId"] == element.as_str()));
+            if !inputs.is_empty() {
+                studio["configuration"] = json!({ "configurationParameters": inputs });
+            }
+        }
         if studio["partOrder"].is_null() {
             let mut order: Vec<String> = parts.as_array().into_iter().flatten().filter_map(|p| p["partId"].as_str().map(str::to_string)).collect();
             order.sort_by_key(|id| onshape_id_value(id));
@@ -5856,42 +6059,15 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
         }
         res.untranslated.extend(t.finish().into_iter().map(|p| format!("{name}: {p}")));
-        for (key, (path, inference, q)) in &connectors {
-            if path.last().and_then(|i| element_of.get(i)) != Some(element) {
-                continue;
-            }
-            trace(&format!("{name}: mate connector {}", key.1));
-            let found = match t.resolve(q) {
-                Ok(ids) if !ids.is_empty() => Ok(ids[0].clone()),
-                Ok(_) => Err("its entity resolved to nothing".to_string()),
-                Err(e) => Err(e),
-            };
-            // Live's frame, when known, settles an edge's centre or midpoint: the query's edge if its point is there,
-            // else the one whose point is (asm-hand-drill-pinslot's Gear Triple Connector: its query read as another
-            // hole of the pattern, 4.2 mm off the pin's axis, so every mate of the drill failed with it). Not an axis
-            // point or a face's centre: the face's end circles have the same point, not the same frame.
-            let found = match (found, connector_origins.get(key)) {
-                (Err(_), Some(o)) => t.connector_entity(inference, *o),
-                (Ok(e), Some(o)) if matches!(inference.as_str(), "CENTER" | "MID_POINT") && e.starts_with("edge:") => match t.connector_entities_on_part_of(&e, inference, *o) {
-                    Ok(at) if !at.is_empty() && !at.contains(&e) => Ok(at[0].clone()),
-                    _ => Ok(e),
-                },
-                (found, _) => found,
-            };
-            match found {
-                Ok(e) => {
-                    entities.insert(key.clone(), e);
-                }
-                Err(e) => res.untranslated.push(format!("mate connector {}: {e}", key.1)),
-            }
-        }
+        res.untranslated.extend(t.notes.iter().map(|n| format!("{name}: {n}")));
         // (An Import's Part Studio is a tab of its own.)
         if sources.contains(element)
             && let Some(tab) = &t.tab
         {
             built.insert(element.clone(), (tab.clone(), t.feature_ids.clone()));
         }
-        tabs.insert(element.clone(), t.tab.clone().unwrap_or(name));
+        choice_ids.insert(element.clone(), t.config_inputs.clone());
+        tabs.insert(element.clone(), t.tab.clone().unwrap_or(name.clone()));
         // Our parts (name, volume m³): live's part names come from its Part Studio's properties, which translation
         // doesn't carry ("Housing" here is our "Part 1"); such a part is ours by its only part or its volume band.
         let solids: Vec<(String, f64, String)> = t
@@ -5949,6 +6125,65 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             if let (Some(pid), Some(ours)) = (p["partId"].as_str(), ours) {
                 part_names.insert((element.clone(), pid.to_string()), ours);
             }
+        }
+        // Each connector found with the studio in its instance's configuration (an entity's id may differ between
+        // configurations: asm-welding-config's Part 8 at Circle1in has its cap edge meet another face), grouped by
+        // configuration; then back to the default.
+        let mut here: Vec<ToFind> = connectors
+            .iter()
+            .filter(|(_, (path, ..))| path.last().and_then(|i| element_of.get(i)) == Some(element))
+            .map(|(key, c)| {
+                let choices = c.0.last().and_then(|i| instance_of.get(i)).map(|i| instance_config_entries(i).into_iter().filter(|(n, _)| t.config_inputs.contains(n)).collect()).unwrap_or_default();
+                (key, c, choices)
+            })
+            .collect();
+        here.sort_by(|a, b| a.2.cmp(&b.2));
+        let mut active: Vec<(String, String)> = Vec::new();
+        // Our part of an instance (its body id), for a connector found by live's point alone.
+        let own_part = |instance: &Option<String>| -> Option<String> {
+            let pid = instance_of.get(instance.as_ref()?)?["partId"].as_str()?;
+            let ours = part_names.get(&(element.clone(), pid.to_string()))?;
+            solids.iter().find(|(n, ..)| n == ours).map(|(.., id)| id.clone())
+        };
+        for (key, (path, inference, q), choices) in here {
+            let path_end = path.last().cloned();
+            if choices != active {
+                let values: serde_json::Map<String, Value> = choices.iter().map(|(n, v)| (n.clone(), json!(v))).collect();
+                if let Err(e) = t.call("config_activate", json!({ "tab": t.tab, "reset": true, "values": values })) {
+                    res.untranslated.push(format!("mate connector {}: its configuration not shown ({e})", key.1));
+                }
+                active = choices;
+            }
+            let found = match t.resolve(q) {
+                Ok(ids) if !ids.is_empty() => Ok(ids[0].clone()),
+                Ok(_) => Err("its entity resolved to nothing".to_string()),
+                Err(e) => Err(e),
+            };
+            // Live's frame, when known, settles an edge's centre or midpoint: the query's edge if its point is there,
+            // else the one whose point is (asm-hand-drill-pinslot's Gear Triple Connector: its query read as another
+            // hole of the pattern, 4.2 mm off the pin's axis, so every mate of the drill failed with it). Not an axis
+            // point or a face's centre: the face's end circles have the same point, not the same frame.
+            let found = match (found, connector_origins.get(key)) {
+                (Err(_), Some(o)) => t.connector_entity(inference, *o),
+                // Nothing on its part there: the query read as another part's edge (asm-welding-config's Part 8 cap
+                // edge read as a hole of another part): the one at live's point.
+                (Ok(e), Some(o)) if matches!(inference.as_str(), "CENTER" | "MID_POINT") && e.starts_with("edge:") => match t.connector_entities_on_part_of(&e, inference, *o) {
+                    Ok(at) if !at.is_empty() && !at.contains(&e) => Ok(at[0].clone()),
+                    Ok(at) if at.is_empty() => Ok(own_part(&path_end).and_then(|part| t.connector_candidates(inference, *o).ok()?.into_iter().find(|(_, p)| *p == part).map(|(id, _)| id)).unwrap_or(e)),
+                    _ => Ok(e),
+                },
+                (found, _) => found,
+            };
+            trace(&format!("{name}: mate connector {} -> {found:?}", key.1));
+            match found {
+                Ok(e) => {
+                    entities.insert(key.clone(), e);
+                }
+                Err(e) => res.untranslated.push(format!("mate connector {}: {e}", key.1)),
+            }
+        }
+        if !active.is_empty() {
+            let _ = t.call("config_activate", json!({ "tab": t.tab, "reset": true }));
         }
     }
     let occurrences: Vec<&Value> = values(&root["occurrences"]);
@@ -6017,7 +6252,6 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 res.untranslated.push(format!("instance {}: its {} {element} wasn't translated", i["name"], if i["type"] == "Assembly" { "subassembly" } else { "Part Studio" }));
                 continue;
             };
-            trace(&format!("insert {}", i["name"]));
             let mut args = json!({ "tab": l.tab, "source": source });
             // Its configuration variables (see the studio's synthesized configuration).
             let vars = instance_config_values(i);
@@ -6029,6 +6263,29 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 };
                 args["configuration"] = Value::Object(vars.iter().map(|(n, v, u)| (n.clone(), json!(format!("{v}{}", unit(u))))).collect());
             }
+            // Its List and Checkbox choices, for the inputs its Part Studio has in ours.
+            let choices: Vec<(String, Value)> = instance_config_entries(i)
+                .into_iter()
+                .filter(|(n, _)| !vars.iter().any(|(x, ..)| x == n))
+                .filter(|(n, _)| choice_ids.get(element).is_some_and(|ids| ids.contains(n)))
+                .map(|(n, v)| {
+                    let v = match v.as_str() {
+                        "true" => json!(true),
+                        "false" => json!(false),
+                        _ => json!(v),
+                    };
+                    (n, v)
+                })
+                .collect();
+            if i["type"] == "Part" && !choices.is_empty() {
+                if !args["configuration"].is_object() {
+                    args["configuration"] = json!({});
+                }
+                for (n, v) in choices {
+                    args["configuration"][n] = v;
+                }
+            }
+            trace(&format!("insert {}: {args}", i["name"]));
             if i["type"] == "Part" {
                 match i["partId"].as_str().and_then(|p| part_names.get(&(element.to_string(), p.to_string()))) {
                     Some(n) => args["part"] = json!(n),
