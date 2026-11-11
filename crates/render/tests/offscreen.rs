@@ -2454,3 +2454,43 @@ fn a_sketch_point_is_drawn_as_lives_in_each_state() {
         }
     }
 }
+
+/// DEPTH24-BLANK: on a device without float depth with stencil (24-bit depth + stencil) the box still draws. The
+/// format is chosen once a process, so the render runs in a child of this test binary under `NOSHAPE_DEPTH24`.
+#[test]
+fn the_24_bit_depth_fallback_draws() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let out = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "offscreen::depth24_child", "--ignored", "--nocapture", "--test-threads=1"])
+        .env("NOSHAPE_DEPTH24", "1")
+        .output()
+        .unwrap();
+    let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    assert!(out.status.success() && text.contains("1 passed"), "{text}");
+}
+
+#[test]
+#[ignore = "run by the_24_bit_depth_fallback_draws, in its own process"]
+fn depth24_child() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mesh = r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], 1));
+    let mut scene = Scene::default();
+    let edges = r.upload_lines(&primitives::box_edges([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], 10, 1.5));
+    scene.instances.push(Instance::new(Drawable::Mesh(mesh)).with_color([0.2, 0.4, 0.8, 1.0]));
+    scene.instances.push(Instance::new(Drawable::Lines(edges)).with_color([0.02, 0.02, 0.03, 1.0]));
+    scene.set_state(2, state::SELECTED);
+    let mut cam = Camera::default();
+    cam.fit_sphere(glam::DVec3::ZERO, 0.0175, 4.0 / 3.0);
+    let style = Style::default();
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: 400, height: 300, device_pixel_ratio: 1.0, style: &style, pick: true }).unwrap();
+    assert!(f.pick.is_some_and(|p| p.ids[150 * 400 + 200] != 0), "the box picks");
+    let px = |x: usize, y: usize| { let i = (y * 400 + x) * 4; [f.bgra[i + 2], f.bgra[i + 1], f.bgra[i]] };
+    let (centre, corner) = (px(200, 150), px(5, 5));
+    assert_ne!(centre, corner, "the box over the background: centre {centre:?}, corner {corner:?}");
+}

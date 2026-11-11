@@ -2352,7 +2352,7 @@ impl Renderer {
         adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("noshape"),
-                required_features: adapter.features() & Self::WANTED_FEATURES,
+                required_features: adapter.features() & Self::wanted_features(),
                 required_limits,
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 memory_hints: wgpu::MemoryHints::Performance,
@@ -2366,6 +2366,16 @@ impl Renderer {
     /// (float depth with stencil, else 24-bit depth; GPU timestamps for
     /// `NOSHAPE_PERF`).
     pub const WANTED_FEATURES: wgpu::Features = wgpu::Features::DEPTH32FLOAT_STENCIL8.union(wgpu::Features::TIMESTAMP_QUERY).union(wgpu::Features::FLOAT32_BLENDABLE);
+
+    /// [`Self::WANTED_FEATURES`], less float depth with stencil under `NOSHAPE_DEPTH24` (the 24-bit fallback's test,
+    /// as on an adapter without it).
+    fn wanted_features() -> wgpu::Features {
+        let mut f = Self::WANTED_FEATURES;
+        if std::env::var_os("NOSHAPE_DEPTH24").is_some() {
+            f.remove(wgpu::Features::DEPTH32FLOAT_STENCIL8);
+        }
+        f
+    }
 
     /// A renderer on an existing device, e.g. the UI toolkit's, so its
     /// [`Present::Texture`] frames can be composited without a copy. The

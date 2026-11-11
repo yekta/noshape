@@ -1191,7 +1191,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   faces culled) such a triangle was culled and the solid's inside showed through, drawn dark by the back-face pass. Fixed in
   the kernel's `tidy_triangles` (every display tessellation: each triangle turned along its corners' normals, none without
   area). Guard: crates/ops/tests/planar_face_mesh.rs (T1 synthetic plates both meshers at four qualities; T2 the corpus).
-- [ ] P2 DEPTH24-BLANK (psui) **With the Depth24PlusStencil8 fallback (an adapter without DEPTH32FLOAT_STENCIL8) the 3D view
+- [x] (psui 2026-11-11: not reproduced: on a device without DEPTH32FLOAT_STENCIL8 (`NOSHAPE_DEPTH24`, vibe3 llvmpipe) the box, its edges, a selection and the pick pass draw; T1 `offscreen::the_24_bit_depth_fallback_draws` keeps it so) P2 DEPTH24-BLANK (psui) **With the Depth24PlusStencil8 fallback (an adapter without DEPTH32FLOAT_STENCIL8) the 3D view
   renders nothing**: the synthetic cable box forced onto it came out a blank white image (vibe5, lavapipe). Rare (DX12, Metal
   and current Vulkan drivers have the float format), but the fallback must draw.
 
