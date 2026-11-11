@@ -334,10 +334,13 @@ fn compile_with(path: Arc<str>, src: &str, resolver: &dyn Resolver, loading: &mu
         built.insert(canon, m.clone());
         imports.push(Some(m));
     }
-    // Version checks (Onshape lists them without a position).
+    // Version checks (Onshape lists them without a position; after a stray first token, at the import: live 2485).
     let own = ast.version.unwrap_or(0);
     let mut errors = Vec::new();
-    if ast.version.is_none() {
+    if let Some((pos, message)) = &ast.recovered {
+        errors.push(CompileError { module: path.clone(), pos: *pos, message: message.clone(), parse: true, level: Level::Error });
+    }
+    if ast.version.is_none() && ast.recovered.is_none() {
         errors.push(CompileError { module: path.clone(), pos: Pos::default(), message: "Missing FeatureScript version".into(), parse: false, level: Level::Error });
     }
     for (item, m) in ast.items.iter().zip(&imports) {
@@ -350,7 +353,8 @@ fn compile_with(path: Arc<str>, src: &str, resolver: &dyn Resolver, loading: &mu
         }
         let v = version.split('.').next().and_then(|v| v.parse().ok()).unwrap_or(0);
         if v > own {
-            errors.push(CompileError { module: path.clone(), pos: Pos::default(), message: format!("Cannot import a module with FeatureScript version: {v} from module with older version {own}"), parse: false, level: Level::Error });
+            let pos = if ast.recovered.is_some() { item.pos } else { Pos::default() };
+            errors.push(CompileError { module: path.clone(), pos, message: format!("Cannot import a module with FeatureScript version: {v} from module with older version {own}"), parse: false, level: Level::Error });
         }
     }
     if !errors.is_empty() {

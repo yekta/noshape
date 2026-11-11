@@ -26,6 +26,9 @@ pub struct Module {
     /// `FeatureScript 3095;`
     pub version: Option<u32>,
     pub items: Vec<TopLevel>,
+    /// A stray token before `FeatureScript <n>;` the parser dropped, as ANTLR's single-token deletion (live 2485: a
+    /// "/" typed at 1:1): its error, and the version then counts as 0.
+    pub recovered: Option<(Pos, String)>,
 }
 
 #[derive(Clone, Debug)]

@@ -2020,6 +2020,8 @@ impl Workspace {
         let perf_open = matches!(self.doc_panel, Some((DocPanel::Performance(_), _)));
         let where_open = matches!(self.doc_panel, Some((DocPanel::WhereUsed(_), _)));
         let paused = self.active_part_studio().is_some_and(|v| v.read(cx).regen_paused());
+        // At a version there is no Create version… (live psui/q2485: 6 icons become 5).
+        let at_version = self.doc.read(cx).session.viewing_version().is_some();
         let perf_error = crate::doc_panels::PerfSnapshot { adapter: self.gpu.adapter_name(), ..Default::default() }.software_renderer();
         // Live (part-studio/181): the icons' ink starts at x 10, y 49 (20 px
         // icons): 2 px under the rail's top border, and centred in the 40 px
@@ -2043,7 +2045,7 @@ impl Workspace {
             )
             // Live 10-27: paused regeneration drops Create version… (and
             // Comments).
-            .when(!paused, |d| d.child(
+            .when(!paused && !at_version, |d| d.child(
                 crate::ui::rail_button("rail-version", "version", false, true, cx).pl(px(1.))
                     .tip("Create version…", TipSide::Right)
                     .map(|d| noshape_app_core::ui_script::mark(d, || "button:Create version…".into()))

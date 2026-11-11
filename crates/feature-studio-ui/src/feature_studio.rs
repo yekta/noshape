@@ -480,7 +480,8 @@ pub struct FsUiState {
     pub caret: (u32, u32),
     pub line: String,
     pub lines: usize,
-    pub committed: bool,
+    /// None where there is no Commit (a version: live fs-view-version).
+    pub committed: Option<bool>,
     /// Edits not yet saved into the document (the toolbar's Undo already undoes them).
     pub unsaved: bool,
     pub notices: usize,
@@ -545,8 +546,9 @@ impl FeatureStudioView {
         let menu = ed.completion_menu_state();
         // Committed: the text Part Studios use (Onshape saves as you type, applies on Commit).
         let committed = match self.doc.read(cx).session.doc.tab(self.tab).map(|t| &t.content) {
-            Some(TabContent::FeatureStudio(f)) => text == f.source,
-            _ => true,
+            _ if self.doc.read(cx).session.viewing_version().is_some() => None,
+            Some(TabContent::FeatureStudio(f)) => Some(text == f.source),
+            _ => Some(true),
         };
         // Lines as the editor shows them (a trailing newline starts an empty last line).
         FsUiState {
@@ -772,12 +774,47 @@ impl FeatureStudioView {
         out
     }
 
-    /// Viewing a version (live std at 3095.0, dom/fs-nav-shortcuts.txt): the
-    /// toolbar row holds only the view-only bar, "Versions are view only.
-    /// Viewing 3095.0." and [Return to Main] (Part Studio's bar, without its
-    /// custom features button).
+    /// Viewing a version: the toolbar's place is the view-only bar. The document's own (live psui/q2485): "Versions
+    /// are view only. Viewing V1." and (?), centred, the editing tools gone, Module outline and the back / forward
+    /// arrows still at the right. std's (live std at 3095.0, dom/fs-nav-shortcuts.txt): "… Viewing 3095.0." and
+    /// [Return to Main] alone.
     fn render_version_bar(&self, version: &str, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
+        if !crate::std_source::is_std(&self.doc.read(cx).session.path) {
+            let text = format!("Versions are view only. Viewing {version}.");
+            // Its ? opens help on versions, as the Part Studio's.
+            let help = div()
+                .id("fs-vb-help")
+                .map(|d| crate::ui_script::mark(d, || "button:Versions help".into()))
+                .size(px(18.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .child(crate::ui::glyph("help-dot", 17.8, crate::theme::help_dot(0x999999)))
+                .on_click(|_, _, cx| noshape_app_core::help::open("Versions and workspaces", cx));
+            let banner = h_flex()
+                .h(px(32.))
+                .mt(px(-4.))
+                .px(px(20.))
+                .gap(px(18.))
+                .bg(rgb(0xffffff))
+                .border_1()
+                .border_t_0()
+                .border_color(rgb(0xd7d7d7))
+                .rounded_b(px(10.))
+                .child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(rgb(0x333333)).child(text))
+                .child(help);
+            return crate::ui::toolbar()
+                .id("fs-version-bar")
+                .relative()
+                .child(div().absolute().top_0().left_0().right_0().flex().justify_center().child(banner))
+                .child(div().flex_1())
+                .child(self.render_nav(cx))
+                .border_b_1()
+                .border_color(rgb(0xd7d7d7))
+                .into_any_element();
+        }
         let branch = {
             let s = &self.doc.read(cx).session;
             s.store.branch(s.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into())
@@ -821,6 +858,65 @@ impl FeatureStudioView {
             .border_b_1()
             .border_color(rgb(0xd7d7d7))
             .into_any_element()
+    }
+
+    /// The toolbar's right end, kept at a version too (live psui/q2485): Module outline ▾, back / forward with their
+    /// lists, Line, Column.
+    fn render_nav(&self, cx: &mut Context<Self>) -> Div {
+        let pal = p();
+        let probe = |cell: &Rc<std::cell::Cell<Bounds<Pixels>>>| {
+            let c = cell.clone();
+            canvas(move |b, _, _| c.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()
+        };
+        let cell = |id: SharedString| h_flex().id(id).relative().flex_none().h(px(32.)).px(px(6.)).gap(px(2.)).rounded(px(3.)).cursor_pointer().hover(|d| d.bg(pal.border));
+        let pos = self.editor.read(cx).cursor_position();
+        let symbols = outline_of(self.editor.read(cx));
+        let current = symbols.iter().rev().find(|s| s.line <= pos.line as usize + 1).map(|s| format!("{}({})", s.name, s.params));
+        let (can_back, can_fwd) = (self.nav_at > 0, self.nav_at + 1 < self.nav.len());
+        // Kept across renders: the outline popover is placed before this
+        // frame paints the button (opened by ctrl+shift+O as well).
+        let out_anchor = self.outline_anchor.clone();
+        h_flex()
+            .flex_none()
+            .child(
+                cell("fs-outline-btn".into())
+                    .w(px(149.))
+                    .when(self.outline.is_some(), |d| d.bg(pal.border))
+                    .tooltip(crate::ui::tooltip("Module outline (cmd+shift+O / ctrl+shift+O)")).map(|d| crate::ui_script::mark(d, || "button:Module outline".into()))
+                    .child(os::glyph(os::GLYPH_OUTLINE, 20., pal.text))
+                    .child(div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(current.unwrap_or_else(|| "Module outline".into())))
+                    .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., pal.text))
+                    .child(probe(&out_anchor))
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_outline(window, cx))),
+            )
+            .child(div().w(px(10.)))
+            .child(
+                cell("fs-back".into())
+                    .opacity(if can_back { 1. } else { 0.4 })
+                    .tooltip(crate::ui::tooltip("Back reference (ctrl+[/cmd+[)")).map(|d| crate::ui_script::mark(d, || "button:Back reference".into()))
+                    .child(os::glyph(os::GLYPH_ARROW_LEFT, 20., pal.text_muted))
+                    .child(
+                        div().id("fs-back-list").child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text_muted)).on_click(cx.listener(|this, e: &ClickEvent, window, cx| {
+                            cx.stop_propagation();
+                            this.open_history(true, e.position() + point(px(-24.), px(14.)), window, cx);
+                        })),
+                    )
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.navigate(-1, window, cx))),
+            )
+            .child(
+                cell("fs-forward".into())
+                    .opacity(if can_fwd { 1. } else { 0.4 })
+                    .tooltip(crate::ui::tooltip("Forward reference (ctrl+]/cmd+])")).map(|d| crate::ui_script::mark(d, || "button:Forward reference".into()))
+                    .child(os::glyph(os::GLYPH_ARROW_RIGHT, 20., pal.text_muted))
+                    .child(
+                        div().id("fs-forward-list").child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text_muted)).on_click(cx.listener(|this, e: &ClickEvent, window, cx| {
+                            cx.stop_propagation();
+                            this.open_history(false, e.position() + point(px(-24.), px(14.)), window, cx);
+                        })),
+                    )
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.navigate(1, window, cx))),
+            )
+            .child(div().flex_none().relative().px(px(8.)).text_size(px(14.)).text_color(pal.text).child(format!("Line {} , Column {}", pos.line + 1, pos.character + 1)).child(probe(&self.tb.end)))
     }
 
     /// Ace's tooltip over a squiggle (live document/fs-gutter-tooltip): see [`ace_tooltip`].
@@ -1776,14 +1872,7 @@ impl FeatureStudioView {
             Some(t) => format!("Profiling {}", t.name),
             None => monitored.and_then(|t| d.tab(t)).map(|t| format!("Monitor {}", t.name)).unwrap_or_else(|| "Monitor".into()),
         };
-        let pos = self.editor.read(cx).cursor_position();
-        let symbols = outline_of(self.editor.read(cx));
-        let current = symbols.iter().rev().find(|s| s.line <= pos.line as usize + 1).map(|s| format!("{}({})", s.name, s.params));
-        let (can_back, can_fwd) = (self.nav_at > 0, self.nav_at + 1 < self.nav.len());
         let mon_anchor: BoundsCell = Default::default();
-        // Kept across renders: the outline popover is placed before this
-        // frame paints the button (opened by ctrl+shift+O as well).
-        let out_anchor = self.outline_anchor.clone();
         let ma = mon_anchor.clone();
         toolbar = toolbar
             .child(
@@ -1814,45 +1903,7 @@ impl FeatureStudioView {
                     })),
             )
             .child(div().w(px(18.)))
-            .child(
-                cell("fs-outline-btn".into())
-                    .w(px(149.))
-                    .when(self.outline.is_some(), |d| d.bg(pal.border))
-                    .tooltip(crate::ui::tooltip("Module outline (cmd+shift+O / ctrl+shift+O)")).map(|d| crate::ui_script::mark(d, || "button:Module outline".into()))
-                    .child(os::glyph(os::GLYPH_OUTLINE, 20., pal.text))
-                    .child(div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(current.unwrap_or_else(|| "Module outline".into())))
-                    .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., pal.text))
-                    .child(probe(&out_anchor))
-                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_outline(window, cx))),
-            )
-            .child(div().w(px(10.)))
-            .child(
-                cell("fs-back".into())
-                    .opacity(if can_back { 1. } else { 0.4 })
-                    .tooltip(crate::ui::tooltip("Back reference (ctrl+[/cmd+[)")).map(|d| crate::ui_script::mark(d, || "button:Back reference".into()))
-                    .child(os::glyph(os::GLYPH_ARROW_LEFT, 20., pal.text_muted))
-                    .child(
-                        div().id("fs-back-list").child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text_muted)).on_click(cx.listener(|this, e: &ClickEvent, window, cx| {
-                            cx.stop_propagation();
-                            this.open_history(true, e.position() + point(px(-24.), px(14.)), window, cx);
-                        })),
-                    )
-                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.navigate(-1, window, cx))),
-            )
-            .child(
-                cell("fs-forward".into())
-                    .opacity(if can_fwd { 1. } else { 0.4 })
-                    .tooltip(crate::ui::tooltip("Forward reference (ctrl+]/cmd+])")).map(|d| crate::ui_script::mark(d, || "button:Forward reference".into()))
-                    .child(os::glyph(os::GLYPH_ARROW_RIGHT, 20., pal.text_muted))
-                    .child(
-                        div().id("fs-forward-list").child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text_muted)).on_click(cx.listener(|this, e: &ClickEvent, window, cx| {
-                            cx.stop_propagation();
-                            this.open_history(false, e.position() + point(px(-24.), px(14.)), window, cx);
-                        })),
-                    )
-                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.navigate(1, window, cx))),
-            )
-            .child(div().flex_none().relative().px(px(8.)).text_size(px(14.)).text_color(pal.text).child(format!("Line {} , Column {}", pos.line + 1, pos.character + 1)).child(probe(&self.tb.end)));
+            .child(self.render_nav(cx));
         toolbar.border_b_1().border_color(rgb(0xd7d7d7)).into_any_element()
     }
 }

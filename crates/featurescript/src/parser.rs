@@ -38,6 +38,8 @@ type PResult<T> = Result<T, ParseError>;
 /// What may start a top-level construct after the imports (Onshape's
 /// "expecting {...}" list).
 const TOP_EXPECT: &str = "{<EOF>, 'annotation', 'export', 'enum', 'type', 'function', 'predicate', 'operator', 'typeconvert', 'const', TOP_SEMI}";
+/// A module's first token (live 2485).
+const MODULE_START_EXPECT: &str = "{<EOF>, 'FeatureScript', 'annotation', 'export', 'import', 'enum', 'type', 'function', 'predicate', 'operator', 'typeconvert', 'const', TOP_SEMI, ID}";
 const TOP_EXPECT_IMPORTS: &str = "{<EOF>, 'annotation', 'export', 'enum', 'type', 'function', 'predicate', 'operator', 'typeconvert', 'const', 'import', ID, TOP_SEMI}";
 
 pub fn parse(src: &str) -> PResult<Module> {
@@ -180,7 +182,18 @@ impl<'a> Parser<'a> {
 
     fn module(&mut self) -> PResult<Module> {
         let mut version = None;
-        if self.is_ident("FeatureScript") {
+        // One stray token before the version statement: reported and dropped, the version not taken (live 2485).
+        let mut recovered = None;
+        if !self.is_ident("FeatureScript") && matches!(self.peek_at(1), Tok::Ident(x) if &**x == "FeatureScript") && matches!(self.peek(), Tok::Op(_)) {
+            recovered = Some((self.pos(), format!("extraneous input {} expecting {MODULE_START_EXPECT}", self.peek().describe())));
+            self.bump();
+            self.bump();
+            if matches!(self.peek(), Tok::Number(_)) {
+                self.bump();
+            }
+            self.expect_op(Op::Semi)?;
+        }
+        if recovered.is_none() && self.is_ident("FeatureScript") {
             self.bump();
             match self.peek().clone() {
                 Tok::Number(n) => {
@@ -324,7 +337,7 @@ impl<'a> Parser<'a> {
             };
             items.push(TopLevel { pos, name_pos, export, annotation, kind });
         }
-        Ok(Module { version, items })
+        Ok(Module { version, items, recovered })
     }
 
     fn annotation(&mut self) -> PResult<Expr> {

@@ -804,3 +804,17 @@ fn compact_values_answer_as_maps_and_arrays() {
         assert!(!inside(expr, false).has_compact(), "{expr} plain");
     }
 }
+
+/// Live 2485: a "/" typed before `FeatureScript 3112;` gives two notices, the stray token's at 1:1 and the import's
+/// version check at 2:1 (the version then counts as 0).
+#[test]
+fn a_stray_token_before_the_version_gives_two_notices() {
+    let src = "/FeatureScript 3112;\nimport(path : \"onshape/std/common.fs\", version : \"3112.0\");\n";
+    assert_eq!(
+        notices(src),
+        [
+            "[1:1] extraneous input '/' expecting {<EOF>, 'FeatureScript', 'annotation', 'export', 'import', 'enum', 'type', 'function', 'predicate', 'operator', 'typeconvert', 'const', TOP_SEMI, ID}",
+            "[2:1] Cannot import a module with FeatureScript version: 3112 from module with older version 0",
+        ]
+    );
+}

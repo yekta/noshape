@@ -47,6 +47,11 @@ pub fn std_document() -> anyhow::Result<PathBuf> {
     Ok(path)
 }
 
+/// Whether `path` is the local std document (its own folder `std-<version>`).
+pub fn is_std(path: &std::path::Path) -> bool {
+    path.file_name().is_some_and(|f| f == "std.noshape") && path.parent().and_then(|d| d.file_name()).is_some_and(|d| d.to_string_lossy().starts_with("std-"))
+}
+
 /// Open the std document at its version on `module`, caret at `line`, `column`.
 pub fn open(module: &str, line: usize, column: usize, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
     let path = std_document()?;
