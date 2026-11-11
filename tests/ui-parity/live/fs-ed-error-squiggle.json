@@ -1,18 +1,18 @@
 {
  "scenario": "fs-ed-error-squiggle",
- "recorded": "2026-11-08T19:26:24.263Z",
+ "recorded": "2026-11-11T21:28:10.648Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.3"
  },
  "live": {
-  "document": "a029798ee6d5076a7083092d",
-  "workspace": "5712fdbb8f01f43b826a51ba",
-  "element": "c6818312e85d46f464612ddc",
+  "document": "a45c14a16c2b718dfc20d61a",
+  "workspace": "f9bf85e578504ecc31ded317",
+  "element": "5296c49fa4a339eee10f4f26",
   "start": "fs-studio",
-  "startElement": "c6818312e85d46f464612ddc",
+  "startElement": "5296c49fa4a339eee10f4f26",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 50418
+   "t": 38619
   },
   {
    "step": 2,
@@ -233,7 +233,7 @@
      "notices": 0
     }
    },
-   "t": 54773
+   "t": 51671
   },
   {
    "step": 3,
@@ -317,7 +317,7 @@
      "notices": 0
     }
    },
-   "t": 56682
+   "t": 64238
   },
   {
    "step": 4,
@@ -401,7 +401,7 @@
      "notices": 0
     }
    },
-   "t": 58665
+   "t": 76939
   },
   {
    "step": 5,
@@ -477,7 +477,7 @@
      "notices": 1
     }
    },
-   "t": 65927
+   "t": 92139
   },
   {
    "step": 6,
@@ -559,7 +559,7 @@
      "notices": 1
     }
    },
-   "t": 69711
+   "t": 105037
   },
   {
    "step": 7,
@@ -641,7 +641,7 @@
      "notices": 2
     }
    },
-   "t": 74982
+   "t": 119261
   }
  ]
 }

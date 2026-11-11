@@ -1,18 +1,18 @@
 {
  "scenario": "vs-ps-inserted-drag",
- "recorded": "2026-11-08T23:24:47.887Z",
+ "recorded": "2026-11-11T21:30:44.441Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.3"
  },
  "live": {
-  "document": "435320326ffbb8d1c2a582e8",
-  "workspace": "f746c258e3375953c62f0a42",
-  "element": "5623493a1e76831b176908a6",
+  "document": "61b521fdecb10111101d9de8",
+  "workspace": "68d38d25db1579e5aa3d1191",
+  "element": "2555b6a73ca11c4a2cc37a87",
   "start": "vs-two",
-  "startElement": "5623493a1e76831b176908a6",
+  "startElement": "2555b6a73ca11c4a2cc37a87",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -191,7 +191,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 32571
+   "t": 25004
   },
   {
    "step": 2,
@@ -287,7 +287,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 38074
+   "t": 28352
   },
   {
    "step": 3,
@@ -437,7 +437,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 43591
+   "t": 33428
   },
   {
    "step": 4,
@@ -592,7 +592,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 49402
+   "t": 37724
   },
   {
    "step": 5,
@@ -688,41 +688,34 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 55572
+   "t": 41135
   },
   {
    "step": 6,
    "do": {
     "do": "drag",
     "from": {
-     "table_title": "Variable Studio 2"
+     "table_header": "Variable Studio 2"
     },
     "to": {
-     "table_title": "Variable Studio 1",
+     "table_header": "Variable Studio 1",
      "edge": "top"
     }
    },
    "ok": true,
    "at": [
     [
-     1293,
+     1799,
      342
     ],
     [
-     1293,
-     116
+     1799,
+     112
     ]
    ],
    "state": {
     "focus": {
-     "kind": "other",
-     "tag": "input",
-     "text": "Variable Studio 2",
-     "selection": [
-      0,
-      17
-     ],
-     "all": true
+     "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
@@ -801,7 +794,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 61655
+   "t": 46435
   }
  ]
 }
