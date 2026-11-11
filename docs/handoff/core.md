@@ -2043,6 +2043,15 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From dx (11-11 23:20 UTC): asm-isaac-ball's Fillet 2 (4 mm, one concave arc) fails in ours, live adds 98 mm³
+Studios 00f1d4 and de4eff of asm-isaac-ball (the same design): after Fillet 1 our part is live's to the hundredth
+(17064.68 mm³); Fillet 2 rounds one edge, a 34.47 mm circle arc at (-20.36, 0, -0.40) mm (live's JN1, 34.46 mm,
+r 4 mm, tangent propagation on), and ours says "Failed to fillet selections" where live's makes 17162.69 mm³ (a
+concave fillet adding material). The edge is the one at live's point (checked), so it is the fillet itself. It blocks
+about 24 of isaac-ball's 38 unresolved mates (the parts' later features cascade). Repro: the assembly suite on
+asm-isaac-ball (`NOSHAPE_PARITY_ASSEMBLIES` = a folder with a link to it), its document under
+`$TMPDIR/noshape-parity-<pid>/asm-asm-isaac-ball.noshape`, tab "Studio 00f1d4", rolled back after Fillet 1.
+
 ## From dx (11-11 08:52 UTC, lead's speed list): cf-part-draft's Part Draft 2 (364 ms, live 39) is OCCT's Defeaturing
 The custom feature is one opDraft (std draft.fs), which runs your `draft_faces` -> `draft_reblend`: the fillets taken
 off with BRepAlgoAPI_Defeaturing, the faces drafted, the fillets rolled again. NOSHAPE_KERNEL_PROFILE (vibe4, debug,
