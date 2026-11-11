@@ -58,7 +58,7 @@ pub fn linear_pattern() -> FeatureType {
         ParamSpec::num("instanceCount", "Instance count", NumSpec::integer(2, 1, 2500)),
         ParamSpec::flip("oppositeDirection", "Opposite direction"),
         ParamSpec::bool("isCentered", "Centered", false),
-        ParamSpec::bool("hasSecondDir", "Second direction", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("hasSecondDir", "Second direction", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::query1("directionTwo", "Direction", QueryFilter::DIRECTION).hints(Hints::NO_MATE_CONNECTOR_BUTTON).visible(second),
         ParamSpec::num("distanceTwo", "Distance", NumSpec::positive_length(25.0, 1.0)).visible(second),
         ParamSpec::num("instanceCountTwo", "Instance count", NumSpec::integer(1, 1, 2500)).visible(second),

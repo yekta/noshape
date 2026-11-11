@@ -484,7 +484,7 @@ pub fn sheet_metal_loft() -> FeatureType {
             "Profile 2",
             QueryFilter::ANY_EDGE | QueryFilter::ANY_FACE | QueryFilter::WIRE_BODY | QueryFilter::SHEET_BODY | QueryFilter::VERTEX,
         ),
-        ParamSpec::bool("matchConnections", "Connections", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("matchConnections", "Connections", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::array(
             "connections",
             "Match connections",

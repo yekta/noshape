@@ -1913,7 +1913,7 @@ impl PartStudioView {
     fn cm_rows(&self, data: &SketchData) -> Vec<(noshape_sketch::ConstraintId, &'static str, Vec<noshape_sketch::EntityId>)> {
         let (Some(ed), Some(cm)) = (self.sketch.as_ref(), self.ui_ref().and_then(|u| u.cm.as_ref())) else { return Vec::new() };
         let sk = &data.sketch;
-        let mut rows: Vec<(noshape_sketch::ConstraintId, &'static str, Vec<noshape_sketch::EntityId>)> = sk
+        let rows: Vec<(noshape_sketch::ConstraintId, &'static str, Vec<noshape_sketch::EntityId>)> = sk
             .constraints()
             .filter(|c| !matches!(c.kind, noshape_sketch::ConstraintKind::LengthRatio { .. }) && !cm.removed.contains(&c.id.0))
             .filter(|c| cm.types.is_empty() || cm.types.contains(cm_type(c)))
@@ -1943,6 +1943,22 @@ impl PartStudioView {
             })
             .map(|c| (c.id, c.kind.name(), c.kind.entities().to_vec()))
             .collect();
+        // A circular pattern is one row (live: one CIRCULAR_PATTERN, a polygon's too), over its links' entities.
+        let mut grouped: Vec<(noshape_sketch::ConstraintId, &'static str, Vec<noshape_sketch::EntityId>)> = Vec::new();
+        for row in rows {
+            let group = sk.constraint_group(row.0);
+            match grouped.iter_mut().find(|g| g.0 != row.0 && group.contains(&g.0)) {
+                Some(g) => {
+                    for e in row.2 {
+                        if !g.2.contains(&e) {
+                            g.2.push(e);
+                        }
+                    }
+                }
+                None => grouped.push(row),
+            }
+        }
+        let mut rows = grouped;
         if cm.by_entity {
             rows.sort_by_key(|r| (r.2.first().map(|e| e.0).unwrap_or(0), r.1));
         } else {

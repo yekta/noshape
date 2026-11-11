@@ -69,11 +69,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   std_oracle::sweep_regenerates_as_std`, case "along a polyline": native ok, Solid 10 faces 20 edges 3600.0000 mm³; std
   (sweep.fs in the host) ok, Solid 10 faces 20 edges 2880.0000 mm³. Same faces and edges, 20 % less volume: one segment of
   the path left out or a corner swept short. Which is live's is to be measured.
-- [ ] P3 STD-ORACLE-HOLE-INFO (psui, lead 17:11) **std Hole reports "Parameters have been overridden. Check input." where the
+- [x] (psui 2026-11-11 19:01: the oracle's holes had no standard picked, which std reads as its default size (5 mm against the case's 6.35); every live hole has one, and the native rule (L52/L61) already skips an empty one: the cases pick theirs (sync_hole_standard). The std route also gives std the V2 sizes from the V3 ones, as its editing logic leaves them) P3 STD-ORACLE-HOLE-INFO (psui, lead 17:11) **std Hole reports "Parameters have been overridden. Check input." where the
   native Hole is OK**: `std_oracle::hole_regenerates_as_std` (red on main 5428600a9), "simple blind" and "simple blind,
   flat tip" (and others): the geometry is the same (8 faces, 17 / 15 edges, 63599.8306 / 63619.9694 mm³); only std's Info
   status differs (the host's holeEditLogic / table parameters overriding a value the case sets).
-- [ ] P3 STD-ORACLE-DIALOG-HINTS (psui, lead 17:11) **the built-in dialogs' boolean parameters lack a UI hint bit std
+- [x] (psui 2026-11-11 19:01: GROUP_OPEN on the built-in booleans whose std group is "Collapsed By Default": false (Extrude, Fillet, Revolve, Sweep, Loft, patterns, Edit curve, Thread, Hole's Thread class, Query variable); no change on screen, all are off by default) P3 STD-ORACLE-DIALOG-HINTS (psui, lead 17:11) **the built-in dialogs' boolean parameters lack a UI hint bit std
   sets**: `std_oracle::core_dialogs_match_std_in_every_state` (red on main 5428600a9): extrude's hasExtrudeDirection,
   startOffset, hasSecondDirection, fillet's isPartial, isVariable… std hints 0x10002000 (0x10002040), built-in 0x2000
   (0x2040): bit 0x10000000 missing on every one.
@@ -4539,7 +4539,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   library, setting another replaces it). The sheet metal Form feature's form picker (custom host/sheetmetal.rs) should list, next to Onshape's own library, a "My sheet metal forms" entry holding
   that folder's `.noshape` documents (its subfolders as folders, as the documents page shows them), each document's
   Part Studios usable as forms, picked like a document from Other documents (inserted at its latest version). No folder set: no entry.
-- [ ] P3 SKETCH-POLYGON-CONSTRAINTS (skasm) a polygon's constraints aren't Onshape's: ui-parity sketch-circumscribed-polygon
+- [x] (psui 2026-11-11 19:01, live 2496: our Inscribed / Circumscribed already build live's (Inscribed tangent with a midPoint, Circumscribed the vertex on the circle; snap1 / snap2; the readout matches). A polygon's pattern links are now one constraint: one Circular pattern row in the Constraint manager, deleting it takes them all (Sketch::constraint_group)) P3 SKETCH-POLYGON-CONSTRAINTS (skasm) a polygon's constraints aren't Onshape's: ui-parity sketch-circumscribed-polygon
   (hexagon) live 2 × CIRCULAR_PATTERN, 4 × COINCIDENT, HORIZONTAL; ours 10 × CIRCULAR_PATTERN (one link per instance
   point, shapes.rs `polygon`), 3 × COINCIDENT, HORIZONTAL. Same geometry; the constraint list (Constraint manager, the
   glyphs) differs. Needs Onshape's polygon by REST (its constraints and their parameters). (psui 2026-11-06)

@@ -70,7 +70,7 @@ pub fn revolve() -> FeatureType {
 
     p.push(
         ParamSpec::bool("hasStartBound", "Second end position", false)
-            .hints(Hints::GROUP_HEADER)
+            .hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN)
             .visible(move |v| part(v) && (!v.is("endBound", "BLIND") || !v.bool("symmetric"))),
     );
     let second = move |v: &ParamValues| part(v) && v.bool("hasStartBound") && (!v.is("endBound", "BLIND") || !v.bool("symmetric"));
@@ -131,7 +131,7 @@ pub fn sweep() -> FeatureType {
     p.push(ParamSpec::query("lockFaces", "Faces to lock", QueryFilter::ANY_FACE).visible(|v| v.is("profileControl", "LOCK_FACES")));
     p.push(ParamSpec::query1("lockDirectionQuery", "Direction to lock", QueryFilter::DIRECTION).visible(|v| v.is("profileControl", "LOCK_DIRECTION")));
     let twist_ok = |v: &ParamValues| v.is("profileControl", "NONE") || v.is("profileControl", "KEEP_ORIENTATION");
-    p.push(ParamSpec::bool("hasTwist", "Twist", false).hints(Hints::GROUP_HEADER).visible(twist_ok));
+    p.push(ParamSpec::bool("hasTwist", "Twist", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN).visible(twist_ok));
     let twist = move |v: &ParamValues| twist_ok(v) && v.bool("hasTwist");
     p.push(ParamSpec::enum_("twistType", "Twist type", TWIST).hints(Hints::SHOW_LABEL | Hints::REMEMBER_PREVIOUS_VALUE).visible(twist));
     p.push(ParamSpec::num("turns", "Revolutions", NumSpec::real(1.0, 0.0, 1000.0)).visible(move |v| twist(v) && v.is("twistType", "TURNS")));
@@ -244,7 +244,7 @@ pub fn loft() -> FeatureType {
     p.push(ParamSpec::bool("addSections", "Path", false));
     p.push(ParamSpec::query("spine", "Edges, curves and sketches", QueryFilter::ANY_EDGE | QueryFilter::WIRE_BODY).hints(Hints::FOCUS_ON_VISIBLE).visible(|v| v.bool("addSections")));
     p.push(ParamSpec::num("sectionCount", "Section count", NumSpec::integer(5, 1, 50)).visible(|v| v.bool("addSections")));
-    p.push(ParamSpec::bool("matchConnections", "Connections", false).hints(Hints::GROUP_HEADER));
+    p.push(ParamSpec::bool("matchConnections", "Connections", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN));
     p.push(
         ParamSpec::array(
             "connections",
@@ -378,7 +378,7 @@ pub fn hole() -> FeatureType {
             .hints(rem | Hints::UNCONFIGURABLE)
             .visible(move |v| !inch(v) && simple(v)),
         ParamSpec::lookup("isoHoleTable", "Standard", hole_tables::TABLE_ISO_HOLE).hints(rem | Hints::UNCONFIGURABLE).visible(move |v| !inch(v) && !simple(v)),
-        ParamSpec::bool("showThreadClassV2", "Thread class", false).hints(rem | Hints::GROUP_HEADER).visible(|v| !v.is("threadStandard", "UNSET")),
+        ParamSpec::bool("showThreadClassV2", "Thread class", false).hints(rem | Hints::GROUP_HEADER | Hints::GROUP_OPEN).visible(|v| !v.is("threadStandard", "UNSET")),
         ParamSpec::lookup("ansiThreadClassV2", "Thread class", hole_tables::TABLE_ANSI_THREAD_CLASS)
             .hints(rem | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showThreadClassV2") && v.is("threadStandard", "ANSI")),
@@ -457,10 +457,10 @@ pub fn external_thread() -> FeatureType {
         ParamSpec::lookup("branchOfStandard", "Standard", hole_tables::TABLE_EXTERNAL_THREAD).hints(rem | Hints::UNCONFIGURABLE),
         ParamSpec::enum_("depthType", "End type", &[("Blind", "Blind"), ("UpToNext", "Up to next")]).hints(rem),
         ParamSpec::num("threadDepth", "Length", NumSpec::positive_length(10.0, 0.5).bounded(1e-4, 200.0)).hints(rem).visible(|v| v.is("depthType", "Blind")),
-        ParamSpec::bool("addChamfer", "Add chamfer", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("addChamfer", "Add chamfer", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::num("chamferWidth", "Length", BLEND_BOUNDS).hints(rem).visible(|v| v.bool("addChamfer")),
         ParamSpec::num("chamferAngle", "Angle", NumSpec::angle(30.0, 0.1, 89.0)).hints(rem).visible(|v| v.bool("addChamfer")),
-        ParamSpec::bool("addUndercut", "Add undercut", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("addUndercut", "Add undercut", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::num("undercutDiameter", "Diameter", NONNEGATIVE_LENGTH).hints(rem).visible(|v| v.bool("addUndercut")),
         ParamSpec::num("undercutLength", "Length", NONNEGATIVE_LENGTH).hints(rem).visible(|v| v.bool("addUndercut")),
         ParamSpec::bool("splitFace", "Split face", true).hints(rem).visible(|v| !v.bool("addUndercut") && v.is("depthType", "Blind")),

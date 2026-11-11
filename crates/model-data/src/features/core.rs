@@ -54,13 +54,13 @@ pub fn extrude() -> FeatureType {
     p.extend(thin_block());
     p.extend(end_condition("", false));
 
-    p.push(ParamSpec::bool("hasExtrudeDirection", "Direction", false).hints(Hints::GROUP_HEADER).visible(|v| !v.is("bodyType", "THIN")));
+    p.push(ParamSpec::bool("hasExtrudeDirection", "Direction", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN).visible(|v| !v.is("bodyType", "THIN")));
     p.push(
         ParamSpec::query1("extrudeDirection", "Extrude direction", QueryFilter::DIRECTION)
             .visible(|v| !v.is("bodyType", "THIN") && v.bool("hasExtrudeDirection")),
     );
 
-    p.push(ParamSpec::bool("startOffset", "Starting offset", false).hints(Hints::GROUP_HEADER));
+    p.push(ParamSpec::bool("startOffset", "Starting offset", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN));
     p.push(ParamSpec::enum_("startOffsetBound", "Starting offset bound", &[("BLIND", "Blind"), ("ENTITY", "Entity")]).visible(|v| v.bool("startOffset")));
     p.push(ParamSpec::length("startOffsetDistance", "Depth", 25.0, 1.0).visible(|v| v.bool("startOffset") && v.is("startOffsetBound", "BLIND")));
     p.push(ParamSpec::flip("startOffsetOppositeDirection", "Opposite direction").visible(|v| v.bool("startOffset") && v.is("startOffsetBound", "BLIND")));
@@ -87,7 +87,7 @@ pub fn extrude() -> FeatureType {
 
     p.push(
         ParamSpec::bool("hasSecondDirection", "Second end position", false)
-            .hints(Hints::FIRST_IN_ROW | Hints::GROUP_HEADER)
+            .hints(Hints::FIRST_IN_ROW | Hints::GROUP_HEADER | Hints::GROUP_OPEN)
             .visible(move |v| !(v.bool("symmetric") && sym_ok(v))),
     );
     p.extend(end_condition("secondDirection", true));
@@ -155,7 +155,7 @@ pub fn fillet() -> FeatureType {
         ParamSpec::bool("isAsymmetric", "Asymmetric", false).visible(radius_ctl),
         ParamSpec::num("otherRadius", "Second radius", BLEND).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| radius_ctl(v) && v.bool("isAsymmetric")),
         ParamSpec::flip("flipAsymmetric", "Flip asymmetric").visible(move |v| radius_ctl(v) && v.bool("isAsymmetric")),
-        ParamSpec::bool("isPartial", "Partial fillet", false).hints(Hints::GROUP_HEADER).visible(radius_ctl),
+        ParamSpec::bool("isPartial", "Partial fillet", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN).visible(radius_ctl),
         ParamSpec::enum_("startPartialType", "End type", END_TYPES).hints(Hints::SHOW_LABEL | Hints::REMEMBER_PREVIOUS_VALUE).visible(partial),
         ParamSpec::num("startPartialOffset", "Start offset", VR_BLEND).visible(move |v| partial(v) && v.is("startPartialType", "OFFSET")),
         ParamSpec::query1("startPartialEntity", "Select an entity or mate connector", QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::POINT_LIKE).visible(move |v| partial(v) && v.is("startPartialType", "ENTITY")),
@@ -168,7 +168,7 @@ pub fn fillet() -> FeatureType {
         ParamSpec::query1("endPartialEntity", "Select an entity or mate connector", QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::POINT_LIKE).visible(move |v| second(v) && v.is("endPartialType", "ENTITY")),
         ParamSpec::bool("useTrimmedSecondBound", "Trim to face boundaries", false).visible(move |v| second(v) && v.is("endPartialType", "ENTITY")),
         ParamSpec::num("partialSecondEdgeTotalParameter", "End position", NumSpec::real(0.99, 0.0, 1.0)).visible(move |v| second(v) && v.is("endPartialType", "PERCENTAGE")),
-        ParamSpec::bool("isVariable", "Variable fillet", false).hints(Hints::GROUP_HEADER).visible(radius_ctl),
+        ParamSpec::bool("isVariable", "Variable fillet", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN).visible(radius_ctl),
         // Items see the feature's values too (isAsymmetric, crossSection), as
         // in FeatureScript's loops over `definition.vertexSettings`.
         ParamSpec::array(
@@ -209,7 +209,7 @@ pub fn fillet() -> FeatureType {
         ParamSpec::bool("smoothTransition", "Smooth transition", false).visible(variable),
         ParamSpec::bool("allowEdgeOverflow", "Allow edge overflow", true).hints(Hints::GROUP_HEADER).visible(not_curvature),
         ParamSpec::query("keepEdges", "Edges to keep", QueryFilter::EDGE).visible(move |v| not_curvature(v) && v.bool("allowEdgeOverflow")),
-        ParamSpec::bool("smoothCorners", "Smooth fillet corners", false).hints(Hints::GROUP_HEADER).visible(not_curvature),
+        ParamSpec::bool("smoothCorners", "Smooth fillet corners", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN).visible(not_curvature),
         ParamSpec::query("smoothCornerExceptions", "Corners to exclude", QueryFilter::VERTEX).visible(move |v| not_curvature(v) && v.bool("smoothCorners")),
     ];
     FeatureType::new("fillet", "Fillet", Category::Detail, p)

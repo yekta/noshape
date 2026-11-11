@@ -227,7 +227,8 @@ fn add_debug(out: &mut crate::display::DebugGeometry, entities: Vec<(noshape_ker
 /// custom features and for built-in features run by the standard library.
 /// `module`: the Feature Studio's, for the isAnything parameters only FeatureScript evaluates in its scope.
 pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[ParamDecl], specs: &[crate::params::ParamSpec], type_id: String, provider: Option<&dyn super::CustomFeatureProvider>, module: Option<Arc<CompiledModule>>) -> FResult<()> {
-    let mut values: ParamValues = ev.params.clone();
+    // A Hole's hidden V2 sizes are its V3 ones, as std's editing logic leaves them (std reads the V2 ones).
+    let mut values: ParamValues = super::std_feature::hole_v2_synced(&type_id, ev.params);
     fill_defaults(specs, &mut values, ev.units);
     // Live (FS probe at Size 0.5 mm): "A parameter value is not valid.",
     // the field marked.

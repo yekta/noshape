@@ -123,6 +123,13 @@ impl Sketch {
         self.constraints.values()
     }
 
+    /// The constraints one stands for as a whole: a circular pattern's links about its centre (live: one
+    /// CIRCULAR_PATTERN, a polygon's too), otherwise itself.
+    pub fn constraint_group(&self, id: ConstraintId) -> Vec<ConstraintId> {
+        let Some(ConstraintKind::CircularPatternLink { center, .. }) = self.constraint(id).map(|c| &c.kind) else { return vec![id] };
+        self.constraints().filter(|c| matches!(c.kind, ConstraintKind::CircularPatternLink { center: o, .. } if o == *center)).map(|c| c.id).collect()
+    }
+
     pub fn constraint_count(&self) -> usize {
         self.constraints.len()
     }

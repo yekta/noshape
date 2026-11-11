@@ -244,13 +244,13 @@ pub fn curve_approximation(gate: impl Fn(&ParamValues) -> bool + Clone + Send + 
     let on = move |v: &ParamValues| g(v) && v.bool("approximate");
     let on2 = on.clone();
     vec![
-        ParamSpec::bool("approximate", "Approximate", false).hints(Hints::GROUP_HEADER).visible(gate),
+        ParamSpec::bool("approximate", "Approximate", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN).visible(gate),
         ParamSpec::num("approximationDegree", "Target degree", NumSpec::integer(3, 2, 15)).visible(on.clone()),
         ParamSpec::num("approximationMaxCPs", "Maximum control points", NumSpec::integer(15, 4, 100)).visible(on.clone()),
         ParamSpec::num("approximationTolerance", "Tolerance", TOLERANCE_BOUND).visible(on.clone()),
         ParamSpec::bool("keepStartDerivative", "Keep start derivative", false).visible(on.clone()),
         ParamSpec::bool("keepEndDerivative", "Keep end derivative", false).visible(on.clone()),
-        ParamSpec::bool("approximationShowDeviation", "Show deviation", false).hints(Hints::GROUP_HEADER).visible(on),
+        ParamSpec::bool("approximationShowDeviation", "Show deviation", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN).visible(on),
         ParamSpec::num("maxDeviation", "Maximum deviation", NumSpec::positive_length(0.0, 0.0))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(move |v| on2(v) && v.bool("approximationShowDeviation")),
@@ -273,7 +273,7 @@ pub fn skip_instances(two_directions: bool) -> Vec<ParamSpec> {
         (vec![ParamSpec::num("index", "Index", NumSpec::integer(1, -100_000, 100_000))], "#index")
     };
     vec![
-        ParamSpec::bool("skipInstances", "Skip instances", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("skipInstances", "Skip instances", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::array("skippedInstances", "Instances to skip", "instance", item)
             .item_template(template)
             .hints(Hints::INITIAL_FOCUS | Hints::ALLOW_ARRAY_FOCUS | Hints::PREVENT_ARRAY_REORDER)

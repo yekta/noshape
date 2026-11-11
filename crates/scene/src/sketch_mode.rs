@@ -4801,9 +4801,12 @@ impl SketchEditor {
             data.sketch.solve();
             return true;
         }
-        if data.sketch.remove_constraint(cid).is_err() {
+        // A circular pattern goes whole (live: one constraint, its links ours).
+        let group = data.sketch.constraint_group(cid);
+        if group.iter().filter(|c| data.sketch.remove_constraint(**c).is_ok()).count() == 0 {
             return false;
         }
+        self.selected_constraints.retain(|c| !group.contains(c));
         prune_exprs(data);
         data.sketch.solve();
         true
@@ -8053,6 +8056,10 @@ mod tests {
             assert!(data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::CircularPatternLink { .. })), "the edges are a circular pattern");
             let circle = data.sketch.entities().find(|e| e.kind() == EntityKind::Circle).map(|e| data.sketch.curve(e.id).unwrap());
             assert!(matches!(circle, Some(Curve2::Circle { radius, .. }) if (radius - 0.01).abs() < 1e-9), "{tool:?}: the circle goes through the click");
+            // Its pattern is one constraint (live 2496): deleting it takes every link.
+            let link = data.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::CircularPatternLink { .. })).map(|c| c.id).unwrap();
+            assert!(ed.delete_constraint(&mut data, link));
+            assert!(!data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::CircularPatternLink { .. })), "{tool:?}: the whole pattern goes");
         }
     }
 

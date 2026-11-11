@@ -256,7 +256,7 @@ pub fn editing_logic_in_clicked(
 /// the V3 ones. Ours keeps only the V3 parameters, and holeEditLogic copies the V2 ones back when the table changes
 /// (a remembered 13.44 mm countersink became the 10 mm default on the Countersink tab: ui-parity
 /// hole-countersink-tab).
-fn hole_v2_synced(type_id: &str, values: &crate::params::ParamValues) -> crate::params::ParamValues {
+pub(crate) fn hole_v2_synced(type_id: &str, values: &crate::params::ParamValues) -> crate::params::ParamValues {
     const V2_V3: [(&str, &str); 10] = [
         ("holeDiameterV2", "holeDiameterV3"),
         ("tapDrillDiameterV2", "tapDrillDiameterV3"),

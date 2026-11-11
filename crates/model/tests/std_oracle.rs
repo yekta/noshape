@@ -922,7 +922,8 @@ fn hole_cases() -> Vec<(&'static str, Studio)> {
             pv.set("scope", ParamValue::Query(vec![cube]));
             pv.set("unitsSystem", en("METRIC"));
             set(pv);
-            noshape_model::features::hole_tables::apply_table_to_params(pv);
+            // (A standard picked, as every live hole has one: an empty one std reads as its default size.)
+            noshape_model::features::hole_tables::sync_hole_standard(pv);
         });
         (name, s)
     };

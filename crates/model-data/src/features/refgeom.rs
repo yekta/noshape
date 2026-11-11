@@ -191,7 +191,7 @@ pub fn query_variable() -> FeatureType {
             &[("ALL", "Edges, faces, and vertices"), ("EDGE", "Only edges"), ("VERTEX", "Only vertices"), ("FACE", "Only faces")],
         ).hints(Hints::SHOW_LABEL)
         .visible(move |v| adjacent(v) && v.is("adjacencyType", "VERTEX")),
-        ParamSpec::bool("addAdditionalQueries", "Add additional queries", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("addAdditionalQueries", "Add additional queries", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::array(
             "additionalQueries",
             "Additional queries",

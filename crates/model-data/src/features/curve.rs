@@ -278,15 +278,15 @@ pub fn edit_curve() -> FeatureType {
     let cps = |v: &ParamValues| v.bool("editControlPoints");
     let p = vec![
         ParamSpec::query("wire", "Curves", CURVES).hints(Hints::INITIAL_FOCUS),
-        ParamSpec::bool("approximate", "Approximate", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("approximate", "Approximate", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::num("approximationDegree", "Target degree", NumSpec::integer(3, 2, 15)).visible(appr),
         ParamSpec::num("approximationMaxCPs", "Maximum control points", NumSpec::integer(15, 4, 100)).visible(appr),
         ParamSpec::num("approximationTolerance", "Tolerance", TOLERANCE_BOUND).visible(appr),
         ParamSpec::bool("keepStartDerivative", "Keep start derivative", false).visible(appr),
         ParamSpec::bool("keepEndDerivative", "Keep end derivative", false).visible(appr),
-        ParamSpec::bool("elevate", "Elevate", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("elevate", "Elevate", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::num("elevationDegree", "Target degree", NumSpec::integer(3, 2, 15)).visible(|v| v.bool("elevate")),
-        ParamSpec::bool("planarize", "Planarize", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("planarize", "Planarize", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::enum_(
             "planeReference",
             "Reference plane",
@@ -296,7 +296,7 @@ pub fn edit_curve() -> FeatureType {
         ParamSpec::query1("referencePlane", "Entity or mate connector", QueryFilter::PLANE_LIKE)
             .visible(|v| v.bool("planarize") && v.is("planeReference", "CUSTOM")),
         ParamSpec::bool("lockEnds", "Lock ends", false).visible(|v| v.bool("planarize") && v.is("planeReference", "BEST")),
-        ParamSpec::bool("editControlPoints", "Edit control points", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("editControlPoints", "Edit control points", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::enum_("editPointMode", "Edit mode", &[("XYZ", "XYZ"), ("UVN_TANGENT", "UVN (Tangent)"), ("UVN_CONTROL_POLYGON", "UVN (Control polygon)")])
             .visible(cps),
         ParamSpec::array(
@@ -336,7 +336,7 @@ pub fn edit_curve() -> FeatureType {
         ParamSpec::num("curveNumSpans", "Spans", NumSpec::integer(0, 0, 100_000))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showDetails")),
-        ParamSpec::bool("approximationShowDeviation", "Show deviation", false).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("approximationShowDeviation", "Show deviation", false).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::num("maxDeviation", "Maximum deviation", NumSpec::positive_length(0.0, 0.0))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("approximationShowDeviation")),

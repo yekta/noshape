@@ -75,6 +75,17 @@ fn polygons_and_slot() {
             let area = 0.5 * n as f64 * big_r * big_r * (2.0 * PI / n as f64).sin();
             assert!((regions[0].area() - area).abs() < 1e-9);
             let _ = p;
+            // Live (2496): one CIRCULAR_PATTERN, the corners snap1 / snap2, and the circle's ties: Inscribed TANGENT +
+            // MIDPOINT on the seed, Circumscribed the seed's end COINCIDENT on the circle.
+            let kinds: Vec<&str> = sk.constraints().filter(|c| !matches!(c.kind, ConstraintKind::CircularPatternLink { .. })).map(|c| c.kind.name()).collect();
+            let want: &[&str] = if on_vertex { &["Coincident", "Coincident", "Coincident"] } else { &["Coincident", "Coincident", "Tangent", "Midpoint"] };
+            let mut sorted = kinds.clone();
+            sorted.sort();
+            let mut w = want.to_vec();
+            w.sort();
+            assert_eq!(sorted, w, "n={n} on_vertex={on_vertex}");
+            let links: Vec<_> = sk.constraints().filter(|c| matches!(c.kind, ConstraintKind::CircularPatternLink { .. })).map(|c| c.id).collect();
+            assert_eq!(sk.constraint_group(links[0]), links, "one pattern");
         }
     }
     let mut sk = Sketch::new();
