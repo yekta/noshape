@@ -364,6 +364,18 @@ fn an_edit_after_reopening_runs_from_the_edit_on() {
     assert_eq!(r.evaluated, vec![edited.features[1].id]);
     assert_eq!(parts(&r), parts(&fresh));
     assert_eq!(r.display.features.iter().map(|s| s.status).collect::<Vec<_>>(), fresh.display.features.iter().map(|s| s.status).collect::<Vec<_>>());
+    // The states kept but the contexts damaged: the extrude's input can't be read, so everything runs again.
+    let saved = store.0.lock().unwrap().clone();
+    for (key, ..) in &first.fresh {
+        if let Some(v) = store.0.lock().unwrap().get_mut(&persist::context_key(*key)) {
+            let n = v.len() / 2;
+            v[n] ^= 1;
+        }
+    }
+    let r = Regenerator::new().regenerate(&edited, &ConfigValues::default(), &units, &opts);
+    assert_eq!(r.evaluated.len(), 2);
+    assert_eq!(parts(&r), parts(&fresh));
+    *store.0.lock().unwrap() = saved;
     // Every kept entry and shape damaged: everything evaluated again, the same parts.
     let keys: Vec<_> = store.0.lock().unwrap().keys().copied().collect();
     for k in keys {
