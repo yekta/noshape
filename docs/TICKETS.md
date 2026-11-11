@@ -1168,8 +1168,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     (2 / 2 alone on vibe5).
   - psui: vs-cfg-value-unconfigure differs since its edit (824a27c58, 04:08): step 8 live opens the context menu (Delete, Move
     down, Unconfigure), ours none (2 / 2 alone).
-  - Speed flags against the 00:54 run (c2-sm-louver 5.0 -> 8.6 s, cf-drive-train-generator, cf-fill-pattern, cf-part-draft
-    ×1.4–1.7) are both loaded vibe5 runs: re-checked in the 02:00 window before filing.
+  - Not code (qa 11:50, lead's A/B): the speed flags against the 00:54 run (c2-sm-louver 5.0 -> 8.6 s, cf-drive-train-generator,
+    cf-fill-pattern, cf-part-draft ×1.4–1.7) are vibe5's load: at those documents 13–17 in the 00:54 run, 20–25 in this one.
+    6364f3c47 against 96359491b alternating, 3 runs each, on the same saved documents (vibe5, load 1.3–3.8, bin/doc-ab.sh):
+    c2-sm-louver 4,507–4,878 vs 4,545–4,865 ms, cf-drive-train-generator 1,577–1,637 vs 1,553–1,648, cf-fill-pattern
+    3,006–3,086 vs 3,022–3,088, cf-part-draft 1,573–1,629 vs 1,568–1,620 (×0.99–1.00; no feature moves more than 20 ms).
+    Nothing to bisect.
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
