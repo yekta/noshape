@@ -33,6 +33,42 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**Design 11-11 02:10 UTC (lead's P0, hat8 "Mac mini hat": open 108 s, regen 92 s): a persistent regeneration cache.
+Not built: for the lead's go.**
+- Today: `Regenerator` caches per-feature results in memory (`CacheEntry`: the context after the feature, its state),
+  keyed by a hash chain (config, units, variables, contexts, then per feature its type / name / params / suppression,
+  a derived source's version, a Feature Studio's version). The display cache (app-core display_cache.rs, 11-06) shows
+  the last model at once on reopen, but view-only until a full regeneration from scratch lands (hat8: 92 s).
+- Goal: a reopen takes each feature's result from disk, so the parts are live (selectable, editable) after the load,
+  and an edit at feature k re-runs from k only, as in a session.
+- Key (stable across runs; today's isn't): blake3 over the same chain, plus the build (display_cache's build_id:
+  version, executable, OCCT patch set). Today's chain uses DefaultHasher (not stable across Rust releases) and
+  in-memory counters for derived sources and Feature Studios; persistent keys take their content instead (a derived
+  source = that studio's own final key, a Feature Studio = its source's hash). A new build starts empty (results may
+  change with our code); the first open after an update regenerates once and refills.
+- Entry per feature: its state (status, messages) and its context as a delta. Bodies are content-addressed: a body
+  file per (feature key, body id) holding its shape (OCCT binary, BinTools via `Shape::to_bin_bytes`, no
+  triangulation) and names / colour / kind (bincode); the context lists its bodies by those ids (unchanged bodies are
+  the earlier feature's file, as the Arc is shared in memory), plus sketches, planes, connectors, variables, sheet
+  metal data (bincode, zstd). The Context types need Serialize / Deserialize (most are plain data; Shape through
+  the bytes above).
+- Where: the user cache dir (`paths::cache_dir()/regen/<key prefix>/…`), as the display cache; not in the document
+  (it would grow the file and travel with it). LRU cap like the display cache's (2 GB default), whole documents
+  evicted together.
+- Size (hat8, measured on vibe3 from its dumped bodies): 2-3,467 KB per body in BinTools (typical 50-330 KB; the
+  894-face union body 3.5 MB). Each feature stores only the bodies it changes, so about 137 features x ~150 KB +
+  the union's versions: ~25-60 MB per document and configuration before zstd. To measure exactly on the build.
+- Load cost: reading BinTools back was 0.05-96 ms per body (3.5 MB: 96 ms) on vibe3 under load. A reopen needs only
+  the last feature's context: its bodies (hat8: a few MB, ~100-300 ms) on a background thread, the display cache
+  already showing; earlier features' contexts load lazily when an edit needs them.
+- Write: after a regeneration settles, on a background thread, new entries only (tmp file + rename); failures
+  ignored. Reads check a header (format, build) and the key; anything off is dropped and the feature runs.
+- Not cached: features reading Assembly contexts (keyed by context revisions only, which are session numbers), and
+  anything the in-memory cache already refuses (the touch probe).
+- Checks: T1 regen tests that a document reopened from the cache gives the same parts, names and states as a fresh
+  regeneration (every model in the parity suite, cache on and off); a corrupt or old-build file falls back.
+- Cost to build: ~2-3 days (serde on Context, the store, stable keys, load / write threads, tests).
+
 **State 11-10 22:00 UTC: delete face of a prism's rounds in place (cf-lighten 602 -> ~218 ms, live 114).**
 - cf-lighten's Lighten 1 re-rounds its tools (opModifyFillet): OCCT's Defeaturing took 35-70 ms per tool, 242 of its
   431 ms. `delete_prism_rounds` (features.cpp, tried first in op_defeature; NOSHAPE_DEFEATURE_OCCT=1 skips it): a
