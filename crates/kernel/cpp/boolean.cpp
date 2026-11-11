@@ -8713,6 +8713,68 @@ OpOut op_unify_edges(const OcShape& s)
   return make_result({s.shape}, u.Shape(), hist.get());
 }
 
+// Edges shorter than `len` whose middle is within `len` of one of `pts` collapsed into one vertex at their middle, its
+// tolerance reaching both old ends, as Parasolid leaves a blend's sliver end (c2-hunting-knife's Chamfer 1: a strip
+// 0.011 mm wide where the chamfer meets the slope ends in one vertex, live 2462's JZQ). Edges between two faces;
+// unchanged when the result isn't valid.
+OpOut op_collapse_short_edges(const OcShape& s, rust::Slice<const double> pts, double len)
+{
+  if (pts.size() % 3 != 0)
+    fail_invalid("points must be triples");
+  require_non_null(s.shape, "shape");
+  ShapeIMap es;
+  TopExp::MapShapes(s.shape, TopAbs_EDGE, es);
+  NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef;
+  TopExp::MapShapesAndUniqueAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  BRep_Builder                   bb;
+  ShapeIMap                      used;
+  int                            n = 0;
+  for (int i = 1; i <= es.Extent(); ++i)
+  {
+    const TopoDS_Edge e = TopoDS::Edge(es(i));
+    if (BRep_Tool::Degenerated(e))
+      continue;
+    GProp_GProps gp;
+    BRepGProp::LinearProperties(e, gp);
+    const NCollection_List<TopoDS_Shape>* fl = ef.Seek(e);
+    if (gp.Mass() >= len || fl == nullptr || fl->Extent() != 2)
+      continue;
+    TopoDS_Vertex v1, v2;
+    TopExp::Vertices(e, v1, v2);
+    if (v1.IsNull() || v2.IsNull() || v1.IsSame(v2) || used.Contains(v1) || used.Contains(v2))
+      continue;
+    const gp_Pnt p1 = BRep_Tool::Pnt(v1), p2 = BRep_Tool::Pnt(v2);
+    const gp_Pnt pm(0.5 * (p1.XYZ() + p2.XYZ()));
+    bool         asked = false;
+    for (size_t j = 0; j + 2 < pts.size() && !asked; j += 3)
+      asked = pm.Distance(gp_Pnt(pts[j], pts[j + 1], pts[j + 2])) <= len;
+    if (!asked)
+      continue;
+    TopoDS_Vertex vm;
+    bb.MakeVertex(vm, gp_Pnt(0.5 * (p1.XYZ() + p2.XYZ())), 0.5 * p1.Distance(p2) + std::max(BRep_Tool::Tolerance(v1), BRep_Tool::Tolerance(v2)));
+    rs->Replace(v1.Oriented(TopAbs_FORWARD), vm.Oriented(TopAbs_FORWARD));
+    rs->Replace(v2.Oriented(TopAbs_FORWARD), vm.Oriented(TopAbs_FORWARD));
+    rs->Remove(e);
+    used.Add(v1);
+    used.Add(v2);
+    ++n;
+  }
+  if (n == 0)
+    return make_result({s.shape}, s.shape, nullptr);
+  try
+  {
+    const TopoDS_Shape out = rs->Apply(s.shape);
+    if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+      return make_result({s.shape}, s.shape, nullptr);
+    return make_result({s.shape}, out, rs->History().get());
+  }
+  catch (const Standard_Failure&)
+  {
+    return make_result({s.shape}, s.shape, nullptr);
+  }
+}
+
 // Edges between the same two faces joined where they meet tangentially at a vertex near one of `pts`, their curves
 // concatenated (a line and the B-spline section running on from it); every other vertex kept.
 OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double tol)

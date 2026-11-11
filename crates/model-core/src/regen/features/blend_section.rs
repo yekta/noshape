@@ -1005,6 +1005,19 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &joined.history, &joined.shape, &BTreeMap::new(), None);
         shape = joined.shape;
     }
+    // A chamfer's sliver end (an edge under 0.02 mm it made): one vertex, as live's (c2-hunting-knife's Chamfer 1: the
+    // bottom strip 0.011 mm wide where it meets the slope, live 2462's JZQ; 0.037 and 0.044 mm edges stay).
+    if spec.reference.is_some() {
+        const SLIVER: f64 = 2e-5;
+        let mid = |x: &Shape| x.edge_info().ok().filter(|i| i.length < SLIVER).and_then(|i| x.point_at(0.5 * (i.first_param + i.last_param)).ok());
+        let before: Vec<DVec3> = body.shape.edges().iter().filter_map(mid).collect();
+        let made: Vec<DVec3> = shape.edges().iter().filter_map(mid).filter(|p| before.iter().all(|q| (*p - *q).length() > SLIVER)).collect();
+        if !made.is_empty() {
+            let collapsed = k::collapse_short_edges(&shape, &made, SLIVER)?;
+            names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &collapsed.history, &collapsed.shape, &BTreeMap::new(), None);
+            shape = collapsed.shape;
+        }
+    }
     if !shape.is_valid() || shape.count(ShapeType::Solid) != 1 {
         return Err(fail("the result is not one valid solid"));
     }

@@ -447,6 +447,14 @@ pub fn unify_edges(shape: &Shape) -> Result<OpResult> {
 
 /// Edges between the same two faces joined where they meet tangentially at a vertex within `tol` of one of `points`
 /// (their curves concatenated: a line and the B-spline section running on from it), every other vertex kept.
+/// Edges between two faces shorter than `len` with their middle within `len` of one of `points` collapsed into one
+/// vertex at their middle (its tolerance reaching both old ends), as Parasolid leaves a blend's sliver end; the shape
+/// unchanged where the result isn't valid.
+pub fn collapse_short_edges(shape: &Shape, points: &[DVec3], len: f64) -> Result<OpResult> {
+    let flat: Vec<f64> = points.iter().flat_map(|p| [p.x, p.y, p.z]).collect();
+    Ok(OpResult::from_ffi(ck(ffi::op_collapse_short_edges(shape.raw(), &flat, len))?))
+}
+
 pub fn join_edges_at(shape: &Shape, points: &[DVec3], tol: f64) -> Result<OpResult> {
     let flat: Vec<f64> = points.iter().flat_map(|p| [p.x, p.y, p.z]).collect();
     Ok(OpResult::from_ffi(ck(ffi::op_join_edges_at(shape.raw(), &flat, tol))?))

@@ -4004,6 +4004,9 @@ fn a_distance_angle_chamfer_keeps_constant_offsets_as_live() {
     let r = s.ok();
     let sh = &r.context.bodies[0].shape;
     assert_eq!(sh.faces().len(), 19);
+    // The bottom strip's 0.011 mm end at the slope one vertex, as live's JZQ: 50 edges, 32 vertices.
+    let shown = sh.shown_topology().unwrap();
+    assert_eq!((shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (50, 32));
     // The strips' widths: where each strip meets a chamfer face, |y| (their other edge is the mid plane, y 0).
     let faces = sh.faces();
     let ef = sh.edge_faces().unwrap();
