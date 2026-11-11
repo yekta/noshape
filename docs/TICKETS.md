@@ -1799,11 +1799,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   compute differently. Matching the counts means splitting our cone / cylinder edges 0.0106 mm from the corner (a made
   edge, and 85 = 78 + 8 - 1 leaves one more of ours to find: our two corners at z 101.607). Not built: **lead**, take
   this one as live's artefact (unscored.json) or say to imitate it.
-- [ ] P2 REGION-UNION-ARC (core 11-04 09:05) sketch regions picked together are united when they share lines or a
+- [x] P2 REGION-UNION-ARC (core 11-04 09:05) sketch regions picked together are united when they share lines or a
   whole loop (sketch regions::union_touching, eval.rs picked_regions), not when they share only an arc of a loop:
   clamp-hms's Sketch 2 (a trapezoid whose top arc lies on a whole r8 circle, the r8–r5 ring inside) then made its
   Extrude 5's bore three faces where Extrude 4's met it (29/71/46, live 25/63/40; the r5 profile was the same both
   ways, the difference came in the kernel's seams). So those stay apart for now; live extrudes them as one face.
+  **Closed (psui 2026-11-11 16:21): no difference left.** clamp-hms 15/15 to the end (model suite on ccf3390d5); a lug (three
+  lines closed by an r8 circle, an r5 circle inside: the lug region and the r5–r8 ring picked together, extruded 5 mm) gives
+  7 faces, one top and one bottom cap, as live builds it.
 - [x] verified 5363e4d8 (qa 11-04 08:36: bin/rbbisect.py on slow1151-pre identical to a6ff8389 feature by feature, Fillet 2 31406.528 / 51, no negative part) (core 11-04 06:40: the edge is convex: the rim's end edge runs the other way at its inner corner, and the straight-edge rounds read convexity off it; now off the face's inward direction across the edge, each tangent point must lie on its end edge, and no other face's box may meet the round's: the round off the 0.5 mm rim declines, OCCT's as before; the document 8 × 40183.951 mm³ / 66 faces again; T1 kernel blend::a_round_off_a_thin_rim_is_not_taken_the_wrong_way) P0 BLEND-RUST-STRAIGHT-WRONG (core; regression of 4570b4e5 "rounds of straight edges between faces ruled along them
   … are noshape's", not in v0.4.25) **a saved document's Fillet 2 removes 6× the volume and the parts after it go negative**:
   /root/qa-scratch/tickets/slow1151-pre.noshape (also slow1151-before-extrude), bin/rbbisect.py (volume / faces after each
@@ -4486,6 +4489,13 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   model has them on one plane. Exported (STEP, IGES) and read back, live's import (and ours) merges coplanar faces only
   within 1e-7 m: 61 faces for live's 58 (exchange suite, "live imports ours"). Group our import of ours.step's planar
   faces by normal and n·centroid to see them.
+  **psui 2026-11-11 16:32 (ccf3390d5): three cap faces, all on the B-spline wall.** Natively 70 faces as live; ours read
+  back 61 (live's STEP 58). The three that don't merge are the end caps (x = -25 twice, x = -13) of the "Up to Part" wall
+  whose faces are the filling part's piece (a B-spline, degree 14, 537 u poles) and its 2 mm Offset: each cap is a plane
+  fitted through corners the offset's intersection put off the cap plane (x -25.000013, -25.000029, -13.000600 mm), so it
+  is tilted against its exact neighbour by 2.3e-6, 2.8e-6 and 7.5e-5 rad (offsets 1.5e-9, 3.1e-9, 7.9e-8 m). Every other
+  coplanar pair is exact. Fix where the wall is thickened: its caps on the side planes the wall ends on (or its corners
+  projected onto them), not fitted.
 - [ ] P2 SUITE-FAN-BLADE-IMPORT (dx, lead 20:07; core 2026-11-08 20:05 UTC): c2-fan-blade-sweep's derived source
   8b633129 (one STEP Import 1): "fan blade" 68/155/95 faces/edges/vertices, live 58/119/63; "fan" 159/470/313, live
   143/404/251 (run it alone: NOSHAPE_PARITY_MODELS=<models>/c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=8b633129…). dx 2026-11-08 21:27 UTC: ours kept the file's split
