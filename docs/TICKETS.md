@@ -424,7 +424,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (round trip, volume sweep, fixed tickets, the user's cases); the 48 ticket documents on the release CLI = green b73d2fece.
   Agent session (Haiku, the release's MCP): 21 tool calls, 1 failed (sketch_constrain symmetric about a point; the error says
   how to centre a shape instead), the block right (23,214.6 mm³, 7 faces). qa-os (run 42962794441): macOS footer and Show in
-  Finder OK; Windows footer OK, Show in Explorer still fails (WIN-SHOW-IN-EXPLORER, not new).
+  Finder OK; Windows footer OK, Show in Explorer still fails (WIN-SHOW-IN-EXPLORER, not new). GUI rows (vibe3 :63)
+  pixel-identical to v0.4.39 (11 / 11; g34's first capture was blank under vibe3's load 30, 0 pixels on the rerun).
 - Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 HAND-DRILL-MATES-OVERDEFINED (parity suite only),
   P1 T2-ASM-STANDARD-CONTENT-HANG (a T2 bench). Long-running P0s: BLEND-RUST, SHELL-SLOW, REGEN-SPEED.
 
