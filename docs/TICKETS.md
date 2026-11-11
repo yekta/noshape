@@ -375,6 +375,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   later Fillet 6 has "1 missing selection" (Ok before; b73d2fece Ok, 6364f3c47 / e2c8da0f9 / the artifact not); the document
   still opens in 6 s (the hang stays fixed). The 48 ticket documents on the artifact's CLI = green e2c8da0f9. Agent session
   (Haiku, the artifact's MCP): 9 tool calls, 0 failed, the block right (23,214.6 mm³, 7 faces).
+- **qa 06:38, v0.4.43 checked (published 06:34, run 42962825060, cut e2c8da0f9): no blocker.** 11 assets, every job green incl.
+  the three "Restart into" updates; the published Linux files (tar.gz, CLI tar.gz, .deb) are the smoked artifact byte for byte and
+  match SHA256SUMS. GUI rows (vibe3 :63) pixel-identical to v0.4.42 (11 / 11). qa-os (run 42973503852): macOS footer and Show in
+  Finder OK; Windows footer OK, Show in Explorer still fails (WIN-SHOW-IN-EXPLORER, not new).
   - Since 6364f3c47 (checked 00:49): bool's 53812f2a0 / 08e5c8647 (the 0028 hook answers a plane containing an extrusion's
     direction with the exact rulings again: the pair 44e52dafb had turned off), core's d06b20de1 (a circle about a revolved
     surface's axis as its iso-line) and 2d50ff580 (Delete face of a prism's rounds), dx's 03ad6d6fa (translator), skasm's
