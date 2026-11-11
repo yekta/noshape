@@ -7256,13 +7256,23 @@ static std::vector<TopoDS_Shape> group_disjoint(const std::vector<TopoDS_Shape>&
   BRep_Builder    bb;
   bb.MakeCompound(copies);
   NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> owner;
+  // A pattern's instances share one shape, placed: meshed once (a mesh is kept in the shape's own frame), each
+  // instance its placed copy (cf-surface-pattern's 85 spheres: their grouping 4.7 s -> 1.7 s).
+  NCollection_DataMap<occ::handle<TopoDS_TShape>, TopoDS_Shape> meshed;
   for (int i = 0; i < n; ++i)
   {
     if (!close[(size_t)i])
       continue;
     fail_if_cancelled();
-    const TopoDS_Shape c = BRepBuilderAPI_Copy(t[(size_t)i], true, false).Shape();
-    BRepMesh_IncrementalMesh(c, defl, false, 0.5);
+    const TopoDS_Shape& x    = t[(size_t)i];
+    const TopoDS_Shape* base = meshed.Seek(x.TShape());
+    if (base == nullptr)
+    {
+      const TopoDS_Shape m = BRepBuilderAPI_Copy(x.Located(TopLoc_Location()), true, false).Shape();
+      BRepMesh_IncrementalMesh(m, defl, false, 0.5);
+      base = meshed.Bound(x.TShape(), m);
+    }
+    const TopoDS_Shape c = base->Located(x.Location()).Oriented(x.Orientation());
     for (TopExp_Explorer f(c, TopAbs_FACE); f.More(); f.Next())
       owner.Bind(f.Current(), i);
     bb.Add(copies, c);
