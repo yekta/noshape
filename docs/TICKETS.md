@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## qa, 2026-11-11
-- [ ] P0 STORE-FACE-SPLIT (core; qa 2026-11-11 12:06, the lead's result-cache check) **a part read back from the persistent
+- [ ] P0 STORE-FACE-SPLIT (core; qa 2026-11-11 11:51, the lead's result-cache check) **a part read back from the persistent
   result cache has a periodic face split into pieces that share one id**: green 1bfbaacdb, NOSHAPE_RESULT_STORE set, the same
   document opened twice (cold writes, warm reads). c2-helical-sweep (corpus, saved copy): no store and cold, Part 1 has 6 faces;
   warm, 14: Revolve 1's cylinder face (7,959.07 mm²) comes back as 9 faces with one id (1,363.88 + 134.68 + 921.34 + 6 ×
