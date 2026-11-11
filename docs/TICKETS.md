@@ -400,6 +400,26 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-11 17:00 release (qa list 15:24, candidate watcher green 44ff040aa, 14:21; CI 43039009971 running; the latest release is v0.4.43)
+- **qa 15:24: no blocker in the code; one naming change for the lead's call (below).** In since v0.4.43 (e2c8da0f9): core's
+  result store stages 2–4 (68fa4e55c, 7468469f2, a5ca9e85b, 6ca9e1f94) and its STORE-FACE-SPLIT fix 255b927a6, core's thin-wall
+  cap fix 2f8f73d70 and unify retries ea7634111, bool's union / Shell work (310b9fed7, 201bd381d, 58a8181f4 "deeper", 4af1c55df,
+  9b7856620, 88e0dbcd4), blend's OCCT patch 0029 (40461c529), opChamfer (cb0551bfe) and equal-distance chamfer (011fcc6da), dx's
+  mesh fix (fcd0b283f) and Union with Keep tools (fb83a50ef), psui's threads below the UI (13a1da56a) and B-spline meshing
+  (4b6ff3c04).
+  - Model suite, full corpus (vibe4): 77/87, 826/947; against 96359491b only c2-rings-loft 12 -> 17/17 features (better); the
+    gear documents at baseline (cf-spur-gear 14/14, cf-part-draft 13/13, cf-planetary-gears 1/1, cf-drive-train-generator 2/2).
+  - Result store: go (STORE-FACE-SPLIT verified 14:43: corpus 87 / 87, mutations, corruption).
+  - Sweeps on vibe3 (volume sweep 20, cf corpus 13, the 48 ticket documents) = 96359491b except two copies of fuzz seed 1151's
+    document (slow1151-pre, slow1151-before-extrude): **Linear pattern 2 now "Select a pattern direction."** (Ok before), so
+    its three instances are gone (8 -> 5 parts, each 40,183.81 mm³). Bisected on vibe4 (noshape-cli per step): first bad
+    **core's 2f8f73d70** ("faces a unify merges after a boolean keep their oldest name"; 201bd381d before it Ok). The pattern's
+    direction was picked on a face that unify merged; its stored name now resolves to nothing. A fuzz document; but the same
+    renaming can leave a user's saved reference to such a face unresolved after updating: core to say whether old names are
+    still found (and the lead whether this holds the cut).
+  - Fuzz: v0.4.43 release CLI seeds 9181– (vibe3 bin/v3cf32.sh), no deaths so far; GUI fuzz no new deaths.
+- Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 HAND-DRILL-MATES-OVERDEFINED (parity only).
+
 ## Release blockers for the 2026-11-11 05:00 release, candidate e2c8da0f9 (qa list 04:50; watcher GREEN 03:57, CI 3-platform success; the latest release is v0.4.41, v0.4.42 from b73d2fece in its release CI)
 - **qa 04:58: no blocker on e2c8da0f9.** Model suite, full corpus (vibe4): 77/87, 821/947; against 6364f3c47 only
   c2-sm-louver 31 -> 32 (better); the gear documents unchanged with bool's rulings back: cf-spur-gear 14/14, cf-part-draft

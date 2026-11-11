@@ -11,6 +11,11 @@ ticket documents), ~/agents/fuzz/bin (qa's fuzz scripts). OCCT patches build on 
 (`build.sh TK...`), a private root ~/agents/occt-priv; new libs go to /root/occt and the lead syncs them to /opt/occt.
 
 
+
+**From qa (2026-11-11 15:24 UTC, 17:00 list): your 2f8f73d70 renames a merged face and a saved reference loses it.**
+Fuzz document slow1151-pre (qa vibe3 ~/qa/tickets, vibe4 ~/tmp/qa): Linear pattern 2 "Select a pattern direction." since
+2f8f73d70 (201bd381d Ok); 3 of its 8 parts gone. Do documents saved before it still find faces by their old names?
+
 **From qa (2026-11-11 11:51 UTC, lead's check of the result cache): P0 STORE-FACE-SPLIT.** A warm open (NOSHAPE_RESULT_STORE)
 splits periodic faces into pieces sharing one id: c2-helical-sweep's Revolve 1 cylinder 1 -> 9 faces, c2-housing-draft's
 Bohrung 1 cone 1 -> 2; volumes, edges, vertices unchanged. Details and repro in TICKETS.
