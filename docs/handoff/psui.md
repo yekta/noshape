@@ -713,6 +713,15 @@ REQUESTS 20:20). Where the slowest go (preview regeneration):
 
 ## In progress
 
+**11-11 04:08 UTC, the night's lands (live 2464, 2467, 2468, 2475, 2476, 2424).** Sheet metal flat as a sketchable
+body (skasm.md has the details: placement, flat faces, sketches edited in the flat view, cross-highlight); notices'
+stack rows are the links (2467); another document's part in an assembly: Edit in context opens its document with the
+banner's Create version and update in assembly ("Update version for edit in context", only that instance moves),
+Release… (linked to its version; ops release_create `instance`); Ctrl+Z ignored while a Variable Studio cell has the
+keyboard (2476); the drawing tab's Change to version… on Selective update with this document's row; split import as
+2424 (TICKETS IMPORT-SPLIT-DOCUMENTS). Scenario fixes awaiting live re-records: fs-notices-monitor-dropdown (done by
+live), vs-cfg-value-unconfigure.
+
 **11-10 19:58 UTC, live 2464 / 2466.** Another document's part in an assembly: Properties… is editable except Name,
 Not revision managed and the Mass override; Save writes into the version the instance uses (the source file's
 unversioned meta `version-part-properties/<mv>`, laid over the version whenever it is read: `derived::external_snapshot`),
