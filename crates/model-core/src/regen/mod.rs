@@ -267,7 +267,7 @@ fn reused(e: &CacheEntry, input: &Context) -> Result<Context, String> {
         Some(&j) if !read[j] => b[j].clone(),
         _ => x.clone(),
     }).collect();
-    out.bodies = bodies.into();
+    out.bodies.set_all(bodies);
     features::refgeom::refresh_open_composites(&mut out);
     out.renumber_default_names();
     Ok(out)
@@ -723,6 +723,7 @@ impl Regenerator {
                                 {
                                     ev.ctx.sketches[i] = old.clone();
                                 }
+                                ev.flush_aliases();
                                 ctx = Arc::new(ev.ctx);
                                 if f.type_id == "assignVariable" {
                                     let name = params.text("name").trim().trim_start_matches('#').to_string();
@@ -910,6 +911,7 @@ fn eval_sub_features(ev: &mut EvalCtx, subs: &[(FeatureId, String, String, crate
         };
         let mut sub = EvalCtx::new(*id, name, params, units, std::mem::take(&mut ev.ctx), outer_vars);
         let r = sub_fn(&mut sub);
+        sub.flush_aliases();
         ev.ctx = sub.ctx;
         // Its fields aren't the feature's: no field of the dialog is named.
         r.map_err(|e| eval::FeatureError { faulty: Vec::new(), ..e })?;
@@ -928,6 +930,7 @@ pub fn with_sub_features(ctx: Arc<Context>, f: &crate::partstudio::Feature, unit
     let mut ev = EvalCtx::new(f.id, &f.name, &params, units, (*ctx).clone(), &empty);
     // A sub-feature that fails leaves the rest as they were (the feature itself reports it).
     let _ = eval_sub_features(&mut ev, &subs, units, &empty);
+    ev.flush_aliases();
     Arc::new(ev.ctx)
 }
 

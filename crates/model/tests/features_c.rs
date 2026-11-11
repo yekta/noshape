@@ -4165,3 +4165,45 @@ fn a_round_over_a_tube_end_rolls_the_ball_over_the_rim_as_live() {
         assert!(worst < 2e-5, "seam {seam}: a blend point's ball off the rolling ball by {} mm", worst / mm(1.0));
     }
 }
+
+/// A face a unify merges after a boolean goes by each of its parents' names: a reference made under another parent's
+/// (v0.4.43 named a merged face by the boolean result's order; in v0.4.44 hat15's SSD pad sketches lost their plane)
+/// still finds it, and an edge of it named through that parent too.
+#[test]
+fn a_merged_face_is_found_by_another_parents_name() {
+    let mut s = Studio::new();
+    let block = |s: &mut Studio, x0: f64| {
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(x0, 0.0), (x0 + 10.0, 0.0), (x0 + 10.0, 10.0), (x0, 10.0)], true);
+        let id = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        s.region(id)
+    };
+    let a = block(&mut s, 0.0);
+    s.add("extrude", |p| {
+        p.set("entities", q(a));
+        p.set("depth", expr("5 mm"));
+    });
+    let b = block(&mut s, 10.0);
+    let second = s.add("extrude", |p| {
+        p.set("entities", q(b));
+        p.set("depth", expr("5 mm"));
+        p.set("operationType", en("NEW"));
+    });
+    // The second block's top by itself, as a reference made then names it.
+    let r = s.ok();
+    let top = face_at(&r, 1, DVec3::new(mm(15.0), mm(5.0), mm(5.0)));
+    // Added to the first block: the two tops are one face, named by the first block's.
+    let f = s.ps.features.iter_mut().find(|f| f.id == second).unwrap();
+    f.params.set("operationType", en("ADD"));
+    f.params.set("defaultScope", ParamValue::Bool(true));
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    let Reference::Face(name) = &top else { unreachable!() };
+    assert!(!r.context.bodies[0].faces.iter().any(|n| **n == *name), "the merged face keeps the first block's name");
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(12.0, 2.0), (18.0, 2.0), (18.0, 8.0), (12.0, 8.0)], true);
+    s.sketch(top, sk);
+    let r = s.ok();
+    let plane = r.display.sketches.last().map(|k| k.frame.origin.z);
+    assert!(plane.is_some_and(|z| near(z, mm(5.0), 1e-12)), "{plane:?}");
+}

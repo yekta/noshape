@@ -799,6 +799,7 @@ fn cut_sheet_metal(ev: &mut EvalCtx, parts: &[BodyId], tools: Vec<NamedShape>) -
     let mut sub = EvalCtx::new(ev.feature, ev.name, &p, ev.units, ev.ctx.clone(), ev.outer_vars);
     sub.cancel = ev.cancel.clone();
     let res = crate::regen::custom_features::evaluate_std(&mut sub, "boolean.fs", "booleanBodies");
+    sub.flush_aliases();
     ev.warnings.extend(sub.warnings);
     ev.infos.extend(sub.infos);
     res.map_err(|_| fe("Hole creates invalid geometry."))?;

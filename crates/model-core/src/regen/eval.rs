@@ -143,6 +143,9 @@ impl<'a> std::ops::Deref for Features<'a> {
 }
 
 pub struct EvalCtx<'a> {
+    /// (another name, the face's name) for merged faces named since the last [`EvalCtx::flush_aliases`]: put in the
+    /// context's bodies (looked up only where a name finds nothing).
+    pub aliases: parking_lot::Mutex<Vec<(Name, Name)>>,
     pub feature: FeatureId,
     pub name: &'a str,
     pub params: &'a ParamValues,
@@ -273,7 +276,8 @@ pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(Fe
     let found = |kind: LookupKind, n: &TopoName, any: &dyn Fn(&Body) -> bool| {
         ctx.bodies.note_lookup(kind, n);
         let bodies = ctx.bodies.untracked();
-        bodies.iter().any(|b| b.has_exact(n)) || bodies.iter().any(|b| any(b))
+        // (Then under another name a merged face goes by: Bodies::find_untracked.)
+        bodies.iter().any(|b| b.has_exact(n)) || bodies.iter().any(|b| any(b)) || !ctx.bodies.find_untracked(kind, n).is_empty()
     };
     let resolves = |r: &Reference| -> bool {
         match r {
@@ -381,7 +385,16 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: Features::default(), xform: None, custom: None, custom_type: None, cancel: None, scratch: false, probe_touched: false }
+        EvalCtx { aliases: Default::default(), feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: Features::default(), xform: None, custom: None, custom_type: None, cancel: None, scratch: false, probe_touched: false }
+    }
+
+    /// Puts the merged faces' other names noted while naming into the context's bodies (before the context is handed
+    /// on).
+    pub fn flush_aliases(&mut self) {
+        let a = std::mem::take(&mut *self.aliases.lock());
+        if !a.is_empty() {
+            self.ctx.bodies.add_aliases(a);
+        }
     }
 
     /// The run was aborted (a newer edit made it stale): stop and return
@@ -917,13 +930,16 @@ impl<'a> EvalCtx<'a> {
     pub fn name_result(&self, args: &[&ShapeNames], hist: &k::History, out: &Shape, roles: &BTreeMap<u32, Role>, generated: Option<&dyn Fn(&Name) -> Role>) -> Vec<Name> {
         let records = hist_records(hist);
         let count = out.count(ShapeType::Face);
-        name_faces(&FaceNamingInput { feature: self.feature, args, records: &records, out_count: count, out_face_key: &|i| face_key(out, i), roles, generated_role: generated, parent_rank: None })
+        let aliases = std::cell::RefCell::new(Vec::new());
+        let names = name_faces(&FaceNamingInput { feature: self.feature, args, records: &records, out_count: count, out_face_key: &|i| face_key(out, i), roles, generated_role: generated, parent_rank: None, aliases: Some(&aliases) });
+        self.aliases.lock().extend(aliases.into_inner().into_iter().filter_map(|(a, j)| names.get(j).map(|n| (a, n.clone()))));
+        names
     }
 
     /// Names after the unify that follows a boolean: a merged face keeps its oldest parent, the target's face over a
     /// tool's and then the one made first (as Parasolid keeps a part's faces), not whichever the boolean's result
     /// happened to put first (that moved with a tool's curve kinds: hat8's SSD pad sketches lost their plane).
-    fn name_unified(&self, args: &[&ShapeNames], face_names: Vec<Name>, unified: &k::OpResult) -> Vec<Name> {
+    fn name_unified(&mut self, args: &[&ShapeNames], face_names: Vec<Name>, unified: &k::OpResult) -> Vec<Name> {
         // By argument, then the oldest: three faces of the target merged keep the one whose feature comes first (hat8's
         // SSD pads sketch on SSD corner stops' face, merged with Converter corner stops' by a later bridge); the
         // boolean result's order (which moved with a tool's curve kinds) only between faces of one feature.
@@ -951,7 +967,12 @@ impl<'a> EvalCtx<'a> {
         let before = unify_input_names(face_names);
         let records = hist_records(&unified.history);
         let out = &unified.shape;
-        name_faces(&FaceNamingInput { feature: self.feature, args: &[&before], records: &records, out_count: out.count(ShapeType::Face), out_face_key: &|i| face_key(out, i), roles: &BTreeMap::new(), generated_role: None, parent_rank: Some(&rank) })
+        // The names its other parents would have given a merged face: references made before this ranking (v0.4.43,
+        // by the result's order) still find it (hat15's SSD pad sketches).
+        let aliases = std::cell::RefCell::new(Vec::new());
+        let names = name_faces(&FaceNamingInput { feature: self.feature, args: &[&before], records: &records, out_count: out.count(ShapeType::Face), out_face_key: &|i| face_key(out, i), roles: &BTreeMap::new(), generated_role: None, parent_rank: Some(&rank), aliases: Some(&aliases) });
+        self.ctx.bodies.add_aliases(aliases.into_inner().into_iter().filter_map(|(a, j)| names.get(j).map(|n| (a, n.clone()))));
+        names
     }
 
     /// Bounding diagonal of everything (for "through all").
@@ -1055,7 +1076,7 @@ impl<'a> EvalCtx<'a> {
         found
     }
 
-    fn fuse_named(&self, tools: Vec<NamedShape>) -> FResult<Vec<NamedShape>> {
+    fn fuse_named(&mut self, tools: Vec<NamedShape>) -> FResult<Vec<NamedShape>> {
         let shapes: Vec<Shape> = tools.iter().map(|t| t.shape.clone()).collect();
         let res = k::boolean(k::BooleanOp::Fuse, &shapes[..1], &shapes[1..], &k::BooleanOptions::default())?;
         let names: Vec<&ShapeNames> = tools.iter().map(|t| &t.names).collect();
@@ -1072,6 +1093,7 @@ impl<'a> EvalCtx<'a> {
     }
 
     pub(crate) fn add_new_bodies(&mut self, t: NamedShape, kind: BodyKind, base_index: u32) -> FResult<()> {
+        self.flush_aliases();
         let pieces = if kind == BodyKind::Solid && t.shape.count(ShapeType::Solid) > 1 { split_solids(&t.shape, &t.names.faces, Some(self.feature)) } else { vec![t] };
         for (j, p) in pieces.into_iter().enumerate() {
             let name = self.ctx.alloc_part_name(kind);
@@ -1330,7 +1352,7 @@ impl<'a> EvalCtx<'a> {
             extra.push(Arc::new(Body::named(BodyId { feature: self.feature, index: 30_000 + j as u32 }, name, kind, p.shape, p.names, color, self.feature)));
         }
         let first_kept = replaced.keys().next().copied();
-        let old = std::mem::take(&mut self.ctx.bodies);
+        let old = self.ctx.bodies.take_all();
         for (i, b) in old.into_iter().enumerate() {
             if let Some(nb) = replaced.remove(&i) {
                 self.ctx.bodies.push(nb);
@@ -1347,6 +1369,7 @@ impl<'a> EvalCtx<'a> {
 
     /// Replace a body's shape after a local operation (fillet, shell...).
     pub fn replace_body(&mut self, bi: usize, shape: Shape, faces: Vec<Name>) {
+        self.flush_aliases();
         let old = self.ctx.bodies[bi].clone();
         let pieces = split_solids(&shape, &faces, Some(self.feature));
         let mut iter = pieces.into_iter();

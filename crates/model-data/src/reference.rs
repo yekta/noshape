@@ -125,6 +125,28 @@ impl TopoName {
         }
     }
 
+    /// `self` with every face name `f` maps somewhere in it put in its place (through splits, an edge's or vertex's
+    /// faces, a boundary's face); `None` when nothing in it maps.
+    pub fn renamed(&self, f: &dyn Fn(&TopoName) -> Option<Arc<TopoName>>) -> Option<TopoName> {
+        if let Some(n) = f(self) {
+            return Some((*n).clone());
+        }
+        let re = |n: &Arc<TopoName>| n.renamed(f).map(Arc::new);
+        match self {
+            TopoName::Split { parent, by, ordinal } => re(parent).map(|p| TopoName::Split { parent: p, by: *by, ordinal: *ordinal }),
+            TopoName::Edge { faces: [a, b], ordinal } => {
+                let (x, y) = (re(a), re(b));
+                (x.is_some() || y.is_some()).then(|| TopoName::edge(x.unwrap_or_else(|| a.clone()), y.unwrap_or_else(|| b.clone()), *ordinal))
+            }
+            TopoName::Vertex { faces, ordinal } => {
+                let mapped: Vec<Option<Arc<TopoName>>> = faces.iter().map(re).collect();
+                mapped.iter().any(Option::is_some).then(|| TopoName::vertex(mapped.into_iter().zip(faces.iter()).map(|(m, o)| m.unwrap_or_else(|| o.clone())).collect(), *ordinal))
+            }
+            TopoName::Boundary { face, ordinal } => re(face).map(|x| TopoName::Boundary { face: x, ordinal: *ordinal }),
+            _ => None,
+        }
+    }
+
     /// Strip split wrappers: the original face this one came from.
     pub fn root(&self) -> &TopoName {
         let mut cur = self;

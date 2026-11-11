@@ -387,8 +387,8 @@ impl FsContext {
     pub fn take_context(&self) -> Context {
         let mut st = self.state.lock();
         let mut ctx = std::mem::take(&mut st.ctx);
-        let (hidden, shown): (Vec<_>, Vec<_>) = std::mem::take(&mut ctx.bodies).into_iter().partition(|b| st.hidden.contains(&b.id));
-        ctx.bodies = (shown).into();
+        let (hidden, shown): (Vec<_>, Vec<_>) = ctx.bodies.take_all().into_iter().partition(|b| st.hidden.contains(&b.id));
+        ctx.bodies.set_all(shown);
         ctx.fs_hidden_bodies = hidden;
         ctx.fs_attributes = st.attributes().to_vec();
         ctx.fs_variables = st.variables.clone();
@@ -957,6 +957,7 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
     }
     let warnings = std::mem::take(&mut ev.warnings);
     let infos = std::mem::take(&mut ev.infos);
+    ev.flush_aliases();
     let mut ctx = ev.ctx;
     match r {
         Ok(v) => {

@@ -1907,7 +1907,7 @@ fn merge_instance(ev: &mut EvalCtx, sub: crate::regen::context::Context, rn: &Re
         let nb = Body::new(rn.body_id(&b.id), b.name.clone(), b.kind, b.shape.clone(), faces, b.color, ev.feature);
         bodies.push(Arc::new(nb));
     }
-    ev.ctx.bodies = bodies.into();
+    ev.ctx.bodies.set_all(bodies);
     ev.ctx.next_part = sub.next_part;
     ev.ctx.next_surface = sub.next_surface;
     ev.ctx.next_curve = sub.next_curve;

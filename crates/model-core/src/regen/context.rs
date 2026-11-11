@@ -429,6 +429,10 @@ pub struct Bodies {
     v: Vec<Arc<Body>>,
     #[serde(skip)]
     reads: Option<Arc<BodyReads>>,
+    /// Other names faces go by (a merged face's other parents': [`Bodies::add_aliases`]), looked at only when a name
+    /// finds nothing.
+    #[serde(default)]
+    aliases: Arc<Vec<(Name, Name)>>,
 }
 
 impl Bodies {
@@ -472,6 +476,49 @@ impl Bodies {
         }
     }
     pub fn find_untracked(&self, kind: LookupKind, n: &TopoName) -> Vec<(usize, usize)> {
+        if self.aliases.is_empty() {
+            return self.find_named(kind, n);
+        }
+        // Not a name any face goes by now: under another name a merged face goes by (a reference made when an older
+        // version named it by another of its parents: hat15's SSD pad sketches, made in v0.4.43), followed a few
+        // merges on; that name exactly before the near matches of this one (a piece of another face of that parent
+        // made whole again).
+        let exact = |m: &TopoName| self.v.iter().any(|b| b.has_exact(m));
+        let mut chain: Vec<TopoName> = Vec::new();
+        if !exact(n) {
+            let mut cur = n.clone();
+            for _ in 0..8 {
+                let Some(next) = cur.renamed(&|x| self.aliases.iter().find(|(a, _)| **a == *x).map(|(_, to)| to.clone())) else { break };
+                if exact(&next) {
+                    return self.find_named(kind, &next);
+                }
+                chain.push(next.clone());
+                cur = next;
+            }
+        }
+        let found = self.find_named(kind, n);
+        if !found.is_empty() {
+            return found;
+        }
+        chain.iter().map(|m| self.find_named(kind, m)).find(|f| !f.is_empty()).unwrap_or_default()
+    }
+    /// Records `pairs` (another name, the face's name) for [`Bodies::find_untracked`].
+    pub fn add_aliases(&mut self, pairs: impl IntoIterator<Item = (Name, Name)>) {
+        // (The first wins at lookup: no check for repeats, which would scan the list each time.)
+        Arc::make_mut(&mut self.aliases).extend(pairs.into_iter().filter(|(from, to)| from != to));
+    }
+    /// Puts `v` in place of the bodies, as a new list would (no reads noted from here on), keeping the other names
+    /// faces go by.
+    pub fn set_all(&mut self, v: Vec<Arc<Body>>) {
+        self.v = v;
+        self.reads = None;
+    }
+    /// Takes the bodies out, keeping the other names faces go by.
+    pub fn take_all(&mut self) -> Vec<Arc<Body>> {
+        self.reads = None;
+        std::mem::take(&mut self.v)
+    }
+    fn find_named(&self, kind: LookupKind, n: &TopoName) -> Vec<(usize, usize)> {
         let mut out = Vec::new();
         // (An open composite's entities are its members': features change the members, never the composite.)
         for (bi, b) in self.v.iter().enumerate().filter(|(_, b)| b.composite.as_ref().is_none_or(|c| c.closed)) {
@@ -617,13 +664,13 @@ impl IntoIterator for Bodies {
 
 impl FromIterator<Arc<Body>> for Bodies {
     fn from_iter<I: IntoIterator<Item = Arc<Body>>>(it: I) -> Self {
-        Bodies { v: it.into_iter().collect(), reads: None }
+        Bodies { v: it.into_iter().collect(), reads: None, aliases: Arc::default() }
     }
 }
 
 impl From<Vec<Arc<Body>>> for Bodies {
     fn from(v: Vec<Arc<Body>>) -> Self {
-        Bodies { v, reads: None }
+        Bodies { v, reads: None, aliases: Arc::default() }
     }
 }
 
