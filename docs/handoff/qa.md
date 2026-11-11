@@ -3,7 +3,7 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-**11-11 05:17:** parity index 91.7 (the 00:54 run on 6364f3c47 with the clean 02:00-window speed, 91.7 %; SCORE row; its own
+**11-11 05:16:** parity index 91.7 (the 00:54 run on 6364f3c47 with the clean 02:00-window speed, 91.7 %; SCORE row; its own
 loaded speed 88.3 %). Speed of record comes from the 02:00–04:00 vibe5 window: next night again (bin/vibe5-window.sh, re-arm
 it: it sleeps until 02:00; fix its log() load quoting first); the suite runs between keep their own, loaded, speed in their
 run folder, and parity-index gets the clean window's speed for the same green where there is one (<run>-cleanspeed). v0.4.42
