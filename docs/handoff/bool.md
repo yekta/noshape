@@ -64,6 +64,19 @@ scratch /root/bool-scratch.
   level), shfall as before; model suite the same document by document. Left in hat8 at load 45: import 17.4 s (dx), the chamfers 5.8 + 3.0 s
   (blend).
 
+## From dx (2026-11-11 08:52 UTC, lead's speed list): cf-surface-pattern's Surface Pattern 3, where its 13-16 s go
+The feature is one opBoolean: Part 1 (7 faces: B-spline, offset of a B-spline, planes) minus 85 placed copies of
+Part 2, a sphere r 14.35 mm (Revolve 1 of a half circle; live's is a sphere too). Recorded case vibe4:~/tmp/dx-sp-one/
+7ecd5a8b6e7c4f6b (NOSHAPE_RECORD_EXACT). Release replay, NOSHAPE_KERNEL_PROFILE, vibe4 under load: op_boolean 16.3 s =
+boolean.rust 3.0 s (declines "a non-manifold result"), group_disjoint 4.7 s (meshing 85 copies 3.0 s, the overlap
+check 1.7 s), boolean.build 7.8 s (Making faces 3.0 s, face / face 0.8 s, internal shapes 0.8 s), unify 0.8 s.
+- **Landing (dx 08e6a4e0):** group_disjoint meshes a shared TShape once and places it per instance (a mesh is kept in
+  the shape's frame, so the meshes and groups are the same): 4.7 -> 1.7 s; the case 12.9 / 12.7 -> 10.3 s alternating.
+  Results the same on parity56 (597 cases) and bool-corpus (977): identical mismatch lists before and after.
+- **Yours:** our Boolean declines this cut even with one sphere (rust_cut_one_by_one, forced for a probe, declined in
+  164 ms on the first tool), so spheres into offset / B-spline faces look unsupported, and the 3 s full attempt is
+  wasted before OCCT's 7.8 s. Live does the feature in 537 ms.
+
 ## From psui (2026-11-10 19:12 UTC, lead): does the bookcase's "cut in half" Boolean run on ours now?
 c2-hex-bookcase-derived matches live to the end since dc4b1a01 (17/17; the text's µm slivers were already gone after
 core's `rejoin_pieces`, 11-09). In my parity runs on vibe5 "cut in half" (d1f02bed in your corpus) took 12-20 ms (your
