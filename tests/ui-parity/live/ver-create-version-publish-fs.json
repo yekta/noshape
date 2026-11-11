@@ -1,19 +1,19 @@
 {
  "scenario": "ver-create-version-publish-fs",
- "recorded": "2026-11-09T08:00:15.211Z",
+ "recorded": "2026-11-11T08:04:51.190Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
  },
  "live": {
-  "document": "8fa9fa83738c905fd61f6240",
-  "workspace": "24182ed3399a552a21b09ac9",
-  "element": "92d8b80d1a2bdefc8f97dc8a",
+  "document": "71a362d25d58812c3d5ee1fb",
+  "workspace": "62fb7b9d3426257f093cd90f",
+  "element": "80b7f1222be45f5343d7a339",
   "start": "fs-custom",
-  "startElement": "92d8b80d1a2bdefc8f97dc8a",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "80b7f1222be45f5343d7a339",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -121,12 +121,12 @@
      "title": "Create version from Main",
      "fields": [
       {
-       "label": null,
+       "label": "Name",
        "kind": "input",
        "value": "V2"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
        "kind": "input",
        "value": ""
       },
@@ -214,7 +214,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 36713
+   "t": 29823
   },
   {
    "step": 2,
@@ -245,12 +245,12 @@
      "title": "Create version from Main",
      "fields": [
       {
-       "label": null,
+       "label": "Name",
        "kind": "input",
        "value": "V2"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
        "kind": "input",
        "value": ""
       },
@@ -338,7 +338,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 44231
+   "t": 31924
   },
   {
    "step": 3,
@@ -429,7 +429,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 61475
+   "t": 34003
   }
  ]
 }

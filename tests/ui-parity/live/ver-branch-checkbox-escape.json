@@ -1,18 +1,18 @@
 {
  "scenario": "ver-branch-checkbox-escape",
- "recorded": "2026-11-09T06:55:50.419Z",
+ "recorded": "2026-11-11T08:06:29.296Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
  },
  "live": {
-  "document": "f8d50f6b1b1b3f7527744763",
-  "workspace": "e9750cd30373569f3f7d329a",
-  "element": "32e70e25b6d39d56c6f35821",
+  "document": "ef6614b4dcbcbed4132de66b",
+  "workspace": "03b1d6dc90603592ccd01d59",
+  "element": "a29c05b6236cbb21db6eb9f8",
   "start": "doc-versions",
-  "startElement": "32e70e25b6d39d56c6f35821",
+  "startElement": "a29c05b6236cbb21db6eb9f8",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -225,7 +225,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 35684
+   "t": 20951
   },
   {
    "step": 2,
@@ -362,7 +362,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 40557
+   "t": 23152
   },
   {
    "step": 3,
@@ -393,12 +393,12 @@
      "title": "Create workspace from V1",
      "fields": [
       {
-       "label": null,
+       "label": "Name",
        "kind": "input",
        "value": "B1"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
        "kind": "input",
        "value": ""
       },
@@ -516,7 +516,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 44163
+   "t": 26085
   },
   {
    "step": 4,
@@ -547,12 +547,12 @@
      "title": "Create workspace from V1",
      "fields": [
       {
-       "label": null,
+       "label": "Name",
        "kind": "input",
        "value": "B1"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
        "kind": "input",
        "value": ""
       },
@@ -670,7 +670,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 47392
+   "t": 28177
   },
   {
    "step": 5,
@@ -793,7 +793,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 51417
+   "t": 31501
   }
  ]
 }

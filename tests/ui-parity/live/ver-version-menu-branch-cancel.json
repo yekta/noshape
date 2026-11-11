@@ -1,18 +1,18 @@
 {
  "scenario": "ver-version-menu-branch-cancel",
- "recorded": "2026-11-08T03:16:16.766Z",
+ "recorded": "2026-11-11T08:08:20.641Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
  },
  "live": {
-  "document": "4a325a16b5049991967b8117",
-  "workspace": "f7a76f62a028a3248895d0a8",
-  "element": "9141c26b2dd6892f2a3f9f05",
+  "document": "e26b21b530581320962cf91c",
+  "workspace": "9268bc16fdb2edbdedf57192",
+  "element": "9bcf771d9da52b0fe37ad7f8",
   "start": "doc-versions",
-  "startElement": "9141c26b2dd6892f2a3f9f05",
+  "startElement": "9bcf771d9da52b0fe37ad7f8",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -225,7 +225,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 43415
+   "t": 24296
   },
   {
    "step": 2,
@@ -362,7 +362,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 50340
+   "t": 26454
   },
   {
    "step": 3,
@@ -393,12 +393,12 @@
      "title": "Create workspace from V1",
      "fields": [
       {
-       "label": null,
+       "label": "Name",
        "kind": "input",
        "value": "B1"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
        "kind": "input",
        "value": ""
       },
@@ -516,7 +516,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 54146
+   "t": 29313
   },
   {
    "step": 4,
@@ -637,7 +637,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 58905
+   "t": 31389
   }
  ]
 }
