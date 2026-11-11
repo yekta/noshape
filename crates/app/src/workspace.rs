@@ -1788,9 +1788,16 @@ impl Workspace {
                         }
                         let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
                         let (v5, v6, v7, v8, v9, v10, v11) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
-                        // A protected workspace (live wp-933): Properties…, Show code,
-                        // Copy to clipboard only.
+                        // A protected workspace (live wp-933, ver-protected-tab-menu): Open in new browser tab,
+                        // Properties…, Show code, Copy to clipboard, Export….
                         if view.read(cx).doc.read(cx).session.is_protected() {
+                            let v13 = view.clone();
+                            let menu = menu.item(I::new("Open in new browser tab").on_click(move |_, _, cx| {
+                                let (doc, gpu) = (v13.read(cx).doc.clone(), v13.read(cx).gpu.clone());
+                                if let Err(e) = crate::files::open_tab_window(doc, id, gpu, cx) {
+                                    log::warn!("Could not open a window: {e}");
+                                }
+                            }));
                             let menu = menu.item(I::new("Properties…").on_click(move |_, w, cx| {
                                 let doc = v6.read(cx).doc.clone();
                                 let thumb = v6.read(cx).tab_thumbs.read(cx).picture(id).flatten();
@@ -1801,10 +1808,12 @@ impl Workspace {
                             } else {
                                 menu
                             };
-                            return menu.item(I::new("Copy to clipboard").on_click(move |_, _, cx| {
+                            let menu = menu.item(I::new("Copy to clipboard").on_click(move |_, _, cx| {
                                 let t = v8.read(cx).doc.read(cx).session.doc.tab(id).cloned();
                                 cx.set_global(dd::CopiedTab(t));
                             }));
+                            let partless = matches!(view.read(cx).views.get(&id), Some(TabView::PartStudio(v)) if !v.read(cx).has_parts());
+                            return if matches!(kind, "partstudio" | "assembly" | "drawing") && !partless { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
                         }
                         // Onshape (live ui2-tabmenu-*): ⊗ Delete | Open in new browser
                         // tab, Rename, Properties…, Show code | Duplicate, Copy to

@@ -10,6 +10,26 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## From psui (2026-11-11 15:03 UTC, lead: the full ui-parity run on green 13a1da56a), FYI: the drawing misses
+
+vibe5, 5 shards, 1,483 scenarios with live recordings: 1,435 match. Yours, unchanged from this morning's run (none
+new); most are the selection after a step (`.drawing.selection.length` live 1 / ours 0):
+- drw-centermark-align: step 5 differs at .drawing.annotations.length: live 0 / ours 1 (7/8 states)
+- drw-crop-existing-profile: step 4 differs at .drawing.selection.length: live 1 / ours 0 (12/13 states)
+- drw-datum-target-hide-dim: step 3 differs at .drawing.selection.length: live 1 / ours 0 (7/12 states)
+- drw-detail-existing-profile: step 4 differs at .drawing.selection.length: live 1 / ours 0 (12/13 states)
+- drw-dimension-3-point-angular: step 4 differs at .drawing.selection.length: live 1 / ours 0 (6/7 states)
+- drw-dimension-foreshorten: step 9 differs at .drawing.selection.length: live 0 / ours 1 (11/12 states)
+- drw-format-painter: step 10 differs at .drawing.selection.length: live 1 / ours 0 (12/13 states)
+- drw-max-min-dimension: step 5 differs at .drawing.selection.length: live 1 / ours 0 (5/6 states)
+- drw-max-min-key: step 5 differs at .drawing.selection.length: live 1 / ours 0 (5/6 states)
+- drw-note-move-to-title-block: step 8 differs at .drawing.selection.length: live 1 / ours 0 (8/9 states)
+- drw-sheet-properties: step 4 differs at .dialog.text[3]: live "Front" / ours "Part 1 In progress" (5/7 states)
+- drw-sheet-rename: step 5 differs at .dialog.text[3]: live "Part 1 In progress" / ours "Front" (5/8 states)
+- drw-view-align-horizontally: step 4 differs at .drawing.selection.length: live 1 / ours 0 (5/6 states)
+- drw-view-align-vertically: step 1 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (4/6 states)
+- drw-view-replicate-annotations: step 8 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (8/10 states)
+
 ## 11-11 06:09 UTC: Boolean Union with Keep tools (core's item, lead gave it to dx)
 
 The union is a new part (next Part N, own colour), the tools stay, as live's lines show (hand drill's 9fbc05, two of

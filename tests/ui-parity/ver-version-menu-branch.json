@@ -28,6 +28,11 @@
    "on": {
     "button": "Create"
    }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
   }
  ]
 }

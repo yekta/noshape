@@ -22,6 +22,9 @@ R3": both MID_AXIS_POINT Z (0,0,-1), the Revolute turns them opposite). **asm-st
 inserted bolt's rotation (transform[0] live 1, ours 0). asm-triad-z-anti-align-with-z's highlighted last row is our
 runner's whole-pixel triad point (live's pointer sits between pixels).
 
+psui 15:03 UTC: on green 13a1da56a (full run, vibe5) these still miss: asm-mate-edit-escape, asm-mate-menu-edit,
+asm-standard-content-edit-instance (yours, above), asm-triad-z-anti-align-with-z (runner); every other asm-* matches.
+
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
 ## From dx (2026-11-10 21:05 UTC, lead): yours from the hand drill: Cylindrical 22's BOTTOM_AXIS_POINT takes the other end

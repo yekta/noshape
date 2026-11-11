@@ -605,8 +605,10 @@ def compare(live, ours, whole_document=True):
         bd = (b or {}).get("dialog")
         if isinstance(bd, dict) and str(live.get("recorded", "")) < PANELS_READ_SINCE.get(bd.get("title"), "") and (a or {}).get("dialog") is None:
             b = dict(b, dialog=None)
+        # A toast shows from the action that raised it: after the step before's reading (ver-protection-enable: live's
+        # was gone 3.4 s after the reading that first showed it, 7.5 s after the step before).
         if isinstance((a or {}).get("message"), str) and t is not None:
-            toast_shown.setdefault(a["message"], t)
+            toast_shown.setdefault(a["message"], prev_t if prev_t is not None else t)
         if a is not None and a.get("message") is None and isinstance((b or {}).get("message"), str) and t is not None \
                 and t - toast_shown.get(b["message"], t) >= TOAST_MS:
             b = dict(b, message=None)
