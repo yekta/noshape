@@ -3356,13 +3356,24 @@ fn fit_spline_through_two_vertices_is_a_line() {
     let pts = [DVec2::new(0.0, 0.0), DVec2::new(0.02, 0.01)].map(|p| sk.add_point(p));
     let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
     let se = |e: u32| Reference::SketchEntity { sketch: sid, entity: e };
-    s.add("fitSpline", |p| p.set("vertices", ParamValue::Query(pts.iter().map(|p| se(p.0)).collect())));
+    let fit = s.add("fitSpline", |p| p.set("vertices", ParamValue::Query(pts.iter().map(|p| se(p.0)).collect())));
     let r = s.ok();
     let edges: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Wire).flat_map(|b| b.shape.edges()).collect();
     let [e] = edges.as_slice() else { panic!("one edge: {}", edges.len()) };
     let i = e.edge_info().unwrap();
     assert!(matches!(i.curve, noshape_kernel::Curve::Line { .. }), "{:?}", i.curve);
     assert!((i.length - 0.02f64.hypot(0.01)).abs() < 1e-9, "{}", i.length);
+    // A document saved while it was a spline (v0.4.44) names its edge and ends by index alone: they still resolve,
+    // the ends in the same order.
+    use noshape_model::reference::{Source, TopoName};
+    let wire = |i: u32| TopoName::Wire { feature: fit, source: Source::Index(i) };
+    let (params, vars) = (ParamValues::default(), std::collections::BTreeMap::new());
+    let ev = noshape_model::regen::eval::EvalCtx::new(fit, "", &params, &s.units, (*r.context).clone(), &vars);
+    let [(bi, ei)] = ev.resolve_edges(&[Reference::Edge(wire(0))])[..] else { panic!("the saved edge reference doesn't resolve") };
+    assert!((ev.edge_shape(bi, ei).unwrap().edge_info().unwrap().length - i.length).abs() < 1e-12);
+    let start = ev.resolve_vertex_point(&Reference::Vertex(wire(0x8_0000))).expect("the saved start reference");
+    let end = ev.resolve_vertex_point(&Reference::Vertex(wire(0x8_0001))).expect("the saved end reference");
+    assert!(start.length() < 1e-12 && ((end - start).length() - i.length).abs() < 1e-12, "{start} {end}");
 }
 
 /// Move curve boundary's distance arrow (audit-part-studio M10; moveCurveBoundary.fs addExtendCurveManipulator):
