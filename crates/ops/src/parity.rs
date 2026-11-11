@@ -1852,7 +1852,10 @@ impl<'a> Translator<'a> {
             k
         };
         if use_ids && !ids.is_empty() && ids.iter().all(|id| self.refs.contains_key(&(k, id.clone()))) {
-            let found: Vec<String> = ids.iter().map(|id| self.by_geometry(k, id)).collect::<Result<_, _>>()?;
+            let found: Vec<String> = match ids.iter().map(|id| self.by_geometry(k, id)).collect::<Result<_, _>>() {
+                Ok(found) => found,
+                Err(e) => self.regions_by_sum(k, &ids).ok_or(e)?,
+            };
             // A swept edge a Boolean split: Onshape's query keeps every piece.
             let strings = packed_strings_of(text);
             if strings.iter().any(|s| s == "SPLIT") && strings.iter().any(|s| s == "SWEPT_EDGE") {
@@ -3363,6 +3366,37 @@ impl<'a> Translator<'a> {
         found.first().and_then(id)
     }
 
+    /// Live's selected sketch regions as ours when some are pieces of one of ours: a sketch on a face is split by
+    /// the face's edges, and an in-context face's we can't have (asm-isaac-ball: live's 497.181 + 11.1 mm² are our
+    /// 508.281). Each of ours taken whole, for live's regions whose areas it holds (or for one of the same area).
+    fn regions_by_sum(&mut self, k: usize, ids: &[String]) -> Option<Vec<String>> {
+        let refs: Vec<LiveRef> = ids.iter().map(|id| self.refs.get(&(k, id.clone())).cloned()).collect::<Option<_>>()?;
+        if refs.iter().any(|r| r.kind != "SKETCH_REGION" || r.measure.is_none()) {
+            return None;
+        }
+        let sketch = refs.iter().find_map(|r| r.sketch_of.clone())?;
+        let ours = self.feature_ids.get(&sketch)?.clone();
+        let g = self.sketch_geometry(&ours)?;
+        let unit = per_unit(&g["units"]);
+        let regions: Vec<(String, f64)> = g["regions"].as_array()?.iter().filter_map(|r| Some((r["id"].as_str()?.to_string(), r["area"].as_f64()? * unit * unit))).collect();
+        let near = |a: f64, b: f64| (a - b).abs() <= 1e-3 * a.max(b).max(1e-12);
+        let mut left: Vec<f64> = refs.iter().filter_map(|r| r.measure).collect();
+        let mut out = Vec::new();
+        for (id, area) in regions {
+            if left.is_empty() {
+                break;
+            }
+            // The smallest group of live's regions left that makes up this one of ours.
+            let n = left.len().min(12);
+            let group = (1u32..1 << n).filter(|m| near((0..n).filter(|i| m & (1 << i) != 0).map(|i| left[i]).sum(), area)).min_by_key(|m| m.count_ones());
+            if let Some(m) = group {
+                left = (0..left.len()).filter(|i| *i >= n || m & (1 << i) == 0).map(|i| left[i]).collect();
+                out.push(id);
+            }
+        }
+        left.is_empty().then_some(out)
+    }
+
     /// The sketch region of ours with live's area (when given) nearest
     /// live's point, over every sketch built so far. (Our region `center`
     /// is a label point, not the centroid live gives: area decides.)
@@ -3373,6 +3407,8 @@ impl<'a> Translator<'a> {
             None => self.feature_ids.values().cloned().collect(),
         };
         let mut best: Option<(f64, String)> = None;
+        // (Ours, for the message: each region's area, mm².)
+        let mut seen: Vec<f64> = Vec::new();
         for s in sketches {
             let Some(g) = self.sketch_geometry(&s) else { continue };
             let (o, x, y) = (f3(&g["frame"]["origin"]), f3(&g["frame"]["x"]), f3(&g["frame"]["y"]));
@@ -3383,6 +3419,9 @@ impl<'a> Translator<'a> {
                 let k = per_unit(&g["units"]);
                 let w: Vec<f64> = (0..3).map(|i| (o[i] + u * x[i] + v * y[i]) * k).collect();
                 let d = (0..3).map(|i| (w[i] - p[i]).powi(2)).sum::<f64>().sqrt();
+                if let Some(a) = r["area"].as_f64() {
+                    seen.push(a * k * k * 1e6);
+                }
                 // (1e-3: live's area may come from the region's tessellation.)
                 if let Some(a) = area
                     && r["area"].as_f64().is_none_or(|ours| (ours * k * k - a).abs() > 1e-3 * a.max(1e-12))
@@ -3401,7 +3440,13 @@ impl<'a> Translator<'a> {
         }
         match best {
             Some((d, id)) if area.is_some() || d < 1e-3 => Ok(id),
-            _ => Err(format!("no sketch region of ours at {:?} mm", mm(p))),
+            _ => {
+                let areas = |v: &[f64]| v.iter().map(|a| format!("{a:.3}")).collect::<Vec<_>>().join(", ");
+                Err(match area {
+                    Some(a) => format!("no sketch region of ours with live's area {:.3} mm² (ours: {})", a * 1e6, areas(&seen)),
+                    None => format!("no sketch region of ours at {:?} mm", mm(p)),
+                })
+            }
         }
     }
 
