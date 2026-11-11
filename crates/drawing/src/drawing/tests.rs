@@ -4742,8 +4742,8 @@ fn datum_target_outside_styles_put_the_size_on_a_leader() {
 
 /// ANSI radial / diameter values dropped inside the circle (live
 /// asbdt-3r-1 / 3d-1, drawing.md D13): a diameter's value centred on the
-/// circle's center with one arrow to the edge; a radius's value where dropped,
-/// no leader from it.
+/// circle's center with one arrow to the edge; a radius's value centred too
+/// (live drw-dimension-foreshorten), no leader from it.
 #[test]
 fn ansi_radial_values_dropped_inside_the_circle() {
     let (doc, mut drawing) = demo();
@@ -4766,8 +4766,7 @@ fn ansi_radial_values_dropped_inside_the_circle() {
     assert_eq!(lines, 1, "one line to the edge and on past it");
     drawing.sheets[0].annotations.last_mut().unwrap().kind = AnnotationKind::RadialDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.012, diameter: false, angle: 0.0, dim_line: false, knee: Some(-4.0) };
     let (c, t, _) = center(&drawing, 960);
-    let r = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap().placement(ViewId(2)).unwrap().len_to_sheet(0.012);
-    assert!((t[1] - c[1]).abs() < 1.0 && (t[0] - (c[0] + r - 4.0)).abs() < 1.0, "where dropped: {t:?} vs {c:?} r {r}");
+    assert!((t[0] - c[0]).abs() < 1.0 && (t[1] - c[1]).abs() < 1.0, "centred: {t:?} vs {c:?}");
 }
 
 /// Styles panel › Thickness / Pitch scale on a sheet sketch line (SK16): its
