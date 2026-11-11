@@ -3,6 +3,15 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**11-11 00:52: suite layout now:** qa-suites.sh runs the model suite (speed) on vibe5 (`QA_SPEED_HOST`, no quiet wait, each
+document's line with vibe5's load: models-timed.log; lead 11-10) and the assembly / exchange suites on vibe4 (`QA_SUITES_HOST`;
+the watcher moved to vibe3) at the same time; `QA_REDO=<run dir>` redoes a run's remote stage; no index is published without a
+model score. Speed's last index: 91.4 (e3a19f63, vibe5 under load 4–12; INDEX.md "Scoring changes"). bin/clean-speed-0200.sh
+(detached) takes the clean vibe5 measurement at 02:02 (lead's 02:00–04:00 window), debug and release, ->
+suites/clean-speed.log: put it in SCORE / parity-index and tell the lead whether release should become the speed build.
+Release checks: re-cut lists in TICKETS (gear regression window 17:30–44e52dafb closed; 05:00 list on 6364f3c47).
+v0.4.42 cut from b73d2fece (lead): check it at publish (bin/qa-relsmoke.sh 0.4.42 v0441 on vibe3, tixvol, agent session, qa-os).
+
 **11-10 12:28 (lead):** main red 11:44 from core's unlanded OCCT patch 0028 libs synced into /opt/occt on vibe3–5 (12:00
 libTKBO.a; kernel export::step_writes_the_used_part_of_long_splines), not a commit; core restores the old lib. The 11:02 suite
 run (b612e762) was stopped 12:28 in its remote stage (built on those libs, bool-measure's parity_models beside it): STOPPED file

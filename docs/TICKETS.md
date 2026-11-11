@@ -352,6 +352,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-11 05:00 release (qa list 00:52, checked on watcher green 6364f3c47, 23:55; v0.4.42 in its release CI from b73d2fece)
+- **qa 00:52: no blocker on 6364f3c47** (b73d2fece + blend's 12b1d8a6f: a chamfer OCCT can't build built as sections of
+  constant offsets; core's 2d50ff580: Delete face of a prism's rounds). Model suite, full corpus (vibe4): 77/87, 820/947, every
+  document = b73d2fece (gear documents at baseline). cf corpus and the 48 ticket documents = b73d2fece except three fuzz
+  documents, all from 12b1d8a6f (a chamfer that failed now builds; the features after it follow):
+  - cli-delete-crash: Chamfer 4 builds (90,913 -> 90,449 mm³, 15 -> 24 faces); then Shell 1 "Could not shell part with
+    selections." (was Ok) and Chamfer 7 "Select edges or faces to chamfer." (was 1 missing selection): Part 1 46,320 ->
+    180,793 mm³.
+  - cli-draft-segv: Chamfer 5 builds (15,927 -> 15,391 mm³); Part 1 112,331 -> 96,963 mm³.
+  - cli-shell-gpf: Chamfer 3 builds (a 19.9 mm equal-offset chamfer on 3 edges: 32,525 -> 26,993 mm³, 24 -> 29 faces); then
+    Shell 3 "Could not shell part with selections." (was 1 missing selection); its three parts now equal (56,213.73 mm³ each;
+    were 66,316 / 63,444 / 66,316).
+  No live result for fuzz documents; for blend: the two Shells that now fail run on the newly chamfered parts.
+- bool's a9839a4b (rulings) is not on main yet: checked on the first green with it.
+
 ## Release blockers for the re-cut of the 2026-11-10 17:00 release (qa list 20:31, checked on watcher green 44e52dafb, 20:03; v0.4.42 from 8d135b0f was cancelled by the lead; the latest release is v0.4.41)
 - **qa 20:31: no blocker on 44e52dafb.** The regression window (main from ~17:30 to bool's 44e52dafb: the OCCT 0028 hook
   answering plane-against-extrusion pairs, cf-spur-gear 6 of 14 features off) is closed there:
