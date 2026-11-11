@@ -4476,6 +4476,20 @@ struct Scaled
 using MakeBuild = std::function<BlendBuild(const Scaled& sc)>;
 
 
+// The faces of `s` whose surfaces are of `type` (as BRepAdaptor_Surface reads them, without its parameter bounds: an
+// adaptor for each edge's two faces, the finishing passes' old way, took 0.3-0.8 s a blend on a user's parts).
+static ShapeIMap faces_of_type(const TopoDS_Shape& s, GeomAbs_SurfaceType type)
+{
+  ShapeIMap out;
+  for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+  {
+    const occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(x.Current()));
+    if (!g.IsNull() && GeomAdaptor_Surface(g).GetType() == type)
+      out.Add(x.Current());
+  }
+  return out;
+}
+
 // Round blends that met across the face between them (live W1: R2 on both top edges of a 4 mm rib "consumes the
 // rib top": one half-cylinder, 10 faces): OCCT's (made a hair smaller, the face between removed) are two cylinders
 // whose axes are 1e-7 apart; such neighbours, one radius on one axis, merged into one face. Only the edges between
@@ -4483,6 +4497,10 @@ using MakeBuild = std::function<BlendBuild(const Scaled& sc)>;
 // on a boss, which Chamfer 2 lost).
 void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
 {
+  const KernelTimer timer("blend.full_rounds");
+  const ShapeIMap cylinders = faces_of_type(r, GeomAbs_Cylinder);
+  if (cylinders.Extent() < 2)
+    return;
   ShapeAncMap ef;
   TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
   occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
@@ -4490,7 +4508,7 @@ void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
   for (int i = 1; i <= ef.Extent(); ++i)
   {
     const ShapeList& fs = ef(i);
-    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || done.Contains(fs.First()) || done.Contains(fs.Last()) || kept_edge(ef.FindKey(i)))
+    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || done.Contains(fs.First()) || done.Contains(fs.Last()) || !cylinders.Contains(fs.First()) || !cylinders.Contains(fs.Last()) || kept_edge(ef.FindKey(i)))
       continue;
     const TopoDS_Face   fa = TopoDS::Face(fs.First()), fb = TopoDS::Face(fs.Last());
     BRepAdaptor_Surface a(fa), b(fb);
@@ -4544,7 +4562,12 @@ static void merge_corner_spheres(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
   if (legacy_topology())
     return;
   const KernelTimer timer("blend.corner_spheres");
-  ShapeAncMap       ef;
+  // The sphere faces, by their surfaces (an adaptor per edge's faces took 0.3-0.8 s on a user's chamfered parts, which
+  // have none).
+  const ShapeIMap spheres = faces_of_type(r, GeomAbs_Sphere);
+  if (spheres.Extent() < 2)
+    return;
+  ShapeAncMap ef;
   TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
   occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
   ShapeIMap                      done;
@@ -4552,7 +4575,7 @@ static void merge_corner_spheres(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
   for (int i = 1; i <= ef.Extent(); ++i)
   {
     const ShapeList& fs = ef(i);
-    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || done.Contains(fs.First()) || done.Contains(fs.Last()))
+    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || done.Contains(fs.First()) || done.Contains(fs.Last()) || !spheres.Contains(fs.First()) || !spheres.Contains(fs.Last()))
       continue;
     const TopoDS_Face   fa = TopoDS::Face(fs.First()), fb = TopoDS::Face(fs.Last());
     BRepAdaptor_Surface a(fa), b(fb);
