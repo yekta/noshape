@@ -36,8 +36,8 @@ impl PartStudioView {
         // Live (dom/dialog-export-parasolid.txt): a part's file is
         // "<studio> - <part>"; the tab's is the studio's name.
         let base = match bodies.as_slice() {
-            [b] => format!("{} - {}", self.studio_name(cx), self.display.body(b).map(|d| d.name.clone()).unwrap_or_else(|| "Part".into())),
-            _ => self.studio_name(cx),
+            [b] => noshape_ops::export::export_base_name(&self.studio_name(cx), Some(&self.display.body(b).map(|d| d.name.clone()).unwrap_or_else(|| "Part".into()))),
+            _ => noshape_ops::export::export_base_name(&self.studio_name(cx), None),
         };
         // Through the user's export rules (Preferences › User export rules).
         let (element, name, props) = match bodies.as_slice() {
@@ -282,7 +282,7 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
                 rows.push(chk("ex-latest", "Use latest version", s.latest, |s, v| s.latest = v));
                 rows.push(chk("ex-custom-units", "Use custom units for export", s.custom_units, |s, v| s.custom_units = v));
                 if s.custom_units {
-                    rows.push(sel("ex-units", "Units", &units, s.units, false, |s, i| s.units = i));
+                    rows.push(sel("ex-units", "Units", &units[..noshape_ops::export::STEP_UNITS], s.units, false, |s, i| s.units = i));
                 }
                 if step_ap242(&s) {
                     rows.push(chk("ex-tol", "Include derived tolerances in export", s.derived_tolerances, |s, v| s.derived_tolerances = v));

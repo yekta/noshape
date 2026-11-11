@@ -86,6 +86,9 @@ pub const RESOLUTIONS: [&str; 4] = ["Coarse", "Medium", "Fine", "Custom"];
 pub const STL_FORMATS: [&str; 2] = ["Text", "Binary"];
 /// Units and their size in meters.
 pub const UNITS: [(&str, f64); 6] = [("Centimeter", 0.01), ("Foot", 0.3048), ("Inch", 0.0254), ("Meter", 1.0), ("Millimeter", 0.001), ("Yard", 0.9144)];
+/// STEP's "Use custom units for export" list: [`UNITS`] without Yard (live qexport); ticking it starts on its first,
+/// Centimeter.
+pub const STEP_UNITS: usize = 5;
 
 pub const OPTIONS: [&str; 3] = ["Download", "Download and store file in a new tab", "Store file in a new tab"];
 /// URDF "Geometry format".
@@ -220,7 +223,7 @@ pub struct StepPrefs {
 
 impl Default for StepPrefs {
     fn default() -> Self {
-        Self { version: VersionPrefs::default(), preprocessing: 0, custom_units: false, units: METER, derived_tolerances: false, mbd_text_height: false, mbd_text_mm: MBD_TEXT_MM }
+        Self { version: VersionPrefs::default(), preprocessing: 0, custom_units: false, units: 0, derived_tolerances: false, mbd_text_height: false, mbd_text_mm: MBD_TEXT_MM }
     }
 }
 
@@ -317,7 +320,7 @@ impl SolidExportPrefs {
         s.compress = if s.format == PartFormat::Glb { self.glb_compress } else { self.gltf_compress };
         let stl = s.format == PartFormat::Stl;
         s.resolution = if stl { self.stl_resolution } else { self.mesh_resolution }.min(CUSTOM_RESOLUTION);
-        s.units = if stl { self.stl_units } else { p.units }.min(UNITS.len() - 1);
+        s.units = if stl { self.stl_units.min(UNITS.len() - 1) } else { p.units.min(STEP_UNITS - 1) };
         s.stl_text = if s.format == PartFormat::Urdf { self.urdf_stl_text } else { self.stl_text };
     }
 
@@ -330,6 +333,16 @@ impl SolidExportPrefs {
         s.memory = Box::new(self.clone());
         s
     }
+}
+
+/// The Export dialog's file name (live qexport): the tab's name, a single part's "<tab> - <part>", cut before any
+/// "<" (an instance's "<2>").
+pub fn export_base_name(tab: &str, part: Option<&str>) -> String {
+    let name = match part {
+        Some(p) => format!("{tab} - {p}"),
+        None => tab.to_string(),
+    };
+    name.split('<').next().unwrap_or_default().trim().to_string()
 }
 
 /// A unit's short name in Custom's labels (live: "Chordal tolerance (in)").
@@ -1259,6 +1272,28 @@ mod tests {
         assert_eq!(super::crc32(b"123456789"), 0xcbf4_3926);
     }
 
+    /// Live qexport: the Export dialog's first-time values and its file name.
+    #[test]
+    fn export_dialog_first_time_values_and_name() {
+        use super::*;
+        let p = SolidExportPrefs::default();
+        let s = p.settings(false);
+        assert_eq!(s.format, PartFormat::Parasolid);
+        assert!(s.latest && !s.y_up && !s.custom_units);
+        let mut step = ExportSettings { format: PartFormat::Step, ..Default::default() };
+        p.give(&mut step);
+        assert_eq!(UNITS[step.units].0, "Centimeter", "ticking Use custom units starts on the list's first");
+        assert!(!UNITS[..STEP_UNITS].iter().any(|u| u.0 == "Yard"));
+        let mut stl = ExportSettings { format: PartFormat::Stl, ..Default::default() };
+        p.give(&mut stl);
+        assert_eq!((UNITS[stl.units].0, stl.stl_text, stl.resolution), ("Meter", false, 1));
+        // Presets: chordal, angular, STL facet width (0.025 / 0.01 / 0.001 in), max chord 10 m.
+        assert_eq!(PRESETS, [(0.24, 12.5, 0.635), (0.12, 6.25, 0.254), (0.06, 2.5, 0.0254)]);
+        assert_eq!((CustomResolution::default(), CustomResolution::default().max_chord_m), (CustomResolution::preset(1), 10.0));
+        assert_eq!(export_base_name("Part Studio 1", Some("Bolt <3>")), "Part Studio 1 - Bolt");
+        assert_eq!(export_base_name("Part Studio 1", None), "Part Studio 1");
+    }
+
     #[test]
     fn base64_pads() {
         assert_eq!(super::base64(b"ab"), "YWI=");
@@ -1333,7 +1368,8 @@ mod tests {
         use super::*;
         let row = |f: PartFormat| PartFormat::list(false).iter().position(|x| *x == f).unwrap();
         let mut s = SolidExportPrefs::default().settings(false);
-        assert_eq!((s.format, s.latest, s.resolution, s.units, s.stl_text), (PartFormat::Parasolid, true, 1, 3, false), "live's first Export");
+        // (The units held are STEP's, unseen until its custom units are ticked: Centimeter, live qexport.)
+        assert_eq!((s.format, s.latest, s.resolution, s.units, s.stl_text), (PartFormat::Parasolid, true, 1, 0, false), "live's first Export");
         set_part_format(&mut s, row(PartFormat::Step));
         (s.version, s.latest, s.custom_units, s.units) = (1, false, true, 4);
         set_part_format(&mut s, row(PartFormat::Stl));
