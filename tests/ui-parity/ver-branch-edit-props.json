@@ -28,6 +28,11 @@
    "on": {
     "button": "Create workspace and edit properties"
    }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
   }
  ]
 }

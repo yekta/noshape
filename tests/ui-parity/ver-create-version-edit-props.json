@@ -16,6 +16,11 @@
    "on": {
     "button": "Create version and edit properties"
    }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
   }
  ]
 }
