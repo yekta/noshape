@@ -64,6 +64,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   connector on a Spur gear's internal sketch: dx), 15 mates on it.
 
 ## psui, 2026-11-11
+- [ ] P2 STD-ORACLE-SWEEP-POLYLINE (core, lead 17:11; psui 2026-11-11 17:11, red on main 5428600a9 too) **std Sweep along a
+  polyline sweeps less than our native Sweep**: `cargo test -p noshape-model --release --test all -- --ignored
+  std_oracle::sweep_regenerates_as_std`, case "along a polyline": native ok, Solid 10 faces 20 edges 3600.0000 mm³; std
+  (sweep.fs in the host) ok, Solid 10 faces 20 edges 2880.0000 mm³. Same faces and edges, 20 % less volume: one segment of
+  the path left out or a corner swept short. Which is live's is to be measured.
+- [ ] P3 STD-ORACLE-HOLE-INFO (psui, lead 17:11) **std Hole reports "Parameters have been overridden. Check input." where the
+  native Hole is OK**: `std_oracle::hole_regenerates_as_std` (red on main 5428600a9), "simple blind" and "simple blind,
+  flat tip" (and others): the geometry is the same (8 faces, 17 / 15 edges, 63599.8306 / 63619.9694 mm³); only std's Info
+  status differs (the host's holeEditLogic / table parameters overriding a value the case sets).
+- [ ] P3 STD-ORACLE-DIALOG-HINTS (psui, lead 17:11) **the built-in dialogs' boolean parameters lack a UI hint bit std
+  sets**: `std_oracle::core_dialogs_match_std_in_every_state` (red on main 5428600a9): extrude's hasExtrudeDirection,
+  startOffset, hasSecondDirection, fillet's isPartial, isVariable… std hints 0x10002000 (0x10002040), built-in 0x2000
+  (0x2040): bit 0x10000000 missing on every one.
+
 - [x] (psui 2026-11-11, lead 02:58: live shows Release… on that menu ([Upgrade] on Free); ours has it as a paid plan does, the part at its version in the Release candidate dialog, linked to it; ops release_create `instance`) P3 LINKED-PART-RELEASE (psui, unverified: paid plans; lead 01:20) **Release… on another document's part in an
   assembly**: live (2464) lists "Release… [Upgrade]" in that instance's menu, and on the Free plan it only opens the
   upgrade modal, so what Release does there (release the source document's part at its version? from this document's
