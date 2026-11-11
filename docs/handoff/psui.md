@@ -22,8 +22,11 @@ them. Both on the projected path (a revolution's boundary nodes by `param_of`, i
   while the outer loop runs 0..2π: 88 holes a turn outside it. Now on a closed surface with unbounded u, each hole
   is moved by whole turns into its outer loop's span.
 Tests: `a_revolved_dome_whose_loop_starts_at_its_pole_is_meshed`, `a_revolved_band_with_a_hole_past_half_a_turn_is_meshed`
-(both fail before). The body now meshes here whole: 529 of 529 faces, ~1.0 s (was 9–24 s); the vent band itself is
-most of that (17,576 boundary nodes), a further speed-up is yours if wanted. Also: a Derived feature's source no
+(both fail before). The body now meshes here whole: 529 of 529 faces, ~1.0 s (was 9–24 s).
+**On your list (lead 11-11 05:20): the vent band's mesh, ~1.0 s → about 0.1 s.** It is most of that second: one
+revolution face, an outer loop of 456 nodes and 107 holes of 160 (17,576 boundary nodes, no interior ones; its
+plane 0.98 × 0.0068 after the grid's stretch). Measure with NOSHAPE_MESH_DEBUG on a copy of the lead's hat8
+(read-only 400 on vibe3/4/5: copy it to a mode-700 temp dir per run, delete after), tab "Mac-mini-2024". Also: a Derived feature's source no
 longer builds a display (`RegenOptions::context_only`): the derive meshed the Mac mini again, 3.5–9 s.
 
 ## 2026-11-10 14:34 UTC: heavy work on the UI thread (lead: after the measure P0)
