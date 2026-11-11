@@ -1160,7 +1160,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - core / blend: c2-impeller-loft's Fillet 3 ("Failed to fillet selections.") and Move face 1 ("Could not offset selected
     faces as requested.") now fail; the document already differs from feature 11 (Shell Gehäuse).
   - Not code: c2-hex-bookcase-derived (19:02's 563 ms) is 164 ms in the clean window, under live's 290.
-  **qa 11:42, the 07:57 run (green 96359491b) against the 00:54 one (6364f3c47; index 91.7 with the clean-window speed):** index
+  **qa 11:41, the 07:57 run (green 96359491b) against the 00:54 one (6364f3c47; index 91.7 with the clean-window speed):** index
   91.2: speed 91.7 -> 87.7 % (this run's speed under vibe5 load, median 14.7, against the clean window: -0.40 of the index);
   Documents / tabs 96.2 -> 95.0 % and drawing interaction 94.4 -> 93.6 % (new states: 952 -> 1028, 1372 -> 1384); geometry
   820 -> 821/947, assemblies 1260 -> 1266/1731 (+0.03 each); 1412/1483 scenarios. Flags:
