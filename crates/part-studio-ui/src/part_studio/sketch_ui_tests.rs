@@ -3664,6 +3664,14 @@ fn a_sketch_on_the_flat_is_drawn_in_the_flat_view(cx: &mut TestAppContext) {
         let part = ctx.bodies.iter().find(|b| ctx.sheet_metal.contains_key(&b.id)).unwrap().id.clone();
         let solid = noshape_model::sheetmetal::flat_pattern_for(ctx, &part).unwrap().flat_view_solid().unwrap();
         let top = solid.faces().iter().enumerate().filter(|(_, f)| f.face_plane().ok().flatten().is_some_and(|p| p.unit_normal().z > 0.999)).max_by(|a, b| a.1.area().unwrap_or(0.0).total_cmp(&b.1.area().unwrap_or(0.0))).unwrap().0;
+        // It shows the plate's sketch side, the face on Top (the flat is the plate turned over: live 2468, the sketch
+        // side faces +Z): the face the main view lights for it.
+        let shown = noshape_model::sheetmetal::flat_face_counterpart(ctx, &noshape_model::sheetmetal::flat_face_name(&part, top)).expect("the part's face");
+        let Reference::Face(n) = &shown else { panic!("{shown:?}") };
+        let body = ctx.body(&part).unwrap();
+        let fi = *body.find_faces(n).first().expect("on the part");
+        let pl = body.shape.faces()[fi].face_plane().unwrap().unwrap();
+        assert!(pl.unit_normal().z < -0.999 && pl.origin.z.abs() < 1e-9, "{pl:?}");
         (part, top)
     });
     cx.update_window(window, |_, w, cx| {

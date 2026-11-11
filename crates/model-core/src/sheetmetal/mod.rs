@@ -66,6 +66,32 @@ pub fn flat_face_frame(ctx: &crate::regen::context::Context, name: &TopoName) ->
     Some(crate::display::PlaneFrame { origin, x, y: n.cross(x), normal: n })
 }
 
+/// The part's face a flat face ([`flat_face_name`]) shows: the wall's face its centre comes from (a bend's
+/// developed strip and an edge face have none).
+pub fn flat_face_counterpart(ctx: &crate::regen::context::Context, name: &TopoName) -> Option<crate::reference::Reference> {
+    use noshape_kernel as k;
+    let (part, i) = flat_face_of(name)?;
+    let flat = flat_pattern_for(ctx, &part).ok()?;
+    let face = flat.flat_view_solid()?.faces().get(i)?.clone();
+    let [u0, u1, v0, v1] = face.uv_bounds().ok()?;
+    let c = face.point_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).ok()?;
+    let reach = flat.thickness * 1.001 + 1e-9;
+    let near = |s: &k::Shape, p: glam::DVec3, tol: f64| k::make_vertex(p).ok().and_then(|v| k::distance(&v, s).ok()).is_some_and(|d| d.distance <= tol);
+    // Its centre on the flat's definition plane (z 0) goes back onto a wall's definition face; a face off z 0 is
+    // the wall's face that far to the side the sheet is on.
+    let on_def = glam::DVec3::new(c.x, c.y, 0.0);
+    let (q, nf) = flat.place.as_ref()?.walls.iter().find_map(|(def, m)| {
+        let back = m.inverse();
+        let q = back.transform_point3(on_def);
+        near(def, q, reach).then(|| (q, back.transform_vector3(glam::DVec3::Z).normalize()))
+    })?;
+    let body = ctx.body(&part)?;
+    let faces = body.shape.faces();
+    let candidates = if c.z.abs() < 1e-9 { vec![q] } else { vec![q + nf * c.z.abs(), q - nf * c.z.abs()] };
+    let fi = candidates.iter().find_map(|p| faces.iter().position(|f| f.face_plane().ok().flatten().is_some() && near(f, *p, 1e-7)))?;
+    Some(crate::reference::Reference::Face((*body.faces[fi]).clone()))
+}
+
 /// The flat pattern of the part [`flat_body_id`] `id` names, as a body of
 /// `ctx` (the flat view's solid: the sheet in its flat place, its faces
 /// named by [`flat_face_name`]), named "Flat pattern of <name>".

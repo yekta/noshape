@@ -497,7 +497,7 @@ impl PartStudioView {
         shown
     }
 
-    /// The part's faces the selected flat faces show (the reference side's or the back's base wall face).
+    /// The part's faces the selected flat faces show.
     pub(super) fn flat_cross_selection(&self, cx: &App) -> Vec<Reference> {
         let Some(fv) = self.flat_view.as_ref() else { return Vec::new() };
         self.selection
@@ -505,7 +505,8 @@ impl PartStudioView {
             .filter_map(|r| {
                 let Reference::Face(n) = r else { return None };
                 let (_, i) = noshape_model::sheetmetal::flat_face_of(n)?;
-                self.flat_model_face(fv.read(cx).side_of(i)?)
+                // (The wall's face it shows; a bend strip's, the base wall's on that side.)
+                self.context.as_ref().and_then(|c| noshape_model::sheetmetal::flat_face_counterpart(c, n)).or_else(|| self.flat_model_face(fv.read(cx).side_of(i)?))
             })
             .collect()
     }

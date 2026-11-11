@@ -2977,7 +2977,9 @@ fn flat_place(def: &Definition, topo: &Topo, unfolded: &Unfolded) -> Option<crat
     let x = crate::display::PlaneFrame::face_x(n);
     let y = n.cross(x);
     let live = glam::DMat4::from_cols(glam::DVec4::new(x.x, y.x, n.x, 0.0), glam::DVec4::new(x.y, y.y, n.y, 0.0), glam::DVec4::new(x.z, y.z, n.z, 0.0), glam::DVec4::new(0.0, 0.0, -p0.dot(n), 1.0));
-    Some(crate::sheetmetal::flat::FlatPlace { view: live * w.inverse(), front: def.front, back: def.back })
+    let view = live * w.inverse();
+    let walls = unfolded.walls.iter().filter_map(|(f, m)| Some((topo.faces.get(*f)?.clone(), view * *m))).collect();
+    Some(crate::sheetmetal::flat::FlatPlace { view, front: def.front, back: def.back, walls })
 }
 
 struct Unfolded {

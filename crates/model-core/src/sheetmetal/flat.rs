@@ -83,12 +83,15 @@ pub struct FlatPattern {
 /// Live 2468: the flat is laid out by its fixed face (the first sketch segment's): a point p of that face goes to
 /// (p·x, p·y, (p − o)·n) with the face's plane frame (o, x, n), so the flat keeps its in-plane coordinates and lies
 /// on z = 0, the sheet `front` above it and `back` below.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct FlatPlace {
     /// [`FlatPattern::shape`]'s space → the flat's place.
     pub view: DMat4,
     pub front: f64,
     pub back: f64,
+    /// Each wall's definition face in the part and its map from the part to the flat's place: a face of the flat
+    /// leads back to the part's face it shows (the flat view's cross-highlight, live 2468).
+    pub walls: Vec<(Shape, DMat4)>,
 }
 
 impl FlatPattern {
