@@ -1160,6 +1160,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - core / blend: c2-impeller-loft's Fillet 3 ("Failed to fillet selections.") and Move face 1 ("Could not offset selected
     faces as requested.") now fail; the document already differs from feature 11 (Shell Gehäuse).
   - Not code: c2-hex-bookcase-derived (19:02's 563 ms) is 164 ms in the clean window, under live's 290.
+  **qa 11:42, the 07:57 run (green 96359491b) against the 00:54 one (6364f3c47; index 91.7 with the clean-window speed):** index
+  91.2: speed 91.7 -> 87.7 % (this run's speed under vibe5 load, median 14.7, against the clean window: -0.40 of the index);
+  Documents / tabs 96.2 -> 95.0 % and drawing interaction 94.4 -> 93.6 % (new states: 952 -> 1028, 1372 -> 1384); geometry
+  820 -> 821/947, assemblies 1260 -> 1266/1731 (+0.03 each); 1412/1483 scenarios. Flags:
+  - dx: drw-section-hatch-general-none differs since live's re-record (1ac4f68ad, 01:38): step 10 "dropdown:None is not shown"
+    (2 / 2 alone on vibe5).
+  - psui: vs-cfg-value-unconfigure differs since its edit (824a27c58, 04:08): step 8 live opens the context menu (Delete, Move
+    down, Unconfigure), ours none (2 / 2 alone).
+  - Speed flags against the 00:54 run (c2-sm-louver 5.0 -> 8.6 s, cf-drive-train-generator, cf-fill-pattern, cf-part-draft
+    ×1.4–1.7) are both loaded vibe5 runs: re-checked in the 02:00 window before filing.
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
