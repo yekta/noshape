@@ -1887,6 +1887,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   curve (a corner is two vertices), Ent::SketchSheet(s) owning the regions with SketchSheetEdge / SketchSheetVertex
   from the regions' merged boundaries (rings without vertices); then every place that takes Ent::SketchBody as a
   body (opDeleteBodies, transforms, patterns, Booleans, qEverything) handles the new bodies.
+  **psui 2026-11-11 17:08: edges and vertices are live's, the bodies left (SKETCH-BODIES-PER-ENTITY).** Lines, arcs,
+  elliptical arcs and conics have end vertices of their own (Ent::SketchCurveEnd, as open fit splines had), the points that
+  are only their ends no vertices; a ring's region piece no vertex. qCreatedBy(sketch, EDGE / VERTEX) of UI sketches: a
+  rectangle 8 / 12, a circle 2 / 1, a line 1 / 2, on a 60 × 40 face a Ø10 circle 6 / 5 and a line across 8 / 8, all live's
+  (T1 custom_features a_sketchs_edges_and_vertices_are_lives); model suite = f324e41f per document. Bodies stay one per
+  sketch (live 5 / 3 / 1).
 - [x] (core 11-03 07:45: a blend's new B-spline faces that are planes, cylinders, cones, spheres or tori within 1e-5 of the part are rebuilt on that surface, kept when the solid stays valid and its volume the same (features.cpp analytic_blend_faces; ≤ 0.1 ms a blend on live-30-features): the Spur Gear's root fillets are cylinders as live (defaults 100 / changed 121 cylinders, no B-splines; T1 kernel_robustness::a_fillet_between_extruded_faces_is_a_cylinder); the blend corpus as recorded) P2 FILLET-PRISMATIC-CYLINDER (core 11-03, live REST on live 1830's gears) a constant fillet between two faces
   extruded the same way (the Spur Gear's root fillets: the root cylinder and an extruded involute spline) is a
   cylinder in live (qGeometry CYLINDER, evSurfaceDefinition radius 0.378848 / 0.166393 mm); ours an OCCT B-spline

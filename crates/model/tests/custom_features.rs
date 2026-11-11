@@ -4413,3 +4413,65 @@ fn a_split_part_drafted_both_sides_with_reapplied_fillets_unions_again() {
     let v = total_volume(&r) * 1e9;
     assert!((v / (2.0 * half) - 1.0).abs() < 1e-3, "{v} mm³, about {}", 2.0 * half);
 }
+
+/// A sketch's edges and vertices in FeatureScript are live's (core's "imprint probe 1", SKETCH-IMPRINT-TOPOLOGY): each
+/// open curve has end vertices of its own (a rectangle 8 edge ends), a circle's ring none, its centre one; on a face the
+/// regions' own edges and vertices take in the face's.
+#[test]
+fn a_sketchs_edges_and_vertices_are_lives() {
+    use glam::DVec2;
+    use noshape_model::reference::DatumPlane;
+    use noshape_model::sketch_feature::SketchData;
+    let units = UnitPrefs::default();
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    let mut ps = PartStudio::new();
+    let add_sketch = |ps: &mut PartStudio, plane: Reference, draw: &dyn Fn(&mut noshape_sketch::Sketch)| {
+        let mut sk = noshape_sketch::Sketch::new();
+        draw(&mut sk);
+        let mut f = ps.new_feature("sketch", &units).unwrap();
+        f.params.set("sketchPlane", ParamValue::Query(vec![plane]));
+        f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        let id = f.id;
+        ps.features.push(f);
+        id
+    };
+    let top = Reference::Plane(DatumPlane::Top);
+    let rect = add_sketch(&mut ps, top.clone(), &|s| { s.corner_rectangle(mm(0.0, 0.0), mm(20.0, 10.0)); });
+    let circle = add_sketch(&mut ps, top.clone(), &|s| { s.add_circle(mm(100.0, 0.0), 0.005); });
+    let line = add_sketch(&mut ps, top.clone(), &|s| { s.add_line(mm(200.0, 0.0), mm(230.0, 0.0)); });
+    let block = add_sketch(&mut ps, top.clone(), &|s| { s.corner_rectangle(mm(-30.0, -20.0), mm(30.0, 20.0)); });
+    let mut reg = Regenerator::new();
+    let fx0 = Fixture::new(&studio(""));
+    let key = fx0.regen(&mut reg, &ps).display.sketches.iter().find(|s| s.feature == block).unwrap().regions[0].key.clone();
+    let mut ex = ps.new_feature("extrude", &units).unwrap();
+    ex.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: block, key }]));
+    ex.params.set("depth", expr("10 mm"));
+    ps.features.push(ex);
+    let r = fx0.regen(&mut reg, &ps);
+    let topf = r.context.bodies[0].faces.iter().find(|n| format!("{n:?}").contains("CapEnd")).unwrap().clone();
+    let fcircle = add_sketch(&mut ps, Reference::Face((*topf).clone()), &|s| { s.add_circle(mm(0.0, 0.0), 0.005); });
+    let fline = add_sketch(&mut ps, Reference::Face((*topf).clone()), &|s| { s.add_line(mm(-40.0, 0.0), mm(40.0, 0.0)); });
+    let mut body = String::from(r#"
+function counts(context is Context, q is Query) returns string
+{
+    return size(evaluateQuery(context, qEntityFilter(q, EntityType.EDGE))) ~ " " ~ size(evaluateQuery(context, qEntityFilter(q, EntityType.VERTEX)));
+}
+annotation { "Feature Type Name" : "Sketch topology" }
+export const sketchTopology = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+"#);
+    for (name, f) in [("rect", rect), ("circle", circle), ("line", line), ("face circle", fcircle), ("face line", fline)] {
+        body += &format!("        println(\"{name} \" ~ counts(context, qCreatedBy(makeId(\"{f}\"))));\n");
+    }
+    body += "    });\n";
+    let fx = Fixture::new(&studio(&body));
+    let f = ps.new_feature(&fx.ty("sketchTopology"), &fx.units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    let out = custom::run::output_of(fid).expect("output").output;
+    // (live: edges, vertices)
+    assert_eq!(out.lines().collect::<Vec<_>>(), ["rect 8 12", "circle 2 1", "line 1 2", "face circle 6 5", "face line 8 8"]);
+}
