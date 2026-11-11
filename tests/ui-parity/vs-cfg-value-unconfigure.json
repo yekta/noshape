@@ -1,6 +1,6 @@
 {
  "name": "vs-cfg-value-unconfigure",
- "about": "Insert into all unticked, then: Configure a Value cell, then right-click › Unconfigure from Configuration",
+ "about": "Insert into all unticked, then: Configure a Value cell, then right-click › Unconfigure",
  "area": "studios",
  "source": "universe variable-studio vs-value-unconfigure (studios 11-08, coverage batch 3)",
  "start": "vs-vars",
@@ -50,7 +50,7 @@
   {
    "do": "click",
    "on": {
-    "menu": "Unconfigure from Configuration"
+    "menu": "Unconfigure"
    }
   }
  ]
