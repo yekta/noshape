@@ -3399,7 +3399,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   write BTMParameterReferencePartStudio as that value. Live 2294 (08:11): a sketch click applies and closes the
   panel, the field reads the studio's name (both as ours now), placement as a library bar (ours).
 
-- [ ] P2 UIP-SELECT-OTHER-LIST (psui) **ui-parity face-menu-select-other: after the face menu's Select other…, ours reports
+- [x] (psui 2026-11-11: face-menu-select-other and asm-face-menu-select-other match live, 4/4 states, in the 11-10 17:42 full run) P2 UIP-SELECT-OTHER-LIST (psui) **ui-parity face-menu-select-other: after the face menu's Select other…, ours reports
   no list**, live (re-recorded 11-07 03:09, 43f4389bc) a select-other list ("Front plane / Face of Extrude 1 / Part 1 / Edge of
   Extrude 1 / …") and a Select other panel. It matched before only because the old recording had no list either. Fails 4 / 4
   run alone on green 917d4c4c. Either ours doesn't open the list or the state dump doesn't report it. (qa 2026-11-07 07:16)
@@ -3427,7 +3427,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   z-height to zero and normals to positive ✓; Export / Cancel; the File name input focused, its text selected. Ours goes
   straight to the OS save dialog (DXF only, mm). The drawing export's DXF / DWG writers and its modal
   (drawing-ui/drawing_export.rs) are the parts to reuse; the `sketch_export` op (file, format today) gets the same options.
-- [ ] P2 SKETCH-MIRROR-LINE-SELECTED (psui) live shows the sketch Mirror's mirror line selected once picked (ui-parity
+- [x] (psui 2026-11-11: sketch-mirror-tool matches live, 17/17 states, in the 11-10 17:42 and 11-11 00:50 runs) P2 SKETCH-MIRROR-LINE-SELECTED (psui) live shows the sketch Mirror's mirror line selected once picked (ui-parity
   sketch-mirror-tool step 14: selection 1); ours doesn't. Selecting it in `Tool::Mirror` (sketch_mode.rs) made the next click
   on the curve to mirror find no hover in the app (4 of 4 runs, vibe5; the editor's unit test, which sets the hover itself,
   mirrors fine), so it's reverted until that's understood: something in the Part Studio's GPU hover with a selected sketch
