@@ -2214,9 +2214,11 @@ impl<'a> Translator<'a> {
     /// interior point lies inside those curves. `None`: not a region query.
     fn region_from_query(&mut self, text: &str) -> Result<Option<String>, String> {
         let mut own_edges: Vec<String> = Vec::new();
+        let mut packed_side = None;
         let (sk, strings) = match text.split("qCompressed(1.0,\"").nth(1).and_then(|r| r.split('"').next()) {
             Some(packed) => {
                 let Ok(tree) = noshape_model::custom::host::packed::unpack(packed) else { return Ok(None) };
+                packed_side = packed_edge_side(&tree);
                 // A body told apart by region faces is the body's (c2-hunting-knife's Extrude 8 booleanScope: Loft 1's
                 // SWEPT_BODY).
                 if packed_entity_type(&tree).as_deref() == Some("BODY") {
@@ -2331,7 +2333,7 @@ impl<'a> Translator<'a> {
         // whole curve): the region at a point a hair along that piece from the vertex (-1: the piece starting there, +1:
         // ending there) and a hair to the face's side (+1 its left, as a loop runs; a circle's inside).
         if bounded.len() != 1 && !derived
-            && let Some(q) = edge_side_query(text)
+            && let Some(q) = edge_side_query(text).or(packed_side)
             && let Some(probe) = self.edge_side_probe(&sk, &g, &q)
         {
             let k = per_unit(&g["units"]);
@@ -2732,7 +2734,9 @@ impl<'a> Translator<'a> {
             // Whatever made it (opExtrude, opRevolve, opThicken…): the feature's part.
             let op = strings.iter().find_map(|s| s.rsplit_once(".op").map(|(f, _)| f.to_string()))?;
             // The part our Extrude made (the part of its faces).
-            let Some(ours) = self.feature_ids.get(&op).cloned() else { return Some(Err(format!("SWEPT_BODY: feature {op} was not built"))) };
+            // (A custom feature's own operation, Spur gear's `blank`: the feature's part.)
+            let built = self.feature_ids.get(&op).or_else(|| op.split_once('.').and_then(|(f, _)| self.feature_ids.get(f)));
+            let Some(ours) = built.cloned() else { return Some(Err(format!("SWEPT_BODY: feature {op} was not built"))) };
             let r = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 1 }));
             return Some(r.and_then(|f| f["faces"][0]["part"].as_str().map(str::to_string).ok_or_else(|| format!("SWEPT_BODY of {op}: no part of ours"))));
         }
@@ -2919,8 +2923,36 @@ impl<'a> Translator<'a> {
         self.curves.get(&(sk.to_string(), pattern_alias(sketch, id)?)).cloned()
     }
 
+    /// An end cap's circle of extrude `op` (ours `ours`): of its planar faces, those farthest from the sketch live's
+    /// extrude took its profile from, nearest when `start`; a circle of them, when all their circles share a centre.
+    fn end_cap_circle(&mut self, op: &str, ours: &str, start: bool) -> Option<String> {
+        let f = self.features.iter().find(|f| f["featureId"] == op)?;
+        let texts: Vec<String> = f["parameters"].as_array()?.iter().flat_map(|p| p["queries"].as_array().into_iter().flatten()).filter_map(|q| q["queryString"].as_str().map(str::to_string)).collect();
+        let sk = texts.iter().flat_map(|t| packed_strings_of(t)).find_map(|s| s.strip_suffix(".wireOp").or_else(|| s.strip_suffix(".imprint")).map(str::to_string).filter(|s| self.frames.contains_key(s)))?;
+        let [o, x, y] = self.frames.get(&sk).copied()?;
+        let n = glam::DVec3::from(x).cross(glam::DVec3::from(y));
+        let faces = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 1000 })).ok()?;
+        let k = per_unit(&faces["units"]);
+        let level = |c: [f64; 3]| (glam::DVec3::from(c) * k - glam::DVec3::from(o)).dot(n).abs();
+        let planes: Vec<(String, f64)> = faces["faces"].as_array()?.iter().filter(|f| f["surface"] == "plane").filter_map(|f| Some((f["id"].as_str()?.to_string(), level(f3(&f["centroid"])?)))).collect();
+        let far = if start { planes.iter().map(|p| p.1).fold(f64::INFINITY, f64::min) } else { planes.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max) };
+        let mut circles: Vec<(String, [f64; 3])> = Vec::new();
+        for (cap, _) in planes.iter().filter(|p| (p.1 - far).abs() < 1e-7) {
+            let edges = self.call("query_entities", json!({ "kind": "edges", "of": [cap], "limit": 1000 })).ok()?;
+            circles.extend(edges["edges"].as_array()?.iter().filter(|e| e["curve"] == "circle" && e["closed"] == true).filter_map(|e| Some((e["id"].as_str()?.to_string(), f3(&e["center"])?.map(|c| c * k)))));
+        }
+        let (first, c) = circles.first()?;
+        circles.iter().all(|(_, d)| (0..3).all(|i| (d[i] - c[i]).abs() < 1e-9)).then(|| first.clone())
+    }
+
     fn extrude_entity(&mut self, name: &str, is_start: bool, crossing: Option<usize>, op: &str, sk: &str, curves: &[Vec<[f64; 2]>]) -> Result<String, String> {
         let ours = self.feature_ids.get(op).cloned().ok_or_else(|| format!("{name}: extrude {op} was not built"))?;
+        // A curve of a custom feature's own sketch (Spur gear's `blankSketch`), whose curves we can't name: a cap's
+        // edge by its centre, when the cap's circles share one (asm-hand-drill-pinslot's second Spur gear centred on
+        // Extrude 1's hub over the first one's hole).
+        if name == "CAP_EDGE" && !self.feature_ids.contains_key(sk) && sk.split_once('.').is_some_and(|(f, _)| self.feature_ids.contains_key(f)) {
+            return self.end_cap_circle(op, &ours, is_start).ok_or_else(|| format!("{name}: {sk} is a custom feature's own sketch, and {op}'s end cap has no one centre"));
+        }
         let our_sketch = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("{name}: sketch {sk} was not built"))?;
         if curves.is_empty() {
             return Err(format!("{name} of {op}: its sketch curves were not translated"));
@@ -4925,6 +4957,63 @@ fn edge_side_query(text: &str) -> Option<EdgeSide> {
     Some(EdgeSide { edge, vertex, side })
 }
 
+/// [`edge_side_query`] of a packed region query: its first TOPOLOGY edge that names a vertex of its own (the piece of a
+/// curve between two others' crossings: asm-hand-drill-pinslot's Triple Connector, a circle halved by two lines, each
+/// half extruded); each as `[edge, side]`, its vertices `[vertex, flag]`.
+fn packed_edge_side(p: &noshape_model::custom::host::packed::Packed) -> Option<EdgeSide> {
+    use noshape_model::custom::host::packed::Packed;
+    fn field<'a>(p: &'a Packed, key: &str) -> Option<&'a Packed> {
+        let Packed::Map(kv) = (match p {
+            Packed::Tagged(_, inner) => inner.as_ref(),
+            other => other,
+        }) else {
+            return None;
+        };
+        kv.iter().find(|(k, _)| matches!(k, Packed::Str(s) if s == key)).map(|(_, v)| v)
+    }
+    fn text<'a>(p: &'a Packed, key: &str) -> Option<&'a str> {
+        match field(p, key)? {
+            Packed::Str(s) => Some(s),
+            Packed::Tagged(_, v) => match v.as_ref() {
+                Packed::Str(s) => Some(s),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+    // [entity, number] pairs of a query's TOPOLOGY disambiguation.
+    fn pairs(p: &Packed) -> Vec<(&Packed, f64)> {
+        let Some(Packed::Array(data)) = field(p, "disambiguationData") else { return Vec::new() };
+        data.iter()
+            .filter(|d| text(d, "disambiguationType") == Some("TOPOLOGY"))
+            .filter_map(|d| match field(d, "entities") {
+                Some(Packed::Array(groups)) => Some(groups),
+                _ => None,
+            })
+            .flatten()
+            .filter_map(|g| match g {
+                Packed::Array(a) => match a.as_slice() {
+                    [q, Packed::Num(n)] => Some((q, *n)),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect()
+    }
+    let entity = |q: &Packed| field(q, "derivedFrom").and_then(|d| text(d, "sketchEntityId")).map(str::to_string);
+    let vertex = |q: &Packed| -> Option<([String; 2], f64)> {
+        let (v, flag) = pairs(q).into_iter().find(|(v, _)| text(v, "queryType") == Some("INTERSECT"))?;
+        let Some(Packed::Array(from)) = field(v, "derivedFrom") else { return None };
+        let [a, b] = from.as_slice() else { return None };
+        Some(([text(a, "sketchEntityId")?.to_string(), text(b, "sketchEntityId")?.to_string()], flag))
+    };
+    let edges: Vec<(&Packed, f64)> = pairs(p).into_iter().filter(|(q, _)| text(q, "queryType") == Some("IMPRINT") && text(q, "entityType") == Some("EDGE")).collect();
+    // (A whole curve's side goes by which way the curve runs, which ours may not share with live's: c2-fan-blade-sweep's
+    // Extrude 1 took the region beside its own.)
+    let (q, side) = edges.iter().find(|(q, _)| vertex(q).is_some())?;
+    Some(EdgeSide { edge: entity(q)?, vertex: vertex(q), side: *side })
+}
+
 /// The live sketch entity an IMPRINT edge of a text query is derived from (`"derivedFrom":subQk`, its
 /// `var subQk=sketchEntityQuery(…,"<id>")`, or `"derivedFrom":sketchEntityQuery(…,"<id>")`).
 fn face_edge_entity(text: &str) -> Option<String> {
@@ -5634,7 +5723,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             trace(&format!("{name}: feature {k}"));
             let step = t.step(k);
             res.untranslated.extend(step.problems.iter().map(|p| format!("{name} › {} ({}): {p}", step.name, step.feature_type)));
-            if step.status.as_deref().is_some_and(|s| s != "Ok") {
+            // (One live has suppressed is added, then suppressed: its status is the add's.)
+            if step.status.as_deref().is_some_and(|s| s != "Ok") && studio["features"][k]["suppressed"] != true {
                 res.differences.push(format!("{name} › {}: {} ({})", step.name, step.status.as_deref().unwrap_or(""), step.message.as_deref().unwrap_or("")));
             }
         }
@@ -6089,6 +6179,19 @@ mod tests {
         let body = noshape_model::custom::host::packed::unpack("&56c$eJylVNuSojAQ/ZnsoxThpj5iiBovwCSsii8WStAoigLe5usHtGZG3anaXX2hQp8+p0/Snfxq6OBtz9NzX2dQAaHIgvVUzPdBLpKNFeSBCfvKn4h33nIGVeBQ0iK22ZtY2MW2hW3kszpIUjEXmyDOTA3JfZ3KpQiFrAY8x3V6TssvlnyTi1zwzDRMpcxiUxDyVBx42EyT9SUSXJPOZbVGAPDXD9MAtlq4oCxElifpNVgDiGLTI45dAMmWpxerJGwogIQmZBBKBmiudn2X5yv5tDz77+8T5ShS7mwL17vyGC5CIWBd7KH2BNse8XzGQbbi+WxxNUBCNpOgVIEG0Jaj36PTQTM80pNpldZonQZ0inhRrRJJVSDW21RscspZFZC+S4ntWfC6X2pcvl8kGlJOIwplVoF6qS5BAG9gqBU41Cms/jtfeZGvv8g3XuRXf+TTKqoXE9A0Eb7H7gUvXYBlo2TQHJNohdBgnuq78NyZKJ+1ZmBw9LtuO4qtAUYPjlT1Oy22o85+z8j6Dau3Q001qn+O8OOW7hzEqNaeoaFcPyanbH7roBXLMlfYqtlcth6HSAkKdg385ejU+rea5gk3X+ITG2Xz25TwPzQOo90xMczTkBbgcxqF7alUB+PETbYL0pGnXRSJOOa5mc6elzSkigrBiL6Nxj3bdTZr/JxWRVUvBku1HxWKoCo/RK9j13As/769xaNybBkrnunRQPi5kCdKsu0lUXntA8CG2PUmJesD5FWYjw==").unwrap();
         assert_eq!(super::packed_entity_type(&body).as_deref(), Some("BODY"));
         assert_eq!(super::packed_entity_type(&fan).as_deref(), Some("FACE"));
+    }
+
+    /// A packed region query's piece of a curve: asm-hand-drill-pinslot's Triple Connector halves a circle by two lines
+    /// and extrudes both halves; live names each half by the circle's piece from one crossing to the other (JcO starts
+    /// where the circle meets Bk5r…, JcS ends there), so they are two regions, not one.
+    #[test]
+    fn a_packed_regions_piece_of_a_curve_tells_its_halves_apart() {
+        let side = |q: &str| super::packed_edge_side(&noshape_model::custom::host::packed::unpack(q).unwrap()).unwrap();
+        let (o, s) = (side("&244$eJyNj0tTwjAUhf9MXMqQPmHZR4oF2+JNBmXFlCZIhinFtKD115sWdERduLu55zs599z4Nno4CtUmNsUG4rLOy7V8PuaNrPZh3uQeTozfCmsPgo4Qy+bZfTZZ6lHsG9lIUXumZwTDxKFrxIWSJ8EjVZV6Y9P8DLWd2c8R+XpQC5FwQrRlK+umUu3l+wCIx+Is1UJ1EKpPjrlvoJh7mGI8cFBUv/uWDI8jqZJAnFb4VSqRHegYvXSt+o84ojPCgrsVSVnMllSgeieaYns+IOa0QNMFr0JpNilrTRh2nQGDAbpL38YGy9ObYT/a4IALIxjDGgrgILTf39lq/rhLZ/lUA4FLHbQgwMjTmQwKfe8tH7hIlgcl9w0U+sI4ZQQoCVh4i/8Xk9ROZOLyLTpuQg1g60JgRyPYDfE3V7ejLoqTOeggwJvPCMDGDwwM60ov/tLHfS8LRV5ArrUPCACx3A=="), side("&244$eJyNT8tSwjAU/Zm4lCF9wrKPFAu2xZsMyoopTZAMU4ppQevXmxZ8u3B373ncc8+Vb6O7o1BtYlNsIC7rvFzLx2PeyGof5k3u4cT4zbD2IOgIsWye3WaTpR7FvpGNFLVnekYwTBy6RlwoeRI8UlWpEZvmZ1Hbmf0ckY+FWoiEE6ItW1k3lWov5wMgHouzVBPVQag+Oea+gWLuYYrxwEFR/epbMjyOpEoCcVrhZ6lEdqBj9NS16g9xRGeEBTcrkrKYLalA9U40xfb8QMxpgaYLXoXSbFLWmjDsOgMGA3SXvo0NlqeRYT/a4IALIxjDGgrgILTf39lqfr9LZ/lUCwKXOmhBgJGHszIo9L/XfOAiWR6U3DdQ6A/jlBGgJGAh/l9KUjuRicuX6LgJtQBbFwV2tAS74TX+YutA6qI4mYMOAjx+zwBs/JCBocHNJ1/8xY/7XhaKvIB8594A/22xrw=="));
+        assert_eq!(o.edge, "JVdoDi3tNTy3");
+        assert_eq!(o.vertex, Some((["JVdoDi3tNTy3".to_string(), "Bk5rPWkNKaJ5".to_string()], -1.0)));
+        assert_eq!(s.vertex, Some((["JVdoDi3tNTy3".to_string(), "Bk5rPWkNKaJ5".to_string()], 1.0)));
+        assert_eq!((o.side, s.side), (1.0, 1.0));
     }
 
     /// stef-radijator's Fillet 1 names `TNHaprdwY81W.1.18.0` of an 18-instance circular pattern listing the seed

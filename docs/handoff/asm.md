@@ -54,6 +54,12 @@ places (ours from `connector_world`, live's = occurrence transform x `mateConnec
 - Also fixed (translator, my ee69e4a6a's regression): a region told apart by another sketch's imprint is that
   sketch's only when the imprint is the TOPOLOGY entity's own (the fan's RoBG), not one deeper in an edge's history
   (the spur gear's Extrude 6: "Select face or sketch region to extrude." gone).
+- 11-11: Cylindrical 23 fixed (dx): the Triple Connector's Sketch 4 halves a circle with two lines and Extrude 3
+  takes both halves; live names each half by the circle's piece between the crossings (packed TOPOLOGY vertex flags),
+  which the translator now reads, so both halves are extruded, Fillet 3 rounds the right pin and the connector is
+  live's. The spur gear connector translated too (a custom feature's own sketch: the end cap's circle by its centre);
+  the Gear 5 Connector still has no part: its Boolean 2 Union with Keep tools merges in ours (core.md). Mates 7/52;
+  Planar 11 (core) and Cylindrical 22 (asm) still hold the cluster.
 - Landed with them: the assembly suite one document per process (the whole run hits vibe5's earlyoom): every
   assembly as before but the drill, 5 -> 6/52; the model suite 76/87, 818/947 either way.
 - For asm (not changed): when one mate in a big cluster can't hold, ours flags every mate the least-squares

@@ -1935,6 +1935,18 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From dx (11-11 00:04 UTC): Boolean Union with ☑ Keep tools makes a new part and keeps the tools (ours merges into the first)
+
+asm-hand-drill-pinslot's studio 9fbc05 (the 9.02mm Gear 5 Connector) and f79298: **Boolean 2 = Union of the two
+Spur gears, Keep tools on.** Live's per-feature lines: after it **three parts**, the union a new part (3,605.4 mm³)
+and both gears unchanged (1,326.3 and 2,279.2 mm³); Delete part 1 then deletes the two gears by id, leaving the union.
+Ours (basic.rs `boolean`, UNION) ignores `keepTools`: the union goes into the first-picked gear (its id and name) and
+the other is removed, so Delete part 1 deletes everything and the assembly's 15 mates on the Gear 5 Connector have no
+part. Behaviours.md has the dialog (Union | Subtract | Intersect, ☐ Keep tools) but no capture of Union + Keep tools;
+from live's lines here: a new part (new id, so a delete of the tools' ids keeps it), the tools kept as they were. Its
+name and colour as live's new parts (an Intersect's common volume already does this, the INTERSECTION branch above).
+Repro: the corpus document alone, `parity::parity_assemblies` (the studio's lines "Studio 9fbc05 › …").
+
 ## From dx (11-10 21:05 UTC, lead): asm-hand-drill-pinslot's Top Ring Gear chamfer fails (Tangent / APEX_RANGE)
 
 Studio 0d1e01 (the Top Ring Gear, "Spur gear (42 teeth)") of asm-hand-drill-pinslot: **Chamfer 1 reads "Failed to
