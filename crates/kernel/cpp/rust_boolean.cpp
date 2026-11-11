@@ -931,9 +931,31 @@ using Sections = std::map<std::array<uint32_t, 4>, std::vector<IntTools_Curve>>;
 
 // During one of noshape's own Booleans (rust_boolean): its arguments, and the sections of free-form faces it
 // asked for (brep_occt_sections), by id: the curve and its two faces (in the order of its curves on them).
+// Faces' own extents (BRepBndLib::AddOptimal, without tolerances), each made once for a Boolean's sections (a face in
+// many pairs: hat8's union boxed its grip faces 1300 times, 18 % of it), on any thread.
+struct ExactBoxes
+{
+  std::mutex                                                          m;
+  NCollection_DataMap<TopoDS_Shape, Bnd_Box, TopTools_ShapeMapHasher> boxes;
+  Bnd_Box                                                             of(const TopoDS_Face& f)
+  {
+    {
+      const std::lock_guard<std::mutex> lock(m);
+      if (const Bnd_Box* b = boxes.Seek(f))
+        return *b;
+    }
+    Bnd_Box b;
+    BRepBndLib::AddOptimal(f, b, false, false);
+    const std::lock_guard<std::mutex> lock(m);
+    boxes.Bind(f, b);
+    return b;
+  }
+};
+
 struct FreeSections
 {
   const std::vector<const OcShape*>*                     srcs = nullptr;
+  ExactBoxes                                             exact;
   std::vector<std::pair<std::array<TopoDS_Face, 2>, IntTools_Curve>> curves;
   // Sections moved from others (brep_occt_moved), by id (the same as `curves`'): built when an edge takes one.
   struct Moved
@@ -2754,7 +2776,7 @@ bool coaxial_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<
 // on the z = 6.9 mm top of its base's 432 grip faces, each pair 60 ms of OCCT's marching to a curve outside the wall):
 // they meet only in that slab, so along a curve only where an edge of each lies there along one curve, or a face
 // touches it inside. Neither: no section (their touching points are the edges' own). True with none then.
-static bool apart_across_slab(const TopoDS_Face& fa, const TopoDS_Face& fb)
+static bool apart_across_slab(const TopoDS_Face& fa, const TopoDS_Face& fb, ExactBoxes& exact)
 {
   Bnd_Box ba, bb;
   BRepBndLib::Add(fa, ba, false);
@@ -2771,10 +2793,8 @@ static bool apart_across_slab(const TopoDS_Face& fa, const TopoDS_Face& fb)
       axis = k;
   if (axis < 0)
     return false;
-  ba.SetVoid();
-  bb.SetVoid();
-  BRepBndLib::AddOptimal(fa, ba, false, false);
-  BRepBndLib::AddOptimal(fb, bb, false, false);
+  ba = exact.of(fa);
+  bb = exact.of(fb);
   ba.Get(a[0], a[1], a[2], a[3], a[4], a[5]);
   bb.Get(b[0], b[1], b[2], b[3], b[4], b[5]);
   const double tol = BRep_Tool::MaxTolerance(fa, TopAbs_EDGE) + BRep_Tool::MaxTolerance(fb, TopAbs_EDGE) + Precision::Confusion();
@@ -2843,7 +2863,7 @@ static bool apart_across_slab(const TopoDS_Face& fa, const TopoDS_Face& fb)
 // A curved face resting on a plane: on one side of it, touching it along edges of its own (a Mac mini base's 432 grip
 // faces under the body's bottom, each 60 ms of OCCT's marching): those edges, exact. False where the face's box reaches
 // across the plane, no edge lies in it, or a point inside the face comes within tolerance (OCCT's then).
-static bool resting_on_plane(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+static bool resting_on_plane(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out, ExactBoxes& exact)
 {
   const occ::handle<Geom_Plane> pa = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fa)), pb = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fb));
   if (pa.IsNull() == pb.IsNull())
@@ -2883,8 +2903,7 @@ static bool resting_on_plane(const TopoDS_Face& fa, const TopoDS_Face& fb, std::
     return false;
   // (On one side of it, by its own extent without tolerances: a B-spline's box by its poles reached 3.5 mm over a
   // grip face's plane.)
-  Bnd_Box box;
-  BRepBndLib::AddOptimal(f, box, false, false);
+  const Bnd_Box box = exact.of(f);
   if (box.IsVoid())
     return false;
   double x0, y0, z0, x1, y1, z1;
@@ -3055,7 +3074,7 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
 
 // Our Boolean's own sections: own_sections, else a face resting on a plane or faces meeting only in a slab (not OCCT's
 // hook: its pave filler takes those cases' curves untried).
-static bool boolean_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+static bool boolean_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out, ExactBoxes& exact)
 {
   if (own_sections(fa, fb, out))
     return true;
@@ -3063,7 +3082,7 @@ static bool boolean_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::
   // (Only with a free-form face: OCCT's sections of planes, cylinders, cones and spheres are analytic and quick (a plate's
   // holes paid the exact boxes for nothing).)
   const auto free_form = [](const TopoDS_Face& f) { return BRepAdaptor_Surface(f, false).GetType() > GeomAbs_Sphere; };
-  return (free_form(fa) || free_form(fb)) && (resting_on_plane(fa, fb, out) || apart_across_slab(fa, fb));
+  return (free_form(fa) || free_form(fb)) && (resting_on_plane(fa, fb, out, exact) || apart_across_slab(fa, fb, exact));
 }
 
 // OCCT's section of two faces, one of them free-form, brought onto both surfaces where its approximation is coarse
@@ -3208,13 +3227,14 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
       continue;
     jobs.push_back(Job{key, TopoDS::Face(input(*t_free->srcs, a.first, TopAbs_FACE, a.second)), TopoDS::Face(input(*t_free->srcs, b.first, TopAbs_FACE, b.second)), false, {}});
   }
+  FreeSections* const fs = t_free;
   OSD_Parallel::For(0, static_cast<int>(jobs.size()), [&](int k) {
     // (None started once the caller's budget or cancel says stop.)
     if (noshape_should_break() != 0)
       return;
     try
     {
-      if (boolean_sections(jobs[k].fa, jobs[k].fb, jobs[k].lines))
+      if (boolean_sections(jobs[k].fa, jobs[k].fb, jobs[k].lines, fs->exact))
       {
         jobs[k].done = true;
         return;
@@ -3321,7 +3341,7 @@ static rust::String occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_ar
   // (Kept for the Boolean's later rounds (boolean_with: again with vertices merged), whose input faces are these.)
   else if (made != t_free->ahead.end())
     lines = made->second;
-  else if (boolean_sections(fa, fb, lines))
+  else if (boolean_sections(fa, fb, lines, t_free->exact))
     t_free->ahead.emplace(swap ? std::array<uint32_t, 4>{b_arg, b_face, a_arg, a_face} : std::array<uint32_t, 4>{a_arg, a_face, b_arg, b_face}, lines);
   else
   {

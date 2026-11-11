@@ -1859,3 +1859,19 @@ fn offset_curve_edges_fused_as_occt() {
     assert!((v - w).abs() <= 1e-7 * o.shape.area().unwrap(), "volume {v} against OCCT's {w}");
     assert_eq!(offsets(&r.shape), offsets(&o.shape), "the offset curves kept");
 }
+
+/// A cut whose part has an arc shorter than the tolerance between two vertices (recorded, bool-corpus): noshape's
+/// Boolean takes it, the arc straight between its vertices inside it (it declined "a tiny arc"), OCCT's result and
+/// history.
+#[test]
+fn an_arc_shorter_than_the_tolerance_cut_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "175cf82eaa55aca3").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert_eq!(k::bool_corpus::Summary::of(&r).differences(&c.summary), Vec::<String>::new());
+}

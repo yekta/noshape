@@ -3887,10 +3887,15 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     let k = Circ { c: center, n: normal, x: xdir, y: normal.cross(xdir), r: radius };
                     let a0 = k.angle(cx.pool.p[v[0] as usize]);
                     let sweep = if v[0] == v[1] { TAU } else { (k.angle(cx.pool.p[v[1] as usize]) - a0).rem_euclid(TAU) };
-                    if sweep * radius <= tol {
+                    // (An arc shorter than the tolerance between two vertices: straight between them here, within its
+                    // sagitta; its edge keeps the circle.)
+                    if sweep * radius <= tol && v[0] != v[1] {
+                        Geo::Line
+                    } else if sweep * radius <= tol {
                         return Err(Decline("a tiny arc"));
+                    } else {
+                        Geo::Arc { k, a0, sweep }
                     }
-                    Geo::Arc { k, a0, sweep }
                 }
             };
             if v[0] == v[1] && e.v[0] != e.v[1] {

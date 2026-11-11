@@ -3,6 +3,29 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Shell Gehäuse (c2-impeller-loft feature 11; lead 01:05: match live, by_quadrics) — 11-11 07:40 UTC state
+- Against live's 2275 points (bool/q2275/edges.json; probe xprobe `probe_live_points`, our result from the dump
+  imp-dump/shell-0): JKN (the inlet's inner circle) <= 0.33 um, JKB's run <= 0.05 um, JKJ (a seam) <= 0.09 um to 80 %
+  of it, then 1.5 / 6.3 / 11.6 / 17.1 um at its top; JKF (the inlet's inner rim at z = 0) 3.4 um in the middle, up to
+  50 um at 20 % and 80 %. Our offsets are exact (3.000000 mm from the walls on a grid) where their feet lie on their
+  faces; the difference is where the inlet's offset runs past the inlet face (x 0-10) to the rim (x 14.4-23.7): how the
+  face's surface is extended.
+- Extensions tried (scratch switches XEXT_CONT / XEXT_LEN in shell.cpp, not landed): GeomLib's tangent one (ours now)
+  45,279.95 mm3; C2 45,279.90; C3 45,278.32 (JKF 0.4-18 um, corners 5.6 um); the B-spline's own polynomials
+  (`continued`, tried first) fail on JKF (a marched point 0.2 mm off the folded offset) and put its corner at x 14.4847
+  (live 14.4477). Live 45,272.92. Asked live for JKC's surface past x = 10 (REQUESTS 2482).
+
+## To core (2026-11-11 07:19 UTC, lead: profile cf-sheet-metal-model-plus; sheet-metal time is core's): face points, not Booleans
+- vibe4 (load 20), main 310b9fed: 2007 ms against live's 917; Extrude 4 966 ms (live 339), Flange 1 504 (224), Sheet
+  Metal Up to Part 426 (160). NOSHAPE_KERNEL_PROFILE: Extrude 4 922 ms = 22 Booleans 282 ms, `props_surface` 288 ms
+  (559 calls), `face_contains_point` 170 ms (853), `min_distance` 72 ms (737), `face_project_point` 59 ms (412); Flange 1
+  498 ms = `props_surface` 607 ms of CPU (541 calls, on threads), the display mesh 190 ms, 10 Booleans 112 ms; Up to
+  Part 464 ms = 3 Booleans 127, split 90, fillet 75.
+- The queries are a point on each face: model-core regen/features/helpers_a.rs `centroid_on_face` (a centroid by
+  `props_surface`, then projected) and `inner_point` (uv samples tested with `contains_point`), ~550 a feature. A point
+  from the face's own parameters first (a plane's, a cylinder's at their uv middle when inside) or made once a face
+  (cached by face across the sheet-metal steps) would take most of it. The Booleans (13 ms each) are ours already.
+
 ## hat8's "Mac mini body + base union" (11-11 04:47 UTC; lead P0: the user's document opens slowly)
 - **What touches:** the body (258 faces, z >= 6.9 mm) on its base (529 faces, 432 of them ~3 mm B-spline grip faces,
   z <= 6.9). 1076 face pairs' boxes meet, every one only in the z = 6.9 slab; 1296 were the body's flat bottom faces
@@ -34,9 +57,11 @@ scratch /root/bool-scratch.
 - **hat8's other OCCT Booleans:** Riser legs grip's tree (4.1 s; "a shared shape OCCT may keep or remake"), Merge seat
   lip into riser (1.2-1.7 s; "a non-manifold result") and one more fuse: OCCT's recorded results are invalid
   (`valid 0`), downstream of the riser core finds invalid at Riser legs grip; left until that is fixed. Two cuts
-  (0.6 s each) declined "a tiny arc", then "a section OCCT makes as a conic" (next: arcs shorter than the tolerance
-  straight between their vertices, +4 cases a corpus, and each face's exact box made once a Boolean, sections ahead
-  1.15 -> 0.30 s in the union; gating). Left in hat8 at load 45: import 17.4 s (dx), the chamfers 5.8 + 3.0 s
+  (0.6 s each) declined "a tiny arc", now "a section OCCT makes as a conic". Landing (08:3x): an arc shorter than the
+  tolerance between two vertices straight between them inside the Boolean (its edge keeps the circle): +4 cases in
+  each corpus, 0 differences (T1 an_arc_shorter_than_the_tolerance_cut_as_occt); each face's exact box made once a
+  Boolean: the union's sections ahead 1.15 -> 0.30 s. Gate: corpora + parity56, valve2, snap, knurl / gear (times
+  level), shfall as before; model suite the same document by document. Left in hat8 at load 45: import 17.4 s (dx), the chamfers 5.8 + 3.0 s
   (blend).
 
 ## From psui (2026-11-10 19:12 UTC, lead): does the bookcase's "cut in half" Boolean run on ours now?
