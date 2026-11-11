@@ -13,6 +13,43 @@ Worktree /root/projects/noshape-wt/blend (and blend2 for a second build), builds
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## 11-11 10:55 UTC: impeller Fillet 1 exact (+2,412.23 mm3 vs live 2,412.73), knife Chamfer 1 speed, 0029 landed
+- Landed: OCCT 0029 (704ed18d -> fb83a50e; the lead installed its libTKFillet.a / ChFi3d.hxx into /root/occt and
+  /opt/occt). Queued: blend-opchamfer (6642171e; model suite 820 = 820, assembly suite = 6364f3c47's, cf-fix-pcb's
+  flag was noise). blend-equal: assembly pair re-running on vibe4 (the vibe3 OOM killed the first base).
+- **The impeller's Fillet 1: OCCT's round is the wrong surface, not our input.** Live's JWK grid (core/q2479) has its
+  ball centres 10.0000 mm off our wall and 20.0000 mm off our tube's axis: our part matches live where it matters.
+  OCCT's round (as is in metres, at the working scale, any `SetParams`) is off the exact rolling ball by up to
+  0.11 mm at its rails and 0.28 mm across the arc near the rim (0.64 at the end arcs): +2,767 mm3 on the part, +2,592
+  on the tube run on past the rim, against live's +2,412.73. (So OCCT's fillets on free-form walls can be ~1% of R
+  off live's in general: a candidate for exact sections elsewhere.)
+- Branch blend-cliff (worktree blend4, d307c7910 WIP on d2c2b71ef): `cliff_end_round` builds the whole round
+  directly: the balls by angle about the tube's axis, on the tube (centre rt + R off the axis, R off the wall, a
+  secant on the axial offset) except over the rim's band, where they touch the rim and the wall (the cliff solver);
+  their exact arcs lofted into two faces (JWO over the band, JWK round the rest: 173.398 / 1,364.985 mm2, live
+  173.434 / 1,364.999; JWO's box = live's to 0.01 mm); the faces' touch edges imprinted on the part as they are (normal
+  projection onto the B-spline wall returns nothing); the wall's and the tube's pieces under the round dropped; sewn
+  (1e-7 of the part) into a valid solid: +2,412.232 mm3. Booleans don't do it: rim balls tangent to the wall cut to
+  nothing, lofts whose arcs touch the wall / tube are taken for disjoint, and sections in the balls' own planes cross
+  where the band's end planes meet (a line through the fill's air); an arc 0.1% larger fuses (+2,402.9) but its edges
+  sit 0.45 mm short of live's. Left: the tube's remaining face stays two (split at its old seam where the touch
+  curve's halves meet; live one face JWG; unify_same_domain_whole doesn't merge them), the zz probes out, a T1 test,
+  speed, the suites; the impeller document pair is running (only-cliff1).
+- Knife Chamfer 1 (branch blend-knifespeed, worktree blend5, a0834a6c4): 706 ms was OCCT's attempt 174 ms (its first
+  build invalid, then three retries at 1-1e-7..1-1e-5, all invalid), noshape's Boolean declining the lofted tool
+  60 ms ("an edge nearly on another argument's face") and OCCT's cut 310 ms (117 edge/face pairs on the blade's
+  B-spline faces). Now: a distance-and-angle or two-distance chamfer tries OCCT without retries (`without_blend_retries`)
+  and goes to its sections at once; section_blend's lofted tools run OCCT's Boolean only (`with_occt_boolean`).
+  T1 alternation 648-707 -> 471-512 ms; model suite = base (no "OCCT's retries build it" with NOSHAPE_BLEND_VERIFY);
+  g++-13 builds; assembly pair on vibe3. OCCT fails every chamfer of those two edges (even 0.01 mm equal), fillets
+  build: no cheap predictor. The cut itself is the rest (~300 ms): oriented boxes, no-Rust, running the chamfer line
+  past the faces don't help.
+- RELEASE-BUILD-FILLET-HANG's Fillet 6 "1 missing selection": its missing edge is the one Chamfer 4 chamfers (the same
+  query); live's the same (behaviours.md:10592). Nothing to fix.
+- Next (lead 08:25 / 08:10): finish the cliff round by 18:00 or write down what blocks it; then the speed gaps:
+  learning-center-michael Fillet 2 628/46 ms, cf-snap-hook Fillet 6 119/8, knife Fillet 2 213/10,
+  c2-tpd-fillet-variable Fillet 1 87/29, motor-mount-jack Fillet 2 33/3.
+
 ## 11-11 05:21 UTC: branches in flight, OCCT 0029, the impeller's cliff round
 - Landed: knife Chamfer 1 (12b1d8a6), blend-fastfinish (4dc4f096: the finishing passes' sphere / cylinder scans by
   surface type; hat8's Seat lip chamfer 3.2 -> 1.9 s, Riser feet 5.7 -> 5.2 s, results identical).
