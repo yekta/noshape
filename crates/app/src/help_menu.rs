@@ -12,22 +12,13 @@ use gpui_kit::*;
 /// Every row, in live's order, then ours after a divider.
 pub fn items(menu: OsMenu) -> OsMenu {
     let menu = menu
-        .item(OsMenuItem::new("Help").on_click(|_, window, cx| open_guide(window, cx)))
+        .item(OsMenuItem::new("Help").on_click(|_, _, cx| open_section("", cx)))
         .item(OsMenuItem::new("FeatureScript documentation").on_click(|_, window, cx| open_featurescript_library(window, cx)))
         .item(OsMenuItem::new("Keyboard shortcuts").on_click(|_, window, cx| window.dispatch_action(Box::new(noshape_app_core::actions::ToggleShortcutHelp), cx)))
         .separator()
         .item(OsMenuItem::new("System check").on_click(|_, window, cx| crate::system_check::open(window, cx)));
     let menu = crate::about::help_item(menu).separator();
     crate::agent_setup::help_items(menu)
-}
-
-/// Help › Help: the user guide (ships with the app), in a scrolling modal.
-fn open_guide(window: &mut Window, cx: &mut App) {
-    window.open_dialog(cx, |dialog, _, cx| {
-        crate::os_ui::modal(dialog, "Help", 800.)
-            .child(div().id("help-guide").w_full().max_h(px(640.)).overflow_y_scroll().text_color(p().text).child(crate::doc_panels::markdown(noshape_ops::about::USER_GUIDE).w_full()))
-            .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("close", "Close", cx))))
-    });
 }
 
 /// Help › FeatureScript documentation: the standard library's source, read-only in a window of its own (its "std"

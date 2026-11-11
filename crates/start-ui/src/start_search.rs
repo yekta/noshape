@@ -10,7 +10,7 @@
 use crate::os_menu::{OsMenu, OsMenuItem};
 use crate::os_ui as os;
 use crate::theme::p;
-use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -104,7 +104,7 @@ impl Query {
         if !self.types.is_empty() {
             parts.push(format!("type:{}", self.types.iter().map(|t| type_key(t)).collect::<Vec<_>>().join(",")));
         }
-        for (key, v) in [("description", &self.description), ("partNumber", &self.part_number), ("revision", &self.revision)] {
+        for (key, v) in [("description", &self.description), ("partnumber", &self.part_number), ("revision", &self.revision)] {
             if !v.is_empty() {
                 parts.push(format!("{key}:{v}"));
             }
@@ -123,13 +123,14 @@ impl Query {
     /// rest of the criteria from `base`; None when the text has no
     /// `key:` term (a plain search of names).
     pub fn parse_text(text: &str, base: &Query) -> Option<Query> {
-        const KEYS: [&str; 6] = ["type", "name", "description", "partNumber", "revision", "state"];
-        // The terms: each key's value runs to the next key.
+        const KEYS: [&str; 6] = ["type", "name", "description", "partnumber", "revision", "state"];
+        // The terms: each key's value runs to the next key; keys in any case (live writes `partnumber:`).
+        let lower = text.to_ascii_lowercase();
         let mut found: Vec<(usize, &str)> = Vec::new();
         for key in KEYS {
             let pat = format!("{key}:");
             let mut from = 0;
-            while let Some(i) = text[from..].find(&pat) {
+            while let Some(i) = lower[from..].find(&pat) {
                 let at = from + i;
                 if at == 0 || text[..at].ends_with(' ') {
                     found.push((at, key));
@@ -149,7 +150,7 @@ impl Query {
                 "type" => q.types = value.split(',').filter_map(|v| TYPES.iter().copied().find(|t| type_key(t) == v.trim().to_lowercase())).collect(),
                 "name" => q.name = value,
                 "description" => q.description = value,
-                "partNumber" => q.part_number = value,
+                "partnumber" => q.part_number = value,
                 "revision" => q.revision = value,
                 _ => q.state = STATES.iter().copied().find(|s| s.eq_ignore_ascii_case(&value)),
             }
@@ -379,6 +380,7 @@ pub struct AdvancedSearch {
     extra: Vec<(&'static str, Entity<InputState>, bool)>,
     results_from: usize,
     results_at: usize,
+    _subs: Vec<Subscription>,
 }
 
 impl EventEmitter<SearchEvent> for AdvancedSearch {}
@@ -389,20 +391,21 @@ impl AdvancedSearch {
             let ph = ph.to_string();
             cx.new(|cx| InputState::new(window, cx).placeholder(ph))
         };
-        Self {
-            types: Vec::new(),
-            name: field("Enter name", window, cx),
-            description: field("Enter description", window, cx),
-            part_number: field("Enter part number", window, cx),
-            revision: field("Enter revision", window, cx),
-            state: None,
-            extra: Vec::new(),
-            results_from: 0,
-            results_at: 0,
-        }
+        let [name, description, part_number, revision] = ["Enter name", "Enter description", "Enter part number", "Enter revision"].map(|ph| field(ph, window, cx));
+        // Typing notifies the page, which writes the query into its search box as it goes (live docs-adv-name).
+        let _subs = [&name, &description, &part_number, &revision]
+            .map(|st| {
+                cx.subscribe(st, |_, _, ev: &InputEvent, cx| {
+                    if matches!(ev, InputEvent::Change) {
+                        cx.notify();
+                    }
+                })
+            })
+            .into();
+        Self { types: Vec::new(), name, description, part_number, revision, state: None, extra: Vec::new(), results_from: 0, results_at: 0, _subs }
     }
 
-    fn query(&self, cx: &App) -> Query {
+    pub(crate) fn query(&self, cx: &App) -> Query {
         let v = |s: &Entity<InputState>| s.read(cx).value().trim().to_string();
         Query {
             types: self.types.clone(),

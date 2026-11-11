@@ -490,6 +490,8 @@ impl StartView {
                         this.search.update(cx, |s, cx| s.set_value(text, window, cx));
                         this.query = String::new();
                     }
+                    // The page takes the keyboard back (live docs-adv-name: focus none).
+                    window.focus(&this.focus, cx);
                 }
                 crate::start_search::SearchEvent::Reset => this.adv_query = None,
             }
@@ -497,6 +499,13 @@ impl StartView {
         });
         let mut subs = subs;
         subs.push(adv_sub);
+        // Live docs-adv-name: the search box shows the query while its criteria are typed or picked.
+        subs.push(cx.observe_in(&adv, window, |this: &mut Self, adv, window, cx| {
+            let text = adv.read(cx).query(cx).to_text();
+            if this.adv_open && this.search.read(cx).value() != text.as_str() {
+                this.search.update(cx, |s, cx| s.set_value(text, window, cx));
+            }
+        }));
         let create_focus = cx.focus_handle().tab_stop(true);
         subs.push(cx.on_focus(&create_focus, window, |_, _, cx| cx.notify()));
         subs.push(cx.on_blur(&create_focus, window, |_, _, cx| cx.notify()));
@@ -3350,9 +3359,12 @@ impl StartView {
                 .child(
                     div()
                         .occlude()
-                        .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| {
-                            this.cols_open = false;
-                            cx.notify();
+                        // A press on + Add leaves it to the button's toggle (live docs-columns-panel: it closes).
+                        .on_mouse_down_out(cx.listener(|this, e: &MouseDownEvent, _, cx| {
+                            if !this.cols_anchor.get().contains(&e.position) {
+                                this.cols_open = false;
+                                cx.notify();
+                            }
                         }))
                         // Esc closes it and the page takes the keyboard back (live docs-columns-search: focus none).
                         .on_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
@@ -3825,8 +3837,11 @@ impl Render for StartView {
             .when(self.adv_open, |d| {
                 let b = self.adv_anchor.get();
                 d.child(
-                    deferred(anchored().position(point(b.left(), b.bottom() + px(1.))).child(div().on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| {
-                        if !crate::os_menu::is_open(cx) {
+                    deferred(anchored().position(point(b.left(), b.bottom() + px(1.))).child(div().on_mouse_down_out(cx.listener(|this, e: &MouseDownEvent, _, cx| {
+                        // A press on the ▾ leaves it to the caret's toggle (live docs-adv-open: it closes).
+                        let caret = this.adv_anchor.get();
+                        let on_caret = caret.contains(&e.position) && e.position.x >= caret.right() - px(20.);
+                        if !crate::os_menu::is_open(cx) && !on_caret {
                             this.adv_open = false;
                             cx.notify();
                         }

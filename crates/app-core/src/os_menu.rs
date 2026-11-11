@@ -819,7 +819,8 @@ impl Render for OsMenu {
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
             .when(native, |d| d.shadow(Vec::new()).py(px(1.)).border_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0x858585 } else { 0x767676 })))
             .text_color(pal.text)
-            .children(rows)
+            // Live (fs-compact-snippet-menu): the compact toolbar's snippet list is a 675 px box that scrolls.
+            .map(|d| if snippets { d.child(div().id("snippet-scroll").max_h(px(671.)).overflow_y_scroll().children(rows)) } else { d.children(rows) })
             .child(canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
             // A `<select>`'s list closes when the wheel turns outside it (Chrome; the page scrolls on, and the list
             // stayed behind over another field: PREFS-SELECT-LIST-DETACH). Inside, a long list scrolls.
