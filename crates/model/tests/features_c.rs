@@ -4019,3 +4019,55 @@ fn a_distance_angle_chamfer_keeps_constant_offsets_as_live() {
         assert!((w - live).abs() < 0.002, "strip at x {x}: {w} mm (live {live})");
     }
 }
+
+/// A kernel-built part imported (as BREP), its one edge between the faces `a` and `b` (by a point on each) chamfered
+/// `d` mm equally: the chamfer face's area in mm².
+fn rim_chamfer_area(part: noshape_kernel::Shape, a: DVec3, b: DVec3, d: &str) -> (usize, f64) {
+    let path = std::env::temp_dir().join(format!("noshape-rim-chamfer-{}-{}.brep", std::process::id(), a.x.to_bits() ^ b.y.to_bits()));
+    noshape_kernel::write_brep(&part, &path).unwrap();
+    let brep = std::fs::read_to_string(&path).unwrap();
+    let _ = std::fs::remove_file(&path);
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b0 = &r.context.bodies[0];
+    let faces = b0.shape.faces();
+    let on = |q: DVec3| faces.iter().position(|f| f.contains_point(q, 1e-9).unwrap_or(false)).unwrap();
+    let (fa, fb) = (on(a), on(b));
+    let ef = b0.shape.edge_faces().unwrap();
+    let e = ef.iter().position(|f| f.len() == 2 && f.contains(&(fa as u32)) && f.contains(&(fb as u32))).expect("the rim");
+    let edge = Reference::Edge((*b0.edges[e]).clone());
+    let d = d.to_string();
+    s.add("chamfer", move |p| {
+        p.set("entities", ParamValue::Query(vec![edge]));
+        p.set("width", expr(&d));
+    });
+    let r = s.ok();
+    let sh = &r.context.bodies[0].shape;
+    let new: Vec<f64> = sh.faces().iter().filter(|f| !matches!(f.face_surface(), Ok(noshape_kernel::Surface::Plane(_) | noshape_kernel::Surface::Cylinder { .. }))).map(|f| f.area().unwrap() / (mm(1.0) * mm(1.0))).collect();
+    (sh.faces().len(), new.iter().sum())
+}
+
+/// Live 2441: an equal-distance chamfer on an edge whose faces' angle varies is the chord of one rolling ball, its
+/// radius putting the setback at the asked distance at the edge's middle: a Ø10 hole tilted 30° through a block's top
+/// (the angle 60°..120°, the ball √3 mm, 97.880 mm²) and a Ø20 cylinder cut by a plane tilted 30° (1/√3 mm, 52.661 mm²).
+#[test]
+fn equal_chamfers_on_tilted_rims_roll_one_ball_as_live() {
+    use noshape_kernel::{Plane, cut, make_box, make_cylinder};
+    let n = DVec3::new(0.0, -(30f64.to_radians()).sin(), 30f64.to_radians().cos());
+    let block = make_box(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), mm(40.0), mm(40.0), mm(20.0)).unwrap();
+    let p = DVec3::splat(mm(20.0));
+    let hole = make_cylinder(&Plane::new(p - n * mm(40.0), n, DVec3::X), mm(5.0), mm(80.0), std::f64::consts::TAU).unwrap();
+    let a = cut(&block, &hole).unwrap().shape;
+    let (faces, area) = rim_chamfer_area(a, DVec3::new(mm(1.0), mm(1.0), mm(20.0)), p - n * mm(5.0) + DVec3::new(mm(5.0), 0.0, 0.0), "1 mm");
+    assert_eq!(faces, 8);
+    assert!((area - 97.88025).abs() < 0.05, "tilted hole: {area} mm² (live 97.880)");
+    let cyl = make_cylinder(&Plane::new(DVec3::new(mm(100.0), 0.0, 0.0), DVec3::Z, DVec3::X), mm(10.0), mm(30.0), std::f64::consts::TAU).unwrap();
+    let x = DVec3::X;
+    let y = n.cross(x);
+    let top = make_box(&Plane::new(DVec3::new(mm(100.0), 0.0, mm(20.0)) - x * mm(50.0) - y * mm(50.0), n, x), mm(100.0), mm(100.0), mm(60.0)).unwrap();
+    let b = cut(&cyl, &top).unwrap().shape;
+    let (faces, area) = rim_chamfer_area(b, DVec3::new(mm(100.0), 0.0, mm(20.0)), DVec3::new(mm(110.0), 0.0, mm(5.0)), "1 mm");
+    assert_eq!(faces, 4);
+    assert!((area - 52.66144).abs() < 0.05, "tilted top: {area} mm² (live 52.661)");
+}

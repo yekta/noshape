@@ -865,11 +865,12 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
                 None => {}
             }
         }
-        // Arcs of slanted rims whose chamfers run off their plane: each chamfer as if alone, trimmed by what it meets.
-        use super::blend_section::{RimBlend, ring_blend, rims, rims_overflow};
+        // Arcs of slanted rims whose chamfers run off their plane: each chamfer as if alone, trimmed by what it meets; tilted
+        // rims' chamfers, the chord of one rolling ball (live 2441).
+        use super::blend_section::{RimBlend, ring_blend, rims, rims_overflow, rims_tilted};
         if let k::ChamferSpec::Equal(d) = spec
             && let Some(rims) = rims(&body.shape, &edges)
-            && rims_overflow(&rims, &body.shape, &[d], RimBlend::Chamfer)
+            && (rims_tilted(&rims) || rims_overflow(&rims, &body.shape, &[d], RimBlend::Chamfer))
             && ring_blend(ev, bi, &rims, &edges, &[d], RimBlend::Chamfer).is_ok()
         {
             continue;

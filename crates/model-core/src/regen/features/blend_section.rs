@@ -1589,10 +1589,17 @@ pub fn rims_overflow(rims: &Rims, shape: &Shape, sizes: &[f64], kind: RimBlend) 
     false
 }
 
+/// Whether any rim's plane is tilted to its cylinder's axis (the faces' angle varies along it: an equal-distance
+/// chamfer's setback then follows the angle, live 2441).
+pub fn rims_tilted(rims: &Rims) -> bool {
+    rims.0.iter().any(|(rim, _)| rim.axis.dot(rim.np).abs() < 1.0 - 1e-9)
+}
+
 /// Fillets and chamfers of convex closed edges where a plane meets a cylinder (or arcs of that whose rest is off the
 /// body) whose blends run off the plane or into each other ([`rims_overflow`]), or where OCCT's chain fails: each rim
-/// blended on its own on a wedge of its plane and cylinder (OCCT's blend of a lone rim, the whole intersection), the
-/// region between the rim and its blend cut away, so each blend ends where it meets another face or blend, as live's
+/// blended on its own all round (a round on a wedge of its plane and cylinder, OCCT's blend of a lone rim; a chamfer
+/// as [`rim_chamfer_tool`]), the region between the rim and its blend cut away, so each blend ends where it meets
+/// another face or blend, as live's
 /// (c2-rings-loft's Fillet 1: a ring's two R2 rims meet at its narrow bottom and run out onto its outside; its Chamfer
 /// 1: a notch's arc chamfered through the strip of plane beside it, the chamfer running on past the arc's ends until
 /// it leaves the part).
@@ -1607,6 +1614,9 @@ pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], siz
         let i = *i;
         let r = sizes.get(i).or(sizes.first()).copied().ok_or_else(|| fail("no size"))?;
         let e = edges[i];
+        let ename = body.edges[e].clone();
+        let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
+        let generated = Arc::new(TopoName::face(feature, Role::Generated(ename.clone())));
         let (axis, np, p) = (rim.axis, rim.np, rim.p);
         let cos = axis.dot(np);
         // The wedge: a slab on the plane around the rim, with the cylinder's inside or outside.
@@ -1630,25 +1640,23 @@ pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], siz
             .filter(|(d, _)| *d < scale * 1e-6)
             .ok_or_else(|| fail("no rim on the wedge"))?
             .1;
-        let rounded = match kind {
-            RimBlend::Round => k::fillet(&wedge, std::slice::from_ref(&edge), r)?,
-            RimBlend::Chamfer => k::chamfer(&wedge, std::slice::from_ref(&edge), k::ChamferSpec::Equal(r), &[])?,
+        let tool = match kind {
+            RimBlend::Round => k::cut(&wedge, &k::fillet(&wedge, std::slice::from_ref(&edge), r)?.shape)?.shape,
+            // A chamfer: the chord of one rolling ball all round (live 2384 / 2441); on a rim square to its plane that is
+            // OCCT's chamfer (the setback the same all round), faster.
+            RimBlend::Chamfer if rim.axis.dot(rim.np).abs() >= 1.0 - 1e-9 => k::cut(&wedge, &k::chamfer(&wedge, std::slice::from_ref(&edge), k::ChamferSpec::Equal(r), &[])?.shape)?.shape,
+            RimBlend::Chamfer => rim_chamfer_tool(rim, &shape.sub_shape(ShapeType::Edge, e)?, r, &wedge, seam_where_whole(rim, r)?, scale)?,
         };
-        let tool = k::cut(&wedge, &rounded.shape)?;
-        if !tool.shape.is_valid() || tool.shape.count(ShapeType::Solid) != 1 {
+        if !tool.is_valid() || tool.count(ShapeType::Solid) != 1 {
             return Err(fail("the rim's blend left no one solid to cut"));
         }
         // Its blend: the face on neither the plane nor the cylinder.
-        let ename = body.edges[e].clone();
-        let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
-        let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
         let names: Vec<Name> = tool
-            .shape
             .faces()
             .iter()
             .map(|f| if matches!(f.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. })) { generated.clone() } else { blend.clone() })
             .collect();
-        cuts.push(NamedShape::new(tool.shape, names));
+        cuts.push(NamedShape::new(tool, names));
     }
     let (cut, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &cuts)?;
     let cut = NamedShape::new(cut, names);
@@ -2030,6 +2038,57 @@ pub fn cliff_rim_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], sizes: &[f6
 /// its touch lines on the plane and the cylinder stay (a point a little past each lies on its face), from the
 /// cylinder's own seam round; the seam's ends then split only pieces of one curve (one edge, as live's, which has no
 /// seam), never a curve where the round meets another face or round.
+/// The region a rim's chamfer `d` takes off `wedge` (the rim's plane and cylinder about it), all round the rim: live's
+/// chamfer is the chord of one ball rolling between the plane and the cylinder (2384, 2441), its radius `d tan(φ / 2)`
+/// at the edge's middle (φ the faces' angle there), so the setback is `d` there and follows the angle elsewhere. The
+/// wedge split by the closed sheet through the ball's touch points (each chord a little longer both ways), the piece
+/// at the rim kept: its faces on the plane and the cylinder are theirs. The sheet starts at `seam` (a radial off the
+/// part).
+fn rim_chamfer_tool(rim: &Rim, edge: &Shape, d: f64, wedge: &Shape, seam: DVec3, scale: f64) -> FResult<Shape> {
+    let (x, y) = rim.frame();
+    let angle = |v: DVec3| v.dot(y).atan2(v.dot(x));
+    // The edge's middle: an arc's; a whole rim's, where Parasolid's ellipse is halfway round from its start (its major
+    // axis's end opposite the cylinder's axis seen on the plane), the end toward that axis.
+    let a_mid = if rim.arc.is_empty() {
+        match (rim.np - rim.axis * rim.axis.dot(rim.np)).try_normalize() {
+            Some(n) => angle(-n * rim.axis.dot(rim.np).signum()),
+            None => 0.0,
+        }
+    } else {
+        let info = edge.edge_info()?;
+        rim.angle_of(edge.point_at(0.5 * (info.first_param + info.last_param))?)
+    };
+    let ball = |a: f64, r: f64| -> (DVec3, DVec3, DVec3) {
+        let (p, radial) = rim.at(x, y, a);
+        let base = rim.origin + radial * (rim.rc + rim.out * r);
+        let c = base + rim.axis * (((p - base).dot(rim.np) - r) / rim.axis.dot(rim.np));
+        (p, c + rim.np * r, c - radial * (rim.out * r))
+    };
+    let (_, radial) = rim.at(x, y, a_mid);
+    let phi = std::f64::consts::PI - rim.np.dot(-radial * rim.out).clamp(-1.0, 1.0).acos();
+    let r = d * (phi / 2.0).tan();
+    if !r.is_finite() || r <= 0.0 {
+        return Err(fail("the rim's faces are tangent"));
+    }
+    const N: usize = 64;
+    let mut chords = Vec::new();
+    for k in 0..N {
+        // (From the wedge's seam, off the part: the sheet's own seam would split the chamfer face.)
+        let (_, t1, t2) = ball(angle(seam) + k as f64 * std::f64::consts::TAU / N as f64, r);
+        let past = (t2 - t1) * 0.25;
+        chords.push(k::make_wire(&[k::make_line(t1 - past, t2 + past)?])?);
+    }
+    let sheet = k::loft(&chords, &k::LoftOptions { solid: false, closed: true, ..Default::default() })?.shape;
+    let (p, t1, t2) = ball(a_mid, r);
+    let inside = (p + t1 + t2) / 3.0;
+    k::split(std::slice::from_ref(wedge), std::slice::from_ref(&sheet), &k::BooleanOptions::default())?
+        .shape
+        .solids()
+        .into_iter()
+        .find(|piece| piece.classify_point(inside, scale * 1e-9).is_ok_and(|c| c == k::PointClass::Inside))
+        .ok_or_else(|| fail("the chamfer's sheet didn't cut the rim off the wedge"))
+}
+
 fn seam_where_whole(rim: &Rim, r: f64) -> FResult<DVec3> {
     let (x, y) = rim.frame();
     // An arc's blend: the middle of the longest way round off the arc, where the result keeps none of it (just past
