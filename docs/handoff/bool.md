@@ -100,8 +100,10 @@ asm-infento-subs loses 59 occurrences and 80 mates; its biggest cascade (37 feat
 non-manifold body.", live OK; then Extrude 13 the same, Boolean 6 / 7 "Need at least two parts", chamfers and
 fillets lose their edges. Reproduce: a folder with a link to /home/ngyekta/parity/models/asm-infento-subs as
 NOSHAPE_PARITY_ASSEMBLIES, `cargo test --release -p noshape-ops --test all parity::parity_assemblies -- --ignored
---nocapture`. The recorded Booleans (NOSHAPE_RECORD_BOOLEANS, failed calls included, exact) are being written to
-vibe3:~/tmp/dx/infento-bool; dx adds the case's name here when the run ends.
+--nocapture`. No kernel call fails: the cut succeeds and its **result has an edge on more than two faces**, which
+`boolean_into` (eval.rs:1186, Parasolid's refusal of such cuts, live Bo3) turns into the error; live's cut is manifold.
+All 1,612 of the document's Booleans are recorded (exact) in vibe3:~/tmp/dx/infento-bool: the case is the cut whose
+replayed result is non-manifold while its target isn't (a scan over the corpus with `non_manifold` finds it).
 
 ## From dx (2026-11-11 08:52 UTC, lead's speed list): cf-surface-pattern's Surface Pattern 3, where its 13-16 s go
 The feature is one opBoolean: Part 1 (7 faces: B-spline, offset of a B-spline, planes) minus 85 placed copies of
