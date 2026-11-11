@@ -12,7 +12,7 @@ pub fn ops() -> Vec<Op> {
         group: "export",
         verb: "parts",
         summary: "Export a Part Studio's parts or an Assembly to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino)",
-        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP, Parasolid and IGES keep the assembly (the root product / ASSEMBLY / subfigures, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine/custom for mesh formats; Coarse / Medium / Fine are chordal 0.24 / 0.12 / 0.06 mm at 12.5 / 6.25 / 2.5°; Custom's fields: STL `chordal_tolerance` / `angular_deviation` deg / `min_facet_width` in the STL's `units` (metres unless `units` says otherwise); an STL is facetted as Onshape's are at these values (its Coarse / Medium / Fine: the same triangle counts and smoothness), the other mesh formats `distance_tolerance` m / `angular_tolerance` deg / `max_chord_length` m; unset fields keep the last-used ones, first Medium's), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`. An option not given takes the value the app's Export dialog last exported with (per format, as Onshape remembers them; the first time Onshape's defaults: Medium, STL in Meter and Binary, the latest versions); `options` defaults to download.",
+        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP, Parasolid and IGES keep the assembly (the root product / ASSEMBLY / subfigures, each part once, placed by its instances), the other formats get the placed parts; with `tab` a CAD file's tab (a STEP in CAD Imports, its menu's Export…), the file's parts converted to PARASOLID, ACIS, IGES, PVZ, JT, RHINO, GLTF, GLB, OBJ or 3MF, the stored file named after the file without its extension. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine/custom for mesh formats; Coarse / Medium / Fine are chordal 0.24 / 0.12 / 0.06 mm at 12.5 / 6.25 / 2.5°; Custom's fields: STL `chordal_tolerance` / `angular_deviation` deg / `min_facet_width` in the STL's `units` (metres unless `units` says otherwise); an STL is facetted as Onshape's are at these values (its Coarse / Medium / Fine: the same triangle counts and smoothness), the other mesh formats `distance_tolerance` m / `angular_tolerance` deg / `max_chord_length` m; unset fields keep the last-used ones, first Medium's), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`. An option not given takes the value the app's Export dialog last exported with (per format, as Onshape remembers them; the first time Onshape's defaults: Medium, STL in Meter and Binary, the latest versions); `options` defaults to download.",
         fields: vec![
             doc_field(),
             tab_field(),
@@ -108,6 +108,9 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         s.version = list.iter().position(|x| x.eq_ignore_ascii_case(v)).ok_or_else(|| OpError::param("version", &format!("one of {}", list.join(", "))))?;
         s.latest = false;
     }
+    if is_cad_file(ctx, a)? {
+        return cad_file(ctx, a, format, s);
+    }
     if super::configuration::asm::is_assembly(ctx, a)? {
         return assembly(ctx, a, format, s);
     }
@@ -161,6 +164,29 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     write_out(od, tab, a, format, n, |file| crate::export::write_export(&s, file, list))
 }
 
+/// Whether `tab` is a CAD file's tab (a STEP in CAD Imports).
+fn is_cad_file(ctx: &mut Ctx, a: &Args) -> Result<bool, OpError> {
+    let Some(key) = a.opt_str("tab")? else { return Ok(false) };
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let Ok(tab) = crate::doc::find_tab(od.doc(), key) else { return Ok(false) };
+    Ok(matches!(od.doc().tab(tab).map(|t| &t.content), Some(noshape_model::TabContent::File(f)) if f.kind() == noshape_model::file_tab::FileKind::Cad))
+}
+
+/// Export of a CAD file tab (its menu's Export…, live document/94): the file's parts in another format, named after
+/// the file without its extension.
+fn cad_file(ctx: &mut Ctx, a: &Args, format: PartFormat, s: ExportSettings) -> Result<OpOutput, OpError> {
+    if !crate::export::FILE_FORMATS.contains(&format) {
+        let names: Vec<&str> = crate::export::FILE_FORMATS.iter().map(|f| f.label()).collect();
+        return Err(OpError::param("format", &format!("a CAD file exports to {}", names.join(", "))));
+    }
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = crate::doc::find_tab(od.doc(), a.str("tab")?)?;
+    let Some(noshape_model::TabContent::File(f)) = od.doc().tab(tab).map(|t| t.content.clone()) else { return Err(OpError::param("tab", "not a file tab")) };
+    let parts = crate::export::cad_file_parts(&f, &od.doc().settings.units).map_err(|e| OpError::new("export_failed", format!("{e:#}")).with_param("tab"))?;
+    let n = parts.len();
+    write_out_named(od, tab, &crate::export::file_stem(&f.file_name), a, format, n, |file| crate::export::write_export(&s, file, parts))
+}
+
 /// Export of an Assembly tab: its instances (or `parts`: instance ids or
 /// names); STEP and Parasolid keep the assembly, as Onshape's.
 fn assembly(ctx: &mut Ctx, a: &Args, format: PartFormat, s: ExportSettings) -> Result<OpOutput, OpError> {
@@ -182,11 +208,16 @@ fn assembly(ctx: &mut Ctx, a: &Args, format: PartFormat, s: ExportSettings) -> R
 
 /// Write the export to `file` (or store it), as the dialog's Options say.
 fn write_out(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, a: &Args, format: PartFormat, n: usize, write: impl FnOnce(&std::path::Path) -> anyhow::Result<std::path::PathBuf>) -> Result<OpOutput, OpError> {
-    let (download, store) = options_arg(a)?;
     let tab_name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+    write_out_named(od, tab, &tab_name, a, format, n, write)
+}
+
+/// [`write_out`], a stored file named `tab_name` (with the format's extension) unless `file` names it.
+fn write_out_named(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, tab_name: &str, a: &Args, format: PartFormat, n: usize, write: impl FnOnce(&std::path::Path) -> anyhow::Result<std::path::PathBuf>) -> Result<OpOutput, OpError> {
+    let (download, store) = options_arg(a)?;
     let mut file = match a.opt_str("file")? {
         Some(f) => std::path::PathBuf::from(f),
-        None if !download => store_dir()?.join(&tab_name),
+        None if !download => store_dir()?.join(tab_name),
         None => return Err(OpError::param("file", "required (or options \"store\")")),
     };
     if !download && a.opt_str("file")?.is_some() {

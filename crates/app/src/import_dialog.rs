@@ -323,10 +323,13 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
                 crate::notifications::push(cx, format!("Import {name}"), format!("Uploaded · Translated · Post-processing done · Created {name}"), false);
             }
         }
-        // Live: "onshape-cone.sat has been imported. Open document ×".
-        if let ([p], true, Some(_)) = (paths, ok, first) {
+        // Live: "onshape-cone.sat has been imported. Open document ×"; the link shows what it made.
+        if let ([p], true, Some(tab)) = (paths, ok, first) {
             let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-            cx.emit(DocEvent::Info(format!("{name} has been imported.")));
+            let me = cx.entity().downgrade();
+            doc.info_with_link(format!("{name} has been imported."), "Open document", move |_, cx| {
+                let _ = me.update(cx, |_, cx| cx.emit(DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(tab))));
+            }, cx);
         }
     });
     first

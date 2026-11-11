@@ -148,9 +148,34 @@ pub fn open_export_modal(base: String, assembly: bool, run: RunExport, window: &
 /// or "Include hidden instances in export" (live dom/dialog-export-jt.txt
 /// vs -jt-tab.txt).
 pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, run: RunExport, window: &mut Window, cx: &mut App) {
+    open_modal(base, assembly, parts_only, false, run, window, cx);
+}
+
+/// A CAD file tab's Export modal (live document/94): File name, Format (its [`FILE_FORMATS`]), Options and Export
+/// unique parts as individual files; no format's own options.
+pub fn open_file_export_modal(base: String, run: RunExport, window: &mut Window, cx: &mut App) {
+    open_modal(base, false, false, true, run, window, cx);
+}
+
+/// The formats a CAD file's Export lists, those this build writes.
+fn file_formats() -> Vec<PartFormat> {
+    FILE_FORMATS.into_iter().filter(|f| PartFormat::list(false).contains(f)).collect()
+}
+
+fn set_file_format(s: &mut ExportSettings, i: usize) {
+    let f = file_formats().get(i).copied().unwrap_or(PartFormat::Parasolid);
+    if let Some(row) = PartFormat::list(false).iter().position(|x| *x == f) {
+        set_part_format(s, row);
+    }
+}
+
+fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, run: RunExport, window: &mut Window, cx: &mut App) {
     let file = cx.new(|cx| InputState::new(window, cx).default_value(base));
-    // The last export's format and options (live: exportSolidOptions).
+    // The last export's format and options (live: exportSolidOptions); a CAD file's, Parasolid unless it was one of its.
     let st = Rc::new(RefCell::new(noshape_ops::export::SolidExportPrefs::load().settings(assembly)));
+    if cad_file && !file_formats().contains(&st.borrow().format) {
+        set_file_format(&mut st.borrow_mut(), 0);
+    }
     // Resolution › Custom's fields (live 1745): STL's three, their lengths
     // in the STL units, then the other mesh formats' three.
     let custom: Rc<Vec<(&'static str, Entity<InputState>)>> = Rc::new(CUSTOM_FIELDS.iter().map(|f| (f.id, cx.new(|cx| InputState::new(window, cx).default_value(custom_text(&st.borrow(), f))))).collect());
@@ -237,15 +262,16 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
         }
         let sel = |id, label, opts: &[&str], cur, disabled, set| Row::Select { id, label, opts: opts.iter().map(|o| o.to_string()).collect(), cur, disabled, set };
         let chk = |id, label, on, set| Row::Check { id, label, on, set };
-        let formats = PartFormat::list(assembly);
+        let formats = if cad_file { file_formats() } else { PartFormat::list(assembly) };
         let labels: Vec<&str> = formats.iter().map(|f| f.label()).collect();
         let units: Vec<&str> = UNITS.iter().map(|u| u.0).collect();
-        let set_format: fn(&mut ExportSettings, usize) = if assembly { set_asm_format } else { set_part_format };
+        let set_format: fn(&mut ExportSettings, usize) = if cad_file { set_file_format } else if assembly { set_asm_format } else { set_part_format };
         let mut rows = vec![sel("ex-format", "Format", &labels, formats.iter().position(|x| *x == f).unwrap_or(0), false, set_format)];
-        if f != PartFormat::Urdf {
+        if f != PartFormat::Urdf && !cad_file {
             rows.push(chk("ex-yup", "Export models oriented Y axis up", s.y_up, |s, v| s.y_up = v));
         }
         match f {
+            _ if cad_file => {}
             PartFormat::Parasolid => {
                 rows.push(sel("ex-version", "Version", &PARASOLID_VERSIONS, s.version, s.latest, |s, i| s.version = i));
                 rows.push(chk("ex-latest", "Use latest version", s.latest, |s, v| s.latest = v));
@@ -311,7 +337,9 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
             if f != PartFormat::Urdf {
                 rows.push(chk("ex-individual", "Export unique parts as individual files", s.individual, |s, v| s.individual = v));
             }
-            rows.push(chk("ex-hidden", "Include hidden instances in export", s.hidden, |s, v| s.hidden = v));
+            if !cad_file {
+                rows.push(chk("ex-hidden", "Include hidden instances in export", s.hidden, |s, v| s.hidden = v));
+            }
         }
         crate::ui_script::note_dialog(|| {
             let mut fields = vec![serde_json::json!({ "label": "File name", "kind": "input", "value": file.read(cx).value().to_string() })];
