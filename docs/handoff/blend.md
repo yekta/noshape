@@ -13,6 +13,33 @@ Worktree /root/projects/noshape-wt/blend (and blend2 for a second build), builds
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## 11-11 15:35 UTC: branches and gates; the speed gaps
+- Landed: blend-opchamfer (cb0551bf), blend-equal (011fcc6d). Queued: blend-knifespeed's Chamfer 1 commit (a6ffa0de:
+  no OCCT retries for a distance-and-angle / two-distance chamfer with sections to fall back on, lofted section tools
+  OCCT's Boolean only; same-base alternation 659 / 659 -> 459 / 484 ms; model and assembly suites = base).
+- blend-cliff (worktree blend4, d307c7910 + 465ba03dc on d2c2b71ef): the impeller's Fillet 1 built directly (below);
+  sections ~3° apart and one at the tube's seam (the faces' edges must pass through the seam point to sew); the wall,
+  tube and cap split together (the cap's rim split alike); the wall evaluated as noshape's NURBS (`Shape::face_nurbs`)
+  with Newton feet: Fillet 1 3.4 s -> 0.40 s (live 38 ms). T1 `a_round_over_a_tube_end_rolls_the_ball_over_the_rim_as_live`
+  (a 30°-tilted wall, the tube's seam under the round and in the band; every blend point's ball R off the wall and 2R
+  off the axis or R off the rim, < 0.02 mm). Model suite 821 = 821; assembly pair running (vibe4).
+- blend-lcm (worktree blend7, 1344a2271 on the knife commit): `fillet_by_tools`' sphere / torus tools cut by OCCT's
+  Boolean straight away (`occt_boolean`), noshape's declining them after its sections; learning-center-michael's Fillet 2
+  654 / 647 -> 583 / 591 ms. The rest is OCCT's cut (314 face pairs); gluing it is 3x faster but wrong (40 faces, live
+  44); fusing the tools first gains ~5%. Model suite = base; g++-13 OK; assembly pair running (vibe3).
+- blend-filletspeed (worktree blend6, ecc05c0e5 + dbeefc647 on 44ff040aa): blend_direct's blend / part-face sections on
+  OCCT's pool, merged in their order (cf-snap-hook's Fillet 6 122 / 160 -> 76 / 77 ms); a full round of a bore or boss
+  cuts its revolved tool glued (motor-mount-jack's Fillet 2 67 / 69 -> 25 / 39 ms). Fillet 6 alone: model suite 826 =
+  826, g++-13 OK; the pair's model suite (vibe5) and assembly pair (vibe4, after blend-cliff's) running.
+- Knife Fillet 2 (254 / 278 ms, live 10): OCCT's failing attempt ~72 ms (its build ~37, the rest pre-checks), the
+  sections and their run-on ~70, the reface and Boolean ~105. Classifying before the distance in `reach` and a box
+  test before `trimmed_run_on`'s distances made it slower (the classifier runs every step; a B-spline face's precise box
+  costs about a distance). Not fixed yet.
+- c2-tpd-fillet-variable Fillet 1: ~80% is noshape's Boolean's sections-ahead (bool's code): for bool.
+- cf-snap-hook Fillet 5 (109 / 132 ms, live 6) is the next of that document's.
+- List: the impeller round's tube remainder can stay two faces split at its old seam (live one face JWG); the T1 case
+  merges them (12 faces) but the impeller didn't (21 faces before the cap-split change: re-check).
+
 ## 11-11 10:55 UTC: impeller Fillet 1 exact (+2,412.23 mm3 vs live 2,412.73), knife Chamfer 1 speed, 0029 landed
 - Landed: OCCT 0029 (704ed18d -> fb83a50e; the lead installed its libTKFillet.a / ChFi3d.hxx into /root/occt and
   /opt/occt). Queued: blend-opchamfer (6642171e; model suite 820 = 820, assembly suite = 6364f3c47's, cf-fix-pcb's
