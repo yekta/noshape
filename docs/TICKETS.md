@@ -1148,7 +1148,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     mates 5 -> 6/52: Pin slot 7 no longer "Mate overdefines the assembly." (now as live), and Studio e53bba's Extrude 6 and
     Chamfer 1 now translate. Its parent's translator commit (core 730d6f28c) gives 5/52 with both still failing, so it is
     dx's f8378048c: its parent f577aac93 (with bool's 44e52dafb) also gives 5/52 (qa-scratch/recut/hd-*.log). No occurrence moved.
-  - qa 07:45, the suite on e2c8da0f9 (= v0.4.43) against f8378048c: 1266/1731 occurrences (+6), 174/357 mates, all better:
+  - qa 07:44, the suite on e2c8da0f9 (= v0.4.43) against f8378048c: 1266/1731 occurrences (+6), 174/357 mates, all better:
     asm-hand-drill-pinslot mates 6 -> 7/52 (Cylindrical 23 no longer "overdefines"; Studio 4ece4b's Sweep 1, 9fbc05's Spur gear
     and Booleans now build: dx's 03ad6d6fa targets this assembly), asm-infento-subs 103 -> 108/167 occurrences, asm-suspension
     25 -> 26/30. Not bisected (no loss).
