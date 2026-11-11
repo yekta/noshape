@@ -3347,6 +3347,24 @@ fn fit_spline_magnitude_arrow_as_std() {
     assert!((m.abs() - 2.0).abs() < 1e-9, "startMagnitude {m}");
 }
 
+/// A fit spline through two vertices with no end directions is a line, as live's (its edge reads LINE: asm-rack-pinion's
+/// Transform 1 turns a gear about one; a spline of ours there read as another straight edge).
+#[test]
+fn fit_spline_through_two_vertices_is_a_line() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [DVec2::new(0.0, 0.0), DVec2::new(0.02, 0.01)].map(|p| sk.add_point(p));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let se = |e: u32| Reference::SketchEntity { sketch: sid, entity: e };
+    s.add("fitSpline", |p| p.set("vertices", ParamValue::Query(pts.iter().map(|p| se(p.0)).collect())));
+    let r = s.ok();
+    let edges: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Wire).flat_map(|b| b.shape.edges()).collect();
+    let [e] = edges.as_slice() else { panic!("one edge: {}", edges.len()) };
+    let i = e.edge_info().unwrap();
+    assert!(matches!(i.curve, noshape_kernel::Curve::Line { .. }), "{:?}", i.curve);
+    assert!((i.length - 0.02f64.hypot(0.01)).abs() < 1e-9, "{}", i.length);
+}
+
 /// Move curve boundary's distance arrow (audit-part-studio M10; moveCurveBoundary.fs addExtendCurveManipulator):
 /// a composite curve from (0, 30) to (20, 30) to (20, 50) mm on Top, the help point at (40, 0) nearest its start:
 /// the arrow starts there pointing −X, so its tip at 10 mm is the extended end (std's arrow base); Opposite

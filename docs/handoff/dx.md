@@ -30,6 +30,20 @@ new); most are the selection after a step (`.drawing.selection.length` live 1 / 
 - drw-view-align-vertically: step 1 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (4/6 states)
 - drw-view-replicate-annotations: step 8 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (8/10 states)
 
+## 11-11 23:09 UTC: assembly suite 1450 -> 1483/1731 occurrences, mates 249 -> 284/470 (vibe5, all 24, none worse)
+- Placing at live's transform always sets the rotation (an unrotated one kept a mate's snap: isaac-ball's fixed
+  parts); fixed instances are placed again after the mates too. isaac-ball 100 -> 105/121, infento-subs mates 37 -> 67,
+  clamp-pattern 27/27 occ, 13/23 mates.
+- Two of a studio's parts with live's name ("Spur gear (8 teeth)" twice) map to two of ours, inserted by body id.
+- Fit spline through two vertices with no end directions is a line, as live's (its edge reads LINE; rack-pinion's
+  Transform 1 turned its gear about another straight edge). model test features_c::fit_spline_through_two_vertices_is_a_line.
+- asm-rack-pinion with live's fetched import: 4 -> 25/25 occ, 3/8 mates. Its 5 failing mates sit on the second gear;
+  its studio matches live to 0.2 mm³ up to Fillet 1, then Extrude 5 (a 3 x 5 mm rectangle on face JtW, 6 mm) adds 60
+  mm³ for live's 90: 30 mm³ overlap with the body in ours.
+- asm-isaac-ball (105/121, 58/96): its 38 unresolved mates are mostly on studios 00f1d4 / de4eff (same design), whose
+  Fillet 2 fails: JN1 (id-only, a 34.46 mm arc) resolves to an edge id that isn't on the part after Fillet 1; ours at
+  live's point is a 34.47 mm circle arc (CP1QNV…). Next.
+
 ## 11-11 21:44 UTC: welding-config's Fastened 4-8 solve (assembly mates 244 -> 249/464, none worse)
 - Part Studio List and Checkbox configurations translate: the inputs under live's ids and options (from the studio's
   `configuration`, else read from its configured values and its instances), configured feature parameters and sketch

@@ -339,7 +339,14 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
                 tangents = t;
             }
         }
-        k::make_interpolated_spline(&pts, &tangents, closed)?
+        // Two vertices and no end directions: a line, as live's (asm-rack-pinion's Transform axis through two points).
+        if let [a, b] = pts.as_slice()
+            && tangents.is_empty()
+        {
+            k::make_line(*a, *b)?
+        } else {
+            k::make_interpolated_spline(&pts, &tangents, closed)?
+        }
     };
     add_wire_bodies(ev, vec![k::make_wire(&[edge])?])
 }

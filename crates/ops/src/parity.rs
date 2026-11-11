@@ -670,11 +670,9 @@ impl<'a> Translator<'a> {
         let [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, ..] = transform else { return Err(format!("transform of {instance}: 16 numbers")) };
         let rot = glam::DMat3::from_cols(glam::DVec3::new(*m0, *m4, *m8), glam::DVec3::new(*m1, *m5, *m9), glam::DVec3::new(*m2, *m6, *m10));
         let (axis, angle) = glam::DQuat::from_mat3(&rot).to_axis_angle();
-        let mut args = json!({ "tab": assembly, "instance": instance, "translation": mm([*m3, *m7, *m11]) });
-        if angle.abs() > 1e-12 {
-            args["axis"] = json!([axis.x, axis.y, axis.z]);
-            args["angle"] = json!(format!("{} rad", angle));
-        }
+        // (The rotation always: without it the instance keeps its own, a mate's snap included.)
+        let (axis, angle) = if angle.abs() > 1e-12 { (axis, angle) } else { (glam::DVec3::Z, 0.0) };
+        let args = json!({ "tab": assembly, "instance": instance, "translation": mm([*m3, *m7, *m11]), "axis": [axis.x, axis.y, axis.z], "angle": format!("{angle} rad") });
         self.call("assembly_transform", args).map(|_| ())
     }
 
@@ -6100,7 +6098,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 // By its name unless its volume fits other parts of ours and not that one (default names shift when
                 // ours has a part fewer: asm-welding-config's "Part 7" is our Part 6).
                 let by_name = ours_parts.iter().any(|(n, _)| n == pname) && (fits.is_empty() || fits.iter().any(|n| n == pname));
-                let ours = if by_name || ours_parts.is_empty() {
+                // Several of ours by that name (asm-rack-pinion's two "Spur gear (8 teeth)"): one each, in order, by id.
+                let same: Vec<&String> = solids.iter().filter(|(n, ..)| n == pname).map(|(.., id)| id).collect();
+                let ours = if by_name && same.len() > 1 {
+                    same.iter().find(|id| !taken.contains(id)).copied().unwrap_or(same[0]).clone()
+                } else if by_name || ours_parts.is_empty() {
                     pname.to_string()
                 } else if let [(only, _)] = ours_parts.as_slice() {
                     only.clone()
@@ -6143,7 +6145,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let own_part = |instance: &Option<String>| -> Option<String> {
             let pid = instance_of.get(instance.as_ref()?)?["partId"].as_str()?;
             let ours = part_names.get(&(element.clone(), pid.to_string()))?;
-            solids.iter().find(|(n, ..)| n == ours).map(|(.., id)| id.clone())
+            solids.iter().find(|(n, _, id)| n == ours || id == ours).map(|(.., id)| id.clone())
         };
         for (key, (path, inference, q), choices) in here {
             let path_end = path.last().cloned();
@@ -6412,7 +6414,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     {
         res.differences.push(format!("holding the instances: {e}"));
     }
-    for o in top.iter().filter(|o| o["fixed"] != true) {
+    // (Fixed ones too: a mate's snap may have turned one: asm-isaac-ball's Part 1 <15>.)
+    for o in &top {
         let Some(name) = top_name(o) else { continue };
         if let Some(m) = o["transform"].as_array().map(|a| a.iter().filter_map(Value::as_f64).collect::<Vec<_>>())
             && let Err(e) = placer.place("Assembly 1", &name, &m)
