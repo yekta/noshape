@@ -3089,7 +3089,7 @@ impl PartStudioView {
 
         let ed = self.sketch.as_ref().expect("sketch");
         let frame = ed.frame;
-        let vp = self.viewport.read(cx);
+        let vp = self.vp().read(cx);
         let project = |q: DVec2| vp.project(frame.to_world(q)).map(|s| (s.x as f32, s.y as f32));
         let editing = self.dim_input.as_ref().map(|(c, st, _)| (*c, st.clone()));
 
@@ -3233,7 +3233,7 @@ impl PartStudioView {
                 if let Some(popup) = var_popup.take() {
                     let off = self.ui.dim_box_offset;
                     let box_left = x - 104.0 + f32::from(off.x);
-                    let room = self.viewport.read(cx).size().x as f32 - (box_left + 209.0);
+                    let room = self.vp().read(cx).size().x as f32 - (box_left + 209.0);
                     let popup_left = if room >= 228.0 { box_left + 213.0 } else { box_left - 224.0 };
                     on_top.push(div().absolute().left(px(popup_left - 107.0)).top(px(y - 17.0) + off.y).child(popup).into_any_element());
                 }
@@ -4322,7 +4322,7 @@ impl PartStudioView {
         if cands.is_empty() {
             return;
         }
-        let Some(pos) = self.viewport.read(cx).project(frame.to_world(c)) else { return };
+        let Some(pos) = self.vp().read(cx).project(frame.to_world(c)) else { return };
         let names: Vec<(noshape_sketch::EntityId, String)> = cands.iter().map(|(_, e)| (*e, entity_name(&data.sketch, *e))).collect();
         let view = cx.entity();
         let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _window, _cx| {

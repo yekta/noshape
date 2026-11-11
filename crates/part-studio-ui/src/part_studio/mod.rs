@@ -6748,7 +6748,10 @@ impl PartStudioView {
     fn render_underlay_slice(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         // Live: centered 8 px above the viewport's middle, like the right strip.
         let mut underlay = vec![div().absolute().top_0().bottom(px(16.)).left_0().flex().items_center().child(self.render_list_toggle(cx)).into_any_element()];
-        underlay.extend(self.render_sketch_labels(window, cx));
+        // (A sketch on the flat has them over the flat view: live 2468.)
+        if self.flat_sketch_vp(cx).is_none() {
+            underlay.extend(self.render_sketch_labels(window, cx));
+        }
         underlay.extend(self.render_viewport_underlay(cx));
         // Live ("Panels vs feature dialogs"): Isolate stays open under a
         // feature dialog that opens in the same top-left spot.

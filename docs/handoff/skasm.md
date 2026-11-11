@@ -23,8 +23,8 @@
     the main scene's), its viewport events go to sketch mode with `active_vp` set (`PartStudioView::vp()` is what
     sketch mode reads), its dimension labels drawn there; GPUI test `a_sketch_on_the_flat_is_drawn_in_the_flat_view`.
     A selected flat face lights the part's face it shows (`flat_face_counterpart`: back through its wall's map,
-    `FlatPlace::walls`; a bend strip falls back to the base wall's face). Not yet live's: a dimension's edit box and
-    the GPUI-drawn sketch boxes still sit over the main view.
+    `FlatPlace::walls`; a bend strip falls back to the base wall's face). The sketch's GPUI boxes (dimension box,
+    glyphs, counts) go over the flat view too (`render_sketch_labels` with `active_vp`).
 
 ## From psui (2026-11-10 18:35 UTC, lead: c2-hex-bookcase-derived's text, skasm paused)
 - Took SUITE-HEX-BOOKCASE-TEXT. On main its text was already live's (core's `rejoin_pieces`, 11-09 18:40) and the µm

@@ -1097,6 +1097,16 @@ impl PartStudioView {
             v.show_sketch_frame(sketch_frame, cx);
         });
 
+        // A sketch on the flat: its boxes, glyphs and dimension box over the flat view (live 2468).
+        let flat_labels = match self.flat_sketch_vp(cx) {
+            Some(fvp) => {
+                self.active_vp = Some(fvp);
+                let labels = self.render_sketch_labels(window, cx);
+                self.active_vp = None;
+                labels
+            }
+            None => Vec::new(),
+        };
         let split = SPLIT.with(|s| s.get());
         v_flex()
             .id("sm-panel")
@@ -1141,7 +1151,7 @@ impl PartStudioView {
             )
             // Live (4): the main window's Measure and Analysis tools sit at
             // the flat view's bottom right.
-            .child(div().flex_1().min_h(px(SPLIT_MIN_BOTTOM)).relative().child(fv).child(h_flex().occlude().absolute().bottom_0().right_0().h(px(30.)).px(px(5.)).gap(px(5.)).children(self.eval_buttons("flat", false, cx))))
+            .child(div().flex_1().min_h(px(SPLIT_MIN_BOTTOM)).relative().child(fv).children(flat_labels).child(h_flex().occlude().absolute().bottom_0().right_0().h(px(30.)).px(px(5.)).gap(px(5.)).children(self.eval_buttons("flat", false, cx))))
             .into_any_element()
     }
 }
