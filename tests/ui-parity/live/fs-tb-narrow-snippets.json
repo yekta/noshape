@@ -1,0 +1,314 @@
+{
+ "scenario": "fs-tb-narrow-snippets",
+ "recorded": "2026-11-11T02:23:22.819Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
+ },
+ "live": {
+  "document": "5e684f2425770425ecc681f1",
+  "workspace": "a35c2c911618aacb8149b8e4",
+  "element": "5ec40e67a0fe813e95fc508d",
+  "start": "fs-studio",
+  "startElement": "5ec40e67a0fe813e95fc508d",
+  "runner": "live2 .nstate-uip-3.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": "Default geometry"
+  },
+  "parts": [],
+  "partsHeading": "Parts (0)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    },
+    {
+     "name": "Feature Studio 1",
+     "kind": "featurestudio",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "doc_tab": "Feature Studio 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    583,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "textarea",
+     "text": "FeatureScript 3112;\n\n",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      0,
+      0
+     ],
+     "line": "FeatureScript 3112;",
+     "lines": 4,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 46053
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "caret": "Snippets"
+    }
+   },
+   "ok": true,
+   "at": [
+    375,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Length parameter",
+      "Angle parameter",
+      "Count parameter",
+      "Query parameter",
+      "Enum parameter",
+      "Boolean parameter",
+      "String parameter",
+      "Array parameter",
+      "Selection-driven array parameter",
+      "Part Studio reference parameter",
+      "Variable Studio reference parameter",
+      "Image reference parameter",
+      "CSV reference parameter",
+      "JSON reference parameter",
+      "Parameter group",
+      "qEverything",
+      "qCreatedBy",
+      "qBodyType",
+      "qGeometry",
+      "qSketchRegion",
+      "qCapEntity",
+      "qContainsPoint",
+      "qIntersectsPlane",
+      "qAdjacent",
+      "qUnion",
+      "qIntersection",
+      "qSubtraction",
+      "evaluateQuery",
+      "evVertexPoint",
+      "evLine",
+      "evAxis",
+      "evPlane",
+      "evOwnerSketchPlane",
+      "evEdgeTangentLine",
+      "evFaceTangentPlane",
+      "evDistance",
+      "evLength",
+      "evArea",
+      "evVolume",
+      "evApproximateCentroid",
+      "evApproximateMassProperties",
+      "evBox3d",
+      "vector",
+      "line",
+      "plane",
+      "coordSystem",
+      "transform",
+      "rotationAround",
+      "scaleUniformly",
+      "fromWorld",
+      "toWorld",
+      "Sketch",
+      "skLineSegment",
+      "skCircle",
+      "skEllipse",
+      "skArc",
+      "skEllipticalArc",
+      "skFitSpline",
+      "skRegularPolygon",
+      "skPolyline",
+      "fCuboid",
+      "fCylinder",
+      "fSphere",
+      "opExtrude",
+      "opRevolve",
+      "opThicken",
+      "opTransform",
+      "opPattern",
+      "opPlane",
+      "opDeleteBodies"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      0,
+      0
+     ],
+     "line": "FeatureScript 3112;",
+     "lines": 4,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 60851
+  }
+ ],
+ "view": {
+  "window": {
+   "width": 1600,
+   "height": 992
+  }
+ }
+}

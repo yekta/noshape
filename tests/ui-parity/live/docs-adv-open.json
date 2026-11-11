@@ -1,0 +1,129 @@
+{
+ "scenario": "docs-adv-open",
+ "recorded": "2026-11-11T02:07:59.398Z",
+ "app": {
+  "name": "live",
+  "version": "1.223.93118.b7e399f9a55f",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-10.5 3dedc795"
+ },
+ "live": {
+  "page": "documents"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": null,
+  "features": null,
+  "parts": [],
+  "undo": null,
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": null,
+  "documents": {
+   "place": "Owned by me",
+   "selected": null,
+   "search": "",
+   "panel": "Details",
+   "advanced": false,
+   "columns": false
+  },
+  "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "caret": "Search"
+    }
+   },
+   "ok": true,
+   "at": [
+    1027,
+    20
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "span"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": true,
+     "columns": false
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 2421
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "caret": "Search"
+    }
+   },
+   "ok": true,
+   "at": [
+    1027,
+    20
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "span"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+   },
+   "t": 4704
+  }
+ ],
+ "tabsOpened": 12
+}

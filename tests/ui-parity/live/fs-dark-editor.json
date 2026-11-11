@@ -1,0 +1,242 @@
+{
+ "scenario": "fs-dark-editor",
+ "recorded": "2026-11-11T01:43:21.306Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.1"
+ },
+ "live": {
+  "document": "9c9795f4d906dc868645cc85",
+  "workspace": "2b7b32d9cd594536e284cda7",
+  "element": "0312f2dd144f1f55e300733a",
+  "start": "fs-studio",
+  "startElement": "0312f2dd144f1f55e300733a",
+  "runner": "live2 .nstate-uip-3.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": "Default geometry"
+  },
+  "parts": [],
+  "partsHeading": "Parts (0)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    },
+    {
+     "name": "Feature Studio 1",
+     "kind": "featurestudio",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "doc_tab": "Feature Studio 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    583,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "textarea",
+     "text": "FeatureScript 3112;\n\n",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      0,
+      0
+     ],
+     "line": "FeatureScript 3112;",
+     "lines": 4,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 61619
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "editor": "code"
+    }
+   },
+   "ok": true,
+   "at": [
+    440,
+    376
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "textarea",
+     "text": "\n\n",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      3,
+      0
+     ],
+     "line": "",
+     "lines": 4,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 75064
+  }
+ ],
+ "view": {
+  "theme": "dark"
+ }
+}
