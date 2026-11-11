@@ -10,6 +10,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-11 08:52 UTC: lead's speed gaps (custom features)
+- Surface Pattern 3: group_disjoint meshes a shared shape once (08e6a4e0, 4.7 -> 1.7 s of its 13-16 s); the rest is
+  bool's (our Boolean declines spheres into offset / B-spline faces, then OCCT 7.8 s): bool.md.
+- Part Draft 2: OCCT's Defeaturing under core's draft_reblend (543 ms of ~0.9 s): core.md.
+- Lighten 1: spread over ops (bool's Shell 185 ms the most); evEdgeConvexity's 42 ms is the host's: next.
+- Drawing: f9d73475 (aligned section edit, drawing menus) queued 08:10; drw 157/173, 1359/1384 states.
+
 ## 11-11 06:09 UTC: Boolean Union with Keep tools (core's item, lead gave it to dx)
 
 The union is a new part (next Part N, own colour), the tools stay, as live's lines show (hand drill's 9fbc05, two of
