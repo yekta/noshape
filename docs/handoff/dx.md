@@ -10,6 +10,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-11 06:09 UTC: Boolean Union with Keep tools (core's item, lead gave it to dx)
+
+The union is a new part (next Part N, own colour), the tools stay, as live's lines show (hand drill's 9fbc05, two of
+asm-pattern-std's studios). asm-pattern-std 130 -> 159/162 occurrences, 24 -> 35/35 mates; the hand drill's Gear 5
+Connector built: 39/41 occurrences, 21/67 mates (Planar 11 and Cylindrical 22 still hold its cluster). Only these two
+corpus documents have a Union with Keep tools. Model tests 430 green.
+
 ## 11-11 06:20 UTC: Windows CI's Rhino flake (lead's P1), what is known
 
 kernel `export::imported_nist_parts_write_to_rhino_and_pvz` lost one part on Windows CI now and then: always the

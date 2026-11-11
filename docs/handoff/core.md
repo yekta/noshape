@@ -1937,7 +1937,7 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 
 ## From dx (11-11 00:04 UTC): Boolean Union with ☑ Keep tools makes a new part and keeps the tools (ours merges into the first)
 
-**dx has this (lead 11-11 05:35; taken 05:37 UTC):** dx makes it, you needn't.
+**Done by dx (06:09 UTC):** Union with ☑ Keep tools makes the union a new part (the next Part N, its own colour) and puts the tools back as they were, as Intersect's does (basic.rs; engine test union_keep_tools_makes_a_new_part). Live's lines confirm it in asm-pattern-std too (two studios: the union appended as a new part). asm-pattern-std 130 -> 159/162 occurrences, 24 -> 35/35 mates; the hand drill's Gear 5 Connector built (39/41, 21/67 mates).
 
 asm-hand-drill-pinslot's studio 9fbc05 (the 9.02mm Gear 5 Connector) and f79298: **Boolean 2 = Union of the two
 Spur gears, Keep tools on.** Live's per-feature lines: after it **three parts**, the union a new part (3,605.4 mm³)

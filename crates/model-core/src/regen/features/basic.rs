@@ -33,7 +33,21 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
             picked.sort_by_key(|&i| refs.iter().position(|r| ev.resolve_bodies(std::slice::from_ref(r)).contains(&i)).unwrap_or(usize::MAX));
             let before = ev.ctx.bodies.len();
             let picked_shapes: Vec<k::Shape> = picked.iter().filter_map(|&i| ev.ctx.bodies.get(i)).map(|b| b.shape.clone()).collect();
+            // ☑ Keep tools: the union is a new part and the tools stay as they were (live, asm-hand-drill-pinslot's
+            // studio 9fbc05: three parts after it, the union 3605.4 mm³ and both gears unchanged; as Intersect's).
+            let kept = ev.bool("keepTools").then(|| ev.ctx.bodies.clone());
             ev.fuse_targets(&picked, Vec::new(), &k::BooleanOptions::default())?;
+            if let Some(saved) = kept
+                && ev.ctx.bodies.len() < before
+            {
+                let made: Vec<NamedShape> = ev.ctx.bodies.iter().filter(|b| !saved.iter().any(|s| std::sync::Arc::ptr_eq(s, b))).map(|b| NamedShape { shape: b.shape.clone(), names: b.shape_names() }).collect();
+                let kind = picked.first().and_then(|&i| saved.get(i)).map_or(crate::display::BodyKind::Solid, |b| b.kind);
+                ev.ctx.bodies = saved;
+                for (i, m) in made.into_iter().enumerate() {
+                    ev.add_new_bodies(m, kind, i as u32)?;
+                }
+                return Ok(());
+            }
             // Live (qa5 BOOL1): parts apart stay as they were, with a blue
             // note while editing; parts touching only along an edge or at a
             // point stay two parts too, with no note (live 1760).

@@ -1588,6 +1588,27 @@ fn union_pick_order_and_intersect_keep_tools() {
     assert!((ps[3].2 - 392.699082).abs() < 1e-4 && ps[3].1 == "Part 4", "{ps:?}");
 }
 
+/// Union with ☑ Keep tools (live: asm-hand-drill-pinslot's Gear 5 Connector studio, two Spur gears united, three parts
+/// after it): the union is a new part, last ("Part 4", its own colour), and the tools stay as they were, so a later
+/// Delete part of the tools leaves it.
+#[test]
+fn union_keep_tools_makes_a_new_part() {
+    let (mut t, [p1, p2, p3]) = qa5_bool();
+    let before = parts(&t.ok());
+    t.add("booleanBodies", &[("operationType", en("UNION")), ("tools", q(vec![Reference::Body(p2.clone()), Reference::Body(p1.clone())])), ("keepTools", b(true))]);
+    let r = t.ok();
+    let ps = parts(&r);
+    assert_eq!(ps.len(), 4, "{ps:?}");
+    assert_eq!(ps[..3], before[..], "the tools stay: {ps:?}");
+    assert!((ps[3].2 - 9178.097245).abs() < 1e-4 && ps[3].1 == "Part 4" && ![p1.clone(), p2.clone(), p3].contains(&ps[3].0), "{ps:?}");
+    let color = |id: &BodyId| r.context.bodies.iter().find(|b| b.id == *id).map(|b| b.color);
+    assert_ne!(color(&ps[3].0), color(&p2), "its own colour");
+    t.add("deleteBodies", &[("entities", q(vec![Reference::Body(p1), Reference::Body(p2)]))]);
+    let ps = parts(&t.ok());
+    assert_eq!(ps.len(), 2, "{ps:?}");
+    assert!(ps.iter().any(|p| (p.2 - 9178.097245).abs() < 1e-4), "the union stays: {ps:?}");
+}
+
 /// qa5 INT2: Intersect of two parts that don't touch (Part 1 and Part 3),
 /// with or without ☑ Keep tools, makes nothing and changes nothing.
 #[test]
