@@ -1131,6 +1131,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     mates 5 -> 6/52: Pin slot 7 no longer "Mate overdefines the assembly." (now as live), and Studio e53bba's Extrude 6 and
     Chamfer 1 now translate. Its parent's translator commit (core 730d6f28c) gives 5/52 with both still failing, so it is
     dx's f8378048c: its parent f577aac93 (with bool's 44e52dafb) also gives 5/52 (qa-scratch/recut/hd-*.log). No occurrence moved.
+  **qa 05:14, the 00:54 run (green 6364f3c47) against the 19:02 one (c4b86cba):** features 818 -> 820/947, scenarios 1378 -> 1385,
+  index 91.7 with the clean-window speed (91.7 %, 82 of 97). Flags:
+  - blend: c2-hunting-knife 738 -> 1,347 ms in the clean window (live 408): its Chamfer 1 now builds (was "Failed to chamfer
+    selections."; 19/51/33 faces/edges/vertices, live 19/50/32) at 647 ms (167 ms as the failure), and Mirror 1 243 ms after it.
+    blend's 12b1d8a6f: a fix, now the knife's slowest feature.
+  - core / blend: c2-impeller-loft's Fillet 3 ("Failed to fillet selections.") and Move face 1 ("Could not offset selected
+    faces as requested.") now fail; the document already differs from feature 11 (Shell Gehäuse).
+  - Not code: c2-hex-bookcase-derived (19:02's 563 ms) is 164 ms in the clean window, under live's 290.
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
