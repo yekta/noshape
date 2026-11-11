@@ -447,6 +447,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - **qa 19:41: CI 43039009971 on 44ff040aa is green on all three** (the 18:10 re-run: Linux OCCT, Test and Release build
     success, macOS and Windows as before). Failures before: 15:00–17:39 the runner's apt (DNS to azure.archive.ubuntu.com, then
     "Unable to locate package gcc-15": ppa.launchpadcontent.net unreachable over IPv6). The 17:00 cut can go ahead from 44ff040aa.
+- **qa 22:43, v0.4.44 checked (published 22:18, run 43089660933, cut 44ff040aa): no blocker.** The Linux job's first attempt
+  failed at upload-artifact (GitHub's artifact service: "Failed to FinalizeArtifact", HTML answers 20:19–20:28; the build and
+  its 24.04 library check had passed); the lead's re-run published it. 11 assets, every job green incl. the three "Restart
+  into" updates; the Linux tarballs and .deb match SHA256SUMS. CLI smoke = v0.4.43 (the volume sweep the same; Rhino export
+  68,317 -> 68,343 bytes, the same solid); the 48 ticket documents on the release CLI = green 44ff040aa; GUI rows (vibe3 :63)
+  pixel-identical to v0.4.43 (11 / 11). Agent session (Haiku, the release's MCP): 9 tool calls, 0 failed, the block right
+  (23,214.6 mm³, 7 faces). qa-os (run 43110843016): macOS footer and Show in Finder OK; Windows footer OK, Show in Explorer still
+  fails (WIN-SHOW-IN-EXPLORER, not new).
 - Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 HAND-DRILL-MATES-OVERDEFINED (parity only).
 
 ## Release blockers for the 2026-11-11 05:00 release, candidate e2c8da0f9 (qa list 04:50; watcher GREEN 03:57, CI 3-platform success; the latest release is v0.4.41, v0.4.42 from b73d2fece in its release CI)
