@@ -22,6 +22,7 @@ mod parity;
 mod planar_face_mesh;
 mod regen_determinism;
 mod regen_profile;
+mod result_keys;
 mod sketch_open_perf;
 mod sketch_recursion;
 mod smoke;

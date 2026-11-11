@@ -416,6 +416,10 @@ impl DerivedProvider for DocStudios {
                 if let TabContent::FeatureStudio(f) = &t.content {
                     f.source.hash(&mut h);
                 }
+                // Its Decals' images and reference parameters' files: File tabs, their bytes.
+                if let TabContent::File(f) = &t.content {
+                    (t.id, noshape_model::custom::file_content_hash(f)).hash(&mut h);
+                }
             }
             for src in ps.features.iter().filter_map(noshape_model::features::importing::source_studio) {
                 if src != tab && self.active.lock().insert(src.clone()) {

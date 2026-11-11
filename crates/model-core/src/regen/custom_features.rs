@@ -181,6 +181,11 @@ pub trait CustomFeatureProvider: Send + Sync + std::fmt::Debug {
     fn version(&self, tab: &str) -> u64 {
         self.studio(tab).map(|s| s.hash).unwrap_or(0)
     }
+    /// Changes whenever a File tab (its bytes too) is added, removed or changed: what a Decal's image or a reference
+    /// parameter reads.
+    fn files_version(&self) -> u64 {
+        0
+    }
 }
 
 /// The FeatureScript host's entry points, registered by noshape-custom ([`set_host`]).

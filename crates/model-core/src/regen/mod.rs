@@ -330,7 +330,9 @@ fn result_key(studio: &PartStudio, config: &ConfigValues, units: &UnitPrefs, opt
             key = hash_bytes(key, &v.to_le_bytes());
         }
     }
-    Some(key)
+    // The File tabs (a Decal's image, a reference parameter's file): their bytes.
+    let files = opts.custom_features.clone().unwrap_or_else(custom_features::fallback_provider).files_version();
+    Some(hash_bytes(key, &files.to_le_bytes()))
 }
 
 /// NOSHAPE_KERNEL_PROFILE: the kernel's profile is printed for each feature.

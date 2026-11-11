@@ -35,6 +35,9 @@ impl CustomFeatureProvider for Latest {
     fn version(&self, tab: &str) -> u64 {
         self.studio(tab).map(|s| s.hash).unwrap_or(0) ^ LATEST_FILES_HASH.load(std::sync::atomic::Ordering::Relaxed)
     }
+    fn files_version(&self) -> u64 {
+        LATEST_FILES_HASH.load(std::sync::atomic::Ordering::Relaxed)
+    }
 }
 
 
@@ -168,7 +171,7 @@ fn importables(doc: &Document) -> Importables {
     // Imported files' BLOB_DATA is a constant: a changed file recompiles.
     for t in doc.tabs.iter() {
         if let TabContent::File(f) = &t.content {
-            (t.id, &f.file_name, f.size, f.uploaded).hash(&mut h);
+            (t.id, &f.file_name, f.size, f.uploaded, file_content_hash(f)).hash(&mut h);
         }
     }
     let deps = if sources.len() > 1 || !others.is_empty() { h.finish() } else { 0 };
@@ -283,7 +286,7 @@ impl DocumentScripts {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         let mut latest = LATEST_FILES.write();
         for (t, f) in &files {
-            (t, &f.file_name, f.size, f.uploaded).hash(&mut h);
+            (t, &f.file_name, f.size, f.uploaded, file_content_hash(f)).hash(&mut h);
             latest.insert(t.to_string(), f.clone());
         }
         drop(latest);
@@ -332,6 +335,9 @@ impl CustomFeatureProvider for LazyScripts {
     fn version(&self, tab: &str) -> u64 {
         self.get().version(tab)
     }
+    fn files_version(&self) -> u64 {
+        self.get().files_version()
+    }
 }
 
 impl CustomFeatureProvider for DocumentScripts {
@@ -349,4 +355,26 @@ impl CustomFeatureProvider for DocumentScripts {
     fn version(&self, tab: &str) -> u64 {
         self.studio(tab).map(|s| s.hash).unwrap_or(0) ^ self.files_hash
     }
+    fn files_version(&self) -> u64 {
+        self.files_hash
+    }
+}
+
+/// A File tab's bytes as a hash (a replacement with the same name, size and upload second is another file), worked
+/// out once per buffer.
+pub fn file_content_hash(f: &crate::file_tab::FileTab) -> u64 {
+    static MEMO: std::sync::LazyLock<parking_lot::Mutex<HashMap<(usize, usize), u64>>> = std::sync::LazyLock::new(Default::default);
+    let at = (std::sync::Arc::as_ptr(&f.data_base64) as *const u8 as usize, f.data_base64.len());
+    if let Some(&h) = MEMO.lock().get(&at) {
+        return h;
+    }
+    let mut out = [0u8; 8];
+    out.copy_from_slice(&blake3::hash(f.data_base64.as_bytes()).as_bytes()[..8]);
+    let h = u64::from_le_bytes(out);
+    let mut memo = MEMO.lock();
+    if memo.len() > 4096 {
+        memo.clear();
+    }
+    memo.insert(at, h);
+    h
 }
