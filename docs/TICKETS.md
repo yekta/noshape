@@ -352,8 +352,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
-## Release blockers for the 2026-11-11 05:00 release (qa list 00:52, checked on watcher green 6364f3c47, 23:55; v0.4.42 in its release CI from b73d2fece)
-- **qa 00:52: no blocker on 6364f3c47** (b73d2fece + blend's 12b1d8a6f: a chamfer OCCT can't build built as sections of
+## Release blockers for the 2026-11-11 05:00 release (qa list 00:49, checked on watcher green 6364f3c47, 23:55; v0.4.42 in its release CI from b73d2fece)
+- **qa 00:49: no blocker on 6364f3c47** (b73d2fece + blend's 12b1d8a6f: a chamfer OCCT can't build built as sections of
   constant offsets; core's 2d50ff580: Delete face of a prism's rounds). Model suite, full corpus (vibe4): 77/87, 820/947, every
   document = b73d2fece (gear documents at baseline). cf corpus and the 48 ticket documents = b73d2fece except three fuzz
   documents, all from 12b1d8a6f (a chamfer that failed now builds; the features after it follow):

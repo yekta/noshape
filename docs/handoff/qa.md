@@ -3,7 +3,7 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
-**11-11 00:52: suite layout now:** qa-suites.sh runs the model suite (speed) on vibe5 (`QA_SPEED_HOST`, no quiet wait, each
+**11-11 00:49: suite layout now:** qa-suites.sh runs the model suite (speed) on vibe5 (`QA_SPEED_HOST`, no quiet wait, each
 document's line with vibe5's load: models-timed.log; lead 11-10) and the assembly / exchange suites on vibe4 (`QA_SUITES_HOST`;
 the watcher moved to vibe3) at the same time; `QA_REDO=<run dir>` redoes a run's remote stage; no index is published without a
 model score. Speed's last index: 91.4 (e3a19f63, vibe5 under load 4–12; INDEX.md "Scoring changes"). bin/clean-speed-0200.sh
