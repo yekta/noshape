@@ -485,6 +485,8 @@ pub struct FsUiState {
     /// Edits not yet saved into the document (the toolbar's Undo already undoes them).
     pub unsaved: bool,
     pub notices: usize,
+    /// The gutter's marked rows: one per line holding notices (live's markers fill rows 1..N, behaviours 1683).
+    pub notice_lines: usize,
     pub completion: Option<Vec<String>>,
     /// Each row's kind at its right ("snippet", "keyword", "function"…).
     pub completion_kinds: Option<Vec<String>>,
@@ -558,6 +560,7 @@ impl FeatureStudioView {
             committed,
             unsaved: text != self.synced,
             notices: self.notices.len(),
+            notice_lines: self.notices.iter().filter(|n| n.line > 0).map(|n| n.line).collect::<std::collections::BTreeSet<_>>().len(),
             completion: menu.open.then(|| menu.items.iter().map(|i| i.label.clone()).collect()),
             completion_kinds: menu.open.then(|| menu.items.iter().map(|i| i.detail.clone().unwrap_or_default()).collect()),
         }

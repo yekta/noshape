@@ -28,6 +28,15 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-11 21:50 UTC: Feature Studio undo steps and the notices count (lead 11-11)
+- Undo: a typed run up to a pause (700 ms, the save delay) is one step; psui's "first character its own step" (2480)
+  dropped (lead: live's recorder types at 90 ms a key and 3 of 4 takes undo the run whole). UI test
+  `a_typed_run_undoes_in_one_step` (also Ctrl+Z straight after typing). fs-tb-redo stays live's split take.
+- Notices: live's reader counts the notices pane's rows when it is open, else the gutter's marked rows (one per notice
+  line, filled from row 1: behaviours 1683). Ours counted every notice; `FsUiState::notice_lines` now. fs-ed-error-
+  squiggle step 7 (hover over the squiggle) reads 2 on live with one ✕ shown: asked live which cell (REQUESTS 2507).
+- IMPORT-SPLIT-DOCUMENTS leftovers (parts-only STEP, Parasolid, IGES with Split) asked live (REQUESTS 2511).
+
 ### 2026-11-11 20:06 UTC: restarted after the quota pause
 - My 4 commits of 11-08 had all landed (9535caa6 last); the parked merge-rows patch landed through psui (71c63ad3a).
   psui covered the area 11-09 to 11-11 (entries above and in psui.md: Feature Studio at a version 2485, undo steps

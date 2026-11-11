@@ -566,9 +566,11 @@ impl Workspace {
         match self.active.and_then(|t| self.views.get(&t)) {
             Some(TabView::FeatureStudio(v)) => {
                 let st = v.read(cx).ui_state(cx);
+                // Live's reader counts the notices pane's rows when it is open, else the gutter's marked rows.
+                let notices = if self.fs_notices.is_some() { st.notices } else { st.notice_lines };
                 let list = st.completion.map(|rows| serde_json::json!({ "kind": "autocomplete", "rows": rows, "meta": st.completion_kinds.clone().unwrap_or_default(), "highlighted": gpui_kit::component::input::COMPLETION_SELECTED_ROW.load(std::sync::atomic::Ordering::Relaxed), "disabled": [] }));
                 Some(serde_json::json!({
-                    "featurestudio": { "caret": [st.caret.0, st.caret.1], "line": st.line, "lines": st.lines, "committed": st.committed, "notices": st.notices },
+                    "featurestudio": { "caret": [st.caret.0, st.caret.1], "line": st.line, "lines": st.lines, "committed": st.committed, "notices": notices },
                     "unsaved": st.unsaved,
                     "list": list,
                 }))
