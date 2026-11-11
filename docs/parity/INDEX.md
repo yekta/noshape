@@ -58,3 +58,8 @@ live and run in qa's 4-hourly run; coverage then grows as the owner writes more.
   (models-timed.log); a clean measurement is taken in the lead's 02:00–04:00 UTC window. The 15:02 run (e3a19f63)
   recomputed with only its speed stage moved (same index.py, same other areas): **Speed 81.9 % → 90.2 %** (57 → 78 of 97 cases
   at or under live), **index 90.5 → 91.4**, under load 4.1–11.8.
+- 2026-11-11 02:08 UTC (qa): the clean vibe5 measurement (the lead's 02:00–04:00 window, 1-minute load 1.0–2.6 at each
+  document) of the same run: Speed 91.3 % (81 of 97 at or under live), index 91.4 (under load at 22:15: 90.2 %, 91.4). Built
+  with --release instead: 91.6 %, the same 81 cases: the suite's debug build (our crates at opt-level 1, dependencies at 3)
+  is kept.
+

@@ -142,6 +142,7 @@ mirror-face-type (a live DOM detail).
 | 2026-11-10 | 4f5863a2 = v0.4.41 (07:02 run; models / assemblies / exchange on vibe3 from load 0.7, vibe2 retired; speed by feature time on vibe3) | 90.4 | 86.2 | 98.1 | 72.8 | 97.2 | 90.4 | 100.0 | 91.7 | 84.3 | 92.5 | 98.5 | 93.5 | 95.4 |
 | 2026-11-10 | e3a19f63 (15:02 run; its vibe3 stage redone 16:43–19:23 after a link failure, models from load 3.3 beside other agents' jobs, ~7 % slower than 10:59) | 90.5 | 86.3 | 98.1 | 72.8 | 97.9 | 94.4 | 100.0 | 92.7 | 81.9 | 92.5 | 98.5 | 93.9 | 95.7 |
 | 2026-11-10 | e3a19f63 (15:02 run; speed re-measured on vibe5's EPYC under load, 1-min load 4.1–11.8, median 9.8 per document, debug build as the suite; the other areas from the 15:02 run) | 91.4 | 86.3 | 98.1 | 72.8 | 95.7 | 94.4 | 100.0 | 92.7 | 90.2 | 96.6 | 98.5 | 93.9 | 95.7 |
+| 2026-11-11 | e3a19f63 (15:02 run; speed in the lead's clean vibe5 window 02:01–02:08, load 1.0–2.6 per document, debug as the suite; release 91.6 %; the other areas from the 15:02 run) | 91.4 | 86.3 | 97.8 | 72.8 | 95.7 | 94.4 | 100.0 | 92.7 | 91.3 | 96.6 | 98.5 | 93.9 | 95.7 |
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
