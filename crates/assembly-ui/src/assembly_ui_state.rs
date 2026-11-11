@@ -345,6 +345,15 @@ impl AssemblyView {
         };
         let focus = focus.or_else(|| self.ui.panel_focus.then(|| json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })));
         let focus = focus.or_else(|| self.ui.checkbox_focus.zip(dialog.as_ref()).map(|(label, d)| json!({ "kind": "field", "label": label, "dialog": d["title"] })));
+        // A right-clicked number field, then the page once its Configure is picked (live asm-pattern-field-configure).
+        let focus = focus.or_else(|| self.ui.keyboard_away.then(|| json!({ "kind": "none" })));
+        let focus = focus.or_else(|| {
+            self.ui.number_focus.as_ref().zip(dialog.as_ref()).map(|((label, st), d)| {
+                let mut f = input(Some(label), st);
+                f["dialog"] = d["title"].clone();
+                f
+            })
+        });
         // (The Mate connector dialog's field keeps no keyboard after a viewport pick: live asm-mate-connector-on-face.)
         let focus = focus.or_else(|| if self.mate.is_none() && !self.mc.as_ref().is_some_and(|m| m.picked) { active_field() } else { None });
         // The Driving mate selector's box has the keyboard (live asm-mate-menu-edit-driver-mate).
@@ -411,7 +420,8 @@ impl AssemblyView {
             Some(SidePanel::Positions) if asm.position_drivers.is_empty() && asm.position_subs.is_empty() && !asm.named_positions.is_empty() => {
                 Some("Capture variants of the assembly as named positions Position instances in the graphics area and define driving mates.".into())
             }
-            Some(SidePanel::Configurations) if !asm.configuration.inputs.is_empty() && asm.configuration.configured.is_empty() => {
+            // (A field of the open pattern configured counts: live asm-pattern-field-configure.)
+            Some(SidePanel::Configurations) if !asm.configuration.inputs.is_empty() && asm.configuration.configured.is_empty() && !self.pattern.as_ref().is_some_and(|p| !p.cfg_pending.is_empty()) => {
                 Some("No assembly features are configured Right click patterns, mates, or instances to configure them.".into())
             }
             _ => None,

@@ -327,6 +327,9 @@ impl AssemblyView {
                 .bg(pal.dialog_bg)
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .text_color(pal.text)
+                // Esc from the expression (unedited: its field passes it on) closes the panel as anywhere else (live
+                // asm-menu-dynamic-suppression-edit-expression).
+                .on_action(cx.listener(|this, _: &gpui_kit::component::input::Escape, window, cx| this.on_cancel(&crate::actions::Cancel, window, cx)))
                 .child(
                     h_flex()
                         .h(px(29.))

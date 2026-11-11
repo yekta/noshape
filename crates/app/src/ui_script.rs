@@ -354,6 +354,10 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             let _ = cx.update(|window, _| window.refresh());
             sleep(cx, 150).await;
             let mut s = state(cx);
+            // ☰ › Close document closed this window for the documents page, which live's runner goes on reading.
+            if s.is_null() && cx.update(|_, _| ()).is_err() {
+                return newest_page_state(cx).await;
+            }
             if s.is_object() {
                 s["tooltip"] = json!(noshape_app_core::ui_script::shown_tooltip());
                 // A modal of the window's (Create Drawing, Export Drawing) holds the focus (live 2063: "other").
@@ -652,6 +656,23 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         let _ = cx.update(|_, cx| cx.quit());
     })
     .detach();
+}
+
+/// The newest window with a page's state (the documents page), drawn with its tooltip, else null.
+async fn newest_page_state(cx: &mut AsyncApp) -> Value {
+    let windows = cx.update(|cx| cx.windows());
+    for w in windows.into_iter().rev() {
+        noshape_app_core::ui_script::clear();
+        if w.update(cx, |_, window, _| window.refresh()).is_err() {
+            continue;
+        }
+        cx.background_executor().timer(Duration::from_millis(150)).await;
+        if let Ok(Some(mut s)) = w.update(cx, |_, window, cx| noshape_app_core::ui_script::page_state(window, cx)) {
+            s["tooltip"] = json!(noshape_app_core::ui_script::shown_tooltip());
+            return s;
+        }
+    }
+    Value::Null
 }
 
 /// The scenario's window width (`"window": {"width": 1480}`, live 2466), else live's runner's 1919 px.

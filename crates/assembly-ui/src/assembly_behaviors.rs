@@ -474,6 +474,11 @@ pub struct AsmUi {
     pub panel_focus: bool,
     /// A dialog checkbox just clicked holds the keyboard (live: the DOM input), by its label; any click clears it.
     pub checkbox_focus: Option<&'static str>,
+    /// A dialog number field right-clicked holds the keyboard, its text selected (live asm-pattern-field-configure),
+    /// by its label; any click clears it.
+    pub number_focus: Option<(&'static str, Entity<InputState>)>,
+    /// A field's Configure leaves the keyboard on the page (live asm-pattern-field-configure); any click clears it.
+    pub keyboard_away: bool,
     pub cfg_only_kinds: [bool; 3],
     pub cfg_toast_ok: bool,
     pub cfg_props_tab: bool,
