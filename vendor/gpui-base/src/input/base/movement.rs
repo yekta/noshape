@@ -169,6 +169,18 @@ impl<M: InputModeKind> InputBaseState<M> {
                 let max_line_len = self.text.slice_line(next_point.row).len();
                 new_offset = line_start_offset + column.min(max_line_len);
             }
+            // A folded line, its remembered column past its text: the caret goes onto the fold's last line, as
+            // Ace's (it draws the header joined to that line's closing bracket: noshape fs-ed-fold-arrows).
+            let header_len = self.text.slice_line(next_point.row).len();
+            if new_offset >= line_start_offset + header_len
+                && column > header_len
+                && let Some(last) = self.display_map.folded_ranges().iter()
+                    .find(|f| f.start_line == next_point.row && f.end_line > f.start_line + 1)
+                    .map(|f| f.end_line - 1)
+            {
+                new_offset = self.text.line_start_offset(last) + column.min(self.text.slice_line(last).len());
+                new_affinity = false;
+            }
         }
 
         (new_offset, new_affinity)
