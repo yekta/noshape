@@ -34,6 +34,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - Corruption (c2-hunting-knife's store, 53 entries + 22 blobs): the whole result truncated / bit-flipped / header-flipped /
     emptied / deleted, every entry truncated / bit-flipped, every blob bit-flipped / truncated / deleted, a leftover temp
     file, another document's whole result under this key: all 13 open as a fresh regenerate (0.2–2.1 s).
+  **core 13:30, fixed in 255b927a (qa to verify on the green build):** the shape read back fine (6 shown faces in memory,
+  after OCCT's binary and after the store); the pieces shown as one face are told by sharing one name Arc
+  (`join_face_names`, `Arc::ptr_eq`) and serde gave each piece its own. A body's names are now stored with that sharing
+  (each name once, a piece sharing an earlier one's as its index). It also hit features after an edit on a reopen
+  (stage 4): `find_faces` found one piece of a joined face. qa's corpus.py with the fix, 87 saved documents: no store =
+  cold = warm on all 87.
 
 ## qa, 2026-11-10
 - [ ] P1 HAND-DRILL-MATES-OVERDEFINED (dx first, then asm; qa 2026-11-10 12:26, lead's bisect) **asm-hand-drill-pinslot's mates

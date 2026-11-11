@@ -63,8 +63,11 @@ What blend takes over:
   content-hashed blobs (checked on read), so an edit after a reopen runs from the edit on.
 - hat8 (vibe3, copy of the original): first open 18.3 s writing 20 MB; reopen 1.3 s; reopen + rename of the last
   feature 7.9 s; all 137 features as the original.
-- Next: entries of earlier features decode one after another (136 for hat8's last feature): a lazy context would
-  read only the one before the edit.
+- Lazy read (stage 5, bed04821 queued 13:31; lost once in vibe4's 10:42 queue wipe): a reopen reads the kept
+  features' light states only and the context just before the first feature that runs (hat8: reopen + rename of the
+  last feature 7.9 -> 4.6 s).
+- STORE-FACE-SPLIT (255b927a): joined face pieces share one name Arc; `Body`'s names are serialized keeping that
+  sharing (context.rs `shared_names`). Anything else that relies on Arc identity must be stored the same way.
 
 **State 11-11 06:12 UTC: hat8 (lead's P0): thin caps valid, merged faces keep their oldest name.**
 - hat8's thin extrudes ("Riser legs", "Seat lip"; thin.rs closed_wall) made caps OCCT finds invalid: its 2D offset of
