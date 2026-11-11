@@ -494,6 +494,9 @@ pub struct PartStudioView {
     flat_task: Option<(usize, Task<()>)>,
     /// The Sheet metal table and flat view panel's graphics area.
     flat_view: Option<Entity<flat_view::FlatView>>,
+    /// The viewport sketch mode works in while it handles another view's event or draws there (the flat view's,
+    /// live 2468), else the main one: see [`Self::vp`].
+    active_vp: Option<Entity<Viewport>>,
     /// Onshape interaction state (hide/isolate, select other, S toolbar...).
     ui: behaviors::UiState,
     /// `NOSHAPE_PERF_SCRIPT` (benchmarks).
@@ -643,6 +646,7 @@ impl PartStudioView {
             flat_cache: None,
             flat_task: None,
             flat_view: None,
+            active_vp: None,
             ui: behaviors::UiState::new(cx),
             perf_script: perf_script::from_env(),
             last_regen_request: None,
@@ -1410,7 +1414,6 @@ impl PartStudioView {
             selection.extend(seeds.iter().cloned());
         }
         let mut extra = self.sketch_overlay(&mut selection, &mut accent, cx);
-        extra.extend(self.flat_backdrop(cx));
         extra.extend(self.extrude_end_cap(cx));
         // The manipulator's glyph follows the camera: the renderer builds it
         // for every frame (camera_geometry.rs).
@@ -1716,11 +1719,13 @@ impl PartStudioView {
             None => {}
         }
         let (tool_cursor, overlay_cursor) = (self.viewport_tool_cursor(), self.viewport_overlay_cursor());
+        let scene = Arc::new(scene);
+        self.show_flat_sketch_scene(&scene, cx);
         self.viewport.update(cx, |vp, cx| {
             (vp.fit_bounds, vp.fit_inset_left) = (fit_bounds, fit_inset);
             vp.selection_count = count;
             (vp.tool_cursor, vp.overlay_cursor) = (tool_cursor, overlay_cursor);
-            vp.set_scene(Arc::new(scene), geometry_changed, cx)
+            vp.set_scene(scene, geometry_changed, cx)
         });
     }
 
@@ -6489,6 +6494,8 @@ fn preselect(ty: &FeatureType, feature: &mut Feature, selection: &[Reference], b
                             Reference::SketchRegion { .. } => filter.intersects(QueryFilter::SKETCH_REGION),
                             Reference::SketchEntity { .. } => filter.intersects(QueryFilter::SKETCH_EDGE),
                             Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => filter.intersects(QueryFilter::PLANE),
+                            // A face of a sheet metal flat (the flat view's New sketch…, live 2468): planar, in no scene.
+                            Reference::Face(n) if noshape_model::sheetmetal::flat_face_of(n).is_some() => filter.intersects(QueryFilter::FACE) || filter.intersects(QueryFilter::PLANE),
                             _ => false,
                         },
                     }
@@ -6775,6 +6782,13 @@ impl PartStudioView {
             labels.extend(self.analysis_labels(window, cx));
             labels.extend(self.sketch_dimension_overlay(window, cx));
             self.viewport.update(cx, |vp, cx| vp.set_overlay_labels(labels, cx));
+            // A sketch on the flat: its dimension labels in the flat view too (live 2468).
+            if let Some(fvp) = self.flat_sketch_vp(cx) {
+                self.active_vp = Some(fvp.clone());
+                let flat_labels = self.sketch_dimension_overlay(window, cx);
+                self.active_vp = None;
+                fvp.update(cx, |vp, cx| vp.set_overlay_labels(flat_labels, cx));
+            }
         }
         overlay.extend(self.render_palette(window, cx));
         overlay.extend(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone().into_any_element()));

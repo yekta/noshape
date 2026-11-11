@@ -68,7 +68,7 @@ impl PartStudioView {
     /// The point nearest the pointer on screen.
     fn choose_inference(&mut self, cx: &App) -> bool {
         let Some(pointer) = self.ui.pointer else { return false };
-        let vp = self.viewport.read(cx);
+        let vp = self.vp().read(cx);
         let Some(i) = self.ui.inference.as_mut() else { return false };
         let Some(points) = &i.points else { return false };
         let choice = points

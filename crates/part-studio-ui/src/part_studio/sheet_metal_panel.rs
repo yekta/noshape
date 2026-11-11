@@ -440,7 +440,38 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// An open sketch on a part's flat (sketched in the main view): the flat drawn there under it, not pickable.
+    /// The viewport sketch mode works in now (see `active_vp`).
+    pub(super) fn vp(&self) -> &Entity<crate::viewport::Viewport> {
+        self.active_vp.as_ref().unwrap_or(&self.viewport)
+    }
+
+    /// The flat view's viewport while a sketch on the flat is open (live 2468: you sketch inside the flat view).
+    pub(super) fn flat_sketch_vp(&self, cx: &App) -> Option<Entity<crate::viewport::Viewport>> {
+        self.sketch.as_ref()?;
+        let on_flat = matches!(self.edit.as_ref()?.dialog.read(cx).feature.params.query("sketchPlane").first(), Some(Reference::Face(n)) if noshape_model::sheetmetal::flat_face_of(n).is_some());
+        on_flat.then(|| self.flat_view.as_ref().map(|f| f.read(cx).viewport.clone())).flatten()
+    }
+
+    /// While a sketch on the flat is open: the flat view shows the scene without the parts, planes and origin (the
+    /// flat, the sketch, its overlays; its picks the main scene's, so sketch mode reads its events as the main ones).
+    pub(super) fn show_flat_sketch_scene(&mut self, scene: &Arc<noshape_render::Scene>, cx: &mut Context<Self>) {
+        let Some(fv) = self.flat_view.clone() else { return };
+        if self.flat_sketch_vp(cx).is_none() {
+            if fv.read(cx).sketching() {
+                fv.update(cx, |v, cx| v.show_sketch_scene(None, cx));
+            }
+            return;
+        }
+        let model = |i: &noshape_render::Instance| {
+            self.built.as_ref().and_then(|b| b.picks.get(i.pick_base)).is_some_and(|t| matches!(t.kind, crate::scene_builder::PickKind::Face | crate::scene_builder::PickKind::Edge | crate::scene_builder::PickKind::Vertex | crate::scene_builder::PickKind::Plane | crate::scene_builder::PickKind::Origin | crate::scene_builder::PickKind::Connector))
+        };
+        let mut shown = (**scene).clone();
+        shown.instances.retain(|i| !model(i));
+        shown.instances.extend(self.flat_backdrop(cx));
+        fv.update(cx, |v, cx| v.show_sketch_scene(Some(Arc::new(shown)), cx));
+    }
+
+    /// An open sketch on a part's flat: the flat drawn under it in the flat view (not pickable: the sketch's plane).
     pub(super) fn flat_backdrop(&mut self, cx: &App) -> Vec<noshape_render::Instance> {
         let part = self.sketch.as_ref().and_then(|_| match self.edit.as_ref()?.dialog.read(cx).feature.params.query("sketchPlane").first() {
             Some(Reference::Face(n)) => noshape_model::sheetmetal::flat_face_of(n).map(|(p, _)| p),
@@ -995,6 +1026,13 @@ impl PartStudioView {
                         FlatViewEvent::ContextMenu(at, on) => this.open_flat_menu(*at, *on == FlatPick::Face, window, cx),
                         FlatViewEvent::Selected(side) => this.select_flat_face(*side, cx),
                         FlatViewEvent::BendSelected(b) => this.ui.sm_flat_bend = *b,
+                        // A sketch on the flat is drawn in the flat view (live 2468): its events go to sketch mode there.
+                        FlatViewEvent::Sketching(ev) => {
+                            let Some(fvp) = this.flat_view.as_ref().map(|f| f.read(cx).viewport.clone()) else { return };
+                            this.active_vp = Some(fvp.clone());
+                            this.on_viewport_event(&fvp, ev, window, cx);
+                            this.active_vp = None;
+                        }
                     }
                 }));
                 self.flat_view = Some(fv.clone());

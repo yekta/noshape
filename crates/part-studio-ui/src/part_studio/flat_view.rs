@@ -42,6 +42,8 @@ pub struct FlatView {
     /// The open sketch's frame on the flat, its name's top-left and in-plane
     /// x / y directions, and the name.
     sketch_frame: Option<SketchFrame>,
+    /// While a sketch on the flat is open: the Part Studio's scene to show (the flat, the sketch, its overlays).
+    sketch_scene: Option<Arc<Scene>>,
     /// Keep the Top view fitted while the view's size settles (until the
     /// user moves the camera), and the size it was last fitted at.
     pending_fit: bool,
@@ -61,6 +63,9 @@ pub enum FlatViewEvent {
     Selected(Option<bool>),
     /// A bend line selected (the model's bend index), or none.
     BendSelected(Option<usize>),
+    /// While a sketch on the flat is open here (live 2468: you sketch inside the flat view): the view's events, for
+    /// sketch mode.
+    Sketching(ViewportEvent),
 }
 
 /// An open sketch's box on the flat (live request 1605: New sketch… on the
@@ -88,6 +93,7 @@ impl FlatView {
     pub fn new(gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let viewport = cx.new(|cx| Viewport::new(gpu.clone(), window, cx));
         let sub = cx.subscribe(&viewport, |this: &mut Self, _, ev: &ViewportEvent, cx| match ev {
+            _ if this.sketch_scene.is_some() && !matches!(ev, ViewportEvent::CameraChanged) => cx.emit(FlatViewEvent::Sketching(ev.clone())),
             // Live (4a): the face under the pointer outlined in the
             // pre-select colour.
             ViewportEvent::Hover(id) => {
@@ -134,7 +140,7 @@ impl FlatView {
             ViewportEvent::CameraChanged if this.fitted.is_some_and(|c| c != this.viewport.read(cx).camera) && this.viewport.read(cx).size() == this.fit_size => this.pending_fit = false,
             _ => {}
         });
-        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, sides: Vec::new(), selected: None, picked: None, selected_bend: None, sketch_frame: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
+        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, sides: Vec::new(), selected: None, picked: None, sketch_scene: None, selected_bend: None, sketch_frame: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
     }
 
     /// Show `flat` in `color` (linear RGBA, the part's). The first pattern
@@ -166,6 +172,26 @@ impl FlatView {
         self.hover = None;
         self.compose(true, cx);
         cx.notify();
+    }
+
+    /// A sketch on the flat open here: the scene to show instead of the flat's own (`None`: back to it).
+    pub fn show_sketch_scene(&mut self, scene: Option<Arc<Scene>>, cx: &mut Context<Self>) {
+        let entering = self.sketch_scene.is_none() && scene.is_some();
+        let leaving = self.sketch_scene.is_some() && scene.is_none();
+        self.sketch_scene = scene;
+        match &self.sketch_scene {
+            Some(s) => {
+                let s = s.clone();
+                self.viewport.update(cx, |vp, cx| vp.set_scene(s, entering, cx));
+            }
+            None if leaving => self.compose(true, cx),
+            None => {}
+        }
+    }
+
+    /// Whether a sketch on the flat is open here.
+    pub fn sketching(&self) -> bool {
+        self.sketch_scene.is_some()
     }
 
     /// The open sketch's frame on the flat, or none.
@@ -244,6 +270,9 @@ impl FlatView {
 
     /// The scene: the flat with the hovered face outlined, and the overlays.
     fn compose(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
+        if self.sketch_scene.is_some() {
+            return;
+        }
         let face = |side: bool| self.picked.filter(|i| self.sides.get(*i).copied().flatten() == Some(side)).or_else(|| self.sides.iter().position(|s| *s == Some(side)));
         let selected: Vec<Reference> = self.selected.and_then(face).map(|i| Reference::Face(noshape_model::reference::TopoName::face(noshape_model::reference::FeatureId(0), noshape_model::reference::Role::New(i as u32)))).into_iter().collect();
         let mut extra_now = self.parts.as_ref().map(|p| p.2.clone()).unwrap_or_default();

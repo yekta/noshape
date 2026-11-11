@@ -337,6 +337,13 @@ impl PartStudioView {
         self.update_conflicts();
         self.opts.editing_sketch = Some(id);
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = true);
+        // A sketch on the flat: drawn in the flat view (live 2468: it zooms to the flat).
+        if let Some(fvp) = self.flat_sketch_vp(cx) {
+            fvp.update(cx, |vp, cx| {
+                vp.tool_captures_left = true;
+                vp.zoom_to_fit(true, cx);
+            });
+        }
     }
 
     pub(super) fn leave_sketch(&mut self, cx: &mut Context<Self>) {
@@ -349,6 +356,11 @@ impl PartStudioView {
                 self.message = None;
             }
             self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
+            if let Some(f) = &self.flat_view {
+                let fvp = f.read(cx).viewport.clone();
+                fvp.update(cx, |vp, _| vp.tool_captures_left = false);
+                f.update(cx, |v, cx| v.show_sketch_scene(None, cx));
+            }
         }
     }
 
@@ -1485,7 +1497,7 @@ impl PartStudioView {
     /// The model edge under a viewport point, picked geometrically (6 px):
     /// an edge at the nearest hit's depth.
     fn model_edge_at(&self, position: DVec2, cx: &App) -> Option<Reference> {
-        let vp = self.viewport.read(cx);
+        let vp = self.vp().read(cx);
         let (o, d) = vp.ray(position);
         let tol = vp.camera.world_per_pixel(vp.size().y) * 6.0;
         let hits = noshape_model::interaction::entities_along_ray(&self.display, o, d, tol, &|_| false, 8);
@@ -2967,7 +2979,7 @@ impl PartStudioView {
     fn placed_dimension_labels(&self, data: &SketchData, cx: &App) -> Vec<PlacedDimension> {
         let Some(ed) = self.sketch.as_ref() else { return Vec::new() };
         let units = self.doc.read(cx).session.doc.settings.units;
-        let vp = self.viewport.read(cx);
+        let vp = self.vp().read(cx);
         let configured: std::collections::HashSet<u32> = data.sketch.constraints().filter(|c| c.is_dimension() && self.dimension_configuration(c.id, cx).is_some()).map(|c| c.id.0).collect();
         let regenerated = self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)).map(|s| s.sketch.clone());
         let mut out = Vec::new();

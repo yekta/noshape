@@ -3613,3 +3613,99 @@ fn the_curvature_map_is_worked_out_off_the_frame(cx: &mut TestAppContext) {
         assert!(v.ui.curvature_job.is_none() && v.opts.vertex_colors.is_some(), "the curvature colours in the scene");
     });
 }
+
+/// Live 2468: New sketch… on a face of the flat sketches inside the flat view: the flat view shows the sketch (not
+/// the parts), takes the tool's clicks, and the sketch ends on the flat (shown only there).
+#[gpui::test]
+fn a_sketch_on_the_flat_is_drawn_in_the_flat_view(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    cx.update(|cx| cx.bind_keys(crate::actions::default_key_bindings()));
+    cx.update(|cx| cx.bind_keys(super::entry_key_bindings()));
+    crate::part_studio_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-ui-flat-sketch-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+        call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "2 mm", "radius": "2 mm" } }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).unwrap().id;
+    let gpu = Gpu::headless().unwrap();
+    let (window, view) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
+        let mut view = None;
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| PartStudioView::new(doc, tab, gpu, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap())
+    });
+    wait_until(cx, window, |cx| view.read(cx).context.as_ref().is_some_and(|c| !c.sheet_metal.is_empty()));
+    // The Sheet metal table and flat view, its flat built.
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.right_panel = Some(crate::part_studio::config_panel::RightPanel::SheetMetal);
+        cx.notify();
+    }));
+    wait_until(cx, window, |cx| view.read(cx).flat_view.is_some() && view.read(cx).flat_cache.as_ref().is_some_and(|c| c.parts.iter().any(|p| p.1.is_ok())));
+    // The flat's top face (its largest face facing +Z).
+    let (part, top) = cx.update(|cx| {
+        let v = view.read(cx);
+        let ctx = v.context.as_ref().unwrap();
+        let part = ctx.bodies.iter().find(|b| ctx.sheet_metal.contains_key(&b.id)).unwrap().id.clone();
+        let solid = noshape_model::sheetmetal::flat_pattern_for(ctx, &part).unwrap().flat_view_solid().unwrap();
+        let top = solid.faces().iter().enumerate().filter(|(_, f)| f.face_plane().ok().flatten().is_some_and(|p| p.unit_normal().z > 0.999)).max_by(|a, b| a.1.area().unwrap_or(0.0).total_cmp(&b.1.area().unwrap_or(0.0))).unwrap().0;
+        (part, top)
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection = vec![Reference::Face(noshape_model::sheetmetal::flat_face_name(&part, top))];
+            v.start_feature("sketch", w, cx);
+        });
+    })
+    .unwrap();
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some());
+    let fvp = cx.update(|cx| view.read(cx).flat_sketch_vp(cx)).expect("sketching in the flat view");
+    assert!(cx.update(|cx| view.read(cx).flat_view.as_ref().unwrap().read(cx).sketching()), "the flat view shows the sketch");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    draw(cx, window);
+    // Two clicks in the flat view at the flat's (10, 10) and (40, 30) mm: a line there.
+    let at = |cx: &mut TestAppContext, x: f64, y: f64| cx.update(|cx| fvp.read(cx).project(glam::DVec3::new(x * 1e-3, y * 1e-3, 2e-3))).expect("on screen");
+    for (x, y) in [(10.0, 10.0), (40.0, 30.0)] {
+        let p = at(cx, x, y);
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.active_vp = Some(fvp.clone());
+                for ev in [
+                    ViewportEvent::PointerMove { position: p, modifiers: Modifiers::default() },
+                    ViewportEvent::ToolDown { position: p, modifiers: Modifiers::default(), click_count: 1 },
+                    ViewportEvent::ToolUp { position: p, modifiers: Modifiers::default() },
+                ] {
+                    v.on_viewport_event(&fvp, &ev, w, cx);
+                }
+                v.active_vp = None;
+            });
+        })
+        .unwrap();
+        draw(cx, window);
+    }
+    let data = cx.update(|cx| view.read(cx).sketch_data(cx)).expect("the sketch");
+    let line = data.sketch.entities().filter_map(|e| match data.sketch.curve(e.id) {
+        Some(noshape_sketch::Curve2::Line { a, b }) => Some((a, b)),
+        _ => None,
+    }).next().expect("a line");
+    let near = |p: DVec2, q: (f64, f64)| (p - DVec2::new(q.0 * 1e-3, q.1 * 1e-3)).length() < 0.5e-3;
+    let frame = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().frame);
+    let w = |p: DVec2| { let q = frame.to_world(p); DVec2::new(q.x, q.y) };
+    assert!(near(w(line.0), (10.0, 10.0)) && near(w(line.1), (40.0, 30.0)), "{:?} {:?}", w(line.0), w(line.1));
+}

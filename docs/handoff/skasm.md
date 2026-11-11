@@ -18,9 +18,12 @@
   - c2-sm-louver 31 -> 32/36 (Sketch 9 matches; next is Extrude 3, bool's OCCT case). Model suite against main
     f8378048c: 820 -> 821/947, the louver only, nothing worse.
   - Flat view: a click selects the flat's face (the main view lights the part's base wall face on that side), New
-    sketch… on the right-clicked one, the flat's sketches drawn there. Not yet live's: the sketch is edited in the main
-    view (the flat drawn under it there), where live sketches inside the flat view; the cross-highlight is the base
-    wall's face, not the exact counterpart.
+    sketch… on the right-clicked one, the flat's sketches drawn there. A sketch on the flat is edited inside the flat
+    view (as live): it shows the Part Studio's scene less the parts, planes and origin, plus the flat (the picks stay
+    the main scene's), its viewport events go to sketch mode with `active_vp` set (`PartStudioView::vp()` is what
+    sketch mode reads), its dimension labels drawn there; GPUI test `a_sketch_on_the_flat_is_drawn_in_the_flat_view`.
+    Not yet live's: the cross-highlight is the base wall's face, not the exact counterpart; a dimension's edit box
+    and the GPUI-drawn sketch boxes still sit over the main view.
 
 ## From psui (2026-11-10 18:35 UTC, lead: c2-hex-bookcase-derived's text, skasm paused)
 - Took SUITE-HEX-BOOKCASE-TEXT. On main its text was already live's (core's `rejoin_pieces`, 11-09 18:40) and the µm
