@@ -16,6 +16,24 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Repro (vibe5 ~/tmp/qa, mode-700): `NOSHAPE_RESULT_STORE=<empty dir> noshape feature list --doc <copy>` twice, then
   `query entities --kind faces --part <Part 1>` with and without the store (qa's sig.py / corpus.py there). The whole-corpus
   check (no store / cold / warm) is still running; more cases follow here.
+  **qa 11:59, the lead's whole check, green 1bfbaacdb (vibe5 ~/tmp/qa: corpus.py, mutate.py, corrupt.py):**
+  - Whole corpus, 87 saved documents, every Part Studio tab (features' status / message; parts' kind, faces, edges,
+    vertices, volume): no store = cold store on all 87; warm = both on 84. The 3 others are this ticket only (face counts;
+    statuses, edges, vertices, volumes equal): c2-helical-sweep (Revolve 1 cylinder 1 -> 9), c2-housing-draft (Bohrung 1
+    cone 1 -> 2), c2-valve-config (Revolve 1 cone, 2,384.65 mm² -> 1,839.18 + 545.47). feature_list over all tabs: 58.4 s
+    without, 60.6 s cold, 24.4 s warm (cf-surface-pattern 12.9 -> 0.59 s, c2-impeller-loft 9.3 -> 0.14, c2-rings-loft 3.3
+    -> 0.16; documents whose context holds FeatureScript attributes (sheet metal, custom features) keep nothing, as designed).
+  - Mutations between a cold and a warm open (each saved through the CLI with the store set; the warm open against a fresh
+    regenerate without one): a Variable Studio value (qa's document: #w 20 -> 35 mm drives an extrude), a derived source tab
+    edited (c2-hex-bookcase-derived: a block added to the tab its Derived feature takes), a Feature Studio a custom feature
+    uses (cf-spur-gear: dedendumFactor ×1.1, committed), the configuration switched (c2-valve-config: espesor_material 6 ->
+    8 mm, both computed cold first: the warm open gives 8 mm's 51,395.56 mm³), units (mm -> in), a feature edited and the
+    bar rolled back (c2-hunting-knife): all equal (the configuration case's face count apart: this ticket). A File tab's
+    bytes can't be replaced through any op (no op writes a File tab's content; an Import keeps its geometry in the feature,
+    `blobData`, not from the tab): not tested; core's T1 result_keys covers it in memory.
+  - Corruption (c2-hunting-knife's store, 53 entries + 22 blobs): the whole result truncated / bit-flipped / header-flipped /
+    emptied / deleted, every entry truncated / bit-flipped, every blob bit-flipped / truncated / deleted, a leftover temp
+    file, another document's whole result under this key: all 13 open as a fresh regenerate (0.2–2.1 s).
 
 ## qa, 2026-11-10
 - [ ] P1 HAND-DRILL-MATES-OVERDEFINED (dx first, then asm; qa 2026-11-10 12:26, lead's bisect) **asm-hand-drill-pinslot's mates
