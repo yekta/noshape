@@ -1233,7 +1233,8 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
             let r = w * 0.5;
             let faces: Vec<Shape> = center.iter().map(|c| face(c.1)).collect::<Result<_, _>>()?;
             let Some(tool) = coaxial_round_tool(&faces, k::Plane::new(origin, axis.normalize(), x_dir), radius, [p1, p2], r) else { return err(UNSUPPORTED) };
-            tool
+            // (Its sides and core on the ring's own planes and cylinder: OCCT's cut glued, 64 -> 32 ms.)
+            return finish_full_round(ev, bi, &body, center[0].1, tool, true);
         }
         _ => {
             // Planar sides and center along one direction (a rib, drafted or not): every section the circle tangent to
@@ -1244,7 +1245,7 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
                 // A rib tapering along its length (live 2306 E): a cone.
                 let faces: Vec<Shape> = center.iter().map(|c| face(c.1)).collect::<Result<_, _>>()?;
                 let Some(tool) = tapered_round_tool(&faces, [(p1, n1), (p2, n2), (cc, nc)]) else { return err(UNSUPPORTED) };
-                return finish_full_round(ev, bi, &body, center[0].1, tool);
+                return finish_full_round(ev, bi, &body, center[0].1, tool, false);
             }
             // The section's plane: x along nc, y along e x nc, origin on the center face.
             let (ax, ay) = (nc, e.cross(nc));
@@ -1296,18 +1297,23 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
             k::extrude(&profile, e * (hi - lo + 2.0 * margin))?.shape
         }
     };
-    finish_full_round(ev, bi, &body, center[0].1, tool)
+    finish_full_round(ev, bi, &body, center[0].1, tool, false)
 }
 
-/// Cuts a full round's tool from the body, its faces named after the (first) center face.
-fn finish_full_round(ev: &mut EvalCtx, bi: usize, body: &crate::regen::context::Body, center: usize, tool: Shape) -> FResult<()> {
-    use super::sheetmetal_util::{bool_named, body_named, tool_named};
+/// Cuts a full round's tool from the body, its faces named after the (first) center face; `glued` where the tool's
+/// faces lie on the body's or don't cross them (OCCT's glue option).
+fn finish_full_round(ev: &mut EvalCtx, bi: usize, body: &crate::regen::context::Body, center: usize, tool: Shape, glued: bool) -> FResult<()> {
+    use super::sheetmetal_util::{body_named, tool_named};
     use crate::reference::TopoName;
     use std::sync::Arc;
     let feature = ev.feature;
     let key = body.faces[center].clone();
     let tool = tool_named(tool, |i| Arc::new(TopoName::face(feature, Role::Blend(Arc::new(TopoName::Split { parent: key.clone(), by: feature, ordinal: i as u16 })))));
-    let (shape, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(body), &[tool])?;
+    let part = body_named(body);
+    let glue = if glued { k::Glue::Shift } else { k::Glue::Off };
+    let res = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&part.shape), std::slice::from_ref(&tool.shape), &k::BooleanOptions { glue, ..Default::default() })?;
+    let names = ev.name_result(&[&part.names, &tool.names], &res.history, &res.shape, &BTreeMap::new(), None);
+    let shape = res.shape;
     let un = k::unify_same_domain(&shape)?;
     let rn = crate::regen::eval::names_for(&shape, names);
     let names = ev.name_result(&[&rn], &un.history, &un.shape, &BTreeMap::new(), None);
