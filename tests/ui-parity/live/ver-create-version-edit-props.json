@@ -1,18 +1,18 @@
 {
  "scenario": "ver-create-version-edit-props",
- "recorded": "2026-11-10T18:21:32.370Z",
+ "recorded": "2026-11-11T05:49:47.207Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.3 0a4d2573 + live2 2026-11-10.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
  },
  "live": {
-  "document": "2c6144831626d0c079ddc464",
-  "workspace": "0b9e17fe14063a4718e13820",
-  "element": "45e122f2eef15a1677053573",
+  "document": "0ef08d2e3c26c31003f6a5b3",
+  "workspace": "95cc778dc02141af97f926bd",
+  "element": "880889c0f580c3d084e61358",
   "start": "doc-branches",
-  "startElement": "45e122f2eef15a1677053573",
+  "startElement": "880889c0f580c3d084e61358",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -135,12 +135,12 @@
      "title": "Create version from Main",
      "fields": [
       {
-       "label": null,
+       "label": "Name",
        "kind": "input",
        "value": "V2"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
        "kind": "input",
        "value": ""
       }
@@ -237,7 +237,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 33386
+   "t": 21255
   },
   {
    "step": 2,
@@ -250,7 +250,7 @@
    "ok": true,
    "at": [
     1230,
-    272
+    322
    ],
    "state": {
     "focus": {
@@ -259,25 +259,32 @@
     },
     "dialog": {
      "kind": "modal",
-     "title": "Create version from Main",
+     "title": "Properties",
      "fields": [
       {
-       "label": null,
+       "label": "Name *",
        "kind": "input",
        "value": "V2"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Onshape Version",
        "kind": "input",
        "value": ""
       }
      ],
      "buttons": [
-      "Create",
-      "Create version and edit properties",
-      "Cancel"
+      "Undo",
+      "Redo",
+      "Apply",
+      "Save",
+      "Close"
      ],
-     "text": "Name: Description: (Maximum of 10000 characters) Note: Merging feature changes is only supported for Part Studio and Assembly tabs"
+     "text": "Properties V2 Version V2 Name * Description Category Onshape Version Apply Save Close"
     },
     "dialogs": [],
     "panels": null,
@@ -364,7 +371,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 48368
+   "t": 25243
   }
  ]
 }

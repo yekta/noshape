@@ -1,18 +1,18 @@
 {
  "scenario": "ver-branch-edit-props",
- "recorded": "2026-11-10T18:28:48.237Z",
+ "recorded": "2026-11-11T05:57:54.228Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.3 0a4d2573 + live2 2026-11-10.2"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
  },
  "live": {
-  "document": "f81d707e69453b2e83d4ee0f",
-  "workspace": "672ffafa314623e58a7a770a",
-  "element": "38449ac2943ce58b2c45ca0c",
+  "document": "a6e1b2bdb865e1d8fb2c01b5",
+  "workspace": "f2a768d262bed1eef0bf069c",
+  "element": "7ef23db5e228071077750345",
   "start": "doc-branches",
-  "startElement": "38449ac2943ce58b2c45ca0c",
+  "startElement": "7ef23db5e228071077750345",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 30328
+   "t": 22894
   },
   {
    "step": 2,
@@ -372,7 +372,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 32751
+   "t": 25094
   },
   {
    "step": 3,
@@ -531,7 +531,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 36325
+   "t": 28061
   },
   {
    "step": 4,
@@ -544,7 +544,7 @@
    "ok": true,
    "at": [
     1219,
-    311
+    361
    ],
    "state": {
     "focus": {
@@ -553,10 +553,10 @@
     },
     "dialog": {
      "kind": "modal",
-     "title": "Create workspace from V1",
+     "title": "Properties",
      "fields": [
       {
-       "label": "Name",
+       "label": "Name *",
        "kind": "input",
        "value": "B2"
       },
@@ -566,17 +566,19 @@
        "value": ""
       },
       {
-       "label": "Open new workspace",
-       "kind": "checkbox",
-       "value": true
+       "label": "Onshape Workspace",
+       "kind": "input",
+       "value": ""
       }
      ],
      "buttons": [
-      "Create",
-      "Create workspace and edit properties",
-      "Cancel"
+      "Undo",
+      "Redo",
+      "Apply",
+      "Save",
+      "Close"
      ],
-     "text": "Name: Description: (Maximum of 10000 characters) Open new workspace Note: Merging feature changes is only supported for Part Studio and Assembly tabs"
+     "text": "Properties B2 Workspace B2 Name * Description Category Onshape Workspace Apply Save Close"
     },
     "dialogs": [],
     "panels": null,
@@ -604,33 +606,14 @@
        "related": false,
        "hidden": false,
        "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
-      },
-      {
-       "name": "Extrude 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
       }
      ],
-     "rollbackAfter": "Extrude 2"
+     "rollbackAfter": "Extrude 1"
     },
     "parts": [
-     "Part 1",
-     "Part 2"
+     "Part 1"
     ],
-    "partsHeading": "Parts (2)",
+    "partsHeading": "Parts (1)",
     "undo": {
      "undo": false,
      "redo": false
@@ -640,8 +623,13 @@
     "sketch": null,
     "drawing": null,
     "document": {
-     "workspace": "Main",
+     "workspace": "B2",
      "history": [
+      {
+       "name": "B2",
+       "kind": "workspace",
+       "selected": true
+      },
       {
        "name": "B1",
        "kind": "workspace",
@@ -650,7 +638,7 @@
       {
        "name": "Main",
        "kind": "workspace",
-       "selected": true
+       "selected": false
       },
       {
        "name": "V1",
@@ -684,7 +672,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 50885
+   "t": 35075
   }
  ]
 }

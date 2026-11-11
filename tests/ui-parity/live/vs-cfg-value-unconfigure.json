@@ -1,19 +1,19 @@
 {
  "scenario": "vs-cfg-value-unconfigure",
- "recorded": "2026-11-08T08:25:50.971Z",
+ "recorded": "2026-11-11T05:58:50.212Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
  },
  "live": {
-  "document": "f8eb84674446c3bcb7700f6e",
-  "workspace": "e361bd1ebae97d8eda63b98b",
-  "element": "6cfcb39979fd5a5a437d37a7",
+  "document": "85cff2757b0377f70d916110",
+  "workspace": "269f90446b293aa3f2340c3c",
+  "element": "057db9c9d8e72cfdaf296503",
   "start": "vs-vars",
-  "startElement": "6cfcb39979fd5a5a437d37a7",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "057db9c9d8e72cfdaf296503",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -187,7 +187,7 @@
     },
     "featurestudio": null
    },
-   "t": 28813
+   "t": 39400
   },
   {
    "step": 2,
@@ -285,7 +285,7 @@
     },
     "featurestudio": null
    },
-   "t": 35406
+   "t": 51902
   },
   {
    "step": 3,
@@ -382,7 +382,7 @@
     },
     "featurestudio": null
    },
-   "t": 40548
+   "t": 64627
   },
   {
    "step": 4,
@@ -496,7 +496,7 @@
     },
     "featurestudio": null
    },
-   "t": 46765
+   "t": 77273
   },
   {
    "step": 5,
@@ -613,7 +613,7 @@
     },
     "featurestudio": null
    },
-   "t": 50451
+   "t": 89936
   },
   {
    "step": 6,
@@ -646,7 +646,7 @@
      "undo": true,
      "redo": false
     },
-    "message": "#width = 40 mm Value added to Configuration × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -720,7 +720,7 @@
     },
     "featurestudio": null
    },
-   "t": 54093
+   "t": 103459
   },
   {
    "step": 7,
@@ -837,36 +837,29 @@
     },
     "featurestudio": null
    },
-   "t": 59093
+   "t": 115965
   },
   {
    "step": 8,
    "do": {
     "do": "click",
     "on": {
-     "menu": "Unconfigure from Configuration"
+     "menu": "Unconfigure"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Unconfigure from Configuration\"}",
+   "ok": true,
+   "at": [
+    854,
+    263
+   ],
    "state": {
     "focus": {
-     "kind": "other",
-     "tag": "div"
+     "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": {
-     "kind": "context-menu",
-     "rows": [
-      "Delete",
-      "Move down",
-      "Unconfigure"
-     ],
-     "highlighted": null,
-     "disabled": []
-    },
+    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -877,7 +870,7 @@
      "undo": true,
      "redo": false
     },
-    "message": null,
+    "message": "No variables are configured Right click a variable value or description to configure them.",
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -951,7 +944,7 @@
     },
     "featurestudio": null
    },
-   "t": 60945
+   "t": 129338
   }
  ]
 }

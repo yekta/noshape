@@ -1,19 +1,19 @@
 {
  "scenario": "ver-vh-header-create-version",
- "recorded": "2026-11-08T07:35:23.661Z",
+ "recorded": "2026-11-11T05:50:38.201Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
  },
  "live": {
-  "document": "3d793bda7214ebc736d32c65",
-  "workspace": "b865feaad3f1fc90dc5c4232",
-  "element": "765fa3bcc55e4b8849e5cbd0",
+  "document": "5ac902eff94351cca7e5415a",
+  "workspace": "f9b01171c7b03c5dbc455d69",
+  "element": "90b1c0027a38380d8713ad06",
   "start": "doc-branches",
-  "startElement": "765fa3bcc55e4b8849e5cbd0",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "90b1c0027a38380d8713ad06",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 27989
+   "t": 21295
   },
   {
    "step": 2,
@@ -261,12 +261,12 @@
      "title": "Create version from Main",
      "fields": [
       {
-       "label": null,
+       "label": "Name",
        "kind": "input",
        "value": "V2"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
        "kind": "input",
        "value": ""
       }
@@ -384,7 +384,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 34450
+   "t": 23510
   }
  ]
 }

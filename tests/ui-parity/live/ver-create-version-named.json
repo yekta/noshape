@@ -1,19 +1,19 @@
 {
  "scenario": "ver-create-version-named",
- "recorded": "2026-11-08T14:13:14.132Z",
+ "recorded": "2026-11-11T05:47:56.994Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
  },
  "live": {
-  "document": "68ec74c0239fb7bf37257e8b",
-  "workspace": "e30a0bee904c538d6d12e112",
-  "element": "ae4e59031b708c517ff7c3ee",
+  "document": "e4bb046c3111f833bf6d385a",
+  "workspace": "c8e575b5b46f0fc91d3f2619",
+  "element": "d5524407c497c0516c27b468",
   "start": "doc-versions",
-  "startElement": "ae4e59031b708c517ff7c3ee",
-  "runner": "live2 "
+  "startElement": "d5524407c497c0516c27b468",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -135,12 +135,12 @@
      "title": "Create version from Main",
      "fields": [
       {
-       "label": null,
+       "label": "Name",
        "kind": "input",
        "value": "V2"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
        "kind": "input",
        "value": ""
       }
@@ -237,7 +237,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 52902
+   "t": 24229
   },
   {
    "step": 2,
@@ -270,12 +270,12 @@
      "title": "Create version from Main",
      "fields": [
       {
-       "label": null,
+       "label": "Name",
        "kind": "input",
        "value": "V2"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
        "kind": "input",
        "value": ""
       }
@@ -372,7 +372,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 54839
+   "t": 26052
   },
   {
    "step": 3,
@@ -397,12 +397,12 @@
      "title": "Create version from Main",
      "fields": [
       {
-       "label": null,
+       "label": "Name",
        "kind": "input",
        "value": "Prototype"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
        "kind": "input",
        "value": ""
       }
@@ -499,7 +499,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 57784
+   "t": 28774
   },
   {
    "step": 4,
@@ -604,7 +604,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 66741
+   "t": 33622
   },
   {
    "step": 5,
@@ -730,7 +730,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 70554
+   "t": 36087
   }
  ]
 }

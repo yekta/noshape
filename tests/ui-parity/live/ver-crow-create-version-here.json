@@ -1,19 +1,19 @@
 {
  "scenario": "ver-crow-create-version-here",
- "recorded": "2026-11-08T07:28:11.934Z",
+ "recorded": "2026-11-11T05:51:31.101Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.2"
  },
  "live": {
-  "document": "412569dea524c6b295ce7a6d",
-  "workspace": "4a51a115e7a7ef3c6b5ab709",
-  "element": "4f13ee656c9bcf8e7cbeb206",
+  "document": "9cf555e7ddba9f2454e42805",
+  "workspace": "614b29937d426bf8dca04111",
+  "element": "1d981347ca70efce28b87719",
   "start": "doc-branches",
-  "startElement": "4f13ee656c9bcf8e7cbeb206",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "1d981347ca70efce28b87719",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 40057
+   "t": 25968
   },
   {
    "step": 2,
@@ -366,7 +366,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 44526
+   "t": 28312
   },
   {
    "step": 3,
@@ -514,7 +514,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 47340
+   "t": 30537
   },
   {
    "step": 4,
@@ -545,12 +545,12 @@
      "title": "Create version from history",
      "fields": [
       {
-       "label": null,
+       "label": "Name",
        "kind": "input",
        "value": "V2"
       },
       {
-       "label": "Description cannot contain HTML.",
+       "label": "Description",
        "kind": "input",
        "value": ""
       },
@@ -683,7 +683,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 51467
+   "t": 33508
   }
  ]
 }
