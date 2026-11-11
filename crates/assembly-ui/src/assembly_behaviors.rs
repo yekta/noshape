@@ -1389,7 +1389,8 @@ impl AssemblyView {
         }
         // Live qa5 CA2: Release… after Export… (the instances' parts; a subassembly's own release items, live
         // asm-menu-dissolve-subassembly).
-        if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. }) {
+        // (Another document's part too, at its version: live 2464, without the Free plan's [Upgrade].)
+        if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. } | InstanceSource::External { body: Some(_), .. }) {
             let tg = targets.clone();
             m.push(item("Release…", move |t, w, cx| t.release_instances(tg.clone(), w, cx)));
         }
@@ -1557,9 +1558,20 @@ impl AssemblyView {
                 }
                 continue;
             }
-            let InstanceSource::Part { studio, body, config } = &inst.source else { continue };
             // The part's name: the instance name without its " <n>".
             let name = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(n, _)| n).to_string();
+            // Another document's part: linked to the version the instance uses.
+            if let InstanceSource::External { key, body: Some(body), .. } = &inst.source
+                && let Some(r) = crate::derived::ExternalRef::parse(key)
+            {
+                for it in noshape_ops::release::linked_part_items(&self.doc.read(cx).session, &r, body, &name) {
+                    if !items.iter().any(|x: &noshape_model::release::ReleaseItem| x.same_object(&it)) {
+                        items.push(it);
+                    }
+                }
+                continue;
+            }
+            let InstanceSource::Part { studio, body, config } = &inst.source else { continue };
             for it in crate::assembly_hooks::release_part_items(self.doc.read(cx), *studio, std::slice::from_ref(body), &[name], config) {
                 if !items.iter().any(|x: &noshape_model::release::ReleaseItem| x.same_object(&it)) {
                     items.push(it);

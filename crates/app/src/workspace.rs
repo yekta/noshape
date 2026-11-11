@@ -2604,7 +2604,8 @@ impl Workspace {
         let n = self.doc.read(cx).session.store.graph().ok().map_or(0, |g| g.versions.len()) + 1;
         let name = format!("V{n}");
         let r = self.doc.update(cx, |d, _| {
-            let v = d.session.create_version(&name, "")?;
+            // (Live 2475: its description.)
+            let v = d.session.create_version(&name, noshape_ops::in_context::VERSION_FOR_EDIT_IN_CONTEXT)?;
             anyhow::Ok(d.session.store.version(v)?.microversion)
         });
         let mv = match r {

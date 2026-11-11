@@ -339,6 +339,11 @@ impl VariableStudioView {
         cx.notify();
     }
 
+    /// A table cell (not one being typed in) has the keyboard.
+    fn cell_has_keyboard(&self, window: &Window) -> bool {
+        self.cell_focus.values().any(|f| f.is_focused(window))
+    }
+
     fn cell_focus_handle(&mut self, key: &str, cx: &mut Context<Self>) -> FocusHandle {
         self.cell_focus.entry(key.to_string()).or_insert_with(|| cx.focus_handle()).clone()
     }
@@ -1412,6 +1417,12 @@ impl VariableStudioView {
         v_flex()
             .size_full()
             .track_focus(&self.focus)
+            // Live 2476: Ctrl+Z does nothing while a table cell has the keyboard (the toolbar's Undo still undoes).
+            .on_action(cx.listener(|this, _: &crate::actions::Undo, window, cx| {
+                if !this.cell_has_keyboard(window) {
+                    cx.propagate();
+                }
+            }))
             .bg(rgb(0xffffff))
             .child(crate::ui::toolbar().child(crate::ui::undo_redo(&self.doc, cx)))
             .child(

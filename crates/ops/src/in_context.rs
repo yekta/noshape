@@ -20,6 +20,9 @@ pub fn contexts_of(ps: &PartStudio, assembly: TabId) -> Vec<(u32, String)> {
     ps.contexts.iter().filter(|c| c.assembly == assembly && referenced.contains(&c.id)).map(|c| (c.id, c.name.clone())).collect()
 }
 
+/// The description of the version "Create version and update in assembly" makes (live 2475).
+pub const VERSION_FOR_EDIT_IN_CONTEXT: &str = "Update version for edit in context";
+
 /// The context Edit in context shows: `existing` (Edit Context N) when it
 /// is one of this assembly's, else a new snapshot "Context N" around the
 /// `primary` instance (None: Create Part Studio in context, the assembly

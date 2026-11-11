@@ -80,6 +80,25 @@ pub fn part_items(session: &Session, tab: TabId, parts: &[BodyId], names: &[Stri
         .collect()
 }
 
+/// The release item of another document's part at a version (an assembly instance's Release…, live 2464 / help
+/// "Allow adding items from other documents"): its name, number and properties there, the next revision of this
+/// document's releases, linked to that version.
+pub fn linked_part_items(session: &Session, r: &crate::derived::ExternalRef, part: &BodyId, name: &str) -> Vec<ReleaseItem> {
+    let Ok(snap) = crate::derived::external_snapshot(&r.path, r.microversion) else { return Vec::new() };
+    let Some(tab) = snap.tabs.iter().find(|t| t.id.to_string() == r.tab) else { return Vec::new() };
+    let p = match &tab.content {
+        TabContent::PartStudio(ps) => ps.part_properties.get(part).cloned().unwrap_or_default(),
+        _ => return Vec::new(),
+    };
+    let info = crate::derived::external_doc_info(&r.path).ok();
+    let version_name = info.as_ref().and_then(|i| i.versions.iter().find(|v| v.microversion == r.microversion && v.label != "Current state")).map(|v| v.label.clone()).unwrap_or_else(|| format!("state {}", r.microversion.short()));
+    let document = noshape_model::release::LinkedDocument { path: r.path.display().to_string(), name: info.map(|i| i.name).unwrap_or_default(), version: r.microversion.to_string(), version_name };
+    let log = release_log(session);
+    let pn = p.part_number.clone().unwrap_or_default();
+    let nrm = p.meta.not_revision_managed;
+    vec![ReleaseItem { tab: tab.id, part: Some(part.clone()), name: name.to_string(), kind: ItemKind::Part, revision: if nrm { String::new() } else { log.next_revision(&pn) }, part_number: pn, not_revision_managed: nrm, reverted: false, config: Default::default(), document: Some(document) }]
+}
+
 /// Part number of a tab item: an Assembly's Properties, otherwise the
 /// tab's metadata (store meta "tab_part_number:<id>").
 pub fn tab_part_number(session: &Session, tab: TabId) -> String {

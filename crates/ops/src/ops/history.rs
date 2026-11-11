@@ -168,7 +168,7 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let hist = store.history(od.session.branch).map_err(|e| OpError::new("io", e.to_string()))?;
     let doc = &od.session.doc;
     let entries: Vec<_> = hist.iter().filter(|m| (q.is_empty() || m.description.to_lowercase().contains(&q)) && f.matches(m, doc, || changed_tabs(store, m))).take(limit).map(|m| json!({ "id": m.id.to_string(), "description": m.description, "author": m.author, "time": format!("{:?}", m.created) })).collect();
-    let versions: Vec<_> = store.list_versions().map_err(|e| OpError::new("io", e.to_string()))?.into_iter().map(|v| json!({ "id": v.id.to_string(), "name": v.name, "microversion": v.microversion.to_string() })).collect();
+    let versions: Vec<_> = store.list_versions().map_err(|e| OpError::new("io", e.to_string()))?.into_iter().map(|v| json!({ "id": v.id.to_string(), "name": v.name, "description": v.description, "microversion": v.microversion.to_string() })).collect();
     let branches: Vec<_> = store.list_branches().map_err(|e| OpError::new("io", e.to_string()))?.into_iter().map(|b| json!({ "id": b.id.to_string(), "name": b.name, "current": b.id == od.session.branch })).collect();
     Ok(json!({ "history": entries, "versions": versions, "branches": branches }).into())
 }

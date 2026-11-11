@@ -920,6 +920,7 @@ fn another_documents_part_pins_its_reference(cx: &mut TestAppContext) {
     assert!(at("Update linked document…") < at("Open linked document") && at("Open linked document") < at("Pin reference"), "{menu:?}");
     assert!(menu.iter().any(|l| l == "Create Drawing of Part 1…"), "{menu:?}");
     assert!(at("Edit in context") < at("Add mate connector to instance origin…"), "{menu:?}");
+    assert!(at("Export…") < at("Release…"), "{menu:?}");
     cx.update(|cx| {
         view.update(cx, |v, cx| {
             v.edit("Pin reference", cx, |a| noshape_ops::assembly::set_reference_pinned(a, p1, true));

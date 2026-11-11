@@ -1886,13 +1886,21 @@ fn documents_import_splits_a_step_assembly_into_linked_documents() {
         a["instances"].as_array().unwrap().iter().map(|i| (i["name"].as_str().unwrap().to_string(), i["source"].clone())).collect()
     };
     let versions = |ctx: &mut Ctx| -> Vec<String> { call(ctx, "history_list", json!({}))["versions"].as_array().unwrap().iter().map(|v| v["name"].as_str().unwrap().to_string()).collect() };
+    // CAD Imports (live 2424 (5)): a Parasolid file per part a document has the Part Studio of, the STEP in the top one.
+    let files = |ctx: &mut Ctx| -> Vec<String> {
+        let mut f: Vec<String> = call(ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] == "File").map(|t| t["name"].as_str().unwrap().to_string()).collect();
+        f.sort();
+        f
+    };
     call(&mut ctx, "document_open", json!({ "path": sub.to_str().unwrap() }));
     assert_eq!(tabs(&mut ctx), ["Sub", "Part 2", "Part 3"]);
+    assert_eq!(files(&mut ctx), ["Part 2.x_t", "Part 3.x_t"]);
     let names: Vec<String> = instances(&mut ctx, "Sub").into_iter().map(|i| i.0).collect();
     assert_eq!(names, ["Part 2 <1>", "Part 3 <1>"]);
     assert_eq!(versions(&mut ctx), ["V1"]);
     call(&mut ctx, "document_open", json!({ "path": top.to_str().unwrap() }));
     assert_eq!(tabs(&mut ctx), ["Assembly 1", "Part 1"]);
+    assert_eq!(files(&mut ctx), ["Part 1.x_t", "nested-asm.step"]);
     let top_instances = instances(&mut ctx, "Assembly 1");
     let names: Vec<&str> = top_instances.iter().map(|i| i.0.as_str()).collect();
     // Live 1742: "Sub <1>" then "Part 1 <1>" (the reverse of the file's order, as Import to a single document).
@@ -1909,9 +1917,11 @@ fn documents_import_splits_a_step_assembly_into_linked_documents() {
     let folder = dir.join("nested-asm.step (1)");
     let mut docs: Vec<String> = r["documents"].as_array().unwrap().iter().map(|d| std::path::Path::new(d.as_str().unwrap()).strip_prefix(&folder).unwrap().display().to_string()).collect();
     docs.sort();
-    assert_eq!(docs, ["Part 1.noshape", "Part 2.noshape", "Part 3.noshape", "Sub.noshape", "nested-asm.step.noshape"], "{r}");
+    // (Live 2424 (4): "Part 1.x_t", after the Parasolid file each holds.)
+    assert_eq!(docs, ["Part 1.x_t.noshape", "Part 2.x_t.noshape", "Part 3.x_t.noshape", "Sub.noshape", "nested-asm.step.noshape"], "{r}");
     call(&mut ctx, "document_open", json!({ "path": folder.join("Sub.noshape").to_str().unwrap() }));
     assert_eq!(tabs(&mut ctx), ["Sub"]);
+    assert_eq!(files(&mut ctx), Vec::<String>::new(), "Sub holds only its assembly");
     let subs = instances(&mut ctx, "Sub");
     assert!(subs.iter().all(|i| i.1["version_of"]["part"].is_string()), "{subs:?}");
     let list = call(&mut ctx, "assembly_list", json!({ "tab": "Sub" }));
@@ -5160,6 +5170,10 @@ fn a_linked_parts_properties_save_into_its_version() {
     let q = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2", "document": lib.to_str().unwrap(), "version": "V1" }));
     let r = call(&mut ctx, "assembly_linked_part_properties", json!({ "instance": q["instance"] }));
     assert_eq!((r["properties"]["part_number"].as_str(), r["properties"]["vendor"].as_str()), (Some("Q2464"), Some("Acme")), "{r}");
+    // Release… on it (live 2464, as a paid plan has it): the part at V1, linked to that version, its number there.
+    let rel = call(&mut ctx, "release_create", json!({ "tab": "Assembly 1", "instance": p["instance"], "name": "R1" }));
+    assert_eq!(rel["items"].as_array().map(Vec::len), Some(1), "{rel}");
+    assert_eq!((rel["items"][0]["name"].as_str(), rel["items"][0]["part_number"].as_str(), rel["items"][0]["linked"]["version"].as_str()), (Some("Part 2"), Some("Q2464"), Some("V1")), "{rel}");
     // The source's workspace keeps its own (none).
     call(&mut ctx, "document_open", json!({ "path": lib.to_str().unwrap() }));
     let a = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
@@ -5207,15 +5221,21 @@ fn edit_in_context_on_another_documents_part() {
     call(&mut ctx, "document_create", json!({ "path": tops }));
     let p = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2", "document": libs, "version": "V1" }));
     let inst = p["instance"].clone();
+    let other = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1", "document": libs, "version": "V1" }))["instance"].clone();
     let r = call(&mut ctx, "assembly_edit_in_context", json!({ "doc": tops, "instance": inst }));
     assert_eq!(r["part_studio"], "Part Studio 1", "{r}");
     assert!(r["document"].as_str().is_some_and(|d| d.ends_with("ctx-other-lib.noshape")), "{r}");
     let listed = call(&mut ctx, "context_list", json!({ "doc": libs, "tab": "Part Studio 1" }));
     assert_eq!(listed["contexts"].as_array().map(Vec::len), Some(1), "the context is the other document's: {listed}");
-    let mv = |ctx: &mut Ctx| call(ctx, "assembly_list", json!({ "doc": tops }))["instances"].as_array().unwrap().iter().find(|i| i["id"] == inst).unwrap()["source"]["version_of"]["microversion"].clone();
+    let mv_of = |ctx: &mut Ctx, id: &Value| call(ctx, "assembly_list", json!({ "doc": tops }))["instances"].as_array().unwrap().iter().find(|i| i["id"] == *id).unwrap()["source"]["version_of"]["microversion"].clone();
+    let mv = |ctx: &mut Ctx| mv_of(ctx, &inst);
     let before = mv(&mut ctx);
     let u = call(&mut ctx, "assembly_version_and_update", json!({ "doc": tops, "instance": inst }));
     assert_eq!(u["version"], "V2", "{u}");
+    // (Live 2475: its description; only this instance moves.)
+    let lv = call(&mut ctx, "history_list", json!({ "doc": libs }))["versions"].as_array().unwrap().iter().find(|v| v["name"] == "V2").cloned().unwrap();
+    assert_eq!(lv["description"], "Update version for edit in context", "{lv}");
+    assert_eq!(mv_of(&mut ctx, &other), before, "Part 1 <1> (the same source) stays at V1");
     assert_ne!(mv(&mut ctx), before, "the instance moved to V2");
     let last = call(&mut ctx, "history_list", json!({ "doc": tops, "limit": 1 }))["history"][0]["description"].clone();
     assert_eq!(last, "Assembly 1 :: Update to V2");

@@ -6864,6 +6864,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string | required | The tab to release (name or id). |
 | `parts` | array of string |  | Part Studio: only these parts (ids or names). |
+| `instance` | string |  | Assembly: only this instance's (its Release…): its part, another document's part at its version (linked to that version), or a subassembly's contents. |
 | `name` | string | required | Release name (the version's name). |
 | `notes` | string |  | Release notes (the version's description). |
 | `part_numbers` | object |  | {item name or part id: part number}. |

@@ -20,6 +20,7 @@ pub fn ops() -> Vec<Op> {
                 doc_field(),
                 req("tab", s(), "The tab to release (name or id)."),
                 opt("parts", strings(), "Part Studio: only these parts (ids or names)."),
+                opt("instance", s(), "Assembly: only this instance's (its Release…): its part, another document's part at its version (linked to that version), or a subassembly's contents."),
                 req("name", s(), "Release name (the version's name)."),
                 opt("notes", s(), "Release notes (the version's description)."),
                 opt("part_numbers", json!({ "type": "object" }), "{item name or part id: part number}."),
@@ -48,14 +49,41 @@ fn item_json(i: &noshape_model::release::ReleaseItem) -> Value {
     if let Some(b) = &i.part {
         v["part"] = json!(crate::refs::body_id(b));
     }
+    if let Some(d) = &i.document {
+        v["linked"] = json!({ "document": d.name, "version": d.version_name });
+    }
     v
+}
+
+/// An assembly instance's Release… items (as the app's instance menu makes them).
+fn instance_items(od: &crate::OpenDoc, tab: noshape_model::document::TabId, key: &str) -> Result<Vec<noshape_model::release::ReleaseItem>, OpError> {
+    use noshape_model::assembly::InstanceSource;
+    let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| &t.content) else { return Err(OpError::param("instance", "`tab` must be an assembly")) };
+    let id = super::assembly::find_instance(asm, key, "instance")?;
+    let inst = asm.instance(id).expect("found");
+    let name = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(n, _)| n).to_string();
+    Ok(match &inst.source {
+        InstanceSource::Part { studio, body, config } => rel::part_items(&od.session, *studio, std::slice::from_ref(body), &[name], config),
+        InstanceSource::External { key, body: Some(body), .. } => {
+            let r = crate::derived::ExternalRef::parse(key).ok_or_else(|| OpError::param("instance", "its reference can't be read"))?;
+            rel::linked_part_items(&od.session, &r, body, &name)
+        }
+        InstanceSource::Assembly { assembly, .. } => {
+            let provider = crate::derived::DocStudios::new(od.doc().clone(), od.studio_cache.clone());
+            rel::tab_items(&od.session, &*provider, *assembly)
+        }
+        _ => return Err(OpError::param("instance", "a part or subassembly instance")),
+    })
 }
 
 fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let tab = crate::doc::find_tab(od.doc(), a.str("tab")?)?;
     let provider = crate::derived::DocStudios::new(od.doc().clone(), od.studio_cache.clone());
-    let mut items = rel::tab_items(&od.session, &*provider, tab);
+    let mut items = match a.opt_str("instance")? {
+        Some(k) => instance_items(od, tab, k)?,
+        None => rel::tab_items(&od.session, &*provider, tab),
+    };
     if items.is_empty() {
         return Err(OpError::param("tab", "nothing to release in this tab"));
     }

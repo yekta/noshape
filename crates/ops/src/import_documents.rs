@@ -53,11 +53,12 @@ pub fn import_single(paths: &[PathBuf], choice: &ImportChoice, place: &Path, new
     Ok((target, errors))
 }
 
-/// Split a STEP assembly into a folder named after the file (live 1742 (B)): one document per subassembly ("Sub":
-/// its Assembly, one Part Studio per part, CAD Imports), deepest first, and the top one named after the file
-/// (Assembly 1, its own parts' Part Studios, CAD Imports), each with V1; an assembly uses another document's
-/// subassembly at that V1. `per_part`: every part its own document too, used at its V1. `None` when the file is no
-/// such assembly (one document then, as Import to a single document; a flat assembly too unless `per_part`).
+/// Split a STEP assembly into a folder named after the file (live 1742 (B), 2424): one document per subassembly
+/// ("Sub": its Assembly, one Part Studio per part not made before, CAD Imports with their Parasolid files), deepest
+/// first, and the top one named after the file (Assembly 1, its own parts' Part Studios, CAD Imports with the file),
+/// each with V1; an assembly uses another document's subassembly and Part Studios at that V1 (a flat assembly is one
+/// document). `per_part`: every part its own document too ("Part 1.x_t"), used at its V1. `None` when the file is no
+/// assembly (one document then, as Import to a single document).
 pub fn import_split(path: &Path, choice: &ImportChoice, per_part: bool, place: &Path, new_doc: &dyn Fn() -> Document) -> anyhow::Result<Option<Imported>> {
     use noshape_kernel as k;
     let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
@@ -65,7 +66,8 @@ pub fn import_split(path: &Path, choice: &ImportChoice, per_part: bool, place: &
         return Ok(None);
     }
     let Some(((root, parts, _), nesting)) = k::read_step_assembly_nested(path, k::LengthUnit::Meter)? else { return Ok(None) };
-    if nesting.subs.is_empty() && !per_part {
+    // (A flat assembly is split too: one document, a Part Studio per part, live 2424 (3).)
+    if nesting.subs.is_empty() && nesting.children.len() < 2 && !per_part {
         return Ok(None);
     }
     let (_, file) = import::import_names(path);
@@ -82,9 +84,10 @@ pub fn import_split(path: &Path, choice: &ImportChoice, per_part: bool, place: &
         for p in used {
             let mut doc = ctx.empty();
             let Some((studio, body)) = ctx.part_studio(&mut doc, p) else { continue };
-            ctx.keep_file(&mut doc);
+            ctx.keep_files(&mut doc, false, &[p]);
             models_first(&mut doc);
-            let target = free_document_path(&folder, &ctx.part_name(p));
+            // (Live 2424 (4): "Part 1.x_t", after the Parasolid file it holds.)
+            let target = free_document_path(&folder, &format!("{}.x_t", ctx.part_name(p)));
             let mv = save_versioned(&target, doc)?;
             part_keys.insert(p, (external_key(&target, mv, studio), body));
             made.documents.push(target);
@@ -92,20 +95,25 @@ pub fn import_split(path: &Path, choice: &ImportChoice, per_part: bool, place: &
     }
     // The subassemblies, deepest first: each one's document is there when its owner's is made.
     let mut sub_keys: HashMap<usize, String> = HashMap::new();
+    // A part's Part Studio is made once, in the first document that uses it: a later one uses it there at V1 (live
+    // 2424 (2): a subassembly used twice is two documents, the second's Part Studios the first's).
     for s in deepest_first(&nesting) {
         let name = nesting.subs[s].clone();
         let mut doc = ctx.empty();
-        let tab = ctx.assembly(&mut doc, Some(s), &name, &part_keys, &sub_keys);
-        ctx.keep_file(&mut doc);
+        let (tab, studios) = ctx.assembly(&mut doc, Some(s), &name, &part_keys, &sub_keys);
+        ctx.keep_files(&mut doc, false, &studios.iter().map(|x| x.0).collect::<Vec<_>>());
         models_first(&mut doc);
         let target = free_document_path(&folder, &name);
         let mv = save_versioned(&target, doc)?;
         sub_keys.insert(s, external_key(&target, mv, tab));
+        for (p, studio, body) in studios {
+            part_keys.insert(p, (external_key(&target, mv, studio), body));
+        }
         made.documents.push(target);
     }
     let mut doc = ctx.empty();
-    ctx.assembly(&mut doc, None, if root.is_empty() { "Assembly 1" } else { &root }, &part_keys, &sub_keys);
-    ctx.keep_file(&mut doc);
+    let (_, studios) = ctx.assembly(&mut doc, None, if root.is_empty() { "Assembly 1" } else { &root }, &part_keys, &sub_keys);
+    ctx.keep_files(&mut doc, true, &studios.iter().map(|x| x.0).collect::<Vec<_>>());
     models_first(&mut doc);
     let target = free_document_path(&folder, &file);
     save_versioned(&target, doc)?;
@@ -197,7 +205,7 @@ impl Split<'_> {
     /// An assembly's tab (`owner`: None the root, else a subassembly) with its parts (their Part Studios here, or
     /// their documents' with `part_keys`) and its subassemblies' documents (`sub_keys`), placed as in the file and
     /// listed in the reverse of its order, as the single-document import.
-    fn assembly(&self, doc: &mut Document, owner: Option<usize>, name: &str, part_keys: &HashMap<usize, (String, BodyId)>, sub_keys: &HashMap<usize, String>) -> TabId {
+    fn assembly(&self, doc: &mut Document, owner: Option<usize>, name: &str, part_keys: &HashMap<usize, (String, BodyId)>, sub_keys: &HashMap<usize, String>) -> (TabId, Vec<(usize, TabId, BodyId)>) {
         let children: Vec<&noshape_kernel::NestChild> = self.nesting.children.iter().rev().filter(|(o, _)| *o == owner).map(|(_, c)| c).collect();
         let mut studios: HashMap<usize, (TabId, BodyId)> = HashMap::new();
         let mut asm = Assembly::default();
@@ -233,14 +241,32 @@ impl Split<'_> {
         let order = &mut doc.settings.tab_order;
         order.retain(|t| *t != tab);
         order.insert(0, tab);
-        tab
+        let mut made: Vec<(usize, TabId, BodyId)> = studios.into_iter().map(|(p, (t, b))| (p, t, b)).collect();
+        made.sort_by_key(|x| x.0);
+        (tab, made)
     }
 
-    /// The file in "CAD Imports" (live: every document of the split keeps it).
-    fn keep_file(&self, doc: &mut Document) {
+    /// "CAD Imports" (live 2424 (5)): a Parasolid file per part whose Part Studio this document has ("Part 2.x_t"),
+    /// and the imported file itself in the top document only (`whole`).
+    fn keep_files(&self, doc: &mut Document, whole: bool, parts: &[usize]) {
         let folder = import::cad_imports_folder(doc);
-        import::add_file_tab(doc, FileTab::new(self.file, self.bytes, noshape_model::file_tab::now()), Some(folder), None);
+        if whole {
+            import::add_file_tab(doc, FileTab::new(self.file, self.bytes, noshape_model::file_tab::now()), Some(folder), None);
+        }
+        for &p in parts {
+            let Some(bytes) = self.parts.get(p).and_then(|x| parasolid_bytes(&x.shape)) else { continue };
+            import::add_file_tab(doc, FileTab::new(&format!("{}.x_t", self.part_name(p)), &bytes, noshape_model::file_tab::now()), Some(folder), None);
+        }
     }
+}
+
+/// A part as a Parasolid text file's bytes (written to a scratch file: the kernel writes to paths).
+fn parasolid_bytes(shape: &noshape_kernel::Shape) -> Option<Vec<u8>> {
+    let tmp = std::env::temp_dir().join(format!("noshape-split-{}-{:x}.x_t", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_nanos()));
+    noshape_kernel::write_parasolid(&tmp, std::slice::from_ref(shape), noshape_kernel::LengthUnit::Meter, false).ok()?;
+    let bytes = std::fs::read(&tmp).ok();
+    let _ = std::fs::remove_file(&tmp);
+    bytes
 }
 
 /// The models before the files (the CAD Imports folder last).

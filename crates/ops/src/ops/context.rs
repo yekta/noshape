@@ -250,7 +250,7 @@ fn version_and_update(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let src = ctx.open(&r.path)?;
     let n = src.session.store.graph().map_or(0, |g| g.versions.len()) + 1;
     let name = format!("V{n}");
-    let v = src.session.create_version(&name, "").map_err(|e| OpError::invalid(format!("the other document's version: {e:#}")))?;
+    let v = src.session.create_version(&name, crate::in_context::VERSION_FOR_EDIT_IN_CONTEXT).map_err(|e| OpError::invalid(format!("the other document's version: {e:#}")))?;
     let mv = src.session.store.version(v).map_err(|e| OpError::invalid(format!("{e:#}")))?.microversion;
     let new_key = crate::derived::ExternalRef { microversion: mv, ..r }.key();
     let (od, tab) = asm_target(ctx, a)?;

@@ -28,7 +28,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   connector on a Spur gear's internal sketch: dx), 15 mates on it.
 
 ## psui, 2026-11-11
-- [ ] P3 LINKED-PART-RELEASE (psui, unverified: paid plans; lead 01:20) **Release… on another document's part in an
+- [x] (psui 2026-11-11, lead 02:58: live shows Release… on that menu ([Upgrade] on Free); ours has it as a paid plan does, the part at its version in the Release candidate dialog, linked to it; ops release_create `instance`) P3 LINKED-PART-RELEASE (psui, unverified: paid plans; lead 01:20) **Release… on another document's part in an
   assembly**: live (2464) lists "Release… [Upgrade]" in that instance's menu, and on the Free plan it only opens the
   upgrade modal, so what Release does there (release the source document's part at its version? from this document's
   release candidate?) is unknown. Ours leaves the item off that menu until live reads Onshape's help pages on it.
