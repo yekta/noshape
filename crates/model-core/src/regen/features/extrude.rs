@@ -183,7 +183,7 @@ fn start_offset_point(ev: &EvalCtx, r: &Reference, n: DVec3) -> FResult<DVec3> {
     let parallel = |m: DVec3| m.normalize_or_zero().cross(n).length() < 1e-9;
     let edge = match r {
         Reference::Edge(_) => ev.resolve_edges(std::slice::from_ref(r)).first().map(|&(b, e)| ev.edge_shape(b, e)).transpose()?,
-        Reference::SketchEntity { sketch, entity } => match ev.ctx.sketch(*sketch).and_then(|s| Some((s.frame, s.sketch.curve(noshape_sketch::EntityId(*entity))?))) {
+        Reference::SketchEntity { sketch, entity } => match ev.ctx.sketch_holding(*sketch, *entity).and_then(|s| Some((s.frame, s.sketch.curve(noshape_sketch::EntityId(*entity))?))) {
             Some((frame, c)) => curve_to_segment(&c).map(|seg| k::make_edge_2d(&crate::regen::eval::kernel_plane(&frame), &seg)).transpose()?,
             None => None,
         },
@@ -369,7 +369,7 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
     }
     let mut tools = Vec::new();
     for (sketch, entity) in &curves {
-        let Some(s) = ev.ctx.sketch(*sketch).cloned() else { continue };
+        let Some(s) = ev.ctx.sketch_holding(*sketch, *entity).cloned() else { continue };
         // Every curve kind (splines and conics too, live: cf-curve-pattern-normal's fit spline).
         let Some(edge) = super::bshared::sketch_edge(ev, *sketch, *entity)? else { continue };
         let dir = if ev.bool("oppositeDirection") { -s.frame.normal } else { s.frame.normal };

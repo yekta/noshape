@@ -94,7 +94,7 @@ pub fn resolve_shapes(ctx: &Context, r: &Reference) -> Vec<Shape> {
             }
         }
         Reference::SketchEntity { sketch, entity } => {
-            if let Some(s) = ctx.sketch(*sketch) {
+            if let Some(s) = ctx.sketch_holding(*sketch, *entity) {
                 let id = noshape_sketch::EntityId(*entity);
                 if let Some(p) = s.sketch.point(id) {
                     if let Ok(v) = k::make_vertex(s.frame.to_world(p)) {

@@ -1056,16 +1056,16 @@ fn transform_refs(ev: &mut EvalCtx, refs: &[Reference], m: &DMat4) -> FResult<()
         let faces = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
         ev.replace_body(bi, res.shape, faces);
     }
+    // Sketch bodies: those only (a sketch's others stay; live moves one curve's wire alone).
+    for (i, take) in ev.ctx.sketch_bodies_of(refs) {
+        let j = ev.ctx.split_sketch(i, &take);
+        let s = &ev.ctx.sketches[j];
+        let frame = crate::regen::eval::transform_frame(&s.frame, m);
+        ev.ctx.sketches[j] = Arc::new(crate::regen::context::SketchResult { frame, ..(**s).clone() });
+    }
     for r in refs {
         match r {
-            Reference::Sketch(f) | Reference::SketchEntity { sketch: f, .. } | Reference::SketchRegion { sketch: f, .. } => {
-                if let Some(pos) = ev.ctx.sketches.iter().position(|s| s.feature == *f) {
-                    let s = &ev.ctx.sketches[pos];
-                    let frame = crate::regen::eval::transform_frame(&s.frame, m);
-                    let new = crate::regen::context::SketchResult { frame, ..(**s).clone() };
-                    ev.ctx.sketches[pos] = Arc::new(new);
-                }
-            }
+            r if is_sketch_ref(r) => {}
             _ => {
                 for p in ev.ctx.planes.iter_mut().filter(|p| &p.reference == r) {
                     p.frame = crate::regen::eval::transform_frame(&p.frame, m);
@@ -1082,6 +1082,11 @@ fn transform_refs(ev: &mut EvalCtx, refs: &[Reference], m: &DMat4) -> FResult<()
         }
     }
     Ok(())
+}
+
+/// A reference to a sketch, one of its bodies or entities.
+fn is_sketch_ref(r: &Reference) -> bool {
+    matches!(r, Reference::Sketch(_) | Reference::SketchBody { .. } | Reference::SketchEntity { .. } | Reference::SketchRegion { .. } | Reference::SketchRegionEdge { .. } | Reference::SketchCurveEnd { .. })
 }
 
 /// Stable instance number of a pattern instance name.
@@ -1105,16 +1110,6 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     if transforms.len() > 2500 {
         return Err(raise_error(i, "PATTERN_INPUT_TOO_MANY_INSTANCES", None));
     }
-    // Sketches, and the sketches of regions and sketch entities (a part pattern copies their owner, the sketch
-    // body: cf-transform-pattern's Transform pattern 4 makes no part in live).
-    let mut sketch_refs: Vec<crate::reference::FeatureId> = Vec::new();
-    for r in &refs {
-        if let Reference::Sketch(f) | Reference::SketchRegion { sketch: f, .. } | Reference::SketchEntity { sketch: f, .. } = r
-            && !sketch_refs.contains(f)
-        {
-            sketch_refs.push(*f);
-        }
-    }
     let only_edges = !refs.is_empty() && refs.iter().all(|r| matches!(r, Reference::Edge(_)));
     let only_faces = !refs.is_empty() && refs.iter().all(|r| matches!(r, Reference::Face(_)));
     let (made, sketches) = run_op(i, &cx, &id, "PATTERN_BODY_FAILED", |ev| {
@@ -1129,8 +1124,19 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             return Ok(done);
         }
         let bodies = ev.resolve_bodies(&refs);
-        // Sketches too (std Form's flat sketches go with its tools).
-        let sources: Vec<(Arc<crate::regen::context::SketchResult>, DMat4)> = sketch_refs.iter().filter_map(|f| ev.ctx.sketches.iter().find(|s| s.feature == *f).cloned()).flat_map(|s| transforms.iter().map(move |m| (s.clone(), *m))).collect();
+        // Sketch bodies too, and the bodies of sketch regions and entities (a part pattern copies their owner body:
+        // cf-transform-pattern's Transform pattern 4 makes no part in live; std Form's flat sketches go with its
+        // tools): copies of those bodies only.
+        let pieces: Vec<Arc<crate::regen::context::SketchResult>> = ev
+            .ctx
+            .sketch_bodies_of(&refs)
+            .into_iter()
+            .map(|(i, take)| {
+                let s = &ev.ctx.sketches[i];
+                if take == s.held() { s.clone() } else { Arc::new(crate::regen::context::SketchResult { bodies: Some(take), ..(**s).clone() }) }
+            })
+            .collect();
+        let sources: Vec<(Arc<crate::regen::context::SketchResult>, DMat4)> = pieces.into_iter().flat_map(|s| transforms.iter().map(move |m| (s.clone(), *m))).collect();
         if bodies.is_empty() && sources.is_empty() {
             return err("Could not pattern selected parts.");
         }
@@ -1161,10 +1167,7 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     }
     own_sketches(&mut st, marker, &sketches);
     for (source, copy) in &sketches {
-        let copied: Vec<Value> = st.attributes_of(&Reference::Sketch(*source)).into_iter().cloned().collect();
-        for v in copied {
-            st.push_attribute(Reference::Sketch(*copy), v);
-        }
+        copy_sketch_attributes(&mut st, *source, *copy);
     }
     for (name, source, b) in made {
         let inst = super::wrap_body_id(&b, marker, st.op_bits(marker), feature);
@@ -1262,10 +1265,14 @@ fn op_delete_bodies(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // Owner bodies of whatever was passed.
     let owners = with_ents(i, &cx, def.get("entities"), |_, q, ents| Ok(ents.iter().filter_map(|e| q.owner(e).or(Some(e.clone()))).map(|e| q.to_ref(&e)).collect::<Vec<_>>()))?;
     run_op(i, &cx, &id, "DELETE_PARTS_FAILED", |ev| {
+        // Sketch bodies: those only (live: one curve's wire goes, the sketch's others stay).
+        let bodies = ev.ctx.sketch_bodies_of(&owners);
+        ev.ctx.delete_sketch_bodies(&bodies);
         for r in &owners {
             match r {
                 Reference::Body(b) => ev.ctx.bodies.retain(|x| &x.id != b),
                 Reference::Sketch(f) => ev.ctx.sketches.retain(|s| s.feature != *f),
+                r if is_sketch_ref(r) => {}
                 other => {
                     ev.ctx.planes.retain(|p| &p.reference != other);
                     ev.ctx.connectors.retain(|p| &p.reference != other);
@@ -2723,6 +2730,7 @@ fn op_merge_contexts(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             None => r,
         },
         Reference::Sketch(old) => sketches.iter().find(|(o, _)| o == old).map_or(r.clone(), |(_, n)| Reference::Sketch(*n)),
+        Reference::SketchBody { sketch: old, entity } => sketches.iter().find(|(o, _)| o == old).map_or(r.clone(), |(_, n)| Reference::SketchBody { sketch: *n, entity: *entity }),
         _ => r,
     };
     // The merged entities keep their attributes (std Form imports its tools by
@@ -2764,6 +2772,22 @@ fn copy_sketches(ev: &mut EvalCtx, id: &[Arc<str>], sketches: impl Iterator<Item
         out.push((s.feature, new));
     }
     out
+}
+
+/// A sketch copy keeps its source's attributes, the sketch's and its bodies'.
+fn copy_sketch_attributes(st: &mut super::CtxState, source: crate::reference::FeatureId, copy: crate::reference::FeatureId) {
+    let copied: Vec<(Reference, Value)> = st
+        .attributes()
+        .iter()
+        .filter_map(|(r, v)| match r {
+            Reference::Sketch(f) if *f == source => Some((Reference::Sketch(copy), v.clone())),
+            Reference::SketchBody { sketch, entity } if *sketch == source => Some((Reference::SketchBody { sketch: copy, entity: *entity }, v.clone())),
+            _ => None,
+        })
+        .collect();
+    for (r, v) in copied {
+        st.push_attribute(r, v);
+    }
 }
 
 /// The sketch copies' ids name operation `marker` (qCreatedBy finds them).

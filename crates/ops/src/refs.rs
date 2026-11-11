@@ -105,6 +105,8 @@ pub fn to_id(r: &Reference) -> String {
             }
         }
         Reference::SketchCurveEnd { sketch, entity, end } => format!("curveend:{sketch}:{entity}:{end}"),
+        Reference::SketchBody { sketch, entity: Some(e) } => format!("sketchbody:{sketch}:{e}"),
+        Reference::SketchBody { sketch, entity: None } => format!("sketchbody:{sketch}:sheet"),
         Reference::Sketch(f) => format!("sketch:{f}"),
         Reference::FeaturePlane(f) => format!("fplane:{f}"),
         Reference::MateConnector { feature, index } => format!("mc:{feature}.{index}"),
@@ -166,6 +168,11 @@ pub fn parse_str(s: &str) -> Option<Reference> {
             let mut parts = rest.split(':');
             let sketch = parse_feature_id(parts.next()?)?;
             Reference::SketchCurveEnd { sketch, entity: parts.next()?.parse().ok()?, end: parts.next()?.parse().ok()? }
+        }
+        "sketchbody" => {
+            let (sketch, entity) = rest.split_once(':')?;
+            let entity = if entity == "sheet" { None } else { Some(entity.parse().ok()?) };
+            Reference::SketchBody { sketch: parse_feature_id(sketch)?, entity }
         }
         "sketch" => Reference::Sketch(parse_feature_id(rest)?),
         "fplane" => Reference::FeaturePlane(parse_feature_id(rest)?),

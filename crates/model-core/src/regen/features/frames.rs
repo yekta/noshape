@@ -276,7 +276,7 @@ fn path_edges(ev: &EvalCtx) -> FResult<Vec<(Shape, Name)>> {
                 }
             }
             Reference::SketchEntity { sketch, entity } => {
-                let is_point = ev.ctx.sketch(*sketch).is_some_and(|s| s.sketch.curve(noshape_sketch::EntityId(*entity)).is_none());
+                let is_point = ev.ctx.sketch_holding(*sketch, *entity).is_some_and(|s| s.sketch.curve(noshape_sketch::EntityId(*entity)).is_none());
                 if is_point {
                     if let Some(p) = ev.resolve_vertex_point(r) {
                         verts.push(p);

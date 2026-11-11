@@ -129,7 +129,7 @@ fn ev_plane(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 fn ev_owner_sketch_plane(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let frame = |q: &QueryCx, e: &Ent| match e {
-        Ent::SketchBody(s) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) | Ent::SketchRegionEdge(s, _) | Ent::SketchRegionVertex(s, _) | Ent::SketchCurveEnd(s, ..) => Some(q.st.ctx.sketches[*s].frame),
+        Ent::SketchSheet(s) | Ent::SketchWire(s, _) | Ent::SketchPointBody(s, _) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) | Ent::SketchRegionEdge(s, _) | Ent::SketchRegionVertex(s, _) | Ent::SketchCurveEnd(s, ..) => Some(q.st.ctx.sketches[*s].frame),
         _ => None,
     };
     // `checkAllEntities`: a plane only when every entity's sketch plane is

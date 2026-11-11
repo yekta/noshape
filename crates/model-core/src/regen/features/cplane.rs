@@ -110,7 +110,7 @@ fn kind(ctx: &Context, r: &Reference) -> Kind {
         Reference::Edge(_) => Kind::Edge,
         Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::SketchRegion { .. } => Kind::Face,
         Reference::SketchEntity { sketch, entity } => {
-            let Some(s) = ctx.sketch(*sketch) else { return Kind::Other };
+            let Some(s) = ctx.sketch_holding(*sketch, *entity) else { return Kind::Other };
             let id = noshape_sketch::EntityId(*entity);
             if s.sketch.point(id).is_some() {
                 Kind::Vertex

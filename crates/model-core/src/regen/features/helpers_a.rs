@@ -92,7 +92,7 @@ pub fn resolve_curves(ev: &EvalCtx, refs: &[Reference]) -> FResult<Vec<SourcedEd
     for r in refs {
         match r {
             Reference::SketchEntity { sketch, entity } => {
-                let Some(s) = ev.ctx.sketch(*sketch) else { return Err(fe("A selected sketch no longer exists")) };
+                let Some(s) = ev.ctx.sketch_holding(*sketch, *entity) else { return Err(fe("A selected sketch no longer exists")) };
                 if let Some(e) = sketch_entity_edge(s, *entity)? {
                     out.push(SourcedEdge { shape: e, source: Source::Sketch { sketch: *sketch, entity: *entity, segment: 0 } });
                 }

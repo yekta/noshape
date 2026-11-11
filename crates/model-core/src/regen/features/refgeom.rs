@@ -168,7 +168,7 @@ fn origin_csys(ev: &EvalCtx, r: &Reference, inference: &str, secondary: &[Refere
         }
         Reference::Vertex(_) => vertex_csys(ev, r).ok_or_else(|| not_found("vertex")),
         Reference::SketchEntity { sketch, entity } => {
-            let s = ev.ctx.sketch(*sketch).ok_or_else(|| not_found("sketch entity"))?;
+            let s = ev.ctx.sketch_holding(*sketch, *entity).ok_or_else(|| not_found("sketch entity"))?;
             let id = noshape_sketch::EntityId(*entity);
             match s.sketch.curve(id) {
                 None => vertex_csys(ev, r).ok_or_else(|| not_found("sketch point")),

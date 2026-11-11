@@ -1887,7 +1887,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   lead's T2 since at least f8e5323e (11-03 00:53): model sheetmetal_std::library_form_tools_as_live (louver: no
   bodies, live 1975.3626 / 1889.368549 mm³) and library_forms_placed_as_live (its Form 1 then finds no tagged tools).
   `cargo test -p noshape-model --test all sheetmetal_std::library_form -- --ignored`. (2026-11-03, skasm)
-- [ ] P2 SKETCH-IMPRINT-TOPOLOGY (core 11-03, from SKETCH-FACE-IMPRINT; live REST probes "core imprint probe 1") a
+- [x] P2 SKETCH-IMPRINT-TOPOLOGY (core 11-03, from SKETCH-FACE-IMPRINT; live REST probes "core imprint probe 1") a
   sketch's bodies in FeatureScript are live's: **each curve is a wire body of its own (its own end vertices), each
   sketch point a point body, and the regions one sheet body** with its own edges and vertices (the face it lies on
   imprinted). qCreatedBy(sketch, BODY / EDGE / VERTEX) on Top: a rectangle 5 / 8 / 12 (wire 4 edges, 8 vertices;
@@ -1919,10 +1919,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   full_regen_ms pending). Its result also differs: ours 36/83/46 faces/edges/vertices, 18314.95 mm³; live 36/79/40,
   18329.66 mm³ (after Extrude 3 already differs by split edges, CUT-CLOSED-EDGES-SPLIT). Our document:
   vibe5:~/tmp/noshape-parity-<pid>/pipeflange-steven.noshape (parity_models, NOSHAPE_PARITY_ONLY=pipeflange-steven).
-- [ ] P3 SKETCH-BODIES-PER-ENTITY (dx 11-05 12:20, live 2060) live's sketch is a body per entity: each curve a wire
+- [x] P3 SKETCH-BODIES-PER-ENTITY (dx 11-05 12:20, live 2060) live's sketch is a body per entity: each curve a wire
   body (a spline's with its 2 end vertices, a circle's with none), each point (interpolation points, centres) a
   one-vertex body, the regions one sheet body (the Spur Gear's tooth sketch: 65 bodies); ours is one sketch body
   (`qOwnerBody` of any of them, `qCreatedBy(sketch, BODY)` 1).
+  **psui 2026-11-11 17:55: done (with SKETCH-IMPRINT-TOPOLOGY's vertices).** A wire body per curve, a point body per
+  point that is no curve's end, one sheet for the regions (host Ent::SketchWire / SketchPointBody / SketchSheet,
+  Reference::SketchBody): a rectangle 5 bodies (4 wires + the sheet), a circle 3, a line 1, as live. opDeleteBodies,
+  opTransform and opPattern on some of a sketch's bodies act on those only: the sketch is then pieces of one feature
+  (SketchResult::bodies), each drawn with its own bodies; references find the piece holding their entity. T1
+  custom_features a_sketchs_bodies_edges_and_vertices_are_lives; model suite = f324e41f per document (826/947, custom
+  features 103/107).
 - [x] (dx 11-05 12:20: Reference::SketchCurveEnd; live 2060's probe gives the same 67 vertices, adjacency and names on
   ours) P3 SKETCH-SPLINE-END-VERTICES (dx 11-05 11:42, live 2059 (c)) live's fit spline has its own start and end
   vertices besides its interpolation points (ends included): the Spur Gear's tooth sketch 67 vertices, ours 63 (we

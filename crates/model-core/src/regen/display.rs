@@ -654,6 +654,10 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
         if e.reference_only {
             continue;
         }
+        // A piece of a sketch draws its own bodies only.
+        if s.bodies.is_some() && !s.holds(e.id.0) {
+            continue;
+        }
         // Text glyph outlines are derived geometry: no points, regular color.
         let glyph = noshape_sketch::text::glyph_text_id(e.id).is_some();
         if e.kind() == EntityKind::Point {
@@ -673,7 +677,7 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
         }
     }
     let mut regions = Vec::new();
-    for (i, r) in s.regions.iter().enumerate() {
+    for (i, r) in s.regions.iter().enumerate().filter(|_| s.holds_sheet()) {
         let outer = r.outer.tessellate(tol);
         let mut flat: Vec<f64> = Vec::new();
         let mut holes_idx = Vec::new();

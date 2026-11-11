@@ -522,7 +522,7 @@ fn sk_solve(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let name = id.last().map(|s| s.to_string()).unwrap_or_default();
     st.ctx.sketches.retain(|s| s.feature != b.marker);
     let legacy_edge_directions = st.ctx.legacy_edge_directions;
-    st.ctx.sketches.push(Arc::new(SketchResult { feature: b.marker, name, frame: b.frame, sketch: b.sketch.clone(), report, regions, imprinted: Vec::new(), split: Vec::new(), wires, dimension_text: BTreeMap::new(), images: b.images.clone(), legacy_edge_directions }));
+    st.ctx.sketches.push(Arc::new(SketchResult { feature: b.marker, name, frame: b.frame, sketch: b.sketch.clone(), report, regions, imprinted: Vec::new(), split: Vec::new(), wires, dimension_text: BTreeMap::new(), images: b.images.clone(), legacy_edge_directions, bodies: None }));
     st.sketches.insert(id, b);
     Ok(Value::Undefined)
 }

@@ -7,7 +7,7 @@ use crate::reference::{BodyId, FeatureId, Reference, TopoName};
 use glam::DVec3;
 use noshape_kernel::{Shape, ShapeType};
 use noshape_units::Quantity;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
 
 /// A part, surface or wire body with persistent names for its sub-shapes.
@@ -272,6 +272,65 @@ pub struct SketchResult {
     pub images: Vec<SketchResultImage>,
     /// Its regions' edges run their loops' way, not their curves' ([`Context::legacy_edge_directions`]).
     pub legacy_edge_directions: bool,
+    /// The sketch's bodies this result holds (`None`: all). A FeatureScript operation on some of them (delete,
+    /// transform, pattern) leaves pieces of one sketch, each holding its own.
+    #[serde(default)]
+    pub bodies: Option<SketchBodies>,
+}
+
+/// Bodies of a sketch (live: a wire body per curve, a point body per point that is no curve's end, one sheet body
+/// for the regions): curves and points by entity id, and the sheet.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SketchBodies {
+    pub entities: BTreeSet<u32>,
+    pub sheet: bool,
+}
+
+impl SketchResult {
+    /// The points that are only the ends of lines, arcs, elliptical arcs or conics: those curves' own end vertices
+    /// stand for them, so they have no body of their own (live: a rectangle 4 wires, 8 vertices).
+    pub fn curve_end_points(&self) -> HashSet<u32> {
+        use noshape_sketch::Geometry as G;
+        let (mut ends, mut kept) = (HashSet::new(), HashSet::new());
+        for e in self.sketch.entities() {
+            match &e.geometry {
+                G::Line { start, end } | G::Arc { start, end, .. } | G::EllipticalArc { start, end, .. } | G::Conic { start, end, .. } => {
+                    ends.extend([start.0, end.0]);
+                }
+                G::Point { .. } => {}
+                _ => kept.extend(e.point_refs().iter().map(|p| p.0)),
+            }
+            kept.extend(e.center().map(|c| c.0));
+            if let G::Conic { control, .. } = &e.geometry {
+                kept.insert(control.0);
+            }
+        }
+        ends.retain(|p| !kept.contains(p));
+        ends
+    }
+
+    /// Every body of the sketch: its curves, its points with a body of their own, its sheet if it has regions.
+    pub fn all_bodies(&self) -> SketchBodies {
+        let ends = self.curve_end_points();
+        let entities = self.sketch.entities().filter(|e| e.kind().is_curve() || (e.kind() == noshape_sketch::EntityKind::Point && !ends.contains(&e.id.0))).map(|e| e.id.0).collect();
+        SketchBodies { entities, sheet: !self.regions.is_empty() }
+    }
+
+    /// The bodies this result holds.
+    pub fn held(&self) -> SketchBodies {
+        self.bodies.clone().unwrap_or_else(|| self.all_bodies())
+    }
+
+    /// Whether it holds an entity's body (a curve's end point goes with its curve).
+    pub fn holds(&self, entity: u32) -> bool {
+        let Some(b) = &self.bodies else { return self.sketch.entity(noshape_sketch::EntityId(entity)).is_some() };
+        b.entities.contains(&entity) || self.sketch.entities().any(|e| b.entities.contains(&e.id.0) && e.endpoints().is_some_and(|(a, z)| a.0 == entity || z.0 == entity))
+    }
+
+    /// Whether it holds the regions' sheet.
+    pub fn holds_sheet(&self) -> bool {
+        self.bodies.as_ref().is_none_or(|b| b.sheet)
+    }
 }
 
 /// An inserted sketch image: its box corner points and encoded file.
@@ -845,8 +904,111 @@ impl Context {
         self.bodies.iter().find(|b| &b.id == id)
     }
 
+    /// A sketch's result: of its pieces, the one holding its regions first.
     pub fn sketch(&self, f: FeatureId) -> Option<&Arc<SketchResult>> {
-        self.sketches.iter().find(|s| s.feature == f)
+        self.sketches.iter().find(|s| s.feature == f && s.holds_sheet()).or_else(|| self.sketches.iter().find(|s| s.feature == f))
+    }
+
+    /// The piece of a sketch holding an entity's body.
+    pub fn sketch_holding(&self, f: FeatureId, entity: u32) -> Option<&Arc<SketchResult>> {
+        self.sketches.iter().find(|s| s.feature == f && s.holds(entity))
+    }
+
+    /// The sketch bodies references stand for, by piece (`sketches` index): a whole sketch all its pieces' bodies, a
+    /// sketch body itself, a curve or its end its wire, a point its point body (a curve's end its curve's wire), a
+    /// region or its edges the sheet.
+    pub fn sketch_bodies_of(&self, refs: &[Reference]) -> Vec<(usize, SketchBodies)> {
+        let mut out: Vec<(usize, SketchBodies)> = Vec::new();
+        let mut add = |i: usize, entity: Option<u32>| {
+            let at = match out.iter().position(|(j, _)| *j == i) {
+                Some(at) => at,
+                None => {
+                    out.push((i, SketchBodies::default()));
+                    out.len() - 1
+                }
+            };
+            match entity {
+                Some(e) => {
+                    out[at].1.entities.insert(e);
+                }
+                None => out[at].1.sheet = true,
+            }
+        };
+        let piece = |f: FeatureId, e: u32| self.sketches.iter().position(|s| s.feature == f && s.holds(e));
+        let sheet = |f: FeatureId| self.sketches.iter().position(|s| s.feature == f && s.holds_sheet() && !s.regions.is_empty());
+        for r in refs {
+            match r {
+                Reference::Sketch(f) => {
+                    for (i, s) in self.sketches.iter().enumerate().filter(|(_, s)| s.feature == *f) {
+                        let held = s.held();
+                        for e in held.entities {
+                            add(i, Some(e));
+                        }
+                        if held.sheet {
+                            add(i, None);
+                        }
+                    }
+                }
+                Reference::SketchBody { sketch, entity: None } | Reference::SketchRegion { sketch, .. } | Reference::SketchRegionEdge { sketch, .. } => {
+                    if let Some(i) = sheet(*sketch) {
+                        add(i, None);
+                    }
+                }
+                Reference::SketchBody { sketch, entity: Some(e) } | Reference::SketchEntity { sketch, entity: e } | Reference::SketchCurveEnd { sketch, entity: e, .. } => {
+                    let Some(i) = piece(*sketch, *e) else { continue };
+                    let s = &self.sketches[i];
+                    // A point that is only curves' ends: the first of those curves' wire.
+                    let body = match s.curve_end_points().contains(e) {
+                        true => s.sketch.entities().find(|c| s.holds(c.id.0) && c.endpoints().is_some_and(|(a, b)| a.0 == *e || b.0 == *e)).map(|c| c.id.0),
+                        false => Some(*e),
+                    };
+                    if let Some(b) = body {
+                        add(i, Some(b));
+                    }
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+
+    /// Splits `take` of piece `i`'s bodies off into a piece of their own (the same sketch, at the end of `sketches`);
+    /// `i` itself when it holds no others. The piece holding them.
+    pub fn split_sketch(&mut self, i: usize, take: &SketchBodies) -> usize {
+        let held = self.sketches[i].held();
+        let taken = SketchBodies { entities: held.entities.intersection(&take.entities).copied().collect(), sheet: held.sheet && take.sheet };
+        let rest = SketchBodies { entities: held.entities.difference(&take.entities).copied().collect(), sheet: held.sheet && !take.sheet };
+        if rest.entities.is_empty() && !rest.sheet {
+            return i;
+        }
+        let mut kept = (*self.sketches[i]).clone();
+        kept.bodies = Some(rest);
+        let mut piece = (*self.sketches[i]).clone();
+        piece.bodies = Some(taken);
+        self.sketches[i] = Arc::new(kept);
+        self.sketches.push(Arc::new(piece));
+        self.sketches.len() - 1
+    }
+
+    /// Deletes sketch bodies (live opDeleteBodies on some of a sketch's: those only); a piece left with none goes.
+    pub fn delete_sketch_bodies(&mut self, bodies: &[(usize, SketchBodies)]) {
+        let mut gone = Vec::new();
+        for (i, take) in bodies {
+            let held = self.sketches[*i].held();
+            let rest = SketchBodies { entities: held.entities.difference(&take.entities).copied().collect(), sheet: held.sheet && !take.sheet };
+            if rest.entities.is_empty() && !rest.sheet {
+                gone.push(*i);
+                continue;
+            }
+            let mut kept = (*self.sketches[*i]).clone();
+            kept.bodies = Some(rest);
+            self.sketches[*i] = Arc::new(kept);
+        }
+        let mut i = 0;
+        self.sketches.retain(|_| {
+            i += 1;
+            !gone.contains(&(i - 1))
+        });
     }
 
     /// Onshape numbers default names by list order ("Part 1", "Part 2", …):

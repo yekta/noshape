@@ -4414,11 +4414,12 @@ fn a_split_part_drafted_both_sides_with_reapplied_fillets_unions_again() {
     assert!((v / (2.0 * half) - 1.0).abs() < 1e-3, "{v} mm³, about {}", 2.0 * half);
 }
 
-/// A sketch's edges and vertices in FeatureScript are live's (core's "imprint probe 1", SKETCH-IMPRINT-TOPOLOGY): each
-/// open curve has end vertices of its own (a rectangle 8 edge ends), a circle's ring none, its centre one; on a face the
-/// regions' own edges and vertices take in the face's.
+/// A sketch's bodies, edges and vertices in FeatureScript are live's (core's "imprint probe 1", SKETCH-IMPRINT-TOPOLOGY,
+/// SKETCH-BODIES-PER-ENTITY): a wire body per curve with end vertices of its own (a rectangle 8 edge ends), a point
+/// body per point that is no curve's end (a circle's centre), one sheet for the regions (on a face the face's edges and
+/// vertices in it); deleting, moving or patterning one curve's wire acts on that wire alone.
 #[test]
-fn a_sketchs_edges_and_vertices_are_lives() {
+fn a_sketchs_bodies_edges_and_vertices_are_lives() {
     use glam::DVec2;
     use noshape_model::reference::DatumPlane;
     use noshape_model::sketch_feature::SketchData;
@@ -4454,7 +4455,12 @@ fn a_sketchs_edges_and_vertices_are_lives() {
     let mut body = String::from(r#"
 function counts(context is Context, q is Query) returns string
 {
-    return size(evaluateQuery(context, qEntityFilter(q, EntityType.EDGE))) ~ " " ~ size(evaluateQuery(context, qEntityFilter(q, EntityType.VERTEX)));
+    var out = "";
+    for (var t in [EntityType.BODY, EntityType.EDGE, EntityType.VERTEX])
+        out = out ~ size(evaluateQuery(context, qEntityFilter(q, t))) ~ " ";
+    for (var t in [BodyType.WIRE, BodyType.POINT, BodyType.SHEET])
+        out = out ~ size(evaluateQuery(context, qBodyType(qEntityFilter(q, EntityType.BODY), t))) ~ " ";
+    return out;
 }
 annotation { "Feature Type Name" : "Sketch topology" }
 export const sketchTopology = defineFeature(function(context is Context, id is Id, definition is map)
@@ -4464,7 +4470,21 @@ export const sketchTopology = defineFeature(function(context is Context, id is I
     for (name, f) in [("rect", rect), ("circle", circle), ("line", line), ("face circle", fcircle), ("face line", fline)] {
         body += &format!("        println(\"{name} \" ~ counts(context, qCreatedBy(makeId(\"{f}\"))));\n");
     }
-    body += "    });\n";
+    body += &format!(r#"
+        const rect = qCreatedBy(makeId("{rect}"));
+        const wires = evaluateQuery(context, qBodyType(qEntityFilter(rect, EntityType.BODY), BodyType.WIRE));
+        const wire = wires[0];
+        const edge = qOwnedByBody(wire, EntityType.EDGE);
+        println("wire edge " ~ size(evaluateQuery(context, edge)) ~ " " ~ size(evaluateQuery(context, qOwnedByBody(wire, EntityType.VERTEX))));
+        opPattern(context, id + "pattern", {{ "entities" : wire, "transforms" : [transform(vector(0, 0, 20) * millimeter)], "instanceNames" : ["1"] }});
+        println("pattern " ~ counts(context, qCreatedBy(id + "pattern")) ~ "| rect " ~ counts(context, rect));
+        opTransform(context, id + "move", {{ "bodies" : wire, "transform" : transform(vector(0, 0, 10) * millimeter) }});
+        const z = function(q) {{ return round(evBox3d(context, {{ "topology" : q }}).minCorner[2] / millimeter); }};
+        println("moved " ~ z(edge) ~ " " ~ z(qOwnedByBody(wires[1], EntityType.EDGE)) ~ " | rect " ~ counts(context, rect));
+        opDeleteBodies(context, id + "delete", {{ "entities" : wire }});
+        println("deleted | rect " ~ counts(context, rect));
+    }});
+"#);
     let fx = Fixture::new(&studio(&body));
     let f = ps.new_feature(&fx.ty("sketchTopology"), &fx.units).unwrap();
     let fid = f.id;
@@ -4472,6 +4492,19 @@ export const sketchTopology = defineFeature(function(context is Context, id is I
     let r = fx.regen(&mut Regenerator::new(), &ps);
     assert_ok(&r);
     let out = custom::run::output_of(fid).expect("output").output;
-    // (live: edges, vertices)
-    assert_eq!(out.lines().collect::<Vec<_>>(), ["rect 8 12", "circle 2 1", "line 1 2", "face circle 6 5", "face line 8 8"]);
+    // (bodies, edges, vertices; wires, points, sheets: live's on Top, the face's edges and vertices live's)
+    assert_eq!(
+        out.lines().collect::<Vec<_>>(),
+        [
+            "rect 5 8 12 4 0 1 ",
+            "circle 3 2 1 1 1 1 ",
+            "line 1 1 2 1 0 0 ",
+            "face circle 3 6 5 1 1 1 ",
+            "face line 2 8 8 1 0 1 ",
+            "wire edge 1 2",
+            "pattern 1 1 2 1 0 0 | rect 5 8 12 4 0 1 ",
+            "moved 10 0 | rect 5 8 12 4 0 1 ",
+            "deleted | rect 4 7 10 3 0 1 ",
+        ]
+    );
 }

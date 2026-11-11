@@ -578,12 +578,12 @@ impl<'a> EvalCtx<'a> {
                 self.ctx.bodies[bi].shape.sub_shape(ShapeType::Vertex, vi).ok()?.vertex_point().ok()
             }
             Reference::SketchEntity { sketch, entity } => {
-                let s = self.ctx.sketch(*sketch)?;
+                let s = self.ctx.sketch_holding(*sketch, *entity)?;
                 let p = s.sketch.point(noshape_sketch::EntityId(*entity))?;
                 Some(s.frame.to_world(p))
             }
             Reference::SketchCurveEnd { sketch, entity, end } => {
-                let s = self.ctx.sketch(*sketch)?;
+                let s = self.ctx.sketch_holding(*sketch, *entity)?;
                 let (a, b) = s.sketch.endpoints(noshape_sketch::EntityId(*entity))?;
                 Some(s.frame.to_world(s.sketch.point(if *end == 0 { a } else { b })?))
             }
@@ -755,7 +755,7 @@ impl<'a> EvalCtx<'a> {
                 }
             }
             Reference::SketchEntity { sketch, entity } => {
-                let s = self.ctx.sketch(*sketch)?;
+                let s = self.ctx.sketch_holding(*sketch, *entity)?;
                 let id = noshape_sketch::EntityId(*entity);
                 match s.sketch.curve(id)? {
                     noshape_sketch::Curve2::Line { a, b } => {

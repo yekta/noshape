@@ -62,8 +62,8 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
             }
         }
         // A sketch curve's midpoint (picked outside the sketch, like an edge's).
-        Reference::SketchEntity { sketch, entity } if ev.ctx.sketch(*sketch).is_some_and(|s| s.sketch.curve(noshape_sketch::EntityId(*entity)).is_some()) => {
-            let s = ev.ctx.sketch(*sketch)?;
+        Reference::SketchEntity { sketch, entity } if ev.ctx.sketch_holding(*sketch, *entity).is_some_and(|s| s.sketch.curve(noshape_sketch::EntityId(*entity)).is_some()) => {
+            let s = ev.ctx.sketch_holding(*sketch, *entity)?;
             let c = s.sketch.curve(noshape_sketch::EntityId(*entity))?;
             let seg = super::features::extrude::curve_to_segment(&c)?;
             let e = k::make_edge_2d(&super::eval::kernel_plane(&s.frame), &seg).ok()?;

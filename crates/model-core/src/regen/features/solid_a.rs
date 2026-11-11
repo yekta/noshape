@@ -837,7 +837,7 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
         }
         // Point profile.
         if (refs.len() == 1 && matches!(refs[0], Reference::Vertex(_) | Reference::Origin | Reference::MateConnector { .. } | Reference::Implicit { .. }))
-            || matches!(&refs[0], Reference::SketchEntity { sketch, entity } if ev.ctx.sketch(*sketch).is_some_and(|s| s.sketch.point(noshape_sketch::EntityId(*entity)).is_some()))
+            || matches!(&refs[0], Reference::SketchEntity { sketch, entity } if ev.ctx.sketch_holding(*sketch, *entity).is_some_and(|s| s.sketch.point(noshape_sketch::EntityId(*entity)).is_some()))
         {
             let p = ev.resolve_vertex_point(&refs[0]).ok_or_else(|| fe("Could not create valid profiles from selections."))?;
             out.push(Section { shape: k::make_vertex(p)?, profile: None });

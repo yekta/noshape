@@ -101,6 +101,9 @@ pub type CreatedCache = HashMap<(FsId, Option<query::EType>), (query::CreatedSee
 /// An attribute filter's matches: how many attributes it has looked at, and the positions of those it matched.
 type AttrMatches = (usize, Arc<Vec<usize>>);
 
+/// A sketch piece's points that are only curves' ends.
+pub type CurveEnds = Arc<std::collections::HashSet<u32>>;
+
 pub struct CtxState {
     pub ctx: Context,
     /// The Part Studio feature being evaluated.
@@ -156,6 +159,8 @@ pub struct CtxState {
     pub on_face: Mutex<HashMap<(noshape_kernel::Shape, [i64; 3]), bool>>,
     /// Each sketch's region edges ([`query::QueryCx::region_pieces`]), by (sketch, its regions' address and count).
     pub region_pieces: Mutex<HashMap<(crate::reference::FeatureId, usize, usize), Arc<query::RegionPieces>>>,
+    /// Each sketch result's points that are only curves' ends ([`query::QueryCx::curve_ends`]), by (sketch, result).
+    pub curve_ends: Mutex<HashMap<(crate::reference::FeatureId, usize), CurveEnds>>,
     /// The operation that made each construction plane (`ConstructionPlane` references; qCreatedBy).
     pub plane_ops: HashMap<Reference, FsId>,
     /// Each operation's bits of its bodies' ids (unique in this feature).
@@ -312,6 +317,7 @@ impl FsContext {
                 pieces_on_old: Mutex::new(HashMap::new()),
                 on_face: Mutex::new(HashMap::new()),
                 region_pieces: Mutex::new(HashMap::new()),
+                curve_ends: Mutex::new(HashMap::new()),
                 topo_cache: Mutex::new(HashMap::new()),
                 sketch_order_cache: Mutex::new(HashMap::new()),
                 name_index: Mutex::new(HashMap::new()),

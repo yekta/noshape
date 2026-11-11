@@ -349,7 +349,9 @@ fn form_tools(st: &CtxState, wall: &Value, face: usize, ids: &mut Vec<(Arc<str>,
         let mut sketches = Vec::new();
         for sk in item.get("sketchBodyIds").as_array().iter().flat_map(|a| a.iter()) {
             body(sk);
-            if let Some(Reference::Sketch(f)) = sk.as_str().and_then(|s| st.transient_ref(&s).cloned()) {
+            if let Some(Reference::Sketch(f) | Reference::SketchBody { sketch: f, .. }) = sk.as_str().and_then(|s| st.transient_ref(&s).cloned())
+                && !sketches.contains(&f)
+            {
                 sketches.push(f);
             }
         }

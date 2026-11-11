@@ -59,7 +59,7 @@ fn locations(ev: &EvalCtx) -> FResult<Vec<Location>> {
         match r {
             Reference::SketchEntity { sketch, entity } => {
                 // (A location gone is dropped, as from std's query: none left is "No hole points selected.")
-                let Some(s) = ev.ctx.sketch(*sketch) else { continue };
+                let Some(s) = ev.ctx.sketch_holding(*sketch, *entity) else { continue };
                 let id = noshape_sketch::EntityId(*entity);
                 let p2 = match s.sketch.point(id) {
                     Some(p) => Some(p),
