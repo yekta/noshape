@@ -57,6 +57,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   page's import (single and split) runs in the background, its progress in the page's new Notifications bell (live's
   steps, the document's link), a file read hanging past 30 s fails it saying so; the page no longer opens the
   document by itself (live: you stay on the page, the bell's link opens it).
+  psui 11-11 04:06 (live 2424 answered, checked on its own STEP files): a part's Part Studio is made once (a
+  subassembly used twice is two documents, the second using the first's Part Studios at V1), a flat assembly is one
+  document (a Part Studio per part), CAD Imports holds each part's "Part N.x_t" and the STEP in the top document only,
+  per-part documents are "Part N.x_t", names drop the exporter's " <1>". Left: a second split's folder and two
+  documents of one name (live allows both; ours a file system: " (1)", " (2)"); a parts-only file; Parasolid / IGES
+  assemblies.
 
 ## From the user, 2026-11-04
 - [x] (skasm 11-08: live 2270: no constraint button is dimmed; a selection a constraint can't take (a handle arm in Concentric too) gets std's words in the yellow banner, kept until the next message, × or a constraint added, the selection cleared and no tool; Midpoint on two points and Symmetric on two lines start their tool with the picks; scene sketch_mode a_constraint_a_selection_cant_take_refuses_with_lives_words, e2e coincident_on_one_point_is_a_no_op, ui-parity sketch-constraint-refusals 91/91) P1 SKETCH-SPLINE-HANDLE-ARM (skasm, lead 11-06 23:15, from the user) a spline's handle (the tangent arm from an
