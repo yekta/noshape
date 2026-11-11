@@ -54,6 +54,11 @@ struct GuideWindow {
 
 impl Global for GuideWindow {}
 
+/// The user guide's window, if open (the ui-parity driver keeps to the page: live opens help in a browser tab).
+pub(crate) fn guide_window(cx: &App) -> Option<AnyWindowHandle> {
+    cx.try_global::<GuideWindow>().map(|g| g.handle)
+}
+
 /// A section of the user guide in a window of its own (a dialog's ? or Learn more; live opens its help in a browser
 /// tab), "Whole guide" for the rest.
 struct GuideView {

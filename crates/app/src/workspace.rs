@@ -848,22 +848,18 @@ impl Workspace {
         });
     }
 
-    /// "+" › Paste <element>: the element copied with Copy to clipboard.
-    fn paste_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// "+" › Paste <element>: the element copied with Copy to clipboard, after the open tab, which stays open (live
+    /// doc-tab-menu-copy-paste); a name already there gets " Copy <n>".
+    fn paste_tab(&mut self, cx: &mut Context<Self>) {
         let Some(t) = cx.try_global::<crate::doc_dialogs::CopiedTab>().and_then(|c| c.0.clone()) else { return };
-        let mut new_id = None;
         let after = self.active;
         self.doc.update(cx, |doc, cx| {
             doc.edit_document(&format!("Paste tab : {}", t.name), cx, |d| {
-                let name = if d.tabs.iter().any(|x| x.name == t.name) { d.next_tab_name(&t.name) } else { t.name.clone() };
+                let name = if d.tabs.iter().any(|x| x.name == t.name) { docedit::copy_name(d, &t.name) } else { t.name.clone() };
                 let id = d.add_tab(&name, t.content.clone());
                 place_after(d, id, after);
-                new_id = Some(id);
             });
         });
-        if let Some(id) = new_id {
-            self.activate(id, window, cx);
-        }
     }
 
     fn duplicate_tab(&mut self, tab: TabId, cx: &mut Context<Self>) {
@@ -1560,7 +1556,7 @@ impl Workspace {
                 if !copied {
                     return m;
                 }
-                m.separator().item(I::new("Paste tab").icon_name("paste").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.paste_tab(w, cx))))
+                m.separator().item(I::new("Paste tab").icon_name("paste").on_click(move |_, _, cx| v7.update(cx, |t, cx| t.paste_tab(cx))))
             });
             // Live 2414: Escape leaves it open (a click elsewhere closes it).
             crate::os_menu::mark_page_dropdown(&menu, cx);

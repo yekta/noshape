@@ -685,7 +685,11 @@ pub fn start_page(cx: &mut App) {
         let stay = std::rc::Rc::new(std::cell::Cell::new(false));
         let stay_seen = stay.clone();
         let mut follow = |cx: &mut AsyncApp| -> Option<AnyWindowHandle> {
-            let now = cx.update(|cx| cx.windows());
+            // (Not the user guide's window: live's help opens in a browser tab, its recorder stays on the page.)
+            let now: Vec<AnyWindowHandle> = cx.update(|cx| {
+                let guide = crate::help_menu::guide_window(cx);
+                cx.windows().into_iter().filter(|w| Some(*w) != guide).collect()
+            });
             if let Some(new) = now.iter().rev().find(|w| !known.contains(w))
                 && !stay_seen.get()
             {
