@@ -318,6 +318,28 @@ fn opposite_extrudes_of_a_circle_unify_into_one_cylinder() {
     }
 }
 
+/// A part with a curved side (a surface of linear extrusion: its curve in the mirror plane) fused with its mirror image:
+/// the side and its image are one surface extruded the other way, one face after the unify (c2-hunting-knife's Mirror 1:
+/// its edge strip, live one face).
+#[test]
+fn a_curved_side_and_its_mirror_image_unify_into_one_face() {
+    let p = |x: f64, z: f64| DVec3::new(x, 0.0, z);
+    let spline = make_interpolated_spline(&[p(0.0, 0.0), p(5.0, 2.0), p(10.0, 1.0), p(15.0, 4.0)], &[], false).unwrap();
+    let wire = make_wire(&[spline, make_line(p(15.0, 4.0), p(15.0, 10.0)).unwrap(), make_line(p(15.0, 10.0), p(0.0, 10.0)).unwrap(), make_line(p(0.0, 10.0), p(0.0, 0.0)).unwrap()]).unwrap();
+    let half = extrude(&make_face_from_wire(&wire, true).unwrap(), DVec3::new(0.0, 5.0, 0.0)).unwrap().shape;
+    let image = transform(&half, &Transform::Mirror(Plane::new(DVec3::ZERO, DVec3::Y, DVec3::X)), true).unwrap().shape;
+    let fused = fuse(&half, &image).unwrap().shape;
+    let r = unify_same_domain(&fused).unwrap();
+    let s = &r.shape;
+    let curved: Vec<f64> = s.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Extrusion { .. }))).map(|f| f.area().unwrap()).collect();
+    let one: f64 = half.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Extrusion { .. }))).map(|f| f.area().unwrap()).sum();
+    // The two caps, three planes and the curved side, each once.
+    assert_eq!(s.faces().len(), 6, "{curved:?}");
+    assert!(curved.len() == 1 && (curved[0] - 2.0 * one).abs() < 1e-9 * one, "{curved:?} vs 2 × {one}");
+    let v = 2.0 * half.volume().unwrap();
+    assert!(s.is_valid() && (s.volume().unwrap() - v).abs() < 1e-9 * v);
+}
+
 /// with_call_budget: a section that takes longer than its budget fails with
 /// "section took too long" (std's collision checks in editing logic give up
 /// on such a pair, qa MIRROR-HANG-402); without one it runs to the end. The

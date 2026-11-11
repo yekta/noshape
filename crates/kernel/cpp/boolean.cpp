@@ -107,6 +107,10 @@
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <Geom_Circle.hxx>
+#include <Geom_SurfaceOfLinearExtrusion.hxx>
+#include <gp_Ax2d.hxx>
+#include <gp_Trsf2d.hxx>
+#include <gp_Vec2d.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom2dAdaptor_Curve.hxx>
 #include <math.hxx>
@@ -3571,6 +3575,108 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
   return s;
 }
 
+// Adjacent faces on two surfaces of linear extrusion that are one surface: one's (u, v) the other's (u, k v + c), k
+// = ±1 (a mirrored half's: the curve in the mirror plane extruded the other way, c2-hunting-knife's edge strip, live one
+// face). The second rebuilt on the first's surface (its curves mapped; for k = -1 its wire and side turned over, the
+// material where it was), so OCCT's unify merges them. The shape unchanged when there's no such pair or the result
+// isn't valid.
+TopoDS_Shape share_mirrored_extrusions(const TopoDS_Shape& s, HHist& hist)
+{
+  ShapeAncMap ef;
+  unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  occ::handle<BRepTools_ReShape>                         rs = new BRepTools_ReShape;
+  NCollection_Map<TopoDS_Shape, TopTools_ShapeMapHasher> moved;
+  BRep_Builder                                           B;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const ShapeList& fs = ef(i);
+    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || kept_edge(ef.FindKey(i)))
+      continue;
+    const TopoDS_Face a = TopoDS::Face(fs.First()), b = TopoDS::Face(fs.Last());
+    if (moved.Contains(a) || moved.Contains(b) || !a.Location().IsIdentity() || !b.Location().IsIdentity())
+      continue;
+    TopLoc_Location la, lb;
+    const auto      ea = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(BRep_Tool::Surface(a, la));
+    const auto      eb = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(BRep_Tool::Surface(b, lb));
+    if (ea.IsNull() || eb.IsNull() || ea == eb || !la.IsIdentity() || !lb.IsIdentity() || !ea->Direction().IsParallel(eb->Direction(), 1e-12))
+      continue;
+    const double k = ea->Direction().Dot(eb->Direction()) > 0 ? 1.0 : -1.0;
+    double       u0, u1, v0, v1;
+    BRepTools::UVBounds(b, u0, u1, v0, v1);
+    const double c = gp_Vec(ea->BasisCurve()->Value((u0 + u1) / 2), eb->BasisCurve()->Value((u0 + u1) / 2)).Dot(gp_Vec(ea->Direction()));
+    Bnd_Box box;
+    BRepBndLib::Add(b, box);
+    const double tol  = 1e-9 * std::max(1.0, std::sqrt(box.SquareExtent()));
+    bool         same = true;
+    for (int iu = 0; iu <= 8 && same; ++iu)
+      for (int iv = 0; iv <= 2 && same; ++iv)
+      {
+        const double u = u0 + (u1 - u0) * iu / 8, v = v0 + (v1 - v0) * iv / 2;
+        same = eb->Value(u, v).Distance(ea->Value(u, k * v + c)) <= tol;
+      }
+    bool closed = false;
+    for (TopExp_Explorer x(b, TopAbs_EDGE); x.More() && !closed; x.Next())
+      closed = BRep_Tool::IsClosed(TopoDS::Edge(x.Current()), b);
+    if (!same || closed)
+      continue;
+    gp_Trsf2d t;
+    if (k > 0)
+      t.SetTranslation(gp_Vec2d(0, c));
+    else
+      t.SetMirror(gp_Ax2d(gp_Pnt2d(0, c / 2), gp_Dir2d(1, 0)));
+    const occ::handle<Geom_Surface> ga(ea);
+    TopoDS_Face                     F;
+    B.MakeFace(F, ga, BRep_Tool::Tolerance(b));
+    const TopoDS_Face bf = TopoDS::Face(b.Oriented(TopAbs_FORWARD));
+    bool              ok = true;
+    for (TopoDS_Iterator w(bf); w.More() && ok; w.Next())
+    {
+      std::vector<TopoDS_Edge> es;
+      for (TopExp_Explorer x(w.Value(), TopAbs_EDGE); x.More(); x.Next())
+      {
+        const TopoDS_Edge e = TopoDS::Edge(x.Current());
+        double            f0, f1;
+        const auto        pc = BRep_Tool::CurveOnSurface(e, bf, f0, f1);
+        if (pc.IsNull())
+        {
+          ok = false;
+          break;
+        }
+        double g0, g1;
+        if (BRep_Tool::CurveOnSurface(e, ga, la, g0, g1).IsNull())
+        {
+          B.UpdateEdge(e, occ::down_cast<Geom2d_Curve>(pc->Transformed(t)), ga, la, BRep_Tool::Tolerance(e));
+          B.Range(e, ga, la, f0, f1);
+        }
+        es.push_back(k > 0 ? e : TopoDS::Edge(e.Reversed()));
+      }
+      if (k < 0)
+        std::reverse(es.begin(), es.end());
+      TopoDS_Wire W;
+      B.MakeWire(W);
+      for (const TopoDS_Edge& e : es)
+        B.Add(W, e);
+      W.Closed(BRep_Tool::IsClosed(W));
+      B.Add(F, W);
+    }
+    if (!ok)
+      continue;
+    rs->Replace(bf, k > 0 ? TopoDS_Shape(F) : F.Reversed());
+    moved.Add(a);
+    moved.Add(b);
+  }
+  if (moved.IsEmpty())
+    return s;
+  const TopoDS_Shape out = rs->Apply(s);
+  if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+    return s;
+  if (hist.IsNull())
+    hist = new BRepTools_History();
+  if (const HHist h = rs->History(); !h.IsNull())
+    hist->Merge(h);
+  return out;
+}
+
 // Adjacent faces on equal tori or spheres (one frame, the same radii) given one surface, on a copy: OCCT's unify
 // tells two tori are one only by intersecting them, which it can't (pulley02's groove: two rounds, each half its
 // height, on one torus, live one face); with one surface it merges them. The shape unchanged when there's no such
@@ -4948,7 +5054,7 @@ TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScop
   // Equal tori and spheres on one surface first, kept where the result is valid (a Shell's common, 14218a58: USD's
   // merge then left it invalid).
   HHist              hs;
-  const TopoDS_Shape shared = share_equal_surfaces(s0b, hs);
+  const TopoDS_Shape shared = share_equal_surfaces(share_mirrored_extrusions(s0b, hs), hs);
   if (!shared.IsSame(s0b))
   {
     HHist              ht;

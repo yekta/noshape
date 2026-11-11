@@ -1161,6 +1161,19 @@ fn defeature_dump_probe() {
         }
     }
     println!("kept neighbours of deleted faces (by edge): {neighbours:?}");
+    if std::env::var_os("NOSHAPE_PROBE_DETAIL").is_some() {
+        let edges = s.edges();
+        for &i in &picked {
+            println!("deleted face {i}: {} area {:.4} mm²", kind(&faces[i]), faces[i].area().unwrap_or(0.0) * 1e6);
+            for (e, fs) in ef.iter().enumerate() {
+                if fs.len() == 2 && fs.contains(&(i as u32)) {
+                    let o = if fs[0] as usize == i { fs[1] } else { fs[0] } as usize;
+                    let c = edges[e].edge_curve().map(|c| format!("{c:?}").chars().take(12).collect::<String>()).unwrap_or_default();
+                    println!("  edge {e} {c} {:.3} mm to face {o} {} area {:.2} mm²", edges[e].length().unwrap_or(0.0) * 1e3, kind(&faces[o]), faces[o].area().unwrap_or(0.0) * 1e6);
+                }
+            }
+        }
+    }
     let shapes: Vec<Shape> = picked.iter().map(|&i| faces[i].clone()).collect();
     for _ in 0..2 {
         let t = std::time::Instant::now();
@@ -1258,5 +1271,20 @@ fn step_part_cylinders_probe() {
         }
         let near: Vec<String> = p.shape.adjacent_faces(i).unwrap().iter().map(|&j| format!("{j}:{:?}", faces[j].face_surface().map(|s| format!("{s:?}").chars().take(60).collect::<String>()))).collect();
         println!("face {i}: r {radius:.6} origin {origin:.6} axis {axis:.6} area {area:.6} uv {:?}\n  near {near:?}", f.uv_bounds());
+    }
+}
+
+/// Probe: a shape's faces on surfaces of linear extrusion (NOSHAPE_PROBE_SHAPE, a .brep): direction, (u, v) bounds and
+/// the corners' points, to see whether two of them lie on one surface.
+#[test]
+#[ignore = "T2: probe"]
+fn extrusion_faces_probe() {
+    let Ok(path) = std::env::var("NOSHAPE_PROBE_SHAPE") else { return };
+    let s = read_brep(std::path::Path::new(&path)).unwrap();
+    for (i, f) in s.faces().iter().enumerate() {
+        let Ok(Surface::Extrusion { direction }) = f.face_surface() else { continue };
+        let b = f.uv_bounds().unwrap();
+        let corners: Vec<DVec3> = [(b[0], b[2]), (b[1], b[2]), (b[0], b[3]), (b[1], b[3])].iter().map(|&(u, v)| f.point_at_uv(u, v).unwrap()).collect();
+        println!("face {i}: dir {direction:.6} uv {b:.6?} area {:.4}\n  corners {corners:.4?}\n  normal mid {:.4}", f.area().unwrap(), f.normal_at_uv((b[0] + b[1]) / 2.0, (b[2] + b[3]) / 2.0).unwrap());
     }
 }

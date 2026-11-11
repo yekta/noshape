@@ -43,6 +43,24 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-11 17:19 UTC: knife Mirror 1, std's Sweep, the impeller's speed blocked.**
+- Knife Mirror 1 (lead 16:58, 23 faces, live 22): the edge strip and its mirror image are two surfaces of linear
+  extrusion, one curve in the mirror plane extruded both ways: one surface, but OCCT's unify can't tell.
+  `share_mirrored_extrusions` (before share_equal_surfaces in unify) rebuilds the second on the first's surface
+  ((u, v) -> (u, k v + c), checked at samples; k = -1 turns its wire and side over). Blend's probe (Chamfer 1 as
+  blend builds it, mirrored, fused): 22 faces; main's Chamfer 1 still differs (19/51/33, live 19/50/32), so the suite
+  stops before Mirror 1 until blend's chamfer lands. T1 kernel `boolean_groups::a_curved_side_and_its_mirror_image_
+  unify_into_one_face`; probe `features::extrusion_faces_probe`.
+- std_oracle sweep (lead 17:05): our host opSweep made transformed corners (2880 mm³ along a polyline) and ignored
+  keepProfileOrientation / lockDirection; now as the Sweep feature (mitred, Fixed / Binormal frame): 3600, the
+  oracle green. Live asked to confirm the mitred volume (REQUESTS core 17:11).
+- Impeller Delete face 2 / Move face 1 speed: our model isn't live's there. Boolean Flansch+Gehäuse (feature 15) 15
+  faces / 41 edges, live 19 / 56 (inputs equal but the Shell's 7 mm³); after Extrude 6 Part 1 33 faces (live 59),
+  Part 2 4 (live 21). Our Move face 1 lands on Part 1 and, with Reapply fillet, deletes and re-rolls a 7414 mm²
+  cylinder tangent to the shell's offset walls; both features are OCCT's Defeaturing (MakerVolume intersections with
+  the offset faces), 1.7-2.0 s. Parallel: 2.8 -> 2.4 s; offset faces as B-splines: 29 s, invalid. Asked the lead who
+  takes Boolean Flansch+Gehäuse.
+
 **State 11-11 14:37 UTC: model-suite failures by features lost (lead 13:40); the PEM FH4 studs' import.**
 - Ranked (suite-unify, 821/947): impeller Shell Gehäuse 37 (bool's), knife Chamfer 1 37 (blend's), rings-loft
   Circular pattern 1 20 (blend's Chamfer 1 gap), fan-blade Sweep 1 11, c2-gamma-imported / c2-wire-clip-imported
