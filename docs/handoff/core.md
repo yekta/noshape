@@ -1993,6 +1993,15 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From dx (11-11 08:52 UTC, lead's speed list): cf-part-draft's Part Draft 2 (364 ms, live 39) is OCCT's Defeaturing
+The custom feature is one opDraft (std draft.fs), which runs your `draft_faces` -> `draft_reblend`: the fillets taken
+off with BRepAlgoAPI_Defeaturing, the faces drafted, the fillets rolled again. NOSHAPE_KERNEL_PROFILE (vibe4, debug,
+loaded): op_defeature 543 ms in 2 calls of the feature's ~0.9 s, op_fillet 140 ms, op_boolean 59, op_split 30. The
+FeatureScript around it costs nothing (opDraft 794 of 922 ms). (The parity harness's own part dump adds ~1100
+props_surface calls to that feature's kernel profile window: not the feature's.)
+cf-lighten's Lighten 1 (434 / 87) is spread over ops: opShell 185 ms (5 shells, bool's builder), opOffsetFace 76,
+opBoolean 62, opEnclose 43, evEdgeConvexity 42 (mine: I'm taking it), evCollisionDetection 20, opModifyFillet 19.
+
 ## From dx (11-11 00:04 UTC): Boolean Union with ☑ Keep tools makes a new part and keeps the tools (ours merges into the first)
 
 **Done by dx (06:09 UTC):** Union with ☑ Keep tools makes the union a new part (the next Part N, its own colour) and puts the tools back as they were, as Intersect's does (basic.rs; engine test union_keep_tools_makes_a_new_part). Live's lines confirm it in asm-pattern-std too (two studios: the union appended as a new part). asm-pattern-std 130 -> 159/162 occurrences, 24 -> 35/35 mates; the hand drill's Gear 5 Connector built (39/41, 21/67 mates).
