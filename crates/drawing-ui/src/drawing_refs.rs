@@ -25,6 +25,8 @@ pub enum RefTarget {
     Version(PinnedVersion),
     /// Another document at a microversion.
     External(noshape_store::MicroversionId),
+    /// This document's first state (Change to version…'s Start, live doc-tab-menu-change-to-version).
+    Start(noshape_store::MicroversionId),
 }
 
 /// A referenced document with newer versions.
@@ -41,12 +43,17 @@ pub struct RefDoc {
     /// The choice Update all takes (the latest version).
     pub latest: usize,
     pub thumbnail: Option<std::sync::Arc<RenderImage>>,
+    /// A newer version is there (the "Newer versions available for n documents" count): not this document's own row
+    /// that Change to version… lists anyway.
+    pub newer: bool,
 }
 
 /// Reference manager state: tab (0 Update to latest, 1 Selective update),
 /// the documents, ticked rows and per-row chosen versions.
 pub struct RefManager {
     pub tab: u8,
+    /// Opened by the tab's Change to version…: this document's row stays listed.
+    pub change_to_version: bool,
     pub docs: Vec<RefDoc>,
     pub checked: HashSet<usize>,
     pub chosen: HashMap<usize, usize>,
@@ -108,14 +115,23 @@ impl DrawingEditor {
     }
 
     pub fn open_ref_manager(&mut self, cx: &mut Context<Self>) {
-        let docs = self.referenced_docs(cx);
-        self.ref_manager = Some(RefManager { tab: 0, docs, checked: HashSet::new(), chosen: HashMap::new() });
+        let docs = self.referenced_docs(false, cx);
+        self.ref_manager = Some(RefManager { tab: 0, change_to_version: false, docs, checked: HashSet::new(), chosen: HashMap::new() });
+        cx.notify();
+    }
+
+    /// The tab's Change to version… (live doc-tab-menu-change-to-version): on Selective update, this document's row
+    /// listed whether or not a newer version is there ("Main ⇨ Start" with no versions).
+    pub fn open_change_to_version(&mut self, cx: &mut Context<Self>) {
+        let docs = self.referenced_docs(true, cx);
+        let tab = u8::from(docs.iter().all(|d| !d.newer));
+        self.ref_manager = Some(RefManager { tab, change_to_version: true, docs, checked: HashSet::new(), chosen: HashMap::new() });
         cx.notify();
     }
 
     /// The referenced documents that have newer versions than their views
     /// show (live: a workspace reference counts while a version exists).
-    fn referenced_docs(&self, cx: &App) -> Vec<RefDoc> {
+    fn referenced_docs(&self, change_to_version: bool, cx: &App) -> Vec<RefDoc> {
         let dm = self.doc.read(cx);
         let bases: Vec<Option<PinnedVersion>> = self.drawing.sheets.iter().flat_map(|s| &s.views).filter(|v| matches!(v.kind, ViewKind::Base { .. })).map(|v| v.pinned.clone()).collect();
         let mut out = Vec::new();
@@ -123,15 +139,19 @@ impl DrawingEditor {
         let own: Vec<&Option<PinnedVersion>> = bases.iter().filter(|p| other_path(p.as_ref()).is_none()).collect();
         if let Some(first) = own.first() {
             let versions = dm.session.store.list_versions().unwrap_or_default();
-            if let Some(newest) = versions.last() {
+            let behind = versions.last().is_some_and(|newest| own.iter().any(|p| p.as_ref().is_none_or(|p| p.id != newest.id.to_string())));
+            if behind || change_to_version {
                 let branch = dm.session.store.branch(dm.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into());
                 let current = first.as_ref().map_or(branch.clone(), |p| p.name.clone());
-                let behind = own.iter().any(|p| p.as_ref().is_none_or(|p| p.id != newest.id.to_string()));
-                if behind {
-                    let mut choices = vec![(branch, RefTarget::Main)];
-                    choices.extend(versions.iter().rev().map(|v| (v.name.clone(), RefTarget::Version(PinnedVersion { locked: false, id: v.id.to_string(), name: v.name.clone() }))));
+                let mut choices = vec![(branch, RefTarget::Main)];
+                choices.extend(versions.iter().rev().map(|v| (v.name.clone(), RefTarget::Version(PinnedVersion { locked: false, id: v.id.to_string(), name: v.name.clone() }))));
+                // Change to version… offers the document's Start too (as the assembly's, live asm-menu-change-to-version).
+                if change_to_version && let Some(root) = dm.session.store.graph().ok().and_then(|g| g.microversions.iter().find(|m| m.parents.is_empty()).map(|m| m.id)) {
+                    choices.push(("Start".into(), RefTarget::Start(root)));
+                }
+                if choices.len() > 1 {
                     let thumbnail = dm.session.store.get_meta("thumbnail").ok().flatten().as_deref().and_then(crate::library::decode_thumbnail);
-                    out.push(RefDoc { name: dm.name(), path: None, current, choices, latest: 1, thumbnail });
+                    out.push(RefDoc { name: dm.name(), path: None, current, choices, latest: 1, thumbnail, newer: behind });
                 }
             }
         }
@@ -152,7 +172,7 @@ impl DrawingEditor {
             }
             let current = choices.iter().find(|(_, t)| *t == RefTarget::External(r.microversion)).map(|(l, _)| l.clone()).unwrap_or_else(|| format!("state {}", r.microversion.short()));
             let thumbnail = crate::start_library::file_thumbnail(&r.path);
-            out.push(RefDoc { name: info.name, path: Some(r.path), current, choices, latest: 0, thumbnail });
+            out.push(RefDoc { name: info.name, path: Some(r.path), current, choices, latest: 0, thumbnail, newer: true });
         }
         out
     }
@@ -161,11 +181,18 @@ impl DrawingEditor {
     fn update_reference(&mut self, d: &RefDoc, target: &RefTarget, label: &str, cx: &mut Context<Self>) {
         let (path, name) = (d.path.clone(), d.name.clone());
         let target = target.clone();
+        let own = self.doc.read(cx).session.path.clone();
         self.edit(&format!("Change to version : {label}"), cx, |dr| {
             for v in dr.sheets.iter_mut().flat_map(|s| s.views.iter_mut()).filter(|v| matches!(v.kind, ViewKind::Base { .. })) {
                 match (&path, &target) {
                     (None, RefTarget::Main) if other_path(v.pinned.as_ref()).is_none() => v.pinned = None,
                     (None, RefTarget::Version(pin)) if other_path(v.pinned.as_ref()).is_none() => v.pinned = Some(pin.clone()),
+                    // This document's Start: its state there, by reference.
+                    (None, RefTarget::Start(mv)) if other_path(v.pinned.as_ref()).is_none() => {
+                        if let ViewKind::Base { source, .. } = &v.kind {
+                            v.pinned = Some(PinnedVersion { locked: false, id: crate::derived::ExternalRef { path: own.clone(), microversion: *mv, tab: source.to_string() }.key(), name: "Start".into() });
+                        }
+                    }
                     (Some(path), RefTarget::External(mv)) => {
                         if let Some(r) = v.pinned.as_ref().filter(|p| !p.locked).and_then(|p| crate::derived::ExternalRef::parse(&p.id)).filter(|r| r.path == *path) {
                             v.pinned = Some(PinnedVersion { locked: false, id: crate::derived::ExternalRef { microversion: *mv, ..r }.key(), name: format!("{name} {label}") });
@@ -205,8 +232,8 @@ impl DrawingEditor {
             }
         }
         self.ensure_sources(false, cx);
-        let docs = self.referenced_docs(cx);
-        self.ref_manager = Some(RefManager { tab: m.tab, docs, checked: HashSet::new(), chosen: HashMap::new() });
+        let docs = self.referenced_docs(m.change_to_version, cx);
+        self.ref_manager = Some(RefManager { tab: m.tab, change_to_version: m.change_to_version, docs, checked: HashSet::new(), chosen: HashMap::new() });
         cx.notify();
     }
 
@@ -231,7 +258,7 @@ impl DrawingEditor {
                 .when(!on, |d| d.text_color(ink))
                 .child(label)
         };
-        let n = m.docs.len();
+        let n = m.docs.iter().filter(|d| d.newer).count();
         let mut list = v_flex().flex_1().min_h_0();
         for (i, d) in m.docs.iter().enumerate() {
             let chosen = m.chosen.get(&i).copied().unwrap_or(d.latest);
@@ -308,13 +335,17 @@ impl DrawingEditor {
         let enabled = n > 0 && (tab == 0 || !m.checked.is_empty());
         let info = format!("Newer versions available for {n} document{}", if n == 1 { "" } else { "s" });
         // Its texts for the ui-parity runner (live 2303: a flyout of the drawing).
-        let mut text: Vec<String> = vec!["Reference manager".into(), "Update to latest".into(), "Selective update".into(), info.clone()];
+        // (As live's reader reads it since 11-10: a panel of texts, a selective row's box first.)
+        let mut text: Vec<String> = vec!["Update to latest".into(), "Selective update".into(), info.clone()];
         for (i, d) in m.docs.iter().enumerate() {
             let to = d.choices.get(m.chosen.get(&i).copied().unwrap_or(d.latest)).map(|c| c.0.clone()).unwrap_or_default();
-            text.extend([d.name.clone(), format!("{} ⇨ {to}", d.current)]);
+            if tab == 1 {
+                text.push(if m.checked.contains(&i) { "[x] ".into() } else { "[ ] ".into() });
+            }
+            text.extend([d.name.clone(), d.current.clone(), "⇨".into(), to]);
         }
         text.push(if tab == 0 { "Update all".into() } else { "Update selected".into() });
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Reference manager", "text": text }));
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "panel", "title": "Reference manager", "text": text }));
         Some(
             v_flex()
                 .id("dr-ref-manager")

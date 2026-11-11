@@ -532,7 +532,7 @@ def runner_names(state, start, live_side):
     if not (isinstance(d, dict) and d.get("kind") == "panel" and isinstance(d.get("text"), list) and start):
         return state
     def name(t):
-        if live_side and isinstance(t, str) and re.fullmatch(r"noshape ui parity live2-\d+[a-z]?", t):
+        if live_side and isinstance(t, str) and re.fullmatch(r"noshape ui parity( live2-\d+[a-z]?)?", t):
             return "<document>"
         if live_side and t == f"start {start}":
             return "Part Studio 1"

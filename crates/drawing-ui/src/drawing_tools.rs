@@ -108,6 +108,11 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
+        // The Reference manager (live doc-tab-menu-change-to-version: Escape closes it).
+        if self.ref_manager.take().is_some() {
+            cx.notify();
+            return;
+        }
         if matches!(self.panel, Some(Panel::SheetName { .. } | Panel::Rotation { .. })) {
             self.panel = None;
             cx.notify();

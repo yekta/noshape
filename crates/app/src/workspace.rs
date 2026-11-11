@@ -1227,7 +1227,7 @@ impl Workspace {
     fn change_drawing_version(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
         self.activate(tab, window, cx);
         let Some(TabView::Drawing(v)) = self.views.get(&tab) else { return };
-        v.update(cx, |v, cx| v.open_ref_manager(cx));
+        v.update(cx, |v, cx| v.open_change_to_version(cx));
     }
 
     /// Tab › Export…: Onshape's Export modal (live, drawing/40 layout): File
