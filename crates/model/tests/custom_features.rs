@@ -3931,6 +3931,116 @@ export const tiltedBlock = defineFeature(function(context is Context, id is Id, 
     }
 }
 
+/// Live 2336 / 2393: opChamfer's distance and angle (2 mm at 30°) lies on the face all the edges share, else on each
+/// edge's face left of its direction (a block's top front edge: the top; a cylinder's top rim: the cap, its bottom rim:
+/// the cylinder); Opposite direction swaps. The cap's area after it (mm²): r 18 is 1,017.876, r 18.8453 1,115.7219.
+#[test]
+fn op_chamfer_distance_lies_on_the_shared_or_left_face_as_live() {
+    let cuboid = "fCuboid(context, id + \"c\", { \"corner1\" : vector(0, 0, 0) * millimeter, \"corner2\" : vector(40, 20, 10) * millimeter });";
+    let cylinder = "fCylinder(context, id + \"c\", { \"bottomCenter\" : vector(0, 0, 0) * millimeter, \"topCenter\" : vector(0, 0, 10) * millimeter, \"radius\" : 20 * millimeter });";
+    let edge = |at: &str| format!("qContainsPoint(qCreatedBy(id + \"c\", EntityType.EDGE), {at} * millimeter)");
+    let both = format!("qUnion([{}, {}])", edge("vector(20, 0, 10)"), edge("vector(20, 0, 0)"));
+    let cases: [(&str, String, &str, [f64; 2]); 4] = [
+        (cuboid, edge("vector(20, 0, 10)"), "vector(20, 15, 10)", [720.0, 753.812]),
+        (cylinder, edge("vector(20, 0, 10)"), "vector(0, 0, 10)", [1017.876, 1115.7219]),
+        (cylinder, edge("vector(20, 0, 0)"), "vector(0, 0, 0)", [1115.7219, 1017.876]),
+        (cylinder, both, "vector(0, 0, 10)", [1115.7219, 1017.876]),
+    ];
+    for (shape, entities, cap_at, want) in cases {
+        for (opposite, area) in [(false, want[0]), (true, want[1])] {
+            let src = format!(
+                r#"FeatureScript 336;
+import(path : "onshape/std/geometry.fs", version : "336.0");
+annotation {{ "Feature Type Name" : "Chamfer probe" }}
+export const chamferProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {{}}
+    {{
+        {shape}
+        opChamfer(context, id + "ch", {{ "entities" : {entities}, "chamferType" : ChamferType.OFFSET_ANGLE, "width" : 2 * millimeter, "angle" : 30 * degree, "oppositeDirection" : {opposite}, "tangentPropagation" : false }});
+        println(evArea(context, {{ "entities" : qContainsPoint(qCreatedBy(id + "c", EntityType.FACE), {cap_at} * millimeter) }}) / millimeter ^ 2);
+    }});
+"#
+            );
+            let fx = Fixture::new(&src);
+            let mut ps = PartStudio::new();
+            let f = ps.new_feature(&fx.ty("chamferProbe"), &fx.units).unwrap();
+            let fid = f.id;
+            ps.features.push(f);
+            assert_ok(&fx.regen(&mut Regenerator::new(), &ps));
+            let got: f64 = custom::run::output_of(fid).unwrap().output.trim().parse().unwrap();
+            assert!((got - area).abs() < 1e-3, "{entities} opposite {opposite}: cap {got} mm², live {area}");
+        }
+    }
+}
+
+/// A probe feature (FeatureScript 3112: ChamferMethod is 2985's) running `body`, its printed number.
+fn fs_probe_number(body: &str) -> f64 {
+    let src = format!(
+        r#"FeatureScript 3112;
+import(path : "onshape/std/geometry.fs", version : "3112.0");
+annotation {{ "Feature Type Name" : "Chamfer probe" }}
+export const chamferProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {{}}
+    {{
+        {body}
+    }});
+"#
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("chamferProbe"), &fx.units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    let Some(out) = custom::run::output_of(fid) else {
+        let notices: Vec<String> = custom::run::outputs().values().flat_map(|o| o.notices.iter().map(|n| format!("{} {}: {}", n.module, n.pos, n.message))).collect();
+        panic!("no output: {:?}; notices {notices:?}", r.display.features.iter().map(|f| (&f.status, &f.message)).collect::<Vec<_>>());
+    };
+    out.output.trim().parse().unwrap()
+}
+
+/// opChamfer's other options as the Chamfer feature's (CHAMFER-FS-OPCHAMFER): a direction override flips its edge's
+/// side (the block's top front edge: the 2 mm on the front, top 753.812 mm²); tangent propagation chamfers the chain
+/// round a rounded corner, without it the chamfer stops at its edge (running straight on, live G7); Tangent measurement
+/// on a shaft's flat-to-round edge (equal 2 mm: live's Chamfer feature 5,353.017918 / 5,355.154098 mm³ by method).
+#[test]
+fn op_chamfer_takes_overrides_propagation_and_method_as_the_feature() {
+    let cuboid = r#"fCuboid(context, id + "c", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(40, 20, 10) * millimeter });"#;
+    let edge = |at: &str| format!(r#"qContainsPoint(qCreatedBy(id + "c", EntityType.EDGE), {at} * millimeter)"#);
+    let top = fs_probe_number(&format!(
+        r#"{cuboid}
+        opChamfer(context, id + "ch", {{ "entities" : {e}, "directionOverrides" : {e}, "chamferType" : ChamferType.OFFSET_ANGLE, "width" : 2 * millimeter, "angle" : 30 * degree, "tangentPropagation" : false }});
+        println(evArea(context, {{ "entities" : qContainsPoint(qCreatedBy(id + "c", EntityType.FACE), vector(20, 15, 10) * millimeter) }}) / millimeter ^ 2);"#,
+        e = edge("vector(20, 0, 10)")
+    ));
+    assert!((top - 753.812).abs() < 1e-3, "override: top {top} mm² (live 753.812 with Opposite)");
+    let chamfered = |entities: String, propagate: bool| {
+        fs_probe_number(&format!(
+            r#"{cuboid}
+        opFillet(context, id + "f", {{ "entities" : {corner}, "radius" : 5 * millimeter }});
+        opChamfer(context, id + "ch", {{ "entities" : {entities}, "chamferType" : ChamferType.EQUAL_OFFSETS, "width" : 1 * millimeter, "tangentPropagation" : {propagate} }});
+        println(evVolume(context, {{ "entities" : qCreatedBy(id + "c", EntityType.BODY) }}) / millimeter ^ 3);"#,
+            corner = edge("vector(40, 0, 5)")
+        ))
+    };
+    let one = chamfered(edge("vector(20, 0, 10)"), false);
+    let propagated = chamfered(edge("vector(20, 0, 10)"), true);
+    // (With propagation the chamfer takes the chain round the corner; without, it stops at the edge and runs straight
+    // on into the arc: less removed.)
+    assert!(propagated < one - 1.0, "one edge {one} mm³, propagated {propagated} mm³");
+    for (method, live) in [("FACE_OFFSET", 5353.017918), ("APEX_RANGE", 5355.154098)] {
+        let got = fs_probe_number(&format!(
+            r#"fCylinder(context, id + "c", {{ "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 20) * millimeter, "radius" : 10 * millimeter }});
+        fCuboid(context, id + "x", {{ "corner1" : vector(6, -20, -1) * millimeter, "corner2" : vector(20, 20, 21) * millimeter }});
+        opBoolean(context, id + "b", {{ "tools" : qCreatedBy(id + "x", EntityType.BODY), "targets" : qCreatedBy(id + "c", EntityType.BODY), "operationType" : BooleanOperationType.SUBTRACTION }});
+        opChamfer(context, id + "ch", {{ "entities" : qContainsPoint(qOwnedByBody(qCreatedBy(id + "c", EntityType.BODY), EntityType.EDGE), vector(6, 8, 10) * millimeter), "chamferType" : ChamferType.EQUAL_OFFSETS, "width" : 2 * millimeter, "chamferMethod" : ChamferMethod.{method}, "tangentPropagation" : false }});
+        println(evVolume(context, {{ "entities" : qCreatedBy(id + "c", EntityType.BODY) }}) / millimeter ^ 3);"#
+        ));
+        assert!((got - live).abs() < 1e-3, "{method}: {got} mm³ (live {live})");
+    }
+}
+
 /// evAxis of a cylinder face (live 1992): along its axis through the middle of the face's extent as it is now, not
 /// its surface's frame origin: the Ø20 × 20 mm cylinder's side 10 mm up, 9 after a 2 mm chamfer on its top edge
 /// (cf-o-ring-generator's O Ring 5 reads it after Chamfer 1).

@@ -862,7 +862,11 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
     } else {
         k::ChamferSpec::Equal(def_length(i, &def, "radius")?)
     };
+    // Tangent (apex) measurement, the sides flipped edge by edge.
+    let apex = chamfer && def_enum(&def, "chamferMethod").is_some_and(|m| &*m == "APEX_RANGE");
+    let override_refs = if chamfer { evaluate_refs(i, &cx, def.get("directionOverrides"))? } else { Vec::new() };
     run_op(i, &cx, &id, if chamfer { "CHAMFER_FAILED" } else { "FILLET_FAILED" }, |ev| {
+        let overrides = ev.resolve_edges(&override_refs);
         let groups = by_body(ev.resolve_edges(&refs));
         if groups.is_empty() {
             return Err(super::code_error(if chamfer { "CHAMFER_SELECT_EDGES" } else { "FILLET_SELECT_EDGES" }));
@@ -870,11 +874,53 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
         let blend_role = |n: &Name| Role::Blend(n.clone());
         for (bi, edges) in groups.into_iter().rev() {
             let body = ev.ctx.bodies[bi].clone();
+            let propagate = def_bool(&def, "tangentPropagation", false);
+            // Without propagation a chamfer stops at the selection and runs straight on into a tangent neighbour (live
+            // G7), as the Chamfer feature's: OCCT's would run on along it.
+            let stops = chamfer && !propagate && crate::regen::features::detail::propagate_tangent(&body.shape, &edges).len() > edges.len();
+            let edges = if chamfer && propagate { crate::regen::features::detail::propagate_tangent(&body.shape, &edges) } else { edges };
             let shapes: Vec<Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
+            let flipped: HashSet<usize> = overrides.iter().filter(|(b, _)| *b == bi).map(|&(_, e)| e).collect();
+            let (mut spec, mut reference) = (spec, Vec::new());
+            if (chamfer && !matches!(spec, k::ChamferSpec::Equal(_))) || apex {
+                reference = distance_faces(&body.shape, &edges, def_bool(&def, "oppositeDirection", false), &flipped).map_err(|e| fe(e.to_string()))?;
+            }
+            // Onshape's sides where OCCT reads them otherwise (a face curved across the edge): two distances.
+            use crate::regen::features::blend_section::ChamferSides;
+            let sides = match (apex, spec) {
+                (true, k::ChamferSpec::Equal(d)) => Some(ChamferSides::Tangent(d, d)),
+                (true, k::ChamferSpec::TwoDistances(a, b)) => Some(ChamferSides::Tangent(a, b)),
+                (true, k::ChamferSpec::DistanceAngle(d, angle)) => Some(ChamferSides::TangentAngle(d, angle)),
+                (false, k::ChamferSpec::DistanceAngle(d, angle)) if chamfer => Some(ChamferSides::OffsetAngle(d, angle)),
+                _ => None,
+            };
+            if let Some(sides) = sides
+                && let Some(two) = crate::regen::features::detail::sides_as_offsets(&body.shape, &edges, &reference, sides)?
+            {
+                spec = two;
+            } else if matches!(spec, k::ChamferSpec::Equal(_)) {
+                reference.clear();
+            }
+            let distances = match spec {
+                _ if !stops => None,
+                k::ChamferSpec::Equal(d) => Some((d, d)),
+                k::ChamferSpec::TwoDistances(a, b) if edges.len() == 1 => {
+                    let first = body.shape.edge_faces().map_err(|e| fe(e.to_string()))?.get(edges[0]).and_then(|f| f.first().copied()).map(|f| body.shape.sub_shape(ShapeType::Face, f as usize)).transpose().map_err(|e| fe(e.to_string()))?;
+                    let on_first = first.is_some_and(|f| reference.first().is_some_and(|r| r.is_same(&f)));
+                    Some(if on_first { (a, b) } else { (b, a) })
+                }
+                _ => None,
+            };
+            if let Some((r1, r2)) = distances {
+                use crate::regen::features::blend_section::{BlendSpec, Section, section_blend};
+                let spec = BlendSpec { section: Section::Chamfer, r1, r2, width: None, partial: None, run_on: true, cliff: false, sides: None, overflow: false, reference: None };
+                section_blend(ev, bi, &edges, &spec)?;
+                continue;
+            }
             let res = match (chamfer, spec) {
                 // The same blends as the Fillet and Chamfer features (with their fallbacks).
                 (false, k::ChamferSpec::Equal(r)) => k::fillet_checked(&body.shape, &shapes, &[r]),
-                (_, s) => k::chamfer_checked(&body.shape, &shapes, s, &[]),
+                (_, s) => k::chamfer_checked(&body.shape, &shapes, s, &reference),
             }
             .map_err(|e| fe(e.to_string()))?;
             let names = body.shape_names();
@@ -884,6 +930,59 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
         Ok(())
     })?;
     Ok(Value::Undefined)
+}
+
+/// The face each edge's distance lies on for opChamfer's distance and angle (live 2336 / 2393): the face all the edges
+/// share (a blank's two rims: its cylinder), else each edge's face on the left of its curve's direction (a cylinder's
+/// top rim: its cap, its bottom rim: the cylinder); Opposite direction the other face, and so a direction override for
+/// its chain. Empty where an edge doesn't have two faces (OCCT's choice then).
+fn distance_faces(shape: &Shape, edges: &[usize], opposite: bool, flipped: &HashSet<usize>) -> Result<Vec<Shape>, k::KernelError> {
+    let ef = shape.edge_faces()?;
+    let faces = shape.faces();
+    let Some(pairs) = edges.iter().map(|&e| ef.get(e).and_then(|f| <[u32; 2]>::try_from(f.as_slice()).ok())).collect::<Option<Vec<_>>>() else { return Ok(Vec::new()) };
+    let shared: Vec<u32> = pairs[0].iter().copied().filter(|f| pairs.iter().all(|p| p.contains(f))).collect();
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    // A direction override flips its chain (the edges joined to it through shared vertices), as the Chamfer feature's.
+    let ends: Vec<[DVec3; 2]> = edges.iter().map(|&e| shape.sub_shape(ShapeType::Edge, e).and_then(|s| s.edge_info()).map(|i| [i.start, i.end])).collect::<Result<_, _>>()?;
+    let mut flip = vec![false; edges.len()];
+    for i in (0..edges.len()).filter(|&i| flipped.contains(&edges[i])) {
+        let mut chain = vec![i];
+        let mut seen = vec![false; edges.len()];
+        seen[i] = true;
+        while let Some(a) = chain.pop() {
+            flip[a] = !flip[a];
+            for b in 0..edges.len() {
+                if !seen[b] && ends[a].iter().any(|p| ends[b].iter().any(|q| p.distance(*q) < scale * 1e-9)) {
+                    seen[b] = true;
+                    chain.push(b);
+                }
+            }
+        }
+    }
+    let mut out = Vec::with_capacity(edges.len());
+    for ((&e, pair), flip) in edges.iter().zip(&pairs).zip(flip) {
+        let pick = match shared.as_slice() {
+            [f] if edges.len() > 1 => *f,
+            _ => {
+                let edge = shape.sub_shape(ShapeType::Edge, e)?;
+                let info = edge.edge_info()?;
+                let t = 0.5 * (info.first_param + info.last_param);
+                let (p, along) = (edge.point_at(t)?, edge.tangent_at(t)?.normalize());
+                // (The face the step `n × t` from the edge stays on is on its left.)
+                let left = pair.iter().copied().find(|&f| {
+                    let face = &faces[f as usize];
+                    face.normal_at_point(p).is_ok_and(|n| face.contains_point(p + n.normalize().cross(along) * (scale * 1e-4), scale * 1e-7).unwrap_or(false))
+                });
+                match left {
+                    Some(f) => f,
+                    None => return Ok(Vec::new()),
+                }
+            }
+        };
+        let face = if opposite != flip { if pick == pair[0] { pair[1] } else { pair[0] } } else { pick };
+        out.push(faces[face as usize].clone());
+    }
+    Ok(out)
 }
 
 fn op_chamfer(i: &mut Interp, a: Vec<Value>) -> R<Value> {

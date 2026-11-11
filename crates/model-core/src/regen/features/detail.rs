@@ -912,16 +912,23 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
 /// the same along them and all come to the same distances. None where OCCT reads it as Onshape does, or can't be told.
 fn two_offsets(ev: &EvalCtx, body: &crate::regen::context::Body, edges: &[usize], sides: super::blend_section::ChamferSides, flipped: &BTreeSet<usize>) -> FResult<Option<(k::ChamferSpec, Vec<k::Shape>)>> {
     let reference = distance_one_faces(ev, body, edges, flipped, ev.bool("oppositeDirection"))?;
+    Ok(sides_as_offsets(&body.shape, edges, &reference, sides)?.map(|spec| (spec, reference)))
+}
+
+/// A chamfer's sides as Onshape measures them (see `blend_section::ChamferSides`) read as two distances on `reference`
+/// (each edge's Distance 1 face) and the other face, where its edges' sections are the same along them and all come to
+/// the same distances. None where OCCT reads it as Onshape does, or can't be told.
+pub fn sides_as_offsets(shape: &k::Shape, edges: &[usize], reference: &[k::Shape], sides: super::blend_section::ChamferSides) -> FResult<Option<k::ChamferSpec>> {
     if reference.len() != edges.len() {
         return Ok(None);
     }
-    let adjacency = body.shape.edge_faces()?;
+    let adjacency = shape.edge_faces()?;
     let mut offsets: Option<[f64; 2]> = None;
-    for (&e, r) in edges.iter().zip(&reference) {
+    for (&e, r) in edges.iter().zip(reference) {
         let Some(&[a, b]) = adjacency.get(e).map(|f| f.as_slice()) else { return Ok(None) };
-        let (fa, fb) = (body.shape.sub_shape(ShapeType::Face, a as usize)?, body.shape.sub_shape(ShapeType::Face, b as usize)?);
+        let (fa, fb) = (shape.sub_shape(ShapeType::Face, a as usize)?, shape.sub_shape(ShapeType::Face, b as usize)?);
         let other = if fa.is_same(r) { fb } else { fa };
-        let d = match super::blend_section::chamfer_offsets(&body.shape, e, [r, &other], sides)? {
+        let d = match super::blend_section::chamfer_offsets(shape, e, [r, &other], sides)? {
             Some(Some(d)) => d,
             // OCCT reads it as Onshape does (a mix of edges: OCCT's reading for now).
             _ => return Ok(None),
@@ -931,7 +938,7 @@ fn two_offsets(ev: &EvalCtx, body: &crate::regen::context::Body, edges: &[usize]
         }
         offsets = Some(d);
     }
-    Ok(offsets.map(|[d0, d1]| (k::ChamferSpec::TwoDistances(d0, d1), reference)))
+    Ok(offsets.map(|[d0, d1]| k::ChamferSpec::TwoDistances(d0, d1)))
 }
 
 /// Onshape's entity order of faces (its deterministic ids, live G37): faces of
