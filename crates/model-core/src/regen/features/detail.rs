@@ -1232,9 +1232,10 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
             }
             let r = w * 0.5;
             let faces: Vec<Shape> = center.iter().map(|c| face(c.1)).collect::<Result<_, _>>()?;
-            let Some(tool) = coaxial_round_tool(&faces, k::Plane::new(origin, axis.normalize(), x_dir), radius, [p1, p2], r) else { return err(UNSUPPORTED) };
-            // (Its sides and core on the ring's own planes and cylinder: OCCT's cut glued, 64 -> 32 ms.)
-            return finish_full_round(ev, bi, &body, center[0].1, tool, true);
+            let Some((tool, bore)) = coaxial_round_tool(&faces, k::Plane::new(origin, axis.normalize(), x_dir), radius, [p1, p2], r) else { return err(UNSUPPORTED) };
+            // (A bore's: its sides and core on the plate's own planes and cylinder, OCCT's cut glued, 64 -> 32 ms. A
+            // boss's glued comes out with its outer half torus one face, not OCCT's two: kept as it was.)
+            return finish_full_round(ev, bi, &body, center[0].1, tool, bore);
         }
         _ => {
             // Planar sides and center along one direction (a rib, drafted or not): every section the circle tangent to
@@ -1392,7 +1393,7 @@ fn tapered_round_tool(center: &[Shape], planes: [(DVec3, DVec3); 3]) -> Option<S
 /// The tool a full round of a whole cylinder (`faces`, on `cyl`'s axis, radius `rc`) between two planes through
 /// `sides` takes off: the ring from the cylinder to the torus' core circle, less the torus of radius `r`; outside the
 /// cylinder for a bore, inside for a boss. `None` where the faces don't go all the way round or the boss is too thin.
-fn coaxial_round_tool(faces: &[Shape], cyl: k::Plane, rc: f64, sides: [DVec3; 2], r: f64) -> Option<Shape> {
+fn coaxial_round_tool(faces: &[Shape], cyl: k::Plane, rc: f64, sides: [DVec3; 2], r: f64) -> Option<(Shape, bool)> {
     let turn: f64 = faces.iter().map(|f| f.uv_bounds().map_or(0.0, |b| b[1] - b[0])).sum();
     if turn < std::f64::consts::TAU - 1e-6 {
         return None;
@@ -1426,7 +1427,7 @@ fn coaxial_round_tool(faces: &[Shape], cyl: k::Plane, rc: f64, sides: [DVec3; 2]
     ])
     .ok()?;
     let profile = k::make_face_from_wire(&wire, true).ok()?;
-    k::revolve(&profile, cyl.origin, cyl.normal, std::f64::consts::TAU).ok().map(|o| o.shape)
+    k::revolve(&profile, cyl.origin, cyl.normal, std::f64::consts::TAU).ok().map(|o| (o.shape, bore))
 }
 
 #[cfg(test)]
