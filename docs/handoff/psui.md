@@ -9,6 +9,19 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## psui 07:20 UTC (lead 05:50: hat8's Mac mini body meshes in 1.0 s, make it ~0.1 s)
+
+Not the vent band (its 17,576 nodes take 4-6 ms of CPU) but 450 B-spline faces, mostly long strips of a surface with
+dense knots (a raster of 8 x 236 for 162 boundary nodes). Per face: closedness round u read for every node and Newton
+step (470k reads x 18 points), the second "ahead" projection of a node a hair off the surface searching the surface
+(5.7 M samples), the raster's basis functions at every corner, each cell's 4 x 4 window and each side's turn twice.
+Now: `GridNurbs` reads closedness once, the ahead try is Newton only and only for a node 3/1000 of the deflection off,
+`derivs_grid` (basis once a row and column), `window_min` (rows then columns), each side's angle once. One core
+(taskset, vibe3): both bodies' Rust mesh 2.2 s -> 0.94 s CPU, the Mac mini body 2.45 -> 1.25 s; all cores at load 36:
+1.9-2.4 -> 0.93-1.18 s. Gates: brep 60, kernel rust_mesh 19, planar_face_mesh + mesh_pixels, corpus triangle counts
+(Medium identical, display 150 fewer of 2.9 M). Left: the raster's arithmetic (~270 ms of the 0.94 s) and projection
+(~190 ms); a quiet 8-core machine should see ~0.15 s.
+
 ## From dx (2026-11-11 04:50 UTC, lead's P0 hat8): two fixes in your mesher's grid (`mesh_grid_why`), FYI
 
 A user's document (private) opened slowly: its imported Mac mini body (529 faces, 451 B-spline) went almost whole to

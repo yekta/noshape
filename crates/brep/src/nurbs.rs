@@ -635,8 +635,32 @@ impl NurbsSurface {
     pub fn derivs(&self, u: f64, v: f64) -> [DVec3; 6] {
         let (p, q) = (self.udegree, self.vdegree);
         let (su, sv) = (span(&self.uknots, p, self.nu, u), span(&self.vknots, q, self.nv, v));
-        let bu = basis_derivs(&self.uknots, su, u, p, 2);
-        let bv = basis_derivs(&self.vknots, sv, v, q, 2);
+        self.derivs_from(su, &basis_derivs(&self.uknots, su, u, p, 2), sv, &basis_derivs(&self.vknots, sv, v, q, 2))
+    }
+
+    /// [`NurbsSurface::derivs`] at each (u, v) of a grid, row by row (`us` along each of `vs`): each column's and
+    /// row's basis functions once, not at every point.
+    pub fn derivs_grid(&self, us: &[f64], vs: &[f64]) -> Vec<[DVec3; 6]> {
+        let (p, q) = (self.udegree, self.vdegree);
+        let columns: Vec<(usize, [[f64; M]; 3])> = us
+            .iter()
+            .map(|&u| {
+                let su = span(&self.uknots, p, self.nu, u);
+                (su, basis_derivs(&self.uknots, su, u, p, 2))
+            })
+            .collect();
+        let mut out = Vec::with_capacity(us.len() * vs.len());
+        for &v in vs {
+            let sv = span(&self.vknots, q, self.nv, v);
+            let bv = basis_derivs(&self.vknots, sv, v, q, 2);
+            out.extend(columns.iter().map(|(su, bu)| self.derivs_from(*su, bu, sv, &bv)));
+        }
+        out
+    }
+
+    /// The point and derivatives from the basis functions (and their derivatives) of its knot spans.
+    fn derivs_from(&self, su: usize, bu: &[[f64; M]; 3], sv: usize, bv: &[[f64; M]; 3]) -> [DVec3; 6] {
+        let (p, q) = (self.udegree, self.vdegree);
         // Homogeneous derivatives SKL (k along u, l along v, k + l <= 2), then the quotient rule (A4.4).
         let mut aw = [[DVec3::ZERO; 3]; 3];
         let mut w = [[0.0; 3]; 3];
@@ -785,7 +809,7 @@ impl NurbsSurface {
             let step = DVec2::new((d * f - b * g) / det, (a * g - b * f) / det);
             // (Round a closed surface's period rather than stopping at its seam: a rim's nodes beside it.)
             let nu = uv.x - step.x;
-            let nu = if self.closed_in_u() && (nu < u0.min(u1) || nu > u0.max(u1)) { u0.min(u1) + (nu - u0.min(u1)).rem_euclid((u1 - u0).abs()) } else { nu.clamp(u0.min(u1), u0.max(u1)) };
+            let nu = if (nu < u0.min(u1) || nu > u0.max(u1)) && self.closed_in_u() { u0.min(u1) + (nu - u0.min(u1)).rem_euclid((u1 - u0).abs()) } else { nu.clamp(u0.min(u1), u0.max(u1)) };
             let next = DVec2::new(nu, (uv.y - step.y).clamp(v0.min(v1), v0.max(v1)));
             let moved = (next - uv).abs();
             uv = next;

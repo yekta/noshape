@@ -494,13 +494,30 @@ fn in_parallel<T: Send>(n: usize, run: usize, f: impl Fn(usize) -> T + Sync) -> 
     })
 }
 
+/// Each of `out_w` × `out_h` cells' least of `grid` (`w` × `h`, row by row) over its window of 4 × 4 (one back, two
+/// on, cut at the grid's ends): along the rows, then down the columns.
+fn window_min(grid: &[(f64, f64)], w: usize, h: usize, out_w: usize, out_h: usize) -> Vec<(f64, f64)> {
+    let least = |a: (f64, f64), b: &(f64, f64)| (a.0.min(b.0), a.1.min(b.1));
+    let window = |k: usize, n: usize| k.saturating_sub(1)..=(k + 2).min(n - 1);
+    let along: Vec<(f64, f64)> = (0..h).flat_map(|j| (0..out_w).map(move |i| grid[j * w..][window(i, w)].iter().fold((f64::MAX, f64::MAX), least))).collect();
+    let mut out = vec![(f64::MAX, f64::MAX); out_w * out_h];
+    for (j, row) in out.chunks_mut(out_w).enumerate() {
+        for jj in window(j, h) {
+            for (o, a) in row.iter_mut().zip(&along[jj * out_w..]) {
+                *o = least(*o, a);
+            }
+        }
+    }
+    out
+}
+
 /// One face, its edges' nodes from `nodes`.
 fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[Option<EdgeNodes>], defl: Deflection, nurbs: MeshNurbs, pcurves: Option<&[Vec<Option<u32>>]>) -> Option<FaceMesh> {
     match face.surface {
         MeshSurface::Nurbs { index } => {
             let s = nurbs.surfaces.get(index as usize)?;
             let pc = pcurves.map(|p| (p, nurbs.curves));
-            mesh_ruled(edges, face, s, nodes, pc).or_else(|| mesh_grid(edges, face, s, nodes, defl, pc))
+            mesh_ruled(edges, face, s, nodes, pc).or_else(|| mesh_grid(edges, face, &GridNurbs { closed: s.closed_in_u(), s }, nodes, defl, pc))
         }
         MeshSurface::Plane { origin, normal, xdir } => mesh_plane(vertices, edges, face, origin, normal, xdir, nodes),
         // A strip's rows, else (a piece bounded by other curves: a knurl's lands) a grid as a B-spline's.
@@ -602,8 +619,8 @@ fn mesh_ruled(edges: &[MeshEdge], face: &MeshFace, s: &NurbsSurface, nodes: &[Op
     }
     let (points, per_use) = loop_nodes(edges, &face.loops[0], nodes)?;
     let edge_nodes: Vec<Vec<Vec<u32>>> = vec![per_use.iter().map(|idx| idx.iter().map(|&i| i as u32).collect()).collect()];
-    let uv = uv_from_curves(face, &edge_nodes, nodes, pcurves?, s, &points)?;
-    let ((u0, u1), (v0, v1)) = GridSurface::range(s);
+    let uv = uv_from_curves(face, &edge_nodes, nodes, pcurves?, &GridNurbs { closed: s.closed_in_u(), s }, &points)?;
+    let ((u0, u1), (v0, v1)) = s.range();
     let (tu, tv) = (1e-9 * (u1 - u0).abs().max(1.0), 1e-9 * (v1 - v0).abs().max(1.0));
     // Rims by their v, each its nodes by u; the sides straight (their two ends only).
     let mut rims: Vec<(f64, Vec<usize>)> = Vec::new();
@@ -1095,6 +1112,10 @@ trait GridSurface: Sync {
     fn breaks(&self, along_u: bool) -> &[f64];
     /// [S, Su, Sv, Suu, Suv, Svv] at (u, v).
     fn derivs(&self, u: f64, v: f64) -> [DVec3; 6];
+    /// [`GridSurface::derivs`] at each (u, v) of a grid, row by row (`us` along each of `vs`).
+    fn derivs_grid(&self, us: &[f64], vs: &[f64]) -> Vec<[DVec3; 6]> {
+        vs.iter().flat_map(|&v| us.iter().map(move |&u| self.derivs(u, v))).collect()
+    }
     fn at(&self, u: f64, v: f64) -> DVec3;
     /// A node's point and first derivatives: [S, Su, Sv].
     fn d1(&self, u: f64, v: f64) -> [DVec3; 3] {
@@ -1104,6 +1125,11 @@ trait GridSurface: Sync {
     /// The parameters of a point near the surface (the nearest to `seed`'s where the surface closes) and its
     /// distance from there.
     fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64);
+    /// Only the iteration from `seed` (a second try from a node's predicted parameters: no searches of the surface
+    /// when it ends a hair off it, as an imported edge's nodes are).
+    fn param_from(&self, p: DVec3, seed: DVec2) -> (DVec2, f64) {
+        self.param_of(p, Some(seed))
+    }
     /// Whether an apex's or pole's degenerate edge runs along its u by its own parameters (a cone's, sphere's or
     /// torus's, as the bridge reads them).
     fn degenerate_edges_run_along_u(&self) -> bool {
@@ -1111,57 +1137,70 @@ trait GridSurface: Sync {
     }
 }
 
-impl GridSurface for NurbsSurface {
+/// A B-spline surface for [`mesh_grid`], whether it closes round u read once (18 points; it was read for every
+/// boundary node and Newton step: 8.5 M points for hat8's Mac mini).
+struct GridNurbs<'a> {
+    s: &'a NurbsSurface,
+    closed: bool,
+}
+
+impl GridSurface for GridNurbs<'_> {
     fn name(&self) -> &'static str {
         "B-spline"
     }
     fn closed(&self) -> bool {
-        self.closed_in_u()
+        self.closed
     }
     fn range(&self) -> ((f64, f64), (f64, f64)) {
-        NurbsSurface::range(self)
+        self.s.range()
     }
     fn breaks(&self, along_u: bool) -> &[f64] {
-        if along_u { &self.uknots } else { &self.vknots }
+        if along_u { &self.s.uknots } else { &self.s.vknots }
     }
     fn derivs(&self, u: f64, v: f64) -> [DVec3; 6] {
-        NurbsSurface::derivs(self, u, v)
+        self.s.derivs(u, v)
+    }
+    fn derivs_grid(&self, us: &[f64], vs: &[f64]) -> Vec<[DVec3; 6]> {
+        self.s.derivs_grid(us, vs)
     }
     fn at(&self, u: f64, v: f64) -> DVec3 {
-        NurbsSurface::at(self, u, v)
+        self.s.at(u, v)
     }
     fn d1(&self, u: f64, v: f64) -> [DVec3; 3] {
-        NurbsSurface::d1(self, u, v)
+        self.s.d1(u, v)
+    }
+    fn param_from(&self, p: DVec3, seed: DVec2) -> (DVec2, f64) {
+        self.s.param_of(p, Some(seed))
     }
     /// Closed round u: a node the iteration from `seed` can't reach across the seam (it stops short, as far off as
     /// the step from the seed's point) is found afresh, and one on the seam is at u0 or u1, the one nearer `seed`.
     /// (Not every node a little off the surface: an intersection curve's are, and each searched afresh took 12-54 ms
     /// on a displacement map's tube.)
     fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64) {
-        let mut r = NurbsSurface::param_of(self, p, seed);
+        let mut r = self.s.param_of(p, seed);
         let Some(s) = seed else { return r };
         // (Open too: on a bumpy surface the iteration from the last node can settle in a dip beside it, a displaced
         // top's rim.)
-        let step = (p - NurbsSurface::at(self, s.x, s.y)).length();
+        let step = (p - self.s.at(s.x, s.y)).length();
         let off = (1e-9 * (1.0 + p.abs().max_element())).max(0.25 * step);
         if r.1 > off {
             // Near the seed first (a dip beside it: a few spans' samples, not the whole surface's, 14 ms a node on a
             // million-pole displacement map), then the whole surface if that's off too.
-            let near = self.param_near(p, s, 2.0);
+            let near = self.s.param_near(p, s, 2.0);
             if near.1 < r.1 {
                 r = near;
             }
             if r.1 > off {
-                let fresh = NurbsSurface::param_of(self, p, None);
+                let fresh = self.s.param_of(p, None);
                 if fresh.1 < r.1 {
                     r = fresh;
                 }
             }
         }
-        if !self.closed_in_u() {
+        if !self.closed {
             return r;
         }
-        let ((u0, u1), _) = NurbsSurface::range(self);
+        let ((u0, u1), _) = self.s.range();
         let eps = 1e-9 * (u1 - u0);
         // Stopped on the seam but not on the surface there: the clamped iteration from a node on the seam can't
         // step inside (a swept hose's rim, its first nodes from the seam's corner all at u1): from just inside
@@ -1169,7 +1208,7 @@ impl GridSurface for NurbsSurface {
         if r.1 > 1e-9 * (1.0 + p.abs().max_element()) && ((r.0.x - u0).abs() <= eps || (r.0.x - u1).abs() <= eps) {
             let h = 1e-3 * (u1 - u0);
             for inside in [u1 - h, u0 + h] {
-                let t = NurbsSurface::param_of(self, p, Some(DVec2::new(inside, r.0.y)));
+                let t = self.s.param_of(p, Some(DVec2::new(inside, r.0.y)));
                 if t.1 < r.1 {
                     r = t;
                 }
@@ -1340,9 +1379,10 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
             let (mut q, mut d) = s.param_of(*p, seed);
             // Also from the last step repeated (a rim's coarse nodes, a display preview's, are far apart: from the last
             // node's parameters alone the iteration settled in a dip of a displacement map's bumps).
-            if k >= 2 && d > 1e-9 * (1.0 + p.abs().max_element()) {
+            // (Not for a node a hair off it, as an imported edge's are: 3/1000 of the deflection.)
+            if k >= 2 && d > (1e-9 * (1.0 + p.abs().max_element())).max(0.003 * defl.linear) {
                 let ahead = uv[k - 1] * 2.0 - uv[k - 2];
-                let (q2, d2) = s.param_of(*p, Some(ahead));
+                let (q2, d2) = s.param_from(*p, ahead);
                 if d2 < d {
                     (q, d) = (q2, d2);
                 }
@@ -1568,10 +1608,18 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
         let f = ((nu * nv) as f64 / MAX_RASTER as f64).sqrt();
         (nu, nv) = (((nu as f64 / f) as usize).max(8), ((nv as f64 / f) as usize).max(8));
     }
-    let corner = |k: usize| DVec2::new(lo.x + (hi.x - lo.x) * (k % (nu + 1)) as f64 / nu as f64, lo.y + (hi.y - lo.y) * (k / (nu + 1)) as f64 / nv as f64);
+    let us: Vec<f64> = (0..=nu).map(|i| lo.x + (hi.x - lo.x) * i as f64 / nu as f64).collect();
+    let vs: Vec<f64> = (0..=nv).map(|j| lo.y + (hi.y - lo.y) * j as f64 / nv as f64).collect();
+    // The corners' derivatives as a grid (a B-spline's basis functions once a row and column), in runs of rows of
+    // about 4096 corners (a big raster on several threads; a face's few thousand on its own: the faces are).
+    let rows = (4096 / (nu + 1)).max(1);
+    let mut grid = vec![[DVec3::ZERO; 6]; (nu + 1) * (nv + 1)];
+    for (r, d) in in_parallel((nv + 1).div_ceil(rows), 1, |r| s.derivs_grid(&us, &vs[r * rows..((r + 1) * rows).min(nv + 1)])) {
+        grid[r * rows * (nu + 1)..][..d.len()].copy_from_slice(&d);
+    }
     let mut allowed = vec![(f64::MAX, f64::MAX); (nu + 1) * (nv + 1)];
     let mut normal = vec![DVec3::ZERO; (nu + 1) * (nv + 1)];
-    for (k, d) in in_parallel((nu + 1) * (nv + 1), 1024, |k| s.derivs(corner(k).x, corner(k).y)) {
+    for (k, d) in grid.into_iter().enumerate() {
         let step = |first: f64, second: f64| {
             if second.is_nan() || second <= 0.0 {
                 return f64::MAX;
@@ -1604,34 +1652,21 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     let (cw, ch) = (w / nu as f64, h / nv as f64);
     // How far the normal turns across each raster cell, each way (a twist turns it too, where the second derivatives
     // along the rows don't see it): the steps that turn it by the angular deflection.
+    // (Each raster side's turn once: two cells share it.)
+    let angle = |a: DVec3, b: DVec3| if a == DVec3::ZERO || b == DVec3::ZERO { 0.0 } else { a.angle_between(b) };
+    let along_u: Vec<f64> = (0..=nv).flat_map(|j| (0..nu).map(move |i| (j, i))).map(|(j, i)| angle(normal[j * (nu + 1) + i], normal[j * (nu + 1) + i + 1])).collect();
+    let along_v: Vec<f64> = (0..nv).flat_map(|j| (0..=nu).map(move |i| (j, i))).map(|(j, i)| angle(normal[j * (nu + 1) + i], normal[(j + 1) * (nu + 1) + i])).collect();
     let turned: Vec<(f64, f64)> = (0..nu * nv)
         .map(|c| {
             let (i, j) = (c % nu, c / nu);
-            let at = |di: usize, dj: usize| normal[(j + dj) * (nu + 1) + i + di];
-            let angle = |a: DVec3, b: DVec3| if a == DVec3::ZERO || b == DVec3::ZERO { 0.0 } else { a.angle_between(b) };
-            let (tu, tv) = (angle(at(0, 0), at(1, 0)).max(angle(at(0, 1), at(1, 1))), angle(at(0, 0), at(0, 1)).max(angle(at(1, 0), at(1, 1))));
+            let (tu, tv) = (along_u[j * nu + i].max(along_u[(j + 1) * nu + i]), along_v[j * (nu + 1) + i].max(along_v[j * (nu + 1) + i + 1]));
             let step = |size: f64, turn: f64| if turn > 0.0 { size * defl.angular / turn } else { f64::MAX };
             (step(cw, tu), step(ch, tv))
         })
         .collect();
-    let mut field: Vec<(f64, f64)> = (0..nu * nv)
-        .map(|c| {
-            // (Its own corners and cells and its neighbours': a peak between samples.)
-            let (i, j) = (c % nu, c / nu);
-            let mut x_y = (w, h);
-            for jj in j.saturating_sub(1)..=(j + 2).min(nv) {
-                for ii in i.saturating_sub(1)..=(i + 2).min(nu) {
-                    let a = allowed[jj * (nu + 1) + ii];
-                    x_y = (x_y.0.min(a.0), x_y.1.min(a.1));
-                    if ii < nu && jj < nv {
-                        let t = turned[jj * nu + ii];
-                        x_y = (x_y.0.min(t.0), x_y.1.min(t.1));
-                    }
-                }
-            }
-            (x_y.0.max(least), x_y.1.max(least))
-        })
-        .collect();
+    // (Its own corners and cells and its neighbours': a peak between samples.)
+    let (near_allowed, near_turned) = (window_min(&allowed, nu + 1, nv + 1, nu, nv), window_min(&turned, nu, nv, nu, nv));
+    let mut field: Vec<(f64, f64)> = near_allowed.iter().zip(&near_turned).map(|(a, t)| (w.min(a.0).min(t.0).max(least), h.min(a.1).min(t.1).max(least))).collect();
     // The face's typical cell shape (a long bend's: a sliver along its flat length, as BRepMesh's), the plane it is
     // triangulated on stretched so that one is square; a cell no more than ten times longer either way than that (a
     // boundary node amid cells far longer fanned triangles across several: a wavy tube's seam, 11° of turn).
