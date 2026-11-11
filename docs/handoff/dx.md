@@ -10,6 +10,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-11 09:57 UTC: drawing scenarios 161/173, 1367/1384 states (vibe5 suite, nothing worse)
+- Landed / queued: Esc keeps what a sketch tool or Max/min dimension made selected (+4 scenarios); a datum target
+  above its origin has its dimension on their line, a selected target shows its hidden dimensions highlighted
+  (datum-target-hide-dim 7 -> 11/12; its step 3 is live's reader: the same orange edge reads [] in show-dims).
+- Tried and reverted: view boxes grown by their annotations (about 20 dimension / callout scenarios worse); lines
+  under the open menu not counted (foreshorten's step 9 is our radial text left of the click, live's on the centre).
+- Asked live (REQUESTS, 09:24) for screenshots: format-painter 10, dimension-3-point-angular 4,
+  view-rotate-horizontal-to 9. Live's recorder keeps uip/<scenario>-<step>.png: look there first.
+- Left: sheet-properties / sheet-rename (1 px hover), view-align-* / view-replicate-annotations (reader's Top EDGE),
+  note-move-to-title-block, centermark-align, dimension-foreshorten (radial text placement).
+
 ## 11-11 08:52 UTC: lead's speed gaps (custom features)
 - Surface Pattern 3: group_disjoint meshes a shared shape once (08e6a4e0, 4.7 -> 1.7 s of its 13-16 s); the rest is
   bool's (our Boolean declines spheres into offset / B-spline faces, then OCCT 7.8 s): bool.md.
