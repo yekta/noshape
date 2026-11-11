@@ -98,7 +98,7 @@ pub fn import_split(path: &Path, choice: &ImportChoice, per_part: bool, place: &
     // A part's Part Studio is made once, in the first document that uses it: a later one uses it there at V1 (live
     // 2424 (2): a subassembly used twice is two documents, the second's Part Studios the first's).
     for s in deepest_first(&nesting) {
-        let name = nesting.subs[s].clone();
+        let name = ctx.sub_name(s);
         let mut doc = ctx.empty();
         let (tab, studios) = ctx.assembly(&mut doc, Some(s), &name, &part_keys, &sub_keys);
         ctx.keep_files(&mut doc, false, &studios.iter().map(|x| x.0).collect::<Vec<_>>());
@@ -178,6 +178,12 @@ impl Split<'_> {
         d
     }
 
+    /// A subassembly's name, less an exporter's instance number (live 2424 (1): Onshape's STEP names the product
+    /// "SubA <1>"; the document, its tab and its instances read "SubA").
+    fn sub_name(&self, s: usize) -> String {
+        without_instance_number(&self.nesting.subs[s])
+    }
+
     /// A part's name: the file's, else "Part <n>" by its place in the file.
     fn part_name(&self, p: usize) -> String {
         self.parts.get(p).and_then(|x| x.name.clone()).filter(|n| !n.trim().is_empty()).unwrap_or_else(|| format!("Part {}", p + 1))
@@ -225,12 +231,13 @@ impl Split<'_> {
                     }
                 },
                 (None, Some(s)) => match sub_keys.get(&s) {
-                    Some(key) => (InstanceSource::External { key: key.clone(), body: None, config: ConfigValues::default() }, self.nesting.subs[s].clone()),
+                    Some(key) => (InstanceSource::External { key: key.clone(), body: None, config: ConfigValues::default() }, self.sub_name(s)),
                     None => continue,
                 },
                 _ => continue,
             };
-            let base = if c.name.trim().is_empty() { label } else { c.name.clone() };
+            // (Numbered again here: "Sub <1>", "Sub <2>", live 2424 (2).)
+            let base = if c.name.trim().is_empty() { label } else { without_instance_number(&c.name) };
             let n = count.entry(base.clone()).or_insert(0);
             *n += 1;
             let id = InstanceId(asm.next_id());
@@ -257,6 +264,14 @@ impl Split<'_> {
             let Some(bytes) = self.parts.get(p).and_then(|x| parasolid_bytes(&x.shape)) else { continue };
             import::add_file_tab(doc, FileTab::new(&format!("{}.x_t", self.part_name(p)), &bytes, noshape_model::file_tab::now()), Some(folder), None);
         }
+    }
+}
+
+/// `name` less an exporter's trailing instance number (" <1>").
+fn without_instance_number(name: &str) -> String {
+    match name.rsplit_once(" <") {
+        Some((base, rest)) if rest.strip_suffix('>').is_some_and(|d| !d.is_empty() && d.chars().all(|c| c.is_ascii_digit())) && !base.trim().is_empty() => base.to_string(),
+        _ => name.to_string(),
     }
 }
 
