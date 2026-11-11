@@ -1545,6 +1545,9 @@ fn op_sweep(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let profiles = evaluate_refs(i, &cx, def.get("profiles"))?;
     let path = evaluate_refs(i, &cx, def.get("path"))?;
+    // The profile's own orientation kept, or kept square to a direction (sweep.fs sets these from Profile control).
+    let keep = def_bool(&def, "keepProfileOrientation", false) || def_enum(&def, "profileControl").is_some_and(|c| &*c == "KEEP_ORIENTATION");
+    let lock_dir = vec3_of(def.get("lockDirection")).filter(|d| d.length() > 1e-12).map(|d| d.normalize());
     run_op(i, &cx, &id, "SWEEP_FAILED", |ev| {
         // Onshape's opSweep on empty selections, path first (as the Sweep feature).
         if path.is_empty() {
@@ -1556,8 +1559,19 @@ fn op_sweep(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let wire = path_wire(ev, &path)?;
         let opts = k::SweepOptions { solid: true, ..Default::default() };
         let mut tools = Vec::new();
+        // A sharp corner of the path mitred, as the Sweep feature (Onshape's: the pieces meet in the plane that halves
+        // it); the transformed sections where that fails.
+        let mitred = k::SweepOptions { transition: k::SweepTransition::RightCorner, ..opts.clone() };
         for p in ev.profiles(&profiles)? {
-            let res = sweep_any_frame(&p.shape, &wire, &opts).map_err(|e| fe(format!("Sweep failed: {e}")))?;
+            let mode = if keep { Some(k::SweepMode::Fixed { z: p.frame.normal, x: p.frame.x }) } else { lock_dir.map(k::SweepMode::Binormal) };
+            let run = |o: &k::SweepOptions| match &mode {
+                Some(m) => k::sweep(&p.shape, &wire, &k::SweepOptions { mode: *m, ..o.clone() }),
+                None => sweep_any_frame(&p.shape, &wire, o),
+            };
+            let res = match run(&mitred) {
+                Ok(r) if r.shape.is_valid() && r.shape.count(ShapeType::Solid) > 0 => r,
+                _ => run(&opts).map_err(|e| fe(format!("Sweep failed: {e}")))?,
+            };
             let names = sweep_names(ev, &p, &res, true, true);
             tools.push(NamedShape::new(res.shape.clone(), names));
         }
