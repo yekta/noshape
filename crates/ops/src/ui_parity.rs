@@ -276,7 +276,12 @@ fn build_assembly(ctx: &mut Ctx, asm: &Value) -> Result<(), String> {
             let id = faces["faces"].get(0).and_then(|f| f["id"].as_str()).ok_or_else(|| format!("no face of {instance} at {}", s["face"]))?;
             Ok(json!({ "instance": instance, "entity": id, "inference": s["inference"].as_str().unwrap_or("center") }))
         };
-        let mut args = json!({ "type": m["type"].as_str().unwrap_or("fastened").to_lowercase(), "a": side(ctx, &m["a"]).map_err(what)?, "b": side(ctx, &m["b"]).map_err(what)? });
+        // As live's REST builder makes it: no primaryAxisAlignment (spec default true: flipped, plain flip icon, live
+        // 2423) unless `flip` (false), and a REST connector whose Z points the other way (live 2412: pin-block's pin
+        // stays upright, the second connector's matedCS Z (0, 0, -1) with the mate flipped).
+        let mut b = side(ctx, &m["b"]).map_err(what)?;
+        b["flip"] = json!(true);
+        let mut args = json!({ "type": m["type"].as_str().unwrap_or("fastened").to_lowercase(), "a": side(ctx, &m["a"]).map_err(what)?, "b": b, "flip_primary": m["flip"].as_bool() != Some(true) });
         if let Some(n) = m["name"].as_str() {
             args["name"] = json!(n);
         }
@@ -333,6 +338,10 @@ mod tests {
         let t: Vec<f64> = pin["translation"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
         assert!((t[0] + 60.0).abs() < 1e-6 && t[1].abs() < 1e-6 && (t[2] + 5.0).abs() < 1e-6, "{pin}");
         assert_eq!(list["mates"][0]["name"], "Revolute 1", "{list}");
+        // Live's REST-made Revolute 1: Flip primary axis on (its plain icon), the pin upright.
+        assert_eq!(list["mates"][0]["flip_primary"], true, "{list}");
+        let r: Vec<f64> = pin["rotation"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+        assert!(r[3].abs() > 1.0 - 1e-9, "{pin}");
         // "Sketch 1 region 0" is the square with the hole (live's block; our first region), not the hole's disc.
         let mp = call(&mut ctx, "query_mass_properties", json!({ "tab": "Part Studio 1", "parts": ["Part 1"] })).unwrap();
         let v = 40.0 * 40.0 * 20.0 - std::f64::consts::PI * 25.0 * 20.0;

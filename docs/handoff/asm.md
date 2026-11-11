@@ -8,6 +8,19 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
+## Now (asm back 2026-11-11 20:02 UTC)
+- Both commits ahead (trace, paused handoff) had landed; worktree on origin/main.
+- pin-block's Revolute 1 (asm-mate-edit-escape / -menu-edit): live 2423 settles it: the flip icon is the stored
+  primaryAxisAlignment (spec default true: plain icon; false: `-opposite`); a REST-made mate leaves it out, so true.
+  Live's pin still stands upright, so its REST connector's Z points the other way (2412: second connector's matedCS
+  (0, 0, -1) with the mate flipped). The ui-parity start builder (`ui_parity.rs build_assembly`) now makes its mates
+  as live's REST builder does: Flip primary axis on unless `flip`, the second connector flipped. Testing.
+- Variable renames: an Assembly's configuration variable is `#<id>`, so a rename keeps mate offsets and pattern
+  distances (e2e renaming_a_configuration_variable_keeps_its_uses now covers a pattern too).
+- Drag inside a flexible subassembly (app): `DragState::nested` drags with `nested_drags`; on release `edit` →
+  `fold_solved` writes every child's solved position into `Instance::nested` (sub-instance frame, as dx's op): the
+  moved child's entry is the op's. History text differs: app "Move : Sub <2>", op "Move : Sub <2> > Part 1 <1>".
+
 ## From dx (11-11 17:18 UTC): occurrence-path assembly_transform for flexible subassemblies is dx's (built, lead)
 Don't redo it. asm-welding-config (-40 occurrences) and asm-xdev-subs (~-50) lose parts inside **flexible**
 subassemblies (`isRigid: false`): live gives each instance of a subassembly its own internal positions, the translator

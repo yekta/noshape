@@ -7583,12 +7583,22 @@ fn renaming_a_configuration_variable_keeps_its_uses() {
     call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": top }, "b": { "instance": "Part 1 <2>", "entity": bottom }, "offset": { "z": "#gap" } }));
     let lift = |ctx: &mut Ctx| num(&face(ctx, "Part 1 <2>", -1.0)["centroid"][2]) - 10.0;
     assert!((lift(&mut ctx).abs() - 5.0).abs() < 1e-6, "{}", lift(&mut ctx));
+    let edges = call(&mut ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": "Part 1 <1>", "kind": "edges" }));
+    let x_edge = edges["edges"].as_array().unwrap().iter().find(|e| e["curve"] == "line" && num(&e["direction"][0]).abs() > 0.99).unwrap()["id"].clone();
+    call(&mut ctx, "assembly_pattern", json!({ "tab": "Assembly 1", "kind": "linear", "seeds": ["Part 1 <2>"], "direction": { "instance": "Part 1 <1>", "entity": x_edge }, "distance": "#gap * 4" }));
+    let patterned_x = |ctx: &mut Ctx| {
+        let l = call(ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+        l["instances"].as_array().unwrap().iter().map(|i| num(&i["translation"][0]).abs()).fold(0.0, f64::max)
+    };
+    assert!((patterned_x(&mut ctx) - 20.0).abs() < 1e-6, "{}", patterned_x(&mut ctx));
     call(&mut ctx, "config_edit_input", json!({ "tab": "Assembly 1", "input": "gap", "name": "space" }));
     let l = call(&mut ctx, "config_list", json!({ "tab": "Assembly 1" }));
     assert_eq!(l["inputs"][0]["name"], "space", "{l}");
     let m = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
     assert_eq!(m["mates"][0]["ok"], true, "the mate's #gap still resolves: {m}");
     assert!((lift(&mut ctx).abs() - 5.0).abs() < 1e-6, "{}", lift(&mut ctx));
+    assert_eq!(m["patterns"][0]["distance"], "#gap * 4", "{m}");
+    assert!((patterned_x(&mut ctx) - 20.0).abs() < 1e-6, "the pattern's #gap still resolves: {}", patterned_x(&mut ctx));
     let e = try_call(&mut ctx, "config_edit_ids", json!({ "tab": "Assembly 1", "input": "gap", "id": "space" })).unwrap_err();
     assert!(e.param.as_deref() == Some("tab") && e.message.contains("no Edit FeatureScript IDs"), "an Assembly's ids can't be edited: {e:?}");
 }
