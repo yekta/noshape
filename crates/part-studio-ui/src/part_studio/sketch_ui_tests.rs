@@ -2793,7 +2793,8 @@ fn export_dialog_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
     let d = ExportDialog { window, exported: Default::default() };
     d.open(cx, false);
     let first = d.export(cx);
-    assert_eq!((first.format, first.latest, first.resolution, first.units), (PartFormat::Parasolid, true, 1, 3), "live's first Export: Parasolid, latest version");
+    // (The units held are STEP's, unseen until its custom units are ticked: Centimeter, live qexport.)
+    assert_eq!((first.format, first.latest, first.resolution, first.units), (PartFormat::Parasolid, true, 1, 0), "live's first Export: Parasolid, latest version");
 
     d.open(cx, false);
     d.pick(cx, "ex-format", "STEP");
