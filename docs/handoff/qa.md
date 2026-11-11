@@ -3,6 +3,36 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+
+## Speed gaps 11-11 (qa 07:45; the lead hands them out)
+
+From qa's clean 02:00 vibe5 run (green 6364f3c47, the newest suite run's green; debug as the suite; 1-min load 1.0–2.6 at each
+document). The documents in the top 10 by ours/live or by ms over live (13), largest gap first; for each, our 3 slowest features
+with live's time for the same feature (its "Show regeneration times" value, live.jsonl per_feature_ms), the Onshape type and the
+owner by type (Booleans / Shell -> bool, fillets / chamfers -> blend, FeatureScript custom features -> dx, the rest -> core).
+bin/speed-gaps.py <models-report.json> repeats it.
+
+| # | document | ours / live (ms) | ratio | over by | slowest features: ours / live ms (type) -> owner |
+|---|---|---|---|---|---|
+| 1 | c2-impeller-loft | 10,073 / 2,773 | ×3.6 | 7.3 s | Delete face 2 1,533 / 12 (deleteFace) core; Move face 1 1,288 / 26 (moveFace) core; Extrude Bohrungssitz Ansaugflansch 1,051 / 177 (extrude) core |
+| 2 | cf-surface-pattern | 7,856 / 4,178 | ×1.9 | 3.7 s | Surface Pattern 3 6,439 / 537 (custom) dx; Surface Pattern 4 1,172 / 3,371 dx; Surface Pattern 5 119 / 71 dx |
+| 3 | c2-rings-loft | 2,960 / 1,557 | ×1.9 | 1.4 s | Shell 1 954 / 235 (shell) bool; Circular pattern 2 516 / 201 core; Circular pattern 1 433 / 767 core |
+| 4 | c2-hunting-knife | 1,347 / 408 | ×3.3 | 0.94 s | Chamfer 1 647 / 19 (chamfer) blend; Mirror 1 243 / 29 (mirror) core; Fillet 2 213 / 10 (fillet) blend |
+| 5 | learning-center-michael | 639 / 96 | ×6.7 | 0.54 s | Fillet 2 628 / 46 (fillet) blend; Extrude 2 6 / 6; Fillet 1 3 / 10 |
+| 6 | cf-snap-hook | 659 / 274 | ×2.4 | 0.39 s | Snap Hook 2 145 / 83 (custom) dx; Snap Hook 1 133 / 81 dx; Fillet 6 119 / 8 (fillet) blend |
+| 7 | cf-lighten | 446 / 114 | ×3.9 | 0.33 s | Lighten 1 434 / 87 (custom) dx; Extrude 1 8 / 5; Extrude 2 3 / 9 |
+| 8 | cf-part-draft | 1,536 / 1,241 | ×1.2 | 0.30 s | Part Draft 3 835 / 865 (custom) dx; Part Draft 2 364 / 39 dx; Spur Gear 207 / 227 dx |
+| 9 | c2-valve-config | 430 / 175 | ×2.5 | 0.26 s | Circular pattern 1 211 / 67 core; Extrude 3 134 / 56 core; Extrude 1 42 / 9 core |
+| 10 | c2-housing-draft | 259 / 105 | ×2.5 | 0.15 s | Rotieren 1 205 / 13 (revolve) core; Boolesch 1 21 / 7 bool; Bohrung 1 16 / 16 (hole) core |
+| 11 | c2-helical-sweep | 110 / 40 | ×2.8 | 70 ms | Sweep 1 109 / 28 (sweep) core |
+| 12 | motor-mount-jack | 101 / 53 | ×1.9 | 48 ms | Fillet 2 33 / 3 (fillet) blend; Extrude 3 23 / 6 core; Extrude 2 18 / 9 core |
+| 13 | c2-tpd-fillet-variable | 88 / 44 | ×2.0 | 44 ms | Fillet 1 87 / 29 (fillet) blend |
+
+Notes: the impeller's Delete face 2 / Move face 1 run on a part already off live's (first difference at feature 11, Shell
+Gehäuse), as do its later features; the knife's Chamfer 1 builds since blend's 12b1d8a6f (it failed fast before);
+cf-surface-pattern's Surface Pattern 3 is 12× live while Pattern 4 is under live; blend's fast-finish (4dc4f0964) and dx's
+mesh fix (fcd0b283f) came after this green: the 11-12 02:00 window re-measures.
+
 **11-11 07:28 (lead):** vibe3 ran out of memory ~07:10 (its /tmp is RAM: 11 GB of leftovers). qa's scripts on vibe3 now keep scratch
 in ~/tmp, never /tmp (all of ~/qa/bin rewritten; the old copy in ~/qa/bin-before-tmp.tgz): fuzz pause / state files are
 ~/tmp/qa-fz-pause-61, ~/tmp/qa-cf-pause / qa-cf-state. Fuzz restarted: GUI bin/fzloop.sh :61 on green 96359491b, CLI
