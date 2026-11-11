@@ -30,6 +30,16 @@ new); most are the selection after a step (`.drawing.selection.length` live 1 / 
 - drw-view-align-vertically: step 1 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (4/6 states)
 - drw-view-replicate-annotations: step 8 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (8/10 states)
 
+## 11-11 10:27 UTC: live's 2486 answers used; drawing still 161/173, 1367/1384
+- Radius value dropped inside its circle: centred on it (ca7c6e94); foreshorten's step 9 stays: after Foreshorten ours
+  draws the jogged form (text up-left, not under the menu), live's shot still shows the plain centred one.
+- format-painter 10 / 3-point angular 4: the reader's 2 px sampling sees filled areas, not our line lengths; a view
+  box grown by its annotations (+ the menu) made ~20 dimension scenarios worse. Left.
+- view-rotate-horizontal-to: live's new take reads no selection at 9 (= ours); asked live to land a re-record.
+- centermark-align: live's data drops the centermark only at the instant after Align centermark (back 1 s later
+  with nothing done): a recorder artifact, not copied.
+- note-move-to-title-block 8 (VIEW Front): screenshot asked of live.
+
 ## 11-11 09:57 UTC: drawing scenarios 161/173, 1367/1384 states (vibe5 suite, nothing worse)
 - Landed / queued: Esc keeps what a sketch tool or Max/min dimension made selected (+4 scenarios); a datum target
   above its origin has its dimension on their line, a selected target shows its hidden dimensions highlighted
