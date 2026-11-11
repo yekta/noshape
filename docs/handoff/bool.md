@@ -3,6 +3,19 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Queue (lead 11-11 08:10 and 09:25 UTC)
+1. hat8's Mac mini union: landed 310b9fed, 201bd381, 88e0dbcd; now (10:36) the inside point search stops when far
+   enough in (`deeper`: 0.7 s on each of two 433-curve faces): our Boolean 2.5-3.3 -> 1.6 s (vibe3, load 17). Left: OCCT's
+   validity check of the result (~0.8 s under load; half of it one 441-edge cone face that changed: kept).
+2. Shell Gehäuse: matched (above).
+3. c2-rings-loft's Shell 1 (954 ms, live 235): its self-interference check is 40 %: edge / face pairs whose edge's
+   faces' meshes stay apart from the face's are dropped (1275 of 1439 pairs; the check ~1.4 -> 0.8 s under load), gating.
+   Then its repair (26 %) and edges (13 %).
+4. Then (lead 09:25, core's profile of qa's speed gaps): c2-housing-draft's Rotieren 1 (OCCT's Boolean 255 ms, projecting
+   edges on faces 137 ms; live's feature 13 ms); the hunting knife's Mirror 1 (our sections ahead 208 ms); c2-rings-loft's
+   Circular pattern 2 (8 Booleans 574 ms, OCCT's build 414); cf-surface-pattern's Surface Pattern 3 (ours declines
+   spheres cutting B-spline / offset faces, even one; OCCT 7.8 s).
+
 ## Shell Gehäuse (c2-impeller-loft feature 11; lead 01:05: match live, by_quadrics) — 11-11 07:40 UTC state
 - Against live's 2275 points (bool/q2275/edges.json; probe xprobe `probe_live_points`, our result from the dump
   imp-dump/shell-0): JKN (the inlet's inner circle) <= 0.33 um, JKB's run <= 0.05 um, JKJ (a seam) <= 0.09 um to 80 %
@@ -14,6 +27,11 @@ scratch /root/bool-scratch.
   45,279.95 mm3; C2 45,279.90; C3 45,278.32 (JKF 0.4-18 um, corners 5.6 um); the B-spline's own polynomials
   (`continued`, tried first) fail on JKF (a marched point 0.2 mm off the folded offset) and put its corner at x 14.4847
   (live 14.4477). Live 45,272.92. Asked live for JKC's surface past x = 10 (REQUESTS 2482).
+- **Matched (1e48728b, landing 10:xx):** live's wall past the face is the exact offset of S(u, 1) + (v - 1) S_v(u, 1)
+  (live 2482); built as such (`linear_extension`), every inner edge within 0.64 um of live's 2275 points, 45,277.36
+  mm3 / 32,144.49 mm2. **Live's reported 45,272.92 mm3 / 32,145.58 mm2 over-integrate its offset face JKG** (live 2484:
+  HIGH = LOW; its own tessellation at 10/2/1 um goes to ~45,277.97 mm3 and 32,144.50 mm2, ours): the suite's remaining
+  difference there is live's integration, not geometry.
 
 ## To core (2026-11-11 07:19 UTC, lead: profile cf-sheet-metal-model-plus; sheet-metal time is core's): face points, not Booleans
 - vibe4 (load 20), main 310b9fed: 2007 ms against live's 917; Extrude 4 966 ms (live 339), Flange 1 504 (224), Sheet

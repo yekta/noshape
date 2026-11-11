@@ -5358,7 +5358,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             let small = (hi - lo).min_element() <= 8.0 * GREY * tol;
             if dist <= GREY * tol || small {
                 // (A thin piece: a point farther in.)
-                r.inside = deeper(&lsegs, &r);
+                r.inside = deeper(&lsegs, &r, 64.0 * GREY * tol);
                 dist = cx.bound_distance(f, r.inside)?;
             }
             // (Near an edge within its and the face's own tolerances too: a 31 um sliver of a Shell slab's face bounded

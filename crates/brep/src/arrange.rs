@@ -189,8 +189,9 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
 
 /// A point inside region `r` (of the curves `segs`) farther from its curves than [`Region::inside`] when a few
 /// tries find one (a thin region's first point is near its sides): along rays into it from points of its loops,
-/// at fractions of the way across.
-pub(crate) fn deeper(segs: &[([u32; 2], C2)], r: &Region) -> DVec2 {
+/// at fractions of the way across; the first at least `enough` in (a base's face round 433 grip faces' edges searched
+/// every curve's rays for the deepest: 0.7 s).
+pub(crate) fn deeper(segs: &[([u32; 2], C2)], r: &Region, enough: f64) -> DVec2 {
     let curves: Vec<C2> = r.outer.iter().chain(r.holes.iter().flatten()).map(|&(s, rev)| if rev { segs[s as usize].1.reversed() } else { segs[s as usize].1.clone() }).collect();
     // (The nearest curve's distance: the curve with the nearest box first, then those whose boxes are nearer than
     // the nearest found yet: the same distance, not each curve's (a gear's face, 294 curves round its 42 tooth gaps:
@@ -234,6 +235,9 @@ pub(crate) fn deeper(segs: &[([u32; 2], C2)], r: &Region) -> DVec2 {
                 let d = depth(q);
                 if d > best.0 {
                     best = (d, q);
+                }
+                if best.0 >= enough {
+                    return best.1;
                 }
             }
         }
