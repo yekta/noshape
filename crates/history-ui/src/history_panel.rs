@@ -901,6 +901,8 @@ fn stale_drawings_warning(doc: &Entity<DocModel>, stale: &Rc<std::cell::RefCell<
     if names.is_empty() {
         return None;
     }
+    // Live's recorder reads the box as the page's alert (ver-create-version-drawings-warning).
+    let note = format!("These drawings should be updated before creating a version: {}", names.iter().map(|(_, n)| n.as_str()).collect::<Vec<_>>().join(", "));
     // Live: each drawing is a link that opens it in a new browser tab (here
     // another window), the dialog staying open.
     let links = h_flex().flex_wrap().gap(px(4.)).text_color(rgb(0x094174)).children(names.into_iter().enumerate().map(|(i, (tab, name))| {
@@ -958,18 +960,17 @@ fn stale_drawings_warning(doc: &Entity<DocModel>, stale: &Rc<std::cell::RefCell<
             .child(button)
             .child(div().child("These drawings should be updated before creating a version:"))
             .child(links)
+            .map(|d| crate::ui_script::mark_note(d, || note))
             .into_any_element(),
     )
 }
 
-/// The fields as live's recorder reads them: Create version's name unlabelled and its description by its hint;
-/// Create workspace's (one form group, live 2418) Name and Description.
+/// The fields as live's recorder reads them (2026-11-11.2, live 2481): Name and Description.
 fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, open: Option<Rc<std::cell::Cell<bool>>>, cx: &App) -> AnyElement {
     let pal = p();
     let label = |t: &str| div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(t.to_string());
-    let workspace = open.is_some();
-    let name_input = os::modal_input(workspace.then_some("Name"), name, cx);
-    os::note_modal_input(Some(if workspace { "Description" } else { "Description cannot contain HTML." }), &desc.read(cx).value());
+    let name_input = os::modal_input(Some("Name"), name, cx);
+    os::note_modal_input(Some("Description"), &desc.read(cx).value());
     os::modal_body()
         .gap(px(10.))
         .child(h_flex().gap(px(4.)).child(label("Name:")).child(div().w(px(300.)).child(os::input_h(name_input, 34.).text_size(px(14.)))))

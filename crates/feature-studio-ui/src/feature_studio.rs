@@ -857,7 +857,12 @@ impl FeatureStudioView {
         cx.notify();
     }
 
+    /// Live 2480 (its saves are its undo steps): the first change after a pause is saved at once, the rest of the run
+    /// when the typing pauses.
     fn schedule_save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.save_task.is_none() {
+            self.save(cx);
+        }
         self.save_task = Some(cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(SAVE_DELAY).await;
             let _ = this.update(cx, |this: &mut Self, cx| this.save(cx));
@@ -2234,6 +2239,10 @@ impl InputHighlighter for ScriptHighlighter {
         if src.len() == self.len { fold_lines(&src, &self.tokens) } else { fold_lines(&src, &lex(&src)) }
     }
 }
+
+#[cfg(test)]
+#[path = "feature_studio_ui_tests.rs"]
+mod ui_tests;
 
 #[cfg(test)]
 mod tests {

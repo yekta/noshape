@@ -588,6 +588,8 @@ def compare(live, ours, whole_document=True):
     # info bubble ≈4.4 s, TOAST-AUTOHIDE) while ours still shows it isn't a difference: the runner doesn't wait live's
     # seconds between steps (sketch-dim-menu-unconfigure, feature-menu-edit-expression, vs-cfg-value-unconfigure).
     toast_shown = {}
+    # Ours' alerts by whether they first showed at a step live took a toast's lifetime or longer over.
+    ours_slow, prev_t = {}, None
     start_name = scenario_start(live.get("scenario")) if isinstance(live.get("scenario"), str) else None
     for name, a, b, failed, t, step in pairs:
         if failed:
@@ -613,6 +615,15 @@ def compare(live, ours, whole_document=True):
         elif a is not None and isinstance(a.get("message"), str) and isinstance((b or {}).get("message"), str) and a["message"] != b["message"] \
                 and t is not None and t - toast_shown.get(b["message"], t) >= TOAST_MS:
             a, b = dict(a, message=None), dict(b, message=None)
+        # A toast of ours raised at a step live's runner took longer than a toast lives (its 12 s steps: live 2477's
+        # vs-cfg-value-unconfigure) was gone before live read the page: not compared there nor after, unless live shows it.
+        if isinstance(a, dict) and isinstance((b or {}).get("message"), str) and t is not None:
+            shown = a.get("message") if isinstance(a.get("message"), str) else ""
+            slow = prev_t is not None and t - prev_t >= TOAST_MS
+            kept = [m for m in b["message"].split(" / ") if m in shown or not ours_slow.setdefault(m, slow)]
+            b = dict(b, message=" / ".join(kept) or None)
+        if t is not None:
+            prev_t = t
         # Live's runner on an assembly start's Part Studio (the lane's shared start, live 2418) still reads the lane's
         # assembly: no assembly where ours shows the Part Studio.
         if isinstance(a, dict) and a.get("assembly") is not None and a.get("partsHeading") is not None and (b or {}).get("assembly") is None \
@@ -660,6 +671,15 @@ def compare(live, ours, whole_document=True):
         for side in (a, b):
             if isinstance(side.get("dialog"), dict) and isinstance(side["dialog"].get("fields"), list):
                 side["dialog"]["fields"] = sorted_child_rows(side["dialog"]["fields"])
+        # Create version's "Publish custom features and tables" shows when the workspace has a Feature Studio (live 2481):
+        # live's lane document holds other runs' studios, so on a lane start live's checkbox is the lane's, not the
+        # start's (ver-insert-create-version, ver-create-version-drawings-warning).
+        publish = "Publish custom features and tables"
+        ad, bd = a.get("dialog"), b.get("dialog")
+        if not whole_document and isinstance(ad, dict) and isinstance(bd, dict) and ad.get("title") == bd.get("title") == "Create version from Main" \
+                and any(isinstance(f, dict) and f.get("label") == publish for f in ad.get("fields") or []) \
+                and not any(isinstance(f, dict) and f.get("label") == publish for f in bd.get("fields") or []):
+            a["dialog"] = dict(ad, fields=[f for f in ad["fields"] if not (isinstance(f, dict) and f.get("label") == publish)])
         # A new subassembly is "Assembly <n>" with the document's next free number, which differs between live's lane
         # documents and ours ("Assembly 2 <1>" / "Assembly 1 <1>"): compared as one name.
         for side in (a, b):

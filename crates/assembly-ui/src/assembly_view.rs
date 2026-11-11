@@ -5232,10 +5232,11 @@ impl AssemblyView {
                                 .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(crate::ui::user_text(doc_name)))
                                 .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child("Main")),
                         )
-                        .child(square("ins-create-version", "version", "Create version…", cx).on_click({
-                            let doc = self.doc.clone();
-                            move |_, w, cx| crate::assembly_hooks::create_version(doc.clone(), w, cx)
-                        }))
+                        // Live ver-insert-create-version: the Insert dialog closes for Create version's (Cancel leaves neither).
+                        .child(square("ins-create-version", "version", "Create version…", cx).on_click(cx.listener(|this, _: &ClickEvent, w, cx| {
+                            this.close_insert(w, cx);
+                            crate::assembly_hooks::create_version(this.doc.clone(), w, cx);
+                        })))
                         .child(square("ins-version-graph", "version-graph", "Version graph", cx).on_click(|_, w, cx| w.dispatch_action(Box::new(crate::actions::ToggleVersionGraph), cx))),
                 )
                 .child(
