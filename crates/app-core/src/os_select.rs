@@ -72,6 +72,8 @@ pub struct OsSelect {
     /// options, [`crate::i18n::spec`]): drawn as they are.
     translated: bool,
     current: SharedString,
+    /// Shown red and italic while the current item isn't among the items (live 2497: "Library not available").
+    missing: Option<SharedString>,
     /// Field height (with its underline).
     height: f32,
     /// The search input while open.
@@ -103,7 +105,7 @@ impl OsSelect {
     }
 
     pub fn new(id: impl Into<SharedString>) -> Self {
-        Self { id: id.into(), items: Vec::new(), pictures: Default::default(), translated: false, current: SharedString::default(), height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, focus: None, bounds: Default::default(), list_bounds: Default::default(), list_overflow: Default::default(), scroll: ScrollHandle::new(), _subs: Vec::new() }
+        Self { id: id.into(), items: Vec::new(), pictures: Default::default(), translated: false, current: SharedString::default(), missing: None, height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, focus: None, bounds: Default::default(), list_bounds: Default::default(), list_overflow: Default::default(), scroll: ScrollHandle::new(), _subs: Vec::new() }
     }
 
     /// A shorter field (Hole's lookup rows are 22 px).
@@ -114,6 +116,11 @@ impl OsSelect {
     /// Pictures shown in the list's rows, by item id.
     pub fn set_pictures(&mut self, pictures: std::collections::HashMap<SharedString, std::sync::Arc<RenderImage>>) {
         self.pictures = pictures;
+    }
+
+    /// What the field says, red and italic, while the current item isn't among the items.
+    pub fn set_missing(&mut self, text: Option<SharedString>) {
+        self.missing = text;
     }
 
     /// The items and the current one (call on every host render).
@@ -209,7 +216,9 @@ impl OsSelect {
 
     fn render_closed(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let label = self.items.iter().find(|(id, _)| *id == self.current).map(|(_, l)| l.clone()).unwrap_or_default();
+        let found = self.items.iter().find(|(id, _)| *id == self.current).map(|(_, l)| l.clone());
+        let missing = found.is_none().then(|| self.missing.clone()).flatten();
+        let label = found.or_else(|| missing.clone()).unwrap_or_default();
         let focused = self.focus.as_ref().is_some_and(|f| f.is_focused(window));
         let mut el = h_flex().id(self.id.clone());
         if let Some(f) = &self.focus {
@@ -255,7 +264,7 @@ impl OsSelect {
             // `#def1fb` hover (§4.5).
             .hover(|d| d.bg(pal.row_hover))
             .cursor_pointer()
-            .child(div().flex_1().min_w_0().text_size(px(14.)).text_color(pal.text).truncate().map(|d| if self.translated { d.child(crate::ui::user_text(label)) } else { d.child(label) }))
+            .child(div().flex_1().min_w_0().text_size(px(14.)).text_color(if missing.is_some() { pal.error } else { pal.text }).when(missing.is_some(), |d| d.italic()).truncate().map(|d| if self.translated { d.child(crate::ui::user_text(label)) } else { d.child(label) }))
             // Live: the 8x4 bootstrap caret, 6 px from the end.
             .child(crate::ui::glyph("drawing-tool-caret", 12., pal.text))
             // Focused (bootstrap .btn-default-focus inside os-enum-parameter):

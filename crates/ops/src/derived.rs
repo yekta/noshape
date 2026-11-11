@@ -287,6 +287,26 @@ pub fn external_context(r: &ExternalRef) -> Option<Arc<Context>> {
     ctx
 }
 
+/// Another document's Part Studio in a configuration (a library form at the sheet's thickness), cached as
+/// [`external_context`].
+pub fn external_context_configured(r: &ExternalRef, values: &noshape_model::configuration::ConfigValues) -> Option<Arc<Context>> {
+    let key = format!("{}#{}", r.key(), serde_json::to_string(&values.0).unwrap_or_default());
+    if let Some(c) = EXT_CONTEXTS.lock().get(&key) {
+        return c.clone();
+    }
+    if EXT_DEPTH.with(|d| d.get()) >= 8 {
+        return None;
+    }
+    EXT_DEPTH.with(|d| d.set(d.get() + 1));
+    let ctx = external_snapshot(&r.path, r.microversion).ok().and_then(|doc| {
+        let provider = DocStudios { doc, cache: Default::default(), active: Default::default() };
+        provider.context_configured(&r.tab, values)
+    });
+    EXT_DEPTH.with(|d| d.set(d.get() - 1));
+    EXT_CONTEXTS.lock().insert(key, ctx.clone());
+    ctx
+}
+
 impl DocStudios {
     /// A Part Studio regenerated in a configuration (not cached).
     pub fn context_in(&self, tab: &str, config: &noshape_model::configuration::ConfigValues) -> Option<Arc<Context>> {
@@ -371,6 +391,9 @@ impl DerivedProvider for DocStudios {
     }
 
     fn context_configured(&self, tab: &str, values: &noshape_model::configuration::ConfigValues) -> Option<Arc<Context>> {
+        if let Some(r) = import_ref(tab).filter(|_| !values.is_empty()) {
+            return external_context_configured(&r, values);
+        }
         if values.is_empty() || tab.starts_with("ext:") || tab.contains('/') {
             return self.context(tab);
         }

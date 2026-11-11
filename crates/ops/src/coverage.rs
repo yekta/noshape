@@ -242,6 +242,8 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("documents:Rename", Op("documents_rename")),
     ("documents:Restore", Op("documents_restore")),
     ("documents:Send to trash", Op("documents_trash")),
+    ("documents:Unset my library", Op("documents_set_library")),
+    ("documents:Update my library", Op("documents_set_library")),
     ("documents:Versions and history", Op("documents_details")),
     ("documents:View in dark mode beta", Op("ui_preferences")),
     ("app:About", Op("app_about")),

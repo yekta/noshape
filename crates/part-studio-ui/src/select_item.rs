@@ -178,6 +178,15 @@ pub struct SelectItemPanel {
     /// Frame's library search box, and its previews by `profileSketch` value (with their size).
     frame_search: Option<(Entity<InputState>, Subscription)>,
     frame_previews: HashMap<(String, u32), Arc<gpui_kit::Image>>,
+    /// The user's sheet metal forms library (live 2497: Library ▾ "‹name› sheet metal forms"), the library picked
+    /// (`Some(true)` the user's; `None` "Library not available": the value's library was unset), the folders and
+    /// document picked under it (`f:` / `d:` and the name), and the selects: Library ▾, then one per level.
+    forms_lib: Option<noshape_ops::forms_library::FormsLibrary>,
+    lib_user: Option<bool>,
+    lib_path: Vec<String>,
+    lib_levels: Vec<(Entity<crate::os_select::OsSelect>, Subscription)>,
+    /// The library documents whose forms' pictures were asked for.
+    lib_pictured: HashSet<PathBuf>,
     _subs: Vec<Subscription>,
 }
 
@@ -271,7 +280,12 @@ fn texts(mode: PanelMode) -> (&'static str, &'static str, &'static str) {
 impl SelectItemPanel {
     pub fn new(setup: PanelSetup, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let PanelSetup { mode, sources, doc_name, doc_path, except, gpu, value, libraries, frame_profiles } = setup;
-        let in_libraries = libraries && (value.is_empty() || value.starts_with(noshape_model::sheetmetal::forms::PREFIX) || value.starts_with(frame_library::PREFIX));
+        let forms_lib = (libraries && !frame_profiles).then(noshape_ops::forms_library::load).flatten();
+        let base = split_value(&value).0;
+        let from_user = forms_lib.as_ref().and_then(|l| l.find(base)).map(|(d, _)| d.folders.iter().map(|f| format!("f:{f}")).chain([format!("d:{}", d.name)]).collect::<Vec<_>>());
+        let unavailable = libraries && !frame_profiles && from_user.is_none() && noshape_ops::forms_library::last().is_some_and(|l| l.find(base).is_some());
+        let in_libraries = libraries && (value.is_empty() || value.starts_with(noshape_model::sheetmetal::forms::PREFIX) || value.starts_with(frame_library::PREFIX) || from_user.is_some() || unavailable);
+        let lib_user = if from_user.is_some() { Some(true) } else if unavailable { None } else { Some(false) };
         let search = cx.new(|cx| InputState::new(window, cx));
         let url = cx.new(|cx| InputState::new(window, cx));
         let subs = vec![
@@ -339,6 +353,11 @@ impl SelectItemPanel {
             frame_selects: HashMap::new(),
             frame_search: None,
             frame_previews: HashMap::new(),
+            forms_lib,
+            lib_user,
+            lib_path: from_user.unwrap_or_default(),
+            lib_levels: Vec::new(),
+            lib_pictured: HashSet::new(),
             focus: cx.focus_handle(),
             _subs: subs,
         };
@@ -1069,12 +1088,105 @@ impl SelectItemPanel {
         v_flex().flex_1().min_h_0().child(col).child(h_flex().flex_none().justify_center().p(px(8.)).child(done)).into_any_element()
     }
 
-    fn render_library_form(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        use noshape_model::sheetmetal::forms;
-        let pal = p();
-        let sources = library_sources();
+    /// The Libraries tab of a Form's Part Studio (live f-2, f-3, 2497): Library ▾ (the user's "‹name› sheet metal
+    /// forms" first, then Onshape's), the levels under it (Onshape's: Type; the user's: its folder tree, a folder a
+    /// Standard, a document a Type), then Form ▾ and the form's inputs.
+    fn render_forms_libraries(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let mut items: Vec<(SharedString, SharedString)> = Vec::new();
+        if self.forms_lib.is_some() {
+            items.push(("user".into(), noshape_ops::forms_library::title().into()));
+        }
+        items.push(("onshape".into(), "Onshape sheet metal forms".into()));
+        let current = match self.lib_user {
+            Some(true) => "user",
+            Some(false) => "onshape",
+            None => "",
+        };
+        let shown = items.iter().find(|(id, _)| id == current).map_or("Library not available".to_string(), |(_, l)| l.to_string());
+        let library = self.lib_level(0, cx);
+        library.update(cx, |s, _| {
+            s.set_items(items, current);
+            s.set_missing(Some("Library not available".into()));
+        });
+        let mut rows = vec![level_row("Library", &shown, library)];
+        let lib = match (self.lib_user, &self.forms_lib) {
+            (Some(true), Some(lib)) => lib.clone(),
+            (Some(false), _) => {
+                let ty = self.lib_level(1, cx);
+                ty.update(cx, |s, _| s.set_items(vec![("onshape".into(), "Onshape form library".into())], "onshape"));
+                rows.push(level_row("Type", "Onshape form library", ty));
+                return self.render_library_form(library_sources(), rows, window, cx);
+            }
+            // "Library not available": Library ▾ and Select alone (live 2497 24).
+            _ => return v_flex().flex_1().min_h_0().child(v_flex().flex_1().pt(px(6.)).children(rows)).child(library_footer(library_select_button(false))).into_any_element(),
+        };
+        let mut sources = Vec::new();
+        // The levels as picked, a level not picked yet at its first item (live 2497 12: Type and Form show the first).
+        let mut path: Vec<String> = Vec::new();
+        for depth in 0.. {
+            let above = path.clone();
+            let within = |d: &&noshape_ops::forms_library::LibraryDocument| d.folders.len() >= depth && d.folders.iter().zip(&above).all(|(f, a)| a.strip_prefix("f:") == Some(f.as_str()));
+            let mut level: Vec<(String, String)> = Vec::new();
+            for d in lib.documents.iter().filter(within) {
+                let (id, name) = match d.folders.get(depth) {
+                    Some(f) => (format!("f:{f}"), f.clone()),
+                    None => (format!("d:{}", d.name), d.name.clone()),
+                };
+                if !level.iter().any(|(i, _)| *i == id) {
+                    level.push((id, name));
+                }
+            }
+            level.sort_by(|a, b| a.1.cmp(&b.1));
+            let picked = self.lib_path.get(depth).filter(|p| level.iter().any(|(i, _)| i == *p)).or(level.first().map(|(i, _)| i)).cloned();
+            let is_doc = picked.as_ref().is_some_and(|p| p.starts_with("d:"));
+            let shown = picked.as_ref().and_then(|p| level.iter().find(|(i, _)| i == p)).map_or(String::new(), |(_, n)| n.clone());
+            let select = self.lib_level(depth + 1, cx);
+            let items = level.iter().map(|(i, n)| (SharedString::from(i.clone()), SharedString::from(n.clone()))).collect();
+            select.update(cx, |s, _| s.set_items(items, picked.clone().unwrap_or_default()));
+            rows.push(level_row(if is_doc { "Type" } else { "Standard" }, &shown, select));
+            let Some(picked) = picked else { break };
+            path.push(picked.clone());
+            if let Some(name) = picked.strip_prefix("d:") {
+                if let Some(doc) = lib.documents.iter().filter(within).find(|d| d.folders.len() == depth && d.name == name) {
+                    sources = doc.forms.iter().map(|f| RefSource { tab: doc.value(&f.tab), name: f.name.clone(), what: RefSourceKind::PartStudio(Vec::new()), configuration: Some(f.configuration.clone()) }).collect();
+                    // Form ▾'s pictures (live 2497 14), once per document.
+                    if self.lib_pictured.insert(doc.path.clone()) {
+                        self.render_version_pictures(doc.path.clone(), doc.microversion, cx);
+                    }
+                }
+                break;
+            }
+        }
+        self.lib_path = path;
+        self.render_library_form(sources, rows, window, cx)
+    }
+
+    /// The Libraries tab's select at `level` (0 Library ▾, then the user library's levels); a pick there clears the
+    /// levels below it.
+    fn lib_level(&mut self, level: usize, cx: &mut Context<Self>) -> Entity<crate::os_select::OsSelect> {
+        while self.lib_levels.len() <= level {
+            let at = self.lib_levels.len();
+            let s = cx.new(|_| crate::os_select::OsSelect::new(SharedString::from(format!("sel-lib-level-{at}"))));
+            let sub = cx.subscribe(&s, move |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, cx| {
+                let crate::os_select::OsSelectEvent::Picked(id) = ev;
+                if at == 0 {
+                    this.lib_user = Some(&**id == "user");
+                    this.lib_path.clear();
+                } else {
+                    this.lib_path.truncate(at - 1);
+                    this.lib_path.push(id.to_string());
+                }
+                this.lib_form = None;
+                cx.notify();
+            });
+            self.lib_levels.push((s, sub));
+        }
+        self.lib_levels[level].0.clone()
+    }
+
+    fn render_library_form(&mut self, sources: Vec<RefSource>, rows: Vec<AnyElement>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let picked = source_of(split_value(&self.value).0);
-        let key = self.lib_form.clone().filter(|k| sources.iter().any(|s| &s.tab == k)).or_else(|| sources.iter().find(|s| s.tab == picked).map(|s| s.tab.clone())).unwrap_or_else(|| format!("{}{}", forms::PREFIX, forms::FORMS[0].id));
+        let key = self.lib_form.clone().filter(|k| sources.iter().any(|s| &s.tab == k)).or_else(|| sources.iter().find(|s| s.tab == picked).map(|s| s.tab.clone())).or_else(|| sources.first().map(|s| s.tab.clone())).unwrap_or_default();
         let select = match &self.lib_select {
             Some((s, _)) => s.clone(),
             None => {
@@ -1101,36 +1213,22 @@ impl SelectItemPanel {
             .gap(px(6.))
             .child(div().w(px(56.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Form"))
             .child(div().flex_1().min_w_0().overflow_hidden().child(select));
-        let mut col = v_flex().id("sel-library-form").flex_1().min_h_0().overflow_y_scroll().pt(px(2.)).child(form_row);
+        let mut col = v_flex().id("sel-library-form").flex_1().min_h_0().overflow_y_scroll().pt(px(6.)).gap(px(2.)).children(rows).child(form_row);
         let Some(cfg) = sources.iter().find(|s| s.tab == key).and_then(|s| s.configuration.clone()) else { return col.into_any_element() };
         col = col.child(self.config_editor(&key, &cfg, Vec::new(), true, window, cx));
         if let Some(img) = self.thumbs.get(&key) {
             col = col.child(div().pl(px(23.)).pt(px(6.)).child(gpui_kit::img(img.clone()).w(px(240.)).h(px(136.)).object_fit(ObjectFit::Contain)));
         }
         let (changed, editing) = self.preview_changed(&key, &cfg);
-        let select_button = div()
-            .id("sel-lib-select")
-            .h(px(30.))
-            .px(px(16.))
-            .flex()
-            .items_center()
-            .justify_center()
-            .rounded(px(3.))
-            .bg(pal.accent)
-            .text_size(px(14.67))
-            .text_color(gpui_kit::rgb(0xffffff))
-            .when(changed, |d| d.opacity(0.4))
-            .when(!changed, |d| d.cursor_pointer().hover(|d| d.bg(pal.accent_hover)))
-            .child("Select")
-            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                if changed {
-                    return;
-                }
-                this.cfg_edit.remove(&key);
-                this.lib_generated.remove(&key);
-                this.pick(join_value(&key, &editing), cx);
-            }));
-        v_flex().flex_1().min_h_0().child(col).child(h_flex().flex_none().justify_end().p(px(8.)).border_t_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(select_button)).into_any_element()
+        let select_button = library_select_button(changed).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+            if changed {
+                return;
+            }
+            this.cfg_edit.remove(&key);
+            this.lib_generated.remove(&key);
+            this.pick(join_value(&key, &editing), cx);
+        }));
+        v_flex().flex_1().min_h_0().child(col).child(library_footer(select_button)).into_any_element()
     }
 
     /// A configured Part Studio's inputs under its row (live fs-refcfg-panel:
@@ -1163,6 +1261,10 @@ impl SelectItemPanel {
         let label = |t: String| div().pt(px(7.)).px(px(5.)).flex_none().text_size(px(12.)).line_height(px(16.)).text_color(gpui_kit::rgb(0x666666)).child(t);
         let mut col = v_flex().pl(px(if preview { 6. } else { 40. })).pr(px(if preview { 6. } else { 26. }));
         for input in &cfg.inputs {
+            // A library form's thickness is the sheet's (live 2497: a user's form shows no Thickness either).
+            if preview && input.id == "thickness" {
+                continue;
+            }
             let Some(name) = input_label(key, input, &editing) else { continue };
             let current = editing.0.get(&input.id).cloned().unwrap_or_default();
             let k = (key.to_string(), input.id.clone());
@@ -1611,6 +1713,41 @@ fn picked_studio_exists(picked: &str, sources: &[RefSource]) -> bool {
     !picked.is_empty() && (picked.starts_with("ext:") || sources.iter().any(|s| s.tab == picked))
 }
 
+/// The Libraries tab's Select (live 2497: bootstrap btn-secondary), pale while a changed input waits for Generate preview.
+fn library_select_button(pale: bool) -> Stateful<Div> {
+    let pal = p();
+    div()
+        .id("sel-lib-select")
+        .h(px(30.))
+        .px(px(16.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(3.))
+        .border_1()
+        .border_color(gpui_kit::rgb(0x959595))
+        .text_size(px(14.67))
+        .text_color(pal.text)
+        .when(pale, |d| d.opacity(0.25))
+        .when(!pale, |d| d.cursor_pointer().hover(|d| d.bg(pal.panel_hover)))
+        .child("Select")
+}
+
+/// The Libraries tab's footer: Select centred under a rule.
+fn library_footer(select: Stateful<Div>) -> Div {
+    h_flex().flex_none().justify_center().p(px(8.)).border_t_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(select)
+}
+
+/// A Libraries tab row: its label and select; a value too long beside the label puts the label above (live 2497 16:
+/// "‹name› sheet metal forms").
+fn level_row(label: &'static str, shown: &str, select: Entity<crate::os_select::OsSelect>) -> AnyElement {
+    let label = div().w(px(56.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child(label);
+    if shown.chars().count() as f32 * 7.2 + 30. > 226. {
+        return v_flex().px(px(6.)).pt(px(4.)).child(label).child(div().w_full().child(select)).into_any_element();
+    }
+    h_flex().h(px(30.)).px(px(6.)).gap(px(6.)).child(label).child(div().flex_1().min_w_0().child(select)).into_any_element()
+}
+
 fn source_of(base: &str) -> String {
     match base.strip_prefix("ext:") {
         Some(rest) => {
@@ -1699,28 +1836,7 @@ impl Render for SelectItemPanel {
         } else if in_libraries && self.frame_profiles {
             body = body.child(self.render_frame_library(window, cx));
         } else if in_libraries {
-            // Library ▾ / Type ▾ (one each), then the forms (live f-2, f-3).
-            let pick_row = |label: &'static str, value: &'static str| {
-                h_flex()
-                    .h(px(30.))
-                    .px(px(6.))
-                    .gap(px(6.))
-                    .child(div().w(px(56.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child(label))
-                    .child(
-                        h_flex()
-                            .flex_1()
-                            .h(px(26.))
-                            .px(px(6.))
-                            .rounded(px(3.))
-                            .border_1()
-                            .border_color(gpui_kit::rgb(0xcccccc))
-                            .text_size(px(12.))
-                            .child(div().flex_1().truncate().child(value))
-                            .child(crate::ui::glyph("expander-down", 8., pal.text)),
-                    )
-            };
-            body = body.child(v_flex().pt(px(6.)).gap(px(2.)).child(pick_row("Library", "Onshape sheet metal forms")).child(pick_row("Type", "Onshape form library")));
-            body = body.child(self.render_library_form(window, cx));
+            body = body.child(self.render_forms_libraries(window, cx));
         } else if other && shown.is_none() {
             body = body.child(self.render_document_browser(cx));
         } else {

@@ -27,6 +27,8 @@ const CANCEL_HOVER: u32 = 0xeeeeee;
 pub const GLYPH_OWNED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="8.3" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="6.8" r="2.6"/><path d="M3.7 14.7c1.1-2.4 3.5-3.9 6.3-3.9s5.2 1.5 6.3 3.9a7.9 7.9 0 0 1-12.6 0z"/></svg>"#;
 pub const GLYPH_RECENT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor"><circle cx="10" cy="10" r="7.25" stroke-width="1.5"/><path d="M10 6v4.6l3 3" stroke-width="1.1"/></svg>"#;
 pub const GLYPH_FOLDER: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M1.5 3.5h6.6l1.6 2h8.8v11h-17z"/></svg>"#;
+/// A folder set as a library (live 2497: the folder with books in it).
+pub const GLYPH_FOLDER_LIBRARY: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M1.5 3.5h6.6l1.6 2h8.8v11h-17z"/><path d="M6.3 9.4h2v5h-2zm3.3-1h2v6h-2zm3.3 1h2v5h-2z" fill="currentColor" stroke="none"/></svg>"#;
 /// The folder filled (the dark theme's tab bar).
 pub const GLYPH_FOLDER_FILLED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" stroke="currentColor" stroke-linejoin="round"><path d="M1.5 3.5h6.6l1.6 2h8.8v11h-17z"/></svg>"#;
 /// Onshape's 10 px section toggles (`svg-icon-expanded` / collapsed).

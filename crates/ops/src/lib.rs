@@ -30,6 +30,7 @@ pub mod history_filter;
 pub mod docedit;
 pub mod error;
 pub mod export;
+pub mod forms_library;
 pub mod file_preview;
 pub mod import;
 pub mod import_documents;

@@ -301,6 +301,8 @@ pub struct StartView {
     /// bar (see `crate::cached_slice`); the search notifies it.
     body: Option<Entity<crate::cached_slice::Slice<StartView>>>,
     library: Library,
+    /// The folder set as My sheet metal forms: its icon is the library's, its menu Sheet metal form library ▸.
+    forms_library: Option<PathBuf>,
     docs: Vec<DocEntry>,
     loaded: bool,
     folders: Vec<PathBuf>,
@@ -514,6 +516,7 @@ impl StartView {
         let mut this = Self {
             focus: cx.focus_handle(),
             shortcut_sheet: None,
+            forms_library: noshape_ops::prefs::LibraryFolders::load().0.get("sheet_metal_forms").cloned(),
             create_focus,
             create_press: false,
             body: None,
@@ -1288,30 +1291,116 @@ impl StartView {
         }
         let v = view.clone();
         let f2 = f.clone();
+        let forms_library = view.read(cx).forms_library.as_ref() == Some(&f);
+        let v3 = view.clone();
         // Live's "Open in new browser tab": another documents window, at the folder.
-        menu.item(item("Open", &f, |t, f, _, cx| t.set_source(Source::Folder(f), cx)))
+        let menu = menu
+            .item(item("Open", &f, |t, f, _, cx| t.set_source(Source::Folder(f), cx)))
             .item(item("Open in new browser tab", &f, |_, f, _, cx| open_new(Some(Source::Folder(f)), cx)))
             .item(item("Rename", &f, |t, f, w, cx| t.rename_folder(f, w, cx)))
-            .item(item("Details", &f, |t, f, _, cx| t.show_folder_details(f, cx)))
-            .item(item("Move to…", &f, |t, f, w, cx| t.move_folder(f, w, cx)))
+            .item(item("Details", &f, |t, f, _, cx| t.show_folder_details(f, cx)));
+        // The folder set as My sheet metal forms (live 2497): no Move to… or Send to trash, its library's submenu.
+        if forms_library {
+            let (v1, v2) = (view.clone(), view);
+            return menu.text_inset(31.).submenu_with_icon(Some("form"), "Sheet metal form library", window, cx, move |m, _, _| {
+                m.item(OsMenuItem::new("Update my library").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.set_forms_library(None, window, cx))))
+                    .item(OsMenuItem::new("Unset my library").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.unset_forms_library(window, cx))))
+            });
+        }
+        menu.item(item("Move to…", &f, |t, f, w, cx| t.move_folder(f, w, cx)))
             .item(OsMenuItem::new("Send to trash").on_click(move |_, window, cx| {
                 let (f, name) = (f2.clone(), name.clone());
                 v.update(cx, |t, cx| t.confirm_trash(f, name, true, window, cx));
             }))
-            .submenu("Set library", window, cx, |m, _, _| Self::library_menu(f, m))
+            .submenu("Set library", window, cx, move |m, _, _| Self::library_menu(v3, f, m))
     }
 
     /// Set library ▸: the folder becomes one of the user's libraries (op `documents_set_library`), ✓ the ones it is.
-    fn library_menu(folder: PathBuf, menu: OsMenu) -> OsMenu {
+    /// My sheet metal forms is built from the folder's documents first (live 2497).
+    fn library_menu(view: Entity<StartView>, folder: PathBuf, menu: OsMenu) -> OsMenu {
         let set = noshape_ops::prefs::LibraryFolders::load();
         noshape_ops::prefs::LIBRARIES.iter().fold(menu, |m, (key, label)| {
-            let folder = folder.clone();
-            m.item(OsMenuItem::new(*label).checked(set.0.get(*key) == Some(&folder)).on_click(move |_, _, _| {
+            let (folder, view) = (folder.clone(), view.clone());
+            let icon = match *key {
+                "frame_profiles" => "frame",
+                "sheet_metal_forms" => "form",
+                "tolerances" => "tolerance",
+                "images" => "image",
+                _ => "standard-content",
+            };
+            m.item(OsMenuItem::new(*label).icon_name(icon).checked(set.0.get(*key) == Some(&folder)).on_click(move |_, window, cx| {
+                if *key == "sheet_metal_forms" {
+                    view.update(cx, |t, cx| t.set_forms_library(Some(folder.clone()), window, cx));
+                    return;
+                }
                 let mut libs = noshape_ops::prefs::LibraryFolders::load();
                 libs.0.insert(key.to_string(), folder.clone());
                 let _ = libs.save();
             }))
         })
+    }
+
+    /// My sheet metal forms (`folder`) or Update my library (`None`): built on a background thread (every Part
+    /// Studio of the folder's documents checked), "Updating…" until then; a failure is live's "Failed to update the
+    /// library" with a paragraph per problem.
+    fn set_forms_library(&mut self, folder: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
+        Self::notify(window, cx, AlertKind::Info, "Updating your sheet metal forms library…");
+        let args = match &folder {
+            Some(f) => serde_json::json!({ "library": "sheet_metal_forms", "folder": f }),
+            None => serde_json::json!({ "library": "sheet_metal_forms", "update": true }),
+        };
+        let run = cx.background_spawn(async move {
+            let op = noshape_ops::registry::by_tool_name("documents_set_library").expect("documents_set_library");
+            noshape_ops::registry::run(&mut noshape_ops::Ctx::new(), op, &args).map(|_| ()).map_err(|e| e.message)
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            let result = run.await;
+            let _ = this.update_in(cx, |t, window, cx| {
+                match result {
+                    Ok(()) => {
+                        t.forms_library = noshape_ops::prefs::LibraryFolders::load().0.get("sheet_metal_forms").cloned();
+                        Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text: "Successfully updated your sheet metal forms library.".into(), restore: None, brief: false });
+                    }
+                    Err(message) => {
+                        cx.default_global::<StartToast>().0 = None;
+                        Self::library_failed(message, window, cx);
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// "Failed to update the library" (live 2497 15): one paragraph per problem, Close.
+    fn library_failed(message: String, window: &mut Window, cx: &mut App) {
+        let mut parts = message.split("\n\n").map(str::to_string);
+        let title = parts.next().unwrap_or_default();
+        let problems: Vec<String> = parts.collect();
+        window.open_dialog(cx, move |dialog, _, cx| {
+            let pal = p();
+            os::modal_doc_page(dialog, title.clone(), 598.)
+                .child(os::modal_body().gap(px(12.)).children(problems.iter().map(|t| div().text_size(px(13.)).text_color(pal.text).child(t.clone()))))
+                .footer(os::modal_footer().child(os::modal_cancel(os::cancel_button("close", "Close", cx))))
+        });
+    }
+
+    /// Sheet metal form library ▸ Unset my library.
+    fn unset_forms_library(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let op = noshape_ops::registry::by_tool_name("documents_set_library").expect("documents_set_library");
+        let unset = noshape_ops::registry::run(&mut noshape_ops::Ctx::new(), op, &serde_json::json!({ "library": "sheet_metal_forms", "clear": true }));
+        if let Err(e) = unset {
+            Self::notify(window, cx, AlertKind::Error, e.message);
+            return;
+        }
+        self.forms_library = None;
+        Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text: "Successfully unset your sheet metal forms library.".into(), restore: None, brief: false });
+        cx.notify();
+    }
+
+    /// A folder's icon: the library's for the one set as My sheet metal forms (live 2497 21).
+    fn folder_glyph(&self, f: &Path) -> &'static [u8] {
+        if self.forms_library.as_deref() == Some(f) { os::GLYPH_FOLDER_LIBRARY } else { os::GLYPH_FOLDER }
     }
 
     /// The selected folder tile: (name, created, modified) in unix ms.
@@ -2138,7 +2227,7 @@ impl StartView {
                         h_flex()
                             .h(px(32.))
                             .gap(px(4.))
-                            .child(os::glyph(os::GLYPH_FOLDER, 20., pal.text))
+                            .child(os::glyph(self.selected.as_deref().map_or(os::GLYPH_FOLDER, |f| self.folder_glyph(f)), 20., pal.text))
                             .child(div().truncate().text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(crate::ui::user_text(name))),
                     )
                     .child(div().h(px(8.)))
@@ -2853,7 +2942,7 @@ impl StartView {
                     .when(!selected, |d| d.bg(rgb(0xf5f5f5)).border_color(rgb(0xeeeeee)).hover(|d| d.bg(pal.row_hover)))
                     .text_size(px(14.))
                     .text_color(pal.text)
-                    .child(os::glyph(os::GLYPH_FOLDER, 20., pal.text))
+                    .child(os::glyph(self.folder_glyph(&f), 20., pal.text))
                     .child(self.inline_rename_field(&f, cx).unwrap_or_else(|| div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())).into_any_element()))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
                         this.selected = Some(f1.clone());
@@ -3041,7 +3130,7 @@ impl StartView {
                     .border_color(rgb(0xececec))
                     .when(selected, |r| r.bg(pal.accent_soft))
                     .when(!selected, |r| r.hover(|r| r.bg(pal.row_hover)))
-                    .child(h_flex().w(px(350.)).flex_none().pl(px(16.)).gap(px(10.)).child(os::glyph(os::GLYPH_FOLDER, 20., pal.text)).child(div().min_w_0().truncate().child(crate::ui::user_text(name))))
+                    .child(h_flex().w(px(350.)).flex_none().pl(px(16.)).gap(px(10.)).child(os::glyph(self.folder_glyph(f), 20., pal.text)).child(div().min_w_0().truncate().child(crate::ui::user_text(name))))
                     .child(div().w(px(200.)).flex_none().pl(px(16.)).child(lib::format_onshape_time(modified)))
                     .child(div().w(px(200.)).flex_none().pl(px(16.)).child("me"))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {

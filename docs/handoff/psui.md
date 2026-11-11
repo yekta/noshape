@@ -9,6 +9,28 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**Builds: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh …`** (vibe4 for clippy). Model suite gate: `NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
+cargo test -q -p noshape-ops --release --test all parity::parity_models -- --ignored --nocapture`, compared per document with
+qa's run (`/root/qa-scratch/recut/models-f324e41f.log`: 77/87, 826/947, custom features 103/107).
+
+**SETLIB-SHEET-METAL-FORMS done (queued 2026-11-11 20:31 UTC)**, live 2497: ops `forms_library.rs` (built library with each form's
+configuration, kept after an unset: `last()`), documents_set_library (sheet_metal_forms builds / `update` / `clear`),
+documents_forms_library; documents page Set library ▸ with icons, background build, "Failed to update the library" modal,
+the set folder's library glyph and "Sheet metal form library ▸ Update / Unset"; the Form picker's Library ▾ / Standard /
+Type / Form levels, "Library not available", Select as live's btn-secondary, centred. Also fixed: another document's
+Part Studio in a configuration (a library form at the sheet's thickness) was regenerated at its defaults
+(`derived::external_context_configured`). Test: crates/ops/tests/prefs.rs `forms_library`. Not done: whether the other
+four libraries' folders also change icon / menu once set (only sheet metal forms seen live); the picker's search box.
+
+**Done today (landed):** SAVED-SKETCH-PLANE-LOST closed (not a regression), REGION-UNION-ARC closed, SHEETMETAL-COPLANAR-WALLS
+narrowed (the Up to Part wall's three fitted caps: core's), sketch topology in FeatureScript as live (abb741da: curve end
+vertices; 2087f44e: a wire body per curve, a point body per point, one sheet; delete / transform / pattern of one body =
+pieces of a sketch, SketchResult::bodies), std_oracle dialogs + Hole green and a polygon's pattern one constraint (bcf62c0e;
+live 2496: our Inscribed / Circumscribed names were already right). STD-ORACLE-SWEEP-POLYLINE is core's.
+**Open for psui after SETLIB:** the sk-* / sm-* ui-parity misses on the newest green; live's answers to pick up
+(REQUESTS: table_header target / vs-ps-inserted-drag re-record, vs-ps-inserted-title-click, ver-version-menu-branch).
+
 ## psui 09:10 UTC: the 11-11 full ui-parity run's list (vibe5, 1511 scenarios), done
 
 Fixed and landed or queued: fold caret, documents advanced search and toggles, the compact snippet list, Help's window,

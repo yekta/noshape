@@ -56,7 +56,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("documents_empty_trash", &[r##"{}"##]),
     ("documents_label", &[r##"{"label": "Brackets", "create": true, "path": "Bracket"}"##, r##"{"label": "Brackets", "path": "Bracket", "on": false}"##]),
     ("documents_forget_recent", &[r##"{"path": "/home/ann/noshape/Bracket.noshape"}"##]),
-    ("documents_set_library", &[r##"{"library": "frame_profiles", "folder": "/home/ann/noshape/Profiles"}"##, r##"{"library": "images", "clear": true}"##]),
+    ("documents_set_library", &[r##"{"library": "frame_profiles", "folder": "/home/ann/noshape/Profiles"}"##, r##"{"library": "sheet_metal_forms", "update": true}"##, r##"{"library": "images", "clear": true}"##]),
+    ("documents_forms_library", &[r##"{}"##]),
     ("tab_move_to_document", &[r##"{"tabs": ["Variable Studio 1"], "name": "Shared variables"}"##, r##"{"tabs": ["Part Studio 2"], "document": "/home/ann/noshape/bracket.noshape"}"##]),
     // features
     ("feature_frame_profiles", &[r##"{}"##, r##"{"standard": "ISO", "profile": "Rectangular tube", "size": "30mm x 30mm x 2mm", "rounded": true}"##]),

@@ -147,15 +147,26 @@ pub fn ops() -> Vec<Op> {
             group: "documents",
             verb: "set_library",
             summary: "Set a folder as one of your libraries (Documents › a folder's Set library ▸)",
-            description: "The folder becomes the user's library of that kind: My frame profiles library, My sheet metal forms, My default tolerances, My images or My standard content (one folder each; setting another replaces it). `clear` unsets the kind. The reply lists every library set.",
+            description: "The folder becomes the user's library of that kind: My frame profiles library, My sheet metal forms, My default tolerances, My images or My standard content (one folder each; setting another replaces it). `clear` unsets the kind (the set folder's Unset my library). My sheet metal forms checks every Part Studio of every document in the folder and its subfolders, at its latest version (a length configuration variable \"thickness\", a solid marked positive or negative by a Form Tag): one that fails stops the whole library, with live's \"Failed to update the library\" problems; `update` builds the set one again from the documents' latest versions (Sheet metal form library ▸ Update my library). The reply lists every library set (and the forms library built, as documents_forms_library lists it).",
             fields: vec![
                 req("library", json!({ "type": "string", "enum": crate::prefs::LIBRARIES.iter().map(|(k, _)| *k).collect::<Vec<_>>() }), "Which library (its key; the menu's row also works)."),
-                opt("folder", s(), "The folder's path (required unless `clear`)."),
+                opt("folder", s(), "The folder's path (required unless `clear` or `update`)."),
                 opt("clear", json!({ "type": "boolean" }), "Unset that library."),
+                opt("update", json!({ "type": "boolean" }), "My sheet metal forms: build the set library again from its documents' latest versions."),
             ],
             mutates: true,
             destructive: false,
             run: set_library,
+        },
+        Op {
+            group: "documents",
+            verb: "forms_library",
+            summary: "List your sheet metal forms library (the Form's picker › Libraries › ‹you› sheet metal forms)",
+            description: "The forms of the folder set as My sheet metal forms, as it was built (documents_set_library): its name (\"‹your name› sheet metal forms\"), version, and each document (the folders above it, its version) with its forms. A form's `value` is the Form feature's formPartStudio: that Part Studio at the library's version. `forms_library` is null when none is set.",
+            fields: vec![],
+            mutates: false,
+            destructive: false,
+            run: forms_library,
         },
         Op {
             group: "documents",
@@ -432,16 +443,51 @@ fn set_library(_ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::param("library", "not a library: frame_profiles, sheet_metal_forms, tolerances, images or standard_content"));
     };
     let mut libs = crate::prefs::LibraryFolders::load();
+    let mut forms = None;
     if a.bool_or("clear", false)? {
         libs.0.remove(key);
     } else {
-        let Some(folder) = a.opt_str("folder")? else { return Err(OpError::param("folder", "the folder to use is required")) };
-        let folder = PathBuf::from(folder);
+        let folder = match (a.opt_str("folder")?, a.bool_or("update", false)?) {
+            (Some(f), _) => PathBuf::from(f),
+            (None, true) => libs.0.get(key).cloned().ok_or_else(|| OpError::param("update", "that library isn't set"))?,
+            (None, false) => return Err(OpError::param("folder", "the folder to use is required")),
+        };
         if !folder.is_dir() {
             return Err(OpError::invalid(format!("{} isn't a folder", folder.display())).with_param("folder"));
+        }
+        // My sheet metal forms: every Part Studio must be a form, or the library isn't made (live 2497).
+        if key == "sheet_metal_forms" {
+            let lib = crate::forms_library::build(&folder).map_err(|p| OpError::invalid(format!("Failed to update the library\n\n{}", p.join("\n\n"))))?;
+            crate::forms_library::save(&lib).map_err(|e| OpError::new("io", format!("saving the library: {e}")))?;
+            forms = Some(lib);
         }
         libs.0.insert(key.to_string(), folder);
     }
     libs.save().map_err(|e| OpError::new("io", format!("saving the libraries: {e}")))?;
-    Ok(json!({ "libraries": libs.0 }).into())
+    let mut out = json!({ "libraries": libs.0 });
+    if let Some(lib) = forms {
+        out["forms_library"] = forms_library_json(&lib);
+    }
+    Ok(out.into())
+}
+
+/// The forms library as documents_forms_library lists it.
+fn forms_library_json(lib: &crate::forms_library::FormsLibrary) -> serde_json::Value {
+    json!({
+        "name": crate::forms_library::title(),
+        "folder": lib.folder,
+        "version": format!("V{}", lib.version),
+        "documents": lib.documents.iter().map(|d| json!({
+            "folders": d.folders,
+            "name": d.name,
+            "path": d.path,
+            "version": d.version,
+            "forms": d.forms.iter().map(|f| json!({ "name": f.name, "value": d.value(&f.tab) })).collect::<Vec<_>>(),
+        })).collect::<Vec<_>>(),
+    })
+}
+
+fn forms_library(_ctx: &mut Ctx, _a: &Args) -> Result<OpOutput, OpError> {
+    let Some(lib) = crate::forms_library::load() else { return Ok(json!({ "forms_library": null }).into()) };
+    Ok(json!({ "forms_library": forms_library_json(&lib) }).into())
 }

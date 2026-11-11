@@ -74,6 +74,7 @@ fn graphics_preferences_toolbar_and_shortcuts_read_set_and_kept() {
     custom_properties(&mut ctx, &dir);
     export_defaults(&mut ctx, &dir);
     libraries(&mut ctx, &dir);
+    forms_library(&mut ctx, &dir);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -91,6 +92,77 @@ fn libraries(ctx: &mut Ctx, dir: &std::path::Path) {
     assert_eq!(e.param.as_deref(), Some("library"), "{e:?}");
     let e = call(ctx, "documents_set_library", json!({ "library": "images", "folder": dir.join("none").to_str().unwrap() })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("folder"), "{e:?}");
+}
+
+/// A form document: a Part Studio driven by a length configuration variable "thickness" (its 10 × 10 mm block's height), its block marked positive by a
+/// Form Tag, versioned "V1" (the library reads a document at its latest version).
+fn form_document(path: &std::path::Path) {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() })).unwrap();
+    call(&mut ctx, "config_add_input", json!({ "kind": "variable", "name": "thickness", "value": "3 mm" })).unwrap();
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" })).unwrap()["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [10, 10]] })).unwrap();
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk })).unwrap()["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "#thickness" } })).unwrap();
+    let part = call(&mut ctx, "query_parts", json!({})).unwrap()["parts"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "tag", "params": { "tagPurpose": "FORM", "positivePart": [part] } })).unwrap();
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" })).unwrap();
+}
+
+/// A Form whose Part Studio is a library form (its `ext:` value) stamps its tool, in the sheet's thickness.
+fn library_form_on_a_plate(path: &std::path::Path, form: &str) {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() })).unwrap();
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" })).unwrap()["sketch"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] })).unwrap();
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "1 mm", "radius": "1 mm" } })).unwrap();
+    let volume = |ctx: &mut Ctx| call(ctx, "query_parts", json!({})).unwrap()["parts"][0]["volume"].as_f64().unwrap();
+    let before = volume(&mut ctx);
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1], "limit": 1 })).unwrap()["faces"][0]["id"].as_str().unwrap().to_string();
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": top })).unwrap()["sketch"].as_str().unwrap().to_string();
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": [[30, 20, 1]] })).unwrap();
+    let pt: Vec<Value> = p["created"].as_array().unwrap().iter().filter(|x| x["type"] == "point").map(|x| x["id"].clone()).collect();
+    let f = call(&mut ctx, "feature_add", json!({ "type": "sheetMetalFormed", "params": { "formPartStudio": form, "locations": pt, "targetFaces": [top] } })).unwrap();
+    assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
+    assert!((volume(&mut ctx) - before - 100.0).abs() < 1e-6, "the form's block, as thick as the sheet (1 mm), not its own 3 mm: {before} -> {}", volume(&mut ctx));
+}
+
+/// My sheet metal forms (live 2497): every Part Studio of every document in the folder and its subfolders, at its
+/// latest version, must be a form, or the library isn't made; Update builds it again (V2), clear unsets it.
+fn forms_library(ctx: &mut Ctx, dir: &std::path::Path) {
+    let forms = dir.join("uip forms");
+    std::fs::create_dir_all(forms.join("uip forms sub")).unwrap();
+    form_document(&forms.join("uip form A.noshape"));
+    form_document(&forms.join("uip forms sub").join("uip form B.noshape"));
+    let plain = forms.join("uip plain.noshape");
+    call(&mut Ctx::new(), "document_create", json!({ "path": plain.to_str().unwrap() })).unwrap();
+    assert_eq!(call(ctx, "documents_forms_library", json!({})).unwrap()["forms_library"], Value::Null);
+
+    let set = json!({ "library": "sheet_metal_forms", "folder": forms.to_str().unwrap() });
+    let e = call(ctx, "documents_set_library", set.clone()).unwrap_err();
+    let element = "Element \"Part Studio 1\" in document \"uip plain\" at its latest version \"Start\" failed validation";
+    assert_eq!(e.message, format!("Failed to update the library\n\n{element}: \"The Part Studio must be driven by a length configuration variable with FeatureScript ID \"thickness\"\". Fix and create a new version.\n\n{element}: \"The Part Studio should have at least one solid body marked as positive or negative\". Fix and create a new version."));
+    assert_eq!(call(ctx, "documents_forms_library", json!({})).unwrap()["forms_library"], Value::Null, "a failed set makes no library");
+
+    std::fs::remove_file(&plain).unwrap();
+    let l = call(ctx, "documents_set_library", set).unwrap();
+    assert_eq!(l["libraries"]["sheet_metal_forms"], forms.to_str().unwrap(), "{l}");
+    let lib = call(ctx, "documents_forms_library", json!({})).unwrap()["forms_library"].clone();
+    assert_eq!(lib["name"], format!("{} sheet metal forms", noshape_store::local_user_name()), "{lib}");
+    assert_eq!(lib["version"], "V1", "{lib}");
+    let docs = lib["documents"].as_array().unwrap();
+    let shape: Vec<(Value, Value, Value, usize)> = docs.iter().map(|d| (d["folders"].clone(), d["name"].clone(), d["version"].clone(), d["forms"].as_array().unwrap().len())).collect();
+    assert_eq!(shape, vec![(json!([]), json!("uip form A"), json!("V1"), 1), (json!(["uip forms sub"]), json!("uip form B"), json!("V1"), 1)], "{lib}");
+    assert_eq!(docs[0]["forms"][0]["name"], "Part Studio 1", "{lib}");
+    assert!(docs[0]["forms"][0]["value"].as_str().unwrap().starts_with("ext:"), "a form is its Part Studio at the library's version: {lib}");
+    library_form_on_a_plate(&dir.join("plate.noshape"), docs[0]["forms"][0]["value"].as_str().unwrap());
+
+    let u = call(ctx, "documents_set_library", json!({ "library": "sheet_metal_forms", "update": true })).unwrap();
+    assert_eq!(u["forms_library"]["version"], "V2", "{u}");
+    call(ctx, "documents_set_library", json!({ "library": "sheet_metal_forms", "clear": true })).unwrap();
+    assert_eq!(call(ctx, "documents_forms_library", json!({})).unwrap()["forms_library"], Value::Null);
+    let e = call(ctx, "documents_set_library", json!({ "library": "sheet_metal_forms", "update": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("update"), "{e:?}");
 }
 
 /// The Export dialog's remembered options are export_parts' defaults (live exportSolidOptions): STL as text in

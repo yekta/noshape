@@ -4506,7 +4506,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   cap vertex on the extrude's own faces, skasm.md) P2 SUITE-HEX-BOOKCASE-TEXT (skasm, paused; core 2026-11-08 20:05 UTC from the model suite): c2-hex-bookcase-derived's
   "text indent" (extrude of a text sketch's regions) makes "shrunk" 43/111/70 faces/edges/vertices, live 31/87/58: the
   text's glyph regions aren't live's. 13 of 17 features lost behind it.
-- [ ] P2 SUITE-LOUVER-SKETCH-9 (skasm, paused; core 2026-11-08 20:05 UTC): c2-sm-louver's Sketch 9 frame origin [0, 0,
+- [x] (psui 2026-11-10 20:36: the flat as a sketchable body, Sketch 9 on it matches; c2-sm-louver 32/36, next Extrude 3 is bool's) P2 SUITE-LOUVER-SKETCH-9 (skasm, paused; core 2026-11-08 20:05 UTC): c2-sm-louver's Sketch 9 frame origin [0, 0,
   606.17] mm, live [-708.49, 351.45, 2.03] (on a sheet metal definition face); 5 of 36 features lost.
 - [ ] P3 INTEGRATOR-BSPLINE-GEAR (core; dx 2026-11-09 00:46 UTC, data exchange) cf-spur-gear's live.step read in ours:
   the 32-tooth gear's volume / area by our integral 4757.60 mm³ / 4122.70 mm², by a fine mesh of the same import
@@ -4537,7 +4537,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   then joins the loop pieces their old seam left (boolean.cpp `merge_same_surface_faces`). "fan" 143 / 404 / 251 =
   live; "fan blade" 58 / 120 / 64 for live's 58 / 119 / 63 (one blade edge still in two smooth pieces: join_loop_pieces
   finds the joint but makes nothing of it). Exchange suite: every "ours imports live.step" as before.
-- [ ] P3 SETLIB-SHEET-METAL-FORMS (skasm, studios 11-08, lead ruling) Set library's "My sheet metal forms": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `sheet_metal_forms` to the folder the user chose (Documents › a
+- [x] (psui 2026-11-11 20:31, live 2497: the folder's documents' Part Studios checked at their latest versions, "Failed to update the library" / the library icon / Sheet metal form library ▸ Update / Unset on the documents page; the Form picker's "‹name› sheet metal forms" with Standard / Type / Form levels from the folder tree, "Library not available" after an unset; ops documents_set_library / documents_forms_library; prefs.rs forms_library) P3 SETLIB-SHEET-METAL-FORMS (skasm, studios 11-08, lead ruling) Set library's "My sheet metal forms": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `sheet_metal_forms` to the folder the user chose (Documents › a
   folder's Set library ▸ "My sheet metal forms", op `documents_set_library`; `libraries.json` in the config dir; one folder per
   library, setting another replaces it). The sheet metal Form feature's form picker (custom host/sheetmetal.rs) should list, next to Onshape's own library, a "My sheet metal forms" entry holding
   that folder's `.noshape` documents (its subfolders as folders, as the documents page shows them), each document's
