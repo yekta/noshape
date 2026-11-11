@@ -32,7 +32,6 @@ use context::Context;
 use eval::EvalCtx;
 use noshape_units::{Quantity, UnitPrefs};
 use std::collections::{BTreeMap, HashMap};
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -151,18 +150,21 @@ pub struct RegenResult {
     pub cancelled: bool,
     /// Features this run evaluated (the others came from the cache).
     pub evaluated: Vec<FeatureId>,
+    /// Each feature's key up to the rollback bar ([`RegenKey`]); none for a studio with Assembly contexts or a
+    /// touch-probe run.
+    pub keys: Vec<(FeatureId, RegenKey)>,
 }
 
 #[derive(Clone)]
 struct CacheEntry {
-    key: u64,
+    key: RegenKey,
     ctx: Arc<Context>,
     state: FeatureState,
     /// The run that last used it ([`Regenerator::run`]).
     last_run: u64,
     /// The feature's own key (its definition and the run's settings, not what came before it), its input and what
     /// it read of it ([`ReadSet`]; `None`: never reused): incremental regeneration.
-    local: u64,
+    local: RegenKey,
     input: Option<Arc<Context>>,
     reads: Option<Arc<ReadSet>>,
 }
@@ -285,7 +287,7 @@ pub struct Regenerator {
     /// Features evaluated so far (not taken from the cache).
     evaluations: u64,
     /// The last runs' results by [`result_key`], newest first.
-    results: Vec<(u64, RegenResult)>,
+    results: Vec<(RegenKey, RegenResult)>,
     /// noshape's Boolean's late declines, by feature type: the like go straight to OCCT's (kept across runs: each
     /// adds or edits a feature or two).
     declines: Arc<noshape_kernel::DeclineMemo>,
@@ -293,7 +295,7 @@ pub struct Regenerator {
 
 /// Everything a run's result depends on (the studio, its settings and the options; preview meshes aside: a full
 /// result serves a preview); none for studios with Assembly contexts (their snapshots are too big to hash each run).
-fn result_key(studio: &PartStudio, config: &ConfigValues, units: &UnitPrefs, opts: &RegenOptions, effective: &[eval::EffectiveFeature]) -> Option<u64> {
+fn result_key(studio: &PartStudio, config: &ConfigValues, units: &UnitPrefs, opts: &RegenOptions, effective: &[eval::EffectiveFeature]) -> Option<RegenKey> {
     if !studio.contexts.is_empty() {
         return None;
     }
@@ -320,11 +322,17 @@ fn kernel_profiling() -> bool {
     *ON.get_or_init(|| std::env::var_os("NOSHAPE_KERNEL_PROFILE").is_some())
 }
 
-fn hash_bytes(prev: u64, data: &[u8]) -> u64 {
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    prev.hash(&mut h);
-    data.hash(&mut h);
-    h.finish()
+/// A regeneration key: 128 bits of a blake3 chain over a feature's definition and everything upstream of it, from
+/// document content only (the same in every run of a build; a persistent result cache looks results up by it).
+pub type RegenKey = u128;
+
+fn hash_bytes(prev: RegenKey, data: &[u8]) -> RegenKey {
+    let mut h = blake3::Hasher::new();
+    h.update(&prev.to_le_bytes());
+    h.update(data);
+    let mut out = [0u8; 16];
+    out.copy_from_slice(&h.finalize().as_bytes()[..16]);
+    RegenKey::from_le_bytes(out)
 }
 
 impl Regenerator {
@@ -383,6 +391,7 @@ impl Regenerator {
         let mut states = Vec::with_capacity(studio.features.len());
         let mut live: Vec<FeatureId> = Vec::new();
         let (mut evaluated, mut cached): (Vec<FeatureId>, usize) = (Vec::new(), 0);
+        let mut keys: Vec<(FeatureId, RegenKey)> = Vec::new();
         self.run += 1;
         let run = self.run;
         // Effective features (configuration applied), visible to evaluators
@@ -457,6 +466,9 @@ impl Regenerator {
                 && !crate::features::importing::is_derived(&f.type_id)
                 && studio.contexts.is_empty();
             live.push(f.id);
+            if i < upto && studio.contexts.is_empty() && opts.touch_probe.is_none() {
+                keys.push((f.id, key));
+            }
             if i >= upto {
                 states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
                 continue;
@@ -686,7 +698,7 @@ impl Regenerator {
         }
         if opts.context_only {
             let display = crate::display::StudioDisplay { features: states, variables: ctx.variables.clone(), regen_ms: t0.elapsed().as_secs_f32() * 1000.0, ..Default::default() };
-            return RegenResult { display, needs_refine: false, context: ctx, cancelled: false, evaluated };
+            return RegenResult { display, needs_refine: false, context: ctx, cancelled: false, evaluated, keys };
         }
         if display::perf_enabled() {
             log::info!(target: "perf", "regen: {} features evaluated, {cached} cached, {:.0} ms (preview meshes {})", evaluated.len(), t0.elapsed().as_secs_f64() * 1e3, opts.preview_meshes);
@@ -707,7 +719,7 @@ impl Regenerator {
         display.features = states;
         display.variables = ctx.variables.clone();
         display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
-        let result = RegenResult { display, needs_refine, context: ctx, cancelled: false, evaluated };
+        let result = RegenResult { display, needs_refine, context: ctx, cancelled: false, evaluated, keys };
         // (Full results only: a preview can't serve a full run, and the dialog's previews as values are typed would
         // push out the states undo goes back to.)
         if let Some(k) = result_key.filter(|_| !result.needs_refine) {

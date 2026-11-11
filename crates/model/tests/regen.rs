@@ -201,3 +201,25 @@ fn a_snapshot_regenerates_only_what_changed() {
     assert_eq!(faces(&a), [8], "the block's 7 faces and the blend");
     assert!((a.context.bodies[0].shape.volume().unwrap() - b.context.bodies[0].shape.volume().unwrap()).abs() < 1e-12);
 }
+
+/// Each feature's regeneration key comes from the document alone: two regenerators, and the studio after a save and
+/// reopen (a JSON round trip), give the same keys; an edit changes its feature's key and those after it, not those
+/// before (the persistent result cache looks results up by them).
+#[test]
+fn regeneration_keys_come_from_the_document_alone() {
+    let (mut ps, units) = studio_with_block();
+    let keys = |ps: &PartStudio| Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default()).keys;
+    let a = keys(&ps);
+    assert_eq!(a.len(), 2);
+    assert_ne!(a[0].1, a[1].1);
+    assert_eq!(a, keys(&ps));
+    let reopened: PartStudio = serde_json::from_str(&serde_json::to_string(&ps).unwrap()).unwrap();
+    assert_eq!(a, keys(&reopened));
+    ps.features[1].params.set("depth", ParamValue::Expr(ExprValue::new("30 mm")));
+    let b = keys(&ps);
+    assert_eq!(a[0], b[0]);
+    assert_ne!(a[1].1, b[1].1);
+    // Up to the rollback bar only.
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions { upto: Some(1), ..Default::default() });
+    assert_eq!(r.keys, b[..1]);
+}
