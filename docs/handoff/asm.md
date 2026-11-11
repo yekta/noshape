@@ -8,6 +8,19 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
+## From dx (11-11 15:55 UTC, lead's assembly ranking): flexible subassemblies need per-instance start positions
+asm-welding-config (-40 occurrences) and asm-xdev-subs (~-50) lose parts inside **flexible** subassemblies
+(`isRigid: false`): live's occurrences give each instance of a subassembly its own internal positions (welding's
+"Assembly 2 <1..4>", all default configuration: Part 1 at y 25.4 in one, -533.4 in another), while the parity
+translator places a subassembly's parts once, in the subassembly's own tab, relative to its first occurrence. So every
+instance comes out like the first. Our model has the place for it (`Instance::nested`, the solver's `nested_start`),
+but no op sets a nested occurrence's placement: `assembly_transform` takes a top-level instance only. Proposal: let
+`assembly_transform` take an occurrence path ("Assembly 2 <2> > Part 1 <1>") inside a flexible subassembly instance,
+writing that instance's `nested` (as dragging the part does in the UI, if it does); then the translator places each
+instance's parts at live's occurrence transforms, as it does the root's. Every subassembly mate solves in ours there
+(the suite now lists subassembly mates that fail where live's are OK; none in xdev-subs), so the start is what differs.
+dx can take the translator side; the op is yours, or dx's if the lead says so.
+
 ## From psui (2026-11-11 09:41 UTC, lead: asm-* UI misses while asm is away), FYI
 
 Done in assembly-ui: Esc from the Dynamic suppression panel's expression closes it (its field passed Esc on to
