@@ -646,9 +646,9 @@ fn lumps_touching_along_a_line_are_two_solids() {
     assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
 }
 
-/// A document's cuts by a pattern of 8 cutters (recorded, parity): noshape's Boolean declines the first late (two edges
-/// leave a vertex one way, found while placing its pieces), so in its feature type's scope the next cut goes straight
-/// to OCCT's; OCCT's results both.
+/// A document's cuts by a pattern of 8 cutters (recorded, parity): noshape's Boolean declines the first late (a short
+/// section from a cutter's corner, found after OCCT's sections), so in its feature type's scope the next cut goes
+/// straight to OCCT's; OCCT's results both.
 #[test]
 fn a_late_decline_sends_the_like_straight_to_occt() {
     let _ = k::set_working_scale(1000.0);
@@ -662,11 +662,11 @@ fn a_late_decline_sends_the_like_straight_to_occt() {
     };
     let memo = std::sync::Arc::new(k::DeclineMemo::default());
     memo.scope("pattern", || {
-        assert_eq!(run(&a).1, "two edges leave a vertex in one direction");
+        assert_eq!(run(&a).1, "a short section from a corner");
         assert_eq!(run(&b).1, "not tried (an earlier path took it)");
     });
     // (Another feature type, or none: tried.)
-    memo.scope("another", || assert_eq!(run(&b).1, "two edges leave a vertex in one direction"));
+    memo.scope("another", || assert_eq!(run(&b).1, "a short section from a corner"));
 }
 
 /// Parity documents' fuses of flat sheets whose tools share edges (recorded): OCCT's route grouped the tools as apart
@@ -1918,4 +1918,48 @@ fn sections_between_the_same_vertices_within_their_errors_are_one() {
     assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
     let v = r.shape.volume().unwrap();
     assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
+}
+
+/// A cut of a Shell's slabs (recorded): a section leaves a vertex of a free-form face nearly tangent to two of its arcs
+/// and runs within the tolerance of each for 5 um; where they part is no vertex (OCCT's pave is the vertex alone).
+/// noshape's Boolean takes the cut with OCCT's recorded counts and volume (to its area times 1e-7).
+#[test]
+fn a_section_leaving_a_vertex_along_an_arc_cut_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "29f3147a12e35a8e").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    let counts = (r.shape.count(k::ShapeType::Face), r.shape.count(k::ShapeType::Edge), r.shape.count(k::ShapeType::Vertex));
+    assert_eq!(counts, (c.summary.faces, c.summary.edges, c.summary.vertices));
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
+}
+
+/// A fuse in a ring's pattern (c2-rings-loft's Circular pattern 2, recorded): an arc of a free-form face, split by the
+/// tool, ends on the face's seam; its last piece's curve on the face ran back to the arc's start (its end's place
+/// taken on the seam's other side), so two curves left a vertex one way and a face was lost. Its ends are the edge's
+/// own parameters: noshape's Boolean takes the fuse, OCCT's result (its counts, the volume to its area times 1e-7).
+#[test]
+fn an_arc_ending_on_a_seam_fused_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "e31206c047fd9e14").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    let counts = |s: &k::Shape| (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge), s.count(k::ShapeType::Vertex));
+    assert!(r.shape.is_valid());
+    assert_eq!(counts(&r.shape), counts(&o.shape));
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-7 * o.shape.area().unwrap(), "volume {v} against OCCT's {w}");
 }

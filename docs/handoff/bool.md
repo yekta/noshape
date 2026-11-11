@@ -99,6 +99,45 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
   level), shfall as before; model suite the same document by document. Left in hat8 at load 45: import 17.4 s (dx), the chamfers 5.8 + 3.0 s
   (blend).
 
+## For bool2 (2026-11-11 23:36 UTC, lead: bool2 makes the gate fast; bool keeps seam, touching solids, Shell, speed)
+The gate today (scripts in /root/bool-scratch, outside the repo; copy what you need):
+- **Corpora + parity56:** `bin/whyall.sh <tag>` from a worktree (rb.sh on vibe5, cores 0-7; `whyall-hi.sh` cores
+  8-15, `whyall3.sh` / `whyall4.sh` other hosts): replays every set in vibe5:~/agents/bool-corpora (bool-corpus,
+  corpus2-6, direct-corpus, sh-new2, parity56 with NOSHAPE_BREP_VS_OCCT=1, valve2, snap, sp-cut: the last three exist
+  on vibe4 only) with NOSHAPE_BREP_WHY; writes `<tag>.sum` (taken / differ per set, DIFF lines) and `<tag>.tsv`
+  (set, case, ms, decline reason). The verdict is by hand: every set 0 differences and no case main takes declined
+  (`comm` of the tsv's case columns against a main run's, e.g. base1 = 08a1dfbe).
+- **Knurl / gear:** `bin/kg.sh` (vibe4: kall, k10-25, k10-25-12, k25-*, cf-spur-gear, gears, gpf; gpf's 2 differences
+  are main's) and `bin/kt.sh` twice (the 50-1000 lines' times on k25-15, k25-25, cf-spur-gear), against main's kt in
+  the same window (vibe4's load moves them 30 %).
+- **shfall:** `bin/why4.sh shfall ""` (vibe4): 2 known differences (37e806ac, 570dfc37).
+- **Model suite** (model-core changes; a Boolean change that moves documents): `suites3.sh <tag> <host> <base wt>
+  <new wt>`, then compare each document's "N/M features" line.
+- `gate-wt4.sh <tag> <worktree>` runs whyall4 + kg + kt + shfall in a row; about 1.5-2 h, most of it builds per call
+  and serial replays.
+
+## 11-11 21:30 UTC: louver, infento, the seam fix
+- **c2-sm-louver Extrude 3 (landed d95c1a0b):** not touching pieces in live (REQUESTS 2277): one of its regions held a
+  "hole" of no area, a text glyph's contour (entity 1<<30 + 91) along an arc and back, which our profile made a slit in
+  the tool; the slit cut the plate into pieces meeting along the 0.635 mm edge. Holes of no area are left out
+  (eval.rs `region_profile_with`). Extrude 3 OK, Part 16's volume as live; its counts 88/258/172 against live's
+  86/252/168 with OCCT's Booleans too (NOSHAPE_BOOL_RUST=0): not the Boolean; to core (the sheet-metal trim).
+- **Touching solids (asm-infento-subs Extrude 13, branch bool-touch2):** live makes two parts of a cut whose lumps meet
+  along a tangent line (Part 5 82,132.6 mm3 and the house 130,236.1). Ours pairs the four faces at such an edge across
+  the material going round it (`across_material`: angle, then how they bend, a crack's sides by their material) and
+  keeps the shells apart; not two arguments' whole edges lying on one another (bool-corpus 788f0e94: OCCT keeps both
+  boxes as they were). model-core's non-manifold refusal looks at each solid (a pinched one still refused, Bo3).
+- **The seam fix (branch bool-seam3):** an open edge's end found across a free-form face's seam takes its own
+  parameter. It unblocks the tyre (asm-infento-subs Boolean 2: 16 tread tools lost a torus face) and makes shfall
+  29f3147a show a near-tangent touch 5 um from a vertex: such a touch with the curve along the boundary from the vertex
+  is that vertex (`intervals_on`). Guard (lead 11-11): OCCT's sections that branch 10.6 um from a corner (a stub 10 to
+  100 tolerances long from the corner to where two more curves start) decline, late ("a short section from a corner":
+  parity56's 5 cuts by patterns of cutters, declined on main too; shorter stubs, b7cb4b90's 0.6 um, ours merges as
+  OCCT). OCCT's builder takes the stub into the vertex: to do, then those 5 are ours. Gate: corpora + parity56 0
+  differences (parity56 351 as main), knurl / gear as main and level, shfall its known 2 (58 taken, main 55).
+- **The tyre after the seam fix:** declines "an ellipse on another face": a section ellipse assigned to a third face
+  (a plane) it only passes near; to look into next.
+
 ## From dx (11-11 15:56 UTC, lead): asm-infento-subs' cascade starts at a Boolean ours calls non-manifold
 asm-infento-subs loses 59 occurrences and 80 mates; its biggest cascade (37 features) starts in Part Studio
 1dc32b5117a43e3600d77826 at feature 15 **Boolean 2** (Subtract, no Keep tools): ours "Boolean operation would result in

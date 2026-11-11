@@ -93,7 +93,7 @@ impl BooleanOptions {
 #[derive(Default)]
 pub struct DeclineMemo(std::sync::Mutex<Vec<(u64, BooleanOp, usize)>>);
 
-const LATE_DECLINES: [&str; 5] = ["a seam off a ruling", "two edges leave a vertex in one direction", "an arc across a cylinder's seam", "a piece across its surface's seam angle", "an invalid result"];
+const LATE_DECLINES: [&str; 6] = ["a seam off a ruling", "two edges leave a vertex in one direction", "an arc across a cylinder's seam", "a piece across its surface's seam angle", "an invalid result", "a short section from a corner"];
 
 std::thread_local! {
     static DECLINE_SCOPE: std::cell::RefCell<Option<DeclineScope>> = const { std::cell::RefCell::new(None) };

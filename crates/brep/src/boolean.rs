@@ -1182,7 +1182,19 @@ impl Ctx<'_> {
                         let sc = (pt1 - pt0) / esw;
                         return Ok(C2::Nurbs { c, t0: pt0 + ra * sc, t1: pt0 + rb * sc });
                     }
-                    let (mut a, mut b) = (at(self.p(s.v[0])), at(self.p(s.v[1])));
+                    // (At an end of an open edge found more than half the edge away from that end's own parameter:
+                    // its place taken on the other side of the face's seam (a ring's arc ending on the seam: its last
+                    // piece ran back to the edge's start): that end's own parameter.)
+                    let ev = self.edge_seg(e).v;
+                    let own = |w: u32, p: DVec3| {
+                        let t = at(p);
+                        let end = if ev[0] != ev[1] && w == ev[0] { Some(*pt0) } else if ev[0] != ev[1] && w == ev[1] { Some(*pt1) } else { None };
+                        match end {
+                            Some(x) if (t - x).abs() > 0.5 * (pt1 - pt0).abs() => x,
+                            _ => t,
+                        }
+                    };
+                    let (mut a, mut b) = (own(s.v[0], self.p(s.v[0])), own(s.v[1], self.p(s.v[1])));
                     // (A piece of a closed edge ending where it closes: that end at whichever of its curve's ends has
                     // the piece's middle between its two ends.)
                     // (Or a period on, either end, within its curve's range: a vertex just past the seam of a face
@@ -1563,6 +1575,18 @@ impl Ctx<'_> {
             Path::Ellipse(e) => e.length(x, y),
             _ => (y - x) * scale,
         };
+        // (A point where it touches the boundary a few tolerances on from one of the face's vertices on it, along the
+        // boundary from there (an arc leaving a vertex nearly tangent to the face's edge, apart only past the
+        // tolerance): that vertex alone, as OCCT's pave.)
+        let along = |x: f64, y: f64| apart(x.min(y), x.max(y)) <= 100.0 * self.tol && distance_with(c2.at((0.5 * (x + y) - t0) / (t1 - t0)), &bound, spans) <= tol;
+        let at_vertex: Vec<bool> = (0..cuts.len())
+            .map(|k| {
+                matches!(cuts[k].1, End::Point(_))
+                    && !across.contains(&cuts[k].0)
+                    && cuts.iter().any(|&(t, end)| matches!(end, End::Vertex(_)) && along(t, cuts[k].0))
+            })
+            .collect();
+        let cuts: Vec<(f64, End)> = cuts.into_iter().zip(at_vertex).filter(|x| !x.1).map(|x| x.0).collect();
         // Cuts at one place (within the section's tolerance, OCCT's paves on it) are one, a vertex if any of them is.
         let mut merged: Vec<(f64, End)> = Vec::with_capacity(cuts.len());
         let mut alone: Vec<bool> = Vec::with_capacity(cuts.len());
@@ -2322,17 +2346,28 @@ impl Ctx<'_> {
     /// ridges' 32 um above).
     fn occt_sections(&mut self, src: &dyn SectionSource, a: (u32, u32), b: (u32, u32)) -> R<Vec<SectionCurve>> {
         let mut secs: Vec<SectionCurve> = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+        let face = |(arg, index): (u32, u32)| {
+            let k = self.faces.partition_point(|g| (g.arg, g.index) < (arg, index));
+            (k < self.faces.len() && (self.faces[k].arg, self.faces[k].index) == (arg, index)).then_some(k)
+        };
+        let tol = self.tol;
+        // (A curve 10 to 100 tolerances long from a vertex of the faces to where two more of the pair's curves branch
+        // (OCCT's section of a tool's corner on a cylinder, branching 10.6 um from the corner): OCCT's builder takes
+        // it into the vertex; not ours. Shorter ones ours merges as OCCT.)
+        let corners: Vec<DVec3> = [face(a), face(b)].into_iter().flatten().flat_map(|f| self.faces[f].edges.iter().flat_map(|&(e, _)| self.edges[e].v)).map(|w| self.p(w)).collect();
+        let at_corner = |q: DVec3| corners.iter().any(|&c| (c - q).length() <= tol);
+        let ends: Vec<[DVec3; 2]> = secs.iter().map(|c| [c.curve.at(c.t0), c.curve.at(c.t1)]).collect();
+        let branch = |q: DVec3| ends.iter().filter(|e| e.iter().any(|&x| (x - q).length() <= tol)).count() >= 3;
+        let stub = |l: f64| l > 10.0 * tol && l <= 100.0 * tol;
+        if ends.iter().any(|&[p0, p1]| stub((p1 - p0).length()) && ((at_corner(p0) && branch(p1)) || (at_corner(p1) && branch(p0)))) {
+            return Err(Decline("a short section from a corner"));
+        }
         // (The edges' meeting points for every pair cost a small Boolean a sixth more.)
         let copied = |arg: u32| self.copies.get(arg as usize).copied().flatten().is_some();
         if !secs.is_empty() && !(copied(a.0) && copied(b.0)) {
             return Ok(secs);
         }
-        let face = |(arg, index): (u32, u32)| {
-            let k = self.faces.partition_point(|g| (g.arg, g.index) < (arg, index));
-            (k < self.faces.len() && (self.faces[k].arg, self.faces[k].index) == (arg, index)).then_some(k)
-        };
         let (Some(fa), Some(fb)) = (face(a), face(b)) else { return Ok(secs) };
-        let tol = self.tol;
         let ends: Vec<DVec3> = self.boundaries_meet(fa, fb).into_iter().filter(|q| secs.iter().all(|c| (c.curve.at(c.t0) - *q).length() > 10.0 * tol && (c.curve.at(c.t1) - *q).length() > 10.0 * tol)).collect();
         if ends.len() < 2 || ends.len() > 4 {
             return Ok(secs);
