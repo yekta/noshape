@@ -94,6 +94,15 @@ scratch /root/bool-scratch.
   level), shfall as before; model suite the same document by document. Left in hat8 at load 45: import 17.4 s (dx), the chamfers 5.8 + 3.0 s
   (blend).
 
+## From dx (11-11 15:56 UTC, lead): asm-infento-subs' cascade starts at a Boolean ours calls non-manifold
+asm-infento-subs loses 59 occurrences and 80 mates; its biggest cascade (37 features) starts in Part Studio
+1dc32b5117a43e3600d77826 at feature 15 **Boolean 2** (Subtract, no Keep tools): ours "Boolean operation would result in
+non-manifold body.", live OK; then Extrude 13 the same, Boolean 6 / 7 "Need at least two parts", chamfers and
+fillets lose their edges. Reproduce: a folder with a link to /home/ngyekta/parity/models/asm-infento-subs as
+NOSHAPE_PARITY_ASSEMBLIES, `cargo test --release -p noshape-ops --test all parity::parity_assemblies -- --ignored
+--nocapture`. The recorded Booleans (NOSHAPE_RECORD_BOOLEANS, failed calls included, exact) are being written to
+vibe3:~/tmp/dx/infento-bool; dx adds the case's name here when the run ends.
+
 ## From dx (2026-11-11 08:52 UTC, lead's speed list): cf-surface-pattern's Surface Pattern 3, where its 13-16 s go
 The feature is one opBoolean: Part 1 (7 faces: B-spline, offset of a B-spline, planes) minus 85 placed copies of
 Part 2, a sphere r 14.35 mm (Revolve 1 of a half circle; live's is a sphere too). Recorded case vibe4:~/tmp/dx-sp-one/
