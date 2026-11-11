@@ -13,6 +13,29 @@ Worktree /root/projects/noshape-wt/blend (and blend2 for a second build), builds
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## 11-11 20:44 UTC: rings-loft's pattern tips (lead: exact, in crates/brep, till end of 11-12); RABC parked
+- Landed today: blend-cliff (362b57e0, the impeller's Fillet 1), the knife's Chamfer 1 speed (11b4acf2). Queued:
+  blend-lcm, blend-filletspeed (both gated: model suite =, assemblies = (asm-infento-subs 108 on both sides, four
+  alternating runs: main's 113 earlier was its own noise), g++-13). Knife sliver fix (blend-parity 5052819de: a sectioned
+  chamfer's edge under 0.02 mm it made collapsed to one vertex, as live's JZQ; knife 15 -> 16 of 52): model suite
+  826 -> 827, assembly pair running (vibe4); the knife then stops at Mirror 1 (unify of a surface of linear extrusion
+  and its mirror image: core).
+- **c2-rings-loft Circular pattern 2** (feature pattern of Extrude 4 + Chamfer 2, 9 copies over 180°; live 103 faces):
+  (a) the copies' chamfer references were lost in the pattern merge's splits: `instance_references` now takes every
+  piece of a renamed edge whose faces descend (`descends_from`) from the renamed faces (blend-parity 6bbfc3d13, WIP:
+  no result change alone). (b) The copies' diamond bosses overlap their neighbours by ~1.3° at the tips (each ±11.9°,
+  22.5° apart): each copy's tip edges end in a micro-ridge above the neighbour's already chamfered tip. noshape's blend
+  declines ("a wall shorter than the blend", "a chain end with more than three edges", "another edge of a wall within
+  the blend"); OCCT fails. Sections (the constant-angle guard off, 9bb672ba7 WIP): every copy chamfered, area
+  1435.20 (live 1435.16), but 1e-4..3e-3 mm² fragments at each tip (145 faces); the sliver merge at 0.1 mm gives live's
+  103/254/152 but the area 0.037 under (out of band); the plain tool (corner on the edge) is worse (151). Dumps:
+  vibe4 ~/tmp/blend/dumps/chamfer-26 (seed), -28 (first copy), -30.. (later). Next: the exact chamfer through the
+  neighbour's chamfered tip in noshape's blend (crates/brep/src/blend.rs, bool's gate), till end of 11-12.
+- **RABC parked** (SETBACK-FILL-PATCH): live 2499 (core/q2499/out.json; behaviours "blend (2499)"): RABC is a cubic
+  B-spline, 15 x 14 poles; live's own G1 fill re-run on RABC's finished edges gives 34.709 mm², not 34.464: live's
+  patch depends on the feature's split-edge parameterisation or the faces round the hole; ours 35.641 is above even
+  live's G2 refill. Start there.
+
 ## 11-11 15:35 UTC: branches and gates; the speed gaps
 - Landed: blend-opchamfer (cb0551bf), blend-equal (011fcc6d). Queued: blend-knifespeed's Chamfer 1 commit (a6ffa0de:
   no OCCT retries for a distance-and-angle / two-distance chamfer with sections to fall back on, lofted section tools
