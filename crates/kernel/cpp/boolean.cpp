@@ -5101,12 +5101,39 @@ bool cut_volumes_add_up(const std::vector<TopoDS_Shape>& args, const std::vector
   return !tools.empty() && smallest > 0 && std::abs(volume_of(result) - (va - vt)) <= 1e-3 * smallest;
 }
 
+// Whether the solids a glued fuse left apart don't touch: glue that merged nothing (tools overlapping each other,
+// c2-rings-loft's chamfered tips) leaves them all apart, whose volumes add up all the same.
+static bool apart_solids_dont_touch(const TopoDS_Shape& result)
+{
+  std::vector<TopoDS_Shape> solids;
+  for (TopExp_Explorer e(result, TopAbs_SOLID); e.More(); e.Next())
+    solids.push_back(e.Current());
+  if (solids.size() < 2)
+    return true;
+  std::vector<Bnd_Box> boxes(solids.size());
+  for (size_t i = 0; i < solids.size(); ++i)
+  {
+    BRepBndLib::Add(solids[i], boxes[i], false);
+    boxes[i].Enlarge(Precision::Confusion());
+  }
+  for (size_t i = 0; i < solids.size(); ++i)
+    for (size_t j = i + 1; j < solids.size(); ++j)
+    {
+      if (boxes[i].IsOut(boxes[j]))
+        continue;
+      BRepExtrema_DistShapeShape d(solids[i], solids[j]);
+      if (!d.IsDone() || d.Value() <= Precision::Confusion())
+        return false;
+    }
+  return true;
+}
+
 bool volumes_add_up(const std::vector<TopoDS_Shape>& inputs, const TopoDS_Shape& result)
 {
   double sum = 0;
   for (const TopoDS_Shape& x : inputs)
     sum += volume_of(x);
-  return std::abs(volume_of(result) - sum) <= 1e-7 * std::max(sum, 1e-12);
+  return std::abs(volume_of(result) - sum) <= 1e-7 * std::max(sum, 1e-12) && apart_solids_dont_touch(result);
 }
 
 void for_sub_shapes(const TopoDS_Shape& s, const std::function<void(const TopoDS_Shape&)>& f)

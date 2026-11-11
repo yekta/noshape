@@ -1686,14 +1686,23 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
     // before the pattern (as New), then all go into one boolean. Linear in
     // the instance count; re-applying into the growing part was quadratic
     // (a ×200 rib pattern took 167 s).
-    let ops: Option<Vec<String>> = seeds
-        .iter()
-        .map(|s| match s.params.get("operationType") {
-            Some(crate::params::ParamValue::Enum(o)) if o == "ADD" || o == "REMOVE" => Some(o.clone()),
-            _ => None,
-        })
-        .collect();
-    if let Some(ops) = ops {
+    // (A fillet or chamfer of what an Add before it made, every reference on that: run on each instance's New body before
+    // it's added, as live's: c2-rings-loft's copies of Extrude 4 + Chamfer 2, whose chamfered bosses overlap at their
+    // tips, each tip chamfered as if alone (live 2513). `None` in `ops`.)
+    let mut ops: Option<Vec<Option<String>>> = Some(Vec::new());
+    for (i, s) in seeds.iter().enumerate() {
+        let Some(list) = ops.as_mut() else { break };
+        match s.params.get("operationType") {
+            Some(crate::params::ParamValue::Enum(o)) if o == "ADD" || o == "REMOVE" => list.push(Some(o.clone())),
+            _ if (s.type_id == "fillet" || s.type_id == "chamfer")
+                && seeds[..i].iter().zip(list.iter()).rev().find(|(_, o)| o.is_some()).is_some_and(|(add, o)| o.as_deref() == Some("ADD") && references_only_of(&s.params, add.id)) =>
+            {
+                list.push(None)
+            }
+            _ => ops = None,
+        }
+    }
+    if let Some(ops) = ops.filter(|o| o.iter().any(Option::is_some)) {
         return reapply_as_tools(ev, &seeds, &ops, instances);
     }
     let features = ev.features;
@@ -1762,11 +1771,35 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
     Ok(())
 }
 
+/// Whether every face, edge and vertex referenced in `params` lies only on what `feature` made (an Add's boss).
+fn references_only_of(params: &crate::params::ParamValues, feature: FeatureId) -> bool {
+    let rn = Renamer { tmp: feature, seed: feature, pattern: feature, code: 0 };
+    let mut any = false;
+    fn walk(p: &crate::params::ParamValues, rn: &Renamer, any: &mut bool) -> bool {
+        p.0.values().all(|v| match v {
+            crate::params::ParamValue::Query(q) => q.iter().all(|r| match r {
+                Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => {
+                    *any = true;
+                    match n {
+                        TopoName::Edge { faces, .. } => faces.iter().all(|f| rn.contains(f)),
+                        TopoName::Vertex { faces, .. } => faces.iter().all(|f| rn.contains(f)),
+                        _ => rn.contains(n),
+                    }
+                }
+                _ => true,
+            }),
+            crate::params::ParamValue::Array(items) => items.iter().all(|i| walk(i, rn, any)),
+            _ => true,
+        })
+    }
+    walk(params, &rn, &mut any) && any
+}
+
 /// [`reapply_features`] for Add / Remove seeds: every instance evaluated as
 /// New against the model before the pattern; their solids, renamed like
 /// re-applied instances, are then added or removed in one boolean per seed
 /// (in the seed's merge scope).
-fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String], instances: &[Instance]) -> FResult<()> {
+fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[Option<String>], instances: &[Instance]) -> FResult<()> {
     let features = ev.features;
     let base = ev.ctx.clone();
     let (feature, units, outer_vars, xform, custom) = (ev.feature, ev.units, ev.outer_vars, ev.xform, ev.custom.clone());
@@ -1781,9 +1814,41 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String
             Some(outer) => m * *outer,
             None => m,
         };
-        let mut out = Vec::with_capacity(seeds.len());
-        for seed in seeds {
+        let mut out: PerSeed = Vec::with_capacity(seeds.len());
+        // The last Add's instance: its seed's index, its scratch id, its context after it.
+        let mut last_add: Option<(usize, FeatureId, crate::regen::context::Context)> = None;
+        for (si, seed) in seeds.iter().enumerate() {
             let tmp = FeatureId(mix(&[feature.0, seed.id.0, inst.code as u64]) | (1 << 62));
+            if ops[si].is_none() {
+                // A blend of the Add's New body: its references moved onto that body, run there, the body then the Add's.
+                let Some((ai, atmp, actx)) = last_add.take() else {
+                    out.push(Err("the Add before it failed".into()));
+                    continue;
+                };
+                let to_instance = Renamer { tmp: seeds[ai].id, seed: atmp, pattern: feature, code: inst.code };
+                let params = crate::regen::eval::expand_query_variables(&seed.params, &base).unwrap_or_else(|| seed.params.clone());
+                let params = instance_references(&actx, &params, &|n| to_instance.to_seed(n)).unwrap_or(params);
+                let mut sub = EvalCtx::new(tmp, &seed.name, &params, units, actx, outer_vars);
+                sub.features = features;
+                sub.scratch = true;
+                sub.cancel = cancel.clone();
+                sub.xform = Some(total);
+                sub.custom = custom.clone();
+                let eval_fn = super::evaluator(&seed.type_id).expect("checked by the caller");
+                match eval_fn(&mut sub) {
+                    Ok(()) => {
+                        let (ra, rm) = (Renamer { tmp: atmp, seed: seeds[ai].id, pattern: feature, code: inst.code }, Renamer { tmp, seed: seed.id, pattern: feature, code: inst.code });
+                        let made: Made = sub.ctx.bodies.iter().filter(|b| b.id.feature == atmp).map(|b| (ra.body_id(&b.id), b.kind, b.shape.clone(), b.faces.iter().map(|n| ra.rename(&rm.rename(n))).collect())).collect();
+                        if let Some(Ok((_, add_made))) = out.get_mut(ai) {
+                            *add_made = made;
+                        }
+                        last_add = Some((ai, atmp, sub.ctx));
+                        out.push(Ok((sub.warnings, Vec::new())));
+                    }
+                    Err(e) => out.push(Err(e.message)),
+                }
+                continue;
+            }
             let mut params = crate::regen::eval::expand_query_variables(&seed.params, &base).unwrap_or_else(|| seed.params.clone());
             params.set("operationType", crate::params::ParamValue::Enum("NEW".into()));
             let mut scratch = base.clone();
@@ -1806,6 +1871,9 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String
                 Ok(()) => {
                     let rn = Renamer { tmp, seed: seed.id, pattern: feature, code: inst.code };
                     let made = sub.ctx.bodies.iter().filter(|b| b.id.feature == tmp).map(|b| (rn.body_id(&b.id), b.kind, b.shape.clone(), b.faces.iter().map(|n| rn.rename(n)).collect())).collect();
+                    if ops[si].as_deref() == Some("ADD") {
+                        last_add = Some((si, tmp, sub.ctx));
+                    }
                     Ok((sub.warnings, made))
                 }
                 Err(e) => Err(e.message),
@@ -1868,6 +1936,7 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String
         if t.is_empty() {
             continue;
         }
+        let Some(op) = ops[si].as_deref() else { continue };
         let scope = {
             let sc = EvalCtx::new(ev.feature, &seeds[si].name, &seeds[si].params, ev.units, ev.ctx.clone(), ev.outer_vars);
             super::extrude::scope(&sc)
@@ -1875,7 +1944,7 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String
         // Instances that miss the part leave the pattern OK, without the
         // Add / Remove infos (live "kern (10-23 22:00) patterns": O3, M2).
         let n = ev.infos.len();
-        ev.apply_operation(t, &ops[si], scope, BodyKind::Solid)?;
+        ev.apply_operation(t, op, scope, BodyKind::Solid)?;
         let mut i = n;
         while i < ev.infos.len() {
             if ev.infos[i] == crate::regen::eval::NO_GEOMETRY_CHANGE || ev.infos[i] == crate::regen::eval::TOOLS_MISS_TARGETS {

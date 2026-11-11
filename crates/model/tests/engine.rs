@@ -251,6 +251,39 @@ fn reapplied_instance_references_survive_edits() {
     assert_eq!(res.context.bodies[0].faces.len(), f0);
 }
 
+/// A pattern of a boss and the chamfer of its top: each copy's boss chamfered as if alone, then added (live 2513:
+/// c2-rings-loft's overlapping tips each keep their own chamfer faces).
+#[test]
+fn reapplied_chamfered_bosses_that_overlap_are_each_chamfered_alone() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.012, "2 mm");
+    let pl = t.top_plane("2 mm");
+    let cs = t.sketch(Reference::FeaturePlane(pl), rect(0.002, 0.001, 0.012, 0.011));
+    let r = t.regions(cs)[0].clone();
+    let boss = t.extrude(r, "10 mm", "ADD");
+    let res = t.ok();
+    let top = |x: f64, y: f64| edge_near(&res.context.bodies[0], DVec3::new(x, y, 0.012));
+    let edges = vec![top(0.007, 0.001), top(0.012, 0.006), top(0.007, 0.011), top(0.002, 0.006)];
+    let chamfer = t.add("chamfer", &[("entities", q(edges)), ("width", e("2 mm"))]);
+    t.add(
+        "linearPattern",
+        &[
+            ("patternType", en("FEATURE")),
+            ("instanceFunction", q(vec![Reference::Feature(boss), Reference::Feature(chamfer)])),
+            ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])),
+            ("distance", e("8 mm")),
+            ("instanceCount", e("2")),
+            ("fullFeaturePattern", b(true)),
+        ],
+    );
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1);
+    // Plate 960 mm³; each chamfered boss 800 + ∫₀² (10 − 2t)² dt = 930.667 mm³, overlapping by 160 + ∫₀¹ (2 − 2t)(10 − 2t) dt
+    // = 169.333 mm³.
+    let v = total_volume(&res.context) * 1e9;
+    assert!((v - (960.0 + 2.0 * (800.0 + 392.0 / 3.0) - (160.0 + 28.0 / 3.0))).abs() < 1e-3, "{v}");
+}
+
 #[test]
 fn reapply_reevaluates_up_to_next_per_instance() {
     let mut t = T::new();
