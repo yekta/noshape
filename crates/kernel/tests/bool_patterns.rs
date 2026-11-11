@@ -1875,3 +1875,26 @@ fn an_arc_shorter_than_the_tolerance_cut_as_occt() {
     let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
     assert_eq!(k::bool_corpus::Summary::of(&r).differences(&c.summary), Vec::<String>::new());
 }
+
+/// cf-surface-pattern's Surface Pattern 3 (recorded: a part cut by 85 stamp bodies): near a target's vertex of 4.9 um
+/// a tool's face has two sections between the same two vertices, 2-6 um apart (with the target's face and with another
+/// tool's): one edge within both curves' errors and the vertices' tolerance, as OCCT's existing pave block (left as two,
+/// a sliver lens became slits inside one piece that spanned another tool's boundary: "a non-manifold result").
+/// noshape's Boolean takes the cut: valid, one solid, OCCT's faces, the volume to its area times 1e-7.
+#[test]
+#[ignore = "T2: an 85-tool cut, 2-8 s"]
+fn sections_between_the_same_vertices_within_their_errors_are_one() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "7ecd5a8b6e7c4f6b").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    assert_eq!(r.shape.count(k::ShapeType::Solid), 1);
+    assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
+}

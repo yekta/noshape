@@ -4823,6 +4823,13 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             // (An OCCT section between an edge's two vertices: one with it within the larger of its tolerance and theirs
             // where the edge is a common block, else nearly parallel within twice that, at most ten times its own and
             // 1 mm, OCCT's IsExistingPaveBlock.)
+            // (Two OCCT sections between the same two vertices: one within both curves' errors and the vertices' larger
+            // tolerance, OCCT's IsExistingPaveBlock (a pattern's tool face crossed by another tool and the target near a
+            // target's vertex of 4.9 um: its two sections 2-6 um apart left a sliver lens as slits, cf-surface-pattern).)
+            if s.v[0] != s.v[1] && sedges[i].origins.is_empty() && stol(&o.g) > 0.0 && stol(&s.g) > 0.0 {
+                let tv = cx.pool.t[key.0 as usize].max(cx.pool.t[key.1 as usize]);
+                reach = reach.max(stol(&o.g) + stol(&s.g) + tv);
+            }
             if s.v[0] != s.v[1] && !sedges[i].origins.is_empty() {
                 let tv = cx.pool.t[key.0 as usize].max(cx.pool.t[key.1 as usize]);
                 let dir = |g: &Seg, t: f64| (cx.seg_at(g, (t + 1e-3).min(1.0)) - cx.seg_at(g, (t - 1e-3).max(0.0))).normalize_or_zero();

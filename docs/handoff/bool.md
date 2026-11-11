@@ -15,6 +15,18 @@ scratch /root/bool-scratch.
    edges on faces 137 ms; live's feature 13 ms); the hunting knife's Mirror 1 (our sections ahead 208 ms); c2-rings-loft's
    Circular pattern 2 (8 Booleans 574 ms, OCCT's build 414); cf-surface-pattern's Surface Pattern 3 (ours declines
    spheres cutting B-spline / offset faces, even one; OCCT 7.8 s).
+   - **Surface Pattern 3 ours (landing 14:4x):** its 85-tool cut declined "a non-manifold result": near the target's
+     vertex of 4.9 um a tool's face had two sections between the same two vertices 2-6 um apart (with the target's face
+     and another tool's), a sliver lens left as slits, one piece spanning a tool's boundary. Two sections between the
+     same vertices are one within both curves' errors and the vertices' larger tolerance (OCCT's IsExistingPaveBlock).
+     Suite (vibe5): Surface Pattern 3 9,550 -> 1,850 ms, cf-surface-pattern 11.7 -> 3.4 s (live 4.2 s); its counts
+     129/388/261 (OCCT's 129/382/255, live 131/387/258). Gate: corpora + parity56, knurl / gear (level), shfall,
+     valve2, snap as before; suite the same but for that line. T2 sections_between_the_same_vertices_within_their_errors_are_one.
+   - Held: the seam end fix (c2-rings-loft's Circular pattern 2, 4 fuses ours): it lets shfall's 29f3147a through to a
+     difference of its own (edges leaving a shared vertex nearly tangent part 4.9 um on; ours splits there, OCCT
+     doesn't). Branch bool-seamend in bool-main2.
+   - c2-tpd-fillet-variable's Fillet 1 (blend, 11-11): its sections ahead are real plane / B-spline sections, 100-220 ms
+     each in OCCT's marching (the refit isn't it): needs our own free-form sections.
 
 ## Shell Gehäuse (c2-impeller-loft feature 11; lead 01:05: match live, by_quadrics) — 11-11 07:40 UTC state
 - Against live's 2275 points (bool/q2275/edges.json; probe xprobe `probe_live_points`, our result from the dump
