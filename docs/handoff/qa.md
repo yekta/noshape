@@ -33,7 +33,7 @@ Gehäuse), as do its later features; the knife's Chamfer 1 builds since blend's 
 cf-surface-pattern's Surface Pattern 3 is 12× live while Pattern 4 is under live; blend's fast-finish (4dc4f0964) and dx's
 mesh fix (fcd0b283f) came after this green: the 11-12 02:00 window re-measures.
 
-**11-11 20:35:** the result store (core, stages 2–4 + STORE-FACE-SPLIT fix 255b927a6) checked: go (corpus / mutations /
+**11-11 21:03:** the result store (core, stages 2–4 + STORE-FACE-SPLIT fix 255b927a6) checked: go (corpus / mutations /
 corruption: ~/tmp/qa on vibe5, bin/{sig,corpus,mutate,corrupt,mkdocs}.py, bin/store-all.sh <binary> <tag> runs all three).
 v0.4.44 cut from 44ff040aa (17:00 list); its Linux job failed at upload-artifact (GitHub's artifact service), the lead's watcher
 re-runs it: do the release checks at publish (v0443 as PREV). CI re-runs: bin/ci-rerun-loop.sh <run> (detached, every 30 min,
