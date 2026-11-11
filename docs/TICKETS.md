@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## qa, 2026-11-11
-- [ ] P0 STORE-FACE-SPLIT (core; qa 2026-11-11 11:51, the lead's result-cache check) **a part read back from the persistent
+- [x] (verified by qa 2026-11-11 14:43 on green 44ff040aa, core 255b927a6: the whole check again: corpus 87 / 87 equal with no store, cold and warm (incl. c2-helical-sweep, c2-housing-draft, c2-valve-config); the six mutations equal, face counts too; corruption 13 / 13 on c2-hunting-knife and on c2-helical-sweep. feature_list over all tabs 63.7 s without, 66.2 cold, 26.3 warm (c2-impeller-loft 14.8 -> 0.02 s, cf-surface-pattern 9.0 -> 0.37). Store: go for the 17:00 build.) P0 STORE-FACE-SPLIT (core; qa 2026-11-11 11:51, the lead's result-cache check) **a part read back from the persistent
   result cache has a periodic face split into pieces that share one id**: green 1bfbaacdb, NOSHAPE_RESULT_STORE set, the same
   document opened twice (cold writes, warm reads). c2-helical-sweep (corpus, saved copy): no store and cold, Part 1 has 6 faces;
   warm, 14: Revolve 1's cylinder face (7,959.07 mm²) comes back as 9 faces with one id (1,363.88 + 134.68 + 921.34 + 6 ×
