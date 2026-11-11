@@ -2,6 +2,7 @@
 // put on the part's faces in 2D, only the real intersections computed, each face split and the kept pieces sewn.
 
 #include "internal.hpp"
+#include <OSD_Parallel.hxx>
 
 #include <chrono>
 #include <optional>
@@ -773,7 +774,13 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
   on_blend.resize(all_blends.size());
   // Each face's parameter plane, made once.
   std::map<const TopoDS_TShape*, std::unique_ptr<Domain>> domains;
+  bool frozen = false; // (while the sections run in parallel: only looked up)
   auto domain_of = [&](const TopoDS_Face& f) -> const Domain* {
+    if (frozen)
+    {
+      const auto it = domains.find(f.TShape().get());
+      return it == domains.end() || it->second->face.IsNull() ? nullptr : it->second.get();
+    }
     std::unique_ptr<Domain>& d = domains[f.TShape().get()];
     if (!d)
     {
@@ -785,7 +792,6 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
   };
   auto section = [&](const TopoDS_Face& a, const TopoDS_Face& bface, std::vector<Cut>& on_a, std::vector<Cut>& on_b,
                      const std::vector<TopoDS_Vertex>* run_to) {
-    const KernelTimer t1("blend.direct.section");
     // The surfaces' intersection within the faces' parameter boxes (each curve then trimmed to both faces).
     auto bounded = [](const TopoDS_Face& f) {
       double u0, u1, v0, v1;
@@ -909,6 +915,16 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
             for (ShapeList::Iterator it(*fl); it.More(); it.Next())
               near_support[i].Add(it.Value());
   }
+  // The blends' sections with the part's faces near them: each pair on its own (OCCT's pool; the faces' parameter
+  // planes made first, then only read), put on the faces in the pairs' order (cf-snap-hook's Fillet 6: 85 sections).
+  struct Pair
+  {
+    int    j;
+    size_t k;
+    bool   ok = false;
+    std::vector<Cut> on_a, on_b;
+  };
+  std::vector<Pair> pairs;
   for (size_t k = 0; k < all_blends.size(); ++k)
   {
     Bnd_Box bb;
@@ -918,13 +934,38 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     {
       if (bb.IsOut(pboxes[j]) || std::find(coincident[i].begin(), coincident[i].end(), j) != coincident[i].end() || !near_support[i].Contains(pfaces(j)))
         continue;
-      if (!section(TopoDS::Face(pfaces(j)), all_blends[k], on_part[j], on_blend[k], nullptr))
-      {
-        if (dbg)
-          std::fprintf(stderr, "blend direct: section of part face %d (kind %d) with blend %zu (kind %d) failed\n", j, (int)BRepAdaptor_Surface(TopoDS::Face(pfaces(j))).GetType(), k, (int)BRepAdaptor_Surface(all_blends[k]).GetType());
-        no("a blend's section with the part");
-      }
+      domain_of(TopoDS::Face(pfaces(j)));
+      domain_of(all_blends[k]);
+      pairs.push_back(Pair{j, k});
     }
+  }
+  {
+    const KernelTimer t1("blend.direct.sections");
+    frozen = true;
+    OSD_Parallel::For(0, (int)pairs.size(), [&](int n) {
+      Pair& pr = pairs[(size_t)n];
+      try
+      {
+        pr.ok = section(TopoDS::Face(pfaces(pr.j)), all_blends[pr.k], pr.on_a, pr.on_b, nullptr);
+      }
+      catch (...)
+      {
+        pr.ok = false;
+      }
+    });
+    frozen = false;
+  }
+  for (Pair& pr : pairs)
+  {
+    if (!pr.ok)
+    {
+      if (dbg)
+        std::fprintf(stderr, "blend direct: section of part face %d (kind %d) with blend %zu (kind %d) failed\n", pr.j, (int)BRepAdaptor_Surface(TopoDS::Face(pfaces(pr.j))).GetType(), pr.k, (int)BRepAdaptor_Surface(all_blends[pr.k]).GetType());
+      no("a blend's section with the part");
+    }
+    std::vector<Cut>& a = on_part[pr.j];
+    a.insert(a.end(), pr.on_a.begin(), pr.on_a.end());
+    on_blend[pr.k].insert(on_blend[pr.k].end(), pr.on_b.begin(), pr.on_b.end());
   }
   // Inside a tool / the part.
   std::vector<std::unique_ptr<BRepClass3d_SolidClassifier>> in_tool;
