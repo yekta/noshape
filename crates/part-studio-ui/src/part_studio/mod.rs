@@ -802,7 +802,7 @@ impl PartStudioView {
             if burst {
                 executor.timer(Duration::from_millis(12)).await;
             }
-            let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), touch_probe, ..Default::default() };
+            let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), touch_probe, store: noshape_app_core::result_store::store(), ..Default::default() };
             // Where a slow round trip waits (COMMIT-LATENCY): the background thread starting, the regenerator's lock.
             let started = asked.elapsed();
             // `NOSHAPE_PERF`: when the opened document's first regeneration starts (document open's split).
@@ -825,6 +825,10 @@ impl PartStudioView {
                 *seed.lock() = Some(held.snapshot());
             }
             drop(held);
+            // Kept across sessions once final (a preview's coarse meshes refine first).
+            if let Some(store) = opts.store.clone().filter(|_| !r.needs_refine) {
+                noshape_app_core::result_store::keep(store, &r);
+            }
             (r, studio, config, units, upto, editing_sketch, doc_vars, target)
         });
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
@@ -895,7 +899,7 @@ impl PartStudioView {
                 let regen2 = regen2;
                 let fine = cx
                     .background_spawn(async move {
-                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, relative_deflection: deflection, derived: Some(derived2), custom_features: Some(custom2), cancel: Some(cancel2), touch_probe, ..Default::default() };
+                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, relative_deflection: deflection, derived: Some(derived2), custom_features: Some(custom2), cancel: Some(cancel2), touch_probe, store: noshape_app_core::result_store::store(), ..Default::default() };
                         let Some(target) = regenerator_for(&regen2, true, opts.cancel.as_ref(), &seed2) else {
                             return (noshape_model::regen::RegenResult { cancelled: true, ..Default::default() }, studio, config);
                         };
@@ -905,6 +909,9 @@ impl PartStudioView {
                             *seed2.lock() = Some(held.snapshot());
                         }
                         drop(held);
+                        if let Some(store) = opts.store.clone() {
+                            noshape_app_core::result_store::keep(store, &r);
+                        }
                         (r, studio, config)
                     })
                     .await;

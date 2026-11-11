@@ -10,6 +10,19 @@ use noshape_model::partstudio::PartStudio;
 use noshape_model::reference::FeatureId;
 use noshape_model::regen::{RegenOptions, RegenResult, Regenerator};
 use std::collections::HashMap;
+
+/// The persistent regeneration cache for agents (`NOSHAPE_RESULT_STORE`: a directory; unset, none): a document a CLI
+/// reopens shows its parts without regenerating, as the app's.
+fn result_store() -> Option<std::sync::Arc<dyn noshape_model::regen::ResultStore>> {
+    static STORE: std::sync::OnceLock<Option<std::sync::Arc<noshape_model::regen::persist::DirStore>>> = std::sync::OnceLock::new();
+    let s = STORE.get_or_init(|| {
+        let dir = std::env::var_os("NOSHAPE_RESULT_STORE")?;
+        let exe = std::env::current_exe().ok().and_then(|p| std::fs::metadata(p).ok()).map(|m| format!("{}:{:?}", m.len(), m.modified().ok())).unwrap_or_default();
+        let build = blake3::hash(format!("{}|{exe}|{}", crate::VERSION, crate::OCCT_PATCHES).as_bytes()).to_hex()[..16].to_string();
+        Some(std::sync::Arc::new(noshape_model::regen::persist::DirStore { dir: dir.into(), build, cap: 2 << 30 }))
+    });
+    s.clone().map(|s| s as std::sync::Arc<dyn noshape_model::regen::ResultStore>)
+}
 use std::path::{Path, PathBuf};
 
 /// One open document.
@@ -55,6 +68,7 @@ impl OpenDoc {
             derived: Some(crate::derived::DocStudios::new(doc.clone(), self.studio_cache.clone())),
             custom_features: Some(noshape_model::custom::DocumentScripts::from_document(doc)),
             preview_meshes: false,
+            store: result_store(),
             ..Default::default()
         }
     }
@@ -110,7 +124,11 @@ impl OpenDoc {
         };
         let studio = studio(&self.session.doc, tab)?;
         let reg = self.regens.entry(tab).or_default();
-        Ok(reg.regenerate(studio, &values, &units, &opts))
+        let r = reg.regenerate(studio, &values, &units, &opts);
+        if let Some(store) = opts.store.clone() {
+            noshape_model::regen::persist::keep(store, &r);
+        }
+        Ok(r)
     }
 }
 

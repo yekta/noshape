@@ -63,6 +63,16 @@ pub struct RegenOptions {
     /// Only the context (the parts as shapes) and the features' states, no display: what a Derived feature takes from
     /// its source (hat8's Mac mini was meshed again inside its Derived feature: 3.5-6.2 s of each open).
     pub context_only: bool,
+    /// Results kept across sessions ([`ResultStore`]): a whole regeneration found there under its key is shown
+    /// without evaluating a feature.
+    pub store: Option<Arc<dyn ResultStore>>,
+}
+
+/// Regeneration results kept across sessions by key ([`RegenResult::result_key`]): the bytes [`persist::encode_result`]
+/// wrote. Anything missing, cut short, changed or of another format reads as nothing and the studio regenerates.
+pub trait ResultStore: Send + Sync + std::fmt::Debug {
+    fn get(&self, key: RegenKey) -> Option<Vec<u8>>;
+    fn put(&self, key: RegenKey, bytes: Vec<u8>);
 }
 
 /// Stops a running regeneration that a newer edit made stale (live
@@ -135,7 +145,7 @@ impl RegenCancel {
 
 impl Default for RegenOptions {
     fn default() -> Self {
-        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None, custom_features: None, cancel: None, touch_probe: None, context_only: false }
+        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None, custom_features: None, cancel: None, touch_probe: None, context_only: false, store: None }
     }
 }
 
@@ -154,6 +164,10 @@ pub struct RegenResult {
     /// Each feature's key up to the rollback bar ([`RegenKey`]); none for a studio with Assembly contexts or a
     /// touch-probe run.
     pub keys: Vec<(FeatureId, RegenKey)>,
+    /// The whole result's key where a [`ResultStore`] may keep it (a full run, not one read from the store).
+    pub result_key: Option<RegenKey>,
+    /// Read from the [`ResultStore`]: no feature was evaluated.
+    pub from_store: bool,
 }
 
 #[derive(Clone)]
@@ -289,6 +303,8 @@ pub struct Regenerator {
     evaluations: u64,
     /// The last runs' results by [`result_key`], newest first.
     results: Vec<(RegenKey, RegenResult)>,
+    /// The last result read from a [`ResultStore`] (decoded once: the preview run and the refining one both show it).
+    kept: Option<(RegenKey, Arc<Context>, Vec<FeatureState>)>,
     /// noshape's Boolean's late declines, by feature type: the like go straight to OCCT's (kept across runs: each
     /// adds or edits a feature or two).
     declines: Arc<noshape_kernel::DeclineMemo>,
@@ -345,7 +361,7 @@ impl Regenerator {
     /// snapshots): it regenerates only what changed since. Not the whole runs' results (each holds a full display).
     /// The app seeds a fresh Regenerator with it when cancelled work still holds this one.
     pub fn snapshot(&self) -> Self {
-        Self { entries: self.entries.clone(), run: self.run, meshes: self.meshes.clone(), mesh_owners: self.mesh_owners.clone(), declines: self.declines.clone(), ..Default::default() }
+        Self { entries: self.entries.clone(), run: self.run, meshes: self.meshes.clone(), mesh_owners: self.mesh_owners.clone(), declines: self.declines.clone(), kept: self.kept.clone(), ..Default::default() }
     }
 
     /// How many features this Regenerator has evaluated rather than taken
@@ -417,6 +433,27 @@ impl Regenerator {
             r.evaluated = Vec::new();
             r.display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
             return r;
+        }
+        // Kept across sessions: the whole result, shown from the stored context and states.
+        if let (Some(k), Some(store)) = (result_key, &opts.store)
+            && !opts.context_only
+            && let Some((ctx, states)) = self.kept.clone().filter(|(x, ..)| *x == k).map(|(_, c, s)| (c, s)).or_else(|| store.get(k).and_then(|b| persist::decode_result(&b)).map(|(c, s)| (Arc::new(c), s)))
+            && states.len() == studio.features.len()
+            && states.iter().zip(&studio.features).all(|(s, f)| s.id == f.id)
+        {
+            self.kept = Some((k, ctx.clone(), states.clone()));
+            let (mut display, needs_refine) = display::build(&ctx, studio, opts, &mut self.meshes, &mut self.mesh_owners, &mut self.sketch_displays, run);
+            apply_configured_names(&mut display, studio, config);
+            display.features = states;
+            display.variables = ctx.variables.clone();
+            display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
+            let result = RegenResult { display, needs_refine, context: ctx, from_store: true, ..Default::default() };
+            if !needs_refine {
+                self.results.retain(|(x, _)| *x != k);
+                self.results.insert(0, (k, result.clone()));
+                self.results.truncate(RESULTS);
+            }
+            return result;
         }
         for (i, f) in studio.features.iter().enumerate() {
             if aborted() {
@@ -699,7 +736,7 @@ impl Regenerator {
         }
         if opts.context_only {
             let display = crate::display::StudioDisplay { features: states, variables: ctx.variables.clone(), regen_ms: t0.elapsed().as_secs_f32() * 1000.0, ..Default::default() };
-            return RegenResult { display, needs_refine: false, context: ctx, cancelled: false, evaluated, keys };
+            return RegenResult { display, needs_refine: false, context: ctx, cancelled: false, evaluated, keys, result_key: None, from_store: false };
         }
         if display::perf_enabled() {
             log::info!(target: "perf", "regen: {} features evaluated, {cached} cached, {:.0} ms (preview meshes {})", evaluated.len(), t0.elapsed().as_secs_f64() * 1e3, opts.preview_meshes);
@@ -720,7 +757,7 @@ impl Regenerator {
         display.features = states;
         display.variables = ctx.variables.clone();
         display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
-        let result = RegenResult { display, needs_refine, context: ctx, cancelled: false, evaluated, keys };
+        let result = RegenResult { display, needs_refine, context: ctx, cancelled: false, evaluated, keys, result_key: result_key.filter(|_| !opts.context_only), from_store: false };
         // (Full results only: a preview can't serve a full run, and the dialog's previews as values are typed would
         // push out the states undo goes back to.)
         if let Some(k) = result_key.filter(|_| !result.needs_refine) {

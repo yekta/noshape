@@ -2,6 +2,7 @@
 //! needs to draw, pick and select, with persistent [`Reference`]s attached to
 //! every pickable element. Produced by regeneration; consumed by the app.
 
+use serde::{Deserialize, Serialize};
 use crate::reference::{BodyId, FeatureId, Reference};
 use glam::DVec3;
 use std::sync::Arc;
@@ -348,7 +349,7 @@ pub struct ConnectorDisplay {
     pub z: DVec3,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FeatureStatus {
     Ok,
     Info,
@@ -359,7 +360,7 @@ pub enum FeatureStatus {
     RolledBack,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FeatureState {
     pub id: FeatureId,
     pub status: FeatureStatus,
@@ -404,7 +405,7 @@ pub struct FeatureState {
 
 /// A manipulator of FeatureScript's `addManipulators` (std manipulator.fs),
 /// lengths in metres, angles in radians.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum FeatureManipulator {
     /// `linearManipulator`: dragged along `direction` from `base`.
     Linear { base: DVec3, direction: DVec3, offset: f64, min: f64, max: f64, secondary: bool, primary: Option<String> },
@@ -420,7 +421,7 @@ pub enum FeatureManipulator {
 }
 
 /// One point of a `TOGGLE_POINTS` manipulator.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TogglePoint {
     pub pos: [f64; 3],
     /// The instance's indices along the first and second directions.
@@ -432,7 +433,7 @@ pub struct TogglePoint {
 }
 
 /// Polylines and points in world coordinates (see [`FeatureState::debug`]).
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct DebugGeometry {
     pub lines: Vec<Vec<[f32; 3]>>,
     pub points: Vec<[f32; 3]>,
@@ -441,7 +442,7 @@ pub struct DebugGeometry {
     pub colored: Vec<ColoredDebug>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ColoredDebug {
     Faces(Arc<MeshBuffers>, [u8; 3]),
     Line(Vec<[f32; 3]>, [u8; 3]),
@@ -460,7 +461,7 @@ impl PartialEq for ColoredDebug {
 }
 
 /// A computed parameter value: a length (meters) or text such as "Multiple".
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum ComputedValue {
     Length(f64),
     Text(String),

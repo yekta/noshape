@@ -255,3 +255,80 @@ fn a_context_reads_back_as_it_was_stored() {
         assert!(persist::decode(&bad).is_none(), "a byte changed at {at}");
     }
 }
+
+#[derive(Debug, Default)]
+struct MemStore(std::sync::Mutex<std::collections::HashMap<noshape_model::regen::RegenKey, Vec<u8>>>);
+
+impl noshape_model::regen::ResultStore for MemStore {
+    fn get(&self, key: noshape_model::regen::RegenKey) -> Option<Vec<u8>> {
+        self.0.lock().unwrap().get(&key).cloned()
+    }
+    fn put(&self, key: noshape_model::regen::RegenKey, bytes: Vec<u8>) {
+        self.0.lock().unwrap().insert(key, bytes);
+    }
+}
+
+/// A regeneration kept in a [`ResultStore`] reopens from it without evaluating a feature, with the same parts and
+/// states; a missing, cut-short, changed or other studio's entry is never used (it regenerates instead).
+#[test]
+fn a_kept_regeneration_reopens_without_evaluating() {
+    use noshape_model::regen::{ResultStore, persist};
+    let (ps, units) = studio_with_block();
+    let store = std::sync::Arc::new(MemStore::default());
+    let opts = RegenOptions { store: Some(store.clone()), ..Default::default() };
+    let first = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+    assert!(!first.from_store && first.evaluated.len() == 2);
+    let key = first.result_key.expect("a full run has a key");
+    store.put(key, persist::encode_result(&first.context, &first.display.features).unwrap());
+    let parts = |r: &noshape_model::regen::RegenResult| {
+        r.context.bodies.untracked().iter().map(|b| (b.id.clone(), b.faces.clone(), (b.shape.volume().unwrap() * 1e12).round())).collect::<Vec<_>>()
+    };
+    // A new session: the store's result, nothing evaluated.
+    let again = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+    assert!(again.from_store && again.evaluated.is_empty());
+    assert_eq!(parts(&first), parts(&again));
+    assert_eq!(first.display.features.iter().map(|s| (s.id, s.status)).collect::<Vec<_>>(), again.display.features.iter().map(|s| (s.id, s.status)).collect::<Vec<_>>());
+    assert_eq!(first.display.bodies.len(), again.display.bodies.len());
+    // Damaged entries: regenerated, the same parts.
+    let good = store.get(key).unwrap();
+    for bad in [good[..good.len() - 1].to_vec(), { let mut b = good.clone(); b[good.len() / 2] ^= 1; b }, Vec::new()] {
+        store.put(key, bad);
+        let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        assert!(!r.from_store && r.evaluated.len() == 2);
+        assert_eq!(parts(&first), parts(&r));
+    }
+    // Another studio's result under this key (a collision): its features don't match, so it isn't used.
+    let (mut other, _) = studio_with_block();
+    other.features.truncate(1);
+    let o = Regenerator::new().regenerate(&other, &ConfigValues::default(), &units, &RegenOptions::default());
+    store.put(key, persist::encode_result(&o.context, &o.display.features).unwrap());
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+    assert!(!r.from_store);
+    assert_eq!(parts(&first), parts(&r));
+    // An edit: another key, regenerated.
+    let mut edited = ps.clone();
+    edited.features[1].params.set("depth", ParamValue::Expr(ExprValue::new("30 mm")));
+    let e = Regenerator::new().regenerate(&edited, &ConfigValues::default(), &units, &opts);
+    assert!(!e.from_store && e.result_key != Some(key));
+}
+
+/// The directory store: kept, read back, another build's entry not read, a missing key nothing, past its cap the
+/// least recently used gone.
+#[test]
+fn a_directory_store_keeps_results_per_build_within_its_cap() {
+    use noshape_model::regen::ResultStore;
+    use noshape_model::regen::persist::DirStore;
+    let d = std::env::temp_dir().join(format!("noshape-dir-store-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    let s = DirStore { dir: d.clone(), build: "a".into(), cap: 1 << 20 };
+    assert!(s.get(7).is_none());
+    s.put(7, vec![1, 2, 3]);
+    assert_eq!(s.get(7), Some(vec![1, 2, 3]));
+    assert!(DirStore { dir: d.clone(), build: "b".into(), cap: 1 << 20 }.get(7).is_none());
+    let small = DirStore { dir: d.clone(), build: "a".into(), cap: 5 };
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    small.put(8, vec![4, 5, 6]);
+    assert!(small.get(7).is_none(), "the older entry went");
+    assert_eq!(small.get(8), Some(vec![4, 5, 6]));
+    let _ = std::fs::remove_dir_all(&d);
+}

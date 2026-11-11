@@ -38,7 +38,7 @@ pub fn default_dir() -> PathBuf {
 }
 
 /// This build: its version, the executable's size and time (a rebuild of the same version), the OCCT patch set.
-fn build_id() -> &'static str {
+pub(crate) fn build_id() -> &'static str {
     static ID: OnceLock<String> = OnceLock::new();
     ID.get_or_init(|| {
         let exe = std::env::current_exe().ok().and_then(|p| std::fs::metadata(p).ok());
