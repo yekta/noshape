@@ -3,6 +3,18 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**11-11 02:34, the Mac mini hat per feature (for bool, dx, blend, core; lead's quiet vibe5 window, load 1.4–2.3; green
+6364f3c47's binary; `feature list --tab <tab>` on a fresh copy each run, 3 runs; bin/hat-split.sh <binary> <tab> <tag> on vibe5):**
+- "Mac mini hat": wall 17.07 / 16.36 / 16.36 s, regen_ms 15,104 / 14,800 / 14,813, **wall outside regeneration 1.97 / 1.56 /
+  1.55 s** (opening the 28.7 MB document, listing; the first run's cache cold). 137 features, all Ok. Top 8 by regen_ms (mean):
+  Mac mini body + base union (booleanBodies) 8,134 ms; Riser feet chamfers (chamfer) 2,149; Mac mini (2024 STEP reference)
+  (importDerived) 1,506; Seat lip 45° chamfer (chamfer) 1,142; Riser legs grip (moveFace) 695; Merge seat lip into riser
+  (booleanBodies) 236; Front/back openings cut (extrude) 163; Riser screw bosses (extrude) 150. Run to run within 3 %.
+- "Mac-mini-2024": wall 1.61 / 1.58 / 1.57 s, regen_ms 56, **wall outside regeneration 1.55 / 1.52 / 1.52 s**: so ~1.5 s of
+  either tab's open is the document's load, not its features. Its 2 features: Import 1 (importForeign) 49 ms, Centre Mac mini on
+  origin (transform) 7 ms.
+Clean speed in the same window: e3a19f63 91.3 % (release 91.6 %), green 6364f3c47 91.3 % (debug), index 91.4.
+
 **11-11 02:00 (lead's vibe5 window): the user's Mac mini hat, quiet-host baseline** (green 6364f3c47's binary on vibe5,
 `feature list --tab "Mac mini hat"` on a fresh copy each time; the document is private: vibe3/vibe5 ~/lead-private, never in the
 repo): wall 16.39 / 16.47 / 16.36 s, regen_ms 14,841 / 14,930 / 14,815 (137 features, all Ok), load 0.04–1.44 before each.
