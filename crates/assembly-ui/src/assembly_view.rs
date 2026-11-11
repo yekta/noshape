@@ -6380,6 +6380,9 @@ impl AssemblyView {
         // here would take the focus of every click in it, fields included).
         self.with_actions(div().size_full().relative().key_context("Assembly AssemblyFront"), cx)
             .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                this.ui.checkbox_focus = None;
+                this.ui.number_focus = None;
+                this.ui.keyboard_away = false;
                 // As the view's own (see `render`), the front layer counting
                 // as inside it.
                 if !this.focus.contains_focused(window, cx) && !window.context_stack().iter().any(|c| c.contains("AssemblyFront")) {
@@ -6725,6 +6728,8 @@ impl Render for AssemblyView {
             .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
                 this.ui.panel_focus = false;
                 this.ui.checkbox_focus = None;
+                this.ui.number_focus = None;
+                this.ui.keyboard_away = false;
                 // Keep keyboard shortcuts working after clicking the viewport or lists,
                 // without stealing focus from an input that just took it.
                 if !this.focus.contains_focused(window, cx) {

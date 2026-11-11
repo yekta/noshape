@@ -8,6 +8,20 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
+## From psui (2026-11-11 09:41 UTC, lead: asm-* UI misses while asm is away), FYI
+
+Done in assembly-ui: Esc from the Dynamic suppression panel's expression closes it (its field passed Esc on to
+nothing: the panel is on the front layer; test `dynamic_suppressions_panel_escape_and_remove` now presses the key);
+a pattern field's right-click holds the keyboard (`ui.number_focus`), its Configure leaves it (`ui.keyboard_away`)
+and is an Undo step of the open dialog (`PatternToggles::cfg_pending`), the Configurations panel's "No assembly
+features are configured" note goes once the open pattern has a configured field; clicks on the front layer clear
+`checkbox_focus` as the view's do. Left for you (geometry): **asm-mate-edit-escape / asm-mate-menu-edit**: pin-block's
+Revolute 1 is flipped in ours (`flip_primary`, field 5 false) and not in live, with the same pose: our hole
+connector's Z or the automatic flip at creation differs from live's REST mate (behaviours "skasm (2026-10-27) oracle_asm
+R3": both MID_AXIS_POINT Z (0,0,-1), the Revolute turns them opposite). **asm-standard-content-edit-instance**: the
+inserted bolt's rotation (transform[0] live 1, ours 0). asm-triad-z-anti-align-with-z's highlighted last row is our
+runner's whole-pixel triad point (live's pointer sits between pixels).
+
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
 ## From dx (2026-11-10 21:05 UTC, lead): yours from the hand drill: Cylindrical 22's BOTTOM_AXIS_POINT takes the other end

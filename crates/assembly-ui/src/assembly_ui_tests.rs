@@ -734,7 +734,9 @@ fn placing_off_a_snap_turns_the_instance_back(cx: &mut TestAppContext) {
 /// open, Escape closes it with nothing selected, and Remove expression says "Dynamic suppression removed.".
 #[gpui::test]
 fn dynamic_suppressions_panel_escape_and_remove(cx: &mut TestAppContext) {
-    let (window, view) = pattern_assembly(cx, "dyn-suppression");
+    // (The panel is on the front layer the workspace draws.)
+    let path = pattern_document(cx, "dyn-suppression");
+    let (window, view) = open_assembly_with_front(cx, &path);
     let target = cx.update(|cx| super::props::DynTarget::Instance(instance(view.read(cx), "Part 2 <1>", cx)));
     cx.update(|cx| view.update(cx, |v, cx| v.set_dynamic_suppression(target, Some("1 > 2".into()), cx)));
     draw(cx, window);
@@ -748,7 +750,15 @@ fn dynamic_suppressions_panel_escape_and_remove(cx: &mut TestAppContext) {
     .unwrap();
     draw(cx, window);
     assert_eq!(cx.update(|cx| view.read(cx).history_state(cx)), (false, false), "Undo off while the panel is open");
-    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.on_cancel(&crate::actions::Cancel, w, cx))).unwrap();
+    // Escape from its expression field (which has the keyboard).
+    cx.update(|cx| cx.bind_keys(crate::actions::default_key_bindings()));
+    cx.update_window(window, |_, w, cx| {
+        use gpui_kit::Focusable as _;
+        let st = view.read(cx).ui.dynamic_suppression.as_ref().map(|d| d.1.clone()).unwrap();
+        assert!(st.read(cx).focus_handle(cx).is_focused(w), "the expression has the keyboard");
+        w.dispatch_keystroke(gpui_kit::Keystroke::parse("escape").unwrap(), cx);
+    })
+    .unwrap();
     draw(cx, window);
     cx.update(|cx| {
         let v = view.read(cx);

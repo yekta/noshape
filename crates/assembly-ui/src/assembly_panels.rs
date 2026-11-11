@@ -158,14 +158,16 @@ impl McSession {
     }
 }
 
-/// A pattern dialog's checkboxes and flips (its dialog-level undo).
-#[derive(Clone, Copy, PartialEq)]
+/// A pattern dialog's checkboxes, flips and fields configured in it (its dialog-level undo; live
+/// asm-pattern-field-configure: Configure is an Undo step of the open dialog).
+#[derive(Clone, PartialEq)]
 pub struct PatternToggles {
     pub second: bool,
     pub third: bool,
     pub opposite: [bool; 3],
     pub equal: [bool; 3],
     pub centered: [bool; 3],
+    pub cfg_pending: Vec<&'static str>,
 }
 
 impl PatternSession {
@@ -176,6 +178,7 @@ impl PatternSession {
             opposite: [self.opposite, self.opposite2, self.opposite3],
             equal: [self.equal, self.equal2, self.equal3],
             centered: [self.centered, self.centered2, self.centered3],
+            cfg_pending: self.cfg_pending.clone(),
         }
     }
 
@@ -184,6 +187,7 @@ impl PatternSession {
         [self.opposite, self.opposite2, self.opposite3] = t.opposite;
         [self.equal, self.equal2, self.equal3] = t.equal;
         [self.centered, self.centered2, self.centered3] = t.centered;
+        self.cfg_pending = t.cfg_pending;
     }
 
     /// Before a toggle: remember the state for Undo (and enable ✓).
@@ -1474,6 +1478,10 @@ impl AssemblyView {
         if configured || s.cfg_pending.contains(&param) {
             return;
         }
+        // An Undo step of the dialog, which doesn't count as an edit for ✓ (live: ✓ stays off with no instances).
+        let t = s.toggles();
+        s.toggle_history.0.push(t);
+        s.toggle_history.1.clear();
         s.cfg_pending.push(param);
         let text = format!("{} {} added to {}", s.name, noshape_model::assembly::config::param_label(param), input.name);
         self.show_cfg_toast(text, false, cx);
@@ -1649,13 +1657,24 @@ impl AssemblyView {
             }
             let view = cx.entity();
             let input = field.read(cx).state().clone();
+            let label = noshape_model::assembly::config::param_label(param);
+            let held = input.clone();
             div()
                 .id(id)
                 .debug_selector(move || id.to_string())
                 .child(el)
-                .os_context_menu_over_field(Some(input), move |menu, _, _| {
+                .os_context_menu_over_field(Some(input), move |menu, _, cx| {
                     let v = view.clone();
-                    menu.item(crate::os_menu::OsMenuItem::new("Configure").on_click(move |_, _, cx| v.update(cx, |this, cx| this.configure_pattern_field(param, cx))))
+                    v.update(cx, |this, _| this.ui.number_focus = Some((label, held.clone())));
+                    menu.item(crate::os_menu::OsMenuItem::new("Configure").on_click(move |_, window, cx| {
+                        v.update(cx, |this, cx| {
+                            this.configure_pattern_field(param, cx);
+                            // The keyboard goes to the page (live asm-pattern-field-configure: focus none).
+                            this.ui.number_focus = None;
+                            this.ui.keyboard_away = true;
+                            window.focus(&this.focus, cx);
+                        })
+                    }))
                 })
                 .into_any_element()
         };
