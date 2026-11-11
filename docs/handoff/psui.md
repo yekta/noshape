@@ -9,6 +9,42 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## Resume here (psui 2026-11-11 20:02 UTC, moved to another account by the lead)
+**Builds: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh …`** (vibe4 for clippy). Model suite gate: `NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
+cargo test -q -p noshape-ops --release --test all parity::parity_models -- --ignored --nocapture`, compared per document with
+qa's run (`/root/qa-scratch/recut/models-f324e41f.log`: 77/87, 826/947, custom features 103/107).
+
+**In progress: SETLIB-SHEET-METAL-FORMS (P3, TICKETS), WIP on branch `agent/psui-wip`, commit "WIP SETLIB", not landed, NOT
+COMPILED yet.** Live's answer: behaviours.md "psui (2497)" (live/psui/q2497/: screenshots, picker-dom.html, form-feature.json).
+- Done in the WIP: `crates/ops/src/forms_library.rs` (FormsLibrary / LibraryDocument saved in
+  config_dir/sheet-metal-forms-library.json; `build(folder)` walks the folder tree, each document at its newest named
+  version else "Start", checks every Part Studio: a Length config variable id "thickness" and an unsuppressed Tag
+  tagPurpose FORM with positivePart / negativePart, problems in live's words "Element "…" in document "…" at its latest
+  version "…" failed validation: "…". Fix and create a new version."; `title()` = "‹local_user_name()› sheet metal forms";
+  `LibraryDocument::value(tab)` = the `ext:` key of the Part Studio at the library's microversion). ops: documents_set_library
+  builds it for sheet_metal_forms (`update` rebuilds, `clear` unsets) and errors "Failed to update the library\n\n…";
+  new op documents_forms_library lists it.
+- Next: compile; examples.rs entries (documents_forms_library, an `update` example); e2e test (a folder with a form
+  document passes, a plain Part Studio fails with both messages, update bumps V1 → V2, clear unsets); start-ui folder menu
+  (live: Set library ▸ picking My sheet metal forms runs the build with "Updating your sheet metal forms library…", a
+  failure modal "Failed to update the library" with one paragraph per problem + Close, success toast "Successfully
+  updated your sheet metal forms library."; once set the folder shows the library icon, its menu drops Move to…,
+  Transfer ownership… and Send to trash, and Set library becomes "Sheet metal form library ▸ Update my library / Unset my
+  library" ("Successfully unset your sheet metal forms library."); list them in ops coverage.rs); the Form picker
+  (part-studio-ui select_item.rs render_library_form: Library ▾ "‹name› sheet metal forms" first, then "Onshape sheet
+  metal forms"; under it the folder tree named bottom up: Form = the document's Part Studios, Type = the document,
+  Standard = a folder above; a subfolder and a document can share one list; no thumbnails; the form's configuration
+  inputs as for Onshape's; Select sets formPartStudio to `value`); a Form remembering a library pick after Unset shows
+  "Library not available" (red). Check the Form regenerates from an `ext:` formPartStudio (other-document forms).
+
+**Done today (landed):** SAVED-SKETCH-PLANE-LOST closed (not a regression), REGION-UNION-ARC closed, SHEETMETAL-COPLANAR-WALLS
+narrowed (the Up to Part wall's three fitted caps: core's), sketch topology in FeatureScript as live (abb741da: curve end
+vertices; 2087f44e: a wire body per curve, a point body per point, one sheet; delete / transform / pattern of one body =
+pieces of a sketch, SketchResult::bodies), std_oracle dialogs + Hole green and a polygon's pattern one constraint (bcf62c0e;
+live 2496: our Inscribed / Circumscribed names were already right). STD-ORACLE-SWEEP-POLYLINE is core's.
+**Open for psui after SETLIB:** the sk-* / sm-* ui-parity misses on the newest green; live's answers to pick up
+(REQUESTS: table_header target / vs-ps-inserted-drag re-record, vs-ps-inserted-title-click, ver-version-menu-branch).
+
 ## psui 09:10 UTC: the 11-11 full ui-parity run's list (vibe5, 1511 scenarios), done
 
 Fixed and landed or queued: fold caret, documents advanced search and toggles, the compact snippet list, Help's window,
