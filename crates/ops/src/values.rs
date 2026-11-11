@@ -157,7 +157,7 @@ pub fn from_json(s: &ParamSpec, v: &Value, units: &UnitPrefs, doc: &Document) ->
             let arr = v.as_array().ok_or_else(bad)?;
             ParamValue::Lookup(arr.iter().map(|x| x.as_str().map(str::to_string).ok_or_else(bad)).collect::<Result<_, _>>()?)
         }
-        ParamKind::Sketch => ParamValue::Sketch(Box::new(serde_json::from_value(v.clone()).map_err(|e| OpError::invalid(format!("sketch data: {e}")))?)),
+        ParamKind::Sketch => ParamValue::Sketch(std::sync::Arc::new(serde_json::from_value(v.clone()).map_err(|e| OpError::invalid(format!("sketch data: {e}")))?)),
         ParamKind::Reference { .. } => {
             let t = v.as_str().ok_or_else(bad)?;
             if t.is_empty() {

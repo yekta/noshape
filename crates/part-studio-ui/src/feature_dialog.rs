@@ -1388,7 +1388,15 @@ impl FeatureDialog {
     /// Mutable sketch payload of a Sketch feature draft.
     pub fn sketch_data_mut(&mut self) -> Option<&mut noshape_model::sketch_feature::SketchData> {
         match self.feature.params.0.get_mut("sketch") {
-            Some(ParamValue::Sketch(d)) => Some(d),
+            Some(ParamValue::Sketch(d)) => Some(std::sync::Arc::make_mut(d)),
+            _ => None,
+        }
+    }
+
+    /// The draft's sketch, shared (no copy).
+    pub fn sketch_data_shared(&self) -> Option<std::sync::Arc<noshape_model::sketch_feature::SketchData>> {
+        match self.feature.params.get("sketch") {
+            Some(ParamValue::Sketch(d)) => Some(d.clone()),
             _ => None,
         }
     }

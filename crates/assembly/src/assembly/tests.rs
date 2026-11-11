@@ -29,7 +29,7 @@ fn extruded_studio(sk: noshape_sketch::Sketch, depth: &str, largest: bool) -> Pa
     let mut ps = PartStudio::new();
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     let sid = sketch.id;
     ps.features.push(sketch);
     let mut reg = Regenerator::new();
@@ -1763,8 +1763,9 @@ fn replicate_updates_when_target_geometry_changes() {
         && let Some(ParamValue::Sketch(sd)) = ps.features[0].params.get("sketch").cloned()
     {
         let mut sd = sd;
-        sd.sketch.add_circle(DVec2::new(-0.02, 0.012), 0.005);
-        sd.sketch.add_circle(DVec2::new(0.02, 0.012), 0.005);
+        let data = std::sync::Arc::make_mut(&mut sd);
+        data.sketch.add_circle(DVec2::new(-0.02, 0.012), 0.005);
+        data.sketch.add_circle(DVec2::new(0.02, 0.012), 0.005);
         ps.features[0].params.set("sketch", ParamValue::Sketch(sd));
     }
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
@@ -3622,7 +3623,7 @@ fn revolved_studio(profile: impl FnOnce(&mut noshape_sketch::Sketch)) -> PartStu
     let axis = sk.add_line(DVec2::new(0.0, -0.05), DVec2::new(0.0, 0.05));
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Front)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     let sid = sketch.id;
     ps.features.push(sketch);
     let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
@@ -6335,7 +6336,7 @@ fn a_flat_pattern_instance_is_the_flat() {
     let mut ps = PartStudio::new();
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     let sid = sketch.id;
     ps.features.push(sketch);
     let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());

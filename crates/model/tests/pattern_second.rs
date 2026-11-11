@@ -61,7 +61,7 @@ impl Studio {
         Regenerator::new().regenerate(&self.ps, &ConfigValues::default(), &self.units, &RegenOptions { cancel, ..Default::default() })
     }
     fn sketch_region(&mut self, sk: noshape_sketch::Sketch) -> Reference {
-        let s = self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = self.regen(None);
         let d = r.display.sketches.iter().find(|x| x.feature == s).unwrap();
         Reference::SketchRegion { sketch: s, key: d.regions[0].key.clone() }

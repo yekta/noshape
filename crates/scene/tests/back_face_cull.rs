@@ -35,7 +35,7 @@ fn extruded(w: f64, h: f64, circle: Option<(DVec2, f64)>, depth: &str) -> Studio
     }
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     let sid = sketch.id;
     ps.features.push(sketch);
     let regen = |ps: &PartStudio| Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());

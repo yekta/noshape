@@ -442,7 +442,7 @@ pub(super) fn commit(od: &mut OpenDoc, t: SketchTarget) -> Result<(), OpError> {
     let ps = doc::studio(od.doc(), t.tab)?;
     let config = ps.configuration.defaults();
     let mut feature = ps.configuration.for_editing(&ps.features[t.index], &config);
-    feature.params.set("sketch", ParamValue::Sketch(Box::new(t.data)));
+    feature.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(t.data)));
     edit_studio(od, t.tab, &studio::edit_description(&t.name), |ps| {
         studio::edit_feature(ps, t.index, feature, &config);
         Ok(())

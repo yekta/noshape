@@ -67,7 +67,7 @@ impl Studio {
         }
         let sketch = self.add("sketch", |pv| {
             pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(plane)]));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         });
         let r = self.ok();
         let sk = r.display.sketches.iter().find(|s| s.feature == sketch).expect("sketch");
@@ -194,7 +194,7 @@ fn tab_merges_into_the_bottom_face() {
     }
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
@@ -239,7 +239,7 @@ fn qa5_letters_follow_live() {
     }
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
@@ -271,7 +271,7 @@ fn tab_merges_into_the_top_face() {
     }
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
@@ -490,7 +490,7 @@ fn bend_keeps_flat_length() {
     let line = sk.add_line_between(a, b).unwrap().0;
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
@@ -543,7 +543,7 @@ fn corner_break_rounds_a_slots_corners_beside_its_flange() {
     sk.corner_rectangle(glam::DVec2::new(mm(20.0), mm(10.0)), glam::DVec2::new(mm(40.0), mm(30.0)));
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
@@ -596,7 +596,7 @@ fn bend_matches_live() {
     let line = sk.add_line_between(a, b).unwrap().0;
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
@@ -628,7 +628,7 @@ fn tab_editing_logic_fills_merge_face_and_offset() {
     }
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
@@ -759,7 +759,7 @@ fn extruded_l_keeps_its_end_faces_in_pieces() {
     let lines = [sk.add_line_between(p[0], p[1]).unwrap(), sk.add_line_between(p[1], p[2]).unwrap()];
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     s.ok();
     s.add("sheetMetalStart", |pv| {
@@ -934,7 +934,7 @@ fn a_cut_after_flanges_keeps_the_bends() {
     sk.add_circle(glam::DVec2::new(mm(30.0), mm(20.0)), mm(5.0));
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
@@ -986,7 +986,7 @@ pub(crate) fn qa4_s1_enclosure_as_live() {
     sk.add_circle(glam::DVec2::new(mm(50.0), mm(1.5)), mm(6.0));
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Front)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
@@ -1053,7 +1053,7 @@ fn form_editing_logic_fills_the_target_face() {
         // The point at world (30, 20, 2), in the sketch's own frame.
         let sketch = s.add("sketch", |pv| {
             pv.set("sketchPlane", ParamValue::Query(vec![plane]));
-            pv.set("sketch", ParamValue::Sketch(Box::default()));
+            pv.set("sketch", ParamValue::Sketch(Default::default()));
         });
         let r = s.ok();
         let frame = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch").frame;
@@ -1061,7 +1061,7 @@ fn form_editing_logic_fills_the_target_face() {
         let mut sk = noshape_sketch::Sketch::new();
         let point = sk.add_point(glam::DVec2::new(w.dot(frame.x), w.dot(frame.y)));
         let f = s.ps.features.iter_mut().find(|f| f.id == sketch).expect("sketch feature");
-        f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         s.ok();
         s.add("sheetMetalFormed", |p| {
             p.set("formPartStudio", ParamValue::Text("library:circle-emboss".into()));
@@ -1142,7 +1142,7 @@ fn library_circle_emboss_as_live() {
     // world origin's projection (request 1619), so the point is at (40, 30, 2).
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![top.clone()]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let f = s.ok().context.sketch(sketch).expect("sketch").frame;
     let at = (f.origin + f.x * mm(40.0) + f.y * mm(30.0)) * 1e3;
@@ -1207,7 +1207,7 @@ fn library_forms_placed_as_live() {
         let point = sk.add_point(glam::DVec2::new(mm(60.0), mm(40.0)));
         let sketch = s.add("sketch", |pv| {
             pv.set("sketchPlane", ParamValue::Query(vec![top.clone()]));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         });
         s.add("sheetMetalFormed", |p| {
             p.set("formPartStudio", ParamValue::Text(format!("library:{form}")));
@@ -1246,7 +1246,7 @@ fn a_cut_survives_a_later_flange() {
     sk.add_circle(glam::DVec2::new(mm(30.0), mm(20.0)), mm(5.0));
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
@@ -1278,7 +1278,7 @@ fn a_cut_survives_a_later_flange() {
     sk.add_circle(glam::DVec2::new(mm(30.0), mm(20.0)), mm(5.0));
     let sketch = s2.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s2.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
@@ -1310,7 +1310,7 @@ fn a_hole_survives_a_later_flange() {
     let p = sk.add_point(glam::DVec2::new(mm(30.0), mm(20.0)));
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     s.ok();
     s.add("hole", |h| {
@@ -1350,7 +1350,7 @@ fn jog_matches_live() {
     let line = sk.add_line_between(a, b).unwrap().0;
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
@@ -1384,7 +1384,7 @@ fn tab_beside_the_plate_as_live() {
         });
         let sketch = s.add("sketch", |pv| {
             pv.set("sketchPlane", ParamValue::Query(vec![Reference::FeaturePlane(plane)]));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         });
         let r = s.ok();
         let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
@@ -1425,7 +1425,7 @@ fn a_counterbore_survives_a_later_flange() {
     let p = sk.add_point(glam::DVec2::new(mm(30.0), mm(20.0)));
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::FeaturePlane(plane)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     s.ok();
     s.add("hole", |h| {
@@ -1620,7 +1620,7 @@ fn a_bend_through_a_ripped_corner_is_refused() {
     let line = sk.add_line_between(a, b).unwrap().0;
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let bottom = face_at(&r, DVec3::new(50.0, 30.0, 0.0));
@@ -1661,7 +1661,7 @@ fn a_tab_into_a_ripped_corner_fills_it_from_its_flange() {
     let sketch_on = |s: &mut Studio, sk: noshape_sketch::Sketch| {
         s.add("sketch", |pv| {
             pv.set("sketchPlane", ParamValue::Query(vec![wall.clone()]));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         })
     };
     let probe = sketch_on(&mut s, noshape_sketch::Sketch::new());
@@ -1704,7 +1704,7 @@ fn a_bend_beside_a_rolled_wall() {
     let arc = sk.add_arc_between(p[3], p[2], p[1]).unwrap();
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     s.ok();
     s.add("sheetMetalStart", |pv| {
@@ -1736,7 +1736,7 @@ fn bends_of_both_hands_beside_a_rolled_wall() {
     let last = sk.add_line_between(p[2], p[4]).unwrap();
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     s.ok();
     s.add("sheetMetalStart", |pv| {
@@ -1768,7 +1768,7 @@ fn a_bend_beside_a_spline_rolled_wall_is_a_cylinder() {
     let spline = sk.add_fit_spline(&[(20.0, 0.0), (23.0, 6.0), (30.0, 10.0)].map(|(x, y)| glam::DVec2::new(mm(x), mm(y)))).unwrap();
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     s.ok();
     s.add("sheetMetalStart", |pv| {
@@ -1817,7 +1817,7 @@ fn a_pattern_of_active_sheet_metal_is_stds() {
     sk.add_circle(glam::DVec2::new(mm(100.0), mm(20.0)), mm(5.0));
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
@@ -1849,7 +1849,7 @@ fn collinear_walls_keep_the_ends_in_pieces() {
     let lines: Vec<_> = p.windows(2).map(|w| sk.add_line_between(w[0], w[1]).unwrap()).collect();
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     s.ok();
     s.add("sheetMetalStart", |pv| {
@@ -1879,7 +1879,7 @@ fn an_inner_flange_beside_a_stepped_tab_ends_at_the_step() {
     }
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let key = r.display.sketches.iter().find(|g| g.feature == sketch).unwrap().regions[0].key.clone();
@@ -1931,7 +1931,7 @@ fn a_bend_aligned_flange_on_a_plate_with_a_hole() {
     sk.add_circle(glam::DVec2::new(mm(30.0), mm(20.0)), mm(5.0));
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let key = r.display.sketches.iter().find(|g| g.feature == sketch).unwrap().regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).unwrap().key.clone();
@@ -1965,7 +1965,7 @@ fn a_bend_reliefs_round_is_centred_on_the_tangent_line() {
     }
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let key = r.display.sketches.iter().find(|g| g.feature == sketch).unwrap().regions[0].key.clone();
@@ -2007,7 +2007,7 @@ fn a_pattern_of_a_flanged_part_copies_it_whole() {
     }
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.ok();
     let key = r.display.sketches.iter().find(|g| g.feature == sketch).unwrap().regions[0].key.clone();
@@ -2052,7 +2052,7 @@ fn probe_flat_box(plane: DatumPlane, pts: [(f64, f64); 3]) -> ([f64; 3], [f64; 3
     let lines = [sk.add_line_between(p[0], p[1]).unwrap(), sk.add_line_between(p[1], p[2]).unwrap()];
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(plane)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     s.ok();
     s.add("sheetMetalStart", |pv| {

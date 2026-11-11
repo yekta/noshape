@@ -29,7 +29,7 @@ fn fillet_expression_change_moves_like_onshape() {
         let mut ps = PartStudio::new();
         let mut f = ps.new_feature("sketch", &units).unwrap();
         f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        f.params.set("sketch", ParamValue::Sketch(Box::new(data)));
+        f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
         ps.features.push(f);
         let out = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
         let solved = &out.context.sketches[0].sketch;

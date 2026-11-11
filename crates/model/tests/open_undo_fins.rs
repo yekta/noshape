@@ -50,7 +50,7 @@ fn add(ps: &mut PartStudio, units: &UnitPrefs, ty: &str, params: &[(&str, ParamV
 }
 
 fn sketch_region(ps: &mut PartStudio, units: &UnitPrefs, sk: noshape_sketch::Sketch) -> Reference {
-    let s = add(ps, units, "sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = add(ps, units, "sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), units, &RegenOptions::default());
     let d = r.display.sketches.iter().find(|x| x.feature == s).unwrap();
     Reference::SketchRegion { sketch: s, key: d.regions[0].key.clone() }

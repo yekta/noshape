@@ -59,7 +59,7 @@ impl T {
         for i in 0..4 {
             sk.add_line_between(pts[i], pts[(i + 1) % 4]).unwrap();
         }
-        let s = self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = self.regen();
         let key = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions[0].key.clone();
         let x = self.add("extrude", &[("entities", q(vec![Reference::SketchRegion { sketch: s, key }])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
@@ -304,7 +304,7 @@ fn reference_to_split_pieces_survives_when_the_split_goes_away() {
         for (c, r) in circles {
             sk.add_circle(*c, *r);
         }
-        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let rr = t.regen();
         let keys: Vec<_> = rr.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
         t.add("extrude", &[("entities", q(keys)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))])
@@ -466,7 +466,7 @@ fn shell_that_breaks_the_part_fails() {
     let mut t = T::new();
     let mut sk = noshape_sketch::Sketch::new();
     sk.corner_rectangle(DVec2::ZERO, DVec2::new(0.075554, 0.020245));
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let key = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions[0].key.clone();
     t.add("extrude", &[("entities", q(vec![Reference::SketchRegion { sketch: s, key }])), ("depth", e("15 mm")), ("operationType", en("NEW"))]);
@@ -486,7 +486,7 @@ fn shell_that_breaks_the_part_fails() {
     let mut pts = noshape_sketch::Sketch::new();
     let p0 = pts.add_point(DVec2::new(0.015, 0.006));
     let p1 = pts.add_point(DVec2::new(0.015, 0.014245));
-    let s2 = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(plane)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: pts, ..Default::default() })))]);
+    let s2 = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(plane)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: pts, ..Default::default() })))]);
     let locs = vec![Reference::SketchEntity { sketch: s2, entity: p0.0 }, Reference::SketchEntity { sketch: s2, entity: p1.0 }];
     let part = Reference::Body(noshape_model::BodyId { feature: t.ps.features[1].id, index: 0 });
     let hole = t.add("hole", &[("locations", q(locs)), ("holeDiameterV3", e("6.35 mm")), ("holeDepthV3", e("12 mm")), ("endStyleV2", en("BLIND")), ("scope", q(vec![part]))]);

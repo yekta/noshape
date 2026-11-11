@@ -320,7 +320,7 @@ impl Studio {
         }
         let sketch = self.add("sketch", |pv| {
             pv.set("sketchPlane", ParamValue::Query(vec![plane]));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         });
         let r = self.regen();
         let sk = r.display.sketches.iter().find(|s| s.feature == sketch).expect("sketch");
@@ -914,7 +914,7 @@ fn hole_cases() -> Vec<(&'static str, Studio)> {
         let p = sk.add_point(DVec2::new(0.02, 0.02));
         let sketch = s.add("sketch", |pv| {
             pv.set("sketchPlane", ParamValue::Query(vec![plane]));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         });
         let cube = body_ref(&r, 0);
         s.add("hole", |pv| {
@@ -980,7 +980,7 @@ fn hole_tapped_depths_link_as_std() {
     let top = face_at(&r, DVec3::new(20.0, 20.0, 40.0));
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![top]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let cube = body_ref(&r, 0);
     let base = move |depth: &str, tapped: &str, clearance: &str| {
@@ -1211,7 +1211,7 @@ fn polyline(s: &mut Studio, plane: Reference, pts: &[(f64, f64)]) -> (FeatureId,
     }
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![plane]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let edges = s.sketch_edges(sketch);
     (sketch, edges)
@@ -1701,7 +1701,7 @@ fn external_thread_editing_logic_runs_std() {
     sk.add_circle(DVec2::ZERO, 0.004);
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", q(Reference::Plane(DatumPlane::Top)));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.regen();
     let region = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch").regions[0].key.clone();
@@ -1785,7 +1785,7 @@ fn wrap_editing_logic_runs_std() {
     sk.add_circle(DVec2::ZERO, 0.01);
     let circle = s.add("sketch", |pv| {
         pv.set("sketchPlane", q(Reference::Plane(DatumPlane::Top)));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.regen();
     let key = r.display.sketches.iter().find(|x| x.feature == circle).expect("sketch").regions[0].key.clone();
@@ -1964,7 +1964,7 @@ fn hole_editing_logic_runs_std() {
         let p = sk.add_point(DVec2::new(0.02, 0.02));
         let sketch = s.add("sketch", |pv| {
             pv.set("sketchPlane", ParamValue::Query(vec![plane]));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         });
         s.add("hole", |pv| {
             pv.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: p.0 }]));
@@ -2004,7 +2004,7 @@ fn hole_scope_follows_depth_as_live() {
     let p = sk.add_point(DVec2::new(0.02, 0.02));
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![face_at(&r, DVec3::new(20.0, 20.0, 20.0))]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     s.add("hole", |pv| {
         pv.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: p.0 }]));

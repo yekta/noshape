@@ -58,7 +58,7 @@ impl Studio {
         let mut data = SketchData { sketch: sk, ..Default::default() };
         data.dimension_exprs.insert(cw.0, ExprValue::new(w));
         data.dimension_exprs.insert(ch.0, ExprValue::new(h));
-        let s = self.add("sketch", &[("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(data)))]);
+        let s = self.add("sketch", &[("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(data)))]);
         let r = self.regen(&ConfigValues::default());
         let key = r.display.sketches.iter().find(|x| x.feature == s).and_then(|x| x.regions.first()).map(|g| g.key.clone()).expect("a region");
         let x = self.add("extrude", &[("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: s, key }])), ("depth", e(d)), ("operationType", ParamValue::Enum("NEW".into()))]);
@@ -276,7 +276,7 @@ fn p2_oracle_derived() {
     let mut d2 = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
     let p = sk.add_point(DVec2::new(0.1, 0.05));
-    let s2 = d2.add("sketch", &[("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s2 = d2.add("sketch", &[("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let d = derived(&mut d2, "c1", Some("medium"));
     d2.ps.feature_mut(d).unwrap().params.set("location", ParamValue::Query(vec![Reference::SketchEntity { sketch: s2, entity: p.0 }]));
     let r = regen(&d2);

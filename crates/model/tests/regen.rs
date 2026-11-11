@@ -24,7 +24,7 @@ fn studio_with_block() -> (PartStudio, UnitPrefs) {
     let mut ps = PartStudio::new();
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(rect_with_hole(0.1, 0.05, 0.01))));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(rect_with_hole(0.1, 0.05, 0.01))));
     let sketch_id = sketch.id;
     ps.features.push(sketch);
     (ps, units).tap(|(ps, units)| {
@@ -87,6 +87,7 @@ fn sketch_extrude_fillet_and_edit_upstream() {
 
     // Edit upstream: make the block wider. The fillet must still find its edges.
     if let Some(ParamValue::Sketch(d)) = ps.features[0].params.0.get_mut("sketch") {
+        let d = std::sync::Arc::make_mut(d);
         let ids: Vec<_> = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).map(|e| e.id).collect();
         // Move the two right-hand corners.
         let p1 = d.sketch.point(ids[1]).unwrap();

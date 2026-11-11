@@ -61,7 +61,7 @@ impl T {
         for i in 0..4 {
             sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
         }
-        let s = self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = self.regen();
         let reg = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions[0].key.clone();
         self.add("extrude", &[("entities", q(vec![Reference::SketchRegion { sketch: s, key: reg }])), ("depth", e("20 mm"))]);
@@ -148,7 +148,7 @@ fn a_sketch_on_one_split_piece_s_face_takes_that_face() {
     let (mut t, face, _) = middle_top();
     let mut sk = noshape_sketch::Sketch::new();
     sk.add_circle(DVec2::new(0.02, 0.02), 0.005);
-    let s = t.add("sketch", &[("sketchPlane", q(vec![face])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![face])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.ok();
     let d = r.display.sketches.iter().find(|x| x.feature == s).unwrap();
     assert!((d.frame.origin.z - 0.012).abs() < 1e-9 && d.frame.normal.z > 0.999, "{:?}", d.frame);
@@ -197,7 +197,7 @@ fn pieces_of_other_ops_name_apart() {
     for i in 0..4 {
         sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
     }
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let reg = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions[0].key.clone();
     let target = Reference::Body(r.context.bodies[0].id.clone());
@@ -258,7 +258,7 @@ fn other_features_take_one_split_piece_s_face() {
     let (mut t, face, _) = middle_top();
     let mut sk = noshape_sketch::Sketch::new();
     sk.add_circle(DVec2::new(0.02, 0.02), 0.005);
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let reg = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions[0].key.clone();
     t.add("extrude", &[("entities", q(vec![Reference::SketchRegion { sketch: s, key: reg }])), ("endBound", en("UP_TO_SURFACE")), ("endBoundEntityFace", q(vec![face]))]);
@@ -287,7 +287,7 @@ fn one_split_through_several_bodies_names_each_cut_face_apart() {
         let (a0, a1) = (sk.add_point(DVec2::new(0.0, -0.006)), sk.add_point(DVec2::new(0.0, 0.006)));
         let axis = sk.add_line_between(a0, a1).unwrap();
         sk.set_construction(axis, true).unwrap();
-        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = t.regen();
         let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
         assert_eq!(regions.len(), 3);
@@ -337,7 +337,7 @@ fn one_remove_through_several_bodies_names_each_wall_apart() {
             sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
         }
     }
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
     t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm"))]);
@@ -347,7 +347,7 @@ fn one_remove_through_several_bodies_names_each_wall_apart() {
     for i in 0..4 {
         sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
     }
-    let s2 = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s2 = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.ok();
     assert_eq!(r.context.bodies.len(), 3);
     let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s2).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s2, key: g.key.clone() }).collect();

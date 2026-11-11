@@ -1515,11 +1515,11 @@ mod tests {
         let mut data = crate::sketch_feature::SketchData::default();
         let line = data.sketch.add_line(glam::DVec2::new(0.0, 0.0), glam::DVec2::new(40.0, 0.0));
         let o = data.sketch.use_external_point(glam::DVec2::ZERO);
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
         assert!(features_using(&ps.features, &Reference::Origin).is_empty(), "no constraint on the origin point");
         let Some(Geometry::Line { start, .. }) = data.sketch.entity(line).map(|e| e.geometry.clone()) else { panic!("a line") };
         data.sketch.add_constraint(ConstraintKind::Coincident { a: start, b: o }).unwrap();
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data)));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
         assert_eq!(features_using(&ps.features, &Reference::Origin), vec![FeatureId(1001)]);
         assert!(features_using(&ps.features, &Reference::Plane(crate::reference::DatumPlane::Top)).is_empty());
     }

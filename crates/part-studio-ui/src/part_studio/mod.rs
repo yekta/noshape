@@ -1077,6 +1077,11 @@ impl PartStudioView {
     /// What [`Self::apply_display`] does before building the scene; returns whether the geometry changed and the
     /// build to run.
     fn apply_display_begin(&mut self, display: Arc<StudioDisplay>, window: &mut Window, cx: &mut Context<Self>) -> (bool, SceneJob) {
+        // The face → edge tables a selection's highlight reads, built off the UI thread now (`prewarm_face_edges`).
+        if !Arc::ptr_eq(&self.display, &display) {
+            let warm = display.clone();
+            cx.background_spawn(async move { noshape_scene::builder::prewarm_face_edges(&warm) }).detach();
+        }
         self.display_seq += 1;
         self.scene_gen += 1;
         if let Some(studio) = self.doc.read(cx).studio(self.tab) {

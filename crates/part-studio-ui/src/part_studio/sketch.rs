@@ -415,8 +415,9 @@ impl PartStudioView {
         });
     }
 
-    pub(super) fn sketch_data(&self, cx: &App) -> Option<SketchData> {
-        self.edit.as_ref().and_then(|e| e.dialog.read(cx).sketch_data().cloned())
+    /// The open sketch's data, shared with the dialog's draft (every frame of sketch mode reads it: no copy).
+    pub(super) fn sketch_data(&self, cx: &App) -> Option<std::sync::Arc<SketchData>> {
+        self.edit.as_ref().and_then(|e| e.dialog.read(cx).sketch_data_shared())
     }
 
     /// Regenerate immediately on the UI thread (sketch edits are cheap: only
@@ -916,7 +917,7 @@ impl PartStudioView {
         // (amber) while the dimension is placed.
         let tool_picks = if ed.tool == Tool::Dimension { ed.tool_picks() } else { Vec::new() };
         selection.extend(tool_picks.iter().map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
-        accent.extend(ed.picked(data.as_ref()).iter().filter(|e| !tool_picks.contains(e)).map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
+        accent.extend(ed.picked(data.as_deref()).iter().filter(|e| !tool_picks.contains(e)).map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
         let Some(data) = data else { return Vec::new() };
         let units = self.doc.read(cx).session.doc.settings.units;
         let (lines, points) = ed.overlay(&data, &units);
@@ -4298,6 +4299,7 @@ impl PartStudioView {
         let created = self.doc.update(cx, |doc, cx| {
             doc.edit_studio(tab, "Paste into sketch", cx, |ps| {
                 let Some(noshape_model::ParamValue::Sketch(d)) = ps.feature_mut(id).and_then(|f| f.params.0.get_mut("sketch")) else { return Vec::new() };
+                let d = std::sync::Arc::make_mut(d);
                 let created = d.sketch.paste(&clip, DVec2::ZERO);
                 d.sketch.solve();
                 created.into_iter().filter(|e| d.sketch.curve(*e).is_some()).collect::<Vec<_>>()

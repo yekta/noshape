@@ -146,7 +146,7 @@ fn sketch_drag_and_constraint_latency() {
     let mut ps = PartStudio::new();
     let mut f = ps.new_feature("sketch", &units).unwrap();
     f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    f.params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
     let fid = f.id;
     ps.features.push(f);
     let mut regen = Regenerator::new();
@@ -166,7 +166,7 @@ fn sketch_drag_and_constraint_latency() {
         let t_move = t.elapsed();
         ed.tool_drag(&mut data, p);
         let t_edit = t.elapsed();
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
         regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
         frames.push(t.elapsed());
         if t.elapsed() > Duration::from_millis(30) {
@@ -214,7 +214,7 @@ fn speed_target_200_entity_sketch() {
     let mut ps = PartStudio::new();
     let mut f = ps.new_feature("sketch", &units).unwrap();
     f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    f.params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
     let fid = f.id;
     ps.features.push(f);
     let mut regen = Regenerator::new();
@@ -234,7 +234,7 @@ fn speed_target_200_entity_sketch() {
         ed.pointer_move(&mut data, p, false, false);
         ed.tool_drag(&mut data, p);
         solves.push(t.elapsed());
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
         regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
         steps.push(t.elapsed());
     }
@@ -266,7 +266,7 @@ fn sketch_drag_regeneration_only() {
     let mut ps = PartStudio::new();
     let mut f = ps.new_feature("sketch", &units).unwrap();
     f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    f.params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
     let fid = f.id;
     ps.features.push(f);
     let mut regen = Regenerator::new();
@@ -278,7 +278,7 @@ fn sketch_drag_regeneration_only() {
         let p = from + v(0.00002 * (i % 40) as f64, 0.00001 * (i % 40) as f64);
         data.sketch.drag(&[(noshape_sketch::DragHandle::Point(corner), p)]);
         let t = Instant::now();
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
         regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
         frames.push(t.elapsed());
     }
@@ -309,7 +309,7 @@ fn big_shape_sketch_drag_step_parts() {
     let mut ps = PartStudio::new();
     let mut f = ps.new_feature("sketch", &units).unwrap();
     f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    f.params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
     let fid = f.id;
     ps.features.push(f);
     let mut regen = Regenerator::new();
@@ -326,7 +326,7 @@ fn big_shape_sketch_drag_step_parts() {
         let _ = data.sketch.regions();
         regions.push(t.elapsed());
         let t = Instant::now();
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
         regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
         regenerate.push(t.elapsed());
     }
@@ -364,7 +364,7 @@ fn s300_rectangle_grid() {
     let mut ps = PartStudio::new();
     let mut f = ps.new_feature("sketch", &units).unwrap();
     f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    f.params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
     let fid = f.id;
     ps.features.push(f);
     let opts = RegenOptions { editing_sketch: Some(fid), ..Default::default() };
@@ -386,7 +386,7 @@ fn s300_rectangle_grid() {
         let t = Instant::now();
         data.sketch.set_dimension_value(dims[7], 0.010 + 0.0005 * (k % 3) as f64).unwrap();
         data.sketch.solve();
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
         regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
         t.elapsed()
     }).collect());
@@ -406,7 +406,7 @@ fn s300_rectangle_grid() {
         let t = Instant::now();
         ed.pointer_move(&mut data, p, false, false);
         ed.tool_drag(&mut data, p);
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
         regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
         steps.push(t.elapsed());
     }
@@ -419,7 +419,7 @@ fn s300_rectangle_grid() {
         let t = Instant::now();
         d.sketch.add_constraint(ConstraintKind::HorizontalDistance { a: corners[k * 4], b: corners[k * 4 + 4], value: 0.015 }).unwrap();
         d.sketch.solve();
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(d.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(d.clone())));
         regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
         t.elapsed()
     }).collect());
@@ -483,7 +483,7 @@ fn s300_mixed_curves() {
     let mut ps = PartStudio::new();
     let mut f = ps.new_feature("sketch", &units).unwrap();
     f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    f.params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
     let fid = f.id;
     ps.features.push(f);
     let opts = RegenOptions { editing_sketch: Some(fid), ..Default::default() };
@@ -503,7 +503,7 @@ fn s300_mixed_curves() {
         let t = Instant::now();
         data.sketch.set_dimension_value(dims[9], 0.008 + 0.0005 * (k % 3) as f64).unwrap();
         data.sketch.solve();
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
         regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
         t.elapsed()
     }).collect());
@@ -522,7 +522,7 @@ fn s300_mixed_curves() {
         let t = Instant::now();
         ed.pointer_move(&mut data, p, false, false);
         ed.tool_drag(&mut data, p);
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
         regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
         steps.push(t.elapsed());
     }
@@ -540,7 +540,7 @@ fn s300_mixed_curves() {
         let _ = data.sketch.regions();
         regions.push(t.elapsed());
         let t = Instant::now();
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
         regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
         regenerate.push(t.elapsed());
     }
@@ -550,7 +550,7 @@ fn s300_mixed_curves() {
         let t = Instant::now();
         d.sketch.add_constraint(ConstraintKind::HorizontalDistance { a: corners[k], b: corners[k + 4], value: 0.015 }).unwrap();
         d.sketch.solve();
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(d.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(d.clone())));
         regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
         t.elapsed()
     }).collect());
@@ -572,7 +572,7 @@ fn s300_mixed_curves() {
     let rebuild = stats((0..5).map(|k| {
         data.sketch.set_dimension_value(dims[9], 0.008 + 0.0005 * ((k + 1) % 3) as f64).unwrap();
         data.sketch.solve();
-        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
         let t = Instant::now();
         regen.regenerate(&ps, &ConfigValues::default(), &units, &plain);
         t.elapsed()

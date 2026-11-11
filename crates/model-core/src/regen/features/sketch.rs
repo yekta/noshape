@@ -24,7 +24,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     };
     let data = match ev.params.get("sketch") {
         Some(ParamValue::Sketch(d)) => d.clone(),
-        _ => Box::default(),
+        _ => Default::default(),
     };
     let mut sk = data.sketch.clone();
     // Re-project used ("Use") 3D geometry so it follows upstream changes:
@@ -179,7 +179,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     // to the evaluated text before solving.
     let mut data = data;
     if data.texts.iter().any(|t| t.expression) {
-        for t in data.texts.iter_mut().filter(|t| t.expression) {
+        for t in std::sync::Arc::make_mut(&mut data).texts.iter_mut().filter(|t| t.expression) {
             match eval_text_expression(ev, &t.text) {
                 Ok(v) if !v.trim().is_empty() => {
                     t.text = v;
@@ -817,7 +817,7 @@ mod text_expression_tests {
         let mut ps = PartStudio::new();
         let mut f = ps.new_feature("sketch", &units).unwrap();
         f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        f.params.set("sketch", ParamValue::Sketch(Box::new(data)));
+        f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
         ps.features.push(f);
         let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
         let solved = &r.context.sketches[0].sketch;
@@ -849,7 +849,7 @@ mod text_expression_tests {
         let mut ps = PartStudio::new();
         let mut f = ps.new_feature("sketch", &units).unwrap();
         f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         ps.features.push(f);
         let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
         let res = &r.context.sketches[0];

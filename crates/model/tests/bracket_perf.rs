@@ -57,7 +57,7 @@ impl Studio {
         for ((x, y), r) in circles {
             sk.add_circle(DVec2::new(x * 1e-3, y * 1e-3), r * 1e-3);
         }
-        let s = self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(plane)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(plane)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = self.regen().0;
         let mut regions: Vec<_> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| (g.area, Reference::SketchRegion { sketch: s, key: g.key.clone() })).collect();
         regions.sort_by(|a, b| a.0.total_cmp(&b.0));

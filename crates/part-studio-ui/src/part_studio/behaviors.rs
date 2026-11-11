@@ -152,6 +152,9 @@ pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, Vec<Reference>, usize,
 /// A removed part's outline's key: the model before the feature (by address) and the part's faces.
 pub type RemovedOutlineKey = (usize, Vec<Reference>);
 
+/// The shown faces each feature made.
+type FeatureFaces = std::collections::HashMap<FeatureId, Vec<Reference>>;
+
 pub struct UiState {
     /// Edit in context: the assembly shown around the part.
     pub(super) in_context: Option<super::in_context::InContextUi>,
@@ -448,6 +451,8 @@ pub struct UiState {
     /// Every feature name this view has shown, a deleted feature's too (a missing pick reads as the feature that made
     /// it, live fillet-chip-clear-missing: "Extrude 1" after Extrude 1 was deleted).
     pub feature_names: std::collections::HashMap<FeatureId, String>,
+    /// The shown faces each feature made, for the display applied as `display_seq` (`feature_geometry`).
+    pub feature_faces: std::cell::RefCell<Option<(u64, FeatureFaces)>>,
     /// The outline of a part the open feature removes, over its preview: for the model before it (by address) and
     /// those faces; `None` inside while a background task computes it (20-28 ms for a whole part: refresh_scene ran
     /// it on every hover, c2-bottle-split's Split 1).
@@ -811,6 +816,7 @@ impl UiState {
             preview_opacity: crate::feature_dialog::PREVIEW_REST,
             preview_before: None,
             feature_names: Default::default(),
+            feature_faces: Default::default(),
             removed_outline: None,
             before_context: None,
             decal_sized: None,
@@ -930,8 +936,23 @@ impl PartStudioView {
         }
         out.extend(self.display.planes.iter().filter(|p| p.reference == Reference::FeaturePlane(id)).map(|p| p.reference.clone()));
         out.extend(self.display.connectors.iter().filter(|c| c.reference.depends_on() == Some(id)).map(|c| c.reference.clone()));
-        for b in self.display.bodies.iter().filter(|b| !b.hidden) {
-            out.extend(b.face_refs.iter().filter(|r| r.depends_on() == Some(id)).cloned());
+        // The shown faces each feature made, gathered once per display (a click on a row scanned every face: ~3 ms a
+        // click on cf-surface-pattern).
+        let mut cache = self.ui.feature_faces.borrow_mut();
+        let key = self.display_seq;
+        if cache.as_ref().is_none_or(|(k, _)| *k != key) {
+            let mut map: std::collections::HashMap<FeatureId, Vec<Reference>> = std::collections::HashMap::new();
+            for b in self.display.bodies.iter().filter(|b| !b.hidden) {
+                for r in &b.face_refs {
+                    if let Some(f) = r.depends_on() {
+                        map.entry(f).or_default().push(r.clone());
+                    }
+                }
+            }
+            *cache = Some((key, map));
+        }
+        if let Some(faces) = cache.as_ref().and_then(|(_, m)| m.get(&id)) {
+            out.extend(faces.iter().cloned());
         }
         out
     }

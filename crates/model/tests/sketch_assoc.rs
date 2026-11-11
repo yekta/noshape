@@ -21,7 +21,7 @@ fn block() -> (PartStudio, UnitPrefs) {
     sk.corner_rectangle(DVec2::new(-0.05, -0.025), DVec2::new(0.05, 0.025));
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     let sketch_id = sketch.id;
     ps.features.push(sketch);
     let mut reg = Regenerator::new();
@@ -61,7 +61,7 @@ fn intersection_curves_follow_the_model() {
     let data = SketchData { sketch: sk, intersections: vec![IntersectionLink { face: face_ref, entities: ids.iter().map(|e| e.0).collect() }], ..Default::default() };
     let mut s2 = ps.new_feature("sketch", &units).unwrap();
     s2.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Front)]));
-    s2.params.set("sketch", ParamValue::Sketch(Box::new(data)));
+    s2.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
     let s2_id = s2.id;
     ps.features.push(s2);
 
@@ -80,6 +80,7 @@ fn intersection_curves_follow_the_model() {
         *e = ExprValue::new("40 mm");
     }
     if let Some(ParamValue::Sketch(d)) = ps.features[0].params.0.get_mut("sketch") {
+        let d = std::sync::Arc::make_mut(d);
         let pts: Vec<EntityId> = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).map(|e| e.id).collect();
         for p in &pts[1..3] {
             let q = d.sketch.point(*p).unwrap();
@@ -102,7 +103,7 @@ fn sketch_text_regenerates_glyph_regions() {
     let tid = data.add_text("IO", "Liberation Sans", false, false, DVec2::new(0.0, 0.0), 0.01).unwrap();
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(data)));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
     ps.features.push(sketch);
     let r = regen(&ps, &units);
     // "I" is one region, "O" a ring plus its counter: three regions;
@@ -130,6 +131,7 @@ fn sketch_text_regenerates_glyph_regions() {
         t.curve(EntityId(data.texts[0].box_lines[0])).unwrap().length()
     };
     if let Some(ParamValue::Sketch(d)) = ps.features[0].params.0.get_mut("sketch") {
+        let d = std::sync::Arc::make_mut(d);
         d.update_text(tid, |t| {
             t.text = "IOI".into();
             t.bold = true;
@@ -147,6 +149,7 @@ fn sketch_text_regenerates_glyph_regions() {
 
     // Deleting the box removes the text.
     if let Some(ParamValue::Sketch(d)) = ps.features[0].params.0.get_mut("sketch") {
+        let d = std::sync::Arc::make_mut(d);
         let line = EntityId(d.texts[0].box_lines[0]);
         d.sketch.remove_entities(&[line]);
         d.prune_texts();
@@ -180,7 +183,7 @@ fn text_style_edit_regenerates_with_a_cached_regenerator() {
     let tid = data.add_text("Hi", "Liberation Sans", false, false, DVec2::new(0.0, 0.0), 0.01).unwrap();
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(data)));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
     ps.features.push(sketch);
     let mut reg = Regenerator::new();
     let width = |r: &noshape_model::regen::RegenResult| -> f64 {
@@ -191,6 +194,7 @@ fn text_style_edit_regenerates_with_a_cached_regenerator() {
     let r1 = reg.regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
     let w1 = width(&r1);
     if let Some(ParamValue::Sketch(d)) = ps.features[0].params.0.get_mut("sketch") {
+        let d = std::sync::Arc::make_mut(d);
         d.update_text(tid, |t| t.bold = true).unwrap();
         d.sketch.solve();
     }
@@ -211,7 +215,7 @@ fn a_sketch_on_a_face_imprints_the_faces_edges() {
     sk.corner_rectangle(DVec2::ZERO, DVec2::new(0.06, 0.04));
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     let sketch_id = sketch.id;
     ps.features.push(sketch);
     let key = regen(&ps, &units).display.sketches[0].regions[0].key.clone();
@@ -241,7 +245,7 @@ fn a_sketch_on_a_face_imprints_the_faces_edges() {
         let mut f = ps.new_feature("sketch", &units).unwrap();
         f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Face((*top).clone())]));
         f.params.set("disableImprinting", ParamValue::Bool(disable));
-        f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: s, ..Default::default() })));
+        f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: s, ..Default::default() })));
         let id = f.id;
         let mut p = ps.clone();
         p.features.push(f);
@@ -265,7 +269,7 @@ fn a_sketch_on_a_face_imprints_the_faces_edges() {
         _ => unreachable!(),
     };
     f.params.set("sketchPlane", ParamValue::Query(vec![block_region]));
-    f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: s, ..Default::default() })));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: s, ..Default::default() })));
     let id = f.id;
     let mut p = ps.clone();
     p.features.push(f);
@@ -279,7 +283,7 @@ fn a_sketch_on_a_face_imprints_the_faces_edges() {
     assert!(s.regions()[0].entities() == vec![c]);
     let mut f = ps.new_feature("sketch", &units).unwrap();
     f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Face((*top).clone())]));
-    f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: s, ..Default::default() })));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: s, ..Default::default() })));
     let id = f.id;
     ps.features.push(f);
     let mut ex = ps.new_feature("extrude", &units).unwrap();

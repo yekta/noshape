@@ -112,7 +112,7 @@ pub fn pin_sketch_units(doc: &mut crate::document::Document, old: &UnitPrefs) ->
         let mut kinds = std::collections::HashMap::new();
         for f in &mut ps.features {
             let Some(ParamValue::Sketch(data)) = f.params.0.get_mut("sketch") else { continue };
-            n += pin_sketch_data(data, old);
+            n += pin_sketch_data(std::sync::Arc::make_mut(data), old);
             for c in data.sketch.constraints() {
                 kinds.insert((f.id, c.id.0), sketch_dimension_dim(&c.kind));
             }

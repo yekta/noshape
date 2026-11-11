@@ -46,7 +46,7 @@ fn part_pattern_copies_share_one_placed_mesh() {
     // mm, 5 mm high, patterned 4 times 10 mm along x as new parts.
     let mut sk = noshape_sketch::Sketch::new();
     sk.add_circle(DVec2::new(0.0, 0.0), 0.003);
-    let s = add(&mut ps, &units, "sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = add(&mut ps, &units, "sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = regen(&ps, &units);
     let region = Reference::SketchRegion { sketch: s, key: r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions[0].key.clone() };
     let pin = add(&mut ps, &units, "extrude", &[("entities", q(vec![region])), ("depth", e("5 mm")), ("operationType", en("NEW"))]);
@@ -107,7 +107,7 @@ fn parallel_meshing_keeps_every_body_whole() {
     for (p, q2) in [(a, b), (b, c), (c, d), (d, a)] {
         sk.add_line(p, q2);
     }
-    let s = add(&mut ps, &units, "sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = add(&mut ps, &units, "sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = regen(&ps, &units);
     let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
     assert_eq!(regions.len(), 7);

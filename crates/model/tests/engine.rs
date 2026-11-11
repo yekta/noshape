@@ -64,10 +64,10 @@ impl T {
         self.ps.feature_mut(id).unwrap().params.set(k, v);
     }
     fn sketch(&mut self, plane: Reference, sk: noshape_sketch::Sketch) -> FeatureId {
-        self.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))])
+        self.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))])
     }
     fn set_sketch(&mut self, id: FeatureId, sk: noshape_sketch::Sketch) {
-        self.set(id, "sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        self.set(id, "sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     }
     /// Region keys of a sketch, largest first.
     fn regions(&mut self, sketch: FeatureId) -> Vec<Reference> {
@@ -1044,7 +1044,7 @@ fn workspace_unit_change_keeps_unitless_sketch_dimensions() {
     sk.set_driving(cid, true).unwrap();
     let mut data = SketchData { sketch: sk, ..Default::default() };
     data.dimension_exprs.insert(cid.0, ExprValue::new("25"));
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(data)))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(data)))]);
     let r = t.regions(s)[0].clone();
     t.extrude(r, "10 mm", "NEW");
     let mm = total_volume(&t.ok().context);

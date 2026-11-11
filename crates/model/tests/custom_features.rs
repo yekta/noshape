@@ -3613,7 +3613,7 @@ export const depthPattern = defineFeature(function(context is Context, id is Id,
     let mut s = ps.new_feature("sketch", &fx.units).unwrap();
     s.id = noshape_model::reference::FeatureId(sketch_id);
     s.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(noshape_model::reference::DatumPlane::Top)]));
-    s.params.set("sketch", ParamValue::Sketch(Box::new(data)));
+    s.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
     let sid = s.id;
     ps.features.push(s);
     let r = fx.regen(&mut Regenerator::new(), &ps);
@@ -3665,7 +3665,7 @@ export const shift = defineFeature(function(context is Context, id is Id, defini
         sk.corner_rectangle(glam::DVec2::new(x0 * 1e-3, y0 * 1e-3), glam::DVec2::new(x1 * 1e-3, y1 * 1e-3));
         let mut s = ps.new_feature("sketch", &fx.units).unwrap();
         s.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(noshape_model::reference::DatumPlane::Top)]));
-        s.params.set("sketch", ParamValue::Sketch(Box::new(noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
+        s.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
         let sid = s.id;
         ps.features.push(s);
         let r = fx.regen(&mut Regenerator::new(), ps);
@@ -4100,7 +4100,7 @@ fn bend_centerline_case(flip: bool, up: &str) {
         let mut f = ps.new_feature("sketch", &fx.units).unwrap();
         let sketch = f.id;
         f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        f.params.set("sketch", ParamValue::Sketch(Box::new(noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
+        f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
         ps.features.push(f);
         let r = fx.regen(&mut reg, &ps);
         let key = r.display.sketches.iter().find(|s| s.feature == sketch).unwrap().regions[0].key.clone();
@@ -4201,7 +4201,7 @@ fn edge_order_at_a_corner_as_live() {
     let mut f = ps.new_feature("sketch", &fx.units).unwrap();
     let sketch = f.id;
     f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    f.params.set("sketch", ParamValue::Sketch(Box::new(noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
     ps.features.push(f);
     let r = fx.regen(&mut reg, &ps);
     let key = r.display.sketches.iter().find(|s| s.feature == sketch).unwrap().regions[0].key.clone();
@@ -4431,7 +4431,7 @@ fn a_sketchs_bodies_edges_and_vertices_are_lives() {
         draw(&mut sk);
         let mut f = ps.new_feature("sketch", &units).unwrap();
         f.params.set("sketchPlane", ParamValue::Query(vec![plane]));
-        f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         let id = f.id;
         ps.features.push(f);
         id

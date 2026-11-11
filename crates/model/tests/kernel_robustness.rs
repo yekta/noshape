@@ -72,7 +72,7 @@ impl T {
         for ((x, y), r) in circles {
             sk.add_circle(DVec2::new(x * 1e-3, y * 1e-3), r * 1e-3);
         }
-        let s = self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = self.regen();
         let regions = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
         (s, regions)
@@ -592,11 +592,11 @@ fn sweep_round_tight_bend() {
         let mut t = T::new();
         let mut prof = noshape_sketch::Sketch::new();
         prof.add_circle(DVec2::ZERO, 0.003);
-        let pf = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: prof, ..Default::default() })))]);
+        let pf = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: prof, ..Default::default() })))]);
         let mut path = noshape_sketch::Sketch::new();
         let l = path.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.0, 0.03));
         let a = path.add_arc(DVec2::new(rb * 1e-3, 0.03), DVec2::new(rb * 1e-3, 0.03 + rb * 1e-3), DVec2::new(0.0, 0.03));
-        let pp = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: path, ..Default::default() })))]);
+        let pp = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: path, ..Default::default() })))]);
         let r = t.regen();
         let key = r.display.sketches.iter().find(|x| x.feature == pf).unwrap().regions[0].key.clone();
         let sw = t.add("sweep", &[("profiles", q(vec![Reference::SketchRegion { sketch: pf, key }])), ("path", q(vec![Reference::SketchEntity { sketch: pp, entity: l.0 }, Reference::SketchEntity { sketch: pp, entity: a.0 }]))]);
@@ -623,7 +623,7 @@ fn a_splines_handle_tips_are_marked_in_the_display() {
     let mut sk = noshape_sketch::Sketch::new();
     let s = sk.add_fit_spline_with_handles(&[DVec2::new(0.0, 0.0), DVec2::new(0.03, 0.02), DVec2::new(0.06, 0.0)]).unwrap();
     let (h0, h1) = sk.entity(s).unwrap().spline_handles().unwrap();
-    let f = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let f = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let d = r.display.sketches.iter().find(|x| x.feature == f).unwrap();
     let mut tips: Vec<u32> = d.points.iter().filter(|p| p.tip).map(|p| p.entity).collect();
@@ -663,11 +663,11 @@ fn a_sweep_round_sharp_corners_is_mitred() {
     for k in 0..4 {
         prof.add_line_between(p[k], p[(k + 1) % 4]).unwrap();
     }
-    let pf = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: prof, ..Default::default() })))]);
+    let pf = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: prof, ..Default::default() })))]);
     let mut path = noshape_sketch::Sketch::new();
     let c = [(-20.0, -10.0), (20.0, -10.0), (20.0, 10.0), (-20.0, 10.0)].map(|(x, y)| path.add_point(DVec2::new(x * 1e-3, y * 1e-3)));
     let sides: Vec<_> = (0..4).map(|k| path.add_line_between(c[k], c[(k + 1) % 4]).unwrap()).collect();
-    let pp = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: path, ..Default::default() })))]);
+    let pp = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: path, ..Default::default() })))]);
     let r = t.regen();
     let key = r.display.sketches.iter().find(|x| x.feature == pf).unwrap().regions[0].key.clone();
     let sw = t.add("sweep", &[("profiles", q(vec![Reference::SketchRegion { sketch: pf, key }])), ("path", q(sides.iter().map(|l| Reference::SketchEntity { sketch: pp, entity: l.0 }).collect())), ("extendToFullPath", ParamValue::Bool(true))]);
@@ -797,7 +797,7 @@ fn surface_revolve() {
     let mut sk = noshape_sketch::Sketch::new();
     let l = sk.add_line(DVec2::new(0.01, 0.0), DVec2::new(0.01, 0.02));
     let ax = sk.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.0, 0.02));
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.add(
         "revolve",
         &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![Reference::SketchEntity { sketch: s, entity: l.0 }])), ("axis", q(vec![Reference::SketchEntity { sketch: s, entity: ax.0 }])), ("fullRevolve", ParamValue::Bool(true))],
@@ -827,13 +827,13 @@ fn sweep_twist() {
         for i in 0..4 {
             prof.add_line_between(ids[i], ids[(i + 1) % 4]).unwrap();
         }
-        let pf = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: prof, ..Default::default() })))]);
+        let pf = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: prof, ..Default::default() })))]);
         let mut path = noshape_sketch::Sketch::new();
         let mut ents = vec![path.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.0, 0.05))];
         if arc {
             ents.push(path.add_arc(DVec2::new(0.04, 0.05), DVec2::new(0.04, 0.09), DVec2::new(0.0, 0.05)));
         }
-        let pp = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: path, ..Default::default() })))]);
+        let pp = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: path, ..Default::default() })))]);
         let r = t.regen();
         let key = r.display.sketches.iter().find(|x| x.feature == pf).unwrap().regions[0].key.clone();
         let sw = t.add(
@@ -937,7 +937,7 @@ fn loft_like_onshape() {
             sk.add_circle(DVec2::ZERO, r * 1e-3);
         }
         let p = point.then(|| sk.add_point(DVec2::ZERO));
-        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         if let Some(p) = p {
             return Reference::SketchEntity { sketch: s, entity: p.0 };
         }
@@ -1338,7 +1338,7 @@ fn blend_sweep_matches_onshape() {
     fn sketch_on(t: &mut T, plane: Reference, build: impl FnOnce(&mut noshape_sketch::Sketch)) -> Vec<Reference> {
         let mut sk = noshape_sketch::Sketch::new();
         build(&mut sk);
-        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = t.regen();
         r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect()
     }
@@ -1597,7 +1597,7 @@ fn shell_draft_sweep_matches_onshape() {
         let mut t = block();
         let mut sk = noshape_sketch::Sketch::new();
         sk.add_circle(DVec2::new(mm(30.0), mm(10.0)), mm(5.0));
-        let sid = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let sid = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = t.regen();
         let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == sid).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: sid, key: g.key.clone() }).collect();
         t.add("extrude", &[("entities", q(regions)), ("endBound", en("THROUGH_ALL")), ("symmetric", ParamValue::Bool(true)), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
@@ -1654,7 +1654,7 @@ fn sweep_4_8_matches_onshape() {
     fn sketch_on(t: &mut T, plane: Reference, build: impl FnOnce(&mut noshape_sketch::Sketch) -> Vec<u32>) -> (FeatureId, Vec<Reference>, Vec<u32>) {
         let mut sk = noshape_sketch::Sketch::new();
         let ids = build(&mut sk);
-        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = t.regen();
         let regions = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
         (s, regions, ids)
@@ -2213,7 +2213,7 @@ fn fillet_round_2_matches_onshape() {
         sk.add_line_between(c, d).unwrap();
         sk.add_arc(p(45.0, 20.0), p(45.0, 15.0), p(45.0, 25.0));
         sk.add_arc(p(15.0, 20.0), p(15.0, 25.0), p(15.0, 15.0));
-        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = t.regen();
         let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
         assert_eq!(regions.len(), 1, "slot region");
@@ -2368,7 +2368,7 @@ fn patterns_match_onshape() {
         for &((x, y), r) in circles {
             sk.add_circle(DVec2::new(x * 1e-3, y * 1e-3), r * 1e-3);
         }
-        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = t.regen();
         r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect()
     }
@@ -2509,7 +2509,7 @@ fn hole_and_rib_match_onshape() {
     fn sketch(t: &mut T, plane: Reference, build: impl FnOnce(&mut noshape_sketch::Sketch) -> u32) -> (FeatureId, u32) {
         let mut sk = noshape_sketch::Sketch::new();
         let id = build(&mut sk);
-        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         (s, id)
     }
     let mm = |v: f64| v * 1e-3;
@@ -2677,7 +2677,7 @@ fn loft_square_to_circle_matches_onshape() {
     let p = Reference::FeaturePlane(t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("20 mm"))]));
     let mut sk = noshape_sketch::Sketch::new();
     sk.add_circle(DVec2::ZERO, 0.008);
-    let s2 = t.add("sketch", &[("sketchPlane", q(vec![p])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s2 = t.add("sketch", &[("sketchPlane", q(vec![p])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let r2: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s2).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s2, key: g.key.clone() }).collect();
     let item = |r: Reference| {
@@ -2729,7 +2729,7 @@ fn feature_pattern_of_an_added_boss_off_the_plate_as_live() {
     let top = Reference::FeaturePlane(t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("3 mm"))]));
     let mut sk = noshape_sketch::Sketch::new();
     sk.add_circle(DVec2::new(0.02, 0.02), 0.005);
-    let s = t.add("sketch", &[("sketchPlane", q(vec![top])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![top])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
     let boss = t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
@@ -2951,7 +2951,7 @@ fn opposite_extrudes_of_one_circle_make_one_cylinder_face() {
     let mut t = T::new();
     let mut sk = noshape_sketch::Sketch::new();
     sk.add_circle(DVec2::new(0.0, 5e-3), 6e-3);
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
     t.add("extrude", &[("entities", q(regions.clone())), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
@@ -2975,7 +2975,7 @@ fn a_fillet_between_extruded_faces_is_a_cylinder() {
     sk.add_fit_spline(&[mm(20.0, 0.0), mm(21.0, 5.0), mm(23.0, 10.0), mm(26.0, 15.0)]).unwrap();
     sk.add_line(mm(26.0, 15.0), mm(0.0, 15.0));
     sk.add_line(mm(0.0, 15.0), mm(0.0, 0.0));
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
     assert_eq!(regions.len(), 1);
@@ -3005,13 +3005,13 @@ fn a_hole_through_a_tube_as_live_and_old_studios_as_they_were() {
     let mut tube = noshape_sketch::Sketch::new();
     tube.add_circle(DVec2::ZERO, 0.0375);
     tube.add_circle(DVec2::ZERO, 0.025);
-    let s1 = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: tube, ..Default::default() })))]);
+    let s1 = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: tube, ..Default::default() })))]);
     let r = t.regen();
     let annulus: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s1).unwrap().regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).map(|g| Reference::SketchRegion { sketch: s1, key: g.key.clone() }).into_iter().collect();
     t.add("extrude", &[("entities", q(annulus)), ("depth", e("25 mm")), ("symmetric", ParamValue::Bool(true)), ("operationType", en("NEW"))]);
     let mut hole = noshape_sketch::Sketch::new();
     hole.add_circle(DVec2::ZERO, 0.005);
-    let s2 = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: hole, ..Default::default() })))]);
+    let s2 = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: hole, ..Default::default() })))]);
     let r = t.regen();
     let disc: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s2).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s2, key: g.key.clone() }).collect();
     let cut = t.add("extrude", &[("entities", q(disc)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
@@ -3039,7 +3039,7 @@ fn a_region_slit_by_a_line_extrudes() {
     sk.add_circle(DVec2::ZERO, 0.075);
     sk.add_circle(DVec2::ZERO, 0.04);
     sk.add_line(DVec2::new(0.04, 0.0), DVec2::new(0.1, 0.0));
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let ring: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().filter(|g| (g.area - 0.012644910).abs() < 1e-6).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
     assert_eq!(ring.len(), 1);
@@ -3072,11 +3072,12 @@ fn a_whole_sketch_extrudes_all_its_regions() {
     let mut t = T::new();
     let mut sk = noshape_sketch::Sketch::new();
     sk.add_circle(DVec2::ZERO, 0.005);
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let x = t.add("extrude", &[("entities", q(vec![Reference::Sketch(s)])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
     let r = t.ok(x);
     assert!((volume(&r) - std::f64::consts::PI * 25.0 * 10.0).abs() < 1e-6, "{}", volume(&r));
     if let Some(ParamValue::Sketch(d)) = t.ps.feature_mut(s).unwrap().params.0.get_mut("sketch") {
+        let d = std::sync::Arc::make_mut(d);
         d.sketch.add_circle(DVec2::new(0.02, 0.0), 0.005);
     }
     let r = t.ok(x);
@@ -3091,7 +3092,7 @@ fn a_line_over_a_profiles_side_leaves_it_one_face() {
     let mut sk = noshape_sketch::Sketch::new();
     sk.corner_rectangle(DVec2::ZERO, DVec2::new(0.1, 0.05));
     sk.add_line(DVec2::new(0.04, 0.0), DVec2::new(0.06, 0.0));
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
     assert_eq!(regions.len(), 1);
@@ -3137,7 +3138,7 @@ fn feature_mirror_of_a_boss_copies_the_boss() {
     for i in 0..4 {
         sk.add_line_between(pts[i], pts[(i + 1) % 4]).unwrap();
     }
-    let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().filter(|g| !g.imprinted).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
     let boss = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
@@ -3165,7 +3166,7 @@ fn feature_mirror_of_a_boss_raised_by_a_second_extrude() {
         sk.add_line_between(pts[i], pts[(i + 1) % 6]).unwrap();
     }
     sk.add_line_between(pts[1], pts[4]).unwrap();
-    let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let regions: Vec<_> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().filter(|g| !g.imprinted).collect();
     assert_eq!(regions.len(), 2);
@@ -3196,7 +3197,7 @@ fn part_mirror_of_a_half_blind_hole_merges_across_the_plane() {
         let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
         let mut sk = noshape_sketch::Sketch::new();
         let p = sk.add_point(DVec2::new(0.0, 0.0));
-        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(pl)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(pl)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let body = t.regen().context.bodies[0].id.clone();
         let h = t.add(
             "hole",
@@ -3240,7 +3241,7 @@ fn circular_part_pattern_onto_itself_keeps_its_volume() {
             let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
             let mut sk = noshape_sketch::Sketch::new();
             let p = sk.add_point(DVec2::new(0.0, 0.0));
-            let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(pl)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+            let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(pl)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
             let h = t.add("hole", &[("scope", q(vec![Reference::Body(body.clone())])), ("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }])), ("unitsSystem", en("METRIC")), ("styleV2", en(style)), ("startStyle", en("SKETCH")), ("holeDiameterV3", e("6 mm")), ("endStyleV2", en("BLIND")), ("holeDepthV3", e("5 mm"))]);
             t.ok(h);
         }
@@ -3498,7 +3499,7 @@ fn a_boss_on_a_drafted_blocks_top_adds_to_it() {
         let top = t.faces_where(|c| c.z > 4.999);
         let mut sk = noshape_sketch::Sketch::new();
         sk.add_circle(DVec2::ZERO, 0.002);
-        let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = t.regen();
         let disc: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == s).unwrap().regions.iter().filter(|g| !g.imprinted).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
         assert_eq!(disc.len(), 1);
@@ -3530,7 +3531,7 @@ fn collinear_lines_meeting_alone_extrude_as_one_face() {
             let below = p(&mut sk, 0.0, -5.0);
             sk.add_line_between(o, below).unwrap();
         }
-        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = t.regen();
         let regions: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
         assert_eq!(regions.len(), 1);
@@ -3565,7 +3566,7 @@ fn a_line_under_another_extrudes_as_one_face() {
     rect(-185.0, -15.0, 185.0, 0.0);
     let base = sk.regions().into_iter().find(|r| r.contains(DVec2::new(0.0, -7.5e-3))).unwrap();
     let key = noshape_model::regen::eval::encode_region_key(&base.id);
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     t.regen();
     let x = t.add("extrude", &[("entities", q(vec![Reference::SketchRegion { sketch: s, key }])), ("depth", e("140 mm")), ("operationType", en("NEW"))]);
     let r = t.ok(x);
@@ -3584,7 +3585,7 @@ fn a_sketch_on_a_face_takes_onshapes_frame() {
         t.ok(b);
         for (at, x, y) in [(DVec3::new(20.0, 10.0, 10.0), DVec3::X, DVec3::Y), (DVec3::new(40.0, 10.0, 5.0), DVec3::Y, DVec3::Z), (DVec3::new(20.0, 0.0, 5.0), DVec3::X, DVec3::Z), (DVec3::new(0.0, 10.0, 5.0), DVec3::NEG_Y, DVec3::Z)] {
             let face = t.faces_where(|c| (c - at).length() < 1e-6);
-            let s = t.add("sketch", &[("sketchPlane", q(face)), ("sketch", ParamValue::Sketch(Box::default()))]);
+            let s = t.add("sketch", &[("sketchPlane", q(face)), ("sketch", ParamValue::Sketch(Default::default()))]);
             let r = t.regen();
             let frame = r.context.sketches.iter().find(|k| k.feature == s).unwrap().frame;
             if legacy {
@@ -3610,7 +3611,7 @@ fn a_surface_extrude_of_a_spline_runs_up_to_a_part() {
     let mut sk = noshape_sketch::Sketch::new();
     let spline = sk.add_fit_spline(&[DVec2::new(-0.02, 0.0), DVec2::new(-0.005, 0.01), DVec2::new(0.01, -0.01), DVec2::new(0.02, 0.0)]).unwrap();
     sk.add_ellipse(DVec2::new(0.0, 0.015), DVec2::new(0.008, 0.0), 0.004);
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let up = t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![Reference::SketchEntity { sketch: s, entity: spline.0 }])), ("endBound", en("UP_TO_BODY")), ("endBoundEntityBody", q(vec![part]))]);
     let r = t.ok(up);
     let sheet = r.context.bodies.iter().find(|x| x.kind == noshape_model::display::BodyKind::Surface).expect("a surface");
@@ -3645,7 +3646,7 @@ fn two_halves_of_an_ellipse_extrude_as_one_wall() {
     let mut sk = noshape_sketch::Sketch::new();
     sk.add_ellipse(DVec2::ZERO, DVec2::new(20e-3, 0.0), 7.5e-3);
     sk.add_line(DVec2::new(-20e-3, 0.0), DVec2::new(20e-3, 0.0));
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let regions: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
     assert_eq!(regions.len(), 2);
@@ -3706,7 +3707,7 @@ fn a_face_pattern_of_a_hole_through_a_tubes_wall() {
     let solid = volume(&t.ok(bore));
     let mut sk = noshape_sketch::Sketch::new();
     sk.add_circle(DVec2::new(0.0, 20e-3), 3e-3);
-    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
     let regions: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
     let hole = t.add("extrude", &[("entities", q(regions)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
@@ -3736,7 +3737,7 @@ fn extruded_edges_run_as_their_sketch_lines_are_drawn() {
         for (p0, p1) in [(a, b), (c, d), (a, c), (b, d)] {
             sk.add_line_between(p0, p1).unwrap();
         }
-        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = t.regen();
         let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
         let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("NEW"))]);
@@ -3772,7 +3773,7 @@ fn a_reapplied_draft_drafts_its_instances_boss() {
         for i in 0..4 {
             sk.add_line_between(pts[i], pts[(i + 1) % 4]).unwrap();
         }
-        let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = t.regen();
         (s, r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().filter(|g| !g.imprinted).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect::<Vec<_>>())
     };
@@ -3811,7 +3812,7 @@ fn a_seam_split_arc_is_one_edge() {
                 sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
             }
         }
-        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let r = t.regen();
         let regions: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
         let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("100 mm")), ("symmetric", ParamValue::Bool(true)), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
@@ -3866,7 +3867,7 @@ fn part_mirror_of_a_half_counterbored_hole_merges_across_the_plane() {
         let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
         let mut sk = noshape_sketch::Sketch::new();
         let p = sk.add_point(DVec2::new(0.0, 0.0));
-        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(pl)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(pl)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
         let body = t.regen().context.bodies[0].id.clone();
         let h = t.add(
             "hole",

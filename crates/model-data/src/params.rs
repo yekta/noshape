@@ -26,8 +26,9 @@ pub enum ParamValue {
     Query(Vec<Reference>),
     /// Array parameter: one value map per item.
     Array(Vec<ParamValues>),
-    /// Sketch payload (only used by the Sketch feature).
-    Sketch(Box<crate::sketch_feature::SketchData>),
+    /// Sketch payload (only used by the Sketch feature), shared: reading a draft's sketch (every frame of sketch mode)
+    /// copies no geometry; an edit copies it once if it is shared (`Arc::make_mut`).
+    Sketch(std::sync::Arc<crate::sketch_feature::SketchData>),
     /// Lookup table path (e.g. hole standard cascade), one entry per level.
     Lookup(Vec<String>),
 }
@@ -436,7 +437,7 @@ impl ParamSpec {
             ParamKind::Query { .. } => ParamValue::Query(Vec::new()),
             ParamKind::Array { .. } => ParamValue::Array(Vec::new()),
             ParamKind::Lookup { .. } => ParamValue::Lookup(Vec::new()),
-            ParamKind::Sketch => ParamValue::Sketch(Box::default()),
+            ParamKind::Sketch => ParamValue::Sketch(Default::default()),
             ParamKind::Reference { .. } => ParamValue::Text(String::new()),
         }
     }

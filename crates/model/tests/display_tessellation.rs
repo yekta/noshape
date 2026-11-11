@@ -20,7 +20,7 @@ fn cylinder(diameter: f64) -> PartStudio {
     sk.add_circle(DVec2::ZERO, diameter / 2.0);
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     let sid = sketch.id;
     ps.features.push(sketch);
     let key = regen(&ps).display.sketches[0].regions[0].key.clone();
@@ -144,7 +144,7 @@ fn a_used_bspline_shows_only_its_ends() {
     sk.entity_mut(id).unwrap().external = true;
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     ps.features.push(sketch);
     let d = regen(&ps).display;
     assert_eq!(d.sketches[0].points.len(), 2, "only the spline's two ends: {:?}", d.sketches[0].points.iter().map(|p| p.position).collect::<Vec<_>>());

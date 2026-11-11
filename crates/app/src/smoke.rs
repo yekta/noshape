@@ -95,7 +95,7 @@ fn pins_studio(side: usize) -> noshape_model::partstudio::PartStudio {
     let plane = |p| P::Query(vec![Reference::Plane(p)]);
     let mut sketch = noshape_sketch::Sketch::new();
     sketch.add_circle(glam::DVec2::ZERO, 0.002);
-    let sk = add(&mut ps, "sketch", vec![("sketchPlane", plane(DatumPlane::Top)), ("sketch", P::Sketch(Box::new(noshape_model::sketch_feature::SketchData { sketch, ..Default::default() })))]);
+    let sk = add(&mut ps, "sketch", vec![("sketchPlane", plane(DatumPlane::Top)), ("sketch", P::Sketch(std::sync::Arc::new(noshape_model::sketch_feature::SketchData { sketch, ..Default::default() })))]);
     let regen = noshape_model::regen::Regenerator::new().regenerate(&ps, &noshape_model::configuration::ConfigValues::default(), &units, &noshape_model::regen::RegenOptions::default());
     let key = regen.display.sketches.iter().find(|d| d.feature == sk).and_then(|d| d.regions.first()).map(|r| r.key.clone()).unwrap_or_else(|| fail("pin sketch has no region"));
     let pin = add(&mut ps, "extrude", vec![("entities", P::Query(vec![Reference::SketchRegion { sketch: sk, key }])), ("depth", expr("10 mm"))]);

@@ -521,6 +521,35 @@ document's display mesh is under 0.5 s.
 | pins-assembly-1000 on perf.yml's macOS runners (real GPU) | 120 fps / a frame | 11-04 run 41840797973 (main 60f4813f, fixture pins-assembly-1000, variant `hov@hover:`): GPU 8.7 ms a frame mean, 13 ms p95 (over 8.3 ms: the renderer's next item); presented 33 fps (the runners cap a 1x window near 30); hover p50 23-32 ms (UI 10-15 ms), pick p50 106-113 ms (UI 11-15 ms; the rest the runner's pacing) |
 | open a document | ≤ 0.5 s | **11-06 23:19, with the display cache (vibe5, release, Xvfb + llvmpipe, median of 3; table "Document open with the display cache" below): a reopen shows the model within 0.5 s for 94/94 Part Studio documents (slowest 377 ms, c2-housing-draft; c2-rings-loft 5178 → 218 ms, cf-surface-pattern 10083 → 261 ms); a first open (no cache) 72/95, unchanged: regeneration-bound (OPEN-SLOW-SURFACE-PATTERN, OPEN-SLOW-SHELL-FILLET).** 11-06 20:44 (vibe5 idle, release, Xvfb + llvmpipe, median of 3; table below): 73/95 show their model within 0.5 s of opening (parity corpus 87 + tests/perf 8; pins-assembly-1000 is an assembly, not measured by the Part Studio script). Every slow one is regeneration (OCCT Shell / Fillet, Booleans of many tools, FeatureScript custom features), not scene build or upload. Floor ~170-200 ms (window + GPU init to the first frame ~120-165 ms).** Earlier: v0.4.11 warm: opening → first viewport frame 130–200 ms (an empty viewport, before the model) ✓; first launch 800 ms |
 
+### UI speed against PLAN 2.7 (lead 11-11 21:27; measured 11-11 21:39-23:05 UTC)
+
+vibe5, release, Xvfb + llvmpipe, `/root/psui-scratch/ui-speed.sh` (copies on ~/agents/psui; hat8 from a mode-700 copy,
+deleted after). Numbers are **the UI thread's CPU** (action + the frame that shows it, ms, p50 / p95), what a real GPU
+doesn't change: llvmpipe draws on the same CPUs, so the wait for the frame (3-44 ms here) and the GPU columns are this
+machine's. ui-latency's new kinds: `NOSHAPE_PERF_LATENCY=dialog-open,row-click,fillet-new,sketch-enter,list-scroll`
+(perf_script.rs); orbit / hover / pick are the viewport benches (`NOSHAPE_PERF_BENCH`). Target: a 120 Hz frame (8.3 ms)
+for everything (PLAN 2.7: 120 fps; a click shows within a frame). Live: none of these is recorded (behaviours "speed:
+psui open a document": live's box starves Chrome; its sketch drag is server-bound, ~310-400 ms a step).
+
+| operation | target | worst document before | after the fix | status |
+|---|---|---|---|---|
+| orbit, UI thread per frame | ≤ 8.3 ms | 0.51 / 0.60 (cf-surface-pattern) | | met (GPU: perf.yml NIST 79-85 fps, 12.8-15 ms a frame: not met, the renderer's) |
+| hover, pointer to the frame's submission | within a frame | p50 0.3-0.4, p95 ≤ 1.0 (12.7 on cfss / 8.0 louver: llvmpipe's queue) | | met |
+| pick = selection change, click to submission | within a frame | p50 0.3-0.6, p95 ≤ 1.0; max 52 ms once (hat8: the first pick pass after a view change, llvmpipe runs it in the submit) | | met |
+| feature row click (selection change from the list) | ≤ 8.3 ms | **5.4 / 21.5 (cf-surface-pattern: the first click on each feature 16-21 ms)** | 5.4 / 6.6 | **fixed** |
+| feature list scroll (a wheel step) | ≤ 8.3 ms | 3.0 / 3.5 | | met |
+| feature dialog open (Edit) | ≤ 8.3 ms | 7.1 / 9.1 (hat8), 7.3 / 8.4 (c2-impeller-loft) | hat8 6.4 / 7.4 | p95 at the edge |
+| new Fillet with a face of the busiest part selected | ≤ 8.3 ms | 6.2 / 6.6 (hat8) | | met |
+| sketch-mode entry (Edit on a sketch) | ≤ 8.3 ms | 8.3 / 9.9 (cf-straight-spline), 7.4 / 9.4 (hat8) | 9.2 / 11.0, hat8 5.9 / 7.6 | **not met**: GPUI's prepaint ~5 ms + the sketch overlay ~2 ms; next |
+
+Fixed (the worst first): the first selection of a feature's faces built the body mesh's face → edge table on the UI
+thread (`face_edge_table`, 16-21 ms a body on cf-surface-pattern); now built in the background when a display lands
+(`prewarm_face_edges`). A feature's faces are gathered once per display (`UiState::feature_faces`), not by a scan of
+every face on each click. A sketch's data is shared (`ParamValue::Sketch(Arc<SketchData>)`, copy on write): sketch mode
+read it with a deep copy ~35 times a frame (`sketch_data()`), the sketch evaluator copied it twice a regeneration.
+c2-impeller-loft: hover / pick benches find nothing (its fit leaves the model small at the right: something hidden
+counts in Zoom to fit's bounds; to check).
+
 ### Assembly and drawing tabs with the display cache (11-07 02:36)
 
 Lead 11-07: the display cache for assembly and drawing tabs too (app-core `display_cache`: key, files, eviction,

@@ -216,7 +216,7 @@ pub fn rename_in_param(v: &mut ParamValue, old: &str, new: &str) {
                 }
             }
         }
-        ParamValue::Sketch(data) => data.dimension_exprs.values_mut().for_each(fix),
+        ParamValue::Sketch(data) => std::sync::Arc::make_mut(data).dimension_exprs.values_mut().for_each(fix),
         _ => {}
     }
 }
@@ -457,7 +457,7 @@ mod tests {
         let mut item = crate::params::ParamValues::default();
         item.set("count", ParamValue::Expr(ExprValue::new("#w / 1 mm")));
         let mut params = crate::params::ParamValues::default();
-        params.set("sketch", ParamValue::Sketch(Box::new(data)));
+        params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
         params.set("instances", ParamValue::Array(vec![item]));
         let id = FeatureId::new_random();
         ps.features.push(crate::partstudio::Feature { id, type_id: "newSketch".into(), name: "Sketch 1".into(), suppressed: false, params, folder: None, custom_name: false, hidden: false, suppression_expr: None, sub_features: Vec::new() });

@@ -54,7 +54,7 @@ impl Studio {
     fn sketch(&mut self, plane: Reference, sk: noshape_sketch::Sketch) -> FeatureId {
         self.add("sketch", |p| {
             p.set("sketchPlane", ParamValue::Query(vec![plane]));
-            p.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            p.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         })
     }
 

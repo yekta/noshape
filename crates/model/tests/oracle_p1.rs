@@ -42,7 +42,7 @@ impl Studio {
         draw(&mut sk);
         let sketch = self.add("sketch", |pv| {
             pv.set("sketchPlane", ParamValue::Query(vec![plane]));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         });
         let r = self.regen();
         let sk = r.display.sketches.iter().find(|s| s.feature == sketch).expect("sketch");
@@ -359,7 +359,7 @@ fn hole_cases() -> Vec<(&'static str, Studio)> {
         let point = sk.add_point(DVec2::new(at.0 * 1e-3, at.1 * 1e-3));
         let sketch = s.add("sketch", |pv| {
             pv.set("sketchPlane", q(plane));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         });
         s.add("hole", |p| {
             p.set("locations", q(Reference::SketchEntity { sketch, entity: point.0 }));
@@ -421,7 +421,7 @@ impl Studio {
         let out = draw(&mut sk);
         let sketch = self.add("sketch", |pv| {
             pv.set("sketchPlane", ParamValue::Query(vec![plane]));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         });
         let r = self.regen();
         let sk = r.display.sketches.iter().find(|s| s.feature == sketch).expect("sketch");
@@ -770,7 +770,7 @@ fn plane_cases() -> Vec<(&'static str, Studio)> {
     let point = sk.add_point(pt(110.0, 0.0));
     let sketch = s.add("sketch", |pv| {
         pv.set("sketchPlane", q(top()));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = s.regen();
     s.add("cPlane", |p| {
@@ -988,7 +988,7 @@ fn revolve_cases() -> Vec<(&'static str, Studio)> {
         let line = sk.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.0, 0.02));
         let axis_sketch = s.add("sketch", |pv| {
             pv.set("sketchPlane", q(front));
-            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
         });
         let axis = Reference::SketchEntity { sketch: axis_sketch, entity: line.0 };
         s.add("revolve", |p| {

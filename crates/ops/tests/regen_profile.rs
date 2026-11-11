@@ -106,7 +106,7 @@ fn sheet_metal(rows: &mut Vec<Row>) {
     }
     let sketch = add(&mut ps, &units, "sketch", |pv| {
         pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     });
     let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
     let key = r.display.sketches.iter().find(|s| s.feature == sketch).unwrap().regions[0].key.clone();
@@ -672,6 +672,7 @@ fn edit_latency(check: bool) {
                 if let Some((i, f)) = ps.features.iter().enumerate().find(|(_, f)| matches!(f.params.get("sketch"), Some(ParamValue::Sketch(d)) if !d.dimension_exprs.is_empty())) {
                     let mut e = ps.clone();
                     if let Some(ParamValue::Sketch(d)) = e.features[i].params.0.get_mut("sketch") {
+                        let d = std::sync::Arc::make_mut(d);
                         let (k, v) = d.dimension_exprs.iter().next().map(|(k, v)| (*k, scaled(v))).unwrap();
                         d.dimension_exprs.insert(k, v);
                     }

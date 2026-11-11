@@ -267,7 +267,7 @@ fn the_origins_hidden_point_is_not_an_undo_step(cx: &mut TestAppContext) {
         let mut g = f.clone();
         if let Some(ParamValue::Sketch(d)) = g.params.get("sketch").cloned() {
             let mut d = d;
-            edit(&mut d);
+            edit(std::sync::Arc::make_mut(&mut d));
             g.params.set("sketch", ParamValue::Sketch(d));
         }
         g
@@ -3311,7 +3311,8 @@ fn a_spline_from_before_handle_arms_shows_its_arms_on_entering_its_sketch(cx: &m
             v.doc.update(cx, |doc, cx| {
                 doc.edit_studio(tab, "Spline", cx, |ps| {
                     let f = ps.features.iter_mut().find(|f| f.id == id).unwrap();
-                    let Some(noshape_model::params::ParamValue::Sketch(mut d)) = f.params.get("sketch").cloned() else { panic!("a sketch") };
+                    let Some(noshape_model::params::ParamValue::Sketch(mut arc)) = f.params.get("sketch").cloned() else { panic!("a sketch") };
+                    let d = std::sync::Arc::make_mut(&mut arc);
                     let s = d.sketch.add_fit_spline_with_handles(&[glam::DVec2::new(0.0, 0.05), glam::DVec2::new(0.02, 0.07), glam::DVec2::new(0.04, 0.05)]).unwrap();
                     // (Arms go only with their spline: the saved form without them.)
                     let mut json = serde_json::to_value(&d.sketch).unwrap();
@@ -3320,7 +3321,7 @@ fn a_spline_from_before_handle_arms_shows_its_arms_on_entering_its_sketch(cx: &m
                     }
                     d.sketch = serde_json::from_value(json).unwrap();
                     assert!(d.sketch.handle_arms(s).iter().all(Option::is_none));
-                    f.params.set("sketch", noshape_model::params::ParamValue::Sketch(d));
+                    f.params.set("sketch", noshape_model::params::ParamValue::Sketch(arc));
                 })
             });
             id

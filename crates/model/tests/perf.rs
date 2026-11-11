@@ -29,7 +29,7 @@ fn perforated_plate(n: usize) -> PartStudio {
     let mut ps = PartStudio::new();
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     let sid = sketch.id;
     ps.features.push(sketch);
     let mut reg = Regenerator::new();

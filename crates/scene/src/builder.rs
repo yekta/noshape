@@ -2061,6 +2061,15 @@ pub fn faces_edges(display: &StudioDisplay, faces: &[Reference]) -> Vec<Option<V
 }
 
 /// Per face of `mesh`, the edges bounding it ([`face_edges`]'s rule), worked out once per mesh.
+/// Builds every shown body's face → edge table ahead, on the caller's (background) thread: a face's or feature's first
+/// selection then finds it cached instead of building it on the UI thread (cf-surface-pattern: 16-21 ms on the first
+/// click of each feature's row).
+pub fn prewarm_face_edges(display: &StudioDisplay) {
+    for b in display.bodies.iter().filter(|b| !b.hidden && !b.face_refs.is_empty()) {
+        face_edge_table(&b.mesh);
+    }
+}
+
 fn face_edge_table(mesh: &Arc<noshape_model::display::MeshBuffers>) -> Arc<Vec<Vec<u32>>> {
     type Table = (std::sync::Weak<noshape_model::display::MeshBuffers>, Arc<Vec<Vec<u32>>>);
     static CACHE: std::sync::Mutex<Vec<Table>> = std::sync::Mutex::new(Vec::new());

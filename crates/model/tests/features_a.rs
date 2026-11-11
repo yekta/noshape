@@ -66,7 +66,7 @@ impl T {
         self.ps.feature_mut(id).unwrap().params.set(k, v);
     }
     fn sketch(&mut self, plane: Reference, sk: noshape_sketch::Sketch) -> FeatureId {
-        self.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))])
+        self.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))])
     }
     /// Region keys of a sketch, largest first.
     fn regions(&mut self, sketch: FeatureId) -> Vec<Reference> {
@@ -1432,6 +1432,7 @@ fn pattern_instance_references_survive_upstream_edit() {
     assert_eq!(filleted, 1);
     // Upstream edit: make the seed wider. The fillet still finds its edge.
     if let Some(ParamValue::Sketch(d)) = t.ps.features[0].params.0.get_mut("sketch") {
+        let d = std::sync::Arc::make_mut(d);
         let ids: Vec<_> = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).map(|e| e.id).collect();
         for id in [ids[1], ids[2]] {
             let p = d.sketch.point(id).unwrap();

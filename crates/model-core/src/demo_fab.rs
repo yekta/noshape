@@ -20,7 +20,7 @@ fn entities(sketch: FeatureId, ids: &[u32]) -> ParamValue {
 fn sketch(ps: &mut PartStudio, units: &UnitPrefs, plane: DatumPlane, sk: noshape_sketch::Sketch) -> FeatureId {
     let mut f = ps.new_feature("sketch", units).expect("sketch");
     f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(plane)]));
-    f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     let id = f.id;
     ps.features.push(f);
     id

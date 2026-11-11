@@ -619,9 +619,10 @@ fn part_studio_sketches_in_views() {
     });
     let f = &mut ps.expect("demo has a Part Studio").features[0];
     let Some(crate::params::ParamValue::Sketch(mut sd)) = f.params.get("sketch").cloned() else { panic!("the first feature is a sketch") };
-    let c = sd.sketch.add_line(glam::DVec2::new(-0.05, -0.03), glam::DVec2::new(0.05, 0.03));
-    sd.sketch.set_construction(c, true).unwrap();
-    sd.sketch.add_point(glam::DVec2::new(0.02, 0.01));
+    let data = std::sync::Arc::make_mut(&mut sd);
+    let c = data.sketch.add_line(glam::DVec2::new(-0.05, -0.03), glam::DVec2::new(0.05, 0.03));
+    data.sketch.set_construction(c, true).unwrap();
+    data.sketch.add_point(glam::DVec2::new(0.02, 0.01));
     f.params.set("sketch", crate::params::ParamValue::Sketch(sd));
     let fid = f.id;
     drawing.sheets[0].view_mut(ViewId(1)).unwrap().shown_sketches = vec![fid];
@@ -1986,7 +1987,7 @@ fn flat_bracket() -> (crate::Document, Drawing) {
     let lines: Vec<u32> = (0..2).map(|i| sk.add_line_between(pts[i], pts[i + 1]).unwrap().0).collect();
     let mut f = ps.new_feature("sketch", &units).unwrap();
     f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    f.params.set("sketch", ParamValue::Sketch(Box::new(crate::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(crate::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
     let sid = f.id;
     ps.features.push(f);
     let mut f = ps.new_feature("sheetMetalStart", &units).unwrap();

@@ -52,7 +52,7 @@ impl Studio {
         (r, t)
     }
     fn sketch(&mut self, sk: noshape_sketch::Sketch) -> FeatureId {
-        self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))])
+        self.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))])
     }
 }
 

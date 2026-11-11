@@ -23,7 +23,7 @@ fn a_cylinder_shows_two_edges_and_no_vertex() {
     sk.add_circle(DVec2::ZERO, 0.025);
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     let sid = sketch.id;
     ps.features.push(sketch);
     let key = regen(&ps).display.sketches[0].regions[0].key.clone();

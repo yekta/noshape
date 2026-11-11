@@ -29,7 +29,7 @@ pub fn plate_studio() -> PartStudio {
     let mut ps = PartStudio::new();
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(plate_sketch(0.1, 0.06, 0.012))));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(plate_sketch(0.1, 0.06, 0.012))));
     let sid = sketch.id;
     ps.features.push(sketch);
     let mut reg = Regenerator::new();
@@ -63,7 +63,7 @@ pub fn plate_studio_with_hole_features() -> PartStudio {
     }
     let mut sketch = ps.new_feature("sketch", &units).unwrap();
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: outline, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: outline, ..Default::default() })));
     let sid = sketch.id;
     ps.features.push(sketch);
     let mut centers = noshape_sketch::Sketch::new();
@@ -71,7 +71,7 @@ pub fn plate_studio_with_hole_features() -> PartStudio {
     let corners = [centers.add_point(DVec2::new(-w / 2.0 + 0.012, -h / 2.0 + 0.012)), centers.add_point(DVec2::new(w / 2.0 - 0.012, h / 2.0 - 0.012))];
     let mut points = ps.new_feature("sketch", &units).unwrap();
     points.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    points.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: centers, ..Default::default() })));
+    points.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: centers, ..Default::default() })));
     let pid = points.id;
     ps.features.push(points);
     let mut reg = Regenerator::new();
@@ -242,7 +242,7 @@ pub fn pin_studio() -> PartStudio {
     let mut sk = noshape_sketch::Sketch::new();
     sk.add_circle(DVec2::ZERO, 0.012);
     sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
-    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
     let sid = sketch.id;
     ps.features.push(sketch);
     let mut reg = Regenerator::new();

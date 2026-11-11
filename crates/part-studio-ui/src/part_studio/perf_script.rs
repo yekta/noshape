@@ -9,6 +9,9 @@
 //! first frame that draws it (its present to the screen excluded): a feature dialog opening (Edit on each of the last
 //! features in turn, cancelled after) and a feature row click (the list's and the graphics' highlight), 20 each, then
 //! logs `BENCH SUMMARY dialog-open` / `row-click`. It focuses its window first (an unfocused one is frame-capped).
+//! `NOSHAPE_PERF_LATENCY=<kinds>` (comma-separated) picks the samples: also `fillet-new` (a new Fillet with a face of
+//! the part with the most faces selected), `sketch-enter` (Edit on the last sketch: sketch mode's first frame) and
+//! `list-scroll` (a wheel step over the feature list, up and down in turn).
 
 use super::PartStudioView;
 use gpui_kit::*;
@@ -197,6 +200,9 @@ impl PartStudioView {
     fn run_ui_latency(&mut self, cx: &mut Context<Self>) {
         let Some(window) = cx.active_window().or_else(|| cx.windows().first().copied()) else { return };
         let features: Vec<noshape_model::reference::FeatureId> = self.studio(cx).map(|s| s.features.iter().rev().filter(|f| f.type_id != "sketch").take(4).map(|f| f.id).collect()).unwrap_or_default();
+        let sketch = self.studio(cx).and_then(|s| s.features.iter().rev().find(|f| f.type_id == "sketch" && !f.suppressed).map(|f| f.id));
+        let busy_face = self.display.bodies.iter().max_by_key(|b| b.face_refs.len()).and_then(|b| b.face_refs.first().cloned());
+        let kinds: Vec<String> = std::env::var("NOSHAPE_PERF_LATENCY").unwrap_or_else(|_| "dialog-open,row-click".into()).split(',').map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).collect();
         if features.is_empty() {
             log::info!(target: "perf", "perf script: no feature to open");
             return;
@@ -211,7 +217,8 @@ impl PartStudioView {
             cx.background_executor().timer(pause()).await;
             let active = cx.update_window(window, |_, w, _| w.is_window_active()).unwrap_or(false);
             log::info!(target: "perf", "perf script: ui-latency window active {active}");
-            for (kind, n) in [("dialog-open", 20usize), ("row-click", 20)] {
+            for kind in kinds.iter().map(String::as_str) {
+                let n = 20usize;
                 let mut ms = Vec::new();
                 let (mut handler, mut wait, mut frame) = (Vec::new(), Vec::new(), Vec::new());
                 let mut cpu = Vec::new();
@@ -221,16 +228,41 @@ impl PartStudioView {
                     let id = features[k % features.len()];
                     let shown: std::sync::Arc<std::sync::Mutex<Option<Sample>>> = Default::default();
                     let tx = shown.clone();
+                    // What the sample starts from: a face of the busiest part selected (`fillet-new`).
+                    if kind == "fillet-new" {
+                        let Some(face) = busy_face.clone() else { break };
+                        let _ = cx.update_window(window, |_, _, cx| {
+                            let _ = this.update(cx, |this: &mut Self, cx| this.pick(crate::scene_builder::PickTarget { reference: face, kind: crate::scene_builder::PickKind::Face, anchor: None }, cx));
+                        });
+                        cx.background_executor().timer(pause()).await;
+                    }
                     let ok = cx.update_window(window, |_, w, cx| {
                         for st in FRAME_STAGES.iter().chain(&FRAME_STAGES_CPU).chain(PARTS.iter().filter(|p| !FRAME_STAGES.contains(p))) {
                             noshape_render::perf::series_start(st);
                         }
                         let t0 = Instant::now();
                         let c0 = noshape_render::perf::thread_cpu_time().unwrap_or_default();
-                        let _ = this.update(cx, |this: &mut Self, cx| match kind {
-                            "dialog-open" => this.edit_feature(id, w, cx),
-                            _ => this.click_feature(id, false, cx),
-                        });
+                        match kind {
+                            // A wheel step over the feature list, as the user's (the list's own scroll handling).
+                            "list-scroll" => {
+                                let b = this.update(cx, |this: &mut Self, _| this.ui.list_scroll.bounds()).unwrap_or_default();
+                                let dy = if k % 2 == 0 { -120. } else { 120. };
+                                let ev = ScrollWheelEvent { position: b.center(), delta: ScrollDelta::Pixels(point(px(0.), px(dy))), ..Default::default() };
+                                w.dispatch_event(PlatformInput::ScrollWheel(ev), cx);
+                            }
+                            _ => {
+                                let _ = this.update(cx, |this: &mut Self, cx| match kind {
+                                    "dialog-open" => this.edit_feature(id, w, cx),
+                                    "fillet-new" => this.start_feature("fillet", w, cx),
+                                    "sketch-enter" => {
+                                        if let Some(sk) = sketch {
+                                            this.edit_feature(sk, w, cx)
+                                        }
+                                    }
+                                    _ => this.click_feature(id, false, cx),
+                                });
+                            }
+                        }
                         let handler = t0.elapsed().as_secs_f32() * 1e3;
                         let handler_cpu = noshape_render::perf::thread_cpu_time().unwrap_or_default().saturating_sub(c0).as_secs_f32() * 1e3;
                         // The first frame after the action draws it: its start, then its layout, prepaint and paint.
@@ -269,10 +301,14 @@ impl PartStudioView {
                         }
                         cx.background_executor().timer(std::time::Duration::from_millis(2)).await;
                     }
-                    if kind == "dialog-open" {
+                    if matches!(kind, "dialog-open" | "fillet-new" | "sketch-enter") {
                         cx.background_executor().timer(pause()).await;
                         let _ = cx.update_window(window, |_, w, cx| {
-                            let _ = this.update(cx, |this: &mut Self, cx| this.cancel_edit(w, cx));
+                            let _ = this.update(cx, |this: &mut Self, cx| {
+                                this.cancel_edit(w, cx);
+                                this.selection.clear();
+                                cx.notify();
+                            });
                         });
                     }
                 }
