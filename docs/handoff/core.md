@@ -12,7 +12,7 @@ ticket documents), ~/agents/fuzz/bin (qa's fuzz scripts). OCCT patches build on 
 
 
 
-**From qa (2026-11-11 15:24 UTC, 17:00 list): your 2f8f73d70 renames a merged face and a saved reference loses it.**
+**From qa (2026-11-11 15:22 UTC, 17:00 list): your 2f8f73d70 renames a merged face and a saved reference loses it.**
 Fuzz document slow1151-pre (qa vibe3 ~/qa/tickets, vibe4 ~/tmp/qa): Linear pattern 2 "Select a pattern direction." since
 2f8f73d70 (201bd381d Ok); 3 of its 8 parts gone. Do documents saved before it still find faces by their old names?
 
