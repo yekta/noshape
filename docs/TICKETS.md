@@ -421,6 +421,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - CI 43039009971 on 44ff040aa: macOS and Windows OCCT / Test / Release build green; Linux's OCCT job failed on the runner's
     apt ("Temporary failure resolving 'azure.archive.ubuntu.com'"), so Linux Test / Release build were skipped: infrastructure,
     re-run by qa 15:22 (--failed).
+  - qa 16:01: the re-run failed the same way (15:53–16:01, apt can't resolve azure.archive.ubuntu.com on the Linux runner;
+    githubstatus "All Systems Operational"). Linux T1 on 44ff040aa passed on the watcher (14:21). The lead cuts from 44ff040aa
+    once GitHub's Linux runners reach apt (release.yml's Linux build and install checks need it).
+  - qa 16:09, the next candidate f324e41f0 (watcher green 15:44: 44ff040aa + core's reopen reading kept features' states only):
+    the result store's corpus 87 / 87 (no store = cold = warm), the six mutations equal, corruption 13 / 13 on both documents;
+    feature_list over all tabs 70.3 s without, 73.6 cold, 32.0 warm (vibe5 under load).
 - Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 HAND-DRILL-MATES-OVERDEFINED (parity only).
 
 ## Release blockers for the 2026-11-11 05:00 release, candidate e2c8da0f9 (qa list 04:50; watcher GREEN 03:57, CI 3-platform success; the latest release is v0.4.41, v0.4.42 from b73d2fece in its release CI)
