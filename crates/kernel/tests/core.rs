@@ -318,6 +318,48 @@ fn brep_and_bin_round_trip() {
     assert!(Shape::from_brep_bytes(b"garbage").is_err());
 }
 
+/// A STEP part whose cylinder comes as two bands with their seams half a turn apart, each ended by a round (a torus,
+/// not a plane: c2-gamma-imported's PEM FH4 studs, live one face): read as one cylinder face, each round keeping its own
+/// seam's vertex on the circle it meets.
+#[test]
+fn a_step_cylinder_in_two_bands_between_rounds_reads_as_one_face() {
+    let p = |x: f64, y: f64| DVec2::new(x, y);
+    let line = |a: DVec2, b: DVec2| Segment2d::Line { a, b };
+    let lower = [
+        line(p(0.0, -2.0), p(4.0, -2.0)),
+        Segment2d::Arc { center: p(4.0, 0.0), radius: 2.0, start_angle: -PI / 2.0, end_angle: 0.0 },
+        line(p(6.0, 0.0), p(6.0, 10.0)),
+        line(p(6.0, 10.0), p(0.0, 10.0)),
+        line(p(0.0, 10.0), p(0.0, -2.0)),
+    ];
+    let upper = [
+        line(p(0.0, 10.0), p(6.0, 10.0)),
+        line(p(6.0, 10.0), p(6.0, 20.0)),
+        Segment2d::Arc { center: p(4.0, 20.0), radius: 2.0, start_angle: 0.0, end_angle: PI / 2.0 },
+        line(p(4.0, 22.0), p(0.0, 22.0)),
+        line(p(0.0, 22.0), p(0.0, 10.0)),
+    ];
+    let solid = |segs: &[Segment2d], start: f64| {
+        let f = make_face_2d(&Plane::xy(), segs, &[]).unwrap();
+        revolve_between(&f, DVec3::ZERO, DVec3::Y, start, start + 2.0 * PI).unwrap().shape
+    };
+    let cylinders = |s: &Shape| -> Vec<f64> { s.faces().iter().filter(|x| matches!(x.face_surface(), Ok(Surface::Cylinder { .. }))).map(|x| x.area().unwrap()).collect() };
+    let fused = fuse(&solid(&lower, 0.0), &solid(&upper, PI)).unwrap().shape;
+    let dir = std::env::temp_dir().join(format!("noshape-kernel-step-bands-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("bands.step");
+    write_step(&path, &[ExportShape { shape: fused.clone(), name: Some("Stud".into()), color: None }], LengthUnit::Millimeter).unwrap();
+    let parts = read_step(&path, LengthUnit::Millimeter).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    let s = &parts[0].shape;
+    let cyl = cylinders(s);
+    // The bottom and top discs, the two rounds, one cylinder 12 mm across and 20 mm long.
+    assert_eq!(s.faces().len(), 5, "{cyl:?}");
+    assert!(cyl.len() == 1 && (cyl[0] - 240.0 * PI).abs() < 1e-6, "{cyl:?}");
+    let v = fused.volume().unwrap();
+    assert!(s.is_valid() && (s.volume().unwrap() - v).abs() < 1e-6 * v);
+}
+
 #[test]
 fn step_round_trip() {
     let dir = std::env::temp_dir().join(format!("noshape-kernel-step-{}", std::process::id()));

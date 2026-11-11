@@ -43,6 +43,31 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-11 14:37 UTC: model-suite failures by features lost (lead 13:40); the PEM FH4 studs' import.**
+- Ranked (suite-unify, 821/947): impeller Shell Gehäuse 37 (bool's), knife Chamfer 1 37 (blend's), rings-loft
+  Circular pattern 1 20 (blend's Chamfer 1 gap), fan-blade Sweep 1 11, c2-gamma-imported / c2-wire-clip-imported
+  Import 1 6 + 6, louver Extrude 3 4, cf-surface-pattern 3 (parked), setback fillet / face blend 1 each (blend's).
+- Import 1: the PEM FH4-M3-18 stud (×15 per document) read 82/224/145, live 81/223/145. Onshape's STEP export has
+  its shank as two faces on two cylinder entities (seams half a turn apart, met at a ring, each band's far end a
+  round: a torus, a cone), every face on a trimmed surface. merge_same_surface_faces now puts faces on a trimmed
+  cylinder / cone / sphere / torus on their own copy of the whole surface (share_bspline_surfaces; its seams read on
+  the forward face, curves keep their ranges) and runs merge_cylinder_bands, which now takes a non-planar cap: b's
+  far circle split at a's seam angle, the cap's curve the old one's run by the new parameter; volume check 1e-6
+  (OCCT's integration reads 2e-7 apart). Counts now live's. T1 kernel
+  `core::a_step_cylinder_in_two_bands_between_rounds_reads_as_one_face`; probe `features::step_part_cylinders_probe`.
+- Still not matching: area 203.1205 mm², live 203.2332; volume 131.1503 mm³, live 131.1277. (a) The groove torus
+  (R 1.5, r 0.15, inner half; live's box the same): exact 2πr(πR − 2r) = 4.158573 mm², ours 4.158579, live
+  4.277452: live reads it 2.9 % high. (b) The 12 knurl cones (bounded by B-spline arcs live reads as circles: wire-
+  clip's "79 circle, 24 other" vs "101 circle, 2 other"): OCCT's integral 0.160416 mm² each, a fine mesh 0.159599 =
+  live's: ours reads 0.5 % high, the segmented Gauss integral the same. Their B-spline edges (0.408 mm, tolerance
+  1.5 um) aren't circles (a circle fits only at 1e-4 mm, R 295 mm): the faces' curves sit up to the tolerance off
+  the 3D edges, ~0.0008 mm² a face. Tighter pcurves from the 3D curves would fix it; not done (0.0098 mm² of the
+  part's 0.11). (a)
+  needs live's word before a harness band (REQUESTS core 14:37).
+- fan-blade Sweep 1 (11): bool's (its thread's Boolean, lead 11-10). louver Extrude 3 (4): the translated feature
+  extrudes sketch F9620bae016d8's regions ("0,6,18,22,24,…" with inner-loop flags): as a new part 102 faces,
+  20,220 mm³, where live (faces of an imprinted extracted surface) cuts 101 mm³: the translator's region mapping.
+
 **State 11-11 10:30 UTC: the speed items (lead 09:25: unify's retries and what the features ask for are core's).**
 - unify (boolean.cpp `unify_in`): pairs no face order can merge (two faces of a cylinder / cone meeting only along
   lines of it, their turns adding up past a full one: c2-helical-sweep's thread strips) no longer trigger the retries:

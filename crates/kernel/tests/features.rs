@@ -1226,3 +1226,37 @@ fn binary_round_trip_shown_faces_probe() {
         println!("{name}: {} faces, shown {}", x.faces().len(), t.face_count());
     }
 }
+
+/// Probe: an imported STEP part's cylinders (NOSHAPE_PROBE_STEP, NOSHAPE_PROBE_PART a name prefix): each with its
+/// axis, radius, area, (u, v) bounds and neighbours, to see why two pieces of one stay apart.
+#[test]
+#[ignore = "T2: probe"]
+fn step_part_cylinders_probe() {
+    let (Ok(path), Ok(part)) = (std::env::var("NOSHAPE_PROBE_STEP"), std::env::var("NOSHAPE_PROBE_PART")) else { return };
+    let parts = noshape_kernel::read_step(std::path::Path::new(&path), noshape_kernel::LengthUnit::Millimeter).unwrap();
+    let Some(p) = parts.iter().find(|p| p.name.as_deref().is_some_and(|n| n.starts_with(&part))) else { return };
+    let faces = p.shape.faces();
+    println!("{}: {} faces", p.name.as_deref().unwrap_or(""), faces.len());
+    let t = noshape_kernel::tessellate(&p.shape, 1e-5, 0.01, false).unwrap();
+    let pt = |k: usize| glam::DVec3::from(t.positions[t.indices[k] as usize].map(f64::from));
+    let mesh: f64 = (0..t.indices.len() / 3).map(|k| pt(3 * k).dot(pt(3 * k + 1).cross(pt(3 * k + 2))) / 6.0).sum();
+    println!("volume {:.6} mesh {mesh:.6}", p.shape.volume().unwrap());
+    for f in &faces {
+        if !matches!(f.face_surface(), Ok(noshape_kernel::Surface::Torus { .. } | noshape_kernel::Surface::Cone { .. })) {
+            continue;
+        }
+        let t = noshape_kernel::tessellate(f, 1e-5, 0.01, false).unwrap();
+        let tri = |k: usize| glam::DVec3::from(t.positions[t.indices[k] as usize].map(f64::from));
+        let mesh: f64 = (0..t.indices.len() / 3).map(|k| (tri(3 * k + 1) - tri(3 * k)).cross(tri(3 * k + 2) - tri(3 * k)).length() / 2.0).sum();
+        println!("{:?}: area {:.6} mesh {mesh:.6}", f.face_surface().map(|s| format!("{s:?}").chars().take(30).collect::<String>()), f.area().unwrap());
+    }
+    for (i, f) in faces.iter().enumerate() {
+        let Ok(noshape_kernel::Surface::Cylinder { origin, axis, radius, .. }) = f.face_surface() else { continue };
+        let area = f.area().unwrap();
+        if area < 5.0 {
+            continue;
+        }
+        let near: Vec<String> = p.shape.adjacent_faces(i).unwrap().iter().map(|&j| format!("{j}:{:?}", faces[j].face_surface().map(|s| format!("{s:?}").chars().take(60).collect::<String>()))).collect();
+        println!("face {i}: r {radius:.6} origin {origin:.6} axis {axis:.6} area {area:.6} uv {:?}\n  near {near:?}", f.uv_bounds());
+    }
+}
