@@ -27,6 +27,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fails: core), Cylindrical 22 (BOTTOM_AXIS_POINT takes the other end: asm), the Gear 5 Connector (in-feature
   connector on a Spur gear's internal sketch: dx), 15 mates on it.
 
+## psui, 2026-11-11
+- [ ] P3 LINKED-PART-RELEASE (psui, unverified: paid plans; lead 01:20) **Release… on another document's part in an
+  assembly**: live (2464) lists "Release… [Upgrade]" in that instance's menu, and on the Free plan it only opens the
+  upgrade modal, so what Release does there (release the source document's part at its version? from this document's
+  release candidate?) is unknown. Ours leaves the item off that menu until live reads Onshape's help pages on it.
+
 ## psui, 2026-11-09
 - [x] (verified by qa 2026-11-10 on green 4f5863a2 = v0.4.41, core b5da62f83: c2-fan-blade-sweep regenerates in 1.56 s on vibe3, live 1.42 s) P0 FAN-BLADE-SWEEP-HANG (dx, speed regression; found by psui's re-measure 11-09 19:40): c2-fan-blade-sweep's
   **Sweep 1 takes 331 s** (live 58 ms; the whole document 332.9 s, live 1.4 s: qa's 18:11 model run on vibe2,
