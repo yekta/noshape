@@ -447,7 +447,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - **qa 19:41: CI 43039009971 on 44ff040aa is green on all three** (the 18:10 re-run: Linux OCCT, Test and Release build
     success, macOS and Windows as before). Failures before: 15:00–17:39 the runner's apt (DNS to azure.archive.ubuntu.com, then
     "Unable to locate package gcc-15": ppa.launchpadcontent.net unreachable over IPv6). The 17:00 cut can go ahead from 44ff040aa.
-- **qa 22:43, v0.4.44 checked (published 22:18, run 43089660933, cut 44ff040aa): no blocker.** The Linux job's first attempt
+- **qa 22:46, v0.4.44 checked (published 22:18, run 43089660933, cut 44ff040aa): no blocker.** The Linux job's first attempt
   failed at upload-artifact (GitHub's artifact service: "Failed to FinalizeArtifact", HTML answers 20:19–20:28; the build and
   its 24.04 library check had passed); the lead's re-run published it. 11 assets, every job green incl. the three "Restart
   into" updates; the Linux tarballs and .deb match SHA256SUMS. CLI smoke = v0.4.43 (the volume sweep the same; Rhino export
