@@ -1688,14 +1688,17 @@ pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::R
     };
     // A line the loop runs along and back (a slit: a line joining a ring's two circles, live learning-center-michael):
     // the loop cut there, its pieces the outer loop and holes (a dead end's pair dropped).
+    let area = |lp: &[(noshape_sketch::regions::ProfileSegment, u32)]| -> f64 {
+        let pts: Vec<glam::DVec2> = lp.iter().flat_map(|(sg, _)| sg.tessellate(1e-6)).collect();
+        (0..pts.len()).map(|i| pts[i].perp_dot(pts[(i + 1) % pts.len()])).sum::<f64>() * 0.5
+    };
     let mut outer_m = merge(&region.outer);
-    let mut holes_m: Vec<_> = region.holes.iter().map(merge).collect();
+    // (A hole of no area, a curve inside the region run along and back, is no hole: live's tool has no slit there
+    // (c2-sm-louver's Extrude 3).)
+    let bb = region.outer.bbox();
+    let mut holes_m: Vec<_> = region.holes.iter().map(merge).filter(|h| area(h).abs() > 1e-9 * (bb.max - bb.min).length_squared()).collect();
     let pieces = split_slits(outer_m.clone());
     if pieces.len() > 1 || pieces.first().is_some_and(|p| p.len() != outer_m.len()) {
-        let area = |lp: &[(noshape_sketch::regions::ProfileSegment, u32)]| -> f64 {
-            let pts: Vec<glam::DVec2> = lp.iter().flat_map(|(sg, _)| sg.tessellate(1e-6)).collect();
-            (0..pts.len()).map(|i| pts[i].perp_dot(pts[(i + 1) % pts.len()])).sum::<f64>() * 0.5
-        };
         let mut pieces: Vec<_> = pieces.into_iter().filter(|p| !p.is_empty()).collect();
         pieces.sort_by(|a, b| area(b).abs().total_cmp(&area(a).abs()));
         let mut it = pieces.into_iter();
@@ -2041,6 +2044,21 @@ mod region_area_tests {
         let segments: Vec<ProfileSegment> = points.iter().zip(points.iter().cycle().skip(1)).map(|(&a, &b)| ProfileSegment::Line { a, b }).collect();
         let sources = (0..segments.len()).map(|i| SegmentSource { entity: EntityId(i as u32), forward: true }).collect();
         Region { id: RegionId { boundary: Vec::new(), ordinal: 0 }, outer: ProfileLoop { segments, sources }, holes: Vec::new(), joined: Vec::new() }
+    }
+
+    /// A hole of no area (c2-sm-louver's Extrude 3: a text glyph's contour along an arc and back, no slit in live's
+    /// tool) is left out of the region's face.
+    #[test]
+    fn a_hole_of_no_area_is_no_hole() {
+        let mut r = region(&[DVec2::ZERO, DVec2::new(0.04, 0.0), DVec2::new(0.04, 0.03), DVec2::new(0.0, 0.03)]);
+        let arc = |start_angle: f64, end_angle: f64, ccw: bool| ProfileSegment::Arc { center: DVec2::new(0.02, 0.015), radius: 0.005, start_angle, end_angle, ccw };
+        let glyph = |forward: bool| SegmentSource { entity: EntityId(1 << 30), forward };
+        r.holes.push(ProfileLoop { segments: vec![arc(0.0, 1.0, true), arc(1.0, 0.0, false)], sources: vec![glyph(true), glyph(false)] });
+        let mut sketch = noshape_sketch::Sketch::new();
+        let report = sketch.solve();
+        let s = super::SketchResult { feature: super::FeatureId(1), name: "Sketch 1".into(), frame: crate::display::PlaneFrame::TOP, sketch, report, regions: vec![r.clone()], imprinted: Vec::new(), split: Vec::new(), wires: Vec::new(), dimension_text: Default::default(), images: Vec::new(), legacy_edge_directions: false, bodies: None };
+        let p = super::region_profile(&s, &r, super::Source::Index(0)).unwrap();
+        assert_eq!(p.shape.count(noshape_kernel::ShapeType::Edge), 4);
     }
 
     /// A loop out along a line and back (the Knuckle's Extrude 4 regions, tools of no volume) encloses no area; a
