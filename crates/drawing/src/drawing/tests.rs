@@ -453,6 +453,25 @@ fn jogged_and_aligned_sections() {
     assert!(!g.edges.is_empty() && !g.section_segments.is_empty());
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert!(texts(&built).iter().any(|t| t == "SECTION C - C"));
+
+    // Off the holes the two legs meet in one flat cut face: no line where they fold (live drw-aligned-section-edit).
+    let id = drawing.sheets[0].next_view_id();
+    drawing.sheets[0].views.push(DrawingView { id, kind: ViewKind::AlignedSection { parent: ViewId(2), center: [-0.02, -0.015], a: [-0.02, -0.045], b: [-0.045, -0.015], label: "D".into() }, position: [330.0, 100.0], ..Default::default() });
+    let g = compute_view(&drawing, &drawing.sheets[0], id, &sources, &cache, true);
+    assert!(g.error.is_none(), "{:?}", g.error);
+    let (f, m) = (g.frame.unwrap(), g.aligned.unwrap());
+    let o = glam::DVec2::from(f.project(m.axis_origin));
+    let d = (glam::DVec2::from(f.project(m.axis_origin + m.axis)) - o).normalize();
+    let side = glam::DVec2::new(-d.y, d.x);
+    let covered = |p: glam::DVec2| g.in_cut_face((p + side * 1e-5).into()) && g.in_cut_face((p - side * 1e-5).into());
+    assert!((-500..500).any(|k| covered(o + d * (k as f64 * 1e-4))), "the cut face spans the fold");
+    let seams: Vec<_> = g
+        .edges
+        .iter()
+        .filter(|e| e.points.iter().all(|p| (glam::DVec2::from(*p) - o).dot(side).abs() < 1e-7))
+        .filter(|e| e.points.windows(2).any(|w| covered((glam::DVec2::from(w[0]) + glam::DVec2::from(w[1])) / 2.0)))
+        .collect();
+    assert!(seams.is_empty(), "{seams:?}");
 }
 
 #[test]

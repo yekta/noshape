@@ -152,6 +152,22 @@ pub fn open_tool_menu(entries: &[MenuEntry], ed: &Entity<DrawingEditor>, e: &Cli
     crate::os_menu::open_anchored(point(x, px(crate::ui::NAVBAR_H + 36.)), Anchor::TopLeft, menu, window, cx);
 }
 
+/// Once the menu is gone, what is under the resting pointer is hovered (a browser's hover follows the page under it:
+/// live drw-sheet-rename's Part 1 popup after Rename...).
+fn hover_after_menu(window: &mut Window) {
+    window.on_next_frame(|window, _| {
+        window.on_next_frame(|window, cx| {
+            let event = MouseMoveEvent { position: window.mouse_position(), pressed_button: None, modifiers: window.modifiers() };
+            window.dispatch_event(PlatformInput::MouseMove(event), cx);
+        });
+    });
+}
+
+/// Open a drawing's right-click `menu` (live's top edge is 2 px under the pointer: dx 2442 (7)).
+pub fn open_drawing_menu(position: Point<Pixels>, menu: Entity<crate::os_menu::OsMenu>, window: &mut Window, cx: &mut App) {
+    crate::os_menu::open(position + point(px(0.), px(2.)), menu, window, cx);
+}
+
 /// [`fill_menu`] for Onshape's right-click menus ([`crate::os_menu`]).
 pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed: &Entity<DrawingEditor>, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>) -> crate::os_menu::OsMenu {
     for e in entries {
@@ -173,6 +189,7 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
                             t.redraw(cx);
                         }
                     });
+                    hover_after_menu(window);
                 });
                 let icon = icon.map(|n| crate::os_menu::MenuIcon::Named(SharedString::from(n)));
                 menu = menu.item(crate::os_menu::OsMenuItem::Item { label: label.clone(), icon, checked: *checked, disabled: *disabled, handler: Some(handler), keys: Vec::new(), user: false, note: None });
@@ -196,6 +213,7 @@ impl DrawingEditor {
             || self.sheet_props.is_some()
             || self.section_dlg.is_some()
             || self.aligned_dlg.is_some()
+            || self.aligned_edit_request.is_some()
             || self.aux_dlg.is_some()
             || self.detail_dlg.is_some()
             || self.crop_dlg.is_some()

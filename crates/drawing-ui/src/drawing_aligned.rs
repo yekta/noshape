@@ -235,6 +235,19 @@ impl DrawingEditor {
         };
         let assembly = parent.and_then(|p| noshape_model::drawing::views::view_source(self.current_sheet(), p)).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly);
         let (n_excl, picking) = (d.exclude.len(), d.picking);
+        crate::ui_script::note_dialog(|| {
+            // Every text shown, in reading order (live's recording of drw-aligned-section-edit): each query's caption,
+            // its "Point ×" once picked.
+            let mut text = vec!["Aligned section view"];
+            for (k, title) in ["Center", "Viewing plane location", "Revolved plane location"].into_iter().enumerate() {
+                text.push(title);
+                if picked > k {
+                    text.extend(["Point", "×"]);
+                }
+            }
+            text.push("Show cut geometry only");
+            serde_json::json!({ "kind": "drawing-panel", "title": "Aligned section view", "text": text })
+        });
         Some(
             v_flex()
                 .id("dr-aligned-dlg")

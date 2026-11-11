@@ -1387,6 +1387,11 @@ impl AlignedMap {
 }
 
 impl ViewGeometry {
+    /// Whether view point `p` is on a section's cut face (even-odd over its boundary segments).
+    pub fn in_cut_face(&self, p: [f64; 2]) -> bool {
+        self.section_segments.iter().filter(|[u, v]| (u[1] > p[1]) != (v[1] > p[1]) && p[0] < u[0] + (p[1] - u[1]) / (v[1] - u[1]) * (v[0] - u[0])).count() % 2 == 1
+    }
+
     fn update_bounds(&mut self) {
         let mut min = [f64::INFINITY; 2];
         let mut max = [f64::NEG_INFINITY; 2];
@@ -3162,10 +3167,55 @@ fn aligned_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, fr
         g.error = error.or(err2);
     }
     g.section_segments = section_segments_of(&faces, frame);
+    drop_fold_seam(&mut g, frame.project(axis_origin), frame.project(axis_origin + parent.dir), diag);
     g.origin = frame.project(center3);
     g.aligned = Some(map);
     g.update_bounds();
     g
+}
+
+/// An aligned section's two legs meet in one flat cut face (live draws no line where they fold): the parts of
+/// edges along the fold line `a`-`b` with cut material on both sides are dropped; an outline along it stays.
+fn drop_fold_seam(g: &mut ViewGeometry, a: [f64; 2], b: [f64; 2], diag: f64) {
+    let (a, b) = (DVec2::from(a), DVec2::from(b));
+    let along = (b - a).normalize_or_zero();
+    if along == DVec2::ZERO {
+        return;
+    }
+    let side = DVec2::new(-along.y, along.x);
+    let (on, probe) = (diag * 1e-6, diag * 1e-4);
+    let edges = std::mem::take(&mut g.edges);
+    let covered = |p: DVec2| g.in_cut_face((p + side * probe).into()) && g.in_cut_face((p - side * probe).into());
+    let mut out = Vec::with_capacity(edges.len());
+    for e in edges {
+        if !e.points.iter().all(|p| (DVec2::from(*p) - a).dot(side).abs() <= on) {
+            out.push(e);
+            continue;
+        }
+        let mut run: Vec<[f64; 2]> = Vec::new();
+        for w in e.points.windows(2) {
+            let (p, q) = (DVec2::from(w[0]), DVec2::from(w[1]));
+            let n = ((q - p).length() / (diag * 1e-3)).ceil().clamp(1.0, 256.0) as usize;
+            for k in 0..n {
+                let (s0, s1) = (p.lerp(q, k as f64 / n as f64), p.lerp(q, (k + 1) as f64 / n as f64));
+                if covered((s0 + s1) / 2.0) {
+                    if run.len() > 1 {
+                        out.push(ViewEdge { points: std::mem::take(&mut run), ..e.clone() });
+                    }
+                    run.clear();
+                    continue;
+                }
+                if run.is_empty() {
+                    run.push(s0.into());
+                }
+                run.push(s1.into());
+            }
+        }
+        if run.len() > 1 {
+            out.push(ViewEdge { points: run, ..e });
+        }
+    }
+    g.edges = out;
 }
 
 /// Nearest and farthest depth (along `dir`) of a set of bodies' bounding boxes.

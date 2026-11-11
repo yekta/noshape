@@ -246,11 +246,11 @@ impl DrawingEditor {
             self.sheet_entries(i, cx)
         };
         let ed = cx.entity();
-        // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
-        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+        // Onshape's right-click menu (os_menu: 12 px text, a drawing's 23.5 px rows).
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
         if !menu.read(cx).is_empty() {
             self.frame_menu = Some(menu.downgrade());
-            crate::os_menu::open(position, menu, window, cx);
+            crate::drawing_view::open_drawing_menu(position, menu, window, cx);
         }
         cx.notify();
     }
@@ -458,10 +458,10 @@ impl DrawingEditor {
                         t.edit_sheet("Delete table", cx, |s| s.tables.retain(|x| x.id != id));
                     }));
                     let ed = cx.entity();
-                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
                     // The drawing's own menu (live's is in its iframe, as the canvas's).
                     this.frame_menu = Some(menu.downgrade());
-                    crate::os_menu::open(e.position, menu, window, cx);
+                    crate::drawing_view::open_drawing_menu(e.position, menu, window, cx);
                 }),
             )
             .into_any_element()
@@ -557,10 +557,10 @@ impl DrawingEditor {
                         }),
                     ];
                     let ed = cx.entity();
-                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
                     // The drawing's own menu (live's is in its iframe, as the canvas's).
                     this.frame_menu = Some(menu.downgrade());
-                    crate::os_menu::open(e.position, menu, window, cx);
+                    crate::drawing_view::open_drawing_menu(e.position, menu, window, cx);
                 }),
             )
             .into_any_element()
@@ -788,13 +788,16 @@ impl DrawingEditor {
                             cx.stop_propagation();
                             let entries = entries.clone();
                             let ed = cx.entity();
-                            let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                            let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
                             this.frame_menu = Some(menu.downgrade());
-                            crate::os_menu::open(e.position, menu, window, cx);
+                            crate::drawing_view::open_drawing_menu(e.position, menu, window, cx);
                         }),
                     )
                 })
                 .pl(px(indent))
+                // Live (dx 2442 (7)): the reference's cell is 25 px, the next row 26 px down.
+                .h(px(25.))
+                .mb(px(1.))
                 .text_color(rgb(0x666666))
                 .child(crate::ui::caret(true))
                 .child(sheets_icon("part", cx))

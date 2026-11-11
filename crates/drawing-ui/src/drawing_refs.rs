@@ -325,8 +325,8 @@ impl DrawingEditor {
                                         })
                                         .collect();
                                     let ed = cx.entity();
-                                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
-                                    crate::os_menu::open(ev.position(), menu, window, cx);
+                                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
+                                    crate::drawing_view::open_drawing_menu(ev.position(), menu, window, cx);
                                 })),
                         )
                     }),

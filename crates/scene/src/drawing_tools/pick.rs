@@ -39,10 +39,12 @@ pub struct SheetPick<'a> {
 
 /// The smallest view rectangle containing `s` (with a margin in mm).
 fn smallest_view(b: &BuiltSheet, s: [f64; 2], margin: f64) -> Option<&ViewPlacement> {
-    b.placements
-        .iter()
-        .filter(|p| p.contains(s, margin))
-        .min_by(|a, c| ((a.max[0] - a.min[0]) * (a.max[1] - a.min[1])).total_cmp(&((c.max[0] - c.min[0]) * (c.max[1] - c.min[1]))))
+    smallest(b.placements.iter().filter(|p| p.contains(s, margin)))
+}
+
+fn smallest<'a>(views: impl Iterator<Item = &'a ViewPlacement>) -> Option<&'a ViewPlacement> {
+    let area = |p: &ViewPlacement| (p.max[0] - p.min[0]) * (p.max[1] - p.min[1]);
+    views.min_by(|a, c| area(a).total_cmp(&area(c)))
 }
 
 impl<'a> SheetPick<'a> {
@@ -131,7 +133,7 @@ impl<'a> SheetPick<'a> {
         };
         // In select mode, hovering anywhere inside a view highlights it.
         match (hover, self.tool, self.built) {
-            (None, Tool::Select, Some(b)) => smallest_view(b, self.cursor, 1.0).and_then(|p| b.picks.iter().position(|t| *t == PickTarget::View(p.id))).map(|i| i as u32),
+            (None, Tool::Select, Some(b)) => self.view_under(self.cursor).and_then(|p| b.picks.iter().position(|t| *t == PickTarget::View(p.id))).map(|i| i as u32),
             (h, _, _) => h,
         }
     }
@@ -223,7 +225,14 @@ impl<'a> SheetPick<'a> {
         if let Some(id) = self.image_at(s) {
             return Some(Sel::Image(id));
         }
-        smallest_view(self.built?, s, 1.0).map(|p| Sel::View(p.id))
+        self.view_under(s).map(|p| Sel::View(p.id))
+    }
+
+    /// The view a click at `s` off its geometry takes: one whose section cut face is there, over any view box
+    /// behind it (live drw-aligned-section-edit), else the smallest view box holding it.
+    fn view_under(&self, s: [f64; 2]) -> Option<&'a ViewPlacement> {
+        let built = self.built?;
+        smallest(built.placements.iter().filter(|p| p.contains(s, 0.0) && self.geoms.get(&p.id).is_some_and(|g| g.in_cut_face(p.to_view(s))))).or_else(|| smallest_view(built, s, 1.0))
     }
 
     /// Snap point (vertex / circle center) of a view near a sheet point.

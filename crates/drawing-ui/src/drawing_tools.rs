@@ -103,6 +103,14 @@ impl DrawingEditor {
             self.close_detail_edit(false, cx);
             return;
         }
+        // Edit aligned section: Esc closes it unapplied, nothing left selected (live drw-aligned-section-edit).
+        if self.aligned_dlg.as_ref().is_some_and(|d| d.edit.is_some()) {
+            self.aligned_dlg = None;
+            self.selection.clear();
+            self.set_preview(None, cx);
+            self.redraw(cx);
+            return;
+        }
         // Rename sheet / Rotation angle: Esc closes them unapplied (live).
         if self.row_rename.take().is_some() {
             cx.notify();
@@ -2077,11 +2085,11 @@ impl DrawingEditor {
             (None, None, None, None) => self.context_entries(sel, cx),
         };
         let ed = cx.entity();
-        // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
-        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+        // Onshape's right-click menu (os_menu: 12 px text, a drawing's 23.5 px rows).
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
         if !menu.read(cx).is_empty() {
             self.frame_menu = Some(menu.downgrade());
-            crate::os_menu::open(position, menu, window, cx);
+            crate::drawing_view::open_drawing_menu(position, menu, window, cx);
         }
         cx.notify();
     }

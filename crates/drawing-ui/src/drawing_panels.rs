@@ -228,10 +228,10 @@ impl DrawingEditor {
                                             t.edit("Assign number", cx, |d| set_number(d, rk, Some(n)));
                                         })];
                                         let ed = cx.entity();
-                                        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                                        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
                                         // The drawing's own menu (live's is in its iframe).
                                         this.frame_menu = Some(menu.downgrade());
-                                        crate::os_menu::open(e.position, menu, window, cx);
+                                        crate::drawing_view::open_drawing_menu(e.position, menu, window, cx);
                                     }),
                                 )
                             })
@@ -421,8 +421,8 @@ impl DrawingEditor {
                         cx.stop_propagation();
                         let ed = cx.entity();
                         let entries = vec![MenuEntry::item("Show", move |t, _, cx| t.show_model_annotation(tab, id, cx))];
-                        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
-                        crate::os_menu::open(e.position, menu, window, cx);
+                        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
+                        crate::drawing_view::open_drawing_menu(e.position, menu, window, cx);
                     }),
                 );
             if r.dimension {

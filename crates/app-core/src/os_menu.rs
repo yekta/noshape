@@ -209,6 +209,8 @@ pub struct OsMenu {
     /// the documents Create menu: 150 px, 29.5 px rows, text 48 px in).
     min_width: Option<f32>,
     row_height: Option<f32>,
+    /// Space above and below a separator's line.
+    sep_margin: f32,
     text_inset: Option<f32>,
     /// Item text size in px (default per style).
     text_px: Option<f32>,
@@ -248,7 +250,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, sep_margin: 0., text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -316,6 +318,14 @@ impl OsMenu {
         self
     }
 
+    /// A drawing's right-click menus (live drw-aligned-section-edit, dx 2442 (7)): 23.5 px rows, separators 3.3 px
+    /// high in all.
+    pub fn drawing_context(mut self) -> Self {
+        self.row_height = Some(23.5);
+        self.sep_margin = 1.15;
+        self
+    }
+
     /// Item text `px` high.
     pub fn text_px(mut self, px: f32) -> Self {
         self.text_px = Some(px);
@@ -350,17 +360,17 @@ impl OsMenu {
     /// Icon-less list style (13 px text, 17 px inset), as on the documents page.
     /// A right-click menu's height (22 px rows, 1 px separators, its 1 px border), for placing it before it is drawn.
     pub fn context_height(&self) -> Pixels {
-        let row = self.row_height.unwrap_or(ROW_H);
-        px(2. + self.items.iter().map(|i| if matches!(i, OsMenuItem::Separator) { 1. } else { row }).sum::<f32>())
+        let (row, sep) = (self.row_height.unwrap_or(ROW_H), 1. + 2. * self.sep_margin);
+        px(2. + self.items.iter().map(|i| if matches!(i, OsMenuItem::Separator) { sep } else { row }).sum::<f32>())
     }
 
     /// The row `y` below the menu's top edge (in its 1 px border) shows hovered, as a pointer resting there when it
     /// opens (live: a menu opened above the pointer has it on its last row).
     pub fn hover_at(&mut self, y: Pixels) {
-        let row = self.row_height.unwrap_or(ROW_H);
+        let (row, sep) = (self.row_height.unwrap_or(ROW_H), 1. + 2. * self.sep_margin);
         let mut top = 1.;
         for (ix, i) in self.items.iter().enumerate() {
-            let h = if matches!(i, OsMenuItem::Separator) { 1. } else { row };
+            let h = if matches!(i, OsMenuItem::Separator) { sep } else { row };
             if !matches!(i, OsMenuItem::Separator) && f32::from(y) >= top && f32::from(y) < top + h {
                 self.hovered = Some(ix);
                 return;
@@ -567,6 +577,7 @@ impl Render for OsMenu {
         // In dropdowns a ✓ takes the icon place too (documents Folders sort menu).
         let any_check = self.items.iter().any(|i| matches!(i, OsMenuItem::Item { checked: true, .. }));
         let snippets = self.snippets;
+        let sep_margin = self.sep_margin;
         let (row_h, icon_x, icon_sz, text_x, text_sz): (f32, f32, f32, f32, f32) = if snippets {
             (33., 4., 18., 14., 14.)
         } else if dropdown {
@@ -695,7 +706,7 @@ impl Render for OsMenu {
                 };
                 match item {
                     // Bootstrap dropdown dividers have 7 px margins.
-                    OsMenuItem::Separator => div().h(px(1.)).w_full().when(dropdown, |d| d.my(px(7.))).bg(gpui_kit::rgb(0xdddddd)).into_any_element(),
+                    OsMenuItem::Separator => div().h(px(1.)).w_full().when(dropdown, |d| d.my(px(7.))).when(sep_margin > 0., |d| d.my(px(sep_margin))).bg(gpui_kit::rgb(0xdddddd)).into_any_element(),
                     OsMenuItem::Item { label, icon, checked, disabled, keys, user, note, .. } => self
                         .tips
                         .get(&ix)

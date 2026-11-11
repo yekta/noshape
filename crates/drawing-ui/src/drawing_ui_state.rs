@@ -224,10 +224,8 @@ impl DrawingEditor {
             .views
             .iter()
             .map(|v| {
-                let parent = match &v.kind {
-                    ViewKind::Projected { parent, .. } | ViewKind::Section { parent, .. } | ViewKind::Detail { parent, .. } | ViewKind::Auxiliary { parent, .. } => Some(self.ui_view_name(*parent)),
-                    _ => None,
-                };
+                // (An aligned section's too: live names its parent, drw-aligned-section-edit.)
+                let parent = sheet.parent_of(v.id).map(|p| self.ui_view_name(p));
                 let scale = self.placement(v.id).map(|p| noshape_model::drawing::sheet::format_scale(p.scale));
                 json!({ "name": self.ui_view_name(v.id), "kind": self.ui_view_kind(v.id), "parent": parent, "scale": scale, "brokenOut": v.broken_out.len() })
             })
@@ -266,13 +264,13 @@ impl DrawingEditor {
         // What is drawn in selection colours (README "### Drawings"; live 2068): selected views; the Projected
         // tool's parent drawn picked after Insert view placed it. Live's reader (2402) says VIEW for a view drawn
         // with the dark selection frame and EDGE for orange inside a view without it: a selected section, auxiliary
-        // or detail view is drawn with the light frame (a projected view either way, by its pixels: block-drawing's
-        // Right VIEW, its Top EDGE).
+        // or detail view is drawn with the light frame, an aligned section with the dark one (drw-aligned-section-edit;
+        // a projected view either way, by its pixels: block-drawing's Right VIEW, its Top EDGE).
         let mut selection: Vec<(String, String)> = Vec::new();
         for s in &self.selection {
             match s {
                 Sel::View(id) => {
-                    let framed = !sheet.view(*id).is_some_and(|v| matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Auxiliary { .. } | ViewKind::Detail { .. }));
+                    let framed = !sheet.view(*id).is_some_and(|v| matches!(v.kind, ViewKind::Section { .. } | ViewKind::Auxiliary { .. } | ViewKind::Detail { .. }));
                     selection.push((if framed { "VIEW" } else { "EDGE" }.into(), self.ui_view_name(*id)));
                 }
                 Sel::Edge(id, _) => selection.push(("EDGE".into(), self.ui_view_name(*id))),
