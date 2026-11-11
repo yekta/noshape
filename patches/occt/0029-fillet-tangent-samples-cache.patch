@@ -1,0 +1,126 @@
+--- a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d.cxx
++++ b/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d.cxx
+@@ -32,6 +32,52 @@
+ #include <TopOpeBRepTool_TOOL.hxx>
+ #include <Geom_Plane.hxx>
+ #include <TopLoc_Location.hxx>
++#include <NCollection_DataMap.hxx>
++#include <TopTools_ShapeMapHasher.hxx>
++
++namespace
++{
++// noshape (patch 0029): the sample counts of the faces IsTangentFaces has seen in this thread's open SamplesScope.
++thread_local NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher>* THE_SAMPLES = nullptr;
++
++int tangentSamples(const TopoDS_Face& theFace)
++{
++  if (THE_SAMPLES != nullptr)
++  {
++    if (const int* aKnown = THE_SAMPLES->Seek(theFace))
++    {
++      return *aKnown;
++    }
++  }
++  BRepAdaptor_Surface                   aBAS(theFace);
++  occ::handle<BRepAdaptor_Surface>      aBAHS = new BRepAdaptor_Surface(aBAS);
++  occ::handle<BRepTopAdaptor_TopolTool> aTool = new BRepTopAdaptor_TopolTool(aBAHS);
++  const int                             aNb   = aTool->NbSamples();
++  if (THE_SAMPLES != nullptr)
++  {
++    THE_SAMPLES->Bind(theFace, aNb);
++  }
++  return aNb;
++}
++} // namespace
++
++ChFi3d::SamplesScope::SamplesScope()
++    : myOwner(THE_SAMPLES == nullptr)
++{
++  if (myOwner)
++  {
++    THE_SAMPLES = new NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher>();
++  }
++}
++
++ChFi3d::SamplesScope::~SamplesScope()
++{
++  if (myOwner)
++  {
++    delete THE_SAMPLES;
++    THE_SAMPLES = nullptr;
++  }
++}
+ 
+ static void Correct2dPoint(const TopoDS_Face& theF, gp_Pnt2d& theP2d);
+ 
+@@ -265,16 +311,8 @@ bool ChFi3d::IsTangentFaces(const TopoDS_Edge&  theEdge,
+     return false;
+   }
+ 
+-  // Computation of the number of samples on the edge.
+-  BRepAdaptor_Surface                   aBAS1(theFace1);
+-  BRepAdaptor_Surface                   aBAS2(theFace2);
+-  occ::handle<BRepAdaptor_Surface>      aBAHS1      = new BRepAdaptor_Surface(aBAS1);
+-  occ::handle<BRepAdaptor_Surface>      aBAHS2      = new BRepAdaptor_Surface(aBAS2);
+-  occ::handle<BRepTopAdaptor_TopolTool> aTool1      = new BRepTopAdaptor_TopolTool(aBAHS1);
+-  occ::handle<BRepTopAdaptor_TopolTool> aTool2      = new BRepTopAdaptor_TopolTool(aBAHS2);
+-  int                                   aNbSamples1 = aTool1->NbSamples();
+-  int                                   aNbSamples2 = aTool2->NbSamples();
+-  int                                   aNbSamples  = std::max(aNbSamples1, aNbSamples2);
++  // Computation of the number of samples on the edge (noshape, patch 0029: each face's once in a SamplesScope).
++  int aNbSamples = std::max(tangentSamples(theFace1), tangentSamples(theFace2));
+ 
+   // Computation of the continuity.
+   double aPar;
+--- a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d.hxx
++++ b/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d.hxx
+@@ -42,6 +42,21 @@ public:
+                                                                   const double       SinTol,
+                                                                   const bool         CorrectPoint);
+ 
++  //! noshape (patch 0029): while one lives on this thread (a builder's PerformElement and Compute open one), each
++  //! face's sample count for IsTangentFaces is kept, so its adaptor and UV bounds are made once, not on every call
++  //! (a user's chamfers along extrusion faces spent 0.5-2 s there). The faces are held, so none is freed meanwhile.
++  class SamplesScope
++  {
++  public:
++    Standard_EXPORT SamplesScope();
++    Standard_EXPORT ~SamplesScope();
++    SamplesScope(const SamplesScope&)            = delete;
++    SamplesScope& operator=(const SamplesScope&) = delete;
++
++  private:
++    bool myOwner;
++  };
++
+   //! Returns true if theEdge between theFace1 and theFace2 is tangent
+   Standard_EXPORT static bool IsTangentFaces(const TopoDS_Edge&  theEdge,
+                                              const TopoDS_Face&  theFace1,
+--- a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder.cxx
++++ b/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder.cxx
+@@ -32,6 +32,7 @@ extern "C" __attribute__((weak)) int noshape_should_break()
+ #include <BRepBlend_Line.hxx>
+ #include <BRepLib.hxx>
+ #include <BRepTopAdaptor_TopolTool.hxx>
++#include <ChFi3d.hxx>
+ #include <ChFi3d_Builder.hxx>
+ #include <ChFi3d_Builder_0.hxx>
+ #include <ChFiDS_CommonPoint.hxx>
+@@ -190,6 +191,7 @@ void ChFi3d_Builder::ExtentAnalyse()
+ 
+ void ChFi3d_Builder::Compute()
+ {
++  const ChFi3d::SamplesScope aSamplesScope; // noshape (patch 0029)
+ 
+ #ifdef OCCT_DEBUG // perf
+   t_total              = 0;
+--- a/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder_1.cxx
++++ b/src/ModelingAlgorithms/TKFillet/ChFi3d/ChFi3d_Builder_1.cxx
+@@ -888,6 +888,7 @@ bool ChFi3d_Builder::PerformElement(const occ::handle<ChFiDS_Spine>& Spine,
+                                     const double                     Offset,
+                                     const TopoDS_Face&               theFirstFace)
+ {
++  const ChFi3d::SamplesScope               aSamplesScope; // noshape (patch 0029)
+   double                                   ta = angular;
+   NCollection_List<TopoDS_Shape>::Iterator It;
+   int                                      Nbface;
