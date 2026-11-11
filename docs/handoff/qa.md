@@ -3,6 +3,12 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**11-11 07:35 (lead):** vibe3 ran out of memory ~07:10 (its /tmp is RAM: 11 GB of leftovers). qa's scripts on vibe3 now keep scratch
+in ~/tmp, never /tmp (all of ~/qa/bin rewritten; the old copy in ~/qa/bin-before-tmp.tgz): fuzz pause / state files are
+~/tmp/qa-fz-pause-61, ~/tmp/qa-cf-pause / qa-cf-state. Fuzz restarted: GUI bin/fzloop.sh :61 on green 96359491b, CLI
+bin/v3cf32.sh (v0.4.43, 9181–9240); v0.4.42's 9121–9180 ended with 0 deaths. bin/vibe5-window.sh is armed for 11-12 02:00 (the
+hat A/B against the 02:00 baseline, then the speed stage on the newest complete suite run); its log suites/window-0200.log.
+
 **11-11 07:24, the Mac mini hat A/B (lead: dx's fcd0b283 mesh fix + blend's fast finish against the 02:00 baseline):** vibe5,
 6364f3c47 (the 02:00 baseline binary) and 96359491b (main with fcd0b283f and 4dc4f0964; built by qa on vibe4 as the watcher
 builds, dev profile, since vibe3 / the watcher hung from ~07:10) alternating, 3 runs each, a fresh writable copy each run
