@@ -369,6 +369,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   c2-sm-louver 31 -> 32 (better); the gear documents unchanged with bool's rulings back: cf-spur-gear 14/14, cf-part-draft
   13/13, cf-planetary-gears 1/1, cf-drive-train-generator 2/2.
 - qa 04:50: no blocker found; the gear documents' model run was still running then.
+- **qa 05:57, v0.4.43 before publish (run 42962825060's Linux artifact; Windows / macOS still building): no blocker.** CLI smoke =
+  v0.4.42 except blend's 12b1d8a6f (a chamfer that failed now builds; all already in this list since 00:49): the volume sweep's
+  three fuzz documents, and RELEASE-BUILD-FILLET-HANG's document (fuzz seed 4539 step 98): its Chamfer 4 now builds and the
+  later Fillet 6 has "1 missing selection" (Ok before; b73d2fece Ok, 6364f3c47 / e2c8da0f9 / the artifact not); the document
+  still opens in 6 s (the hang stays fixed). The 48 ticket documents on the artifact's CLI = green e2c8da0f9. Agent session
+  (Haiku, the artifact's MCP): 9 tool calls, 0 failed, the block right (23,214.6 mm³, 7 faces).
   - Since 6364f3c47 (checked 00:49): bool's 53812f2a0 / 08e5c8647 (the 0028 hook answers a plane containing an extrusion's
     direction with the exact rulings again: the pair 44e52dafb had turned off), core's d06b20de1 (a circle about a revolved
     surface's axis as its iso-line) and 2d50ff580 (Delete face of a prism's rounds), dx's 03ad6d6fa (translator), skasm's
