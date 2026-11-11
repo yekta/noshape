@@ -3,6 +3,11 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**11-11 02:00 (lead's vibe5 window): the user's Mac mini hat, quiet-host baseline** (green 6364f3c47's binary on vibe5,
+`feature list --tab "Mac mini hat"` on a fresh copy each time; the document is private: vibe3/vibe5 ~/lead-private, never in the
+repo): wall 16.39 / 16.47 / 16.36 s, regen_ms 14,841 / 14,930 / 14,815 (137 features, all Ok), load 0.04–1.44 before each.
+bin/hat-time.sh <binary> <tag> on vibe5 repeats it.
+
 **11-11 00:49: suite layout now:** qa-suites.sh runs the model suite (speed) on vibe5 (`QA_SPEED_HOST`, no quiet wait, each
 document's line with vibe5's load: models-timed.log; lead 11-10) and the assembly / exchange suites on vibe4 (`QA_SUITES_HOST`;
 the watcher moved to vibe3) at the same time; `QA_REDO=<run dir>` redoes a run's remote stage; no index is published without a
