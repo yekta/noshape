@@ -418,6 +418,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     renaming can leave a user's saved reference to such a face unresolved after updating: core to say whether old names are
     still found (and the lead whether this holds the cut).
   - Fuzz: v0.4.43 release CLI seeds 9181– (vibe3 bin/v3cf32.sh), no deaths so far; GUI fuzz no new deaths.
+  - CI 43039009971 on 44ff040aa: macOS and Windows OCCT / Test / Release build green; Linux's OCCT job failed on the runner's
+    apt ("Temporary failure resolving 'azure.archive.ubuntu.com'"), so Linux Test / Release build were skipped: infrastructure,
+    re-run by qa 15:24 (--failed).
 - Open, not new: P1 WIN-SHOW-IN-EXPLORER, P1 SAVED-SKETCH-PLANE-LOST, P1 HAND-DRILL-MATES-OVERDEFINED (parity only).
 
 ## Release blockers for the 2026-11-11 05:00 release, candidate e2c8da0f9 (qa list 04:50; watcher GREEN 03:57, CI 3-platform success; the latest release is v0.4.41, v0.4.42 from b73d2fece in its release CI)
