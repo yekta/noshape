@@ -41,7 +41,9 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   REQUESTS 2507), fs-tables-* (lane document), fs-ps-custom-feature-error (compile time). fs-undo, fs-redo,
   fs-undo-button, fs-tb-redo: ours leaves "/" after Undo (psui's 2480 rule: first character its own step); live's
   takes (typed at 90 ms/key) undo the whole run in 3 of 4 (2480's own 90 ms row: one step). Raised with the lead.
-- ver/vs so far: ver-create-version-drawings-warning step 5 (live: Update drawings. leaves no focus; ours keeps Name
+- Totals: prefs/ver/vs 266/273 scenarios, 1213/1229 states (prefs 58/58); all 584 studios scenarios: 19 differ, 1 of
+  them ours after the fix below (ver-create-version-drawings-warning), 4 the undo rule (lead's call), 14 live-side.
+- ver/vs: ver-create-version-drawings-warning step 5 (live: Update drawings. leaves no focus; ours keeps Name
   focused: the dialog host's focus trap hands its focus back to the first field; open), live-side ver-version-menu-branch
   (REQUESTS 2493), vs-ps-inserted-drag (2490), "Unknown of Sketch" (reader), ver-vrow-releases (free plan),
   ver-linked-selective-update (live's click missed).
