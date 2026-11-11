@@ -9,7 +9,7 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
-## psui 07:20 UTC (lead 05:50: hat8's Mac mini body meshes in 1.0 s, make it ~0.1 s)
+## psui 07:16 UTC (lead 05:50: hat8's Mac mini body meshes in 1.0 s, make it ~0.1 s)
 
 Not the vent band (its 17,576 nodes take 4-6 ms of CPU) but 450 B-spline faces, mostly long strips of a surface with
 dense knots (a raster of 8 x 236 for 162 boundary nodes). Per face: closedness round u read for every node and Newton
