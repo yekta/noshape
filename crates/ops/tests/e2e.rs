@@ -5192,6 +5192,38 @@ fn a_sketch_on_the_sheet_metal_flat() {
     assert!((num(&s["frame"]["origin"][2]) - 2.0).abs() < 1e-6 && num(&s["frame"]["normal"][2]) > 0.999, "{s}");
 }
 
+/// Live 2464: Edit in context on another document's part stores the context in that document's Part Studio (its
+/// Main); the banner's Create version and update in assembly versions that document and moves the instance there; a
+/// pinned reference offers no Edit in context.
+#[test]
+fn edit_in_context_on_another_documents_part() {
+    let mut ctx = Ctx::new();
+    two_part_assembly(&mut ctx, "ctx-other-lib.noshape");
+    let lib = std::env::temp_dir().join(format!("noshape-ops-e2e-{}", std::process::id())).join("ctx-other-lib.noshape");
+    let libs = lib.to_str().unwrap().to_string();
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let top = scratch("ctx-other-top.noshape");
+    let tops = top.to_str().unwrap().to_string();
+    call(&mut ctx, "document_create", json!({ "path": tops }));
+    let p = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2", "document": libs, "version": "V1" }));
+    let inst = p["instance"].clone();
+    let r = call(&mut ctx, "assembly_edit_in_context", json!({ "doc": tops, "instance": inst }));
+    assert_eq!(r["part_studio"], "Part Studio 1", "{r}");
+    assert!(r["document"].as_str().is_some_and(|d| d.ends_with("ctx-other-lib.noshape")), "{r}");
+    let listed = call(&mut ctx, "context_list", json!({ "doc": libs, "tab": "Part Studio 1" }));
+    assert_eq!(listed["contexts"].as_array().map(Vec::len), Some(1), "the context is the other document's: {listed}");
+    let mv = |ctx: &mut Ctx| call(ctx, "assembly_list", json!({ "doc": tops }))["instances"].as_array().unwrap().iter().find(|i| i["id"] == inst).unwrap()["source"]["version_of"]["microversion"].clone();
+    let before = mv(&mut ctx);
+    let u = call(&mut ctx, "assembly_version_and_update", json!({ "doc": tops, "instance": inst }));
+    assert_eq!(u["version"], "V2", "{u}");
+    assert_ne!(mv(&mut ctx), before, "the instance moved to V2");
+    let last = call(&mut ctx, "history_list", json!({ "doc": tops, "limit": 1 }))["history"][0]["description"].clone();
+    assert_eq!(last, "Assembly 1 :: Update to V2");
+    call(&mut ctx, "assembly_pin_reference", json!({ "doc": tops, "instance": inst }));
+    let e = try_call(&mut ctx, "assembly_edit_in_context", json!({ "doc": tops, "instance": inst })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("instance"), "{e:?}");
+}
+
 /// A callout on a part's silhouette is that part's, not the part of an edge
 /// a little way off (qa BALLOON-WRONG-ITEM: a click on a pin's silhouette
 /// near the plate's edge showed the plate's item).

@@ -110,6 +110,32 @@ pub fn open_document_at(path: PathBuf, tab: noshape_model::document::TabId, gpu:
     Ok(())
 }
 
+/// Edit in context on another document's part (live 2464): `path` opened on Main (or its window brought to the
+/// front) on Part Studio `studio`, the assembly's context snapshot stored there and shown around the part.
+pub fn open_in_context(path: PathBuf, studio: noshape_model::document::TabId, ctx: noshape_app_core::assembly_context::AssemblyContext, install: (u32, Option<noshape_model::in_context::AssemblyContext>), gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    open_document_window(path.clone(), None, gpu, cx)?;
+    let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(&path)).copied()) else { return Ok(()) };
+    let _ = h.update(cx, |_, window, cx| {
+        let Some(ws) = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<workspace::Workspace>().ok()) else { return };
+        ws.update(cx, |w, cx| w.enter_context_from_other(studio, ctx, install, window, cx));
+    });
+    Ok(())
+}
+
+/// Create version and update in assembly (live 2464): the assembly of `other` opened (or brought to the front) on
+/// tab `assembly`, its instance of the document at `path` moved to microversion `mv` (version `name`).
+pub fn update_linked_instance(other: noshape_app_core::assembly_context::OtherAssembly, assembly: noshape_model::document::TabId, path: PathBuf, mv: noshape_store::MicroversionId, name: &str, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    open_document_at(other.path.clone(), assembly, gpu, cx)?;
+    let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(&other.path)).copied()) else { return Ok(()) };
+    let name = name.to_string();
+    let _ = h.update(cx, |_, window, cx| {
+        let Some(ws) = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<workspace::Workspace>().ok()) else { return };
+        let Some(v) = ws.read(cx).assembly_view(assembly) else { return };
+        v.update(cx, |v, cx| v.move_instance_to_version(other.instance, &path, mv, &name, cx));
+    });
+    Ok(())
+}
+
 /// Open a document (or bring its window to the front) with its Versions and history panel open (the documents
 /// page's row › Versions and history: live lands on the document's /versionsAndHistory).
 pub fn open_document_history(path: PathBuf, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {

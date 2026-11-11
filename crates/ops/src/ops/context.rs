@@ -28,10 +28,20 @@ pub fn ops() -> Vec<Op> {
             verb: "edit_in_context",
             summary: "Edit in context: open an instance's Part Studio with the assembly around it as context geometry",
             description: "Instance › Edit in context (help: Modeling in context): the instance's Part Studio shows the rest of the assembly, placed around the part, as its Assembly context. Without `context`, a new snapshot \"Context N\" (Edit in context, or Create new context once the Part Studio has contexts); with `context`, that existing context of this assembly (Edit Context N). List its geometry with query_entities `context: true` and reference it in features; a context no feature references goes away on context_exit. Not undoable, like the app. Replies with the Part Studio and the context (context_list's fields).",
-            fields: vec![doc_field(), asm_tab(), req("instance", s(), "A part or Part Studio instance (id or name)."), opt("context", s(), "An existing context of this assembly to edit in (default: a new one).")],
+            fields: vec![doc_field(), asm_tab(), req("instance", s(), "A part or Part Studio instance (id or name); another document's part opens that document (its Main), the context stored in its Part Studio (live 2464)."), opt("context", s(), "An existing context of this assembly to edit in (default: a new one).")],
             mutates: true,
             destructive: false,
             run: edit_in_context,
+        },
+        Op {
+            group: "assembly",
+            verb: "version_and_update",
+            summary: "Create version and update in assembly: a version of an instance's other document, the instance moved to it",
+            description: "The in-context banner of another document's assembly (live 2464) › Create version and update in assembly: the instance's document (another one's part, edited in context) gets its next version \"V<n>\" from its Main, and the instance moves to it (\"Update to V<n>\"). Replies with the version and the instance's new reference.",
+            fields: vec![doc_field(), asm_tab(), req("instance", s(), "An instance of another document's part (id or name).")],
+            mutates: true,
+            destructive: false,
+            run: version_and_update,
         },
         Op {
             group: "assembly",
@@ -192,6 +202,23 @@ fn edit_in_context(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = asm_target(ctx, a)?;
     let asm = assembly_of(od.doc(), tab).cloned().expect("assembly");
     let top = find_instance(&asm, a.str("instance")?, "instance")?;
+    // Another document's part (live 2464): the context goes into that document's Part Studio, on its Main.
+    if let InstanceSource::External { key, body: Some(_), .. } = &asm.instance(top).expect("found").source {
+        let r = crate::derived::ExternalRef::parse(key).ok_or_else(|| OpError::param("instance", "its reference can't be read"))?;
+        if asm.pinned_references.contains(&top) {
+            return Err(OpError::param("instance", "its reference is pinned: Unpin reference first"));
+        }
+        let result = solve_assembly(od, tab, &asm, &SolveOptions::default());
+        let name_of = |p: &noshape_model::assembly::eval::InstancePath| asm.instance(p[0]).map(|i| i.name.clone()).unwrap_or_default();
+        let src = ctx.open(&r.path)?;
+        let studio = src.doc().tabs.iter().find(|t| t.id.to_string() == r.tab).map(|t| t.id).ok_or_else(|| OpError::param("instance", "its Part Studio is no longer in the other document"))?;
+        let ps = doc::studio(src.doc(), studio)?.clone();
+        let (id, new) = ic::context_for(&ps, &result, tab, Some(&vec![top]), None, glam::DMat4::IDENTITY, &name_of).ok_or_else(|| OpError::param("instance", "the instance has no geometry to edit in context"))?;
+        edit_studio_not_undoable(src, studio, "Edit in context", |ps| ic::install(ps, id, new))?;
+        let mut out = studio_reply(src, studio, id)?;
+        out.value["document"] = json!(r.path.display().to_string());
+        return Ok(out);
+    }
     let studio = match &asm.instance(top).expect("found").source {
         InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } => *studio,
         _ => return Err(OpError::param("instance", "Edit in context is for part and Part Studio instances")),
@@ -210,6 +237,26 @@ fn edit_in_context(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (id, new) = ic::context_for(&ps, &result, tab, Some(&vec![top]), existing, glam::DMat4::IDENTITY, &name_of).ok_or_else(|| OpError::param("instance", "the instance has no geometry to edit in context"))?;
     edit_studio_not_undoable(od, studio, "Edit in context", |ps| ic::install(ps, id, new))?;
     studio_reply(od, studio, id)
+}
+
+fn version_and_update(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = asm_target(ctx, a)?;
+    let asm = assembly_of(od.doc(), tab).cloned().expect("assembly");
+    let top = find_instance(&asm, a.str("instance")?, "instance")?;
+    let InstanceSource::External { key, body: Some(_), .. } = &asm.instance(top).expect("found").source else {
+        return Err(OpError::param("instance", "not an instance of another document's part"));
+    };
+    let r = crate::derived::ExternalRef::parse(key).ok_or_else(|| OpError::param("instance", "its reference can't be read"))?;
+    let src = ctx.open(&r.path)?;
+    let n = src.session.store.graph().map_or(0, |g| g.versions.len()) + 1;
+    let name = format!("V{n}");
+    let v = src.session.create_version(&name, "").map_err(|e| OpError::invalid(format!("the other document's version: {e:#}")))?;
+    let mv = src.session.store.version(v).map_err(|e| OpError::invalid(format!("{e:#}")))?.microversion;
+    let new_key = crate::derived::ExternalRef { microversion: mv, ..r }.key();
+    let (od, tab) = asm_target(ctx, a)?;
+    let result = solve_assembly(od, tab, &asm, &SolveOptions::default());
+    super::assembly::commit(od, tab, &format!("Update to {name}"), &result, |x| crate::assembly::repoint_external(x, key, &new_key, Some(&[top])))?;
+    Ok(json!({ "version": name, "instance": format!("inst:{}", top.0), "microversion": mv.to_string() }).into())
 }
 
 fn create_in_context(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

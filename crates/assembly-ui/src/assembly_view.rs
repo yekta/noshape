@@ -441,6 +441,18 @@ pub enum AssemblyViewEvent {
     /// Instance menu › Edit in context: open the Part Studio with the
     /// assembly as context graphics.
     EditInContext(TabId, Box<crate::assembly_context::AssemblyContext>),
+    /// Edit in context on another document's part (live 2464): that document's Main opened on its Part Studio, the
+    /// context snapshot `install` stored there (as `noshape_ops::in_context::install` takes it).
+    EditInContextOther(Box<OtherInContext>),
+}
+
+/// [`AssemblyViewEvent::EditInContextOther`]: the other document, its Part Studio, the context to show and the context
+/// snapshot to store there (as `noshape_ops::in_context::install` takes it).
+pub struct OtherInContext {
+    pub path: std::path::PathBuf,
+    pub studio: TabId,
+    pub ctx: crate::assembly_context::AssemblyContext,
+    pub install: (u32, Option<noshape_model::in_context::AssemblyContext>),
 }
 
 impl EventEmitter<AssemblyViewEvent> for AssemblyView {}

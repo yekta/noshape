@@ -246,6 +246,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("assembly_reorder", &[r##"{"feature": "Revolute 2", "before": "Fastened 1"}"##]),
     ("assembly_mate_value", &[r##"{"mate": "Revolute 1", "dof": "rz", "value": "30 deg"}"##]),
     ("assembly_properties", &[r##"{}"##, r##"{"part_number": "FR-1", "bom_behavior": "Show Assembly only"}"##]),
+    ("assembly_version_and_update", &[r##"{"instance": "Part 1 <1>"}"##]),
     ("assembly_pin_reference", &[r##"{"instance": "Part 1 <1>"}"##, r##"{"instance": "Part 1 <1>", "pinned": false}"##]),
     ("assembly_linked_part_properties", &[r##"{"instance": "Part 1 <1>"}"##, r##"{"instance": "Part 1 <1>", "part_number": "BRK-200", "vendor": "Acme"}"##]),
     ("assembly_exploded_view", &[r##"{"action": "add", "name": "Exploded 1"}"##, r##"{"action": "move", "view": "Exploded 1", "step": 3, "to": 1}"##]),

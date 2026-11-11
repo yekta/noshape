@@ -36,6 +36,16 @@ pub struct AssemblyContext {
     /// from the regeneration (`StudioDisplay::context_bodies`), pickable
     /// for references; `None`: display-only `occurrences`.
     pub context: Option<u32>,
+    /// The assembly is another document's (Edit in context on its instance of this document's part, live 2464).
+    pub other: Option<OtherAssembly>,
+}
+
+/// The assembly of another document a Part Studio is edited in the context of: that document and the instance (the
+/// banner's Create version and update in assembly, Go to assembly).
+#[derive(Clone, Debug, PartialEq)]
+pub struct OtherAssembly {
+    pub path: std::path::PathBuf,
+    pub instance: noshape_model::assembly::InstanceId,
 }
 
 /// Onshape's in-context arrow ⇦ (20 px): `solid` = yellow fill (the active

@@ -225,7 +225,7 @@ fn solve(od: &mut OpenDoc, tab: TabId, opts: &SolveOptions) -> Result<AssemblyRe
 
 /// Commit an assembly edit the way the view does: fold in the latest
 /// solved placements (`result`), then apply `f`.
-fn commit<R>(od: &mut OpenDoc, tab: TabId, desc: &str, result: &AssemblyResult, f: impl FnOnce(&mut Assembly) -> R) -> Result<R, OpError> {
+pub(crate) fn commit<R>(od: &mut OpenDoc, tab: TabId, desc: &str, result: &AssemblyResult, f: impl FnOnce(&mut Assembly) -> R) -> Result<R, OpError> {
     let r = od.session.edit_tab(tab, desc, |c| match c {
         TabContent::Assembly(a) => {
             sa::fold_solved(a, result);

@@ -550,6 +550,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Export…", Op("export_parts")),
     ("partStudio:Filter feature list", Op("ui_list")),
     ("partStudio:Go to assembly", Op("context_go_to_assembly")),
+    ("partStudio:Create version and update in assembly", Op("assembly_version_and_update")),
     ("partStudio:Hide all planes", Op("feature_set_visibility")),
     ("partStudio:Hide all sketches", Op("feature_set_visibility")),
     ("partStudio:Set as default", Op("config_edit_option")),

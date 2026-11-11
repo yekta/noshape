@@ -1210,6 +1210,10 @@ impl AssemblyView {
         let mut edit: Vec<MenuEntry> = Vec::new();
         // Graphics (live rmb-asm-two-instances-selected): Edit in context,
         // Find in instance list, Add mate connector…, Replace…, Switch to….
+        // Another document's part (live 2464): Edit in context opens that document, unless the reference is pinned.
+        if !multi && !suppressed && matches!(inst.source, InstanceSource::External { body: Some(_), .. }) && !asm.pinned_references.contains(&top) {
+            edit.push(item("Edit in context", move |t, _, cx| t.edit_in_context(top, cx)));
+        }
         if !multi && !suppressed && matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. }) {
             // With contexts already in the Part Studio: pick one or Create
             // new context; Update context ▸ re-snapshots one (help:

@@ -293,6 +293,12 @@ impl Workspace {
                 // In-context banner › Go to assembly.
                 self._subs.push(cx.subscribe_in(&v, window, |this: &mut Self, _, ev: &crate::part_studio::PartStudioEvent, window, cx| match ev {
                     crate::part_studio::PartStudioEvent::ActivateTab(t) => this.activate(*t, window, cx),
+                    crate::part_studio::PartStudioEvent::GoToOtherAssembly(o, t) => {
+                        if let Err(e) = crate::files::open_document_at(o.path.clone(), *t, this.gpu.clone(), cx) {
+                            log::warn!("Go to assembly: {}: {e}", o.path.display());
+                        }
+                    }
+                    crate::part_studio::PartStudioEvent::VersionAndUpdate(o, t) => this.version_and_update(o.clone(), *t, cx),
                     crate::part_studio::PartStudioEvent::InsertInAssembly { assembly, studio, parts, sketches, at } => {
                         let (assembly, studio, parts, sketches, at) = (*assembly, *studio, parts.clone(), sketches.clone(), *at);
                         this.activate(assembly, window, cx);
@@ -321,6 +327,11 @@ impl Workspace {
                         if let Some(TabView::PartStudio(v)) = this.views.get(t) {
                             let ctx = (**ctx).clone();
                             v.update(cx, |v, cx| v.set_assembly_context(Some(ctx), cx));
+                        }
+                    }
+                    crate::assembly_view::AssemblyViewEvent::EditInContextOther(o) => {
+                        if let Err(e) = crate::files::open_in_context(o.path.clone(), o.studio, o.ctx.clone(), o.install.clone(), this.gpu.clone(), cx) {
+                            log::warn!("Edit in context: {}: {e}", o.path.display());
                         }
                     }
                 }));
@@ -2577,6 +2588,55 @@ impl Workspace {
                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_fs_notices(window, cx)))
                 .into_any_element(),
         )
+    }
+
+    /// The open view of assembly tab `tab`, if it has one.
+    pub fn assembly_view(&self, tab: TabId) -> Option<Entity<crate::assembly_view::AssemblyView>> {
+        match self.views.get(&tab) {
+            Some(TabView::Assembly(v)) => Some(v.clone()),
+            _ => None,
+        }
+    }
+
+    /// The in-context banner's Create version and update in assembly (live 2464): the next version of this document
+    /// ("V<n>"), then the other document's assembly opened on its instance, moved to that version.
+    fn version_and_update(&mut self, other: noshape_app_core::assembly_context::OtherAssembly, assembly: TabId, cx: &mut Context<Self>) {
+        let n = self.doc.read(cx).session.store.graph().ok().map_or(0, |g| g.versions.len()) + 1;
+        let name = format!("V{n}");
+        let r = self.doc.update(cx, |d, _| {
+            let v = d.session.create_version(&name, "")?;
+            anyhow::Ok(d.session.store.version(v)?.microversion)
+        });
+        let mv = match r {
+            Ok(mv) => mv,
+            Err(e) => {
+                self.doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error(format!("{e:#}"))));
+                return;
+            }
+        };
+        self.doc.update(cx, |d, cx| d.reloaded(cx));
+        let here = self.doc.read(cx).session.path.clone();
+        if let Err(e) = crate::files::update_linked_instance(other, assembly, here, mv, &name, self.gpu.clone(), cx) {
+            log::warn!("Create version and update in assembly: {e}");
+        }
+    }
+
+    /// Edit in context from another document's assembly (`files::open_in_context`): the context snapshot stored in
+    /// Part Studio `studio` (not undoable, as for this document's assemblies), the studio shown with it.
+    pub fn enter_context_from_other(&mut self, studio: TabId, ctx: noshape_app_core::assembly_context::AssemblyContext, install: (u32, Option<noshape_model::in_context::AssemblyContext>), window: &mut Window, cx: &mut Context<Self>) {
+        let (id, new) = install;
+        self.doc.update(cx, |d, cx| {
+            d.edit_document_not_undoable("Edit in context", cx, |doc| {
+                if let Some(noshape_model::TabContent::PartStudio(ps)) = doc.tab_mut(studio).map(|t| &mut t.content) {
+                    noshape_ops::in_context::install(ps, id, new);
+                }
+            });
+            cx.emit(crate::doc_model::DocEvent::TabChanged(studio));
+        });
+        self.activate(studio, window, cx);
+        if let Some(TabView::PartStudio(v)) = self.views.get(&studio) {
+            v.update(cx, |v, cx| v.set_assembly_context(Some(ctx), cx));
+        }
     }
 
     fn toggle_fs_notices(&mut self, window: &mut Window, cx: &mut Context<Self>) {

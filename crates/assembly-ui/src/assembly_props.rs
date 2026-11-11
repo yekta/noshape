@@ -533,6 +533,10 @@ impl AssemblyView {
     /// subassembly too, live 1723).
     pub(super) fn edit_in_context_at(&mut self, path: Vec<InstanceId>, existing: Option<u32>, cx: &mut Context<Self>) {
         let Some(inst) = self.occurrence_instance(&path, cx) else { return };
+        if matches!(inst.source, InstanceSource::External { body: Some(_), .. }) {
+            self.edit_in_context_other(path, cx);
+            return;
+        }
         let Some(studio) = inst.source.studio() else { return };
         let Some(own) = self.result.occurrences.iter().find(|o| o.path.starts_with(&path)) else { return };
         let to_studio = own.transform.inverse();
@@ -556,7 +560,49 @@ impl AssemblyView {
         };
         let camera = Some(self.camera_in(to_studio, cx));
         let context = self.add_assembly_context(studio, Some(path), existing, to_studio, None, cx);
-        cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::assembly_context::AssemblyContext { assembly: self.tab, assembly_name, part, occurrences, insert_at: None, camera, context })));
+        cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::assembly_context::AssemblyContext { assembly: self.tab, assembly_name, part, occurrences, insert_at: None, camera, context, other: None })));
+    }
+
+    /// Create version and update in assembly (live 2464): `instance`, a part of the document at `path`, moved to that
+    /// document's microversion `mv` (its new version `name`).
+    pub fn move_instance_to_version(&mut self, instance: InstanceId, path: &std::path::Path, mv: noshape_store::MicroversionId, name: &str, cx: &mut Context<Self>) {
+        let Some(key) = self.assembly(cx).and_then(|a| a.instance(instance)).and_then(|i| i.source.external_key().map(str::to_string)) else { return };
+        let Some(r) = crate::derived::ExternalRef::parse(&key).filter(|r| r.path == path || std::fs::canonicalize(&r.path).ok() == std::fs::canonicalize(path).ok()) else { return };
+        let new_key = crate::derived::ExternalRef { microversion: mv, ..r }.key();
+        self.edit(&format!("Update to {name}"), cx, |a| noshape_ops::assembly::repoint_external(a, &key, &new_key, Some(&[instance])));
+        self.ext_updates.remove(&key);
+    }
+
+    /// Edit in context on another document's part (live 2464): its document opens on Main, its Part Studio showing
+    /// this assembly around the part (the context snapshot stored in that Part Studio, as for a part of this document).
+    fn edit_in_context_other(&mut self, path: Vec<InstanceId>, cx: &mut Context<Self>) {
+        let Some(inst) = self.occurrence_instance(&path, cx) else { return };
+        let InstanceSource::External { key, body: Some(body), .. } = &inst.source else { return };
+        let Some(r) = crate::derived::ExternalRef::parse(key) else { return };
+        let Some(own) = self.result.occurrences.iter().find(|o| o.path.starts_with(&path)) else { return };
+        let to_studio = own.transform.inverse();
+        // The source's Main: the context goes into its Part Studio there.
+        let head = noshape_store::Document::open_read_only(&r.path).ok().and_then(|s| s.head(s.default_branch().ok()?).ok());
+        let Some(src) = head.and_then(|h| crate::derived::external_snapshot(&r.path, h).ok()) else {
+            self.message = Some((true, "The linked document could not be opened.".into()));
+            cx.notify();
+            return;
+        };
+        let Some((studio, Some(TabContent::PartStudio(ps)))) = src.tabs.iter().find(|t| t.id.to_string() == r.tab).map(|t| (t.id, Some(&t.content))) else { return };
+        let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
+        let name_of = |p: &noshape_model::assembly::eval::InstancePath| names.get(&p[0]).cloned().unwrap_or_default();
+        let Some(install) = noshape_ops::in_context::context_for(ps, &self.result, self.tab, Some(&path), None, to_studio, &name_of) else { return };
+        let occurrences = self
+            .result
+            .occurrences
+            .iter()
+            .filter(|o| !o.path.starts_with(&path) && !o.hidden && matches!(o.kind, BodyKind::Solid | BodyKind::Surface))
+            .map(|o| crate::assembly_context::ContextOccurrence { top: o.top(), name: names.get(&o.top()).cloned().unwrap_or_else(|| o.instance_name.clone()), mesh: o.mesh.clone(), transform: to_studio * o.transform, color: o.color })
+            .collect();
+        let assembly_name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
+        let other = Some(crate::assembly_context::OtherAssembly { path: self.doc.read(cx).session.path.clone(), instance: path[0] });
+        let ctx = crate::assembly_context::AssemblyContext { assembly: self.tab, assembly_name, part: Some(body.clone()), occurrences, insert_at: None, camera: Some(self.camera_in(to_studio, cx)), context: Some(install.0), other };
+        cx.emit(AssemblyViewEvent::EditInContextOther(Box::new(crate::assembly_view::OtherInContext { path: r.path.clone(), studio, ctx, install })));
     }
 
     /// The Assembly context (snapshot) a Part Studio shows while edited in
@@ -1063,7 +1109,7 @@ impl AssemblyView {
         let insert_at = Some(frame_to_placement(&frame));
         let camera = Some(self.camera_in(to_studio, cx));
         let context = self.add_assembly_context(studio, None, None, to_studio, insert_at, cx);
-        cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::assembly_context::AssemblyContext { assembly: self.tab, assembly_name, part: None, occurrences, insert_at, camera, context })));
+        cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::assembly_context::AssemblyContext { assembly: self.tab, assembly_name, part: None, occurrences, insert_at, camera, context, other: None })));
         cx.notify();
     }
 

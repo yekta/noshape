@@ -70,6 +70,10 @@ const DEFAULT_SLIDER: f32 = 0.29;
 pub enum PartStudioEvent {
     /// "Go to assembly" in the in-context banner.
     ActivateTab(noshape_model::document::TabId),
+    /// The banner of a context from another document's assembly (live 2464): Go to assembly opens that document on it.
+    GoToOtherAssembly(noshape_app_core::assembly_context::OtherAssembly, noshape_model::document::TabId),
+    /// … and Create version and update in assembly: a version of this document, the instance moved to it.
+    VersionAndUpdate(noshape_app_core::assembly_context::OtherAssembly, noshape_model::document::TabId),
     /// "Insert and go to assembly" (Part Studio created in context).
     InsertInAssembly { assembly: noshape_model::document::TabId, studio: noshape_model::document::TabId, parts: Vec<BodyId>, sketches: Vec<FeatureId>, at: noshape_model::assembly::Placement },
 }
@@ -380,6 +384,7 @@ impl PartStudioView {
                         // [Insert and go to assembly][▾] (Insert and go to
                         // assembly, Go to assembly, Hide/show instances) and ✕.
                         Some(_) => self.insert_go_split(assembly, cx),
+                        None if c.ctx.other.is_some() => self.version_update_split(cx),
                         None => h_flex()
                             .child(small_button("ctx-go", "Go to assembly").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 this.exit_context(cx);
@@ -829,7 +834,7 @@ impl PartStudioView {
         let ctx = id.and_then(|id| {
             let assembly = self.studio(cx)?.contexts.iter().find(|c| c.id == id)?.assembly;
             let assembly_name = self.assembly_name(assembly, cx);
-            Some(AssemblyContext { assembly, assembly_name, part: None, occurrences: Vec::new(), insert_at: None, camera: None, context: Some(id) })
+            Some(AssemblyContext { assembly, assembly_name, part: None, occurrences: Vec::new(), insert_at: None, camera: None, context: Some(id), other: None })
         });
         self.ui.in_context = None;
         if ctx.is_some() {
@@ -1125,6 +1130,40 @@ impl PartStudioView {
     /// [Insert and go to assembly][▾] (Insert and go to assembly, Go to
     /// assembly, Hide/show instances) of a Part Studio created in context
     /// (live assembly/551).
+    /// Edit in context from another document's assembly (live 2464): [Create version and update in assembly][▾]
+    /// (Create version and update in assembly, Go to assembly, Hide/show instances) and ✕.
+    fn version_update_split(&self, cx: &mut Context<Self>) -> AnyElement {
+        h_flex()
+            .child(small_button("ctx-version-update", "Create version and update in assembly").rounded_r(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.leave_to_other(true, cx))))
+            .child(small_button("ctx-version-caret", "").map(|d| crate::ui_script::mark(d, || "caret:Create version and update in assembly".into())).w(px(20.)).px(px(0.)).justify_center().rounded_l(px(0.)).border_l_0().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333))).on_click(cx.listener(move |_this, ev: &ClickEvent, window, cx| {
+                let view = cx.entity();
+                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                    let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+                    m.list_no_icons()
+                        .item(crate::os_menu::OsMenuItem::new("Create version and update in assembly").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.leave_to_other(true, cx))))
+                        .item(crate::os_menu::OsMenuItem::new("Go to assembly").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.leave_to_other(false, cx))))
+                        .item(crate::os_menu::OsMenuItem::new("Hide/show instances").on_click(move |_, _, cx| {
+                            v3.update(cx, |this, cx| {
+                                if let Some(c) = &mut this.ui.in_context {
+                                    c.hide_show_open = !c.hide_show_open;
+                                }
+                                cx.notify();
+                            })
+                        }))
+                });
+                crate::os_menu::mark_page_dropdown(&menu, cx);
+                crate::os_menu::open_anchored(ev.position(), Anchor::TopLeft, menu, window, cx);
+            })))
+            .into_any_element()
+    }
+
+    /// Leave a context from another document's assembly for it (with a version of this document first: `version`).
+    fn leave_to_other(&mut self, version: bool, cx: &mut Context<Self>) {
+        let Some((other, assembly)) = self.ui.in_context.as_ref().and_then(|c| Some((c.ctx.other.clone()?, c.ctx.assembly))) else { return };
+        self.exit_context(cx);
+        cx.emit(if version { PartStudioEvent::VersionAndUpdate(other, assembly) } else { PartStudioEvent::GoToOtherAssembly(other, assembly) });
+    }
+
     fn insert_go_split(&self, assembly: noshape_model::document::TabId, cx: &mut Context<Self>) -> AnyElement {
         h_flex()
             .child(small_button("ctx-insert-go", "Insert and go to assembly").rounded_r(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_insert_go(cx))))

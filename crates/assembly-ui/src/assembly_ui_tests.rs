@@ -832,7 +832,7 @@ fn switch_to_part_studio_carries_the_part(cx: &mut TestAppContext) {
             g.borrow_mut().push(match ev {
                 super::AssemblyViewEvent::ShowPart(_, body) => format!("show {body:?}"),
                 super::AssemblyViewEvent::ActivateTab(_) => "activate".into(),
-                super::AssemblyViewEvent::EditInContext(..) => "context".into(),
+                super::AssemblyViewEvent::EditInContext(..) | super::AssemblyViewEvent::EditInContextOther(..) => "context".into(),
             })
         })
     });
@@ -919,13 +919,14 @@ fn another_documents_part_pins_its_reference(cx: &mut TestAppContext) {
     let at = |l: &str| menu.iter().position(|x| x == l).unwrap_or_else(|| panic!("{l} in {menu:?}"));
     assert!(at("Update linked document…") < at("Open linked document") && at("Open linked document") < at("Pin reference"), "{menu:?}");
     assert!(menu.iter().any(|l| l == "Create Drawing of Part 1…"), "{menu:?}");
+    assert!(at("Edit in context") < at("Add mate connector to instance origin…"), "{menu:?}");
     cx.update(|cx| {
         view.update(cx, |v, cx| {
             v.edit("Pin reference", cx, |a| noshape_ops::assembly::set_reference_pinned(a, p1, true));
         })
     });
     let menu = cx.update(|cx| labels(&view.read(cx).instance_menu(p1, false, cx)));
-    assert!(menu.iter().any(|l| l == "Unpin reference") && !menu.iter().any(|l| l == "Pin reference"), "{menu:?}");
+    assert!(menu.iter().any(|l| l == "Unpin reference") && !menu.iter().any(|l| l == "Pin reference" || l == "Edit in context"), "{menu:?}");
     cx.update(|cx| view.update(cx, |v, cx| v.open_reference_manager(None, cx)));
     cx.update(|cx| assert!(view.read(cx).ui.ref_manager.as_ref().unwrap().docs.is_empty(), "a pinned reference isn't offered an update"));
 }
