@@ -13,6 +13,34 @@ Worktree /root/projects/noshape-wt/blend (and blend2 for a second build), builds
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## 11-11 05:21 UTC: branches in flight, OCCT 0029, the impeller's cliff round
+- Landed: knife Chamfer 1 (12b1d8a6), blend-fastfinish (4dc4f096: the finishing passes' sphere / cylinder scans by
+  surface type; hat8's Seat lip chamfer 3.2 -> 1.9 s, Riser feet 5.7 -> 5.2 s, results identical).
+- blend-equal (worktree blend, 9b4ff66eb): rims tilted to their plane chamfer as one rolling ball's chord
+  (`rim_chamfer_tool`: the wedge split by the closed sheet through the ball's touches, seam off the part); rings-loft
+  12 -> 17/32, model suite 820 -> 825, the flagged "slower" documents being re-run alternately (only-equal2.out);
+  assembly gate running on vibe3.
+- blend-opchamfer (worktree blend3, 5929660a1): CHAMFER-FS-OPCHAMFER done (distance face shared / left, Opposite,
+  direction overrides, propagation and its stop, Tangent method); model suite 820 = 820 (cf-fix-pcb's slower flag to
+  re-run); assembly run on vibe5.
+- OCCT patch 0029 (worktree blendocc, branch blend-occt0029 pushed): a per-face sample count cache in
+  ChFi3d::IsTangentFaces while a builder's PerformElement / Compute runs. Own OCCT at vibe4 ~/blend-occt (work tree
+  ~/blend-occt-work, its git has the patched source; build script /root/blend-scratch/occt0029/build.sh); never in
+  /root/occt or /opt/occt. Blend corpus: identical (1 of 310 cases differs on both, as before), 4.05 -> 3.83 s; patched
+  ChFi3d files compile with g++-13; Kernel (macOS, Windows) passed on the branch; model suite pair running
+  (occ-pair.sh); hat8 re-time next (probe /root/blend-scratch/probes/zz_hat_probe.rs, fresh mode-700 copies on vibe3).
+- Impeller Fillet 1 cliff round (worktree blend4, branch blend-cliff, WIP not committed): live's JWO is the ball
+  touching the wall and the tube's end rim (centre in the rim's normal plane, R from the rim point and the wall):
+  computed over the dump (vibe5 ~/core-cases/dumpfil2/fillet-9), the cliff range is the rim angles -32.3..+33.2 deg,
+  rim ends at z -25.6, wall touches y -7.2 / +7.5, top z -7.609: live's JWO box. `cliff_end_round` builds OCCT's round
+  on the part with the tube run on 3R (valid, +3,075 mm3; +2,592 outside the cliff range) but the cliff part's 2D
+  sections (rim point, ball arc, wall touch, a point inside) fail: in those tilted planes the wall / tube gap is open,
+  no corner or inside point is reliable. Also: OCCT's round outside the cliff range alone adds 2,592 mm3, more than
+  live's whole fillet (+2,412.73): the main round itself may differ from live's (JWK 1,365 mm2; ours 1,261 in two
+  halves), to compare before the cliff part. Next: the cliff face built directly (the pipe of the rim balls trimmed by
+  the wall touch curve and the rim arc, sewn in; blend_direct's way), and the main round's difference first.
+  Correction to core's write-up: live's cap JVG is 201.062 mm2 before and after (an annulus round the bore), as ours.
+
 ## 11-10 22:38 UTC: knife's Chamfer 1 queued (a11be226); the chamfer rule; the impeller's chamfer is a mitre
 - Live 2462 / 2441: a Face offset chamfer is the chord between the feet of a point at fixed offsets from both faces
   (equal distance: one rolling ball), the offsets sized so the asked distances (and angle) hold at one place: the edge's
