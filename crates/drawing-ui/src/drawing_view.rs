@@ -531,6 +531,8 @@ pub struct DrawingEditor {
     /// Points the Sketch point tool placed since it was chosen: in the open drawing sketch until the tool ends (live
     /// 2442: not in the drawing's data until Escape).
     pub tool_points: Vec<noshape_sketch::EntityId>,
+    /// The newest sketch entity and annotation ids when the tool started (what it made is newer).
+    pub tool_start: (u32, u64),
     pub insp_table: crate::drawing_panels::InspectionTableUi,
     /// Inserted image textures (see `drawing_images`).
     pub image_cache: crate::drawing_images::ImageCache,
@@ -791,6 +793,7 @@ impl DrawingEditor {
             panel_highlight: None,
             tool_edge: None,
             tool_points: Vec::new(),
+            tool_start: (0, 0),
             insp_table: Default::default(),
             measure: None,
             status: None,

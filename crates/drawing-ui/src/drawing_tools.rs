@@ -24,6 +24,8 @@ impl DrawingEditor {
         }
         self.projection_parent_lit = false;
         self.tool_points.clear();
+        let sheet = self.drawing_sheet();
+        self.tool_start = (sheet.sketch.sketch.entities().map(|e| e.id.0).max().unwrap_or(0), sheet.annotations.iter().map(|a| a.id).max().unwrap_or(0));
         // A constraint key on a selection that completes it: applied at once.
         if let Tool::Constrain { kind, picks } = &tool
             && picks.is_empty()
@@ -256,19 +258,34 @@ impl DrawingEditor {
             return;
         }
         if !matches!(self.tool, Tool::Select) {
+            let made = self.made_by_tool();
             self.tool = Tool::Select;
             self.overlay = Overlay::default();
             self.note_leader = None;
             self.hover_snap = None;
             // Onshape: Esc ends the tool and nothing stays selected (the
-            // base view of a projected-view chain is no longer orange).
-            self.selection.clear();
+            // base view of a projected-view chain is no longer orange), but what a sketch tool or the maximum /
+            // minimum dimension made.
+            self.selection = made;
             self.set_preview(None, cx);
             self.redraw(cx);
             return;
         }
         self.selection.clear();
         self.redraw(cx);
+    }
+
+    /// What the tool made that Esc leaves selected (live 2442: a sketch point turns orange at Esc; a center point
+    /// circle drawn (drw-crop-existing-profile) and a maximum / minimum dimension placed (drw-max-min-dimension) too).
+    fn made_by_tool(&self) -> Vec<Sel> {
+        let sheet = self.drawing_sheet();
+        let (entities, annotations) = self.tool_start;
+        match self.tool {
+            Tool::Sketch { tool: dt::SkTool::SplinePoint | dt::SkTool::Trim, .. } => Vec::new(),
+            Tool::Sketch { .. } => sheet.sketch.sketch.entities().map(|e| e.id.0).filter(|&id| id > entities).map(Sel::Sketch).collect(),
+            Tool::Dimension { kind: DimTool::MaxMin, .. } => sheet.annotations.iter().filter(|a| a.id > annotations).map(|a| Sel::Annotation(a.id)).collect(),
+            _ => Vec::new(),
+        }
     }
 
     pub fn delete_selection(&mut self, cx: &mut Context<Self>) {
