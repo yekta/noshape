@@ -25,6 +25,7 @@
 #include <BRepBndLib.hxx>
 #include <BRepTopAdaptor_FClass2d.hxx>
 #include <GeomAPI.hxx>
+#include <Geom_OffsetCurve.hxx>
 #include <GProp_GProps.hxx>
 #include <BRepGProp.hxx>
 #include <ShapeAnalysis_Surface.hxx>
@@ -194,34 +195,97 @@ occ::handle<Geom_BSplineCurve> conic_as_bspline(const occ::handle<Geom_Curve>& c
   return fit.IsDone() ? fit.Curve() : occ::handle<Geom_BSplineCurve>();
 }
 
-// A hyperbola's or parabola's part from `f` to `l` as a cubic B-spline through 129 of its points at its own
-// parameters (its parameters the conic's), else null where it misses the conic by over 1e-9 m between them: an
-// input's edge on one (a plane's section of a cone), the curve an extruded face sweeps (Shell's slabs of those).
-occ::handle<Geom_BSplineCurve> conic_part_as_bspline(const occ::handle<Geom_Curve>& c, double f, double l)
+// A curve's part from `f` to `l` as a cubic B-spline through its points at its own parameters (129 of them; 33 on each
+// piece between `breaks`, joined there by knots of multiplicity 3: an offset's corners in curvature), else null where
+// it misses the curve by over 1e-9 m between them.
+static occ::handle<Geom_BSplineCurve> interpolated_part(const occ::handle<Geom_Curve>& c, double f, double l, const std::vector<double>& breaks)
 {
+  // (Breaks a millionth of the range from another or an end left out: a piece that short has points too close to fit.)
+  const double        gap = 1e-6 * (l - f);
+  std::vector<double> at{f};
+  for (const double t : breaks)
+    if (t > at.back() + gap && t < l - gap)
+      at.push_back(t);
+  at.push_back(l);
+  const int           n = at.size() > 2 ? 32 : 128;
+  std::vector<gp_Pnt> poles;
+  std::vector<double> ks{f};
+  std::vector<int>    ms{4};
+  for (size_t k = 0; k + 1 < at.size(); ++k)
+  {
+    const double                             a = at[k], b = at[k + 1];
+    occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, n + 1);
+    occ::handle<NCollection_HArray1<double>> prm = new NCollection_HArray1<double>(1, n + 1);
+    for (int q = 0; q <= n; ++q)
+    {
+      const double t = a + (b - a) * q / n;
+      pts->SetValue(q + 1, c->Value(t));
+      prm->SetValue(q + 1, t);
+    }
+    occ::handle<Geom_BSplineCurve> piece;
+    try
+    {
+      GeomAPI_Interpolate fit(pts, prm, false, 1e-12);
+      fit.Perform();
+      if (!fit.IsDone())
+        return occ::handle<Geom_BSplineCurve>();
+      piece = fit.Curve();
+    }
+    catch (const Standard_Failure&)
+    {
+      return occ::handle<Geom_BSplineCurve>();
+    }
+    for (int q = 0; q < n; ++q)
+    {
+      const double t = a + (b - a) * (q + 0.5) / n;
+      if (piece->Value(t).Distance(c->Value(t)) > 1e-9)
+        return occ::handle<Geom_BSplineCurve>();
+    }
+    if (at.size() == 2)
+      return piece;
+    if (piece->Degree() != 3 || piece->IsRational())
+      return occ::handle<Geom_BSplineCurve>();
+    // (Its poles, the first where the piece before ended; its inner knots, then its end.)
+    for (int q = k == 0 ? 1 : 2; q <= piece->NbPoles(); ++q)
+      poles.push_back(piece->Pole(q));
+    for (int q = 2; q < piece->NbKnots(); ++q)
+    {
+      ks.push_back(piece->Knot(q));
+      ms.push_back(piece->Multiplicity(q));
+    }
+    ks.push_back(b);
+    ms.push_back(k + 2 == at.size() ? 4 : 3);
+  }
+  NCollection_Array1<double> kk(1, static_cast<int>(ks.size()));
+  NCollection_Array1<int>    mm(1, static_cast<int>(ms.size()));
+  for (size_t k = 0; k < ks.size(); ++k)
+  {
+    kk.SetValue(static_cast<int>(k + 1), ks[k]);
+    mm.SetValue(static_cast<int>(k + 1), ms[k]);
+  }
+  NCollection_Array1<gp_Pnt> pp(1, static_cast<int>(poles.size()));
+  for (size_t k = 0; k < poles.size(); ++k)
+    pp.SetValue(static_cast<int>(k + 1), poles[k]);
+  return new Geom_BSplineCurve(pp, kk, mm, 3);
+}
+
+// A hyperbola's, parabola's or offset curve's part from `f` to `l` as a cubic B-spline at its own parameters (its
+// parameters the curve's; null where that misses it by over 1e-9 m): an input's edge on one (a plane's section of a
+// cone; a Move face's offset of an imported corner, a piece a span of its basis), the curve an extruded face sweeps
+// (Shell's slabs of those, the walls on such corners).
+occ::handle<Geom_BSplineCurve> part_as_bspline(const occ::handle<Geom_Curve>& c, double f, double l)
+{
+  std::vector<double> breaks;
+  if (const occ::handle<Geom_OffsetCurve> off = occ::down_cast<Geom_OffsetCurve>(c))
+  {
+    if (const occ::handle<Geom_BSplineCurve> bs = occ::down_cast<Geom_BSplineCurve>(basis_of(off->BasisCurve())))
+      for (int k = 1; k <= bs->NbKnots(); ++k)
+        breaks.push_back(bs->Knot(k));
+    return interpolated_part(c, f, l, breaks);
+  }
   if (occ::down_cast<Geom_Hyperbola>(c).IsNull() && occ::down_cast<Geom_Parabola>(c).IsNull())
     return occ::handle<Geom_BSplineCurve>();
-  const int                                n   = 128;
-  occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, n + 1);
-  occ::handle<NCollection_HArray1<double>> prm = new NCollection_HArray1<double>(1, n + 1);
-  for (int k = 0; k <= n; ++k)
-  {
-    const double t = f + (l - f) * k / n;
-    pts->SetValue(k + 1, c->Value(t));
-    prm->SetValue(k + 1, t);
-  }
-  GeomAPI_Interpolate fit(pts, prm, false, 1e-12);
-  fit.Perform();
-  if (!fit.IsDone())
-    return occ::handle<Geom_BSplineCurve>();
-  const occ::handle<Geom_BSplineCurve> b = fit.Curve();
-  for (int k = 0; k < n; ++k)
-  {
-    const double t = f + (l - f) * (k + 0.5) / n;
-    if (b->Value(t).Distance(c->Value(t)) > 1e-9)
-      return occ::handle<Geom_BSplineCurve>();
-  }
-  return b;
+  return interpolated_part(c, f, l, breaks);
 }
 
 void push3(rust::Vec<double>& v, const gp_XYZ& p)
@@ -403,7 +467,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     // (A hyperbola or parabola: a B-spline of it, its parameters.)
     occ::handle<Geom_BSplineCurve> bsc = bzc.IsNull() ? occ::down_cast<Geom_BSplineCurve>(bc) : GeomConvert::CurveToBSplineCurve(bzc);
     if (bsc.IsNull())
-      bsc = conic_part_as_bspline(bc, f, l);
+      bsc = part_as_bspline(bc, f, l);
     const occ::handle<Geom_Ellipse>      ell  = occ::down_cast<Geom_Ellipse>(bc);
     if (occ::down_cast<Geom_Line>(bc).IsNull() && circ.IsNull() && bsc.IsNull() && ell.IsNull())
       return !occ::down_cast<Geom_Ellipse>(bc).IsNull() ? "an ellipse edge" : !occ::down_cast<Geom_Conic>(bc).IsNull() ? "a conic edge" : "a curved edge";
@@ -501,7 +565,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
       BRepTools::UVBounds(f, u0, u1, v0, v1);
       const double m = 0.01 * (u1 - u0);
-      swept = conic_part_as_bspline(basis_of(ext->BasisCurve()), u0 - m, u1 + m);
+      swept = part_as_bspline(basis_of(ext->BasisCurve()), u0 - m, u1 + m);
     }
     const bool free = !bss.IsNull() || !tor.IsNull() || !sph.IsNull() || ((!ext.IsNull() || !rvl.IsNull()) && !swept.IsNull());
     if (pl.IsNull() && cyl.IsNull() && con.IsNull() && !free)

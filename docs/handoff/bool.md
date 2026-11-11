@@ -26,11 +26,18 @@ scratch /root/bool-scratch.
   every document's result the same; alternating on vibe5 (main's paths by a switch, 3-4 rounds) cf-drive-train,
   cf-snap-hook, c2-sm-louver, cf-fill-pattern, cf-butt-joint, cf-box-dovetail level (fill pattern 2438-2462 /
   2442-2453 ms). Re-gated after the free-form condition: corpora + parity56 the same.
-- **Next in hat8 (mine):** six more Booleans declined "a curved edge": Move face's offset curves (the corners offset
-  3.15 mm in-plane). A B-spline through the curve at its own parameters, fitted per span of its basis (C1 there),
-  takes two of them (bool-main2, gate pending); the others then decline "a shared shape OCCT may keep or remake"
-  (Riser legs grip's 4.1 s tree), "a non-manifold result" (Merge seat lip into riser, 1.2-1.7 s), "a tiny arc" (two),
-  "a section OCCT makes as a conic". Left in hat8 at load 45: import 17.4 s (dx), the chamfers 5.8 + 3.0 s (blend).
+- **Landed 310b9fed (06:26 UTC).** Then (landing, 06:5x): edges and extruded faces on offset curves (Move face's
+  offsets of the corners, 3.15 mm in-plane) go in as a B-spline through the curve at its own parameters, fitted a
+  span of its basis at a time (C1 there); the result keeps the offset curves. Two more of hat8's 25 Booleans ours
+  (20); T1 offset_curve_edges_fused_as_occt. Gate: corpora + parity56, knurl / gear, shfall as before; model suite
+  the same document by document.
+- **hat8's other OCCT Booleans:** Riser legs grip's tree (4.1 s; "a shared shape OCCT may keep or remake"), Merge seat
+  lip into riser (1.2-1.7 s; "a non-manifold result") and one more fuse: OCCT's recorded results are invalid
+  (`valid 0`), downstream of the riser core finds invalid at Riser legs grip; left until that is fixed. Two cuts
+  (0.6 s each) declined "a tiny arc", then "a section OCCT makes as a conic" (next: arcs shorter than the tolerance
+  straight between their vertices, +4 cases a corpus, and each face's exact box made once a Boolean, sections ahead
+  1.15 -> 0.30 s in the union; gating). Left in hat8 at load 45: import 17.4 s (dx), the chamfers 5.8 + 3.0 s
+  (blend).
 
 ## From psui (2026-11-10 19:12 UTC, lead): does the bookcase's "cut in half" Boolean run on ours now?
 c2-hex-bookcase-derived matches live to the end since dc4b1a01 (17/17; the text's µm slivers were already gone after

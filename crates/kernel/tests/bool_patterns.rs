@@ -1824,3 +1824,38 @@ fn a_body_standing_on_a_curved_base_fused_as_occt() {
     assert!(r.shape.is_valid());
     assert_eq!(k::bool_corpus::Summary::of(&r).differences(&k::bool_corpus::Summary::of(&o)), Vec::<String>::new());
 }
+
+/// A part whose edges are offset curves (a profile offset inwards, as Move face's of a hat's legs on an imported Mac
+/// mini's corners: six of its Booleans declined "a curved edge" and went to OCCT) fused with a box across it: the
+/// offset curves a B-spline through them at their own parameters (fitted a span of their basis at a time), noshape's
+/// Boolean takes the fuse, OCCT's result (equivalent), the edges it keeps still offset curves.
+#[test]
+fn offset_curve_edges_fused_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let mm = 1e-3;
+    let p = |x: f64, y: f64| DVec3::new(x, y, 0.0) * mm;
+    let side = k::make_bspline(&[p(0.0, 0.0), p(2.0, 6.0), p(8.0, 9.0), p(14.0, 6.0), p(20.0, 0.0)], None, &[0.0, 0.5, 1.0], &[4, 1, 4], 3, false).unwrap();
+    let base = k::make_bspline(&[p(20.0, 0.0), p(0.0, 0.0)], None, &[0.0, 1.0], &[2, 2], 1, false).unwrap();
+    let face = k::make_face_from_wire(&k::make_wire(&[side, base]).unwrap(), true).unwrap();
+    let inner = k::offset_wire_2d(&face, -mm, k::JoinType::Arc, false).unwrap();
+    let moved = k::extrude(&k::make_face_from_wire(&inner, true).unwrap(), DVec3::Z * 10.0 * mm).unwrap().shape;
+    let offsets = |s: &k::Shape| s.edges().iter().filter(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, k::Curve::Offset))).count();
+    assert!(offsets(&moved) > 0, "Move face's offset curves");
+    let cutter = k::make_box_corners(DVec3::new(8.0, -5.0, 4.0) * mm, DVec3::new(30.0, 20.0, 20.0) * mm).unwrap();
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&moved), std::slice::from_ref(&cutter), &k::BooleanOptions::default());
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&moved), std::slice::from_ref(&cutter), &k::BooleanOptions::default()).unwrap();
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid());
+    // (Its section with the box's floor is the offset profile there exactly, through the curve's B-spline within 1e-9 m;
+    // OCCT's is marched: the volumes agree to the faces' area times 1e-7, as brep_replay's equivalent results.)
+    let counts = |s: &k::Shape| (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge), s.count(k::ShapeType::Vertex));
+    assert_eq!(counts(&r.shape), counts(&o.shape));
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-7 * o.shape.area().unwrap(), "volume {v} against OCCT's {w}");
+    assert_eq!(offsets(&r.shape), offsets(&o.shape), "the offset curves kept");
+}
