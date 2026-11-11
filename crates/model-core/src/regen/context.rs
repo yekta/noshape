@@ -1,5 +1,6 @@
 //! Regeneration context: the state of a Part Studio after a feature.
 
+use serde::{Deserialize, Serialize};
 use crate::display::{BodyKind, PlaneFrame};
 use crate::naming::{GeoKey, Name, name_edges, name_vertices};
 use crate::reference::{BodyId, FeatureId, Reference, TopoName};
@@ -10,6 +11,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, OnceLock};
 
 /// A part, surface or wire body with persistent names for its sub-shapes.
+#[derive(Serialize, Deserialize)]
 pub struct Body {
     pub id: BodyId,
     pub name: String,
@@ -22,8 +24,11 @@ pub struct Body {
     pub color: usize,
     /// Set on Composite part bodies.
     pub composite: Option<crate::display::CompositeInfo>,
+    #[serde(skip)]
     face_lookup: OnceLock<HashMap<Name, usize>>,
+    #[serde(skip)]
     edge_lookup: OnceLock<HashMap<Name, usize>>,
+    #[serde(skip)]
     vertex_lookup: OnceLock<HashMap<Name, usize>>,
 }
 
@@ -244,7 +249,7 @@ impl Body {
 }
 
 /// A solved sketch.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SketchResult {
     pub feature: FeatureId,
     pub name: String,
@@ -267,7 +272,7 @@ pub struct SketchResult {
 }
 
 /// An inserted sketch image: its box corner points and encoded file.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SketchResultImage {
     pub id: u32,
     /// Box corner point entities: lower-left, lower-right, upper-right, upper-left.
@@ -276,7 +281,7 @@ pub struct SketchResultImage {
     pub data_base64: Arc<str>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PlaneEntity {
     pub reference: Reference,
     pub name: String,
@@ -285,7 +290,7 @@ pub struct PlaneEntity {
     pub half_height: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Connector {
     pub reference: Reference,
     pub name: String,
@@ -295,7 +300,7 @@ pub struct Connector {
 }
 
 /// Point bodies and other datum points.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PointEntity {
     pub reference: Reference,
     pub position: DVec3,
@@ -357,9 +362,10 @@ impl BodyReads {
 
 /// A context's bodies: a list, which can note what a feature reads of it ([`BodyReads`]). Single bodies by index
 /// (`bodies[i]`, `get`) are noted one by one; anything else (`iter`, slices, `retain`) as reading them all.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Bodies {
     v: Vec<Arc<Body>>,
+    #[serde(skip)]
     reads: Option<Arc<BodyReads>>,
 }
 
@@ -559,7 +565,7 @@ impl From<Vec<Arc<Body>>> for Bodies {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Context {
     /// The studio's planar faces keep OCCT's plane x ([`crate::partstudio::PartStudio::legacy_face_frames`]).
     pub legacy_face_frames: bool,
@@ -617,9 +623,11 @@ pub struct Context {
     pub face_appearance: Vec<(BodyId, crate::naming::Name, [f32; 4])>,
     /// FeatureScript attributes (`setAttribute`), kept from feature to
     /// feature (custom/host loads and saves them around each custom feature).
+    #[serde(skip)]
     pub fs_attributes: Vec<(crate::reference::Reference, noshape_featurescript::Value)>,
     /// FeatureScript variables that aren't quantities (`setVariable(context, "t", <function>)`: cf-parametric-curve's
     /// Define Parameter), kept from feature to feature like the attributes.
+    #[serde(skip)]
     pub fs_variables: BTreeMap<String, noshape_featurescript::Value>,
     /// Bodies FeatureScript keeps out of the Part Studio (std sheet metal's
     /// definition sheets): no part, no display; custom features see them
@@ -647,7 +655,7 @@ pub struct Context {
 /// attribute): a face point maps to image coordinates by `mapping` (meters
 /// in the plane, or arc length and height on the cylinder), then by the UV
 /// transform; the image covers UV [0, 1]².
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DecalRecord {
     pub feature: FeatureId,
     pub body: BodyId,
@@ -662,7 +670,7 @@ pub struct DecalRecord {
     pub uv_translation: [f64; 2],
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DecalMapping {
     /// Local coordinates along `x` and `y` from `origin`.
     Planar { origin: DVec3, x: DVec3, y: DVec3, z: DVec3 },
@@ -694,7 +702,7 @@ impl DecalRecord {
 
 /// One hole of a Hole feature: where it starts, its direction into the
 /// material and its sizes (meters, radians).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HoleRecord {
     pub feature: FeatureId,
     pub start: DVec3,

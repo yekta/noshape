@@ -223,3 +223,35 @@ fn regeneration_keys_come_from_the_document_alone() {
     let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions { upto: Some(1), ..Default::default() });
     assert_eq!(r.keys, b[..1]);
 }
+
+/// A regenerated context stored and read back (the persistent regeneration cache) is the same: its bodies (ids,
+/// names, kinds, face names, volumes), sketches, planes and variables; bytes cut short or changed never read back.
+#[test]
+fn a_context_reads_back_as_it_was_stored() {
+    use noshape_model::regen::persist;
+    let (ps, units) = studio_with_block();
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let ctx = &*r.context;
+    let bytes = persist::encode(ctx).expect("a plain context is stored");
+    let back = persist::decode(&bytes).expect("and read back");
+    let (a, b) = (ctx.bodies.untracked(), back.bodies.untracked());
+    assert_eq!(a.len(), b.len());
+    for (x, y) in a.iter().zip(b) {
+        assert_eq!((&x.id, &x.name, x.kind, &x.faces, &x.edges, &x.vertices, x.color), (&y.id, &y.name, y.kind, &y.faces, &y.edges, &y.vertices, y.color));
+        let (vx, vy) = (x.shape.volume().unwrap(), y.shape.volume().unwrap());
+        assert!((vx - vy).abs() <= 1e-12 * vx.abs().max(1e-9), "{vx} vs {vy}");
+        assert_eq!(x.shape.faces().len(), y.shape.faces().len());
+    }
+    assert_eq!(ctx.sketches.len(), back.sketches.len());
+    assert_eq!(ctx.planes, back.planes);
+    assert_eq!(ctx.variables, back.variables);
+    // Written again, the same bytes.
+    assert_eq!(persist::encode(&back).unwrap(), bytes);
+    // Cut short or changed: nothing (the feature regenerates).
+    assert!(persist::decode(&bytes[..bytes.len() / 2]).is_none());
+    for at in [0, bytes.len() / 3, bytes.len() - 1] {
+        let mut bad = bytes.clone();
+        bad[at] ^= 0xff;
+        assert!(persist::decode(&bad).is_none(), "a byte changed at {at}");
+    }
+}

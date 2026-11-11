@@ -9,6 +9,7 @@
 //! [`Context::frame_members`] so [`cut_list`] can compute the cut list rows
 //! (profile, length, end angles) from the current geometry.
 
+use serde::{Deserialize, Serialize};
 use super::frames_profiles::{self, FrameProfile};
 use super::sheetmetal_util::{bool_named, oriented_box, piece_source, plane_of, tool_named};
 use crate::display::BodyKind;
@@ -23,7 +24,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// What a frame part is (cut list grouping and description).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MemberKind {
     Segment,
     Gusset,
@@ -31,7 +32,7 @@ pub enum MemberKind {
 }
 
 /// Frame metadata of a part.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FrameMember {
     pub feature: FeatureId,
     pub kind: MemberKind,

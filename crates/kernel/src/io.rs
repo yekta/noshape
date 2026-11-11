@@ -939,3 +939,81 @@ pub fn write_obj(shape: &Shape, path: &Path, deflection: f64) -> Result<()> {
     let m = tessellate(shape, deflection, 0.5, true)?;
     write_obj_mesh(&m, path)
 }
+
+/// A shape stored as OCCT's binary B-rep (no meshes): a persistent regeneration cache's bodies. Inside
+/// [`with_shape_blobs`] each shape is a number into a side table of those bytes (a self-describing format such as JSON
+/// then carries no B-rep); elsewhere, the bytes themselves. An empty shape is no bytes.
+impl Serialize for Shape {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        let bytes = if self.is_null() { Vec::new() } else { self.to_bin_bytes(false).map_err(serde::ser::Error::custom)? };
+        let at = BLOBS.with(|b| {
+            b.borrow_mut().as_mut().map(|v: &mut Vec<Vec<u8>>| {
+                v.push(bytes.clone());
+                v.len() - 1
+            })
+        });
+        match at {
+            Some(i) => s.serialize_u64(i as u64),
+            None => s.serialize_bytes(&bytes),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Shape {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Shape, D::Error> {
+        let bytes = if BLOBS.with(|b| b.borrow().is_some()) {
+            let i = u64::deserialize(d)? as usize;
+            BLOBS.with(|b| b.borrow().as_ref().and_then(|v| v.get(i).cloned())).ok_or_else(|| serde::de::Error::custom("no such shape"))?
+        } else {
+            serde_bytes_compat::deserialize(d)?
+        };
+        if bytes.is_empty() {
+            return Ok(Shape::null());
+        }
+        Shape::from_bin_bytes(&bytes).map_err(serde::de::Error::custom)
+    }
+}
+
+thread_local! {
+    static BLOBS: std::cell::RefCell<Option<Vec<Vec<u8>>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `f` with shapes (de)serialized as numbers into `blobs`: filled while serializing, read while deserializing.
+/// Returns `f`'s result and the table.
+pub fn with_shape_blobs<R>(blobs: Vec<Vec<u8>>, f: impl FnOnce() -> R) -> (R, Vec<Vec<u8>>) {
+    let before = BLOBS.with(|b| b.borrow_mut().replace(blobs));
+    let r = f();
+    let blobs = BLOBS.with(|b| std::mem::replace(&mut *b.borrow_mut(), before)).unwrap_or_default();
+    (r, blobs)
+}
+
+/// Bytes as `serialize_bytes` wrote them, for formats that keep them as bytes (bincode) or as a sequence (JSON).
+mod serde_bytes_compat {
+    use serde::de::{Deserializer, SeqAccess, Visitor};
+
+    struct Bytes;
+
+    impl<'de> Visitor<'de> for Bytes {
+        type Value = Vec<u8>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("bytes")
+        }
+        fn visit_bytes<E>(self, v: &[u8]) -> Result<Vec<u8>, E> {
+            Ok(v.to_vec())
+        }
+        fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Vec<u8>, E> {
+            Ok(v)
+        }
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Vec<u8>, A::Error> {
+            let mut out = Vec::new();
+            while let Some(b) = seq.next_element::<u8>()? {
+                out.push(b);
+            }
+            Ok(out)
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
+        d.deserialize_byte_buf(Bytes)
+    }
+}

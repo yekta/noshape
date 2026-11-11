@@ -187,7 +187,7 @@ impl Default for Tolerance {
 pub const FIT_KINDS: [&str; 3] = ["Fit", "Fit with tolerance", "Fit (tolerance only)"];
 
 /// Hole callout parts of a fit tolerance on a diameter.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HoleFit {
     /// Hole class shown after the size ("H7"); None for Fit (tolerance only).
     pub class: Option<String>,

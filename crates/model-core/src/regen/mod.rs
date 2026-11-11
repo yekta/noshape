@@ -21,6 +21,7 @@ pub mod eval;
 pub mod features;
 pub mod implicit;
 pub mod measure;
+pub mod persist;
 
 use crate::configured_properties::{configured_value, parse_color};
 use crate::in_context::ContextBodies;

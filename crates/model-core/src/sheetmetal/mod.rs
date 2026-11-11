@@ -12,6 +12,7 @@
 //! and the actual wall faces of the body are transformed into the base
 //! wall's plane.
 
+use serde::{Deserialize, Serialize};
 use crate::naming::Name;
 use crate::reference::{FeatureId, TopoName};
 use glam::{DMat4, DVec3};
@@ -103,7 +104,7 @@ pub fn flat_body(ctx: &crate::regen::context::Context, id: &crate::reference::Bo
 }
 
 /// Bend relief shape (model default or Bend relief override).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BendReliefStyle {
     Rectangle,
     Obround,
@@ -121,7 +122,7 @@ impl BendReliefStyle {
 }
 
 /// What created a bend (bend table display).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BendKind {
     /// Regular bend between two walls.
     Bend,
@@ -132,7 +133,7 @@ pub enum BendKind {
 }
 
 /// A planar wall of the sheet metal model.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Wall {
     pub feature: FeatureId,
     /// Faces of the wall on the model's reference sheet side (all walls use
@@ -156,7 +157,7 @@ impl Wall {
 /// from the bend. The parent's reference face is tangent to the bend region
 /// on the line `origin + radial_a * rho + axis * s` (`rho` = `radius` when the
 /// reference side is the bend's inner side, else `radius + thickness`).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Bend {
     pub feature: FeatureId,
     pub kind: BendKind,
@@ -240,7 +241,7 @@ impl Bend {
 }
 
 /// A rip (open joint) between two walls.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Rip {
     pub feature: FeatureId,
     pub a: usize,
@@ -268,7 +269,7 @@ impl Rip {
 }
 
 /// What a [`FlatMark`] stands for in the flat pattern.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlatMarkKind {
     /// A form tool footprint: the flat shows the region filled, with the
     /// outline and a center mark drawn on top (Onshape's form sketch).
@@ -280,7 +281,7 @@ pub enum FlatMarkKind {
 /// Geometry attached to a wall for the flat pattern only (form outlines,
 /// relief cutouts). Loops lie in the plane of the wall's reference face, in
 /// folded coordinates (they follow the wall when later bends move it).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FlatMark {
     pub feature: FeatureId,
     pub wall: usize,
@@ -319,7 +320,7 @@ impl FlatMark {
 /// part added to and the part removed from a sheet metal wall, placed by
 /// aligning `origin` (z = outward normal of the sheet face, the sheet lies
 /// below z = 0) with each form location.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FormTool {
     pub feature: FeatureId,
     pub add: Option<crate::reference::BodyId>,
@@ -331,7 +332,7 @@ pub struct FormTool {
 }
 
 /// Per-body sheet metal model.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SheetMetalData {
     /// Feature that created the model.
     pub model: FeatureId,

@@ -1,5 +1,6 @@
 //! Flat pattern: unfold a sheet metal body into the plane of its base wall.
 
+use serde::{Deserialize, Serialize};
 use super::SheetMetalData;
 use crate::drawing::sheet::{Anchor, LineStyle, Polyline2, SheetGeometry, Text2};
 use crate::reference::BodyId;
@@ -10,7 +11,7 @@ use noshape_kernel::{Shape, ShapeType};
 use std::collections::VecDeque;
 
 /// A bend line of the flat pattern (center of the developed bend region).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FlatBendLine {
     pub a: DVec2,
     pub b: DVec2,
@@ -26,7 +27,7 @@ pub struct FlatBendLine {
 }
 
 /// A form shown in the flat pattern: its outline and center mark.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FlatForm {
     /// Closed outlines (a form without a flat sketch: its tools' widest
     /// sections), drawn as its up / down outline.
@@ -45,7 +46,7 @@ pub struct FlatForm {
 /// A counterbore / countersink head shown in the flat pattern: the head's
 /// circle around the through hole (live: Flat pattern views ›
 /// Counterbore/Countersink up / down).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FlatHead {
     pub center: DVec2,
     pub radius: f64,
@@ -55,7 +56,7 @@ pub struct FlatHead {
 }
 
 /// The unfolded part: outline loops and bend lines in the flat plane.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FlatPattern {
     /// Flat plane in model space (origin, viewing normal = reference side
     /// outward normal of the base wall, X axis).
@@ -83,7 +84,7 @@ pub struct FlatPattern {
 /// Live 2468: the flat is laid out by its fixed face (the first sketch segment's): a point p of that face goes to
 /// (p·x, p·y, (p − o)·n) with the face's plane frame (o, x, n), so the flat keeps its in-plane coordinates and lies
 /// on z = 0, the sheet `front` above it and `back` below.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FlatPlace {
     /// [`FlatPattern::shape`]'s space → the flat's place.
     pub view: DMat4,

@@ -27,6 +27,7 @@ nalgebra.workspace = true
 # DWG / DWT and DXF 2000+ drawing export (MPL-2.0).
 acadrust = "0.6.5"
 blake3.workspace = true
+zstd.workspace = true
 noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [dev-dependencies]
