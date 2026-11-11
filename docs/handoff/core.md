@@ -41,6 +41,13 @@ What blend takes over:
   (MakePrism) wasn't enough: new surfaces and edge directions flipped cf-surface-pattern's Plane 4 (a mid plane of an
   edge after Draft 1's delete). T1 kernel features::a_prisms_rounds_are_deleted_by_running_its_sides_on.
 - learning-center-michael's Fillet 2 (630 / 46 ms) is bool's (blend.md speed survey: the 12-tool ball cut).
+- c2-valve-config (455 / 175 ms): Extrude 3's op_prism_until 120 ms = OCCT's split of the long prism by Revolve 1's
+  face (a revolved rational conic, ~70 ms; no lever found) + `circles_on_revolutions` 46 ms -> 1.6 ms: a circle about
+  the revolution's axis is the surface's v iso-line, its curve on the face a line in (u, v) instead of GeomProjLib's
+  approximation (also after our Booleans: checked with bool's gate). Timers prism_until.split / .naming.
+- props_surface at the top of a feature's NOSHAPE_KERNEL_PROFILE in the parity suite (cf-snap-hook's Snap Hooks 445
+  calls, c2-valve-config's Circular pattern 1 161, cf-part-draft's Part Draft 2 1142) is the harness measuring the
+  feature's faces (ops query face_json, backtraced), not regeneration: read those windows without it.
 
 **State 11-10 20:15 UTC: the model suite's failing features in core's area (lead: by features lost, skip blend / bool).**
 - Landed 730d6f28: c2-impeller-loft's Extrude 4 (a region picked by its edge's side along a spline) takes live's rib.

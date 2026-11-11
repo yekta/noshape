@@ -813,9 +813,28 @@ void circles_on_revolutions(const TopoDS_Shape& s, const ShapeIMap& keep)
     }
     if (!(t0 < 0 && t1 > 0))
       continue;
-    const occ::handle<Geom2d_Curve> c0 = GeomProjLib::Curve2d(circle, t0, t1, BRep_Tool::Surface(f0)), c1 = GeomProjLib::Curve2d(circle, t0, t1, BRep_Tool::Surface(f1));
-    if (c0.IsNull() || c1.IsNull())
+    // On the plane its projection; on the surface of revolution the circle is the iso-line through the middle's v
+    // (its angle u turning with t, either way round the axis): a line in (u, v), not an approximation.
+    const TopoDS_Face&             frv  = rev0 ? f0 : f1;
+    const occ::handle<Geom_Surface> srv = BRep_Tool::Surface(frv);
+    GeomAPI_ProjectPointOnSurf      onrv(mid, srv);
+    if (!onrv.IsDone() || onrv.NbPoints() == 0 || onrv.LowerDistance() > tol)
       continue;
+    double um, vm, umin, umax, vmin, vmax;
+    onrv.LowerDistanceParameters(um, vm);
+    BRepTools::UVBounds(frv, umin, umax, vmin, vmax);
+    while (um < umin - 1e-9)
+      um += 2 * M_PI;
+    while (um > umax + 1e-9)
+      um -= 2 * M_PI;
+    const double                    turn = frame.Direction().Dot(ax.Direction()) > 0 ? 1.0 : -1.0;
+    const occ::handle<Geom2d_Curve> iso  = new Geom2d_Line(gp_Pnt2d(um, vm), gp_Dir2d(turn, 0));
+    if (srv->Value(um + turn * t0, vm).Distance(c.Value(a0)) > tol || srv->Value(um + turn * t1, vm).Distance(c.Value(a1)) > tol)
+      continue;
+    const occ::handle<Geom2d_Curve> flat = GeomProjLib::Curve2d(circle, t0, t1, BRep_Tool::Surface(rev0 ? f1 : f0));
+    if (flat.IsNull())
+      continue;
+    const occ::handle<Geom2d_Curve> c0 = rev0 ? iso : flat, c1 = rev0 ? flat : iso;
     b.UpdateEdge(e, circle, tol);
     b.Range(e, t0, t1);
     b.UpdateEdge(e, c0, f0, tol);
@@ -862,7 +881,10 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   sp.SetTools(single(until.shape));
   sp.SetRunParallel(bop_parallel());
   sp.SetNonDestructive(true);
-  sp.Build(new_cancel_indicator()->Start());
+  {
+    const noshape::KernelTimer timer("prism_until.split");
+    sp.Build(new_cancel_indicator()->Start());
+  }
   if (sp.HasErrors())
     fail_op("up-to extrude: split failed: " + algo_errors(sp));
   HHist spH = history_of({longPrism, until.shape}, sp);
@@ -958,10 +980,12 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
     }
   }
 
+  const noshape::KernelTimer timer("prism_until.naming");
   {
     ShapeIMap inputs;
     TopExp::MapShapes(until.shape, TopAbs_EDGE, inputs);
     TopExp::MapShapes(profile.shape, TopAbs_EDGE, inputs);
+    const noshape::KernelTimer t2("prism_until.circles");
     circles_on_revolutions(result, inputs);
   }
   HistoryBuilder hb(args, result);
@@ -983,6 +1007,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
     if (targetFaces.Contains(f.Current()) && !prismFaces.Contains(f.Current()))
       caps.push_back(f.Current());
   hb.add_cap(0, REL_LAST, compound_of(caps));
+  const noshape::KernelTimer t3("prism_until.finish");
   return hb.finish();
 }
 

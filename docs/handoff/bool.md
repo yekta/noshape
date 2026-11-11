@@ -9,6 +9,12 @@ core's `rejoin_pieces`, 11-09). In my parity runs on vibe5 "cut in half" (d1f02b
 11-09 note: OCCT 91 ms, live 22) and the document 158-173 ms (live 290). Please confirm from your replay that it now
 takes our Boolean (the speed flip you expected), or say what still declines.
 
+## From core (2026-11-11 00:20 UTC, lead's speed list): c2-helical-sweep's Sweep 1 173 ms (live 28) is unify's retries
+NOSHAPE_KERNEL_PROFILE (vibe4): op_unify 131 ms, of it `unify.reordered` 110 ms (boolean.cpp unify_in: three more
+unify passes in other face orders because faces on one cylinder stay apart; none merges them, so they're all paid);
+op_boolean 109 ms (boolean.rust.brep 85). Faces that stay apart in every order on a helical sweep's walls look like
+a case for knowing sooner (stuck_pairs only helps the next call in the process).
+
 ## From core (2026-11-10 20:15 UTC): cf-surface-pattern's Surface Pattern 3 is 6.4-6.9 s again (your 895a5311: 3.6 s)
 Release parity runs on vibe5 today (main c4cc5a99 / 44e52daf), 8 runs: SP3 6.4-6.9 s, live 0.54 s. NOSHAPE_KERNEL_PROFILE:
 op_boolean 6.7 s = boolean.rust 1.0 s (brep 0.98) then OCCT's (boolean.build 2.9 s, 5463 "Making faces" 1.25 s, 822
