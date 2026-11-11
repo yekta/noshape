@@ -3,6 +3,13 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**11-11 05:17:** parity index 91.7 (the 00:54 run on 6364f3c47 with the clean 02:00-window speed, 91.7 %; SCORE row; its own
+loaded speed 88.3 %). Speed of record comes from the 02:00–04:00 vibe5 window: next night again (bin/vibe5-window.sh, re-arm
+it: it sleeps until 02:00; fix its log() load quoting first); the suite runs between keep their own, loaded, speed in their
+run folder, and parity-index gets the clean window's speed for the same green where there is one (<run>-cleanspeed). v0.4.42
+checked 05:15: no blocker. v0.4.43 is cut from e2c8da0f9 (05:00 list) and due ~07:00: same checks (v0441 -> v0442 as PREV;
+w-v43.sh on vibe3). Fuzz: vibe3 bin/v3cf30.sh (v0.4.42, 9121–9180), GUI on e2c8da0f.
+
 **11-11 02:34, the Mac mini hat per feature (for bool, dx, blend, core; lead's quiet vibe5 window, load 1.4–2.3; green
 6364f3c47's binary; `feature list --tab <tab>` on a fresh copy each run, 3 runs; bin/hat-split.sh <binary> <tab> <tag> on vibe5):**
 - "Mac mini hat": wall 17.07 / 16.36 / 16.36 s, regen_ms 15,104 / 14,800 / 14,813, **wall outside regeneration 1.97 / 1.56 /
