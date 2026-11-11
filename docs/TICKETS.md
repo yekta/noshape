@@ -16,7 +16,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Repro (vibe5 ~/tmp/qa, mode-700): `NOSHAPE_RESULT_STORE=<empty dir> noshape feature list --doc <copy>` twice, then
   `query entities --kind faces --part <Part 1>` with and without the store (qa's sig.py / corpus.py there). The whole-corpus
   check (no store / cold / warm) is still running; more cases follow here.
-  **qa 11:59, the lead's whole check, green 1bfbaacdb (vibe5 ~/tmp/qa: corpus.py, mutate.py, corrupt.py):**
+  **qa 11:57, the lead's whole check, green 1bfbaacdb (vibe5 ~/tmp/qa: corpus.py, mutate.py, corrupt.py):**
   - Whole corpus, 87 saved documents, every Part Studio tab (features' status / message; parts' kind, faces, edges,
     vertices, volume): no store = cold store on all 87; warm = both on 84. The 3 others are this ticket only (face counts;
     statuses, edges, vertices, volumes equal): c2-helical-sweep (Revolve 1 cylinder 1 -> 9), c2-housing-draft (Bohrung 1
