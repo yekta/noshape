@@ -21,6 +21,20 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
   `fold_solved` writes every child's solved position into `Instance::nested` (sub-instance frame, as dx's op): the
   moved child's entry is the op's. History text differs: app "Move : Sub <2>", op "Move : Sub <2> > Part 1 <1>".
 
+## hand-drill Cylindrical 22 is studio geometry, not the axis-point rule (asm, 11-11 22:06 UTC; for dx)
+Studio f79298 (Gear Selector Ring Gear) built alone (vibe3 ~/agents/asm/ps-ring/hd-ring, its document
+~/tmp/asm/pr/ring-copy.noshape): 9/30 features as live, first Chamfer 1; the Spur gear gives 83 faces (live 98).
+- Our outer cylinder (r 16.95) runs +y, as live's RFBK (BOTTOM_AXIS_POINT Z +y): the axis rule is right.
+- Its extent isn't: live's Extrude 7 (Sketch 9 at y 2.6, annulus r 14.3-16.95, 2.7 mm) cuts the ring above y -0.1,
+  and Extrude 8 a groove y -2.7..-1.2, leaving RFBK a 0.9 mm band at -3.6..-2.7 (after Fillet 6). Ours keeps one
+  r 16.95 face from y -2.6 to 2.6 (plus a r 16.2 step at -3.7..-2.7), so its bottom point is 2.6 mm off. Our
+  Extrude 7 region is `region:F62e13a2f30a2:0,4,410,419,422,431,434`: Sketch 9's / 10's regions or planes to check.
+- Part volume ours 2817 mm³, live 2169.
+- Speed (P0): this studio regenerates in 56.7 s, live 1.1 s: Fillet 5 32 s (fails), Extrude 2 10.6 s, Fillet 4 9.3 s.
+- The 30 "overdefines" on the Gearbox Housing (dx 21:44): Cylindrical 22 is on the Housing too, and live reds every
+  mate of a conflicting Fastened/Revolute loop (behaviours "request 1798" a2, a3, f79), so they are likely its
+  collateral (and Planar 11's chamfer); recheck once the ring gear is live's.
+
 ## From dx (11-11 17:18 UTC): occurrence-path assembly_transform for flexible subassemblies is dx's (built, lead)
 Don't redo it. asm-welding-config (-40 occurrences) and asm-xdev-subs (~-50) lose parts inside **flexible**
 subassemblies (`isRigid: false`): live gives each instance of a subassembly its own internal positions, the translator
