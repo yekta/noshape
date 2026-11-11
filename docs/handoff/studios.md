@@ -28,6 +28,26 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-11 20:06 UTC: restarted after the quota pause
+- My 4 commits of 11-08 had all landed (9535caa6 last); the parked merge-rows patch landed through psui (71c63ad3a).
+  psui covered the area 11-09 to 11-11 (entries above and in psui.md: Feature Studio at a version 2485, undo steps
+  2480, Create version 2481/2483, Variable Studio table drag and rename 2487, Ctrl+Z in cells 2476, Paste tab, advanced
+  search).
+- Suite on green e3552a6da: doc/docs/fs from qa's full run (vibe5, deleted mid-run at 20:34), prefs/ver/vs re-run on
+  vibe3 (`~/tmp/studios/uip-1111`, /root/studios-scratch/bin/shards-names.sh; one scenario: bin/uip1.sh <names>).
+  doc/docs/fs misses: doc-menu-close-document (fixed: the scenario seeds live's remembered "Owned by me" through
+  config_files start.json; 3/3); live-side: docs-adv-state/type-list (live reads no list for its native pickers),
+  docs-doc-menu-versions-and-history (live still loading), fs-ed-error-squiggle (reading artefact, re-record asked
+  REQUESTS 2507), fs-tables-* (lane document), fs-ps-custom-feature-error (compile time). fs-undo, fs-redo,
+  fs-undo-button, fs-tb-redo: ours leaves "/" after Undo (psui's 2480 rule: first character its own step); live's
+  takes (typed at 90 ms/key) undo the whole run in 3 of 4 (2480's own 90 ms row: one step). Raised with the lead.
+- ver/vs so far: ver-create-version-drawings-warning step 5 (live: Update drawings. leaves no focus; ours keeps Name
+  focused: the dialog host's focus trap hands its focus back to the first field; open), live-side ver-version-menu-branch
+  (REQUESTS 2493), vs-ps-inserted-drag (2490), "Unknown of Sketch" (reader), ver-vrow-releases (free plan),
+  ver-linked-selective-update (live's click missed).
+- P1 WIN-SHOW-IN-EXPLORER: `file_dialogs::os_path` drops the `\\?\` (and `\\?\UNC\`) prefix before reveal / open
+  (start_window `open_in_file_manager`); T1 test os_paths_drop_the_verbatim_prefix. Check on Windows: qa-os.yml.
+
 ### 2026-11-09 22:49 UTC: documents coverage 285 → 304 of 313 (psui, lead: lowest interaction area)
 
 Nine scenarios (source "psui 11-09 (documents coverage)"), all running on ours; live has yet to record them (REQUESTS

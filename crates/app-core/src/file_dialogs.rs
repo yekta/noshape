@@ -30,11 +30,30 @@ pub fn display_path(path: &Path) -> String {
     display_path_in(&path.to_string_lossy(), home.as_deref(), PathStyle::current())
 }
 
+/// `path` as the OS's own programs take it: on Windows without the verbatim prefix canonicalising adds (`\\?\C:\…`,
+/// `\\?\UNC\server\…`), which Explorer refuses ("The parameter is incorrect.").
+pub fn os_path(path: &Path) -> std::path::PathBuf {
+    if !cfg!(windows) {
+        return path.to_path_buf();
+    }
+    os_path_in(&path.to_string_lossy(), PathStyle::Windows).into()
+}
+
+/// [`os_path`] for a path written as `style`'s OS does.
+pub fn os_path_in(path: &str, style: PathStyle) -> String {
+    if style == PathStyle::Unix {
+        return path.to_string();
+    }
+    if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{rest}");
+    }
+    path.strip_prefix(r"\\?\").unwrap_or(path).to_string()
+}
+
 /// [`display_path`] for a path and home folder written as `style`'s OS does.
 pub fn display_path_in(path: &str, home: Option<&str>, style: PathStyle) -> String {
     match style {
-        // A verbatim prefix (`\\?\C:\…`, from canonicalising) isn't the path Explorer shows.
-        PathStyle::Windows => path.strip_prefix(r"\\?\").unwrap_or(path).replace('/', "\\"),
+        PathStyle::Windows => os_path_in(path, style).replace('/', "\\"),
         PathStyle::Unix => match home.map(|h| h.trim_end_matches('/')).filter(|h| !h.is_empty()) {
             Some(h) if path == h => "~".to_string(),
             Some(h) if path.starts_with(&format!("{h}/")) => format!("~{}", &path[h.len()..]),
@@ -187,7 +206,7 @@ fn in_app_save_prompt(title: &'static str, ok_label: &'static str, default: Path
 
 #[cfg(test)]
 mod tests {
-    use super::{PathStyle, display_path_in};
+    use super::{PathStyle, display_path_in, os_path_in};
 
     /// Windows shows the documents folder as Explorer does: the full path, backslashes, no "~" (user 11-07: "~/Documents\noshape").
     #[test]
@@ -196,6 +215,16 @@ mod tests {
         assert_eq!(display_path_in(r"C:\Users\ann\Documents\noshape", home, PathStyle::Windows), r"C:\Users\ann\Documents\noshape");
         assert_eq!(display_path_in(r"C:\Users\ann\OneDrive\Documents/noshape", home, PathStyle::Windows), r"C:\Users\ann\OneDrive\Documents\noshape");
         assert_eq!(display_path_in(r"\\?\C:\Users\ann\Documents\noshape", home, PathStyle::Windows), r"C:\Users\ann\Documents\noshape");
+    }
+
+    /// Explorer is handed the path without canonicalising's verbatim prefix (qa WIN-SHOW-IN-EXPLORER: "The parameter is
+    /// incorrect."); other paths stay as they are.
+    #[test]
+    fn os_paths_drop_the_verbatim_prefix() {
+        assert_eq!(os_path_in(r"\\?\C:\Users\ann\Documents\noshape\uip Bracket.noshape", PathStyle::Windows), r"C:\Users\ann\Documents\noshape\uip Bracket.noshape");
+        assert_eq!(os_path_in(r"\\?\UNC\nas\cad\a.noshape", PathStyle::Windows), r"\\nas\cad\a.noshape");
+        assert_eq!(os_path_in(r"C:\Users\ann\a.noshape", PathStyle::Windows), r"C:\Users\ann\a.noshape");
+        assert_eq!(os_path_in(r"/home/ann/\\?\a", PathStyle::Unix), r"/home/ann/\\?\a");
     }
 
     /// macOS and Linux write the home folder as "~", and only a whole folder name of it.

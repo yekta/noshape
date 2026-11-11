@@ -4036,10 +4036,11 @@ pub fn folder_link(id: &'static str, path: PathBuf, reveal: bool) -> Stateful<Di
 
 /// Opens `path` in the OS's file manager: a folder itself, a file (`reveal`) shown in its folder.
 pub fn open_in_file_manager(path: &Path, reveal: bool, cx: &mut App) {
+    let path = crate::file_dialogs::os_path(path);
     if reveal {
-        cx.reveal_path(path);
+        cx.reveal_path(&path);
     } else {
-        cx.open_with_system(path);
+        cx.open_with_system(&path);
     }
 }
 

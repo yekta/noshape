@@ -4,6 +4,14 @@
  "area": "studios",
  "source": "universe documents doc-menu-close-document (studios 11-08, coverage batch)",
  "start": "doc-tabs",
+ "config_files": {
+  "start.json": {
+   "view": "Grid",
+   "sort": "Modified",
+   "descending": true,
+   "source": "All"
+  }
+ },
  "steps": [
   {
    "on": {
