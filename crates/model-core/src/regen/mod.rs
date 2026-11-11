@@ -68,6 +68,13 @@ pub struct RegenOptions {
     pub store: Option<Arc<dyn ResultStore>>,
 }
 
+/// A stored feature whose context the loop hasn't read (only if a later feature runs).
+struct Pending {
+    key: RegenKey,
+    variables: BTreeMap<String, Quantity>,
+    sheet_metal: bool,
+}
+
 /// Regeneration results kept across sessions by key ([`RegenResult::result_key`]): the bytes [`persist::encode_result`]
 /// wrote. Anything missing, cut short, changed or of another format reads as nothing and the studio regenerates.
 pub trait ResultStore: Send + Sync + std::fmt::Debug {
@@ -422,6 +429,8 @@ impl Regenerator {
         let (mut evaluated, mut cached): (Vec<FeatureId>, usize) = (Vec::new(), 0);
         let mut keys: Vec<(FeatureId, RegenKey)> = Vec::new();
         let mut fresh: Vec<(RegenKey, Arc<Context>, FeatureState)> = Vec::new();
+        // A stored feature's context not read yet: its key, variables and whether sheet metal is active.
+        let mut pending: Option<Pending> = None;
         self.run += 1;
         let run = self.run;
         // Effective features (configuration applied), visible to evaluators
@@ -475,7 +484,7 @@ impl Regenerator {
             let (params, mut suppressed) = (&effective[i].params, effective[i].suppressed);
             // Boolean expressions (dynamic suppression, checkboxes converted
             // to expressions) see the variables defined upstream.
-            let scope = noshape_units::LayeredScope { inner: &ctx.variables, outer: &outer_vars };
+            let scope = noshape_units::LayeredScope { inner: pending.as_ref().map_or(&ctx.variables, |p| &p.variables), outer: &outer_vars };
             let mut expr_error: Option<String> = None;
             if let Some(e) = f.suppression_expr.as_deref().filter(|e| !e.trim().is_empty()) {
                 // Onshape's "Unsuppressed if": active while the expression
@@ -509,7 +518,8 @@ impl Regenerator {
             // Reused when its inputs are (not custom, std-run, derived or Assembly-context features: they read more
             // than the context). A sheet metal aware one (a fillet, an extrude) runs natively without active sheet
             // metal before it.
-            let std_run = std_route::evaluator(&f.type_id).is_some() && !(std_route::sheet_metal_aware(&f.type_id) && !ctx.sheet_metal.values().any(|d| d.active));
+            let sheet_metal = pending.as_ref().map_or_else(|| ctx.sheet_metal.values().any(|d| d.active), |p| p.sheet_metal);
+            let std_run = std_route::evaluator(&f.type_id).is_some() && !(std_route::sheet_metal_aware(&f.type_id) && !sheet_metal);
             let reusable = reuse
                 && f.sub_features.is_empty()
                 && !crate::custom::is_custom(&f.type_id)
@@ -530,25 +540,32 @@ impl Regenerator {
                 let mut e = versions.remove(i);
                 e.last_run = run;
                 ctx = e.ctx.clone();
+                pending = None;
                 states.push(e.state.clone());
                 versions.insert(0, e);
                 cached += 1;
                 continue;
             }
-            // Kept across sessions: this feature's result from the store (an edit after reopening runs from the edit on).
+            // Kept across sessions: this feature's state from the store (an edit after reopening runs from the edit on);
+            // its context is read only if a feature after it runs (`pending`).
             let storable = studio.contexts.is_empty() && !probing;
             if storable
                 && let Some(store) = &opts.store
-                && let Some((stored, state)) = store.get(persist::feature_key(ekey)).and_then(|b| persist::decode_feature(store.clone(), &b))
-                && state.id == f.id
+                && let Some(light) = store.get(persist::feature_key(ekey)).and_then(|b| persist::decode_feature_state(&b))
+                && light.state.id == f.id
             {
-                ctx = Arc::new(stored);
-                let versions = self.entries.entry(f.id).or_default();
-                versions.insert(0, CacheEntry { key: ekey, ctx: ctx.clone(), state: state.clone(), last_run: run, local: elocal, input: None, reads: None });
-                versions.truncate(VERSIONS);
-                states.push(state);
+                states.push(light.state);
+                pending = Some(Pending { key: ekey, variables: light.variables, sheet_metal: light.sheet_metal });
                 cached += 1;
                 continue;
+            }
+            // (The context the features before left in the store: this one runs on it.)
+            if let Some(p) = pending.take() {
+                match opts.store.as_ref().and_then(|s| s.get(persist::context_key(p.key)).and_then(|b| persist::decode_context(s.clone(), &b))) {
+                    Some(c) => ctx = Arc::new(c),
+                    // Missing or damaged: the whole studio again without the store.
+                    None => return self.regenerate(studio, config, units, &RegenOptions { store: None, ..opts.clone() }),
+                }
             }
             if reusable
                 && expr_error.is_none()
@@ -758,6 +775,12 @@ impl Regenerator {
                 fresh.push((ekey, ctx.clone(), state.clone()));
             }
             states.push(state);
+        }
+        if let Some(p) = pending.take() {
+            match opts.store.as_ref().and_then(|s| s.get(persist::context_key(p.key)).and_then(|b| persist::decode_context(s.clone(), &b))) {
+                Some(c) => ctx = Arc::new(c),
+                None => return self.regenerate(studio, config, units, &RegenOptions { store: None, ..opts.clone() }),
+            }
         }
         // Features gone from this run: the most recently used few stay a while.
         let last_run = |versions: &[CacheEntry]| versions.first().map_or(0, |e| e.last_run);

@@ -177,9 +177,6 @@ pub fn feature_key(key: super::RegenKey) -> super::RegenKey {
     super::hash_bytes(key, b"feature entry")
 }
 
-/// What starts a feature's entry.
-const FEATURE_MAGIC: &[u8; 8] = b"NSFEA001";
-
 fn content_hash(bytes: &[u8]) -> [u8; 16] {
     let mut h = [0u8; 16];
     h.copy_from_slice(&blake3::hash(bytes).as_bytes()[..16]);
@@ -262,19 +259,49 @@ impl noshape_kernel::ShapeCodec for BlobReader {
     }
 }
 
-/// A feature's state and context as its entry, its shapes put in `store` (once, `memo` across a writer's entries).
-pub fn encode_feature(store: std::sync::Arc<dyn super::ResultStore>, memo: &mut ShapeMemo, state: &FeatureState, ctx: &Context) -> Option<Vec<u8>> {
+/// The key a feature's context is kept under (apart from its state's: a reopened studio reads the states, and only
+/// the context a later feature runs on).
+pub fn context_key(key: super::RegenKey) -> super::RegenKey {
+    super::hash_bytes(key, b"feature context")
+}
+
+/// What starts a feature's context entry.
+const CONTEXT_MAGIC: &[u8; 8] = b"NSCTF001";
+
+/// A stored feature's state, without its context: what stepping past it needs.
+pub struct FeatureLight {
+    pub state: FeatureState,
+    /// The variables after it (later features' expressions read them).
+    pub variables: std::collections::BTreeMap<String, noshape_units::Quantity>,
+    /// Whether sheet metal is active after it (a later feature's route).
+    pub sheet_metal: bool,
+}
+
+/// A feature's state, its variables and whether sheet metal is active after it.
+pub fn encode_feature_state(state: &FeatureState, ctx: &Context) -> Option<Vec<u8>> {
+    let sheet_metal = ctx.sheet_metal.values().any(|d| d.active);
+    frame(&(state, &ctx.variables, sheet_metal))
+}
+
+/// What [`encode_feature_state`] wrote.
+pub fn decode_feature_state(bytes: &[u8]) -> Option<FeatureLight> {
+    let (state, variables, sheet_metal) = unframe(bytes)?;
+    Some(FeatureLight { state, variables, sheet_metal })
+}
+
+/// A feature's context as its entry, its shapes put in `store` (once, `memo` across a writer's entries).
+pub fn encode_context(store: std::sync::Arc<dyn super::ResultStore>, memo: &mut ShapeMemo, ctx: &Context) -> Option<Vec<u8>> {
     if !storable(ctx) {
         return None;
     }
     let writer = BlobWriter { store, memo: std::mem::take(memo), hashes: Vec::new() };
-    let (json, codec) = noshape_kernel::with_shape_codec(Box::new(writer), || serde_json::to_vec(&(state, ctx)));
+    let (json, codec) = noshape_kernel::with_shape_codec(Box::new(writer), || serde_json::to_vec(ctx));
     let any: Box<dyn std::any::Any> = codec;
     let writer = any.downcast::<BlobWriter>().ok()?;
     *memo = writer.memo;
     let json = zstd::encode_all(&json.ok()?[..], 3).ok()?;
     let mut out = Vec::with_capacity(json.len() + 16 * writer.hashes.len() + 48);
-    out.extend_from_slice(FEATURE_MAGIC);
+    out.extend_from_slice(CONTEXT_MAGIC);
     out.extend_from_slice(&(json.len() as u64).to_le_bytes());
     out.extend_from_slice(&json);
     out.extend_from_slice(&(writer.hashes.len() as u64).to_le_bytes());
@@ -285,13 +312,13 @@ pub fn encode_feature(store: std::sync::Arc<dyn super::ResultStore>, memo: &mut 
     Some(out)
 }
 
-/// What [`encode_feature`] wrote, its shapes from `store`; `None` for anything missing, cut short or changed.
-pub fn decode_feature(store: std::sync::Arc<dyn super::ResultStore>, bytes: &[u8]) -> Option<(Context, FeatureState)> {
+/// What [`encode_context`] wrote, its shapes from `store`; `None` for anything missing, cut short or changed.
+pub fn decode_context(store: std::sync::Arc<dyn super::ResultStore>, bytes: &[u8]) -> Option<Context> {
     let (body, sum) = bytes.split_at_checked(bytes.len().checked_sub(16)?)?;
     if blake3::hash(body).as_bytes()[..16] != *sum {
         return None;
     }
-    let mut r = body.strip_prefix(FEATURE_MAGIC.as_slice())?;
+    let mut r = body.strip_prefix(CONTEXT_MAGIC.as_slice())?;
     let mut take = |n: usize| -> Option<&[u8]> {
         let (a, b) = r.split_at_checked(n)?;
         r = b;
@@ -305,9 +332,8 @@ pub fn decode_feature(store: std::sync::Arc<dyn super::ResultStore>, bytes: &[u8
         hashes.push(take(16)?.try_into().ok()?);
     }
     let reader = BlobReader { store, hashes };
-    let (value, _) = noshape_kernel::with_shape_codec(Box::new(reader), || serde_json::from_slice::<(FeatureState, Context)>(&json));
-    let (state, ctx) = value.ok()?;
-    Some((ctx, state))
+    let (value, _) = noshape_kernel::with_shape_codec(Box::new(reader), || serde_json::from_slice::<Context>(&json));
+    value.ok()
 }
 
 /// Keeps a full regeneration's result, and each feature it evaluated, in `store` on a background thread (encoding
@@ -333,8 +359,12 @@ pub fn keep_now(store: std::sync::Arc<dyn super::ResultStore>, result: &super::R
     }
     let mut memo = ShapeMemo::default();
     for (key, ctx, state) in &result.fresh {
-        if let Some(bytes) = encode_feature(store.clone(), &mut memo, state, ctx) {
-            store.put(feature_key(*key), bytes);
+        // (The context first: a state is only read with its context there.)
+        if let Some(bytes) = encode_context(store.clone(), &mut memo, ctx)
+            && let Some(light) = encode_feature_state(state, ctx)
+        {
+            store.put(context_key(*key), bytes);
+            store.put(feature_key(*key), light);
         }
     }
 }

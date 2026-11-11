@@ -63,9 +63,9 @@ What blend takes over:
   content-hashed blobs (checked on read), so an edit after a reopen runs from the edit on.
 - hat8 (vibe3, copy of the original): first open 18.3 s writing 20 MB; reopen 1.3 s; reopen + rename of the last
   feature 7.9 s; all 137 features as the original.
-- Lazy read (stage 5, bed04821 queued 13:31; lost once in vibe4's 10:42 queue wipe): a reopen reads the kept
-  features' light states only and the context just before the first feature that runs (hat8: reopen + rename of the
-  last feature 7.9 -> 4.6 s).
+- Lazy (stage 5): a feature's state (with its variables and sheet metal flag) and its context are separate entries;
+  stepping past stored features reads states only, the context just before the first feature that runs (a damaged
+  one: the studio again without the store). hat8: reopen 0.8 s, reopen + rename of the last feature 4.6 s (was 7.9).
 - STORE-FACE-SPLIT (255b927a): joined face pieces share one name Arc; `Body`'s names are serialized keeping that
   sharing (context.rs `shared_names`). Anything else that relies on Arc identity must be stored the same way.
 
