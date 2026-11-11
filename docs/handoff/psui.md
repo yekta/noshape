@@ -9,6 +9,18 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## psui 09:10 UTC: the 11-11 full ui-parity run's list (vibe5, 1511 scenarios), done
+
+Fixed and landed or queued: fold caret, documents advanced search and toggles, the compact snippet list, Help's window,
+Feature Studio undo steps (2480), Create version's fields and Insert (2481), a CAD file tab's Export… (ops export_parts
+with a file tab) and Import… keeping the open tab, Paste tab's name, the driver keeping to its page. Left, not ours:
+analysis-thickness x3 and ver-vrow-releases (live's free plan), docs-adv-state/type-list (live's native selects),
+docs-doc-menu-versions-and-history (live still loading), ver-linked-selective-update (live's click missed the box),
+fs-ed-error-squiggle / fs-ps-custom-feature-error (live's compile time), fs-undo x2 (live's save timing), fs-tables-*
+(live's lane document), drw-*/asm-* (dx, asm). Asked live: fs-view-version's toolbar at a version, fs-shortcuts-sheet's
+two notices, five old-recorder Create version / workspace takes. Unexplained, left: vs-ps-inserted-drag (live focuses a
+rename field after the drag), fs-ed-ctrl-click-std, doc-menu-close-document (our runner loses its window).
+
 ## psui 07:16 UTC (lead 05:50: hat8's Mac mini body meshes in 1.0 s, make it ~0.1 s)
 
 Not the vent band (its 17,576 nodes take 4-6 ms of CPU) but 450 B-spline faces, mostly long strips of a surface with
