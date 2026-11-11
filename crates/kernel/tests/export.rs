@@ -1738,3 +1738,25 @@ fn an_extruded_spline_walls_facets_follow_the_surface() {
         assert_eq!(f.vertex_count as usize, tris.len() / 3 + 2, "wall {k}: strips between its edges' nodes, none inside ({} nodes, {} triangles)", f.vertex_count, tris.len() / 3);
     }
 }
+
+/// A STEP name with a raw byte 0x80-0x9F (asm-tvc-mount's servo "Pe\x87a", no UTF-8: the import failed whole) reads
+/// as live reads it, Windows-1252's character ("Pe‡a"); other non-ASCII names come through whole.
+#[test]
+fn step_names_with_windows_1252_bytes_read_as_live() {
+    let dir = std::env::temp_dir().join(format!("noshape-step-name-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let block = make_box(&Plane::xy(), 0.01, 0.01, 0.01).unwrap();
+    let path = dir.join("names.step");
+    write_step(&path, &[ExportShape { shape: block.clone(), name: Some("PeXa".into()), color: None }, ExportShape { shape: block, name: Some("Peça".into()), color: None }], LengthUnit::Millimeter).unwrap();
+    let mut bytes = std::fs::read(&path).unwrap();
+    let at: Vec<usize> = bytes.windows(4).enumerate().filter(|(_, w)| *w == b"PeXa").map(|(i, _)| i).collect();
+    assert!(!at.is_empty(), "the name in the file");
+    for i in at {
+        bytes[i + 2] = 0x87;
+    }
+    std::fs::write(&path, &bytes).unwrap();
+    let names: Vec<String> = read_step(&path, LengthUnit::Millimeter).unwrap().into_iter().filter_map(|s| s.name).collect();
+    assert!(names.iter().any(|n| n == "Pe‡a"), "{names:?}");
+    assert!(names.iter().any(|n| n == "Peça"), "{names:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

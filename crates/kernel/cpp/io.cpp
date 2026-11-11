@@ -108,14 +108,55 @@ void quiet_messenger()
 
 std::string path_str(rust::Str p) { return std::string(p.data(), p.size()); }
 
+// A name as UTF-8. A file's byte 0x80-0x9F (no Latin-1 character) is Windows-1252's, as live reads it
+// (asm-tvc-mount's servo "Pe\x87a" is "Pe‡a"); the rest are Unicode (a byte above 0x7F was a raw 0x87 and failed
+// the whole import as not UTF-8).
+std::string utf8_name(const TCollection_ExtendedString& es)
+{
+  static const char32_t cp1252[32] = {0x20AC, 0xFFFD, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160,
+                                      0x2039, 0x0152, 0xFFFD, 0x017D, 0xFFFD, 0xFFFD, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022,
+                                      0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0xFFFD, 0x017E, 0x0178};
+  std::string out;
+  const int   n = es.Length();
+  for (int i = 1; i <= n; ++i)
+  {
+    char32_t c = es.Value(i);
+    if (c >= 0xD800 && c < 0xDC00 && i < n && es.Value(i + 1) >= 0xDC00 && es.Value(i + 1) < 0xE000)
+      c = 0x10000 + ((c - 0xD800) << 10) + (char32_t(es.Value(++i)) - 0xDC00);
+    else if (c >= 0xD800 && c < 0xE000)
+      c = 0xFFFD;
+    else if (c >= 0x80 && c < 0xA0)
+      c = cp1252[c - 0x80];
+    if (c < 0x80)
+      out += char(c);
+    else if (c < 0x800)
+    {
+      out += char(0xC0 | (c >> 6));
+      out += char(0x80 | (c & 0x3F));
+    }
+    else if (c < 0x10000)
+    {
+      out += char(0xE0 | (c >> 12));
+      out += char(0x80 | ((c >> 6) & 0x3F));
+      out += char(0x80 | (c & 0x3F));
+    }
+    else
+    {
+      out += char(0xF0 | (c >> 18));
+      out += char(0x80 | ((c >> 12) & 0x3F));
+      out += char(0x80 | ((c >> 6) & 0x3F));
+      out += char(0x80 | (c & 0x3F));
+    }
+  }
+  return out;
+}
+
 std::string label_name(const TDF_Label& l)
 {
   occ::handle<TDataStd_Name> n;
   if (!l.FindAttribute(TDataStd_Name::GetID(), n))
     return std::string();
-  const TCollection_ExtendedString& es = n->Get();
-  TCollection_AsciiString           as(es, '?');
-  return std::string(as.ToCString());
+  return utf8_name(n->Get());
 }
 
 bool label_color(const occ::handle<XCAFDoc_ColorTool>& ct, const TDF_Label& l,
