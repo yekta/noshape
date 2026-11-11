@@ -2488,14 +2488,16 @@ impl SheetGeometry {
                         // origin's sides (live 1699: a target up and right of
                         // its origin gets "40" along the bottom and "30" on
                         // the left).
+                        // A target straight above (or beside) its origin: the one dimension on the line through
+                        // both, its text on it (live drw-datum-target-hide-dim: "10" centred on the part's edge).
                         (Some(o), Some(os), false) => {
                             let (dx, dy) = ((anchor[0] - o[0]).abs(), (anchor[1] - o[1]).abs());
                             if dx > 1e-9 {
-                                let level = if p[1] >= os[1] { os[1] - 8.0 } else { os[1] + 8.0 };
+                                let level = if dy <= 1e-9 { os[1] } else if p[1] >= os[1] { os[1] - 8.0 } else { os[1] + 8.0 };
                                 self.linear_dimension_text(os, p, level - os[1].max(p[1]), DimOrientation::Horizontal, &basic(dx, false, ""), pick);
                             }
                             if dy > 1e-9 {
-                                let level = if p[0] >= os[0] { os[0] - 8.0 } else { os[0] + 8.0 };
+                                let level = if dx <= 1e-9 { os[0] } else if p[0] >= os[0] { os[0] - 8.0 } else { os[0] + 8.0 };
                                 self.linear_dimension_text(os, p, level - os[0].max(p[0]), DimOrientation::Vertical, &basic(dy, false, ""), pick);
                             }
                         }
