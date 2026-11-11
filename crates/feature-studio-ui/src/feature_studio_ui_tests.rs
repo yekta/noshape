@@ -35,10 +35,10 @@ fn pause(cx: &mut TestAppContext, window: AnyWindowHandle, ms: u64) {
     draw(cx, window);
 }
 
-/// Live 2480: the Feature Studio's undo steps are its saves; a fast run of typing is two (its first character, then
-/// the rest), and at a key a second each key is one.
+/// Live 2480: the Feature Studio's undo steps are its saves; a run of typing up to a pause is one, and at a key a
+/// second each key is one.
 #[gpui::test]
-fn a_typed_run_undoes_to_its_first_character_then_away(cx: &mut TestAppContext) {
+fn a_typed_run_undoes_in_one_step(cx: &mut TestAppContext) {
     cx.update(gpui_kit::init);
     let dir = std::env::temp_dir().join(format!("noshape-ui-fs-undo-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -78,10 +78,15 @@ fn a_typed_run_undoes_to_its_first_character_then_away(cx: &mut TestAppContext) 
     assert_eq!(text(cx), format!("{start}abc"));
     cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
     draw(cx, window);
-    assert_eq!(text(cx), format!("{start}a"), "the first character is a step of its own");
-    cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
-    draw(cx, window);
-    assert_eq!(text(cx), start);
+    assert_eq!(text(cx), start, "the whole run is one step");
+    // Ctrl+Z before the pause: the run is saved first, then undone whole.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
+    for k in ["p", "q"] {
+        type_key(cx, window, k);
+    }
+    type_key(cx, window, "secondary-z");
+    pause(cx, window, 2000);
+    assert_eq!(text(cx), start, "Ctrl+Z right after typing");
     // A key a second: each its own step.
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
     for k in ["x", "y"] {

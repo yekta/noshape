@@ -953,12 +953,9 @@ impl FeatureStudioView {
         cx.notify();
     }
 
-    /// Live 2480 (its saves are its undo steps): the first change after a pause is saved at once, the rest of the run
-    /// when the typing pauses.
+    /// Saved when the typing pauses: a typed run is one undo step (live 2480 at its recorder's 90 ms a key and slower;
+    /// a key a second is a step each; lead 11-11).
     fn schedule_save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.save_task.is_none() {
-            self.save(cx);
-        }
         self.save_task = Some(cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(SAVE_DELAY).await;
             let _ = this.update(cx, |this: &mut Self, cx| this.save(cx));
