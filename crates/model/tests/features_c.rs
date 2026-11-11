@@ -4077,3 +4077,59 @@ fn equal_chamfers_on_tilted_rims_roll_one_ball_as_live() {
     assert_eq!(faces, 4);
     assert!((area - 52.66144).abs() < 0.05, "tilted top: {area} mm² (live 52.661)");
 }
+
+/// c2-impeller-loft's Fillet 1 in small (live 2479): an R10 round where a Ø20 tube leaves a wall tilted 30° from square
+/// to it, the tube ending 15 mm past the wall at its axis: at the top (a 60° corner) the ball would touch the tube
+/// 17.3 mm along it, past its end, and rolls over the end's rim instead (overflow off): live's JWO, the ball touching
+/// the wall and the rim, between JWK's two balls that touch the tube at the rim. Both faces are the exact rolling
+/// ball's: each point's ball centre is R off the wall and 2R off the tube's axis or R off the rim.
+#[test]
+fn a_round_over_a_tube_end_rolls_the_ball_over_the_rim_as_live() {
+    use noshape_kernel as nk;
+    let tilt = 30f64.to_radians();
+    let up = DVec3::new(tilt.sin(), 0.0, tilt.cos());
+    let out = DVec3::new(tilt.cos(), 0.0, -tilt.sin());
+    let corner = DVec3::new(0.1, 0.0, -0.034);
+    let across = (-out).cross(up).normalize();
+    let wall = nk::make_box(&nk::Plane::new(corner - up * 0.1 - across * 0.06, -out, up), 0.2, 0.12, 0.06).unwrap();
+    // (The tube's seam under the round and in the band over the rim.)
+    for seam in [-DVec3::Z, DVec3::Z] {
+        let tube = nk::make_cylinder(&nk::Plane::new(DVec3::new(0.0, 0.0, -0.034), DVec3::X, seam), 0.01, 0.115, std::f64::consts::TAU).unwrap();
+        let part = nk::fuse(&wall, &tube).unwrap().shape;
+        let brep = String::from_utf8(part.to_brep_bytes().unwrap()).unwrap();
+        let mut s = Studio::new();
+        s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let e = b.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| i.closed && i.start.x < mm(114.0))).expect("the loop");
+        let edge = Reference::Edge((*b.edges[e]).clone());
+        s.add("fillet", move |p| {
+            p.set("entities", ParamValue::Query(vec![edge]));
+            p.set("radius", expr("10 mm"));
+            p.set("allowEdgeOverflow", ParamValue::Bool(false));
+        });
+        let r = s.ok();
+        let shape = &r.context.bodies[0].shape;
+        assert!(shape.is_valid());
+        let blends: Vec<_> = shape.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(nk::Surface::BSpline { .. }))).collect();
+        assert_eq!(blends.len(), 2, "the round on the tube and the round over the rim");
+        let off_wall = |c: DVec3| (c - corner).dot(out);
+        let off_axis = |c: DVec3| DVec3::new(0.0, c.y, c.z + 0.034).length();
+        let off_rim = |c: DVec3| DVec3::new(c.x - 0.115, 0.0, off_axis(c) - 0.01).length();
+        let (mut worst, mut on_rim, mut on_tube) = (0.0f64, 0, 0);
+        for f in &blends {
+            let [u0, u1, v0, v1] = f.uv_bounds().unwrap();
+            for i in 0..=8 {
+                for j in 0..=8 {
+                    let (u, v) = (u0 + (u1 - u0) * i as f64 / 8.0, v0 + (v1 - v0) * j as f64 / 8.0);
+                    let c = f.point_at_uv(u, v).unwrap() + f.normal_at_uv(u, v).unwrap().normalize() * 0.01;
+                    let (tube_err, rim_err) = ((off_axis(c) - 0.02).abs(), (off_rim(c) - 0.01).abs());
+                    if rim_err < tube_err { on_rim += 1 } else { on_tube += 1 }
+                    worst = worst.max((off_wall(c) - 0.01).abs().max(tube_err.min(rim_err)));
+                }
+            }
+        }
+        assert!(on_rim > 0 && on_tube > 0, "balls on the rim {on_rim}, on the tube {on_tube}");
+        assert!(worst < 2e-5, "seam {seam}: a blend point's ball off the rolling ball by {} mm", worst / mm(1.0));
+    }
+}

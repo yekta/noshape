@@ -395,6 +395,19 @@ impl Shape {
         })
     }
 
+    /// A B-spline face's surface as noshape's NURBS, for many evaluations (each bridge call rebuilds the face's
+    /// adaptor: ~0.1 ms on the impeller's 111-pole housing); None for other surfaces and periodic ones.
+    pub fn face_nurbs(&self) -> Result<Option<noshape_brep::nurbs::NurbsSurface>> {
+        if !matches!(self.face_surface()?, crate::Surface::BSpline { .. }) {
+            return Ok(None);
+        }
+        let b = self.face_bspline()?;
+        if b.u_periodic || b.v_periodic {
+            return Ok(None);
+        }
+        Ok(Some(noshape_brep::nurbs::NurbsSurface { udegree: b.u_degree as usize, vdegree: b.v_degree as usize, uknots: b.u_knots, vknots: b.v_knots, nu: b.nu, nv: b.nv, poles: b.poles, weights: b.weights.unwrap_or_default() }))
+    }
+
     /// A face's surface as a B-spline in FeatureScript's form (the
     /// counterpart of [`crate::make_bspline_surface`]): full knot vectors, a
     /// periodic direction with its `degree` overlapping rows or columns.

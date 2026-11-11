@@ -56,6 +56,7 @@ mod step_out;
 pub mod surfacing;
 pub mod transform;
 
+pub use noshape_brep::nurbs::NurbsSurface;
 pub use brep_bridge::{brep_body, last_blend_decline, last_rust_decline, reset_blend_decline, set_rust_blend, set_rust_boolean, set_rust_boolean_only, with_occt_boolean};
 pub use boolean::{
     BooleanOp, BooleanOptions, Glue, boolean, common, cut, fuse, fuse_all, imprint, imprint_kept, mark_kept_edges, project_curves, section,
