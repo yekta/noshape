@@ -932,6 +932,8 @@ OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
               rust::Slice<const double> start_points, rust::Slice<const double> conditions, const OcShape& path,
               int32_t path_count);
 void  set_working_scale(double k);
+// This thread's checked blends retry an invalid result with slightly smaller sizes (on by default).
+void  set_blend_retries(bool on);
 double working_scale();
 // Raises a signal inside a bridge call (tests of the crash guard): 0 SIGSEGV, 1 SIGFPE,
 // 2 std::terminate, 3 a loop under a 0.3 s budget (Linux).

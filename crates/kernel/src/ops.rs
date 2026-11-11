@@ -551,6 +551,16 @@ pub fn set_working_scale(k: f64) -> Result<()> {
     Ok(ffi::set_working_scale(k)?)
 }
 
+/// Runs `f` with this thread's checked fillets and chamfers not retrying an invalid result at slightly smaller sizes
+/// (where the caller has its own way to build the blend: c2-hunting-knife's Chamfer 1, OCCT's three retries 0.2 s,
+/// all invalid), retries on again after.
+pub fn without_blend_retries<R>(f: impl FnOnce() -> R) -> R {
+    ffi::set_blend_retries(false);
+    let r = f();
+    ffi::set_blend_retries(true);
+    r
+}
+
 /// The working scale [`set_working_scale`] set.
 pub fn working_scale() -> f64 {
     ffi::working_scale()

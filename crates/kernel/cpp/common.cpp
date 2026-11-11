@@ -116,6 +116,14 @@ std::atomic<double> g_working_scale{1.0};
 
 double working_scale() { return g_working_scale.load(std::memory_order_relaxed); }
 
+namespace {
+thread_local bool t_blend_retries = true;
+}
+
+bool blend_retries() { return t_blend_retries; }
+
+void set_blend_retries(bool on) { t_blend_retries = on; }
+
 void set_working_scale(double k)
 {
   if (!(k > 0) || !std::isfinite(k))

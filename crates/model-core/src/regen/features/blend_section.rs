@@ -984,7 +984,10 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         if tools.is_empty() {
             continue;
         }
-        let (s, n) = bool_named(ev, op, &named, &tools)?;
+        // (Lofted tools: noshape's own Boolean takes planes, cylinders and cones only and would decline after its
+        // sections, 60 ms of c2-hunting-knife's Chamfer 1.)
+        let lofted = tools.iter().any(|t| t.shape.faces().iter().any(|f| matches!(f.face_surface(), Ok(k::Surface::BSpline { .. }))));
+        let (s, n) = if lofted { k::with_occt_boolean(|| bool_named(ev, op, &named, &tools))? } else { bool_named(ev, op, &named, &tools)? };
         named = NamedShape::new(s, n);
     }
     // A hold line is the user's split of its face: it stays (live 2233: the top's strip beyond an r 6 round).

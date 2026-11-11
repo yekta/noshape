@@ -42,6 +42,16 @@ pub fn set_rust_boolean(on: Option<bool>) {
     brep_decline("not tried (an earlier path took it)");
 }
 
+/// Runs `f` with this thread's Booleans OCCT's only (one whose noshape Boolean would decline after its work: a lofted
+/// blend tool whose edges lie on the body's free-form faces), the setting as before after.
+pub fn with_occt_boolean<R>(f: impl FnOnce() -> R) -> R {
+    let mode = rust_boolean_mode();
+    set_rust_boolean(Some(false));
+    let r = f();
+    set_rust_boolean(mode);
+    r
+}
+
 /// This thread's setting of [`set_rust_boolean`].
 pub(crate) fn rust_boolean_mode() -> Option<bool> {
     MODE.with(|m| m.get())

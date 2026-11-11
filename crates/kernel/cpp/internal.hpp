@@ -310,6 +310,8 @@ std::string algo_errors(const Algo& a)
 // Factor applied to model lengths before fragile OCCT algorithms (blends):
 // they are tuned for millimetre-sized parts. 1 = none (set_working_scale).
 double working_scale();
+// set_blend_retries's switch for this thread.
+bool blend_retries();
 
 // Corner faces of a fillet over smaller corner fillets rebuilt as Parasolid's
 // rolling-ball vertex blends (vertex_blend.cpp); `s` unchanged (and the

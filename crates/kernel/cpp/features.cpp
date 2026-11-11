@@ -4316,6 +4316,8 @@ std::pair<TopoDS_Shape, HHist> checked_blend(const TopoDS_Shape& input, const Bl
   }
   if (ok && valid_shape(r))
     return {r, h};
+  if (!blend_retries())
+    fail_op(std::string(what) + (ok ? " gave an invalid solid" : " failed"));
   // Smallest step that works (an L bracket's 5 mm walls filleted R2.5 all
   // round need 1e-5; volume error ~1e-6 relative).
   for (const double eps : {1e-7, 1e-6, 1e-5})
