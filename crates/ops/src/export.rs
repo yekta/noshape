@@ -385,6 +385,28 @@ impl Default for ExportSettings {
 /// Write `parts` (meters, placed; linear RGBA): Y axis up, one file, or
 /// with "Export unique parts as individual files" one file per part zipped
 /// together (Onshape), or URDF. Returns the written file.
+/// The formats a CAD file tab's Export… converts to (live document/94), those this build writes.
+pub const FILE_FORMATS: [PartFormat; 10] = [PartFormat::Parasolid, PartFormat::Acis, PartFormat::Iges, PartFormat::Pvz, PartFormat::Jt, PartFormat::Rhino, PartFormat::Gltf, PartFormat::Glb, PartFormat::Obj, PartFormat::ThreeMf];
+
+/// A file's name without its extension (a CAD file's export is named so: live document/94).
+pub fn file_stem(file_name: &str) -> String {
+    std::path::Path::new(file_name).file_stem().map(|x| x.to_string_lossy().to_string()).unwrap_or_else(|| file_name.to_string())
+}
+
+/// A CAD file tab's parts as its Export… writes them (read through a scratch copy under its own name: the readers go
+/// by its extension).
+pub fn cad_file_parts(f: &noshape_model::file_tab::FileTab, units: &noshape_units::UnitPrefs) -> anyhow::Result<Vec<(String, k::Shape, [f32; 4])>> {
+    let bytes = f.bytes().ok_or_else(|| anyhow::anyhow!("the file's contents are missing"))?;
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let dir = std::env::temp_dir().join(format!("noshape-file-export-{}-{}", std::process::id(), NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
+    let path = dir.join(&f.file_name);
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(&path, &bytes)?;
+    let parts = crate::import::file_parts(&path, units);
+    let _ = std::fs::remove_dir_all(&dir);
+    parts
+}
+
 pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(String, k::Shape, [f32; 4])>) -> anyhow::Result<std::path::PathBuf> {
     anyhow::ensure!(!parts.is_empty(), "There are no parts to export");
     if let Some(msg) = missing_writer(s.format) {

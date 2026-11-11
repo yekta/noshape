@@ -1954,6 +1954,34 @@ fn import_step_round_trip() {
     assert_eq!(e.param.as_deref(), Some("files[0]"));
 }
 
+/// A CAD file tab's Export… (live document/94): the file's parts in another format; a stored file is named after the
+/// file without its extension; STEP isn't offered.
+#[test]
+fn a_step_file_tab_exports_to_parasolid() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "file-export.noshape");
+    let step = scratch("fx-block.step");
+    call(&mut ctx, "export_parts", json!({ "format": "STEP", "file": step.to_str().unwrap() }));
+    call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let xt = scratch("fx-block.x_t");
+    let r = call(&mut ctx, "export_parts", json!({ "tab": "fx-block.step", "format": "PARASOLID", "file": xt.to_str().unwrap() }));
+    assert_eq!(r["parts"], 1, "{r}");
+    assert!(xt.is_file() && r["bytes"].as_u64().unwrap() > 1000, "{r}");
+    // Read back: the block's volume.
+    let v0 = num(&call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"][0]["volume"]);
+    let back = call(&mut ctx, "import_files", json!({ "files": [xt.to_str().unwrap()], "keep_files": false }));
+    let tab = back["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["id"].as_str().unwrap().to_string();
+    let v1 = num(&call(&mut ctx, "query_parts", json!({ "tab": tab }))["parts"][0]["volume"]);
+    assert!((v1 - v0).abs() < 1.0, "exported volume {v1} vs {v0}");
+    // (OBJ, a .zip as live writes it.)
+    let r = call(&mut ctx, "export_parts", json!({ "tab": "fx-block.step", "format": "OBJ", "options": "store" }));
+    assert!(r["stored_tab"].is_string(), "{r}");
+    let names: Vec<String> = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    assert!(names.contains(&"fx-block.zip".to_string()), "{names:?}");
+    let e = try_call(&mut ctx, "export_parts", json!({ "tab": "fx-block.step", "format": "STEP", "file": step.to_str().unwrap() })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("format"));
+}
+
 /// An IGES round trip keeps the part's name and colour (qa
 /// IGES-IMPORT-NAME-SOLID: it came back as "SOLID", uncoloured).
 #[test]

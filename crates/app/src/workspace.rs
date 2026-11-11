@@ -1329,10 +1329,57 @@ impl Workspace {
                     self.doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error("Translate failed: cannot write a temporary file".into())));
                     return;
                 }
-                let ws = cx.entity();
-                crate::import_dialog::open(self.doc.clone(), vec![path], Some(id), false, move |t, window, cx| ws.update(cx, |this, cx| this.activate(t, window, cx)), window, cx);
+                // Live doc-cad-file-import: the new tabs are added and the open tab stays.
+                crate::import_dialog::open(self.doc.clone(), vec![path], Some(id), false, |_, _, _| {}, window, cx);
             }
         }
+    }
+
+    /// A CAD file tab › Export… (live document/94): the Export modal, then the file read and converted off the UI
+    /// thread ("Exporting <file>…" at once, then where it went or why it failed).
+    fn export_file(&mut self, id: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(TabContent::File(f)) = self.doc.read(cx).session.doc.tab(id).map(|t| t.content.clone()) else { return };
+        let doc = self.doc.clone();
+        let base = noshape_ops::export::file_stem(&f.file_name);
+        crate::part_studio::export::open_file_export_modal(base, std::rc::Rc::new(move |s, name, window, cx| {
+            // (Several parts one file each: a zip; OBJ always, as live.)
+            let (options, ext) = (s.options, s.file_ext(s.individual));
+            let file = format!("{name}.{ext}");
+            let units = doc.read(cx).session.doc.settings.units;
+            let run = {
+                let (doc, f, file) = (doc.clone(), f.clone(), file.clone());
+                move |path: std::path::PathBuf, store: bool, cx: &mut App| {
+                    doc.update(cx, |_, cx| cx.emit(DocEvent::Info(format!("Exporting {file}…"))));
+                    let task = cx.background_spawn(async move { noshape_ops::export::cad_file_parts(&f, &units).and_then(|parts| noshape_ops::export::write_export(&s, &path, parts)) });
+                    cx.spawn(async move |cx| {
+                        let written = task.await;
+                        cx.update(|cx| {
+                            let msg = match written {
+                                Ok(p) if store => {
+                                    let name = crate::part_studio::export::store_written(&doc, id, &p, cx);
+                                    DocEvent::Info(format!("Stored {name}"))
+                                }
+                                Ok(p) => DocEvent::Info(format!("Exported {}", p.display())),
+                                Err(e) => DocEvent::Error(format!("Export failed: {e:#}")),
+                            };
+                            doc.update(cx, |_, cx| cx.emit(msg));
+                        });
+                    })
+                    .detach();
+                }
+            };
+            // Options › Store file in a new tab: no download.
+            if options == 2 {
+                let dir = std::env::temp_dir().join(format!("noshape-store-{}", std::process::id()));
+                if let Err(e) = std::fs::create_dir_all(&dir) {
+                    doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("Export failed: {e}"))));
+                    return;
+                }
+                run(dir.join(&file), true, cx);
+                return;
+            }
+            crate::files::request_save_path("Export", file, ext, window, cx, move |path, cx| run(path, options == 1, cx));
+        }), window, cx);
     }
 
     /// Left rail › Document notes (`notes`) or Performance; one left panel
@@ -2051,7 +2098,7 @@ enum DocPanel {
 /// "File tabs" and "Imported DWG/DXF drawings"): Delete | Rename,
 /// Properties… | (CAD) Import…, (DXF / DWG) Create Drawing of <file>…,
 /// Update… | (images) Select as document thumbnail | Move to document… |
-/// Release… | Download (and Open in new browser tab, as every tab). No
+/// (CAD) Export… | Release… | Download (and Open in new browser tab, as every tab). No
 /// Translate….
 fn file_tab_menu(menu: crate::os_menu::OsMenu, view: &Entity<Workspace>, id: TabId, tab_name: &str, cx: &App) -> crate::os_menu::OsMenu {
     use crate::doc_dialogs as dd;
@@ -2089,9 +2136,13 @@ fn file_tab_menu(menu: crate::os_menu::OsMenu, view: &Entity<Workspace>, id: Tab
     if file_kind == Some(FileKind::Image) {
         menu = menu.item(I::new("Select as document thumbnail").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.select_thumbnail(id, cx)))).separator();
     }
-    menu.item(I::new("Move to document…").on_click(move |_, w, cx| dd::move_to_document(d3.clone(), vec![id], w, cx)))
-        .separator()
-        .item(I::new("Release…").on_click(move |_, w, cx| {
+    menu = menu.item(I::new("Move to document…").on_click(move |_, w, cx| dd::move_to_document(d3.clone(), vec![id], w, cx))).separator();
+    // A CAD file converts to another format (live document/94).
+    if file_kind == Some(FileKind::Cad) {
+        let v7 = view.clone();
+        menu = menu.item(I::new("Export…").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.export_file(id, w, cx)))).separator();
+    }
+    menu.item(I::new("Release…").on_click(move |_, w, cx| {
             let items = crate::release_dialog::tab_items(d4.read(cx), id);
             crate::release_dialog::open_release_candidate(d4.clone(), items, w, cx)
         }))

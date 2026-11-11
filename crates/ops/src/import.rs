@@ -82,6 +82,36 @@ pub struct Foreign {
 /// Read a CAD or mesh file as BREP text. Mesh files carry no unit: they are
 /// read in `units`' length unit.
 pub fn read_foreign(path: &Path, units: &UnitPrefs) -> anyhow::Result<Foreign> {
+    let (shape, info) = read_shape(path, units)?;
+    let t = std::time::Instant::now();
+    let parts = if info.is_empty() { String::new() } else { serde_json::to_string(&info)? };
+    let brep = String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string();
+    if std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some() {
+        eprintln!("import stage brep text ({} MB): {:.1} ms", brep.len() / 1_000_000, t.elapsed().as_secs_f64() * 1000.0);
+    }
+    Ok(Foreign { brep, parts })
+}
+
+/// A CAD file's parts as its tab's Export… writes them (live document/94): each with its name in the file ("Part
+/// <n>" without one) and colour.
+pub fn file_parts(path: &Path, units: &UnitPrefs) -> anyhow::Result<Vec<(String, noshape_kernel::Shape, [f32; 4])>> {
+    let (shape, info) = read_shape(path, units)?;
+    let shapes = if info.is_empty() { vec![shape] } else { shape.children() };
+    Ok(shapes
+        .into_iter()
+        .enumerate()
+        .map(|(i, sh)| {
+            let p = info.get(i);
+            let name = p.and_then(|p| p.name.clone()).filter(|n| !n.is_empty()).unwrap_or_else(|| format!("Part {}", i + 1));
+            let [r, g, b] = p.and_then(|p| p.color).unwrap_or([0.7, 0.7, 0.7]);
+            (name, sh, [r, g, b, p.and_then(|p| p.opacity).unwrap_or(1.0)])
+        })
+        .collect())
+}
+
+/// The file read as the Import reads it: one shape (its named and coloured parts a compound's children, described in
+/// the infos, empty when the file has none).
+fn read_shape(path: &Path, units: &UnitPrefs) -> anyhow::Result<(noshape_kernel::Shape, Vec<noshape_model::features::importing::ImportPartInfo>)> {
     use noshape_kernel as k;
     let mesh_unit = match units.length {
         LengthUnit::Centimeter => k::LengthUnit::Centimeter,
@@ -128,13 +158,7 @@ pub fn read_foreign(path: &Path, units: &UnitPrefs) -> anyhow::Result<Foreign> {
         "sldprt" | "par" | "psm" | "prt" | "ipt" => compound(k::read_native_parts(path, k::LengthUnit::Meter)?),
         other => anyhow::bail!("Unsupported file type .{other}"),
     };
-    let t = std::time::Instant::now();
-    let parts = if info.is_empty() { String::new() } else { serde_json::to_string(&info)? };
-    let brep = String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string();
-    if std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some() {
-        eprintln!("import stage brep text ({} MB): {:.1} ms", brep.len() / 1_000_000, t.elapsed().as_secs_f64() * 1000.0);
-    }
-    Ok(Foreign { brep, parts })
+    Ok((shape, info))
 }
 
 /// Append an Import feature ("Import N") holding `brep` to `ps`.
