@@ -3690,6 +3690,95 @@ occ::handle<Geom_BSplineSurface> continued(const occ::handle<Geom_BSplineSurface
   return s;
 }
 
+// `bs` (not rational, clamped in u) run on past u's start or end (`at_end`) by `len` along its tangent there, in its own
+// parameters: S(u_end, v) + (u - u_end) S_u(u_end, v), the line as a piece of u's degree joined at a knot of that
+// multiplicity (its parameters kept). Null where it can't be.
+static occ::handle<Geom_BSplineSurface> linear_u(const occ::handle<Geom_BSplineSurface>& bs, double len, bool at_end)
+{
+  if (bs->IsURational() || bs->IsVRational() || bs->IsUPeriodic())
+    return nullptr;
+  const int                  p = bs->UDegree(), nu = bs->NbUPoles(), nv = bs->NbVPoles();
+  NCollection_Array1<double> flat(1, nu + p + 1);
+  bs->UKnotSequence(flat);
+  const double u0 = flat(1), u1 = flat(nu + p + 1);
+  if (flat(p + 1) != u0 || flat(nu + 1) != u1)
+    return nullptr;
+  NCollection_Array2<gp_Pnt> old(1, nu, 1, nv);
+  bs->Poles(old);
+  // (The tangent's poles along v: S_u at the end is p / (its last span) times the last two rows' difference.)
+  const double        scale = at_end ? p / (u1 - flat(nu)) : p / (flat(p + 2) - u0);
+  std::vector<gp_Vec> d(static_cast<size_t>(nv));
+  for (int j = 1; j <= nv; ++j)
+    d[(size_t)j - 1] = scale * (at_end ? gp_Vec(old(nu - 1, j), old(nu, j)) : gp_Vec(old(1, j), old(2, j)));
+  // (In parameters: as long as `len` where the tangent is shortest along the side.)
+  double slow = RealLast();
+  for (int k = 0; k <= 16; ++k)
+  {
+    gp_Pnt x;
+    gp_Vec su, sv;
+    bs->D1(at_end ? u1 : u0, bs->VKnot(1) + (bs->VKnot(bs->NbVKnots()) - bs->VKnot(1)) * k / 16, x, su, sv);
+    slow = std::min(slow, su.Magnitude());
+  }
+  if (!(slow > 1e-12))
+    return nullptr;
+  const double               L = len / slow;
+  NCollection_Array2<gp_Pnt> poles(1, nu + p, 1, nv);
+  for (int i = 1; i <= nu + p; ++i)
+    for (int j = 1; j <= nv; ++j)
+    {
+      if (at_end)
+        poles(i, j) = i <= nu ? old(i, j) : old(nu, j).Translated(d[(size_t)j - 1] * (L * (i - nu) / p));
+      else
+        poles(i, j) = i > p ? old(i - p, j) : old(1, j).Translated(d[(size_t)j - 1] * (-L * (p + 1 - i) / p));
+    }
+  const int                  nk = bs->NbUKnots();
+  NCollection_Array1<double> uk(1, nk + 1), vk(1, bs->NbVKnots());
+  NCollection_Array1<int>    um(1, nk + 1), vm(1, bs->NbVKnots());
+  bs->VKnots(vk);
+  bs->VMultiplicities(vm);
+  for (int k = 1; k <= nk; ++k)
+  {
+    uk(at_end ? k : k + 1) = bs->UKnot(k);
+    um(at_end ? k : k + 1) = bs->UMultiplicity(k);
+  }
+  if (at_end)
+  {
+    um(nk)     = p;
+    uk(nk + 1) = u1 + L;
+    um(nk + 1) = p + 1;
+  }
+  else
+  {
+    um(2) = p;
+    uk(1) = u0 - L;
+    um(1) = p + 1;
+  }
+  try
+  {
+    return new Geom_BSplineSurface(poles, uk, vk, um, vm, p, bs->VDegree());
+  }
+  catch (const Standard_Failure&)
+  {
+    return nullptr;
+  }
+}
+
+// `bs` run on past all four of its sides by `len` along its tangents, in its own parameters (live's: an impeller inlet's
+// offset past its face is S(u, 1) + (v - 1) S_v(u, 1) to 2e-14 m, live 2482); null where a side can't be.
+static occ::handle<Geom_BSplineSurface> linear_extension(const occ::handle<Geom_BSplineSurface>& bs, double len)
+{
+  occ::handle<Geom_BSplineSurface> s = occ::down_cast<Geom_BSplineSurface>(bs->Copy());
+  for (int side = 0; side < 4 && !s.IsNull(); ++side)
+  {
+    if (side == 2)
+      s->ExchangeUV();
+    s = linear_u(s, len, side % 2 == 1);
+    if (!s.IsNull() && side == 3)
+      s->ExchangeUV();
+  }
+  return s;
+}
+
 // `tangent_ext`: free-form faces' offsets extended past their edges along their tangents, not by their own polynomials;
 // `continued_any` set where a face's polynomials were, `why` to the reason it failed.
 bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double thickness, double sign, Built& out,
@@ -3857,6 +3946,8 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
           // Its own polynomials run on (live 1799); GeomLib's tangent extension where that can't be done.
           occ::handle<Geom_BoundedSurface> ext = tangent_ext ? nullptr : continued(bs, len);
           continued_any                         = continued_any || !ext.IsNull();
+          if (ext.IsNull())
+            ext = linear_extension(bs, len);
           if (ext.IsNull())
           {
             ext = occ::down_cast<Geom_BoundedSurface>(bs->Copy());
