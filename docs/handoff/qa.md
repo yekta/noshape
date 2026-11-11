@@ -3,6 +3,22 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**11-11 07:24, the Mac mini hat A/B (lead: dx's fcd0b283 mesh fix + blend's fast finish against the 02:00 baseline):** vibe5,
+6364f3c47 (the 02:00 baseline binary) and 96359491b (main with fcd0b283f and 4dc4f0964; built by qa on vibe4 as the watcher
+builds, dev profile, since vibe3 / the watcher hung from ~07:10) alternating, 3 runs each, a fresh writable copy each run
+(bin/hat-ab.sh on vibe5). **vibe5 was loaded by others (1-min load 73 -> 27 during the runs): compare A with B, not with
+02:00's absolute numbers.**
+- "Mac mini hat": wall 36.6 / 22.0 / 24.3 s -> 24.0 / 15.9 / 16.4 s (runs 2–3: ×0.70); outside regeneration 5.0 / 2.7 / 3.1 s
+  -> 0.8 / 0.6 / 0.4 s; regen_ms 31.5 / 19.4 / 21.2 s -> 23.2 / 15.3 / 16.0 s. Per feature (mean, ms): Mac mini body + base union
+  13,291 -> 12,766; Mac mini (2024 STEP reference) 3,360 -> **127**; Riser feet chamfers 2,782 -> 1,650; Seat lip 45° chamfer
+  1,499 -> 824; Riser legs grip 1,073 -> 1,053; Merge seat lip into riser 395 -> 351; Front/back openings cut 253 -> 208; Side
+  openings cut 205 -> 168; Riser fan opening and screw holes 144 -> 122; Riser screw bosses 110 -> 93. All 137 Ok in both.
+- "Mac-mini-2024": wall 2.2 / 2.8 / 3.1 s -> 0.43 / 0.59 / 0.89 s; outside regeneration 2.1–3.0 -> 0.3–0.8 s; regen_ms 62–105 ->
+  84–102 (Import 1 71 -> 85 ms, Centre 10 -> 11).
+So dx's fix takes the derived STEP reference from ~3.4 s to 0.13 s and the document's load (outside regeneration) from 2–5 s to
+under 1 s; blend's finishing passes take the two chamfers ~40 % down; the union (the largest, ~8 s quiet) is unchanged. A quiet
+re-measure belongs in the next 02:00 window.
+
 **11-11 05:16:** parity index 91.7 (the 00:54 run on 6364f3c47 with the clean 02:00-window speed, 91.7 %; SCORE row; its own
 loaded speed 88.3 %). Speed of record comes from the 02:00–04:00 vibe5 window: next night again (bin/vibe5-window.sh, re-arm
 it: it sleeps until 02:00; fix its log() load quoting first); the suite runs between keep their own, loaded, speed in their
