@@ -8,7 +8,7 @@
 //! sheet (live drw2 l).
 
 use crate::drawing_view::*;
-use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::{Disableable as _, WindowExt as _};
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -31,7 +31,11 @@ impl DrawingEditor {
         let remembered = ExportSettings::remembered();
         let name = crate::export_naming::default_name(noshape_model::export_rules::ExportElement::Drawing, remembered.format.label(), &values, name);
         let file = cx.new(|cx| InputState::new(window, cx).default_value(name));
-        let custom = cx.new(|cx| InputState::new(window, cx).placeholder("1-3, 5").default_value(remembered.custom.clone()));
+        let custom = cx.new(|cx| InputState::new(window, cx).placeholder("e.g. 1-3, 5, 7-9").default_value(remembered.custom.clone()));
+        // The name's and the range's errors follow the typing.
+        for input in [&file, &custom] {
+            window.subscribe(input, cx, |_, _: &gpui_kit::component::input::InputEvent, window, _| window.refresh()).detach();
+        }
         let st = Rc::new(RefCell::new(remembered));
         let ed = cx.entity();
         window.open_dialog(cx, move |dialog, _, cx| {
@@ -57,6 +61,7 @@ impl DrawingEditor {
                 })
             };
             let strs = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+            let range_empty = matches!(f, DrawingFormat::Dwg | DrawingFormat::Dxf) && s.sheets == 2 && custom.read(cx).value().trim().is_empty();
             let mut body = crate::os_ui::modal_body()
                 // Live drawing/40: "View export rules" next to the label.
                 .child(gpui_kit::component::h_flex().gap(px(4.)).items_end().child(crate::os_ui::field_label("File name")).child(crate::drawing_hooks::export_rules_link("ex-rules")))
@@ -87,6 +92,10 @@ impl DrawingEditor {
                 body = body.child(select("ex-sheets", "Sheets", strs(&SHEETS), s.sheets, |s, i| s.sheets = i));
                 if s.sheets == 2 {
                     body = body.child(div().pt(px(6.)).child(Input::new(&custom).h(px(34.)).text_size(px(14.))));
+                    // Live drawing/92: an empty range is an error and Export is disabled.
+                    if range_empty {
+                        body = body.child(div().mt(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xdc3545)).child("Sheet range cannot be empty"));
+                    }
                 }
             }
             // DWT has no Overridden dimensions (live).
@@ -123,12 +132,12 @@ impl DrawingEditor {
             crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Export Drawing", "fields": shown.take(), "buttons": ["Export", "Cancel"] }));
             crate::os_ui::modal_help(dialog, "Export Drawing", 600.)
                 .child(body)
-                .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export"))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
+                .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export").disabled(range_empty))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
                     let mut s = st2.borrow().clone();
                     s.custom = custom2.read(cx).value().to_string();
                     let name = file2.read(cx).value().trim().to_string();
-                    if name.is_empty() {
+                    if name.is_empty() || range_empty {
                         return false;
                     }
                     noshape_ops::drawing_export::DrawingExportPrefs::of(&s).save();

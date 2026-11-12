@@ -1797,6 +1797,9 @@ fn drawing_views_and_dimensions() {
     assert!(std::fs::read(&pdf).unwrap().starts_with(b"%PDF"), "{x}");
     let dxf = scratch("drawing.dxf");
     call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "DXF", "file": dxf.to_str().unwrap() }));
+    // Custom sheets with an empty range: live's error (drawing/92).
+    let e = try_call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "DXF", "file": dxf.to_str().unwrap(), "sheets": " " })).unwrap_err();
+    assert_eq!((e.param.as_deref(), e.message.as_str()), (Some("sheets"), "Sheet range cannot be empty"), "{}", e.to_json());
     // Release 14 (live's default) is written in the drawing's code page, not UTF-8.
     let bytes = std::fs::read(&dxf).unwrap();
     assert!(bytes.windows(8).any(|w| w == b"ENTITIES"));

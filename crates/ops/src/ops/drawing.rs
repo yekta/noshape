@@ -1121,6 +1121,7 @@ fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => {}
         Some("all") => s.sheets = 0,
         Some("current") => s.sheets = 1,
+        Some(r) if r.trim().is_empty() => return Err(OpError::param("sheets", "Sheet range cannot be empty")),
         Some(r) => {
             s.sheets = 2;
             s.custom = r.to_string();

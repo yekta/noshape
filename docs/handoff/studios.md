@@ -49,10 +49,11 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   0 to 8 with a fixed "(Drawing)"). A tolerance keeps the drawing's tolerance precision, not the value's (live:
   0.12 + Symmetrical .01 reads "1.97±.010"; ours read "1.97±.01"; T1 numbers_and_tolerances). A save dialog in a
   UI script saves at once into the run's documents folder (live's browser downloads; the stand-in blocked every later
-  step).
+  step). Export's Custom sheets with an empty range: "Sheet range cannot be empty" under the box and Export disabled,
+  placeholder "e.g. 1-3, 5, 7-9" (live drawing/92); drawing_export `sheets: ""` gives the same error.
 - Audit notes not acted on yet: state has no view / annotation positions (drags not comparable), live reads a
-  table's text as null and the palette's fields barely; "Sheet range cannot be empty" (DXF custom sheets) isn't in
-  ours; live's notes disagree on a table cell's double-click (Note editor L5499 / Cell panel L3302).
+  table's text as null and the palette's fields barely (positions: asked live for a `position` key, REQUESTS 15:00,
+  lead 11-12); live's notes disagree on a table cell's double-click (Note editor L5499 / Cell panel L3302).
 
 ### 2026-11-12 08:49 UTC: release management: approvals (lead: full workflow, local approvers), associated drawings, live's strings
 - Live 2522 ("release strings (client code)", "studios: the Release candidate dialog's item messages…") gives the
