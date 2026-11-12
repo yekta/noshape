@@ -22,12 +22,13 @@ FORMAT = "1"
 REPLAY = ("bool-corpus corpus2 corpus3 corpus4 corpus5 corpus6 direct-corpus sh-new2 parity56 valve2 snap sp-cut shfall "
           "kall k10-25 k10-25-12 k25-15 k25-25 k25-71-12 cf-spur-gear gears gpf").split()
 VS_OCCT = {"parity56"}
-# Corpora whose cases can take many GB each (Shell's slab fuses, knurls, gears: the memory budget is 16 GB a
-# process, as whyall.sh's; 10.6 GB the most seen in one shard): their own shards, in a pool of three. Eight such at
-# once were killed for memory on vibe4; one killed shard is run again alone after the rest.
-HEAVY = {"shfall", "kall", "k10-25", "k10-25-12", "k25-15", "k25-25", "k25-71-12", "cf-spur-gear", "gears", "gpf"}
-HEAVY_AT_ONCE = 3
-SPEED = ["k25-15", "k25-25", "cf-spur-gear"]
+# Corpora whose cases take many GB (the memory budget is 16 GB a process, as whyall.sh's): Shell's slab fuses and the
+# gears in a pool of two; the knurls, whose OCCT cuts reached 35-40 GB a process, one at a time, each with 36 GB free
+# (vibe4's earlyoom ends the largest process when memory runs low: eight heavy shards at once lost their results).
+# A shard ended without its results runs again alone after the rest.
+HEAVY = {"shfall", "cf-spur-gear", "gears", "gpf"}
+SOLO = {"kall", "k10-25", "k10-25-12", "k25-15", "k25-25", "k25-71-12"}
+HEAVY_AT_ONCE = 2
 CASE = re.compile(r"^([0-9a-f]{16})")
 
 
@@ -98,11 +99,11 @@ def corpus_cases():
 
 def replay_tasks(role, out, kbin, jobs, okey):
     """Shards (directories of links to the cases' files) balanced by the recorded times, longest first. A shard
-    holds one case of a name and one kind (parity56's against OCCT run here, or not; heavy or not)."""
+    holds one case of a name and one kind (parity56's against OCCT run here, or not; its memory class)."""
     cases = corpus_cases()
     pools = {}
     for x in sorted(cases.values(), key=lambda x: (x["name"], x["key"])):
-        heavy = any(c in HEAVY for c in x["corpora"])
+        heavy = "solo" if any(c in SOLO for c in x["corpora"]) else "heavy" if any(c in HEAVY for c in x["corpora"]) else ""
         variant = 0
         while (x["vs_occt"], heavy, variant, x["name"]) in pools.setdefault("_seen", set()):
             variant += 1
@@ -114,7 +115,7 @@ def replay_tasks(role, out, kbin, jobs, okey):
     for (vs, heavy, variant), xs in sorted(pools.items()):
         weight = sum(x["ms"] + 30 for x in xs)
         # (By time, and by count: cases recorded with our Boolean on (parity56's) say little of the replay's time.)
-        k = max(1, round(4 * jobs * weight / total), -(-len(xs) // (25 if heavy else 40)))
+        k = max(1, round(4 * jobs * weight / total), -(-len(xs) // (5 if heavy == "solo" else 25 if heavy else 40)))
         bins = [[0.0, []] for _ in range(k)]
         for x in sorted(xs, key=lambda x: -x["ms"]):
             b = min(bins, key=lambda b: b[0])
@@ -123,7 +124,7 @@ def replay_tasks(role, out, kbin, jobs, okey):
         for i, (w, members) in enumerate(bins):
             if not members:
                 continue
-            sd = os.path.join(out, role, "shards", f"{'v' if vs else 'h' if heavy else 'r'}{variant}-{i}")
+            sd = os.path.join(out, role, "shards", f"{'v' if vs else heavy[:1] if heavy else 'r'}{variant}-{i}")
             os.makedirs(sd, exist_ok=True)
             for x in members:
                 for f in x["files"]:
@@ -242,15 +243,16 @@ def available_gb():
 
 
 def run_task(t, out, threads):
-    """Runs one shard once the host has memory free for it (a heavy one 16 GB, its budget; another 4 GB); its peak
-    memory and exit kept with it."""
+    """Runs one shard once the host has memory free for it (a knurl's 36 GB, waiting at most 5 minutes; another heavy
+    one 16 GB, its budget; another 4 GB); its peak memory and exit kept with it."""
     log = os.path.join(out, t["role"], "logs", f"{t['kind']}-{t['id']}.log")
     tmp = os.path.join(out, t["role"], "tmp", f"{t['kind']}-{t['id']}")
     os.makedirs(os.path.dirname(log), exist_ok=True)
     os.makedirs(tmp, exist_ok=True)
     env = dict(os.environ, RAYON_NUM_THREADS=str(threads), TMPDIR=tmp, **t["env"])
-    heavy = t.get("heavy", False)
-    while available_gb() < (16 if heavy else 4):
+    need = {"solo": 36, "heavy": 16}.get(t.get("heavy") or "", 4)
+    waited = time.time()
+    while available_gb() < need and (need < 36 or time.time() - waited < 300):
         time.sleep(5)
     t0 = time.time()
     with open(log, "w") as o, open(log + ".err", "w") as e:
@@ -338,6 +340,11 @@ def speed(base_kbin, new_kbin, out, threads, rounds=3):
 # ---- the verdict ---------------------------------------------------------------------------------------------------
 
 TAKEN = {"same", "equivalent", "as-live"}
+
+
+def rounded(text):
+    """A difference's words with its numbers to 9 digits (a volume's last digits move run to run)."""
+    return re.sub(r"-?\d+\.\d+(?:e-?\d+)?", lambda m: f"{float(m[0]):.9g}", text)
 BAD = {"differ", "failed", "noresult"}
 
 
@@ -365,7 +372,7 @@ def compare(base_r, new_r, base_s, new_s, spd):
                 p[4] += sn in BAD
             if sb == "noresult":
                 unknown.append(f"{rn[2].split(',')[0]} {rn[1]}: {rb[4]}")
-            elif sn in BAD and not (sb == sn and rb[4] == rn[4]):
+            elif sn in BAD and not (sb == sn and rounded(rb[4]) == rounded(rn[4])):
                 new_bad.append(f"{rn[2].split(',')[0]} {rn[1]}: {sn}: {rn[4]} (main: {sb} {rb[4]})".strip())
             elif sb in TAKEN and sn == "declined":
                 lost.append(f"{rn[2].split(',')[0]} {rn[1]}: now declined: {rn[4]}")
@@ -472,11 +479,11 @@ def main():
                 t["key"] = skey
             tasks += ts
     print(f"gate-host: {len(tasks)} shards on {a.jobs} jobs x {a.threads} threads", flush=True)
-    # (The heavy shards in a pool of their own, HEAVY_AT_ONCE at a time; the rest beside them; each longest first.)
-    heavy = sorted((t for t in tasks if t.get("heavy")), key=lambda t: -t["weight"])
-    light = sorted((t for t in tasks if not t.get("heavy")), key=lambda t: -t["weight"])
-    with ThreadPoolExecutor(HEAVY_AT_ONCE) as hp, ThreadPoolExecutor(max(1, a.jobs - HEAVY_AT_ONCE)) as lp:
-        futures = [hp.submit(run_task, t, a.out, a.threads) for t in heavy] + [lp.submit(run_task, t, a.out, a.threads) for t in light]
+    # (The knurls one at a time, the other heavy shards HEAVY_AT_ONCE at a time, the rest beside them; longest first.)
+    of = lambda kind: sorted((t for t in tasks if (t.get("heavy") or "") == kind), key=lambda t: -t["weight"])
+    with ThreadPoolExecutor(1) as sp, ThreadPoolExecutor(HEAVY_AT_ONCE) as hp, ThreadPoolExecutor(max(1, a.jobs - HEAVY_AT_ONCE - 1)) as lp:
+        futures = [sp.submit(run_task, t, a.out, a.threads) for t in of("solo")] + [hp.submit(run_task, t, a.out, a.threads) for t in of("heavy")]
+        futures += [lp.submit(run_task, t, a.out, a.threads) for t in of("")]
         done = [f.result() for f in futures]
     # (A shard killed without its results (for memory, beside the others): again, alone.)
     for t in done:
