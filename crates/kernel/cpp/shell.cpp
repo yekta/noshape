@@ -137,6 +137,7 @@
 #include <GeomConvert_CompCurveToBSplineCurve.hxx>
 #include <ShapeAnalysis.hxx>
 #include <memory>
+#include <mutex>
 #include <typeinfo>
 #include <tuple>
 #include <BRepTools_ReShape.hxx>
@@ -3338,6 +3339,48 @@ namespace quad {
 // An edge and a face (their TShapes).
 using EdgeFace = std::set<std::pair<const void*, const void*>>;
 
+// A meshed face's triangles with their tree built; null without a mesh.
+occ::handle<BRepExtrema_TriangleSet> triangle_set(const TopoDS_Face& meshed)
+{
+  NCollection_DynamicArray<TopoDS_Shape> one;
+  one.Append(meshed);
+  occ::handle<BRepExtrema_TriangleSet> set = new BRepExtrema_TriangleSet(one);
+  if (set->Size() == 0 || set->BVH().IsNull())
+    return nullptr;
+  return set;
+}
+
+// Whether a triangle of `set` (its tree built) comes within sqrt(r2) of p (true when unsure).
+bool mesh_within(BRepExtrema_TriangleSet& set, const BVH_Vec3d& p, double r2)
+{
+  const occ::handle<BVH_Tree<double, 3>>& tree = set.BVH();
+  int                                     stack[128];
+  int                                     top = 0;
+  stack[top++]                                = 0;
+  while (top > 0)
+  {
+    const int n = stack[--top];
+    if (BVH_Tools<double, 3>::PointBoxSquareDistance(p, tree->MinPoint(n), tree->MaxPoint(n)) > r2)
+      continue;
+    if (!tree->IsOuter(n))
+    {
+      if (top + 2 > 128)
+        return true;
+      stack[top++] = tree->template Child<0>(n);
+      stack[top++] = tree->template Child<1>(n);
+      continue;
+    }
+    for (int t = tree->BegPrimitive(n); t <= tree->EndPrimitive(n); ++t)
+    {
+      BVH_Vec3d a, b, c;
+      set.GetVertices(t, a, b, c);
+      if (BVH_Tools<double, 3>::PointTriangleSquareDistance(p, a, b, c) <= r2)
+        return true;
+    }
+  }
+  return false;
+}
+
 // Box-overlapping pairs of a shape's sub-shapes, less those whose two shapes are both in `old`, and the edge / face
 // pairs of `by_distance` found clearly apart (past `apart`, by their distance): an edge of a kept face against that
 // face's own offset, the wall away all along it (c2-impeller-loft's Shell Gehäuse: a 120 mm edge 3 mm from the inner
@@ -3609,13 +3652,7 @@ private:
       }
     });
     std::vector<occ::handle<BRepExtrema_TriangleSet>> sets(set_face.size());
-    OSD_Parallel::For(0, static_cast<int>(set_face.size()), [&](int j) {
-      NCollection_DynamicArray<TopoDS_Shape> one;
-      one.Append(meshed[(size_t)set_face[(size_t)j]]);
-      occ::handle<BRepExtrema_TriangleSet> set = new BRepExtrema_TriangleSet(one);
-      if (set->Size() > 0 && !set->BVH().IsNull())
-        sets[(size_t)j] = set;
-    });
+    OSD_Parallel::For(0, static_cast<int>(set_face.size()), [&](int j) { sets[(size_t)j] = triangle_set(meshed[(size_t)set_face[(size_t)j]]); });
     // (A point stands for its chord within half a step, the chord for the edge within its deflection; the mesh lies
     // within its own, half a tenth, of the face: taken twice.)
     const double r2 = std::pow(apart_ + 0.5 * step + defl + 2 * 0.5 * apart_, 2);
@@ -3625,34 +3662,9 @@ private:
       const std::vector<BVH_Vec3d>&               pts = points[(size_t)l.shape];
       if (set.IsNull() || pts.empty())
         return;
-      const occ::handle<BVH_Tree<double, 3>>& tree = set->BVH();
       for (const BVH_Vec3d& p : pts)
-      {
-        int stack[128];
-        int top      = 0;
-        stack[top++] = 0;
-        while (top > 0)
-        {
-          const int n = stack[--top];
-          if (BVH_Tools<double, 3>::PointBoxSquareDistance(p, tree->MinPoint(n), tree->MaxPoint(n)) > r2)
-            continue;
-          if (!tree->IsOuter(n))
-          {
-            if (top + 2 > 128)
-              return;
-            stack[top++] = tree->template Child<0>(n);
-            stack[top++] = tree->template Child<1>(n);
-            continue;
-          }
-          for (int t = tree->BegPrimitive(n); t <= tree->EndPrimitive(n); ++t)
-          {
-            BVH_Vec3d a, b, c;
-            set->GetVertices(t, a, b, c);
-            if (BVH_Tools<double, 3>::PointTriangleSquareDistance(p, a, b, c) <= r2)
-              return;
-          }
-        }
-      }
+        if (mesh_within(*set, p, r2))
+          return;
       l.apart = true;
     });
     std::vector<std::vector<char>> drop((size_t)myLists.Length());
@@ -6552,6 +6564,18 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         kb[(size_t)j] = kb_all[(size_t)j];
     }
     BRepClass3d_SolidClassifier inside(so);
+    // The kept faces' meshes (a twentieth of the wall), each made when first asked.
+    const double                                      kept_defl = 0.05 * thickness;
+    std::vector<occ::handle<BRepExtrema_TriangleSet>> kept_mesh((size_t)nf + 1);
+    std::unique_ptr<std::once_flag[]>                 kept_once(new std::once_flag[(size_t)nf + 1]);
+    auto mesh_of = [&](int j) -> BRepExtrema_TriangleSet* {
+      std::call_once(kept_once[(size_t)j], [&] {
+        const TopoDS_Face copy = TopoDS::Face(BRepBuilderAPI_Copy(faces(j), false, false).Shape());
+        BRepMesh_IncrementalMesh(copy, kept_defl, false, 0.5, false);
+        kept_mesh[(size_t)j] = quad::triangle_set(copy);
+      });
+      return kept_mesh[(size_t)j].get();
+    };
     auto on_wall_in = [&](const std::vector<quad::Surf>& S, BRepClass3d_SolidClassifier& in, const gp_Pnt& p, double eps) {
       // In the part: only across a removed face's surface can a point by the wall leave it (the classifier there).
       bool past_removed = false;
@@ -6586,6 +6610,17 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         const double e = std::abs(quick_value_in(S, j, p.XYZ()));
         if (e <= eps || (e < 1e299 && e >= 2 * thickness - eps))
           continue;
+        // (No nearer than the wall when no triangle comes within it and the mesh's error twice; nearer when one comes
+        // within it less that.)
+        if (BRepExtrema_TriangleSet* m = mesh_of(j); m != nullptr)
+        {
+          const BVH_Vec3d q(p.X(), p.Y(), p.Z());
+          const double    wall = thickness - eps, beyond = wall + 2 * kept_defl, within = wall - 2 * kept_defl;
+          if (!quad::mesh_within(*m, q, beyond * beyond))
+            continue;
+          if (within > 0 && quad::mesh_within(*m, q, within * within))
+            return false;
+        }
         if (v.IsNull())
           v = BRepBuilderAPI_MakeVertex(p);
         BRepExtrema_DistShapeShape d(v, faces(j));
