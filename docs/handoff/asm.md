@@ -21,6 +21,21 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
   `fold_solved` writes every child's solved position into `Instance::nested` (sub-instance frame, as dx's op): the
   moved child's entry is the op's. History text differs: app "Move : Sub <2>", op "Move : Sub <2> > Part 1 <1>".
 
+## Now (asm, 11-12 19:47 UTC)
+- Landed 81f2a19e (Uses moved by their sketch's step; solver: a conflicting group skips least_change and stops
+  LM when it stalls, infento-subs 18 s -> 1.3 s; sketch solves kept when they give live's regions; mate diagnostic).
+  Queued 07687859: axis-point connectors flipped where their Z runs against live's mateConnectorCS
+  (rack-pinion 3 -> 8/8; every other assembly as main 81f2a19e, suite on vibe5).
+- Assembly suite, main 81f2a19e (vibe5): 1512/1731 occurrences, 374 mates as live (with the flip: 376).
+- dx's bbac6bb06 (origin / Part Studio mate connectors) takes clamp-pattern 14/23 -> 12/32 (9 more mates
+  translated, 2 fewer as live): told dx.
+- Suites now run on vibe5 (lead 11-12: not vibe3, it hosts main's watcher): ~/tmp/asm/run-suite.sh with SRC, BIN,
+  OUT; one assembly per process. asm-base worktree (/root/projects/noshape-wt/asm-base) builds main for baselines.
+- Dropped: taking the other end of a top / bottom axis point whose Z is reversed (no effect: clamp-pattern's
+  10.4 mm ends have live's Z, their faces' extent differs).
+- Next: the remaining mate losses by assembly (main 81f2a19e): hand-drill 45 (ring gear's Extrude 7/8, dx), clamp-
+  pattern 20 (one overdefined cluster: a face extent), isaac-ball 29, infento-subs 69, robotic-arm 7.
+
 ## Landing (asm, 11-12 14:24 UTC): three commits, assembly suite 1451 -> 1508/1731 occurrences, mates 247 -> 323
 - 4f4f9ba78: Uses ours can't make where stored are drawn moved by the sketch's common Use step (infento-subs'
   Multi angle joint Sketch 4). cdd42c2d2: a mate group that can't all hold skips least_change and stops LM once it
