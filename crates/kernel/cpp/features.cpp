@@ -6765,47 +6765,6 @@ bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>&
   return false;
 }
 
-// OCCT's Boolean (`op` 0 fuse, 1 cut, else common) of `args` and `tools` at the working scale, as quick_boolean's
-// OCCT branch, for tools noshape's own Boolean doesn't take.
-static bool occt_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, TopoDS_Shape& out, HHist& hist)
-{
-  std::unique_ptr<ScaledInputs> sc;
-  ShapeList                     sargs = args, stools = tools;
-  if (working_scale() != 1.0 && std::getenv("NOSHAPE_BOOL_NO_SCALE") == nullptr)
-  {
-    sc = std::make_unique<ScaledInputs>(working_scale());
-    sargs.Clear();
-    stools.Clear();
-    for (const TopoDS_Shape& x : args)
-      sargs.Append(sc->scale(x));
-    for (const TopoDS_Shape& x : tools)
-      stools.Append(sc->scale(x));
-  }
-  std::unique_ptr<BRepAlgoAPI_BooleanOperation> b;
-  if (op == 0)
-    b = std::make_unique<BRepAlgoAPI_Fuse>();
-  else if (op == 1)
-    b = std::make_unique<BRepAlgoAPI_Cut>();
-  else
-    b = std::make_unique<BRepAlgoAPI_Common>();
-  b->SetArguments(sargs);
-  b->SetTools(stools);
-  b->SetRunParallel(bop_parallel());
-  b->Build();
-  if (b->HasErrors() || !b->IsDone())
-    return false;
-  out  = b->Shape();
-  hist = b->History();
-  if (sc)
-  {
-    out                                  = sc->unscale(out, hist);
-    occ::handle<BRepTools_History> whole = sc->hist;
-    whole->Merge(hist);
-    hist = whole;
-  }
-  return true;
-}
-
 // A fillet of one radius as Parasolid makes it where its rounds overflow their faces or meet earlier rounds of the
 // same radius (live learning-center-michael's Fillet 2, matched to 0.0087 mm³ and its 44 faces): the part less each
 // round's own removal, the spandrel between the edge, its two tangent points and the ball (a line's along it, an arc's
@@ -7223,18 +7182,9 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
       args.Append(cut);
       TopoDS_Shape step;
       HHist        hs;
-      // (Tools with a sphere or a torus, the balls' and rings': OCCT's Boolean straight away; noshape's own takes
-      // planes, cylinders and cones only and declined them after its sections, 0.4-0.8 s of learning-center-michael's
-      // Fillet 2.)
-      bool others = false;
-      for (ShapeList::Iterator it(*part); it.More() && !others; it.Next())
-        for (TopExp_Explorer x(it.Value(), TopAbs_FACE); x.More() && !others; x.Next())
-        {
-          const GeomAbs_SurfaceType k = BRepAdaptor_Surface(TopoDS::Face(x.Current()), false).GetType();
-          others = k != GeomAbs_Plane && k != GeomAbs_Cylinder && k != GeomAbs_Cone;
-        }
-      const bool ok = others ? occt_boolean(side < 0 ? 1 : 0, args, *part, step, hs)
-                             : quick_boolean(side < 0 ? 1 : 0, args, *part, bop_parallel(), step, hs);
+      // (The balls' and rings' tools, spheres and tori, too: noshape's own Boolean takes learning-center-michael's
+      // Fillet 2 cut (143 ms, OCCT's 406 in one run).)
+      const bool ok = quick_boolean(side < 0 ? 1 : 0, args, *part, bop_parallel(), step, hs);
       if (!ok || !valid_shape(step))
         return std::nullopt;
       h   = h.IsNull() ? hs : compose(input, h, hs);
