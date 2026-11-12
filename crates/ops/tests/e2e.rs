@@ -2026,6 +2026,34 @@ fn documents_import_splits_an_iges_assembly() {
     call(&mut ctx, "document_close", json!({}));
 }
 
+/// An IGES subassembly placed twice (live's asm2.igs with a second instance 50 mm along x): one document for it, used
+/// twice by the top Assembly at the file's placements.
+#[test]
+fn documents_import_splits_an_iges_subassembly_placed_twice() {
+    let dir = scratch("docs-import-split-igs-twice");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let dir = dir.canonicalize().unwrap();
+    let mut ctx = Ctx::new();
+    ctx.documents = Some(dir.clone());
+    let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../kernel/tests/data/iges/asm2-twice.igs");
+    let r = call(&mut ctx, "documents_import", json!({ "files": [file], "mode": "split" }));
+    let folder = dir.join("asm2-twice.igs");
+    let (sub, top) = (folder.join("Assembly 1.noshape"), folder.join("asm2-twice.igs.noshape"));
+    assert_eq!(r["documents"], json!([sub.display().to_string(), top.display().to_string()]), "{r}");
+    call(&mut ctx, "document_open", json!({ "path": top.to_str().unwrap() }));
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "asm2-twice" }));
+    let instances = list["instances"].as_array().unwrap();
+    let mut names: Vec<&str> = instances.iter().map(|i| i["name"].as_str().unwrap()).collect();
+    names.sort();
+    assert_eq!(names, ["Assembly 1 <1>", "Assembly 1 <2>", "Part 1 <1>"], "{list}");
+    let mut xs: Vec<f64> = instances.iter().filter(|i| i["name"].as_str().unwrap().starts_with("Assembly 1")).map(|i| num(&i["translation"][0])).collect();
+    xs.sort_by(f64::total_cmp);
+    assert!((xs[0]).abs() < 1e-6 && (xs[1] - 50.).abs() < 1e-6, "the second placement 50 mm along x: {xs:?}");
+    assert_eq!(list["occurrences"].as_array().unwrap().len(), 5, "{list}");
+    call(&mut ctx, "document_close", json!({}));
+}
+
 #[test]
 fn import_step_round_trip() {
     let mut ctx = Ctx::new();

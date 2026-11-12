@@ -194,6 +194,11 @@ fn merged_faces(mut p: ImportedShape, periodic: bool) -> Result<ImportedShape> {
 pub fn read_iges_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option<(StepAssembly, StepNesting)>> {
     let text = std::fs::read(path).map_err(|e| KernelError::Io(format!("could not read IGES file {}: {e}", path.display())))?;
     let Some(tree) = iges_subfigures(&String::from_utf8_lossy(&text)) else { return Ok(None) };
+    // A subfigure the file places more than once: the reader's assembly holds it once, as a compound, with a placement
+    // per instance.
+    if let Some((_, protos, instances)) = read_iges_assembly(path, unit)? {
+        return Ok(iges_placed_tree(&tree, protos, &instances));
+    }
     // The reader keeps a placed subfigure as one compound named after its first solid: its solids are the parts,
     // named in the definition's order.
     let mut parts = Vec::new();
@@ -233,6 +238,49 @@ pub fn read_iges_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option
         children.push((*owner, NestChild { part, sub, name, transform: glam::DMat4::IDENTITY }));
     }
     Ok(Some(((String::new(), parts, Vec::new()), StepNesting { subs: tree.subs, children })))
+}
+
+/// [`read_iges_assembly_nested`] for a file whose subfigures are placed more than once: each prototype that is a
+/// subfigure's compound split into its solids (in the definition's coordinates, named in its order), the top's
+/// children at their placements. `None` for subfigures inside subfigures or a prototype that matches nothing.
+fn iges_placed_tree(tree: &IgesTree, protos: Vec<ImportedShape>, instances: &[PvzInstance]) -> Option<(StepAssembly, StepNesting)> {
+    if tree.children.iter().any(|(o, c)| o.is_some() && matches!(c, IgesChild::Sub(_))) {
+        return None;
+    }
+    let members = |k: usize| tree.children.iter().filter(|(o, _)| *o == Some(k)).filter_map(|(_, c)| if let IgesChild::Solid(n) = c { Some(n.clone()) } else { None }).collect::<Vec<_>>();
+    enum Proto {
+        Part(usize),
+        Sub(usize),
+    }
+    let (mut parts, mut kinds, mut children) = (Vec::new(), Vec::new(), Vec::new());
+    for proto in protos {
+        let solids = proto.shape.solids();
+        let sub = (0..tree.subs.len()).find(|&k| {
+            let m = members(k);
+            m.len() == solids.len() && m.first() == proto.name.as_ref()
+        });
+        match sub {
+            Some(k) if solids.len() > 1 => {
+                for (shape, name) in solids.into_iter().zip(members(k)) {
+                    children.push((Some(k), NestChild { part: Some(parts.len()), sub: None, name: name.clone(), transform: glam::DMat4::IDENTITY }));
+                    parts.push(ImportedShape { shape, name: Some(name), color: proto.color, opacity: proto.opacity, face_colors: Vec::new() });
+                }
+                kinds.push(Proto::Sub(k));
+            }
+            _ => {
+                kinds.push(Proto::Part(parts.len()));
+                parts.push(proto);
+            }
+        }
+    }
+    for inst in instances {
+        let child = match kinds.get(inst.part)? {
+            Proto::Part(p) => NestChild { part: Some(*p), sub: None, name: parts[*p].name.clone().unwrap_or_default(), transform: inst.transform },
+            Proto::Sub(k) => NestChild { part: None, sub: Some(*k), name: tree.subs[*k].clone(), transform: inst.transform },
+        };
+        children.push((None, child));
+    }
+    Some(((String::new(), parts, Vec::new()), StepNesting { subs: tree.subs.clone(), children }))
 }
 
 /// A child in an IGES subfigure tree: a solid (by the name its part gets) or a subfigure definition.

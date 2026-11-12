@@ -94,8 +94,8 @@ selection, an edit or a type search is always built). Next: the history panel (f
   from the file, solids matched to the reader's parts by label; the top Assembly named after the file, lead 11-11).
   e2e: documents_import_splits_loose_step_parts_into_one_document, _a_parasolid_assembly, _an_iges_assembly (live's
   files in crates/kernel/tests/data). The IGES reader keeps a subfigure as one compound part (ticket
-  IGES-SUBFIGURE-ONE-PART, dx): the split breaks it into its solids by the definition's order. Not yet: an IGES
-  subfigure placed twice (not split).
+  IGES-SUBFIGURE-ONE-PART, dx): the split breaks it into its solids by the definition's order. A subfigure placed
+  twice (11-12, asm2-twice.igs) splits too: one document for it, used at each placement (`iges_placed_tree`).
 
 ### 2026-11-11 21:50 UTC: Feature Studio undo steps and the notices count (lead 11-11)
 - Undo: a typed run up to a pause (700 ms, the save delay) is one step; psui's "first character its own step" (2480)

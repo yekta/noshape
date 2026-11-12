@@ -12,7 +12,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   parts, "Part 1" and "Part 2", the second a compound of both solids (io.cpp read_iges_tree: "a subfigure is a
   compound", named after its first solid), so Import files… to a single document makes 2 parts where the file has 3.
   Live (behaviours "studios (2511)" (3), Split) has Part 1, Part 2 and Part 3, each its own; check live's single
-  import of the file. The Split path splits the compound itself (io.rs `read_iges_assembly_nested`).
+  import of the file. The Split path splits the compound itself (io.rs `read_iges_assembly_nested`). Worse with the
+  subfigure placed twice (crates/kernel/tests/data/iges/asm2-twice.igs: a second 408 50 mm along x): `read_iges_parts`
+  gives one unnamed part of all 5 solids (`read_iges_assembly` has Part 1 and the subfigure's compound, placed twice).
 
 ## qa, 2026-11-11
 - [x] (verified by qa 2026-11-11 14:43 on green 44ff040aa, core 255b927a6: the whole check again: corpus 87 / 87 equal with no store, cold and warm (incl. c2-helical-sweep, c2-housing-draft, c2-valve-config); the six mutations equal, face counts too; corruption 13 / 13 on c2-hunting-knife and on c2-helical-sweep. feature_list over all tabs 63.7 s without, 66.2 cold, 26.3 warm (c2-impeller-loft 14.8 -> 0.02 s, cf-surface-pattern 9.0 -> 0.37). Store: go for the 17:00 build.) P0 STORE-FACE-SPLIT (core; qa 2026-11-11 11:51, the lead's result-cache check) **a part read back from the persistent
