@@ -60,27 +60,31 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
     CHECK: "the knurls not run". The timing rounds (ours alone, small) still run. Memory waits are a share of the host
     (30 %), never longer than 10 minutes.
   - **The kall nightly stays off** (kall needs 49.5 GB; vibe3 has 31). The hourly `--main` cron runs against vibe5.
-- **Restart state (11-12 19:20 UTC; lead moves bool2 to the Unbind account ~21:00):**
-  - **Worktrees:** /root/projects/noshape-wt/bool2 (branch bool2-rings; uncommitted switches X_SHARED and DBG_SH in
-    rust_boolean.cpp, experiment only). bool2-gate and bool-gate-base are gate.sh's. bool2-nightly is the crons'
-    checkout. bool2-doc is for docs-only lands. Targets (now on vibe5): bool2, bool2-gate, bool-gate-base (the three
-    allowed).
-  - **Session crons, gone with the session; recreate them:**
-    - every hour at :17: `git -C /root/projects/noshape-wt/bool2-nightly fetch -q origin && git -C
-      /root/projects/noshape-wt/bool2-nightly checkout -q -f --detach origin/main && bash
-      /root/projects/noshape-wt/bool2-nightly/tools/bool/gate.sh --main` (main's results cached ahead of gates);
-    - (the kall nightly, daily 04:33 UTC with `--nightly-kall`, is off until a host has ~50 GB free: see above.)
-  - **Recordings:** vibe4 ~/tmp/bool2/ (impy: impeller, hk: hunting knife, rings: rings-loft, all exact, from
-    NOSHAPE_RECORD_BOOLEANS + NOSHAPE_RECORD_EXACT on one document); bydoc: all 98 documents (text BREP).
-    /root/bool2-scratch/bool-by-doc.py makes the per-document table.
-- **c2-rings-loft's 1b9ae499 (gating, branch bool2-rings, gate run 12 from 19:23 UTC):** Circular pattern 1's
-  8-ring fuse with checked glue. The rings reach into the ring and overlap one another too, so the touching-only path
-  declines "pattern instances overlapping" and our trimmed fuse's final fuse declines as well. OCCT's own fuse_trimmed
-  fails there (volumes don't add up) and OCCT runs the plain fuse. Ours now does the same: rust_fuse_trimmed failing
-  -> rust_boolean plain (boolean.cpp, the checked branch). Taken, equivalent to OCCT (0 records apart, volume
-  1.8e-9 off the recorded one), 222 ms against OCCT's 472. The shared-vertex rule ("a shared shape OCCT may keep or
-  remake") is unchanged: the plain fuse doesn't trip it here. T1
-  bool_patterns::pattern_copies_overlapping_one_another_fused_as_occt. On PASS: land.sh from bool2 (branch bool2-rings).
+- **Sheets of shells (11-12 21:45 UTC, branch bool2-cov 32a0b112f, gating on vibe5):** ours now builds a sheet
+  result's shells as OCCT's BOP does (BOPAlgo_BOP::BuildShape: each input shell's pieces in connected groups, a shell
+  each, OCCT's own MakeConnexityBlocks / OrientFacesOnShell), so "a sheet of shells" is gone ("a sheet of wires" stays).
+  cf-setback-fillet's five 25+1-face fuses then declined "an invalid result": the corner patch's edges were replaced by
+  the fillet's arcs, their curves on the patch taken from its own coincident edges, which lie on it only within their
+  tolerance (40 um). Such an edge's tolerance (and its new vertices') is now raised to its measured distance, as OCCT's
+  CorrectTolerances (`fit_tolerance`, after coincident_pcurve / parallel_pcurve / projections). The 19 corpus cases
+  that declined "a sheet of shells": 17 taken, 0 differ, 3 equivalent (volume 5e-9 relative, 0 records apart); the
+  replay now also compares a sheet's shells with OCCT's. Setback's fuses 14-18 ms against OCCT's 28-37. T1
+  bool_patterns::sheets_of_shells_fused_into_shells_as_occt.
+- **Coverage on vibe5 (11-12 21:35 UTC, main 909e4846, recorded per document; OCCT ms / regen / live):**
+  cf-setback-fillet 284 (5) / 907 / 1089; c2-hunting-knife 551 (2) / 1437 / 408; c2-fan-blade-sweep 724 (3) / 1281 /
+  1418; c2-extension-spring 179 (1); c2-sm-corner-break 103 (23) / 2591 / 1972; cf-sheet-metal-model-plus 55 (7) / 1126
+  / 917; c2-sm-louver 52 (20) / 5897 / 4987; cf-o-ring-generator 21 (4) / 63 / 65. Impeller and rings being re-recorded.
+- **Restart state (11-12 21:45 UTC):**
+  - **Worktrees:** /root/projects/noshape-wt/bool2 (branch bool2-cov). bool2-gate and bool-gate-base are gate.sh's.
+    bool2-nightly is the crons' checkout. bool2-doc is for docs-only lands. Targets on vibe5: bool2, bool2-gate,
+    bool-gate-base.
+  - **Session cron, gone with the session; recreate it:** every hour at :17: `git -C
+    /root/projects/noshape-wt/bool2-nightly fetch -q origin && git -C /root/projects/noshape-wt/bool2-nightly checkout
+    -q -f --detach origin/main && bash /root/projects/noshape-wt/bool2-nightly/tools/bool/gate.sh --main`, skipped while
+    another gate runs. The kall nightly stays off (vibe5 has 29 GB).
+  - **Recordings (exact) on vibe5 ~/tmp/bool2/:** bydoc/rec/<document> (the 8 above), bydoc-imp (impeller, rings), sos
+    (the sheet-of-shells cases); ops-main is main's ops test binary that recorded them. vibe4's (impy, hk, es, bydoc)
+    went with it. /root/bool2-scratch/bool-by-doc2.py (DOCS=..., JOBS=...) makes the per-document table.
 - **The knife's 343b971e (1.5 s, not done):** the chamfer tool's B-spline edges lie within 0.5 um of the blade's faces
   (on_tol 0.2 um, grey band 0.8 um); OCCT takes them as on. Taking them so (X_NEARON in
   /root/bool2-scratch/knife-nearon-wip.patch: all 7 samples within the grey band -> on) gets to "a non-manifold
