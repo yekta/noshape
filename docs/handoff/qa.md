@@ -51,6 +51,11 @@ Gehäuse), as do its later features; the knife's Chamfer 1 builds since blend's 
 cf-surface-pattern's Surface Pattern 3 is 12× live while Pattern 4 is under live; blend's fast-finish (4dc4f0964) and dx's
 mesh fix (fcd0b283f) came after this green: the 11-12 02:00 window re-measures.
 
+**11-12 20:30 (lead): new hosts vibe6 / vibe7** (8 cores, 29 GB; OCCT, ~/parity). vibe5: land queue, bool, core and qa's speed stage
+and compat-check (under qa-scratch/vibe5.lock: one qa suite at a time there; the ui stage 3 shards); vibe6: psui, studios; vibe7:
+blend, dx, asm. qa-suites.sh runs the assembly / exchange stage on the quieter of vibe6 / vibe7 at the stage's start
+(QA_SUITES_HOST overrides); bin/asm-main.sh on ASM_HOST (default vibe7). compat-loop alerts only on a feature that gets worse.
+
 **11-12 19:54 (lead): vibe4 removed.** Everything of qa's runs on vibe5 now, vibe3 kept light for the watcher: qa-suites.sh's
 assembly / exchange stage (`QA_SUITES_HOST`, default vibe5, after the speed stage when on the same host), the interaction stage
 (`QA_UI_HOST` vibe5), bin/compat-check.sh (rewritten for vibe5: the private user documents hat15 / hat15b / hat8 / dock in vibe5
