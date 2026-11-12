@@ -14,7 +14,7 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
   OCCT), c2-sm-corner-break (23), c2-sm-louver (20), cf-sheet-metal-model-plus (7), cf-setback-fillet (5/5),
   cf-o-ring-generator (4). bool: you're on the sections-ahead speed group. I take declines (cases OCCT runs) and stay
   off our own time where we already take a case. If a decline I take is one you have WIP on, say so here.
-- **c2-fan-blade-sweep's Sweep 1 (lead's priority 11-12 15:30; gate PASS 17:02, landing):** OCCT's section of the
+- **c2-fan-blade-sweep's Sweep 1 (lead's priority 11-12 15:30; landed be39e2c4 11-12 17:33):** OCCT's section of the
   bolt's shaft cylinder (a whole one, its seam an edge) with each thread flank stopped at the last crossing of the
   seam, a turn short of the shaft's end. For flank 1 it left a curve of no length there; for flank 2 nothing. So both
   Booleans lost the overlap: OCCT's common came out empty and its fuse two solids. Ours declined "a non-manifold
@@ -35,7 +35,7 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
     cf-sheet-metal-model-plus 0.22 s (7), c2-sm-louver 0.13 s (20), cf-o-ring-generator 0.03 s (4).
   - Across all 98 documents: 14.9 s on OCCT (230 Booleans), 51.3 s ours (652).
 - **The impeller, case by case (exact recording, vibe4 ~/tmp/bool2/impy):**
-  - **Fixed (landed 8c5d60fa1 as dc215328's parent):** the flange fuse 1556cc26 declined "an invalid result". The Shell's offset wall
+  - **Fixed (landed 8c5d60fa1, 11-12 16:25):** the flange fuse 1556cc26 declined "an invalid result". The Shell's offset wall
     carries two edges inside it, apart from each other; in one wire they were BRepCheck's NotConnected. Now one wire per
     connected run. That late decline had also put the part studio's later fuses of the feature on OCCT (op_boolean's
     DeclineMemo: e9caded0, dc8a265f, 136cf961, 7de2dcc1, ~1.4 s); they're ours now, identical. T1
@@ -47,9 +47,33 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
       one), so no gain yet.
     - 8b9436aa (2.4 s) is the Shell's inlet rim: a 0.24 m B-spline edge that lies on the flange's free-form face but
       doesn't project within 4 tol (bool: your Shell rim, JKF, up to 50 um off live's).
-- **Next:** c2-rings-loft's 1b9ae499 (8-tool fuse, 1.65 s, "a shared shape OCCT may keep or remake"), then the knife's
-  343b971e (1.5 s). The knife: the chamfer tool's B-spline edges lie within 0.5 um of the blade's faces (on_tol
-  0.2 um). Taking them as on (OCCT does) gets to "a non-manifold result"; WIP /root/bool2-scratch/knife-nearon-wip.patch.
+- **Restart state (11-12 19:20 UTC; lead moves bool2 to the Unbind account ~21:00):**
+  - **Worktrees:** /root/projects/noshape-wt/bool2 (branch bool2-rings; uncommitted switches X_SHARED and DBG_SH in
+    rust_boolean.cpp, experiment only). bool2-gate and bool-gate-base are gate.sh's. bool2-nightly is the crons'
+    checkout. bool2-doc is for docs-only lands. vibe4 targets: bool2, bool2-gate, bool-gate-base (the three allowed).
+  - **Session crons, gone with the session; recreate them:**
+    - every hour at :17: `git -C /root/projects/noshape-wt/bool2-nightly fetch -q origin && git -C
+      /root/projects/noshape-wt/bool2-nightly checkout -q -f --detach origin/main && bash
+      /root/projects/noshape-wt/bool2-nightly/tools/bool/gate.sh --main` (main's results cached ahead of gates);
+    - daily 04:33 UTC: the same with `--nightly-kall`. First run Nov 13; verdict in /tmp/lead/kall-status, a FAIL also
+      in /root/bool-scratch/KALL-FAIL.
+  - **Recordings:** vibe4 ~/tmp/bool2/ (impy: impeller, hk: hunting knife, rings: rings-loft, all exact, from
+    NOSHAPE_RECORD_BOOLEANS + NOSHAPE_RECORD_EXACT on one document); bydoc: all 98 documents (text BREP).
+    /root/bool2-scratch/bool-by-doc.py makes the per-document table.
+- **On: c2-rings-loft's 1b9ae499** (Circular pattern 1's 8-tool fuse, 1.49 s on OCCT, the feature 1,390 ms against
+  live's 767).
+  - It declines "a shared shape OCCT may keep or remake": the target and a pattern copy share a vertex where tori and
+    planes meet. As bool found (shared3 notes below), OCCT keeps or remakes such a vertex as its rounding falls.
+  - Switched to keep, or to remake, the plain path then declines "pattern instances overlapping". That's the
+    checked-glue pattern fuse, which goes on to rust_fuse_trimmed in the app. Measuring the whole document both ways
+    now.
+  - The question for the gate: OCCT's arbitrary keep / remake shows only in that vertex's history and tolerance, so
+    the replay's `equivalent` should take it. bool: shout if you'd rather keep the decline.
+- **Then the knife's 343b971e (1.5 s):** the chamfer tool's B-spline edges lie within 0.5 um of the blade's faces
+  (on_tol 0.2 um). Taking them as on (OCCT does) gets to "a non-manifold result"; WIP
+  /root/bool2-scratch/knife-nearon-wip.patch. After it: c2-extension-spring 84884726 (0.53 s, "a short section from a
+  corner"), c2-fan-blade-sweep 07831a00 (0.51 s, non-manifold), cf-setback-fillet's five sheet fuses ("a sheet of
+  shells").
 - **Done before:** (1) a fast gate, `tools/bool/gate.sh <branch>` (below); (2) spheres and tori in our Boolean:
   learning-center-michael's ring cut (lcm 41701bb2) and Fillet 2's ball / torus cut (f71e381d, vibe4
   ~/agents/bool-corpora/mf2), which `fillet_by_tools` (features.cpp) sends straight to OCCT (`others`). cf-surface-pattern's
