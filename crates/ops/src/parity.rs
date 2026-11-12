@@ -3966,6 +3966,20 @@ impl<'a> Translator<'a> {
         Ok((id, row["status"].as_str().unwrap_or("Ok").to_string(), row["message"].as_str().map(str::to_string)))
     }
 
+    /// An assembly mate connector argument's Z in its part's coordinates, as ours places it now.
+    fn connector_z_local(&mut self, tab: &str, c: &Value) -> Option<glam::DVec3> {
+        let instance = c["instance"].as_str()?;
+        let list = self.call("assembly_list", json!({ "tab": tab })).ok()?;
+        let occ = list["occurrences"].as_array()?.iter().find(|o| o["path"] == instance).or_else(|| list["instances"].as_array()?.iter().find(|i| i["name"] == instance))?;
+        let r = occ["rotation"].as_array()?;
+        let q = glam::DQuat::from_xyzw(r[0].as_f64()?, r[1].as_f64()?, r[2].as_f64()?, r[3].as_f64()?);
+        let cands = self.call("assembly_connectors", json!({ "tab": tab, "instance": instance, "entity": c["entity"] })).ok()?;
+        let want = format!("implicit:{}:", c["inference"].as_str()?);
+        let z = cands["connectors"].as_array()?.iter().find(|x| x["reference"].as_str().is_some_and(|r| r.starts_with(&want)))?;
+        let z = glam::DVec3::new(z["z"][0].as_f64()?, z["z"][1].as_f64()?, z["z"][2].as_f64()?);
+        Some(q.inverse() * z)
+    }
+
     /// The areas of live's regions of sketch `oid` (its sketch bodies file), m².
     fn live_region_areas(&self, oid: &str) -> Vec<f64> {
         let mut out: Vec<f64> = self.refs.values().filter(|r| r.sketch_file && r.kind == "SKETCH_REGION" && r.sketch_of.as_deref() == Some(oid)).filter_map(|r| r.measure).collect();
@@ -6114,6 +6128,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     type ToFind<'k> = (&'k Key, &'k Connector, Vec<(String, String)>);
     let mut connectors: HashMap<Key, Connector> = HashMap::new();
     let mut connector_origins: HashMap<Key, [f64; 3]> = HashMap::new();
+    let mut connector_z: HashMap<Key, [f64; 3]> = HashMap::new();
     for l in &levels {
         for f in &l.features {
             let all = std::iter::once(*f).chain(f["mateConnectors"].as_array().into_iter().flatten());
@@ -6134,6 +6149,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             for (q, e) in picks.into_iter().flatten().zip(m["featureData"]["matedEntities"].as_array().into_iter().flatten()) {
                 if let (Some(id), Some(o)) = (q["featureId"].as_str(), f3(&e["mateConnectorCS"]["origin"])) {
                     connector_origins.insert((l.element.clone(), id.to_string()), o);
+                }
+                if let (Some(id), Some(z)) = (q["featureId"].as_str(), f3(&e["mateConnectorCS"]["zAxis"])) {
+                    connector_z.insert((l.element.clone(), id.to_string()), z);
                 }
             }
         }
@@ -6552,20 +6570,18 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 res.untranslated.push(format!("{name}: mate type {:?} not mapped", par("mateType").map(|p| &p["value"])));
                 continue;
             };
-            let ends: Vec<Option<Value>> = par("mateConnectorsQuery")
-                .and_then(|p| p["queries"].as_array())
-                .into_iter()
-                .flatten()
-                .map(|q| {
+            let mut ends: Vec<Option<Value>> = Vec::new();
+            for q in par("mateConnectorsQuery").and_then(|p| p["queries"].as_array()).into_iter().flatten() {
+                let end = (|| {
                     let id = q["featureId"].as_str()?;
                     if let Some(name) = origin_connectors.get(id) {
-                        return Some(json!({ "connector": name }));
+                        return Some((json!({ "connector": name }), String::new(), None));
                     }
                     // A Part Studio's Mate connector on an instance: ours there.
                     if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMPartStudioMateConnectorQuery")) {
                         let path = ids(&q["path"]);
                         let ours = path.last().and_then(|i| element_of.get(i)).and_then(|e| studio_features.get(e)).and_then(|f| f.get(id))?;
-                        return Some(json!({ "instance": path_names(&path)?, "reference": format!("mc:{}.0", ours.trim_start_matches("mc:")) }));
+                        return Some((json!({ "instance": path_names(&path)?, "reference": format!("mc:{}.0", ours.trim_start_matches("mc:")) }), String::new(), None));
                     }
                     let key = (l.element.clone(), id.to_string());
                     let (path, inf, _) = connectors.get(&key)?;
@@ -6573,9 +6589,21 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     if let Some(i) = inference(inf) {
                         c["inference"] = json!(i);
                     }
-                    Some(c)
-                })
-                .collect();
+                    Some((c, inf.clone(), connector_z.get(&key).copied()))
+                })();
+                // An axis point's Z runs along its cylinder's axis, whose sense is the kernel's own (Parasolid's
+                // and OCCT's differ: rack-pinion's full round fillet, isaac-ball's bosses): flipped where live's
+                // frame has it the other way.
+                ends.push(end.map(|(mut c, inf, live_z)| {
+                    if inf.ends_with("AXIS_POINT")
+                        && let Some(z) = live_z
+                        && placer.connector_z_local(&l.tab, &c).is_some_and(|ours| ours.dot(glam::DVec3::from(z)) < -0.999)
+                    {
+                        c["flip"] = json!(true);
+                    }
+                    c
+                }));
+            }
             let [Some(a), Some(b)] = ends.as_slice() else {
                 res.untranslated.push(format!("{name}: its connectors not translated"));
                 continue;
