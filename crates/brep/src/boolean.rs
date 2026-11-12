@@ -1054,6 +1054,36 @@ impl Ctx<'_> {
         }
     }
 
+    /// Face `f`'s normal curvature at `p` along its tangent `d` (unit): how fast it bends toward its outward normal.
+    fn bend_at(&self, f: usize, p: DVec3, d: DVec3) -> f64 {
+        match self.faces[f].s {
+            Surf::Plane { .. } => 0.0,
+            Surf::Cyl { o, a, k, flip, .. } => {
+                let w = p - o;
+                let radial = w - a * w.dot(a);
+                let round = a.cross(radial).normalize_or_zero();
+                let b = -d.dot(round).powi(2) / (radial.length() * (1.0 + k * k).sqrt());
+                if flip { -b } else { b }
+            }
+            Surf::Nurbs { flip, .. } => {
+                let g = &self.faces[f];
+                let Some(ns) = g.ns.as_ref() else { return 0.0 };
+                let uv = g.uv_of(p);
+                let [_, su, sv, suu, suv, svv] = ns.derivs(uv.x, uv.y);
+                let (e, ff, gg) = (su.dot(su), su.dot(sv), sv.dot(sv));
+                let det = e * gg - ff * ff;
+                if det.abs() < 1e-30 {
+                    return 0.0;
+                }
+                let (x, y) = (d.dot(su), d.dot(sv));
+                let (al, be) = ((gg * x - ff * y) / det, (e * y - ff * x) / det);
+                let n = su.cross(sv).normalize_or_zero();
+                let b = (suu * (al * al) + suv * (2.0 * al * be) + svv * (be * be)).dot(n);
+                if flip { -b } else { b }
+            }
+        }
+    }
+
     /// Segment `s` in face `f`'s parameter plane (`copy` 1: a seam's right side; `edge`: the input edge it is
     /// (a piece of), whose curve on a free-form face is OCCT's).
     fn c2_of(&self, f: usize, s: &Seg, copy: usize, edge: Option<usize>) -> R<C2> {
@@ -3583,6 +3613,53 @@ fn par_map_by<T: Send>(n: usize, per: usize, run: usize, f: &(dyn Fn(usize) -> T
 
 /// NOSHAPE_BOOL_PCB_PROBE (the partial common blocks' stage P0, bool.md): each two edge pieces of different arguments
 /// leaving one vertex within 25° and within their tolerances of each other for a stretch: how far, and where they part.
+/// Two solids touching along `seg` (`s`), used once by each of four kept pieces: the pieces paired across the
+/// material between them going round the edge (faces leaving it the same way ordered by how they bend, a crack's
+/// two sides by their material), else None.
+fn across_material(cx: &Ctx, seg: &Seg, s: usize, users: &[usize], pieces: &[Piece], keep: &[Option<bool>]) -> Option<[[usize; 2]; 2]> {
+    let m = cx.seg_at(seg, 0.5);
+    let t = (cx.seg_at(seg, 0.5 + 1e-3) - cx.seg_at(seg, 0.5 - 1e-3)).normalize_or_zero();
+    // (Each: its angle round `t`, how it turns round `t` going into it, and whether its use in the result is against
+    // `t`: its material that way round.)
+    let mut around: Vec<(f64, f64, bool, usize)> = Vec::with_capacity(users.len());
+    let mut x = DVec3::ZERO;
+    for &p in users {
+        let r = pieces[p].loops.iter().flatten().find(|u| u.0 == s)?.1;
+        let f = pieces[p].face;
+        let n = cx.normal_at(f, m);
+        let d = n.cross(if r { -t } else { t }).normalize_or_zero();
+        if d == DVec3::ZERO {
+            return None;
+        }
+        if x == DVec3::ZERO {
+            x = d;
+        }
+        let mut angle = d.dot(t.cross(x)).atan2(d.dot(x)).rem_euclid(TAU);
+        if angle > TAU - 1e-6 {
+            angle -= TAU;
+        }
+        around.push((angle, cx.bend_at(f, m, d) * n.dot(t.cross(d)), r ^ (keep[p] == Some(true)), p));
+    }
+    let order = |a: &(f64, f64, bool, usize), b: &(f64, f64, bool, usize)| {
+        if (a.0 - b.0).abs() > 1e-6 {
+            return a.0.total_cmp(&b.0);
+        }
+        if (a.1 - b.1).abs() > 1e-6 * a.1.abs().max(b.1.abs()) {
+            return a.1.total_cmp(&b.1);
+        }
+        a.2.cmp(&b.2)
+    };
+    around.sort_by(order);
+    for i in 0..4 {
+        let (a, b) = (around[i], around[(i + 1) % 4]);
+        if a.2 == b.2 || i < 3 && order(&a, &b).is_ge() {
+            return None;
+        }
+    }
+    let k = usize::from(!around[0].2);
+    Some([[around[k].3, around[k + 1].3], [around[k + 2].3, around[(k + 3) % 4].3]])
+}
+
 fn pcb_probe(cx: &Ctx, sedges: &[SEdge]) {
     let mut at: HashMap<u32, Vec<usize>> = HashMap::default();
     for (i, s) in sedges.iter().enumerate() {
@@ -5910,14 +5987,23 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     if !sheets && uses.iter().any(|(&s, u)| !matches!(sedges[s].seg.g, Geo::Apex { .. }) && (u[0] != u[1] || u[0] == 0)) {
         return Err(Decline("a non-manifold result"));
     }
-    // Seams: an edge one face uses both ways; any other edge two faces once each.
+    // Seams: an edge one face uses both ways; any other edge two faces once each, or four where two solids touch
+    // along it (each face paired with the one across the material at it, as OCCT's).
+    let mut touching: Vec<[usize; 2]> = Vec::new();
+    let mut touching_edges: HashSet<usize> = HashSet::default();
     for (&s, u) in &uses {
-        if !sheets && u[0] > 1 && !matches!(sedges[s].seg.g, Geo::Apex { .. }) {
-            let users = kept.iter().filter(|&&p| !pieces[p].inner.contains(&s) && pieces[p].loops.iter().flatten().any(|x| x.0 == s)).count();
-            if users != 1 || u[0] != 1 {
-                return Err(Decline("a non-manifold result"));
-            }
+        if sheets || u[0] < 2 || matches!(sedges[s].seg.g, Geo::Apex { .. }) {
+            continue;
         }
+        let users: Vec<usize> = kept.iter().copied().filter(|&p| !pieces[p].inner.contains(&s) && pieces[p].loops.iter().flatten().any(|x| x.0 == s)).collect();
+        // (Not two arguments' whole edges lying on one another: OCCT keeps both solids as they were there.)
+        let o = &sedges[s].origins;
+        let whole_pair = o.iter().map(|&e| cx.edges[e].arg).collect::<HashSet<u32>>().len() > 1 && o.iter().all(|&e| edge_pieces[e].len() == 1);
+        let Some(pairs) = (users.len() == 4 && u[0] == 2 && !whole_pair).then(|| across_material(&cx, &sedges[s].seg, s, &users, &pieces, &keep)).flatten() else {
+            return Err(Decline("a non-manifold result"));
+        };
+        touching.extend(pairs);
+        touching_edges.insert(s);
     }
     // Shells: pieces joined by their edges.
     let mut comp: Vec<usize> = (0..kept.len()).collect();
@@ -5929,9 +6015,17 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         i
     }
     let mut first_user: HashMap<usize, usize> = HashMap::default();
+    for [a, b] in touching {
+        let (Ok(a), Ok(b)) = (kept.binary_search(&a), kept.binary_search(&b)) else { continue };
+        let (a, b) = (find(&mut comp, a), find(&mut comp, b));
+        comp[a] = b;
+    }
     for (k, &p) in kept.iter().enumerate() {
         for l in &pieces[p].loops {
             for &(s, _) in l {
+                if touching_edges.contains(&s) {
+                    continue;
+                }
                 if let Some(&o) = first_user.get(&s) {
                     let (a, b) = (find(&mut comp, k), find(&mut comp, o));
                     comp[a] = b;

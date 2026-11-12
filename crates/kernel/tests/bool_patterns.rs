@@ -625,6 +625,27 @@ fn a_25_by_25_knurl() {
     knurl_as_recorded("ae71f76b6e894374", 1e-8);
 }
 
+/// A cut leaving two lumps that touch along a line (asm-infento-subs' Extrude 13, recorded: a wheel house's sides cut
+/// by two tools whose arcs are tangent to its step's plane there; live makes them two parts): noshape's Boolean pairs
+/// the four faces at that edge across the material and takes it, two solids sharing the edge, OCCT's counts and volume.
+#[test]
+fn lumps_touching_along_a_line_are_two_solids() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "c8039d7caebe0624").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    assert_eq!(r.shape.solids().len(), 2);
+    let counts = (r.shape.count(k::ShapeType::Face), r.shape.count(k::ShapeType::Edge), r.shape.count(k::ShapeType::Vertex));
+    assert_eq!(counts, (c.summary.faces, c.summary.edges, c.summary.vertices));
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
+}
+
 /// A document's cuts by a pattern of 8 cutters (recorded, parity): noshape's Boolean declines the first late (two edges
 /// leave a vertex one way, found while placing its pieces), so in its feature type's scope the next cut goes straight
 /// to OCCT's; OCCT's results both.

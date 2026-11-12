@@ -1961,8 +1961,13 @@ fn tools_engulf(target: &Shape, tools: &[Shape]) -> bool {
     t >= v.abs() * (1.0 - 1e-6)
 }
 
-/// An edge of `shape` bounding more than two faces.
+/// An edge of `shape` (of one of its solids: solids touching along an edge are each manifold, live's separate parts,
+/// asm-infento-subs' Extrude 13) bounding more than two faces.
 fn non_manifold(shape: &Shape) -> bool {
+    let solids = shape.solids();
+    if solids.len() > 1 {
+        return solids.iter().any(non_manifold);
+    }
     shape.edge_faces().is_ok_and(|ef| {
         ef.iter().any(|f| {
             let mut f = f.clone();
