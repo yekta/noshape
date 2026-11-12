@@ -167,6 +167,21 @@ pub fn read_iges_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShap
     if t.instances.is_empty() && !t.parts.names.is_empty() {
         return step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, true)).collect();
     }
+    // Shared shapes placed (a subfigure placed twice, studios' asm2-twice.igs): each placement a part of its own.
+    if !t.instances.is_empty() {
+        let parts = step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?;
+        let mut placed = Vec::new();
+        for i in pvz_instances_of(&t.instances) {
+            let Some(p) = parts.get(i.part) else { continue };
+            let mut m = i.transform;
+            m.w_axis = (m.w_axis.truncate() * (1000.0 / unit.mm_per_unit())).extend(1.0);
+            let shape = p.shape.transformed(&crate::Transform::Matrix(m))?;
+            placed.push(merged_faces(ImportedShape { shape, name: p.name.clone(), color: p.color, opacity: p.opacity, face_colors: p.face_colors.clone() }, true)?);
+        }
+        if !placed.is_empty() {
+            return Ok(placed);
+        }
+    }
     Ok(vec![merged_faces(ImportedShape { shape: read_iges(path, unit)?, name: None, color: None, opacity: None, face_colors: Vec::new() }, true)?])
 }
 

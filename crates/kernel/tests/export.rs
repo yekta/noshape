@@ -1650,6 +1650,23 @@ fn iges_subfigure_of_two_solids_is_two_parts() {
     assert!(parts.iter().all(|p| p.shape.solids().len() == 1), "one solid each");
 }
 
+/// The same subassembly placed twice (studios' asm2-twice.igs: a second 408 50 mm along x): a single import gives each
+/// placed solid as a part of its own, Part 1 and Part 2 / Part 3 twice, the second pair 50 mm along x.
+#[test]
+fn iges_subfigure_placed_twice_is_each_placed_solid() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/iges/asm2-twice.igs");
+    let parts = read_iges_parts(&path, LengthUnit::Millimeter).unwrap();
+    let mut names: Vec<Option<&str>> = parts.iter().map(|p| p.name.as_deref()).collect();
+    names.sort();
+    assert_eq!(names, [Some("Part 1"), Some("Part 2"), Some("Part 2"), Some("Part 3"), Some("Part 3")]);
+    assert!(parts.iter().all(|p| p.shape.solids().len() == 1), "one solid each");
+    let xs = |n: &str| -> Vec<f64> { parts.iter().filter(|p| p.name.as_deref() == Some(n)).map(|p| p.shape.bounding_box(false).unwrap().min.x).collect() };
+    for n in ["Part 2", "Part 3"] {
+        let x = xs(n);
+        assert!((x[0] - x[1]).abs() > 49.99 && (x[0] - x[1]).abs() < 50.01, "{n}: {x:?}");
+    }
+}
+
 /// An STL's B-spline tube on a grid as live's facetter makes it (cf-hose-routing's swept hoses: even 5° steps round
 /// the tube, its volume within 0.1 % of the model's): a Ø 6 mm disc swept along a bent spline at REST's 5°, no chord
 /// limit, comes within 0.3 % (BRepMesh's own mesh lost 0.8 % on the hoses).

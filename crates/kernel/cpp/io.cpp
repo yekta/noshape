@@ -1163,6 +1163,52 @@ std::unique_ptr<OcShape> read_iges(rust::Str path)
   return wrap(s);
 }
 
+// Each part that is a compound of solids all with an IGES label (a subfigure) split into one part per solid, named by
+// its label and coloured as its own solid or else as the compound, its face colours carried over; also, for each old
+// part, the new parts it became (its own index when kept whole).
+std::pair<std::vector<Leaf>, std::vector<std::vector<uint32_t>>> split_labelled_solids(std::vector<Leaf> parts, const std::map<const TopoDS_TShape*, std::string>& labelled,
+                                                                                       const occ::handle<XCAFDoc_ColorTool>& ct)
+{
+  std::vector<Leaf>                  split;
+  std::vector<std::vector<uint32_t>> made(parts.size());
+  for (size_t k = 0; k < parts.size(); ++k)
+  {
+    Leaf&                     l = parts[k];
+    std::vector<TopoDS_Shape> solids;
+    for (TopExp_Explorer ex(l.shape, TopAbs_SOLID); ex.More(); ex.Next())
+      solids.push_back(ex.Current());
+    const bool each_named = solids.size() > 1 && std::all_of(solids.begin(), solids.end(), [&](const TopoDS_Shape& x) { return labelled.count(x.TShape().get()) > 0; });
+    if (l.shape.ShapeType() != TopAbs_COMPOUND || !each_named)
+    {
+      made[k].push_back((uint32_t)split.size());
+      split.push_back(std::move(l));
+      continue;
+    }
+    ShapeIMap faces;
+    TopExp::MapShapes(l.shape, TopAbs_FACE, faces);
+    for (const TopoDS_Shape& x : solids)
+    {
+      Leaf one;
+      one.shape    = x;
+      one.name     = labelled.at(x.TShape().get());
+      one.hasColor = ct->GetColor(x, XCAFDoc_ColorGen, one.color) || ct->GetColor(x, XCAFDoc_ColorSurf, one.color);
+      if (!one.hasColor)
+      {
+        one.hasColor = l.hasColor;
+        one.color    = l.color;
+      }
+      ShapeIMap own;
+      TopExp::MapShapes(x, TopAbs_FACE, own);
+      for (const auto& [i, fc] : l.faceColors)
+        if (const int f = own.FindIndex(faces(i + 1)); f > 0)
+          one.faceColors.emplace_back(f - 1, fc);
+      made[k].push_back((uint32_t)split.size());
+      split.push_back(std::move(one));
+    }
+  }
+  return {std::move(split), std::move(made)};
+}
+
 // An IGES file's parts and placed instances when several of its roots are
 // the same shape placed (subfigure instances: live's IGES export of an
 // assembly, request 1755, round-trips as an Assembly); no instances
@@ -1247,42 +1293,7 @@ StepTree read_iges_tree(rust::Str path)
   // A subfigure of several labelled solids (live's IGES of a subassembly: a 308 of "Part 2" and "Part 3" placed by
   // one 408) is each solid a part of its own, named by its label, in the definition's order, as live imports it.
   if (!shared && !labelled.empty())
-  {
-    std::vector<Leaf> split;
-    for (auto& l : parts)
-    {
-      std::vector<TopoDS_Shape> solids;
-      for (TopExp_Explorer ex(l.shape, TopAbs_SOLID); ex.More(); ex.Next())
-        solids.push_back(ex.Current());
-      const bool each_named = solids.size() > 1 && std::all_of(solids.begin(), solids.end(), [&](const TopoDS_Shape& x) { return labelled.count(x.TShape().get()) > 0; });
-      if (l.shape.ShapeType() != TopAbs_COMPOUND || !each_named)
-      {
-        split.push_back(std::move(l));
-        continue;
-      }
-      ShapeIMap faces;
-      TopExp::MapShapes(l.shape, TopAbs_FACE, faces);
-      for (const TopoDS_Shape& x : solids)
-      {
-        Leaf one;
-        one.shape    = x;
-        one.name     = labelled[x.TShape().get()];
-        one.hasColor = ct->GetColor(x, XCAFDoc_ColorGen, one.color) || ct->GetColor(x, XCAFDoc_ColorSurf, one.color);
-        if (!one.hasColor)
-        {
-          one.hasColor = l.hasColor;
-          one.color    = l.color;
-        }
-        ShapeIMap own;
-        TopExp::MapShapes(x, TopAbs_FACE, own);
-        for (const auto& [i, fc] : l.faceColors)
-          if (const int k = own.FindIndex(faces(i + 1)); k > 0)
-            one.faceColors.emplace_back(k - 1, fc);
-        split.push_back(std::move(one));
-      }
-    }
-    parts = std::move(split);
-  }
+    parts = split_labelled_solids(std::move(parts), labelled, ct).first;
   if (shared)
     parts.resize((size_t)protos.Extent());
   std::vector<bool> seen((size_t)protos.Extent(), false);
@@ -1314,6 +1325,23 @@ StepTree read_iges_tree(rust::Str path)
       for (int c = 1; c <= 4; ++c)
         inst.transform.push_back(c == 4 ? t.Value(row, c) * 1e-3 : t.Value(row, c));
     out.instances.push_back(std::move(inst));
+  }
+  // The same when such a subfigure is placed more than once: each placement of it places each of its solids.
+  if (shared && !labelled.empty())
+  {
+    auto [split, made] = split_labelled_solids(std::move(parts), labelled, ct);
+    parts = std::move(split);
+    rust::Vec<PvzInstance> placed;
+    for (const auto& inst : out.instances)
+      for (const uint32_t k : made[inst.part])
+      {
+        PvzInstance one = inst;
+        one.part        = k;
+        if (made[inst.part].size() > 1)
+          one.name = rust::String(parts[k].name);
+        placed.push_back(std::move(one));
+      }
+    out.instances = std::move(placed);
   }
   occ::handle<IGESData_IGESModel> model = occ::down_cast<IGESData_IGESModel>(r.WS()->Model());
   std::string                     root;
