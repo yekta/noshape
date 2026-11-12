@@ -211,12 +211,16 @@ def parse_suite(log, docs):
     """{document: (outcome text without times, our regeneration ms)}: its line and the indented lines under it."""
     blocks, cur = {}, None
     for l in read_lines(log):
+        # (The test's own "test ... ... " starts the first document's line; a custom feature's id is the run's.)
+        l = re.sub(r"custom:[0-9a-f]{16}:", "custom:-:", re.sub(r"^test \S+ \.\.\. ", "", l))
         m = re.match(r"^(\S+?): (.*)$", l)
         if m and m[1] in docs:
             cur = m[1]
             blocks.setdefault(cur, []).append(m[2])
         elif cur and l.startswith("  "):
-            blocks[cur].append(l.strip())
+            # (A one-document run's feature times (NOSHAPE_PARITY_ONLY): not its outcome.)
+            if not re.search(r": \d+ ms, live (\d+ ms|-)$", l):
+                blocks[cur].append(l.strip())
         else:
             cur = None
     got = {}
