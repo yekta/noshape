@@ -51,6 +51,17 @@ new); most are the selection after a step (`.drawing.selection.length` live 1 / 
 - drw-view-align-vertically: step 1 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (4/6 states)
 - drw-view-replicate-annotations: step 8 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (8/10 states)
 
+## 11-12 08:20 UTC: IGES subfigures done; Derived sources inside an assembly tried and dropped
+- IGES-SUBFIGURE-ONE-PART closed (TICKETS): a subfigure of labelled solids is one part per solid, placed twice each
+  placement (asm2.igs, asm2-twice.igs; kernel tests).
+- Studios that Derive from another studio of the same assembly (scissor-lift 5aae43 <- fed22d, tvc-mount 7bc9d8 <-
+  41b795): building the source again as derivedSources gave scissor-lift +4 and tvc-mount +1 occurrences but tvc-mount's
+  Cylindrical 2 / 3 broke and the suite took 4748 s for 3410; reusing the built source (live part id -> our body)
+  gained only tvc-mount's occurrence. Not landed. The real blockers: fed22d's Mirror 6 (core.md: part pattern Add
+  leaves seeds out), 5aae43's Boolean 1 tools RjKP unmapped.
+- Handoffs: core.md has tvc-mount's Mirror 4 (custom feature mirror) and the part pattern seeds; REQUESTS has the
+  rim-connector probe (robotic-arm) and keyboard-pattern's Derived source.
+
 ## 11-12 05:58 UTC: assembly mates 286 -> 320/509, occurrences 1486/1731 (vibe5, all 24, none lower)
 - Assembly mate connectors on the assembly origin (Origin's ORIGIN_X / Y / Z: "Assembly XZ plane" …) are made in ours
   and mates use them by name; a Part Studio's Mate connector feature on an instance is used as ours ("mc:<ours>.0").

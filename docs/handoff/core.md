@@ -2056,6 +2056,15 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 
 **psui has this one and asm-scissor-lift's part Mirror (Add, merge scope leaving the seed parts out; legacy gate),
 lead 2026-11-12 12:14 UTC.**
+## From dx (11-12 06:48 UTC): a part Mirror / pattern with Add and a merge scope leaves its seeds out; live merges them too
+asm-scissor-lift's studio fed22d, Mirror 6 (patternType PART, operationType ADD, merge scope JKD the base, two 8646 mm³
+blocks as entities): live goes from [8646, 8646, 448609] to one part of 483192 mm³ (base + both blocks + both copies);
+ours merges only the copies (465900.5) and leaves the two blocks as parts of their own. `pattern.rs` `part_pattern`
+gives `apply_operation` the copies alone; `seeds_into_scope` (a pattern of one) already takes the seeds as tools
+(std subfeatureToolsTargets). Taking the seeds that meet the scope as tools for any count would match live, but it
+changes the parts of saved Part Studios with such a pattern, so it needs a ScopeRule gate. Every later feature of
+fed22d (its hole's scope JKD, 9 of scissor-lift's 38 missing instances, Derived 1 of 5aae43 too) builds on the merged
+part. Yours.
 
 ## From dx (11-12 05:00 UTC): asm-tvc-mount's Mirror 4 (a feature mirror of a custom fastener hole) fails, live removes 89 mm³
 Studio 7bc9d8 of asm-tvc-mount: Mirror 4 is patternType FEATURE over a custom feature ("#featureName", a fastener

@@ -20,7 +20,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## studios, 2026-11-12
-- [ ] P2 IGES-SUBFIGURE-ONE-PART (dx; studios 2026-11-12 00:11 UTC) **an IGES subfigure of several solids imports as one
+- [x] (dx 2026-11-12 07:38 UTC: the reader splits a subfigure of labelled solids into one part per solid, a placed-twice one placed per solid; a single import has asm2.igs as Part 1-3, asm2-twice.igs as Part 1 and Part 2 / Part 3 twice; kernel tests export::iges_subfigure_*) P2 IGES-SUBFIGURE-ONE-PART (dx; studios 2026-11-12 00:11 UTC) **an IGES subfigure of several solids imports as one
   part.** Live's own export of Assembly 1 = Part 1 + Sub(Part 2, Part 3) as IGES (crates/kernel/tests/data/iges/asm2.igs:
   a 308 definition of the solids DE 211 "Part 2" and DE 317 "Part 3", placed by one 408): `read_iges_parts` gives two
   parts, "Part 1" and "Part 2", the second a compound of both solids (io.cpp read_iges_tree: "a subfigure is a
