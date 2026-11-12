@@ -1638,6 +1638,18 @@ fn iges_from_live_takes_the_label() {
     assert_eq!(names, [Some("Long bra")]);
 }
 
+/// Live's IGES of Assembly 1 = Part 1 + Sub (Part 2, Part 3) (request 2511): Sub is a subfigure (308) of two solids
+/// placed by one instance (408); a single import gives three parts, each named by its solid's label, as live's.
+#[test]
+fn iges_subfigure_of_two_solids_is_two_parts() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/iges/asm2.igs");
+    let parts = read_iges_parts(&path, LengthUnit::Meter).unwrap();
+    let mut names: Vec<Option<&str>> = parts.iter().map(|p| p.name.as_deref()).collect();
+    names.sort();
+    assert_eq!(names, [Some("Part 1"), Some("Part 2"), Some("Part 3")]);
+    assert!(parts.iter().all(|p| p.shape.solids().len() == 1), "one solid each");
+}
+
 /// An STL's B-spline tube on a grid as live's facetter makes it (cf-hose-routing's swept hoses: even 5° steps round
 /// the tube, its volume within 0.1 % of the model's): a Ø 6 mm disc swept along a bent spline at REST's 5°, no chord
 /// limit, comes within 0.3 % (BRepMesh's own mesh lost 0.8 % on the hoses).

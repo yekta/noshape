@@ -1244,6 +1244,45 @@ StepTree read_iges_tree(rust::Str path)
   // Separate shapes: each a part, named and coloured (no instances).
   for (int i = 1; i <= roots.Length() && !shared; ++i)
     collect(st, ct, roots(i), TopLoc_Location(), std::string(), false, Quantity_Color(), parts, 0);
+  // A subfigure of several labelled solids (live's IGES of a subassembly: a 308 of "Part 2" and "Part 3" placed by
+  // one 408) is each solid a part of its own, named by its label, in the definition's order, as live imports it.
+  if (!shared && !labelled.empty())
+  {
+    std::vector<Leaf> split;
+    for (auto& l : parts)
+    {
+      std::vector<TopoDS_Shape> solids;
+      for (TopExp_Explorer ex(l.shape, TopAbs_SOLID); ex.More(); ex.Next())
+        solids.push_back(ex.Current());
+      const bool each_named = solids.size() > 1 && std::all_of(solids.begin(), solids.end(), [&](const TopoDS_Shape& x) { return labelled.count(x.TShape().get()) > 0; });
+      if (l.shape.ShapeType() != TopAbs_COMPOUND || !each_named)
+      {
+        split.push_back(std::move(l));
+        continue;
+      }
+      ShapeIMap faces;
+      TopExp::MapShapes(l.shape, TopAbs_FACE, faces);
+      for (const TopoDS_Shape& x : solids)
+      {
+        Leaf one;
+        one.shape    = x;
+        one.name     = labelled[x.TShape().get()];
+        one.hasColor = ct->GetColor(x, XCAFDoc_ColorGen, one.color) || ct->GetColor(x, XCAFDoc_ColorSurf, one.color);
+        if (!one.hasColor)
+        {
+          one.hasColor = l.hasColor;
+          one.color    = l.color;
+        }
+        ShapeIMap own;
+        TopExp::MapShapes(x, TopAbs_FACE, own);
+        for (const auto& [i, fc] : l.faceColors)
+          if (const int k = own.FindIndex(faces(i + 1)); k > 0)
+            one.faceColors.emplace_back(k - 1, fc);
+        split.push_back(std::move(one));
+      }
+    }
+    parts = std::move(split);
+  }
   if (shared)
     parts.resize((size_t)protos.Extent());
   std::vector<bool> seen((size_t)protos.Extent(), false);
