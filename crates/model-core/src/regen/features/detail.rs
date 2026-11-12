@@ -902,6 +902,11 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
                 if super::blend_section::section_blend(ev, bi, &edges, &sections).is_ok() {
                     continue;
                 }
+                if let k::ChamferSpec::Equal(d) = spec
+                    && super::blend_section::planar_chamfer_cut(ev, bi, &edges, d)?
+                {
+                    continue;
+                }
                 match quick.then(|| k::chamfer_checked(&body.shape, &shapes, spec, &reference)) {
                     Some(Ok(r)) => r,
                     _ => return Err(chamfer_failed(e)),

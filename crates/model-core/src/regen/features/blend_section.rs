@@ -1768,6 +1768,72 @@ pub fn rims_tilted(rims: &Rims) -> bool {
 /// (c2-rings-loft's Fillet 1: a ring's two R2 rims meet at its narrow bottom and run out onto its outside; its Chamfer
 /// 1: a notch's arc chamfered through the strip of plane beside it, the chamfer running on past the arc's ends until
 /// it leaves the part).
+/// Equal chamfers of straight convex edges between two planes, run past their edges' ends where OCCT's can't: each the
+/// part cut by its chamfer's prism along the edge (the edge and its two offset lines on the faces) until it leaves the
+/// part, as live's (c2-rings-loft's Chamfer 3: 10 mm on alternate 15 mm edges of a hexagonal prism, its top a
+/// triangle). `Ok(false)` (nothing done) unless every edge is such, and each prism takes material only at its edge.
+pub fn planar_chamfer_cut(ev: &mut EvalCtx, bi: usize, edges: &[usize], d: f64) -> FResult<bool> {
+    use super::sheetmetal_util::{body_named, bool_named};
+    let body = ev.ctx.bodies[bi].clone();
+    let shape = &body.shape;
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let faces = shape.faces();
+    let ef = shape.edge_faces()?;
+    let mut tools = Vec::new();
+    for &e in edges {
+        let edge = shape.sub_shape(ShapeType::Edge, e)?;
+        let info = edge.edge_info()?;
+        let k::Curve::Line { .. } = info.curve else { return Ok(false) };
+        let Some(fs) = ef.get(e).filter(|f| f.len() == 2) else { return Ok(false) };
+        let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+        if !ff.iter().all(|f| f.is_planar()) {
+            return Ok(false);
+        }
+        let (a, b) = (info.start, info.end);
+        let t = (b - a).normalize();
+        let fr = frame_at(shape, ff, a + (b - a) * 0.5, t, scale)?;
+        // Convex: the faces' material on the chamfer's side of the edge.
+        if fr.u[0].dot(fr.m[1]) <= 1e-9 || fr.u[1].dot(fr.m[0]) <= 1e-9 {
+            return Ok(false);
+        }
+        let l = 2.0 * scale;
+        let p0 = a - t * l;
+        let (pa, pb) = (p0 + fr.u[0] * d, p0 + fr.u[1] * d);
+        // Past the faces (out of the material) on the two sides along them: only the chamfer's plane cuts.
+        let pts = [pa, pa - fr.m[0] * d, p0 - (fr.m[0] + fr.m[1]) * d, pb - fr.m[1] * d, pb];
+        let lines: Vec<Shape> = (0..pts.len()).map(|i| k::make_line(pts[i], pts[(i + 1) % pts.len()])).collect::<Result<_, _>>()?;
+        let section = k::make_face_from_wire(&k::make_wire(&lines)?, true)?;
+        let tool = k::extrude(&section, t * ((b - a).length() + 2.0 * l))?.shape;
+        // Only where its edge is: what it takes off the part, each piece at the edge.
+        let taken = k::common(shape, &tool)?.shape;
+        if taken.solids().iter().any(|piece| k::distance(piece, &edge).map_or(true, |dd| dd.distance > scale * 1e-7)) {
+            return Ok(false);
+        }
+        let ename = body.edges[e].clone();
+        let blend = Arc::new(TopoName::face(ev.feature, Role::Blend(ename.clone())));
+        let generated = Arc::new(TopoName::face(ev.feature, Role::Generated(ename)));
+        // Its chamfer face: the one through both offset lines.
+        let names: Vec<Name> = tool
+            .faces()
+            .iter()
+            .map(|f| if f.contains_point(pa + t * l, scale * 1e-9).unwrap_or(false) && f.contains_point(pb + t * l, scale * 1e-9).unwrap_or(false) { blend.clone() } else { generated.clone() })
+            .collect();
+        tools.push(NamedShape::new(tool, names));
+    }
+    if tools.is_empty() {
+        return Ok(false);
+    }
+    let (cut, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &tools)?;
+    let cut = NamedShape::new(cut, names);
+    let un = k::unify_same_domain(&cut.shape)?;
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+        return Ok(false);
+    }
+    let names = ev.name_result(&[&cut.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
+    Ok(true)
+}
+
 pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], sizes: &[f64], kind: RimBlend) -> FResult<()> {
     use super::sheetmetal_util::{body_named, bool_named};
     let body = ev.ctx.bodies[bi].clone();

@@ -4013,6 +4013,45 @@ fn a_round_running_off_its_edge_meets_the_grind_face_extended_as_live() {
 /// OCCT's chamfer can't build. Live's section keeps constant offsets from the two faces (0.2445 / 0.472 mm, the asked
 /// distance and angle at the middle of the longest edge), so the strips left vary: 0.011 mm at the straight end, 0.044
 /// where the edges meet, 0.055 on the curve; one face per edge.
+/// c2-rings-loft's Chamfer 3 (live): a hexagonal prism 26 across flats and 26 tall, 10 mm equal chamfers on alternate
+/// edges, three at the top and the three between them at the bottom. Each chamfer runs past its edge's ends into the
+/// sides beside it (OCCT's won't): the prism cut by the six planes, its top and bottom triangles.
+#[test]
+fn chamfers_running_past_their_edges_ends_cut_the_prism_as_live() {
+    let mut s = Studio::new();
+    let r = 13.0 / (std::f64::consts::PI / 6.0).cos();
+    let pts: Vec<(f64, f64)> = (0..6).map(|k| { let a = std::f64::consts::PI / 6.0 + k as f64 * std::f64::consts::PI / 3.0; (r * a.cos(), r * a.sin()) }).collect();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &pts, true);
+    let hex = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(hex);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("13 mm"));
+        p.set("hasSecondDirection", ParamValue::Bool(true));
+        p.set("secondDirectionDepth", expr("13 mm"));
+    });
+    let res = s.ok();
+    let b = &res.context.bodies[0];
+    let mid = |x: f64, y: f64, z: f64| {
+        let at = DVec3::new(mm(x), mm(y), mm(z));
+        let edges = b.shape.edges();
+        let i = (0..edges.len()).min_by(|&i, &j| { let m = |k: usize| edges[k].endpoints().map_or(f64::INFINITY, |(a, c)| ((a + c) * 0.5).distance(at)); m(i).total_cmp(&m(j)) }).unwrap();
+        Reference::Edge((*b.edges[i]).clone())
+    };
+    let edges = vec![mid(-6.5, 11.26, 13.0), mid(-6.5, -11.26, 13.0), mid(13.0, 0.0, 13.0), mid(6.5, 11.26, -13.0), mid(6.5, -11.26, -13.0), mid(-13.0, 0.0, -13.0)];
+    s.add("chamfer", move |p| {
+        p.set("entities", ParamValue::Query(edges));
+        p.set("width", expr("10 mm"));
+    });
+    let res = s.ok();
+    let sh = &res.context.bodies[0].shape;
+    let shown = sh.shown_topology().unwrap();
+    assert_eq!((sh.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (14, 36, 24));
+    let v = volume(&res, 0) * 1e9;
+    assert!((v - 9761.261001).abs() < 0.01, "{v} mm³ (live 9761.261001)");
+}
+
 #[test]
 fn a_distance_angle_chamfer_keeps_constant_offsets_as_live() {
     let brep = include_str!("data/knife-chamfer1-input.brep").to_string();
