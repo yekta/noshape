@@ -172,13 +172,10 @@ bo=-; no=-
 say "built in $(( $(date +%s) - t0 )) s; running"
 
 # The branch's own tests of the crates the Boolean reaches, as the land queue runs them (a model test catches what no
-# corpus has: a round's torus split at its seam, 11-12): the kernel's, the model's, model-core's. Before the run (one
-# sync of the worktree at a time).
+# corpus has: a round's torus split at its seam, 11-12): the kernel's, the model's, model-core's.
 tests="cargo test --release -p noshape-kernel --test all && cargo test --release -p noshape-model --test all && cargo test --release -p noshape-model-core --lib"
-(cd "$wt_new" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "$tests" > "$scratch/gate-tests.log" 2>&1); rt=$?
-grep -E '^test result|FAILED$' "$scratch/gate-tests.log" >> "$log"
-failed=$(grep -E '^test .* FAILED$' "$scratch/gate-tests.log" | sed 's/^test //; s/ \.\.\. FAILED$//' | head -3 | paste -sd, -)
-say "crate tests: $([ $rt = 0 ] && echo pass || echo "fail ${failed:-(build or run; $scratch/gate-tests.log)}")"
+# (Beside the run, not before it: 11 min of a 40-min warm gate.)
+(cd "$wt_new" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "$tests" > "$scratch/gate-tests.log" 2>&1) & ptests=$!
 
 # The run: the gate's host script (this checkout's) from the branch's worktree.
 ssh -o BatchMode=yes "$host" "mkdir -p ~/agents/bool-gate/bin ~/agents/bool-gate/runs" && scp -q "$here/gate-host.py" "$host:agents/bool-gate/bin/gate-host.py"
@@ -188,6 +185,10 @@ args=(--out "$out" --jobs "$jobs" --threads "$threads" --cmp base new
 # (A branch that leaves the kernel's crates alone times the same as main.)
 [ $spd = 1 ] && [ "$base_rk" != "$new_rk" ] && args+=(--speed "$bk" "$nk")
 (cd "$wt_new" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && python3 agents/bool-gate/bin/gate-host.py run $(printf '%q ' "${args[@]}")") 2>&1 | tee -a "$log" | grep -E '^(gate-host|VERDICT|replay|model suite|speed)' >&2
+wait $ptests; rt=$?
+grep -E '^test result|FAILED$' "$scratch/gate-tests.log" >> "$log"
+failed=$(grep -E '^test .* FAILED$' "$scratch/gate-tests.log" | sed 's/^test //; s/ \.\.\. FAILED$//' | head -3 | paste -sd, -)
+say "crate tests: $([ $rt = 0 ] && echo pass || echo "fail ${failed:-(build or run; $scratch/gate-tests.log)}")"
 ssh -o BatchMode=yes "$host" "find ~/agents/bool-gate/runs -mindepth 1 -maxdepth 1 -mtime +2 -exec rm -rf {} +" 2>/dev/null
 v=$(grep '^VERDICT' "$log" | tail -1)
 [ -n "$v" ] || v="VERDICT FAIL: the run gave no verdict (see $log)"
