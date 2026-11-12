@@ -693,6 +693,27 @@ fn a_tyres_treads_cut_at_a_tangent_knife_edge() {
     assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
 }
 
+/// A snap hook's body and its Fillet 5 tools (recorded, cf-snap-hook): faces of revolution whose profiles are circles
+/// (OCCT keeps them revolutions, not tori) against tori and each other on their axes, whose sections OCCT marched in
+/// 35-38 B-spline pieces a pair (our Boolean 57-69 ms, now 21-23): noshape's are the circles where the profiles cross,
+/// exact; the fuse as OCCT's (its counts, its volume to its area times 1e-7).
+#[test]
+fn a_face_of_revolution_and_tori_on_its_axis_meet_in_circles() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "45eceb506fe3caa0").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    let counts = (r.shape.count(k::ShapeType::Face), r.shape.count(k::ShapeType::Edge), r.shape.count(k::ShapeType::Vertex));
+    assert_eq!(counts, (c.summary.faces, c.summary.edges, c.summary.vertices));
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
+}
+
 /// A document's cuts by a pattern of 8 cutters (recorded, parity): noshape's Boolean declines the first late (a short
 /// section from a cutter's corner, found after OCCT's sections), so in its feature type's scope the next cut goes
 /// straight to OCCT's; OCCT's results both.

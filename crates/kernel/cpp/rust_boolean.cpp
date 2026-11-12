@@ -2631,6 +2631,36 @@ struct Revolved
   std::optional<gp_Dir>     normal; // a plane's
 };
 
+// A surface of revolution whose profile is a circle in a plane through its axis (a torus OCCT keeps as the revolve
+// made it: cf-snap-hook's body against its Fillet 5 tools' tori, 40-56 ms of OCCT's marching a pair for 35-38 curve
+// pieces of two circles): its axis and that circle.
+std::optional<std::pair<gp_Ax1, gp_Circ>> revolved_circle(const occ::handle<Geom_Surface>& s)
+{
+  const occ::handle<Geom_SurfaceOfRevolution> r = occ::down_cast<Geom_SurfaceOfRevolution>(s);
+  if (r.IsNull())
+    return std::nullopt;
+  occ::handle<Geom_Curve> c = r->BasisCurve();
+  while (const occ::handle<Geom_TrimmedCurve> t = occ::down_cast<Geom_TrimmedCurve>(c))
+    c = t->BasisCurve();
+  const occ::handle<Geom_Circle> ci = occ::down_cast<Geom_Circle>(c);
+  if (ci.IsNull())
+    return std::nullopt;
+  const gp_Ax1  ax = r->Axis();
+  const gp_Circ k  = ci->Circ();
+  const gp_Dir  n  = k.Axis().Direction();
+  if (std::abs(n.Dot(ax.Direction())) > 1e-12 || std::abs(gp_Vec(ax.Location(), k.Location()).Dot(gp_Vec(n))) > 1e-12)
+    return std::nullopt;
+  return std::make_pair(ax, k);
+}
+
+// Such a surface's own angle frame: from the axis towards its profile's centre.
+gp_Ax3 revolved_frame(const gp_Ax1& ax, const gp_Circ& k)
+{
+  const gp_Vec w = gp_Vec(ax.Location(), k.Location());
+  const gp_Vec r = w - gp_Vec(ax.Direction()) * w.Dot(gp_Vec(ax.Direction()));
+  return gp_Ax3(ax.Location(), ax.Direction(), gp_Dir(r));
+}
+
 std::optional<Revolved> revolved(const TopoDS_Face& f)
 {
   occ::handle<Geom_Surface> s = BRep_Tool::Surface(f);
@@ -2646,6 +2676,8 @@ std::optional<Revolved> revolved(const TopoDS_Face& f)
     return Revolved{s, p->Axis(), std::nullopt};
   if (const occ::handle<Geom_ToroidalSurface> p = occ::down_cast<Geom_ToroidalSurface>(s))
     return Revolved{s, p->Axis(), std::nullopt};
+  if (const std::optional<std::pair<gp_Ax1, gp_Circ>> rc = revolved_circle(s))
+    return Revolved{s, rc->first, std::nullopt};
   return std::nullopt;
 }
 
@@ -2667,6 +2699,11 @@ Meridian meridian_of(const Revolved& x, const gp_Ax1& ax)
     const double k = std::tan(p->SemiAngle()) * (p->Axis().Direction().Dot(ax.Direction()) > 0 ? 1 : -1);
     const double z0 = height(p->Location());
     return Meridian{Meridian::Slope, 0, p->RefRadius() - k * z0, k};
+  }
+  if (const std::optional<std::pair<gp_Ax1, gp_Circ>> rc = revolved_circle(x.s))
+  {
+    const gp_Vec w = gp_Vec(o, rc->second.Location());
+    return Meridian{Meridian::Round, w.Dot(a), 0, 0, (w - a * w.Dot(a)).Magnitude(), rc->second.Radius()};
   }
   const occ::handle<Geom_ToroidalSurface> t = occ::down_cast<Geom_ToroidalSurface>(x.s);
   return Meridian{Meridian::Round, height(t->Location()), 0, 0, t->MajorRadius(), t->MinorRadius()};
@@ -2763,6 +2800,16 @@ void revolved_params(const occ::handle<Geom_Surface>& s, const gp_Pnt& q, double
     ElSLib::Parameters(sp->Sphere(), q, u, v);
   else if (const auto to = occ::down_cast<Geom_ToroidalSurface>(s))
     ElSLib::Parameters(to->Torus(), q, u, v);
+  else if (const std::optional<std::pair<gp_Ax1, gp_Circ>> rc = revolved_circle(s))
+  {
+    // (Its angle about the axis from the profile's plane, then the profile's parameter at the point turned back.)
+    const gp_Ax3 f = revolved_frame(rc->first, rc->second);
+    const gp_Vec w(f.Location(), q);
+    u = std::atan2(w.Dot(gp_Vec(f.YDirection())), w.Dot(gp_Vec(f.XDirection())));
+    if (u < 0)
+      u += 2 * M_PI;
+    v = ElCLib::Parameter(rc->second, q.Rotated(rc->first, -u));
+  }
 }
 
 // A circle's curve on face surface `s` (a plane: a circle in its coordinates; else a line across its angles at one
@@ -2793,7 +2840,7 @@ bool coaxial_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<
   if (!a || !b)
     return false;
   // (Not two planes or two analytic faces the Boolean makes itself: a torus or sphere among them.)
-  auto free = [](const Revolved& x) { return !occ::down_cast<Geom_ToroidalSurface>(x.s).IsNull() || !occ::down_cast<Geom_SphericalSurface>(x.s).IsNull(); };
+  auto free = [](const Revolved& x) { return !occ::down_cast<Geom_ToroidalSurface>(x.s).IsNull() || !occ::down_cast<Geom_SphericalSurface>(x.s).IsNull() || revolved_circle(x.s); };
   if (!free(*a) && !free(*b))
     return false;
   // (The axis: either's own, a sphere's the one its angles go round, where its circles are lines across its parameters.)
@@ -2820,6 +2867,8 @@ bool coaxial_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<
       pos = t->Position();
     else if (const auto sp = occ::down_cast<Geom_SphericalSurface>(x->s))
       pos = sp->Position();
+    else if (const std::optional<std::pair<gp_Ax1, gp_Circ>> rc = revolved_circle(x->s))
+      pos = revolved_frame(rc->first, rc->second);
     else
       continue;
     const gp_Vec v = gp_Vec(pos.XDirection()) - gp_Vec(ax->Direction()) * gp_Vec(pos.XDirection()).Dot(gp_Vec(ax->Direction()));
@@ -2836,7 +2885,7 @@ bool coaxial_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<
     double u0 = 0, u1 = 0, v0 = 0, v1 = 0, u = 0, v = 0;
     BRepTools::UVBounds(f, u0, u1, v0, v1);
     revolved_params(x.s, q, u, v);
-    if (!occ::down_cast<Geom_ToroidalSurface>(x.s).IsNull())
+    if (!occ::down_cast<Geom_ToroidalSurface>(x.s).IsNull() || revolved_circle(x.s))
       v = v0 + std::fmod(std::fmod(v - v0 + 1e-9, 2 * M_PI) + 2 * M_PI, 2 * M_PI) - 1e-9;
     return v >= v0 - 1e-9 && v <= v1 + 1e-9;
   };
