@@ -696,6 +696,7 @@ impl TabManager {
             list = list.child(
                 div()
                     .id(SharedString::from(format!("tm-sort-{}", s.label())))
+                    .map(|d| noshape_app_core::ui_script::mark(d, || format!("menu:{}", s.label())))
                     .h(px(22.))
                     .px(px(16.))
                     .flex()

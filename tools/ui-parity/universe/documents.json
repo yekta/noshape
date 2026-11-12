@@ -6301,6 +6301,11 @@
        "button": "Sort tabs"
       },
       "do": "click"
+     },
+     {
+      "on": {
+       "menu": "re:^(Tab order|Name: A → Z|Name: Z → A|Type)$"
+      }
      }
     ]
    ]

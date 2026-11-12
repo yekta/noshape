@@ -1,0 +1,39 @@
+{
+ "name": "doc-tm-sort-type",
+ "about": "Tab manager: Sort tabs › Type, then back to Tab order",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit: marks)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Sort tabs"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Type"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Sort tabs"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Tab order"
+   }
+  }
+ ]
+}

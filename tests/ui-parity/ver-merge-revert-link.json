@@ -1,0 +1,39 @@
+{
+ "name": "ver-merge-revert-link",
+ "about": "merge B1 into Main, then the notice's Revert to before this merge: Main back as before (no hole)",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit: marks)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Merge"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Revert to before this merge"
+   }
+  }
+ ]
+}

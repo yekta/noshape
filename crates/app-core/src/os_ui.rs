@@ -538,7 +538,9 @@ pub fn message_bubble_with_link(
     on_close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
     cx: &App,
 ) -> Stateful<Div> {
-    message_bubble(id, kind, message, on_close, cx).child(div().id("bubble-link").ml(px(-6.)).cursor_pointer().font_weight(FontWeight::SEMIBOLD).underline().child(link.into()).on_click(on_link))
+    let link: SharedString = link.into();
+    let name = link.clone();
+    message_bubble(id, kind, message, on_close, cx).child(crate::ui_script::mark(div().id("bubble-link").ml(px(-6.)).cursor_pointer().font_weight(FontWeight::SEMIBOLD).underline().child(link), move || format!("button:{name}")).on_click(on_link))
 }
 
 /// Onshape's form select (Bootstrap `form-control` select, live DOM): full

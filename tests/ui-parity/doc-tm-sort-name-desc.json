@@ -1,0 +1,27 @@
+{
+ "name": "doc-tm-sort-name-desc",
+ "about": "Tab manager: Sort tabs › Name: Z → A, the list reversed by name",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit: marks)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Sort tabs"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Name: Z → A"
+   }
+  }
+ ]
+}

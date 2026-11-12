@@ -1471,6 +1471,7 @@ impl FeatureStudioView {
             .child(div().size(px(10.)).rounded_full().bg(if on { rgb(0xffffff) } else { rgb(0xbbbbbb) }));
         let row = h_flex()
             .id("fs-co-complete")
+            .map(|d| crate::ui_script::mark(d, || "checkbox:Co-complete".into()))
             .ml(px(10.))
             .h(px(30.))
             .gap(px(6.))

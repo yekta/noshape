@@ -57,9 +57,10 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 - Gap audit (lead 11-12): 34 scenarios (source "studios 11-12 (gap audit)") for merges with both sides edited, a
   version merged, merge + Undo, restore confirmed / its cards / + Undo, branches with names and versions on them, history
   search and keys, tab folders and the Tab manager's folder rows, Feature Studio autocomplete inside a function body,
-  Monitor ▾ profile stop, Preferences' shortcut tabs and Labs. All run on ours; live asked (REQUESTS 10:36). Missing
-  marks the audit found: the merge notice's "Revert to before this merge" link (os_ui.rs:541), the Co-complete switch
-  (feature_studio.rs:1473), the Tab manager's Sort rows (tab_manager.rs:690). ver-crow-restore clicks a change row's
+  Monitor ▾ profile stop, Preferences' shortcut tabs and Labs. All run on ours; live asked (REQUESTS 10:36). The marks
+  the audit found missing are in (11:40): a notice's link is `button:<link>`, the Co-complete switch
+  `checkbox:Co-complete`, the Tab manager's Sort rows `menu:<label>`; 4 more scenarios use them (ver-merge-revert-link,
+  doc-tm-sort-name-desc, doc-tm-sort-type, fs-co-complete-off). ver-crow-restore clicks a change row's
   "Restore to Main…", which ours leaves out on purpose (live 2351).
 
 ### 2026-11-12 07:33 UTC: release management against Onshape's help (lead 11-12; behaviours "lead (2026-11-11 02:15 UTC)")

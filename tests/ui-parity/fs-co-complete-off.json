@@ -1,0 +1,27 @@
+{
+ "name": "fs-co-complete-off",
+ "about": "Labs off: the Feature Studio's Co-complete switch greyed, its tooltip says to enable Onshape Labs, a click changes nothing",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit: marks)",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "checkbox": "Co-complete"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Co-complete"
+   }
+  }
+ ]
+}

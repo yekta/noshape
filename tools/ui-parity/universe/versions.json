@@ -2745,6 +2745,29 @@
    ]
   },
   {
+   "id": "mg-revert-link",
+   "category": "merge",
+   "name": "Revert to before this merge",
+   "where": "the Merged … into … notice's link",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:38661",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Merge into current workspace…"
+      }
+     },
+     {
+      "on": {
+       "button": "Revert to before this merge"
+      }
+     }
+    ]
+   ]
+  },
+  {
    "id": "mg-cancel",
    "category": "merge",
    "name": "Cancel",
