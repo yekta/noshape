@@ -9,20 +9,41 @@ cli-chamfer-hang-pre's Linear pattern 2 "Select a pattern direction." (Ok on v0.
 the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
-- **On:** (1) a fast gate, `tools/bool/gate.sh <branch>` (below); (2) then spheres and tori in our Boolean:
-  learning-center-michael's round tools (lcm 41701bb2) and Fillet 2's ball / torus cut, which `fillet_by_tools`
-  (features.cpp) sends straight to OCCT (`others`). cf-surface-pattern's Surface Pattern 3 is bool's (c7c9d0ff).
+- **On:** (1) a fast gate, `tools/bool/gate.sh <branch>` (below); (2) spheres and tori in our Boolean:
+  learning-center-michael's ring cut (lcm 41701bb2) and Fillet 2's ball / torus cut (f71e381d, vibe4
+  ~/agents/bool-corpora/mf2), which `fillet_by_tools` (features.cpp) sends straight to OCCT (`others`). cf-surface-pattern's
+  Surface Pattern 3 is bool's (c7c9d0ff).
 - **gate.sh** runs bool's gate as one command and prints one verdict line: VERDICT PASS / CHECK / FAIL. It covers every
   corpus in whyall.sh plus shfall, kg.sh's knurls and gears, and the model suite. It also times k25-15, k25-25 and
   cf-spur-gear on our side only (`NOSHAPE_BREP_OURS_ONLY`), main's binary and the branch's alternating, best of 3.
   - Each distinct case is replayed once: the corpora hold 5,327 case files but 2,896 distinct cases (same inputs, op
     and expected result).
-  - The cases run in shards (directories of links) over a job pool. The model suite runs in shards too, through
-    `NOSHAPE_PARITY_ONLY` lists.
+  - The cases run in shards (directories of links) over a job pool. The heavy corpora (shfall, knurls, gears: up to
+    16 GB a process) get a pool of two; any shard starts only with memory free. Eight at once were OOM-killed.
+  - OCCT's results and the facts the replay reads of them (records, validity, volume, unify) are kept by case
+    (`NOSHAPE_BREP_OCCT_CACHE`), keyed by what OCCT's path is built from: crates/kernel's src and cpp, brep's
+    mesh / nurbs / lib.rs, the lock file, the patches, /opt/occt. A crates/brep branch pays OCCT once. k25-15's
+    replay goes 88 -> 37 s.
   - Main's results are cached on the host (~/agents/bool-gate/cache). The key is the git trees the test binary is
     built from, plus the corpora, OCCT's libraries and the models. A branch's results are cached too: once it lands,
     they serve as main's.
   - Host side: tools/bool/gate-host.py. Full log: /root/<caller>-scratch/gate-<sha>.log. One gate per host at a time.
+- **Measured (vibe4, load 25-100):** the old serial gate is about 2.5 h (corpora + parity56 13 min x2 (branch and main),
+  kg + kt about 35 min x2, the model suite 30 min x2). The first sharded run without the OCCT cache spent 25+ min on
+  k25-25's single case (OCCT's 80 s cut at 2 threads under load). The cache removes that from every gate after the first.
+- **lcm (branch bool2-fixes, gating):** OCCT's section of a round and a ring, both tangent to the top plane at a corner, crosses
+  the round's straight edge at about 50 degrees 23 um before the corner, runs 8 um out and hooks back into the corner.
+  OCCT's own pcurve on the round has the same hook. OCCT puts no vertex there: the edge only touches the ring. Ours now
+  treats it as no crossing, starts the section's 2D curve on that face at the crossing (so it leaves the corner
+  inside), merges the curve's start into a crossing within its tolerance (OCCT's pave), and lets a made cylinder face
+  pass its input's angles by up to 1000 tolerances. Cut taken, identical to OCCT. The app's Boolean: 0.9-1.2 s (our
+  decline + OCCT) -> 0.6 s. T1 bool_patterns::a_section_hooking_over_an_edge_into_a_corner_cut_as_occt.
+- **mf2 (branch bool2-fixes, gating):** the mitre ball (box minus sphere) has its equator ending on the sphere's seam:
+  its curve on the sphere ends at 2π, the vertex placed at 0, so both its ends came out at one place and the ball's
+  lower piece was lost. A vertex's parameter on an edge's curve on a face that goes round is now the nearest of its
+  turns. Cut taken, identical to OCCT: 283 ms against OCCT's 961. `fillet_by_tools` now tries our Boolean for the
+  balls' and rings' cut too (quick_boolean, not straight to OCCT). T1
+  bool_patterns::a_ball_whose_edge_ends_on_its_sphere_seam_cut_as_occt.
 - Don't touch: bool's seam-end / touching work (bool-main2, bool-touch); Shell (by_quadrics).
 
 ## Queue (lead 11-11 08:10 and 09:25 UTC)
