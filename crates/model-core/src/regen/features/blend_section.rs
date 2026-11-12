@@ -484,8 +484,11 @@ fn trimmed_run_on(shape: &Shape, supports: [usize; 2], (tool, names): (Shape, Ve
     }
     let mut walls = Vec::new();
     let mut refaced = Vec::new();
+    // (Boxes first: a distance to each of the knife's faces took 100 ms of its Fillet 2.)
+    let boxes: Vec<k::BoundingBox> = run_on.iter().filter_map(|p| p.bounding_box(false).ok()).collect();
+    let near_box = |f: &Shape| f.bounding_box(false).map_or(true, |b| boxes.iter().any(|r| (b.min - DVec3::splat(tol)).cmple(r.max).all() && r.min.cmple(b.max + DVec3::splat(tol)).all()));
     for (i, f) in shape.faces().iter().enumerate() {
-        if supports.contains(&i) || !run_on.iter().any(|p| k::distance(f, p).is_ok_and(|d| d.distance <= tol)) {
+        if supports.contains(&i) || !near_box(f) || !run_on.iter().any(|p| k::distance(f, p).is_ok_and(|d| d.distance <= tol)) {
             continue;
         }
         if matches!(f.face_surface()?, k::Surface::BSpline { .. }) {
