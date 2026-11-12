@@ -652,6 +652,17 @@ def compare(live, ours, whole_document=True):
         bd = (b or {}).get("dialog")
         if isinstance(bd, dict) and str(live.get("recorded", "")) < panel_read_since(bd.get("title")) and (a or {}).get("dialog") is None:
             b = dict(b, dialog=None)
+        # A file picked for an import: ours imports at once, live's upload takes seconds and its "… has been imported"
+        # toast shows only in the next wait (doc-file-tab-update, doc-plus-import-png; psui 11-12): not compared at the
+        # pick, live's slowness isn't copied.
+        if (step or {}).get("do") == "pick_files" and (a or {}).get("message") is None and "has been imported" in str((b or {}).get("message") or ""):
+            b = dict(b, message=None)
+        # The same upload: live's new tab still reads as a plain file at the pick (doc-plus-import-png's image tab).
+        if (step or {}).get("do") == "pick_files":
+            ta, tb = (((a or {}).get("document") or {}).get("tabs") or []), (((b or {}).get("document") or {}).get("tabs") or [])
+            for x, y in zip(ta, tb):
+                if isinstance(x, dict) and isinstance(y, dict) and x.get("kind") == "file" and x.get("name") == y.get("name"):
+                    y["kind"] = "file"
         # A toast shows from the action that raised it: after the step before's reading (ver-protection-enable: live's
         # was gone 3.4 s after the reading that first showed it, 7.5 s after the step before).
         if isinstance((a or {}).get("message"), str) and t is not None:
@@ -786,6 +797,11 @@ def compare(live, ours, whole_document=True):
             dr = side.get("drawing")
             if isinstance(dr, dict) and isinstance(dr.get("annotations"), list):
                 dr["annotations"] = sorted(dr["annotations"], key=lambda x: (str(x.get("kind")), str(x.get("text")), [round(v) for v in (x.get("position") or [])]))
+        # Live's recorder reads a table cell's text with its MText codes ("{\\pxql;AB}", live2 drw-table-cell-dblclick-type),
+        # which it strips from notes: read as the plain text.
+        for x in ((a.get("drawing") or {}).get("annotations") or []):
+            if x.get("kind") == "table" and isinstance(x.get("text"), str):
+                x["text"] = " ".join(re.sub(r"[{}]", "", re.sub(r"\\[A-Za-z][^;{}]*;", "", x["text"])).split())
         # Live's recorder can't read a table's cells (its text is null there).
         anns = [((side.get("drawing") or {}).get("annotations") or []) for side in (a, b)]
         if any(x.get("kind") == "table" and x.get("text") is None for x in anns[0]):

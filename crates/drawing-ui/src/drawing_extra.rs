@@ -2286,15 +2286,10 @@ impl DrawingEditor {
         };
         let (row, col) = self.built.as_ref().and_then(|b| b.table_layout(table)).and_then(|l| l.cell_at(self.cursor)).map(|(r, c)| t.anchor_cell(r, c)).unwrap_or((0, 0));
         let text = cells.get(row).and_then(|r| r.get(col)).cloned().unwrap_or_default();
-        // Live 1143 / behaviours "Note panel popups" (6): an empty cell is
-        // selected (table selected, the cell grey) with the Cell panel; a cell
-        // with text is edited in place.
-        if text.trim().is_empty() {
-            self.selection = vec![Sel::Table(table)];
-            self.cell_sel = Some(crate::drawing_cells::CellSel { table, a: (row, col), b: (row, col) });
-            cx.notify();
-            return;
-        }
+        // A cell, empty or not, is edited in place in the Note editor (live2 drw-table-cell-dblclick-type, lead 11-12).
+        self.fresh_table = None;
+        // The double-click's first click selected the cell: once the text is in, nothing stays selected (live2).
+        self.cell_sel = None;
         let input = self.textarea(&text, 3, window, cx);
         let note = self.cell_note(table, row, col, window, cx);
         // Live 755 / 756: a general table cell is edited with the table

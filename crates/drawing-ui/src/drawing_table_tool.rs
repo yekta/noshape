@@ -85,6 +85,7 @@ impl DrawingEditor {
             let input = self.textarea("", 1, window, cx);
             let note = self.cell_note(id, 0, 0, window, cx);
             self.panel = Some(Panel::Cell { table: id, row: 0, col: 0, input, note });
+            self.fresh_table = Some(id);
         }
         self.table_tool = None;
         self.tool = Tool::Select;

@@ -28,6 +28,17 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-12 20:48 UTC: drawing positions from live2's takes (lead: the three anchors), table cells, import toasts
+- Section / detail labels sit 3.1 mm under their view's geometry (scale and user labels 6 mm): live2 positions put
+  SECTION A - A ~3.1 mm, SCALE 2:1 ~5.6 mm under (build.rs). A note's `position` is its text's box (no leader); a new
+  note with a leader has its text centred on the click (a plain note hangs from it). New general tables' columns are
+  0.8 in (20.32 mm; a mm drawing's isn't recorded). Drawing suite 184 -> 187/215 before the table fixes.
+- Table cells: a double-click edits any cell (empty too) in the Note editor (lead 11-12), the table stays in the state
+  and no tool shows (only a table just made by ✓ is still the Table tool and hidden, `fresh_table`); the cell isn't left
+  selected after. run.py strips MText codes from live's table text. drw-table* 24/28 (the 4 revision tables unrecordable).
+- run.py (psui 11-12): at a `pick_files` step ours' "… has been imported" toast and the new tab's kind aren't compared
+  against live's still-uploading state; doc-file-tab-update and doc-plus-import-png match.
+
 ### 2026-11-12 19:24 UTC: live2's 35 drawing takes (06b0ba9b); `position`; file dialogs (P1)
 - P1 (user, landed e06b09c8): file dialogs start in the folder last chosen per purpose (save / open / document),
   `file_dialogs.json` in the config folder; a deleted folder falls back to the documents folder.

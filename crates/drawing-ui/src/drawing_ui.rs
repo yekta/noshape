@@ -387,7 +387,15 @@ impl DrawingEditor {
                     // New notes take Drawing properties › Notes text height;
                     // a typed height becomes the new Notes default.
                     let sheet = self.sheet;
-                    if let Some(note) = noshape_scene::drawing_tools::new_note(&mut self.drawing, sheet, text, h, style, pos) {
+                    if let Some(mut note) = noshape_scene::drawing_tools::new_note(&mut self.drawing, sheet, text, h, style, pos) {
+                        // A note with a leader: its text centred on the click, the leader meeting its side (live2
+                        // drw-note-leader-edge-first; a plain note hangs from it).
+                        if let AnnotationKind::Note { text, height_mm, style } = &note.kind
+                            && !style.leaders.is_empty()
+                        {
+                            let b = noshape_model::drawing::note::layout(text, *height_mm, style, note.position).bbox;
+                            note.position[1] += (b[3] - b[1]).abs() / 2.0;
+                        }
                         self.edit_sheet("Note", cx, |s| s.annotations.push(note));
                         // Live (UNDO3): a new note takes two undo steps, the
                         // 1st a client-only text-editing entry.

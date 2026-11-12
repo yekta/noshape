@@ -215,8 +215,8 @@ impl DrawingEditor {
             .collect()
     }
 
-    /// Where live's recorder places an annotation (live2 16:46, sheet mm in tenths): a dimension at its text's centre,
-    /// anything else at the centre of its box; none for lines, centerlines and centermarks, which have no box.
+    /// Where live's recorder places an annotation (live2 16:46, sheet mm in tenths): a dimension or a note at its text's
+    /// centre, anything else at the centre of its box; none for lines, centerlines and centermarks, which have no box.
     fn ui_position(&self, kind: &str, of: impl Fn(&PickTarget) -> bool) -> Option<[i64; 2]> {
         if matches!(kind, "line" | "centerline" | "centermark") {
             return None;
@@ -224,7 +224,8 @@ impl DrawingEditor {
         let b = self.built.as_ref()?;
         let mine = |pick: u32| b.picks.get(pick as usize).is_some_and(&of);
         let mut points: Vec<[f64; 2]> = b.geometry.texts.iter().filter(|t| mine(t.pick)).flat_map(noshape_model::drawing::font::text_box).collect();
-        if kind != "dimension" || points.is_empty() {
+        // A note's box is its text's (live: its leader isn't in it).
+        if !matches!(kind, "dimension" | "note") || points.is_empty() {
             points.extend(b.geometry.lines.iter().filter(|l| mine(l.pick)).flat_map(|l| l.points.iter().copied()));
         }
         let first = *points.first()?;
@@ -266,7 +267,7 @@ impl DrawingEditor {
             // (A hole table isn't in live's exports, nor its recorder's state: live 2134.)
             // (A table whose cell is in its Note editor isn't in live's state yet: it shows after the editor closes.)
             let editing = match &self.panel {
-                Some(crate::drawing_view::Panel::Cell { table, note: Some(_), .. }) => Some(*table),
+                Some(crate::drawing_view::Panel::Cell { table, note: Some(_), .. }) if self.fresh_table == Some(*table) => Some(*table),
                 _ => None,
             };
             // (Nor a custom table: live2 drw-custom-table-insert lists none after placing one; nor a cut list,
@@ -532,7 +533,7 @@ impl DrawingEditor {
             "Hatch region"
         } else if self.painter.is_some() {
             "Format painter"
-        } else if matches!(self.panel, Some(crate::drawing_view::Panel::Cell { note: Some(_), .. })) {
+        } else if matches!(&self.panel, Some(crate::drawing_view::Panel::Cell { table, note: Some(_), .. }) if self.fresh_table == Some(*table)) {
             // A new table's cell in its Note editor: still the Table tool (live 2184).
             "Table"
         } else if self.inspection.as_ref().is_some_and(|d| d.reorder.is_none() && d.edit.is_none()) {

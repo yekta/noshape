@@ -351,8 +351,9 @@ impl HatchOpts {
 
 // ------------------------------------------------------------ table tool
 
-/// New general tables: column width and row height (mm).
-pub const TABLE_COL_W: f64 = 28.0;
+/// New general tables' column width (mm): 0.8 in (live2 drw-table-cell-dblclick-type: a 2-column table 40.6 mm wide on
+/// an inch drawing; a mm drawing's isn't recorded).
+pub const TABLE_COL_W: f64 = 20.32;
 
 /// Table dialog: rows and columns as typed (defaults 2, clamped 1–60 and 1–20).
 pub fn table_size(rows: &str, cols: &str) -> (usize, usize) {

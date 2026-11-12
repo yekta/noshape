@@ -2330,7 +2330,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // own selectable item, moved freely by `label_at`.
             let label_pick = picks.id(PickTarget::ViewLabel(v.id));
             let at = v.label_at.unwrap_or_default();
-            let mut y = pl.min[1] - 6.0;
+            // The gap to the first line's top: a section's or detail's own label sits closer than a scale or user
+            // label (live2 positions: SECTION A - A ~3.1 mm, SCALE 2:1 ~5.6 mm below the geometry).
+            let mut y = pl.min[1] - if auto_label { 3.1 } else { 6.0 };
             let label_mark = g.texts.len();
             for (text, height) in label_lines {
                 y -= height;

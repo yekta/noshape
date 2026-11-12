@@ -104,7 +104,8 @@ as the app's own config files, written into the run's config directory before it
 - `{"do": "drag", "from": TARGET, "to": TARGET}`.
 - `{"do": "pick_files", "files": ["uip-asm.step"]}`: answers the file dialog the step before opened with files of
   `files/` (no dialog shows on either side: live's runner intercepts the browser's, ours the app's while a scenario
-  runs); the step fails with "no file dialog is open" when none waits.
+  runs); the step fails with "no file dialog is open" when none waits. Ours imports at once, live's upload takes seconds:
+  an import's "… has been imported" toast isn't compared at the pick step itself (live's shows in the next wait).
   A save dialog (Export, Download) doesn't show while a scenario runs: ours saves at once into the run's documents
   folder, as live's browser downloads.
 - `{"do": "wait", "until": "regenerated" | "dialog" | "ms", "ms": 500}`. Each side also waits, after every step,
