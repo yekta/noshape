@@ -1,6 +1,6 @@
 {
  "scenario": "shell-new-edit-reedit",
- "recorded": "2026-11-12T11:13:48.292Z",
+ "recorded": "2026-11-12T15:37:19.525Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -10,7 +10,7 @@
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "329598f0e3185fbfccf8c39a",
+  "element": "a1741ce250da87c11b66897a",
   "start": "block",
   "startElement": "392bca590892e6ffb484a34b",
   "runner": "live2 .nstate-uip-3.json"
@@ -263,7 +263,7 @@
     },
     "measure": null
    },
-   "t": 29483
+   "t": 30398
   },
   {
    "step": 2,
@@ -431,7 +431,7 @@
     },
     "measure": null
    },
-   "t": 34172
+   "t": 35064
   },
   {
    "step": 3,
@@ -619,7 +619,7 @@
     },
     "measure": null
    },
-   "t": 39180
+   "t": 40278
   },
   {
    "step": 4,
@@ -809,7 +809,7 @@
     },
     "measure": null
    },
-   "t": 41672
+   "t": 42887
   },
   {
    "step": 5,
@@ -993,7 +993,7 @@
     },
     "measure": null
    },
-   "t": 43899
+   "t": 45160
   },
   {
    "step": 6,
@@ -1185,7 +1185,7 @@
     },
     "measure": null
    },
-   "t": 47131
+   "t": 48185
   },
   {
    "step": 7,
@@ -1369,7 +1369,7 @@
     },
     "measure": null
    },
-   "t": 51848
+   "t": 53298
   },
   {
    "step": 8,
@@ -1553,7 +1553,7 @@
     },
     "measure": null
    },
-   "t": 56441
+   "t": 57985
   },
   {
    "step": 9,
@@ -1652,7 +1652,7 @@
     },
     "measure": null
    },
-   "t": 59373
+   "t": 61179
   },
   {
    "step": 10,
@@ -1745,7 +1745,7 @@
     },
     "measure": null
    },
-   "t": 63979
+   "t": 66079
   },
   {
    "step": 11,
@@ -1929,7 +1929,7 @@
     },
     "measure": null
    },
-   "t": 69351
+   "t": 71059
   },
   {
    "step": 12,
@@ -2107,52 +2107,60 @@
     },
     "measure": null
    },
-   "t": 74098
+   "t": 75744
   },
   {
    "step": 13,
    "do": {
     "do": "click",
     "on": {
-     "checkbox": "Hollow"
+     "field": "Shell thickness"
     }
    },
    "ok": true,
    "at": [
-    289,
-    122
+    388,
+    201
    ],
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "div",
-     "label": "Parts to hollow",
+     "tag": "input",
+     "label": "Shell thickness",
+     "text": "1 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
      "dialog": "Shell 1"
     },
     "dialog": {
      "title": "Shell 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Hollow",
        "kind": "boolean",
-       "checked": true,
+       "checked": false,
        "state": "ok"
       },
       {
-       "label": "Parts to hollow",
+       "label": "Faces to remove",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Face of Extrude 1"
+       ],
        "active": true,
-       "state": "error"
+       "state": "ok"
       },
       {
        "label": "Shell thickness",
        "kind": "number",
        "text": "1 mm",
-       "focused": false,
+       "focused": true,
        "state": "ok"
       },
       {
@@ -2168,28 +2176,30 @@
     "dialogs": [
      {
       "title": "Shell 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Hollow",
         "kind": "boolean",
-        "checked": true,
+        "checked": false,
         "state": "ok"
        },
        {
-        "label": "Parts to hollow",
+        "label": "Faces to remove",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Face of Extrude 1"
+        ],
         "active": true,
-        "state": "error"
+        "state": "ok"
        },
        {
         "label": "Shell thickness",
         "kind": "number",
         "text": "1 mm",
-        "focused": false,
+        "focused": true,
         "state": "ok"
        },
        {
@@ -2206,8 +2216,14 @@
     "panels": null,
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -2225,18 +2241,394 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Shell 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Shell 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 78417
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "type",
+    "text": "2"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Shell thickness",
+     "text": "2",
+     "selection": [
+      1,
+      1
+     ],
+     "all": false,
+     "dialog": "Shell 1"
+    },
+    "dialog": {
+     "title": "Shell 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Hollow",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Faces to remove",
+       "kind": "query",
+       "items": [
+        "Face of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Shell thickness",
+       "kind": "number",
+       "text": "2",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Shell 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Hollow",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Faces to remove",
+        "kind": "query",
+        "items": [
+         "Face of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Shell thickness",
+        "kind": "number",
+        "text": "2",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Shell 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Shell 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 80686
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     388,
+     200
+    ],
+    "hover": [],
+    "element": "input.os-param-number.dropdown-source"
+   },
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Shell thickness",
+     "text": "2 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
+     "dialog": "Shell 1"
+    },
+    "dialog": {
+     "title": "Shell 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Hollow",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Faces to remove",
+       "kind": "query",
+       "items": [
+        "Face of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Shell thickness",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Shell 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Hollow",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Faces to remove",
+        "kind": "query",
+        "items": [
+         "Face of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Shell thickness",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Shell 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Shell 1"
@@ -2281,10 +2673,10 @@
     },
     "measure": null
    },
-   "t": 78083
+   "t": 83980
   },
   {
-   "step": 14,
+   "step": 16,
    "do": {
     "do": "wait",
     "until": "regenerated"
@@ -2293,34 +2685,42 @@
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "div",
-     "label": "Parts to hollow",
+     "tag": "input",
+     "label": "Shell thickness",
+     "text": "2 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
      "dialog": "Shell 1"
     },
     "dialog": {
      "title": "Shell 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Hollow",
        "kind": "boolean",
-       "checked": true,
+       "checked": false,
        "state": "ok"
       },
       {
-       "label": "Parts to hollow",
+       "label": "Faces to remove",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Face of Extrude 1"
+       ],
        "active": true,
-       "state": "error"
+       "state": "ok"
       },
       {
        "label": "Shell thickness",
        "kind": "number",
-       "text": "1 mm",
-       "focused": false,
+       "text": "2 mm",
+       "focused": true,
        "state": "ok"
       },
       {
@@ -2336,28 +2736,30 @@
     "dialogs": [
      {
       "title": "Shell 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Hollow",
         "kind": "boolean",
-        "checked": true,
+        "checked": false,
         "state": "ok"
        },
        {
-        "label": "Parts to hollow",
+        "label": "Faces to remove",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Face of Extrude 1"
+        ],
         "active": true,
-        "state": "error"
+        "state": "ok"
        },
        {
         "label": "Shell thickness",
         "kind": "number",
-        "text": "1 mm",
-        "focused": false,
+        "text": "2 mm",
+        "focused": true,
         "state": "ok"
        },
        {
@@ -2374,8 +2776,14 @@
     "panels": null,
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -2393,18 +2801,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Shell 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Shell 1"
@@ -2449,10 +2857,194 @@
     },
     "measure": null
    },
-   "t": 83070
+   "t": 88589
   },
   {
-   "step": 15,
+   "step": 17,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Shell thickness",
+     "text": "2 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
+     "dialog": "Shell 1"
+    },
+    "dialog": {
+     "title": "Shell 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Hollow",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Faces to remove",
+       "kind": "query",
+       "items": [
+        "Face of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Shell thickness",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Shell 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Hollow",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Faces to remove",
+        "kind": "query",
+        "items": [
+         "Face of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Shell thickness",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Shell 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Shell 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 93175
+  },
+  {
+   "step": 18,
    "do": {
     "do": "click",
     "on": {
@@ -2498,12 +3090,12 @@
       },
       {
        "name": "Shell 1",
-       "state": "error",
+       "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Shell 1"
@@ -2548,10 +3140,10 @@
     },
     "measure": null
    },
-   "t": 86563
+   "t": 96373
   },
   {
-   "step": 16,
+   "step": 19,
    "do": {
     "do": "wait",
     "until": "regenerated"
@@ -2591,12 +3183,12 @@
       },
       {
        "name": "Shell 1",
-       "state": "error",
+       "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Shell 1"
@@ -2641,10 +3233,10 @@
     },
     "measure": null
    },
-   "t": 91297
+   "t": 100991
   },
   {
-   "step": 17,
+   "step": 20,
    "do": {
     "do": "dblclick",
     "on": {
@@ -2660,32 +3252,34 @@
     "focus": {
      "kind": "field",
      "tag": "div",
-     "label": "Parts to hollow",
+     "label": "Faces to remove",
      "dialog": "Shell 1"
     },
     "dialog": {
      "title": "Shell 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Hollow",
        "kind": "boolean",
-       "checked": true,
+       "checked": false,
        "state": "ok"
       },
       {
-       "label": "Parts to hollow",
+       "label": "Faces to remove",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Face of Extrude 1"
+       ],
        "active": true,
-       "state": "error"
+       "state": "ok"
       },
       {
        "label": "Shell thickness",
        "kind": "number",
-       "text": "1 mm",
+       "text": "2 mm",
        "focused": false,
        "state": "ok"
       },
@@ -2702,27 +3296,29 @@
     "dialogs": [
      {
       "title": "Shell 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Hollow",
         "kind": "boolean",
-        "checked": true,
+        "checked": false,
         "state": "ok"
        },
        {
-        "label": "Parts to hollow",
+        "label": "Faces to remove",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Face of Extrude 1"
+        ],
         "active": true,
-        "state": "error"
+        "state": "ok"
        },
        {
         "label": "Shell thickness",
         "kind": "number",
-        "text": "1 mm",
+        "text": "2 mm",
         "focused": false,
         "state": "ok"
        },
@@ -2740,8 +3336,14 @@
     "panels": null,
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -2759,18 +3361,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Shell 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Shell 1"
@@ -2815,10 +3417,10 @@
     },
     "measure": null
    },
-   "t": 96182
+   "t": 105712
   },
   {
-   "step": 18,
+   "step": 21,
    "do": {
     "do": "wait",
     "until": "dialog"
@@ -2828,32 +3430,34 @@
     "focus": {
      "kind": "field",
      "tag": "div",
-     "label": "Parts to hollow",
+     "label": "Faces to remove",
      "dialog": "Shell 1"
     },
     "dialog": {
      "title": "Shell 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Hollow",
        "kind": "boolean",
-       "checked": true,
+       "checked": false,
        "state": "ok"
       },
       {
-       "label": "Parts to hollow",
+       "label": "Faces to remove",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Face of Extrude 1"
+       ],
        "active": true,
-       "state": "error"
+       "state": "ok"
       },
       {
        "label": "Shell thickness",
        "kind": "number",
-       "text": "1 mm",
+       "text": "2 mm",
        "focused": false,
        "state": "ok"
       },
@@ -2870,27 +3474,29 @@
     "dialogs": [
      {
       "title": "Shell 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Hollow",
         "kind": "boolean",
-        "checked": true,
+        "checked": false,
         "state": "ok"
        },
        {
-        "label": "Parts to hollow",
+        "label": "Faces to remove",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Face of Extrude 1"
+        ],
         "active": true,
-        "state": "error"
+        "state": "ok"
        },
        {
         "label": "Shell thickness",
         "kind": "number",
-        "text": "1 mm",
+        "text": "2 mm",
         "focused": false,
         "state": "ok"
        },
@@ -2908,8 +3514,14 @@
     "panels": null,
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -2927,18 +3539,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Shell 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Shell 1"
@@ -2983,10 +3595,10 @@
     },
     "measure": null
    },
-   "t": 101805
+   "t": 110327
   },
   {
-   "step": 19,
+   "step": 22,
    "do": {
     "do": "key",
     "key": "Escape"
@@ -2998,7 +3610,7 @@
      339
     ],
     "hover": [
-     "FwahjXsEwN0PAw9_1"
+     "FvNKR0MyjM7Dqpo_1"
     ],
     "element": "span.os-list-item-name"
    },
@@ -3036,12 +3648,12 @@
       },
       {
        "name": "Shell 1",
-       "state": "error",
+       "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Shell 1"
@@ -3086,10 +3698,10 @@
     },
     "measure": null
    },
-   "t": 105857
+   "t": 114038
   },
   {
-   "step": 20,
+   "step": 23,
    "do": {
     "do": "wait",
     "until": "regenerated"
@@ -3129,12 +3741,12 @@
       },
       {
        "name": "Shell 1",
-       "state": "error",
+       "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Shell 1"
@@ -3179,7 +3791,7 @@
     },
     "measure": null
    },
-   "t": 110526
+   "t": 118631
   }
  ]
 }

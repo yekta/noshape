@@ -1,6 +1,6 @@
 {
  "scenario": "sweep-new-edit-reedit",
- "recorded": "2026-11-12T11:00:50.423Z",
+ "recorded": "2026-11-12T15:47:47.885Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -10,7 +10,7 @@
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "890dc4764ec8d55255e57dbc",
+  "element": "5c36b70fbe1a82f008070a61",
   "start": "block",
   "startElement": "392bca590892e6ffb484a34b",
   "runner": "live2 .nstate-uip-3.json"
@@ -357,7 +357,7 @@
     },
     "measure": null
    },
-   "t": 36051
+   "t": 30775
   },
   {
    "step": 2,
@@ -619,7 +619,7 @@
     },
     "measure": null
    },
-   "t": 41412
+   "t": 35475
   },
   {
    "step": 3,
@@ -901,7 +901,7 @@
     },
     "measure": null
    },
-   "t": 47033
+   "t": 39859
   },
   {
    "step": 4,
@@ -1173,7 +1173,7 @@
     },
     "measure": null
    },
-   "t": 49973
+   "t": 42418
   },
   {
    "step": 5,
@@ -1489,7 +1489,7 @@
     },
     "measure": null
    },
-   "t": 54523
+   "t": 46748
   },
   {
    "step": 6,
@@ -1792,7 +1792,7 @@
     },
     "measure": null
    },
-   "t": 59313
+   "t": 51339
   },
   {
    "step": 7,
@@ -1891,7 +1891,7 @@
     },
     "measure": null
    },
-   "t": 63810
+   "t": 54312
   },
   {
    "step": 8,
@@ -1984,7 +1984,7 @@
     },
     "measure": null
    },
-   "t": 68792
+   "t": 58859
   },
   {
    "step": 9,
@@ -2296,7 +2296,7 @@
     },
     "measure": null
    },
-   "t": 75121
+   "t": 63333
   },
   {
    "step": 10,
@@ -2602,40 +2602,37 @@
     },
     "measure": null
    },
-   "t": 80471
+   "t": 68111
   },
   {
    "step": 11,
    "do": {
     "do": "click",
     "on": {
-     "tab": "Surface"
+     "tab": "Add"
     }
    },
    "ok": true,
    "at": [
-    358,
-    121
+    312,
+    149
    ],
    "state": {
     "focus": {
-     "kind": "field",
-     "tag": "div",
-     "label": "Edges and sketch curves to sweep",
-     "dialog": "Sweep 1"
+     "kind": "none"
     },
     "dialog": {
      "title": "Sweep 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [
       {
        "label": "Solid",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Surface",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Thin",
@@ -2643,18 +2640,28 @@
       },
       {
        "label": "New",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Add",
+       "selected": true
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
        "selected": false
       }
      ],
      "fields": [
       {
-       "label": "Edges and sketch curves to sweep",
+       "label": "Faces and sketch regions to sweep",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Face of Extrude 1"
+       ],
        "active": true,
        "state": "ok"
       },
@@ -2696,6 +2703,21 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
+      },
+      {
+       "label": "Merge with all",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
       }
      ],
      "error": null,
@@ -2704,16 +2726,16 @@
     "dialogs": [
      {
       "title": "Sweep 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [
        {
         "label": "Solid",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Surface",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Thin",
@@ -2721,18 +2743,28 @@
        },
        {
         "label": "New",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Add",
+        "selected": true
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
         "selected": false
        }
       ],
       "fields": [
        {
-        "label": "Edges and sketch curves to sweep",
+        "label": "Faces and sketch regions to sweep",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Face of Extrude 1"
+        ],
         "active": true,
         "state": "ok"
        },
@@ -2774,6 +2806,21 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
+       },
+       {
+        "label": "Merge with all",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
        }
       ],
       "error": null,
@@ -2783,8 +2830,14 @@
     "panels": null,
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHC"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -2802,18 +2855,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Sweep 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Sweep 1"
@@ -2823,10 +2876,10 @@
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": true,
+     "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -2858,7 +2911,7 @@
     },
     "measure": null
    },
-   "t": 84210
+   "t": 70611
   },
   {
    "step": 12,
@@ -2869,23 +2922,20 @@
    "ok": true,
    "state": {
     "focus": {
-     "kind": "field",
-     "tag": "div",
-     "label": "Edges and sketch curves to sweep",
-     "dialog": "Sweep 1"
+     "kind": "none"
     },
     "dialog": {
      "title": "Sweep 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [
       {
        "label": "Solid",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Surface",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Thin",
@@ -2893,18 +2943,28 @@
       },
       {
        "label": "New",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Add",
+       "selected": true
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
        "selected": false
       }
      ],
      "fields": [
       {
-       "label": "Edges and sketch curves to sweep",
+       "label": "Faces and sketch regions to sweep",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Face of Extrude 1"
+       ],
        "active": true,
        "state": "ok"
       },
@@ -2946,6 +3006,21 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
+      },
+      {
+       "label": "Merge with all",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
       }
      ],
      "error": null,
@@ -2954,16 +3029,16 @@
     "dialogs": [
      {
       "title": "Sweep 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [
        {
         "label": "Solid",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Surface",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Thin",
@@ -2971,18 +3046,28 @@
        },
        {
         "label": "New",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Add",
+        "selected": true
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
         "selected": false
        }
       ],
       "fields": [
        {
-        "label": "Edges and sketch curves to sweep",
+        "label": "Faces and sketch regions to sweep",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Face of Extrude 1"
+        ],
         "active": true,
         "state": "ok"
        },
@@ -3024,6 +3109,21 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
+       },
+       {
+        "label": "Merge with all",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
        }
       ],
       "error": null,
@@ -3033,8 +3133,14 @@
     "panels": null,
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHC"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -3052,18 +3158,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Sweep 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Sweep 1"
@@ -3073,10 +3179,10 @@
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": true,
+     "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -3108,7 +3214,7 @@
     },
     "measure": null
    },
-   "t": 89967
+   "t": 75209
   },
   {
    "step": 13,
@@ -3157,12 +3263,12 @@
       },
       {
        "name": "Sweep 1",
-       "state": "error",
+       "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Sweep 1"
@@ -3207,7 +3313,7 @@
     },
     "measure": null
    },
-   "t": 94377
+   "t": 78265
   },
   {
    "step": 14,
@@ -3250,12 +3356,12 @@
       },
       {
        "name": "Sweep 1",
-       "state": "error",
+       "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Sweep 1"
@@ -3300,7 +3406,7 @@
     },
     "measure": null
    },
-   "t": 99392
+   "t": 82824
   },
   {
    "step": 15,
@@ -3319,21 +3425,21 @@
     "focus": {
      "kind": "field",
      "tag": "div",
-     "label": "Edges and sketch curves to sweep",
+     "label": "Faces and sketch regions to sweep",
      "dialog": "Sweep 1"
     },
     "dialog": {
      "title": "Sweep 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [
       {
        "label": "Solid",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Surface",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Thin",
@@ -3341,18 +3447,28 @@
       },
       {
        "label": "New",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Add",
+       "selected": true
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
        "selected": false
       }
      ],
      "fields": [
       {
-       "label": "Edges and sketch curves to sweep",
+       "label": "Faces and sketch regions to sweep",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Face of Extrude 1"
+       ],
        "active": true,
        "state": "ok"
       },
@@ -3394,6 +3510,21 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
+      },
+      {
+       "label": "Merge with all",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
       }
      ],
      "error": null,
@@ -3402,16 +3533,16 @@
     "dialogs": [
      {
       "title": "Sweep 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [
        {
         "label": "Solid",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Surface",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Thin",
@@ -3419,18 +3550,28 @@
        },
        {
         "label": "New",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Add",
+        "selected": true
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
         "selected": false
        }
       ],
       "fields": [
        {
-        "label": "Edges and sketch curves to sweep",
+        "label": "Faces and sketch regions to sweep",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Face of Extrude 1"
+        ],
         "active": true,
         "state": "ok"
        },
@@ -3472,6 +3613,21 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
+       },
+       {
+        "label": "Merge with all",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
        }
       ],
       "error": null,
@@ -3481,8 +3637,14 @@
     "panels": null,
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHC"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -3500,18 +3662,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Sweep 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Sweep 1"
@@ -3524,7 +3686,7 @@
      "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -3556,7 +3718,7 @@
     },
     "measure": null
    },
-   "t": 105594
+   "t": 86812
   },
   {
    "step": 16,
@@ -3569,21 +3731,21 @@
     "focus": {
      "kind": "field",
      "tag": "div",
-     "label": "Edges and sketch curves to sweep",
+     "label": "Faces and sketch regions to sweep",
      "dialog": "Sweep 1"
     },
     "dialog": {
      "title": "Sweep 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [
       {
        "label": "Solid",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Surface",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Thin",
@@ -3591,18 +3753,28 @@
       },
       {
        "label": "New",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Add",
+       "selected": true
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
        "selected": false
       }
      ],
      "fields": [
       {
-       "label": "Edges and sketch curves to sweep",
+       "label": "Faces and sketch regions to sweep",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Face of Extrude 1"
+       ],
        "active": true,
        "state": "ok"
       },
@@ -3644,6 +3816,21 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
+      },
+      {
+       "label": "Merge with all",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
       }
      ],
      "error": null,
@@ -3652,16 +3839,16 @@
     "dialogs": [
      {
       "title": "Sweep 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [
        {
         "label": "Solid",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Surface",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Thin",
@@ -3669,18 +3856,28 @@
        },
        {
         "label": "New",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Add",
+        "selected": true
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
         "selected": false
        }
       ],
       "fields": [
        {
-        "label": "Edges and sketch curves to sweep",
+        "label": "Faces and sketch regions to sweep",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Face of Extrude 1"
+        ],
         "active": true,
         "state": "ok"
        },
@@ -3722,6 +3919,21 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
+       },
+       {
+        "label": "Merge with all",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
        }
       ],
       "error": null,
@@ -3731,8 +3943,14 @@
     "panels": null,
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHC"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -3750,18 +3968,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Sweep 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Sweep 1"
@@ -3774,7 +3992,7 @@
      "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -3806,7 +4024,7 @@
     },
     "measure": null
    },
-   "t": 110830
+   "t": 91378
   },
   {
    "step": 17,
@@ -3821,7 +4039,7 @@
      339
     ],
     "hover": [
-     "F6abjnRMksHGKoT_1"
+     "FUWzZE9RNmLPVaz_1"
     ],
     "element": "span.os-list-item-name"
    },
@@ -3859,12 +4077,12 @@
       },
       {
        "name": "Sweep 1",
-       "state": "error",
+       "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Sweep 1"
@@ -3909,7 +4127,7 @@
     },
     "measure": null
    },
-   "t": 115370
+   "t": 95063
   },
   {
    "step": 18,
@@ -3952,12 +4170,12 @@
       },
       {
        "name": "Sweep 1",
-       "state": "error",
+       "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Sweep 1"
@@ -4002,7 +4220,7 @@
     },
     "measure": null
    },
-   "t": 120297
+   "t": 99633
   }
  ]
 }

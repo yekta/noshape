@@ -1,6 +1,6 @@
 {
  "scenario": "loft-new-edit-reedit",
- "recorded": "2026-11-12T11:03:02.908Z",
+ "recorded": "2026-11-12T15:39:24.886Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -10,9 +10,9 @@
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "61eb016120406a527c7cba07",
-  "start": "block",
-  "startElement": "392bca590892e6ffb484a34b",
+  "element": "05b028304201d77a40dc4863",
+  "start": "overlap",
+  "startElement": "29eb680b1e9e8dcfeeda496e",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -46,14 +46,33 @@
      "related": false,
      "hidden": false,
      "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
     }
    ],
-   "rollbackAfter": "Extrude 1"
+   "rollbackAfter": "Extrude 2"
   },
   "parts": [
-   "Part 1"
+   "Part 1",
+   "Part 2"
   ],
-  "partsHeading": "Parts (1)",
+  "partsHeading": "Parts (2)",
   "undo": {
    "undo": false,
    "redo": false
@@ -302,6 +321,24 @@
        "cls": ""
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
        "name": "Loft 1",
        "state": "error",
        "selected": true,
@@ -314,9 +351,10 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
@@ -353,7 +391,7 @@
     },
     "measure": null
    },
-   "t": 37249
+   "t": 29082
   },
   {
    "step": 2,
@@ -560,6 +598,24 @@
        "cls": ""
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
        "name": "Loft 1",
        "state": "error",
        "selected": true,
@@ -572,9 +628,10 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
@@ -611,7 +668,7 @@
     },
     "measure": null
    },
-   "t": 42207
+   "t": 33818
   },
   {
    "step": 3,
@@ -619,7 +676,7 @@
     "do": "click",
     "on": {
      "face": [
-      20,
+      10,
       15,
       10
      ]
@@ -630,8 +687,8 @@
     "JHK"
    ],
    "at": [
-    1173,
-    482
+    1141,
+    473
    ],
    "state": {
     "focus": {
@@ -834,6 +891,24 @@
        "cls": "related-highlight"
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
        "name": "Loft 1",
        "state": "error",
        "selected": true,
@@ -846,9 +921,10 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": true,
      "redo": false
@@ -885,7 +961,7 @@
     },
     "measure": null
    },
-   "t": 47343
+   "t": 38027
   },
   {
    "step": 4,
@@ -893,19 +969,19 @@
     "do": "click",
     "on": {
      "face": [
-      20,
+      45,
       15,
-      0
+      15
      ]
     }
    },
    "ok": true,
    "hover": [
-    "JHC"
+    "JKK"
    ],
    "at": [
-    1173,
-    514
+    1251,
+    489
    ],
    "state": {
     "focus": {
@@ -930,11 +1006,11 @@
       },
       {
        "label": "New",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Add",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Remove",
@@ -949,7 +1025,7 @@
       {
        "label": "Profiles",
        "kind": "other",
-       "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+       "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
        "state": "ok"
       },
       {
@@ -987,21 +1063,6 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -1027,11 +1088,11 @@
        },
        {
         "label": "New",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Add",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Remove",
@@ -1046,7 +1107,7 @@
        {
         "label": "Profiles",
         "kind": "other",
-        "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+        "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
         "state": "ok"
        },
        {
@@ -1084,21 +1145,6 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
        }
       ],
       "error": null,
@@ -1117,8 +1163,8 @@
       },
       {
        "kind": "FACE",
-       "owner": "Part 1",
-       "id": "JHC"
+       "owner": "Part 2",
+       "id": "JKK"
       }
      ]
     },
@@ -1143,6 +1189,24 @@
        "cls": "related-highlight"
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": true,
@@ -1155,14 +1219,16 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -1194,7 +1260,7 @@
     },
     "measure": null
    },
-   "t": 52444
+   "t": 42580
   },
   {
    "step": 5,
@@ -1226,11 +1292,11 @@
       },
       {
        "label": "New",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Add",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Remove",
@@ -1245,7 +1311,7 @@
       {
        "label": "Profiles",
        "kind": "other",
-       "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+       "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
        "state": "ok"
       },
       {
@@ -1283,21 +1349,6 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -1323,11 +1374,11 @@
        },
        {
         "label": "New",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Add",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Remove",
@@ -1342,7 +1393,7 @@
        {
         "label": "Profiles",
         "kind": "other",
-        "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+        "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
         "state": "ok"
        },
        {
@@ -1380,21 +1431,6 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
        }
       ],
       "error": null,
@@ -1413,8 +1449,8 @@
       },
       {
        "kind": "FACE",
-       "owner": "Part 1",
-       "id": "JHC"
+       "owner": "Part 2",
+       "id": "JKK"
       }
      ]
     },
@@ -1439,6 +1475,24 @@
        "cls": "related-highlight"
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": true,
@@ -1451,14 +1505,16 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -1490,7 +1546,7 @@
     },
     "measure": null
    },
-   "t": 57177
+   "t": 47122
   },
   {
    "step": 6,
@@ -1538,6 +1594,24 @@
        "cls": ""
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": false,
@@ -1550,9 +1624,11 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": true,
      "redo": false
@@ -1589,7 +1665,7 @@
     },
     "measure": null
    },
-   "t": 60473
+   "t": 49984
   },
   {
    "step": 7,
@@ -1631,6 +1707,24 @@
        "cls": ""
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": false,
@@ -1643,9 +1737,11 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": true,
      "redo": false
@@ -1682,7 +1778,7 @@
     },
     "measure": null
    },
-   "t": 65195
+   "t": 54580
   },
   {
    "step": 8,
@@ -1695,7 +1791,7 @@
    "ok": true,
    "at": [
     70,
-    339
+    391
    ],
    "state": {
     "focus": {
@@ -1723,11 +1819,11 @@
       },
       {
        "label": "New",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Add",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Remove",
@@ -1742,7 +1838,7 @@
       {
        "label": "Profiles",
        "kind": "other",
-       "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+       "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
        "state": "ok"
       },
       {
@@ -1780,21 +1876,6 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -1820,11 +1901,11 @@
        },
        {
         "label": "New",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Add",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Remove",
@@ -1839,7 +1920,7 @@
        {
         "label": "Profiles",
         "kind": "other",
-        "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+        "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
         "state": "ok"
        },
        {
@@ -1877,21 +1958,6 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
        }
       ],
       "error": null,
@@ -1910,8 +1976,8 @@
       },
       {
        "kind": "FACE",
-       "owner": "Part 1",
-       "id": "JHC"
+       "owner": "Part 2",
+       "id": "JKK"
       }
      ]
     },
@@ -1936,6 +2002,24 @@
        "cls": "related-highlight"
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": true,
@@ -1948,14 +2032,16 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": false,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -1987,7 +2073,7 @@
     },
     "measure": null
    },
-   "t": 70246
+   "t": 59701
   },
   {
    "step": 9,
@@ -2022,11 +2108,11 @@
       },
       {
        "label": "New",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Add",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Remove",
@@ -2041,7 +2127,7 @@
       {
        "label": "Profiles",
        "kind": "other",
-       "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+       "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
        "state": "ok"
       },
       {
@@ -2079,21 +2165,6 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -2119,11 +2190,11 @@
        },
        {
         "label": "New",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Add",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Remove",
@@ -2138,7 +2209,7 @@
        {
         "label": "Profiles",
         "kind": "other",
-        "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+        "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
         "state": "ok"
        },
        {
@@ -2176,21 +2247,6 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
        }
       ],
       "error": null,
@@ -2209,8 +2265,8 @@
       },
       {
        "kind": "FACE",
-       "owner": "Part 1",
-       "id": "JHC"
+       "owner": "Part 2",
+       "id": "JKK"
       }
      ]
     },
@@ -2235,6 +2291,24 @@
        "cls": "related-highlight"
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": true,
@@ -2247,14 +2321,16 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": false,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -2286,7 +2362,7 @@
     },
     "measure": null
    },
-   "t": 75173
+   "t": 64428
   },
   {
    "step": 10,
@@ -2334,11 +2410,11 @@
       },
       {
        "label": "New",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Add",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Remove",
@@ -2353,7 +2429,7 @@
       {
        "label": "Profiles",
        "kind": "other",
-       "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+       "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
        "state": "ok"
       },
       {
@@ -2398,21 +2474,6 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -2438,11 +2499,11 @@
        },
        {
         "label": "New",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Add",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Remove",
@@ -2457,7 +2518,7 @@
        {
         "label": "Profiles",
         "kind": "other",
-        "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+        "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
         "state": "ok"
        },
        {
@@ -2502,21 +2563,6 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
        }
       ],
       "error": null,
@@ -2535,8 +2581,8 @@
       },
       {
        "kind": "FACE",
-       "owner": "Part 1",
-       "id": "JHC"
+       "owner": "Part 2",
+       "id": "JKK"
       }
      ]
     },
@@ -2561,6 +2607,24 @@
        "cls": "related-highlight"
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": true,
@@ -2573,14 +2637,16 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -2612,7 +2678,7 @@
     },
     "measure": null
    },
-   "t": 80595
+   "t": 70090
   },
   {
    "step": 11,
@@ -2653,11 +2719,11 @@
       },
       {
        "label": "New",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Add",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Remove",
@@ -2672,7 +2738,7 @@
       {
        "label": "Profiles",
        "kind": "other",
-       "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+       "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
        "state": "ok"
       },
       {
@@ -2717,21 +2783,6 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -2757,11 +2808,11 @@
        },
        {
         "label": "New",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Add",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Remove",
@@ -2776,7 +2827,7 @@
        {
         "label": "Profiles",
         "kind": "other",
-        "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+        "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
         "state": "ok"
        },
        {
@@ -2821,21 +2872,6 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
        }
       ],
       "error": null,
@@ -2854,8 +2890,8 @@
       },
       {
        "kind": "FACE",
-       "owner": "Part 1",
-       "id": "JHC"
+       "owner": "Part 2",
+       "id": "JKK"
       }
      ]
     },
@@ -2880,6 +2916,24 @@
        "cls": "related-highlight"
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": true,
@@ -2892,14 +2946,16 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -2931,7 +2987,7 @@
     },
     "measure": null
    },
-   "t": 85215
+   "t": 74825
   },
   {
    "step": 12,
@@ -2979,6 +3035,24 @@
        "cls": ""
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": false,
@@ -2991,9 +3065,11 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": true,
      "redo": false
@@ -3030,7 +3106,7 @@
     },
     "measure": null
    },
-   "t": 88820
+   "t": 77840
   },
   {
    "step": 13,
@@ -3072,6 +3148,24 @@
        "cls": ""
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": false,
@@ -3084,9 +3178,11 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": true,
      "redo": false
@@ -3123,7 +3219,7 @@
     },
     "measure": null
    },
-   "t": 93450
+   "t": 82384
   },
   {
    "step": 14,
@@ -3136,7 +3232,7 @@
    "ok": true,
    "at": [
     70,
-    339
+    391
    ],
    "state": {
     "focus": {
@@ -3164,11 +3260,11 @@
       },
       {
        "label": "New",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Add",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Remove",
@@ -3183,7 +3279,7 @@
       {
        "label": "Profiles",
        "kind": "other",
-       "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+       "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
        "state": "ok"
       },
       {
@@ -3228,21 +3324,6 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -3268,11 +3349,11 @@
        },
        {
         "label": "New",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Add",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Remove",
@@ -3287,7 +3368,7 @@
        {
         "label": "Profiles",
         "kind": "other",
-        "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+        "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
         "state": "ok"
        },
        {
@@ -3332,21 +3413,6 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
        }
       ],
       "error": null,
@@ -3365,8 +3431,8 @@
       },
       {
        "kind": "FACE",
-       "owner": "Part 1",
-       "id": "JHC"
+       "owner": "Part 2",
+       "id": "JKK"
       }
      ]
     },
@@ -3391,6 +3457,24 @@
        "cls": "related-highlight"
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": true,
@@ -3403,14 +3487,16 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": false,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -3442,7 +3528,7 @@
     },
     "measure": null
    },
-   "t": 98384
+   "t": 88464
   },
   {
    "step": 15,
@@ -3477,11 +3563,11 @@
       },
       {
        "label": "New",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Add",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Remove",
@@ -3496,7 +3582,7 @@
       {
        "label": "Profiles",
        "kind": "other",
-       "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+       "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
        "state": "ok"
       },
       {
@@ -3541,21 +3627,6 @@
        "kind": "boolean",
        "checked": false,
        "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -3581,11 +3652,11 @@
        },
        {
         "label": "New",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Add",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Remove",
@@ -3600,7 +3671,7 @@
        {
         "label": "Profiles",
         "kind": "other",
-        "text": "Profiles Face of Extrude 1 × Face of Extrude 1 ×",
+        "text": "Profiles Face of Extrude 1 × Face of Extrude 2 ×",
         "state": "ok"
        },
        {
@@ -3645,21 +3716,6 @@
         "kind": "boolean",
         "checked": false,
         "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
        }
       ],
       "error": null,
@@ -3678,8 +3734,8 @@
       },
       {
        "kind": "FACE",
-       "owner": "Part 1",
-       "id": "JHC"
+       "owner": "Part 2",
+       "id": "JKK"
       }
      ]
     },
@@ -3704,6 +3760,24 @@
        "cls": "related-highlight"
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": true,
@@ -3716,14 +3790,16 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": false,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -3755,7 +3831,7 @@
     },
     "measure": null
    },
-   "t": 103125
+   "t": 93082
   },
   {
    "step": 16,
@@ -3767,10 +3843,10 @@
    "pointer": {
     "at": [
      70,
-     339
+     391
     ],
     "hover": [
-     "FxfDRwrYCCGo9lU_1"
+     "FDYmjb5xcjS517T_2"
     ],
     "element": "span.os-list-item-name"
    },
@@ -3807,6 +3883,24 @@
        "cls": ""
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": false,
@@ -3819,9 +3913,11 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": true,
      "redo": false
@@ -3858,7 +3954,7 @@
     },
     "measure": null
    },
-   "t": 107033
+   "t": 96889
   },
   {
    "step": 17,
@@ -3900,6 +3996,24 @@
        "cls": ""
       },
       {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
        "name": "Loft 1",
        "state": "ok",
        "selected": false,
@@ -3912,9 +4026,11 @@
      "rollbackAfter": "Loft 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2",
+     "Part 3"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (3)",
     "undo": {
      "undo": true,
      "redo": false
@@ -3951,7 +4067,7 @@
     },
     "measure": null
    },
-   "t": 111682
+   "t": 101497
   }
  ]
 }
