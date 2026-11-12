@@ -3534,6 +3534,14 @@ static bool solid_inside_out(const TopoDS_Shape& solid)
   return g.Mass() < 0;
 }
 
+bool shape_inside_out(const OcShape& s)
+{
+  for (TopExp_Explorer e(s.shape, TopAbs_SOLID); e.More(); e.Next())
+    if (solid_inside_out(e.Current()))
+      return true;
+  return false;
+}
+
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy, bool touching_only, bool scaled_inputs)

@@ -4166,44 +4166,80 @@ fn a_round_over_a_tube_end_rolls_the_ball_over_the_rim_as_live() {
     }
 }
 
-/// A face a unify merges after a boolean goes by each of its parents' names: a reference made under another parent's
-/// (v0.4.43 named a merged face by the boolean result's order; in v0.4.44 hat15's SSD pad sketches lost their plane)
-/// still finds it, and an edge of it named through that parent too.
+/// A face a unify merges after a boolean goes by the names its parents from the same argument would have given it (an
+/// older version picked among them by their order, which the result's geometry can move): a reference made under one
+/// of them still finds it (hat15's SSD pad sketches, made in v0.4.43, lost their plane in v0.4.44). Not a tool's: the
+/// old naming never named it that, and finding it there drafted a part inside out (qa rust-zero-solid-f197).
 #[test]
 fn a_merged_face_is_found_by_another_parents_name() {
     let mut s = Studio::new();
-    let block = |s: &mut Studio, x0: f64| {
+    let rect = |s: &mut Studio, pts: &[(f64, f64)]| {
         let mut sk = noshape_sketch::Sketch::new();
-        polyline(&mut sk, &[(x0, 0.0), (x0 + 10.0, 0.0), (x0 + 10.0, 10.0), (x0, 10.0)], true);
+        polyline(&mut sk, pts, true);
         let id = s.sketch(Reference::Plane(DatumPlane::Top), sk);
         s.region(id)
     };
-    let a = block(&mut s, 0.0);
+    let block = rect(&mut s, &[(0.0, 0.0), (30.0, 0.0), (30.0, 10.0), (0.0, 10.0)]);
     s.add("extrude", |p| {
-        p.set("entities", q(a));
-        p.set("depth", expr("5 mm"));
+        p.set("entities", q(block));
+        p.set("depth", expr("10 mm"));
     });
-    let b = block(&mut s, 10.0);
-    let second = s.add("extrude", |p| {
-        p.set("entities", q(b));
+    // A groove across the top: its two sides, pieces of the block's top.
+    let groove = rect(&mut s, &[(10.0, 0.0), (20.0, 0.0), (20.0, 10.0), (10.0, 10.0)]);
+    s.add("extrude", |p| {
+        p.set("entities", q(groove));
+        p.set("startOffset", ParamValue::Bool(true));
+        p.set("startOffsetDistance", expr("5 mm"));
+        p.set("depth", expr("10 mm"));
+        p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let right = face_at(&r, 0, DVec3::new(mm(25.0), mm(5.0), mm(10.0)));
+    let left = face_at(&r, 0, DVec3::new(mm(5.0), mm(5.0), mm(10.0)));
+    // Filled again: the two sides and the filler's top are one face.
+    let fill = rect(&mut s, &[(10.0, 0.0), (20.0, 0.0), (20.0, 10.0), (10.0, 10.0)]);
+    let filler = s.add("extrude", |p| {
+        p.set("entities", q(fill));
+        p.set("startOffset", ParamValue::Bool(true));
+        p.set("startOffsetDistance", expr("5 mm"));
         p.set("depth", expr("5 mm"));
         p.set("operationType", en("NEW"));
     });
-    // The second block's top by itself, as a reference made then names it.
     let r = s.ok();
-    let top = face_at(&r, 1, DVec3::new(mm(15.0), mm(5.0), mm(5.0)));
-    // Added to the first block: the two tops are one face, named by the first block's.
-    let f = s.ps.features.iter_mut().find(|f| f.id == second).unwrap();
+    let filler_top = face_at(&r, 1, DVec3::new(mm(15.0), mm(5.0), mm(10.0)));
+    let f = s.ps.features.iter_mut().find(|f| f.id == filler).unwrap();
     f.params.set("operationType", en("ADD"));
     f.params.set("defaultScope", ParamValue::Bool(true));
     let r = s.ok();
     assert_eq!(r.context.bodies.len(), 1);
-    let Reference::Face(name) = &top else { unreachable!() };
-    assert!(!r.context.bodies[0].faces.iter().any(|n| **n == *name), "the merged face keeps the first block's name");
+    let named = |n: &Reference| r.context.bodies[0].faces.iter().any(|x| Reference::Face((**x).clone()) == *n);
+    assert_eq!(named(&left) as u8 + named(&right) as u8, 1, "the top keeps one side's name");
+    let other = if named(&left) { right } else { left };
     let mut sk = noshape_sketch::Sketch::new();
     polyline(&mut sk, &[(12.0, 2.0), (18.0, 2.0), (18.0, 8.0), (12.0, 8.0)], true);
-    s.sketch(top, sk);
+    s.sketch(other, sk);
     let r = s.ok();
     let plane = r.display.sketches.last().map(|k| k.frame.origin.z);
-    assert!(plane.is_some_and(|z| near(z, mm(5.0), 1e-12)), "{plane:?}");
+    assert!(plane.is_some_and(|z| near(z, mm(10.0), 1e-12)), "{plane:?}");
+    // The filler's own top: a tool's face, not a name the top ever went by.
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(12.0, 2.0), (18.0, 2.0), (18.0, 8.0), (12.0, 8.0)], true);
+    s.sketch(filler_top, sk);
+    let (status, message) = s.last_status();
+    assert_eq!((status, message.as_str()), (FeatureStatus::Error, "Select a sketch plane."));
+}
+
+/// A feature whose result is a solid turned inside out (a negative volume) fails, the part never kept (qa
+/// rust-zero-solid-f197's Draft 5 kept Part 1 at −41,157.74 mm³): here an import of a box whose faces point in.
+#[test]
+fn an_inside_out_part_is_never_kept() {
+    let inside_out = noshape_kernel::make_box_corners(DVec3::ZERO, DVec3::new(mm(10.0), mm(20.0), mm(30.0))).unwrap().reversed().unwrap();
+    assert!(inside_out.has_inside_out_solid());
+    let brep = String::from_utf8(inside_out.to_brep_bytes().unwrap()).unwrap();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.regen();
+    let volumes: Vec<f64> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.shape.volume().unwrap()).collect();
+    assert!(volumes.iter().all(|v| *v > 0.0), "{volumes:?} ({:?} {:?})", r.display.features[0].status, r.display.features[0].message);
 }

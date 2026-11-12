@@ -477,6 +477,7 @@ pub(crate) mod ffi {
         fn shape_oriented(s: &OcShape, orientation: u8) -> Result<UniquePtr<OcShape>>;
         fn shape_hash(s: &OcShape) -> Result<u64>;
         fn shape_is_same(a: &OcShape, b: &OcShape) -> Result<bool>;
+        fn shape_inside_out(s: &OcShape) -> Result<bool>;
         fn shape_is_equal(a: &OcShape, b: &OcShape) -> Result<bool>;
         fn shape_is_partner(a: &OcShape, b: &OcShape) -> Result<bool>;
         fn shape_partner_hash(s: &OcShape) -> Result<u64>;

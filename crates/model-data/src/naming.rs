@@ -165,8 +165,13 @@ pub fn name_faces(input: &FaceNamingInput) -> Vec<Name> {
             }
         };
         if let Some(p) = face_parents.first() {
+            // The names the old naming could have given it: its other parents from the same argument (their order
+            // there decided it; a tool's face never came before the target's), not a tool's (qa rust-zero-solid-f197:
+            // a mirror copy's face named that way, which no older version resolved, then drafted the part inside out).
             if let Some(sink) = input.aliases {
-                sink.borrow_mut().extend(face_parents[1..].iter().map(|q| (named(q), j)));
+                let arg_of = |n: &Name| input.parent_rank.and_then(|r| r(n)).map(|(a, _)| a).or_else(|| parent_key.get(&Arc::as_ptr(n)).map(|k| k.0));
+                let pa = arg_of(p);
+                sink.borrow_mut().extend(face_parents[1..].iter().filter(|q| arg_of(q) == pa).map(|q| (named(q), j)));
             }
             out[j] = Some(named(p));
             continue;

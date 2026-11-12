@@ -449,3 +449,14 @@ fn a_fillet_under_a_short_budget_gives_up() {
     let (again, spent) = with_budget_scope(|| fillet(&plate, &edges, 1.0));
     assert!(!spent && again.is_ok());
 }
+
+/// A solid turned inside out (its faces' normals pointing in: a negative volume) is told from one that isn't.
+#[test]
+fn an_inside_out_solid_is_told() {
+    let b = make_box_corners(DVec3::ZERO, DVec3::new(10.0, 20.0, 30.0)).unwrap();
+    assert!(!b.has_inside_out_solid());
+    assert!(b.reversed().unwrap().has_inside_out_solid());
+    let c = make_cylinder(&Plane::xy(), 5.0, 10.0, std::f64::consts::TAU).unwrap();
+    assert!(!c.has_inside_out_solid());
+    assert!(c.reversed().unwrap().has_inside_out_solid());
+}

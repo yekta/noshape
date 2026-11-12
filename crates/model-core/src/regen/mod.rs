@@ -672,6 +672,15 @@ impl Regenerator {
                         if spent && matches!(result, Ok(Ok(()))) {
                             result = Ok(Err(eval::FeatureError::new("Error regenerating.")));
                         }
+                        // A solid it made or changed that is inside out (its faces' normals pointing in, a negative
+                        // volume) fails the feature, never kept (qa rust-zero-solid-f197's Draft 5: Part 1 −41,157.74
+                        // mm³ for 32,264.11).
+                        if matches!(result, Ok(Ok(()))) {
+                            let before: std::collections::HashSet<*const context::Body> = ctx.bodies.untracked().iter().map(Arc::as_ptr).collect();
+                            if ev.ctx.bodies.untracked().iter().any(|b| b.kind == crate::display::BodyKind::Solid && !before.contains(&Arc::as_ptr(b)) && b.shape.has_inside_out_solid()) {
+                                result = Ok(Err(eval::FeatureError::new("Error regenerating.")));
+                            }
+                        }
                         // Stopped part-way: don't cache a half-done feature.
                         if aborted() {
                             return cancelled();
