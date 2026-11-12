@@ -1735,7 +1735,9 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
                     None => {
                         local.clone_from(start);
                         let iterations = levenberg_marquardt(&problem, &mut local, free, scale, dragged);
-                        if !dragged && free.iter().any(|&b| local[b] != bodies[b].pose) {
+                        // (Not for mates that can't all hold: nothing moves then. Its eigendecompositions of a
+                        // big group's Jacobian took most of infento-subs' 18 s solve.)
+                        if !dragged && free.iter().any(|&b| local[b] != bodies[b].pose) && group_conflict(&problem, start, &local, scale).is_empty() {
                             least_change(&problem, &mut local, free, scale, &anchors);
                         }
                         iterations
@@ -1960,9 +1962,18 @@ fn levenberg_marquardt(problem: &Problem, poses: &mut Vec<Frame>, free: &[usize]
     let core = |v: &[f64]| v[..v.len() - stay_rows].iter().map(|x| x * x).sum::<f64>();
     let mut iterations = 0;
     let mut r2 = Vec::new();
+    // Mates that can't all hold creep toward their least-squares compromise for the whole budget (infento-subs: 79
+    // steps of a 92-part group, 18 s): once five steps gain under 1 % above the bound a conflict is judged by
+    // (`group_conflict`), it stops: that group ends in conflict, its poses unused.
+    let bound = 1e-5 * scale.max(1.0);
+    let mut history: Vec<f64> = Vec::new();
     for it in 0..100 {
         iterations = it + 1;
         if cost.sqrt() < 1e-10 {
+            break;
+        }
+        history.push(cost);
+        if !dragged && history.len() > 5 && cost.sqrt() > bound && cost > 0.99 * history[history.len() - 6] {
             break;
         }
         let jac = jacobian(problem, poses, free, &r, scale, eps);
@@ -2320,6 +2331,23 @@ mod tests {
         let p = bodies[1].pose;
         assert!(p.origin.length() < 1e-6, "{:?}", p.origin);
         assert!((p.transform_point(DVec3::new(0.01, 0.0, 0.0)) - DVec3::new(0.0, 0.0, 0.01)).length() < 1e-3);
+    }
+
+    /// A loop of 30 Fastened links closed by a mate it can't hold (live 1798 a2: every link red, nothing moves):
+    /// the solve stops short of its 100-step budget and leaves every part where it was.
+    #[test]
+    fn a_loop_that_cannot_close_stops_early_and_moves_nothing() {
+        let n = 30;
+        let right = Frame::from_axes(DVec3::new(0.005, 0.0, 0.0), DVec3::X, DVec3::Y);
+        let left = Frame::from_axes(DVec3::new(-0.005, 0.0, 0.0), DVec3::NEG_X, DVec3::Y);
+        let mut bodies: Vec<SolverBody> = (0..n).map(|i| body(DVec3::new(0.01 * i as f64, 0.001 * (i % 3) as f64, 0.0), i == 0)).collect();
+        let start: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        let mut mates: Vec<SolverMate> = (0..n - 1).map(|i| mate(MateType::Fastened, i, right, i + 1, left)).collect();
+        mates.push(mate(MateType::Fastened, n - 1, right, 0, left));
+        let r = solve(&mut bodies, &mates, &[], &[]);
+        assert!(r.iterations < 100, "{} steps", r.iterations);
+        assert!(!r.mate_ok[n - 1], "the closing mate fails");
+        assert!(bodies.iter().zip(&start).all(|(b, s)| b.pose == *s), "nothing moves");
     }
 
     /// Live (behaviours "qa4 round 5 s3 mate flip"): a Ø10×40 pin's top-face
