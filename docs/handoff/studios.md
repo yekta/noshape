@@ -28,6 +28,18 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-12 07:06 UTC: documents coverage 304 -> 310 of 313 (pick_files), a CAD file tab's Update…
+- `{"do": "pick_files", "files": [...]}` (tests/ui-parity/README.md): while a scenario runs, the app's file dialogs
+  (`file_dialogs::request_open_path(s)`) show nothing and wait for it (app-core `ui_script::await_pick` /
+  `answer_pick`), as live's runner intercepts the browser's. The 9 scenarios that open a dialog still match.
+- Six scenarios (source "studios 11-12 (documents coverage: pick_files)"): docs-import-modal-options,
+  docs-import-single, docs-import-split, doc-plus-import-cad, doc-plus-import-png, doc-file-tab-update; `via`
+  chains for the five items in universe/documents.json. Live asked to record them (REQUESTS 07:06).
+- A CAD file tab's Update… imports the new file at once with the Import dialog's defaults, its tabs after the active
+  one, and the toast (live 2430; app-core `file_tab_view::set_reimport`, the app's `import_dialog::reimport`).
+- Left uncovered (3): the Print pop-up blocked toast (a browser's), the quick switcher's hover + mouse-up, shortcuts
+  with the keyboard on the top bar.
+
 ### 2026-11-12 03:25 UTC: the history panel's frame cost (lead 11-12)
 - Timing records now split the first frame into layout / prepaint / paint (`timing.stages`). With Versions and
   history open a frame's layout took 12–38 ms (1 ms on a plain tab) and prepaint 21–66: the panel built every row.
