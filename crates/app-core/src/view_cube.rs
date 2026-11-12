@@ -283,7 +283,9 @@ mod tests {
         assert_eq!(cube_shapes(rot).len(), 10);
         assert!(CubeCell([0, 0, 1]).rotation().abs_diff_eq(Camera::rotation_for(StandardView::Top), 1e-9));
         // Corners give Onshape's trimetric views.
-        assert!(CubeCell([1, -1, 1]).rotation().abs_diff_eq(Camera::rotation_for(StandardView::Trimetric), 1e-6));
+        // Live (ui-parity view-cube-front-then-iso's camera): the front-right-top corner looks down its diagonal.
+        let iso = CubeCell([1, -1, 1]).rotation();
+        assert!((iso * DVec3::NEG_Z).abs_diff_eq(DVec3::new(-1.0, 1.0, -1.0) / 3f64.sqrt(), 1e-12) && (iso * DVec3::Y).z > 0.8, "{iso}");
         let fwd = CubeCell([-1, 1, -1]).rotation() * DVec3::NEG_Z;
         assert!(fwd.z > 0.0 && fwd.x > 0.0 && fwd.y < 0.0, "{fwd}");
         // The roll arcs sit around the cube, which stays inside them.

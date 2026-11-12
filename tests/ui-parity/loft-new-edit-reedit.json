@@ -1,9 +1,9 @@
 {
  "name": "loft-new-edit-reedit",
- "about": "Loft between the box's top and bottom faces; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
+ "about": "Loft between the top faces of the two overlapping parts (Part 1's z 10, Part 2's z 15), then Start profile condition Normal to profile; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
  "area": "psui",
  "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
- "start": "block",
+ "start": "overlap",
  "steps": [
   {
    "do": "click",
@@ -19,7 +19,7 @@
    "do": "click",
    "on": {
     "face": [
-     20,
+     10,
      15,
      10
     ]
@@ -29,9 +29,9 @@
    "do": "click",
    "on": {
     "face": [
-     20,
+     45,
      15,
-     0
+     15
     ]
    }
   },

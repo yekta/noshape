@@ -1,6 +1,6 @@
 {
  "name": "section-view-edit",
- "about": "Section view on Front, ✓, then right-click › Edit section view…, Esc, Turn off section view",
+ "about": "Section view on Front, ✓, then right-click › Edit section view…, Esc (live: the section turns off), right-click again: no section items; Esc",
  "area": "psui",
  "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
  "start": "block",
@@ -48,10 +48,8 @@
    }
   },
   {
-   "do": "click",
-   "on": {
-    "menu": "Turn off section view"
-   }
+   "do": "key",
+   "key": "Escape"
   }
  ]
 }

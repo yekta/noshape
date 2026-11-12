@@ -3118,3 +3118,25 @@ fn a_start_offset_ignores_opposite_direction() {
     let bb = res.context.bodies[0].shape.bounding_box(true).unwrap();
     assert!((bb.max.z - 0.001).abs() < 1e-9 && (bb.min.z + 0.005).abs() < 1e-9, "{bb:?}");
 }
+
+/// std booleanStepEditLogic: a Sweep whose tool is the part itself (its front face along its right top edge) merges
+/// into it, Add (live ui-parity sweep-new-edit-reedit): our evCollision found neither solid inside the other.
+#[test]
+fn a_sweep_rebuilding_the_part_adds_to_it() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.03, "10 mm");
+    let res = t.ok();
+    let b = res.context.bodies[0].clone();
+    let front = face_with_normal(&b, DVec3::NEG_Y);
+    let path = edge_near(&b, DVec3::new(0.04, 0.015, 0.01));
+    let sw = t.add("sweep", &[("profiles", q(vec![front.clone()]))]);
+    let at = t.ps.features.iter().position(|f| f.id == sw).unwrap();
+    let ctx = t.reg.regenerate(&t.ps, &ConfigValues::default(), &t.units, &RegenOptions { upto: Some(at), ..Default::default() }).context;
+    let f = t.ps.features[at].clone();
+    let old = f.params.clone();
+    let mut new = old.clone();
+    new.set("path", q(vec![path]));
+    let changed = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), "sweep", f.id, &f.name, &t.units, &old, &new, &["profiles".to_string(), "path".to_string()], true).expect("std's editing logic ran");
+    assert_eq!(changed.get("operationType"), Some(&ParamValue::Enum("ADD".into())), "{changed:?}");
+    assert_eq!(changed.query("booleanScope"), [Reference::Body(b.id.clone())]);
+}

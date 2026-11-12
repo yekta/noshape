@@ -1,6 +1,6 @@
 {
  "name": "sweep-new-edit-reedit",
- "about": "Sweep the box's front face along its top right edge; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
+ "about": "Sweep the box's front face along its top right edge, then Add; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
  "area": "psui",
  "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
  "start": "block",
@@ -68,7 +68,7 @@
   {
    "do": "click",
    "on": {
-    "tab": "Surface"
+    "tab": "Add"
    }
   },
   {

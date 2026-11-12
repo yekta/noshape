@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CAUSES = {}
 KEYS = ["focus", "dialog", "list", "selection", "features", "parts", "message", "tooltip"]
 # Added later (README "undo", "sketch", "assembly"): compared once live's recording has them.
-LATER_KEYS = ["undo", "sketch", "assembly", "drawing", "document", "documents", "preferences", "variables", "featurestudio"]
+LATER_KEYS = ["undo", "sketch", "assembly", "drawing", "document", "documents", "preferences", "variables", "featurestudio", "camera", "measure"]
 # Read from the main page, which a drawing's iframe leaves alone (README "### Drawings"): not compared there.
 NOT_IN_DRAWINGS = {"selection", "undo", "assembly"}
 
@@ -482,7 +482,13 @@ def drop_rows(state, drop):
 # The Insert dialog's fixed text (live reads its rows too, but its lane document holds other runs' studios).
 INSERT_FIXED = {"Current document", "Other documents", "Standard content", "Part Studios", "Assemblies", "(Search Part Studios)", "(Search Assemblies)"}
 # Panels live's recorder read only from these times on: ours isn't compared against older takes there.
-PANELS_READ_SINCE = {"Insert parts and assemblies": "2026-11-09T00:00"}
+PANELS_READ_SINCE = {"Insert parts and assemblies": "2026-11-09T00:00", "Named views": "2026-11-12T00:00", "Material": "2026-11-12T00:00", "Dependencies of": "2026-11-12T00:00"}
+
+
+def panel_read_since(title):
+    """When live's recorder started reading a panel (a "Dependencies of …" panel by its prefix)."""
+    title = str(title or "")
+    return PANELS_READ_SINCE.get(title) or next((v for k, v in PANELS_READ_SINCE.items() if k.endswith(" of") and title.startswith(k + " ")), "")
 
 
 def reference_manager_as_panel(a, b):
@@ -503,6 +509,31 @@ def reference_manager_as_panel(a, b):
         text += str(f.get("text") or "").split()
     text.append(db.get("okLabel"))
     return dict(b, dialog={"kind": "panel", "title": "Reference manager", "text": [t for t in text if t is not None]})
+
+
+def camera_compared(state):
+    """`camera` (live's recorder since 2026-11-12): compared by where it looks from, its view direction and up to 3
+    decimals, and its projection; zoom and the window's size are each side's own."""
+    c = (state or {}).get("camera")
+    if not isinstance(c, dict):
+        return state
+    r = lambda v: [round(x, 3) + 0.0 for x in v] if isinstance(v, list) else v
+    return dict(state, camera={"direction": r(c.get("direction")), "up": r(c.get("up")), "orthographic": c.get("orthographic")})
+
+
+def unknown_picks(a, b):
+    """A start feature's pick built over REST by a point ("edge through [...]") reads "Unknown of Extrude 1" in live's
+    chips (fillet-edit-cancel-keeps); a user's pick never does: ours' "Edge of Extrude 1" is the same pick."""
+    da, db = (a or {}).get("dialog"), (b or {}).get("dialog")
+    if not (isinstance(da, dict) and isinstance(db, dict)):
+        return a
+    fields = []
+    for x, y in zip(da.get("fields") or [], db.get("fields") or []):
+        if isinstance(x, dict) and isinstance(y, dict) and isinstance(x.get("items"), list) and isinstance(y.get("items"), list) and len(x["items"]) == len(y["items"]):
+            same = lambda u, v: u == v or (isinstance(u, str) and isinstance(v, str) and u.startswith("Unknown of ") and re.fullmatch(r"(Edge|Face|Vertex) of " + re.escape(u[len("Unknown of "):]), v))
+            x = dict(x, items=[v if same(u, v) else u for u, v in zip(x["items"], y["items"])])
+        fields.append(x)
+    return dict(a, dialog=dict(da, fields=fields + (da.get("fields") or [])[len(fields):]))
 
 
 def old_workspace_labels(a, b):
@@ -602,8 +633,10 @@ def compare(live, ours, whole_document=True):
         tip_blanked = isinstance(a, dict) and "url" not in a and (step or {}).get("do") != "hover"
         a = insert_panel(runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True))
         b = insert_panel(runner_names(old_workspace_labels(a, reference_manager_as_panel(a, json.loads(json.dumps(b)))), start_name, False))
+        a = unknown_picks(a, b)
+        a, b = camera_compared(a), camera_compared(b)
         bd = (b or {}).get("dialog")
-        if isinstance(bd, dict) and str(live.get("recorded", "")) < PANELS_READ_SINCE.get(bd.get("title"), "") and (a or {}).get("dialog") is None:
+        if isinstance(bd, dict) and str(live.get("recorded", "")) < panel_read_since(bd.get("title")) and (a or {}).get("dialog") is None:
             b = dict(b, dialog=None)
         # A toast shows from the action that raised it: after the step before's reading (ver-protection-enable: live's
         # was gone 3.4 s after the reading that first showed it, 7.5 s after the step before).
@@ -635,7 +668,8 @@ def compare(live, ours, whole_document=True):
         if isinstance(a, dict) and a.get("assembly") is not None and a.get("partsHeading") is not None and (b or {}).get("assembly") is None \
                 and (b or {}).get("partsHeading") is not None:
             a = dict(a, assembly=None)
-        keys = KEYS + [k for k in LATER_KEYS if k in (a or {}) and (whole_document or k != "document")]
+        # (camera and measure: also once our side records them, the Part Studio's for now.)
+        keys = KEYS + [k for k in LATER_KEYS if k in (a or {}) and (whole_document or k != "document") and (k not in ("camera", "measure") or k in (b or {}))]
         if (a or {}).get("drawing"):
             keys = [k for k in keys if k not in NOT_IN_DRAWINGS]
         a = {k: (a or {}).get(k) for k in keys}

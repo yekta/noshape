@@ -34,6 +34,9 @@ pub struct DocModel {
     /// assembly Insert session (live undoes all its instances in one step).
     /// Any other edit, undo or redo commits it first.
     pending: PendingEdit,
+    /// The pending edit is only a preview (the appearance editor's colour while typed): Undo stays off until it is
+    /// committed (live ui-parity appearance-editor-hex).
+    pending_preview: bool,
     /// A client-only undo step just above the history entry that produced
     /// `at` (live: a new drawing note's text-editing session, UNDO3): while
     /// that entry is the newest one applied, Undo first pops the step (no
@@ -109,7 +112,7 @@ impl DocModel {
     /// undo/redo stacks (Onshape's page load; the history stays).
     pub fn new(mut session: Session) -> Self {
         session.forget_undo();
-        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None }
+        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None }
     }
 
     /// An info notice with a link after it ([`notice_bubble`] draws it in whichever view shows the notice).
@@ -254,6 +257,7 @@ impl DocModel {
             return None;
         }
         let r = f(&mut self.session.doc.tab_mut(tab)?.content);
+        self.pending_preview = false;
         let tab_name = self.session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
         if let Err(e) = self.pending.note(&mut self.session, tab, || format!("{tab_name} :: {description}")) {
             cx.emit(DocEvent::Error(format!("Could not save change: {e:#}")));
@@ -263,8 +267,17 @@ impl DocModel {
         Some(r)
     }
 
+    /// [`Self::edit_tab_deferred`] for a preview: Undo doesn't offer it until it is committed.
+    pub fn edit_tab_preview<R>(&mut self, tab: TabId, description: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut TabContent) -> R) -> Option<R> {
+        let preview = self.pending.0.is_none() || self.pending_preview;
+        let r = self.edit_tab_deferred(tab, description, cx, f);
+        self.pending_preview = preview;
+        r
+    }
+
     /// Commit the pending edit (if any) as one microversion.
     pub fn flush_pending(&mut self, cx: &mut Context<Self>) {
+        self.pending_preview = false;
         if let Err(e) = self.pending.flush(&mut self.session) {
             cx.emit(DocEvent::Error(format!("Could not save change: {e:#}")));
         }
@@ -277,7 +290,7 @@ impl DocModel {
 
     /// Undo is possible (a pending edit counts: Undo commits then reverts it).
     pub fn can_undo(&self) -> bool {
-        !self.undo_held && !self.comparing && (self.pending.0.is_some() || self.client_step_here(false) || self.session.can_undo())
+        !self.undo_held && !self.comparing && ((self.pending.0.is_some() && !self.pending_preview) || self.client_step_here(false) || self.session.can_undo())
     }
 
     /// Redo is possible (not over a pending edit, whose commit clears it).

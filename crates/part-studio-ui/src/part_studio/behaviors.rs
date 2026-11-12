@@ -413,6 +413,8 @@ pub struct UiState {
     pub mass_variance: bool,
     /// The Mass and section properties panel as the ui-parity state reads it (kept only while the driver runs).
     pub mass_state: Option<serde_json::Value>,
+    /// The bottom-right Measure readout as live's recorder reads it (`measure.readout`: name, value, units).
+    pub measure_readout: Vec<serde_json::Value>,
     /// An in-feature mate connector's own editor beside the feature's dialog (live 1851), while open.
     pub sub_dialog: Option<(Entity<crate::feature_dialog::FeatureDialog>, Subscription)>,
     /// The no-material notice is due (shown ≈ 1 s after measuring; the ui-parity driver waits for it).
@@ -802,6 +804,7 @@ impl UiState {
             mass_reference: None,
             mass_variance: false,
             mass_state: None,
+            measure_readout: Vec::new(),
             sub_dialog: None,
             material_notice_pending: false,
             mass_job: None,
@@ -1319,7 +1322,8 @@ impl PartStudioView {
                         kind_matches(*k, &dummy, f)
                             // A curve picks the region it bounds; part geometry picks its part.
                             || (*k == PickKind::SketchCurve && f.intersects(QueryFilter::SKETCH_REGION))
-                            || (matches!(k, PickKind::Face | PickKind::Edge | PickKind::Vertex) && f.intersects(QueryFilter::BODY))
+                            || (*k == PickKind::Face && f.intersects(QueryFilter::BODY))
+                            || (matches!(k, PickKind::Edge | PickKind::Vertex) && f.intersects(QueryFilter::SOLID_BODY))
                     })
                     .collect(),
             );
@@ -1369,7 +1373,14 @@ impl PartStudioView {
         if !filter.intersects(QueryFilter::BODY) || !matches!(r, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)) {
             return None;
         }
-        self.body_of(r).map(Reference::Body)
+        // Only a body of a kind the field takes (Split's "Entity to split with": sheets, not a solid's edge).
+        let b = self.body_of(r)?;
+        let takes = match self.context.as_ref().and_then(|c| c.body(&b)).map(|b| b.kind) {
+            Some(noshape_model::display::BodyKind::Solid) => filter.intersects(QueryFilter::SOLID_BODY),
+            Some(noshape_model::display::BodyKind::Surface) => filter.intersects(QueryFilter::SHEET_BODY),
+            _ => true,
+        };
+        takes.then_some(Reference::Body(b))
     }
 
     /// Pick target for a reference shown in a list (default geometry, parts).
@@ -4074,7 +4085,10 @@ impl PartStudioView {
         let changes = {
             let Some(studio) = self.studio(cx) else { return };
             let d = dialog.read(cx);
-            noshape_ops::studio::auto_operation(studio, &self.display, &d.feature, &|k| d.user_set.contains(k))
+            // The model before the feature: the preview's own merge takes the picked face away (a Thicken went
+            // back to New when its thickness changed, live keeps Add: ui-parity thicken-new-edit-reedit).
+            let before = self.ui.preview_before.as_deref().unwrap_or(&self.display);
+            noshape_ops::studio::auto_operation(studio, before, &d.feature, &|k| d.user_set.contains(k))
         };
         if changes.is_empty() {
             return;

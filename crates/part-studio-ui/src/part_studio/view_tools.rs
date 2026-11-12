@@ -402,11 +402,11 @@ impl PartStudioView {
                 if matches!(ev, InputEvent::Change) {
                     cx.notify();
                 }
+                // The field keeps the keyboard for the next name (live ui-parity named-views-add).
                 if matches!(ev, InputEvent::PressEnter { .. }) {
                     let name = st.read(cx).value().trim().to_string();
                     this.save_named_view(name, cx);
                     st.update(cx, |s, cx| s.set_value("", window, cx));
-                    window.focus(&this.focus, cx);
                 }
             });
             st.update(cx, |s, cx| s.focus(window, cx));

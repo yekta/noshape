@@ -261,16 +261,16 @@ impl PartStudioView {
                         m = m.item(item("Align view with vertical axis", Box::new(move |this, _, cx| this.align_view_vertical(&ra, cx))));
                     }
                 }
-                // Default and feature planes.
+                // A default plane: its feature list row's menu (live ui-parity plane-graphics-rclick-menu).
+                (Some(r @ Reference::Plane(_)), Some(PickKind::Plane)) => {
+                    m = super::default_geometry_menu(m, &v, r, false, cx);
+                }
+                // Feature planes.
                 (Some(r), Some(PickKind::Plane)) => {
                     if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
                         m = m.item(item(&format!("Edit {name}…"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx)))).separator();
                     }
                     m = m.item(tool("New sketch…", "sketch", "sketch", &r)).item(tool("Offset plane…", "plane", "cPlane", &r));
-                    if matches!(r, Reference::Plane(_)) {
-                        let rz = r.clone();
-                        m = m.item(item("Size to Part Studio", Box::new(move |this, _, cx| this.size_plane_to_studio(rz.clone(), cx))));
-                    }
                     if paste_sketch {
                         let rp = r.clone();
                         m = m.item(item("Paste sketch", Box::new(move |this, _, cx| this.paste_sketch_onto(rp.clone(), cx))));
@@ -606,11 +606,18 @@ impl PartStudioView {
                         if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
                             m = m.item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))));
                         }
-                        let (b1, b2) = (b.clone(), b.clone());
+                        let (b1, b2, rm) = (b.clone(), b.clone(), r.clone());
                         m = m
                             .separator()
-                            // Live: "Edit material for …" once one is assigned.
-                            .item(item(&format!("{} material for {body_name}…", if has_material { "Edit" } else { "Assign" }), Box::new(move |this, w, cx| this.open_material_panel(vec![b1.clone()], w, cx))))
+                            // Live: "Edit material for …" once one is assigned; the clicked entity is selected while the
+                            // panel is open (ui-parity face-rclick-assign-material).
+                            .item(item(&format!("{} material for {body_name}…", if has_material { "Edit" } else { "Assign" }), Box::new(move |this, w, cx| {
+                                if this.selection.is_empty() {
+                                    this.selection = vec![rm.clone()];
+                                    this.refresh_scene(false, cx);
+                                }
+                                this.open_material_panel(vec![b1.clone()], w, cx)
+                            })))
                             .item(item(&format!("Edit appearance for {body_name}…"), Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Parts(vec![b2.clone()]), w, cx))));
                         if k == PickKind::Face {
                             let fs = faces.clone();
@@ -959,6 +966,11 @@ impl PartStudioView {
     /// (live part-studio/81: "Perp planes angle: 90.000 deg", the number in
     /// monospace; a point reads "Point: X↘ … Y↗ … Z↑ …" with colored axes).
     fn selection_readout(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        self.ui.measure_readout.clear();
+        // None while a feature dialog is open (live ui-parity dialog-enter-commits-new, edge-rclick-fillet: measure null).
+        if self.edit.is_some() {
+            return None;
+        }
         let line = if let Some(o) = self.readout_connector_origin() {
             vec![("Point".to_string(), Measurement::Point(o))]
         } else if self.show_mass && self.ui.mass_ref_active {
@@ -985,6 +997,25 @@ impl PartStudioView {
                 .child(crate::ui::measure_value(num).text_color(pal.text))
                 .child(div().child(unit))
         };
+        // The ui-parity state's readout (live: "Area", "1200.000", "mm2").
+        let l = |x: f64| self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx);
+        let readout: Vec<serde_json::Value> = line
+            .iter()
+            .map(|(label, m)| {
+                let (area, volume) = (Dim { length: 2, angle: 0 }, Dim { length: 3, angle: 0 });
+                let text = match *m {
+                    Measurement::Point(pt) => [pt.x, pt.y, pt.z].map(l).join(" "),
+                    Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) | Measurement::Distance { distance: x, .. } => l(x),
+                    Measurement::Area(x) => self.measure_fmt(Quantity::new(x, area), cx),
+                    Measurement::Volume(x) => self.measure_fmt(Quantity::new(x, volume), cx),
+                    Measurement::Angle(x) => self.measure_fmt(Quantity::new(x, Dim::ANGLE), cx),
+                    Measurement::Percent(x) => format!("{} %", noshape_units::to_fixed(x, 2)),
+                };
+                let (value, units) = text.rsplit_once(' ').map(|(v, u)| (v.to_string(), u.replace('²', "2").replace('³', "3"))).unwrap_or((text, String::new()));
+                serde_json::json!({ "name": label, "value": value, "units": units })
+            })
+            .collect();
+        self.ui.measure_readout = readout;
         let l = |x: f64| self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx);
         let mut row = h_flex().gap(px(12.)).pr(px(6.)).text_size(px(13.)).text_color(pal.text_muted).whitespace_nowrap();
         for (label, m) in line {
@@ -1207,6 +1238,7 @@ impl PartStudioView {
                     }
                 }
             }
+            self.ui.mass_state = Some(face_mass_ui_state(&fv, self.ui.mass_ref_active, self.ui.mass_reference.as_ref().map(|r| self.labeler(cx)(r)), variance));
             face_view = Some(fv);
         } else if self.show_mass {
             title = "Mass properties";
@@ -1488,6 +1520,11 @@ impl PartStudioView {
                     .child(label)
                     .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        // Live: the other tab starts empty.
+                        if this.ui.mass_faces != faces {
+                            this.selection.clear();
+                            this.refresh_scene(false, cx);
+                        }
                         this.ui.mass_faces = faces;
                         cx.notify();
                     }))
@@ -1954,6 +1991,33 @@ fn mass_ui_state(m: &MassView, faces: bool, ref_active: bool, variance: bool) ->
     })
 }
 
+/// The Face tab's state as live's recorder reads it (ui-parity mass-properties-face-tab).
+fn face_mass_ui_state(f: &FaceMassView, ref_active: bool, reference: Option<String>, variance: bool) -> serde_json::Value {
+    use serde_json::json;
+    let num = |label: &str, text: &str| json!({ "label": label, "kind": "number", "text": text, "focused": false, "state": "ok" });
+    let toggle = |label: String| json!({ "label": label, "kind": "toggle", "checked": false, "state": "ok" });
+    let cell = |r: usize, c: usize| f.inertia.as_ref().map(|i| i.0[r][c].clone()).unwrap_or_default();
+    let fields = vec![
+        json!({ "label": "Faces to measure", "kind": "query", "items": f.faces, "active": !ref_active, "state": "ok" }),
+        json!({ "label": "Mate connector for reference frame", "kind": "query", "items": reference.into_iter().collect::<Vec<_>>(), "active": ref_active, "state": "ok" }),
+        json!({ "label": "Show calculation variance", "kind": "boolean", "checked": variance, "state": "ok" }),
+        num("Surface area", &f.area),
+        num("Perimeter", &f.perimeter),
+        toggle(format!("Area moment of inertia ({})", f.unit)),
+        num("Lxx", &cell(0, 0)),
+        num("Lxy", &cell(0, 1)),
+        num("Lyx", &cell(1, 0)),
+        num("Lyy", &cell(1, 1)),
+        toggle(format!("Polar moment of inertia ({})", f.unit)),
+        num("Lzz", f.polar.as_deref().unwrap_or_default()),
+    ];
+    json!({
+        "title": "Mass and section properties", "titleState": "ok", "kind": "feature",
+        "tabs": [{ "label": "Part", "selected": false }, { "label": "Face", "selected": true }],
+        "fields": fields, "error": null, "ok": "enabled",
+    })
+}
+
 /// Kind of a measurement for the measure type selector.
 /// A Measure panel row: label, value, X/Y/Z sub-row axis, and the (x)
 /// variable it creates.
@@ -2127,6 +2191,14 @@ impl PartStudioView {
     }
 
     pub(super) fn set_show_mass(&mut self, show: bool, cx: &mut Context<Self>) {
+        // Live (ui-parity mass-properties-face-tab): opened on a face, its part is what's selected and measured.
+        if show && !self.show_mass && !self.ui.mass_faces {
+            let parts = mass_parts(&self.display, self.selection.iter().filter_map(|r| self.owning_body(r)));
+            if !parts.is_empty() {
+                self.selection = parts.into_iter().map(Reference::Body).collect();
+                self.refresh_scene(false, cx);
+            }
+        }
         self.show_mass = show;
         // Show calculation variance isn't kept (live: reopened, it's unticked).
         self.ui.mass_variance = false;

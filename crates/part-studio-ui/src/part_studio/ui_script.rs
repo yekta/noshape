@@ -247,9 +247,13 @@ impl PartStudioView {
         let message = message.map(|m| if self.canceled_edit.as_ref().is_some_and(|c| c.3 == m) { format!("{m} Restore") } else { crate::doc_model::notice_text(&self.doc, m, cx) });
         // The parts list's heading, as drawn (render_parts_list).
         let parts_heading = format!("Parts ({})", self.display.bodies.iter().filter(|b| super::part_section(b) == "parts").count());
-        let dialog_state = dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.section_dialog_state()).or_else(|| self.appearance_dialog_state(cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.insert_go_state(cx)).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(crate::ui_script::open_dialog);
+        let dialog_state = dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.section_dialog_state()).or_else(|| self.appearance_dialog_state(cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.insert_go_state(cx)).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(|| self.panel_ui_state(cx)).or_else(crate::ui_script::open_dialog);
         // The dialog the focused field is in (live `focus.dialog`; the Create variable popup stands for its dialog).
         let mut focus = focus;
+        // Mass properties' Face tab: its faces field has the keyboard (live ui-parity mass-properties-face-tab).
+        if focus["kind"] == "none" && self.show_mass && self.ui.mass_faces && !self.ui.mass_ref_active {
+            focus = json!({ "kind": "field", "label": "Faces to measure", "dialog": "Mass and section properties" });
+        }
         if in_dialog.is_some() {
             focus["dialog"] = dialog_state.as_ref().map(|d| d["title"].clone()).unwrap_or(Value::Null);
         }
@@ -266,6 +270,26 @@ impl PartStudioView {
             "tooltip": null,
             "undo": self.ui_undo_state(cx),
             "sketch": self.ui_sketch_state(cx),
+            "camera": self.ui_camera_state(cx),
+            // (No readout while a feature dialog is open: the readout isn't rebuilt then.)
+            "measure": if self.ui.measure_readout.is_empty() || self.edit.is_some() { Value::Null } else { json!({ "readout": self.ui.measure_readout, "panel": null }) },
+        })
+    }
+
+    /// `camera` as live's recorder reads it (since 2026-11-12): view direction and up (unit vectors), target and eye
+    /// in mm, the visible width and height in mm, and whether the view is orthographic.
+    fn ui_camera_state(&self, cx: &App) -> Value {
+        let vp = self.viewport.read(cx);
+        let c = &vp.camera;
+        let size = vp.size();
+        let r = |v: f64| (v * 1e6).round() / 1e6;
+        let v3 = |v: DVec3, k: f64| json!([r(v.x * k), r(v.y * k), r(v.z * k)]);
+        let height = 2.0 * c.half_height() * 1000.0;
+        let width = if size.y > 0.0 { height * size.x / size.y } else { 0.0 };
+        json!({
+            "direction": v3(c.forward(), 1.0), "up": v3(c.up(), 1.0), "target_mm": v3(c.target, 1000.0), "eye_mm": v3(c.eye(), 1000.0),
+            "width_mm": r(width), "height_mm": r(height), "mmPerPixel": if size.y > 0.0 { r(height / size.y) } else { 0.0 },
+            "orthographic": c.projection == noshape_render::camera::Projection::Orthographic,
         })
     }
 
@@ -296,6 +320,46 @@ impl PartStudioView {
         };
         let rows: Vec<String> = self.ui.toolbar.shortcut_tools().iter().filter(|id| noshape_model::features::get(id).is_some()).map(|id| if id == "sketch" { "new-sketch".to_string() } else { kebab(id) }).collect();
         Some(json!({ "kind": "shortcut-toolbar", "rows": rows, "disabled": [], "highlighted": null }))
+    }
+
+    /// A side panel as live's recorder reads it since 2026-11-12 (`kind` "panel": its title and texts): Dependencies
+    /// of … (its rows), Named views (the name field, or "(New view name)", and "No views created" with none), Material.
+    fn panel_ui_state(&self, cx: &App) -> Option<Value> {
+        let panel = |title: String, text: Vec<String>| Some(json!({ "kind": "panel", "title": title, "text": text }));
+        if let Some(r) = &self.ui.plane_dependencies {
+            let studio = self.studio(cx)?;
+            let rows = noshape_model::interaction::features_using(&studio.features, r).into_iter().filter_map(|i| studio.feature(i).map(|f| f.name.clone())).collect();
+            return panel(format!("Dependencies of {}", self.default_name(r, cx)), rows);
+        }
+        if let Some(id) = self.ui.dependencies {
+            let studio = self.studio(cx)?;
+            let idx = studio.index_of(id)?;
+            let name = |i: FeatureId| studio.feature(i).map(|f| f.name.clone());
+            let mut rows: Vec<String> = noshape_model::interaction::feature_dependencies(&studio.features, idx).into_iter().filter_map(name).collect();
+            rows.push(studio.features[idx].name.clone());
+            rows.extend(noshape_model::interaction::feature_dependents(&studio.features, idx).into_iter().filter_map(name));
+            return panel(format!("Dependencies of {}", studio.features[idx].name), rows);
+        }
+        if let Some((st, _)) = &self.named_views {
+            let typed = st.read(cx).value().to_string();
+            let mut text = vec![if typed.is_empty() { "(New view name)".to_string() } else { typed }];
+            if self.studio(cx).is_none_or(|s| s.named_views.is_empty()) {
+                text.push("No views created".into());
+            }
+            return panel("Named views".into(), text);
+        }
+        if let Some(m) = &self.ui.material_panel {
+            // Live: its tabs, the picker's text and, with none picked, "No material assigned".
+            let mut text = vec!["Library".to_string(), "Custom".to_string()];
+            if !m.is_custom() {
+                text.push(m.picked_name().unwrap_or_else(|| "- None -".into()));
+                if m.picked_name().is_none() && !m.is_list_open() {
+                    text.push("No material assigned".into());
+                }
+            }
+            return panel("Material".into(), text);
+        }
+        None
     }
 
     /// `undo`: whether the toolbar's Undo and Redo do something (in a sketch

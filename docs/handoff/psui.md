@@ -10,6 +10,16 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**2026-11-12 13:54 UTC:** live recorded 48 of batch 1 (b8a8a5da, 95db6cbb; copies in /root/psui-scratch/cov/live48 until they land).
+Ours 28 -> 35/48 (627/716 states) with: Split's tool field takes a face (part_for_field only takes a body kind the
+field takes), Thicken's operation from the model before the feature, Sweep's Add (evCollision: equal solids are
+inside), a Variable's row reads the dialog, a default plane's graphics menu is its row's, Mass properties selects the
+part / Face tab clears it, the part appearance popup's typing doesn't enable Undo (DocModel::edit_tab_preview), Loft's
+picked list rows end in ×, the view cube's corners look down their diagonal, `camera` / `measure` / panels
+(Dependencies, Named views, Material) recorded. Runner: camera compared by direction/up/projection, PANELS_READ_SINCE
+by title prefix, live's "Unknown of" start picks. Left: Boolean's red Tools with Keep tools, parts-row-dblclick (Y with
+nothing selected makes an undo step on live?), Split's parts with Keep both sides off. 7 re-records asked (REQUESTS).
+
 **2026-11-12 11:55 UTC:** batch 2 (41 scenarios, 8 new starts incl. plate-bend) landed 10411936; on REQUESTS 11:22 + 11:55.
 Erroring features on ours: Rib fixed (std ribEditLogic + opDraft REFERENCE_ENTITY, 0c1f17bf); Replace face, Isocline,
 Bridging, Bend, Jog were scenario mistakes (fixed); Trim curve and Isoparametric fail on live too (std's own rules);

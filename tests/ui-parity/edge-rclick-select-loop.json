@@ -1,6 +1,6 @@
 {
  "name": "edge-rclick-select-loop",
- "about": "Right-click a top edge › Select › Loop/chain connected edges: the top face's edges",
+ "about": "Right-click a top edge › Select › Tangent connected edges (live's edge list: Tangent connected edges, Equal length/radius edges, Parallel edges, Create selection…)",
  "area": "psui",
  "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
  "start": "block",
@@ -25,7 +25,7 @@
   {
    "do": "click",
    "on": {
-    "menu": "Loop/chain connected edges"
+    "menu": "Tangent connected edges"
    }
   }
  ]

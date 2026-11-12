@@ -1185,7 +1185,8 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let Some(common) = k::common(t, g).ok().and_then(|c| c.shape.volume().ok()) else { continue };
             let (vt, vg) = (*tv.get_or_init(|| t.volume().unwrap_or(0.0).abs()), *gv.get_or_init(|| g.volume().unwrap_or(0.0).abs()));
             let near = |a: f64, b: f64| (a.abs() - b).abs() <= 1e-9 * b.max(1e-15);
-            if near(common, vt) && vt < vg {
+            // (Equal solids overlap whole: the tool counts as inside, as live's Add of a Sweep that rebuilds the part.)
+            if near(common, vt) && (vt < vg || near(vt, vg)) {
                 inside.push((tb.clone(), gb.clone(), true));
             } else if near(common, vg) && vg < vt {
                 inside.push((tb.clone(), gb.clone(), false));

@@ -4,6 +4,13 @@
  "area": "psui",
  "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
  "start": "block",
+ "remembered": {
+  "chamfer": {
+   "length:Millimeter": {
+    "width": "2 mm"
+   }
+  }
+ },
  "steps": [
   {
    "do": "click",

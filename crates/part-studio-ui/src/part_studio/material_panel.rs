@@ -54,6 +54,23 @@ pub struct MaterialPanel {
     _subs: Vec<Subscription>,
 }
 
+impl MaterialPanel {
+    /// The Custom tab is showing.
+    pub(super) fn is_custom(&self) -> bool {
+        self.custom
+    }
+
+    /// The picked library material's name.
+    pub(super) fn picked_name(&self) -> Option<String> {
+        self.picked.as_ref().map(|e| e.name.clone())
+    }
+
+    /// The material list is open.
+    pub(super) fn is_list_open(&self) -> bool {
+        self.list_open
+    }
+}
+
 /// A library of the select: the Onshape one, one added to the account, or
 /// a Material Library tab of this document.
 #[derive(Clone, Debug)]

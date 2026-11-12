@@ -490,14 +490,9 @@ pub mod view_cube {
             if let Some(v) = view {
                 return Camera::rotation_for(v);
             }
-            let quarter = match (self.0[0] > 0, self.0[1] > 0) {
-                (true, false) => 0.0,
-                (true, true) => 1.0,
-                (false, true) => 2.0,
-                (false, false) => 3.0,
-            };
-            let t = (quarter * 90.0 + 30.0f64).to_radians();
-            let eye = DVec3::new(0.75f64.sqrt() * t.sin(), -(0.75f64.sqrt()) * t.cos(), 0.5 * self.0[2].signum() as f64);
+            // A corner looks down its diagonal, Z up (live ui-parity view-cube-front-then-iso's camera: (-1, 1, -1)/√3
+            // from the front-right-top corner); an edge between two faces halfway between them.
+            let eye = DVec3::new(self.0[0] as f64, self.0[1] as f64, self.0[2] as f64).normalize();
             Camera::look_rotation(-eye, DVec3::Z)
         }
     }

@@ -435,6 +435,11 @@ impl PartStudioView {
         self.apply_appearance(true, cx);
         let Some(e) = self.ui.appearance_edit.take() else { return };
         self.appearance_closed(&e.target, cx);
+        // A part's popup committed (Enter) leaves nothing selected (live ui-parity appearance-editor-hex).
+        if matches!(e.target, EditTarget::Parts(_)) {
+            self.selection.clear();
+            self.refresh_scene(false, cx);
+        }
         if let EditTarget::ConfiguredCell(part, row) = &e.target {
             let value = noshape_model::configured_properties::color_text(e.rgb, 1.0 - e.transparency);
             let (part, row) = (part.clone(), *row);
@@ -478,8 +483,12 @@ impl PartStudioView {
         e.applied = now;
         let color = [srgb_to_lin(e.rgb[0]), srgb_to_lin(e.rgb[1]), srgb_to_lin(e.rgb[2]), 1.0 - e.transparency];
         let (target, tess, first) = (e.target.clone(), e.tessellation, e.before.is_none());
+        // A part's popup (no ✓) is a preview until Enter or a click away commits it: Undo stays off meanwhile (live
+        // ui-parity appearance-editor-hex); the face and feature dialogs' changes count at once (appearance-face-row-remove).
+        let preview = matches!(target, EditTarget::Parts(_));
+        let tab = self.tab;
         let applied = self.doc.update(cx, |doc, cx| {
-            doc.edit_tab_deferred(self.tab, "Edit appearance", cx, |c| {
+            let edit = |c: &mut noshape_model::document::TabContent| {
                 let noshape_model::document::TabContent::PartStudio(ps) = c else { return None };
                 let before = first.then(|| (ps.appearances.clone(), ps.part_properties.clone()));
                 let added = match &target {
@@ -512,7 +521,8 @@ impl PartStudioView {
                     }
                 };
                 Some((before, added))
-            })
+            };
+            if preview { doc.edit_tab_preview(tab, "Edit appearance", cx, edit) } else { doc.edit_tab_deferred(tab, "Edit appearance", cx, edit) }
         });
         let Some(Some((before, added))) = applied else { return };
         let Some(e) = &mut self.ui.appearance_edit else { return };
