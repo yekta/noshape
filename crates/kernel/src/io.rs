@@ -135,16 +135,7 @@ pub fn read_step_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option
     if t.instances.is_empty() {
         return Ok(None);
     }
-    let at = |t: &[f64]| glam::DMat4::from_cols_array(&[t[0], t[4], t[8], 0.0, t[1], t[5], t[9], 0.0, t[2], t[6], t[10], 0.0, t[3], t[7], t[11], 1.0]);
-    let nesting = StepNesting {
-        subs: t.sub_names.iter().map(|n| n.to_string()).collect(),
-        children: t
-            .nest
-            .iter()
-            .filter(|c| c.transform.len() == 12)
-            .map(|c| (usize::try_from(c.owner).ok(), NestChild { part: usize::try_from(c.part).ok(), sub: usize::try_from(c.sub).ok(), name: c.name.clone(), transform: at(&c.transform) }))
-            .collect(),
-    };
+    let nesting = nesting_of(&t);
     // OCCT reads STEP in millimetres.
     let t0 = std::time::Instant::now();
     let parts = step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, true)).collect::<Result<Vec<_>>>()?;
@@ -152,6 +143,20 @@ pub fn read_step_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option
         eprintln!("  step tree scale: {:.1} ms", t0.elapsed().as_secs_f64() * 1000.0);
     }
     Ok(Some(((t.root.clone(), parts, pvz_instances_of(&t.instances)), nesting)))
+}
+
+/// A tree reader's subassemblies and direct children.
+fn nesting_of(t: &ffi::StepTree) -> StepNesting {
+    let at = |t: &[f64]| glam::DMat4::from_cols_array(&[t[0], t[4], t[8], 0.0, t[1], t[5], t[9], 0.0, t[2], t[6], t[10], 0.0, t[3], t[7], t[11], 1.0]);
+    StepNesting {
+        subs: t.sub_names.iter().map(|n| n.to_string()).collect(),
+        children: t
+            .nest
+            .iter()
+            .filter(|c| c.transform.len() == 12)
+            .map(|c| (usize::try_from(c.owner).ok(), NestChild { part: usize::try_from(c.part).ok(), sub: usize::try_from(c.sub).ok(), name: c.name.clone(), transform: at(&c.transform) }))
+            .collect(),
+    }
 }
 
 /// An IGES file's shapes as parts, named and coloured through OCCT's XDE
@@ -180,6 +185,174 @@ fn merged_faces(mut p: ImportedShape, periodic: bool) -> Result<ImportedShape> {
     Ok(p)
 }
 
+/// An IGES file's subfigure tree (live 2511 (3): Onshape writes a subassembly as a subfigure definition, type 308, of
+/// its parts' solids, placed by an instance, type 408): its parts as [`read_iges_parts`] reads them (placed; a
+/// subfigure's compound split into its solids), each solid matched to its part by name, and the tree, every child at
+/// its place (identity). The root's name is empty
+/// (IGES names no product: live shows the sender's product id, an Onshape shortcoming). `None` without subfigures or
+/// when a solid can't be matched (an instanced solid: one part per placement).
+pub fn read_iges_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option<(StepAssembly, StepNesting)>> {
+    let text = std::fs::read(path).map_err(|e| KernelError::Io(format!("could not read IGES file {}: {e}", path.display())))?;
+    let Some(tree) = iges_subfigures(&String::from_utf8_lossy(&text)) else { return Ok(None) };
+    // The reader keeps a placed subfigure as one compound named after its first solid: its solids are the parts,
+    // named in the definition's order.
+    let mut parts = Vec::new();
+    for part in read_iges_parts(path, unit)? {
+        let solids = part.shape.solids();
+        let members = tree.subs.iter().enumerate().map(|(k, _)| tree.children.iter().filter(|(o, _)| *o == Some(k)).filter_map(|(_, c)| if let IgesChild::Solid(n) = c { Some(n.clone()) } else { None }).collect::<Vec<_>>()).find(|m| m.len() == solids.len() && m.first() == part.name.as_ref());
+        match members {
+            Some(names) if solids.len() > 1 => {
+                for (shape, name) in solids.into_iter().zip(names) {
+                    parts.push(ImportedShape { shape, name: Some(name), color: part.color, opacity: part.opacity, face_colors: Vec::new() });
+                }
+            }
+            _ => parts.push(part),
+        }
+    }
+    let part_of = |name: &str| {
+        let mut hits = parts.iter().enumerate().filter(|(_, p)| p.name.as_deref() == Some(name)).map(|(i, _)| i);
+        match (hits.next(), hits.next()) {
+            (Some(i), None) => Some(i),
+            _ => None,
+        }
+    };
+    let mut children = Vec::new();
+    for (owner, child) in &tree.children {
+        let (part, sub) = match child {
+            IgesChild::Solid(name) => match part_of(name) {
+                Some(p) => (Some(p), None),
+                None => return Ok(None),
+            },
+            IgesChild::Sub(s) => (None, Some(*s)),
+        };
+        let name = match (part, sub) {
+            (Some(p), _) => parts[p].name.clone().unwrap_or_default(),
+            (_, Some(s)) => tree.subs[s].clone(),
+            _ => String::new(),
+        };
+        children.push((*owner, NestChild { part, sub, name, transform: glam::DMat4::IDENTITY }));
+    }
+    Ok(Some(((String::new(), parts, Vec::new()), StepNesting { subs: tree.subs, children })))
+}
+
+/// A child in an IGES subfigure tree: a solid (by the name its part gets) or a subfigure definition.
+enum IgesChild {
+    Solid(String),
+    Sub(usize),
+}
+
+/// The subfigure definitions (308) of an IGES file, named, and the children of the top (independent solids and
+/// subfigure instances, 408) and of each definition. `None` when the file places no subfigure.
+struct IgesTree {
+    subs: Vec<String>,
+    children: Vec<(Option<usize>, IgesChild)>,
+}
+
+fn iges_subfigures(text: &str) -> Option<IgesTree> {
+    // Directory entries: two 80-column lines each, "D" in column 73; parameters by their entry's number.
+    let lines: Vec<&str> = text.lines().filter(|l| l.len() >= 73).collect();
+    let section = |l: &str| l.as_bytes()[72];
+    let field = |l: &str, k: usize| l.get(k * 8..k * 8 + 8).unwrap_or("").trim().to_string();
+    let d: Vec<&str> = lines.iter().copied().filter(|l| section(l) == b'D').collect();
+    struct Entry {
+        kind: u32,
+        independent: bool,
+        label: String,
+    }
+    let mut entries: std::collections::BTreeMap<usize, Entry> = Default::default();
+    for (k, pair) in d.chunks(2).enumerate() {
+        let [a, b] = pair else { break };
+        let status = field(a, 8);
+        // Status digits: blank, subordinate, use, hierarchy; "00" subordinate is independent.
+        let subordinate = status.len() >= 6 && status[status.len() - 6..status.len() - 4] != *"00";
+        entries.insert(2 * k + 1, Entry { kind: field(a, 0).parse().unwrap_or(0), independent: !subordinate, label: field(b, 7) });
+    }
+    if !entries.values().any(|e| e.kind == 408 && e.independent) {
+        return None;
+    }
+    let mut params: std::collections::BTreeMap<usize, String> = Default::default();
+    for l in lines.iter().filter(|l| section(l) == b'P') {
+        let Ok(de) = l.get(64..72).unwrap_or("").trim().parse::<usize>() else { continue };
+        params.entry(de).or_default().push_str(l.get(..64).unwrap_or(""));
+    }
+    let fields = |de: usize| iges_params(params.get(&de).map(String::as_str).unwrap_or(""));
+    // A solid's part name, as the reader gives it: its label, else " DE" and its entry number in 9 columns.
+    let solid = |de: usize, e: &Entry| if e.label.is_empty() { format!(" DE{de:>9}") } else { e.label.clone() };
+    let mut tree = IgesTree { subs: Vec::new(), children: Vec::new() };
+    let mut defs: std::collections::BTreeMap<usize, usize> = Default::default();
+    // A subfigure definition's index, its children read the first time.
+    fn def_of(de: usize, tree: &mut IgesTree, defs: &mut std::collections::BTreeMap<usize, usize>, entries: &std::collections::BTreeMap<usize, Entry>, fields: &dyn Fn(usize) -> Vec<String>, solid: &dyn Fn(usize, &Entry) -> String, depth: usize) -> Option<usize> {
+        if let Some(&k) = defs.get(&de) {
+            return Some(k);
+        }
+        if depth > 32 || entries.get(&de)?.kind != 308 {
+            return None;
+        }
+        let f = fields(de);
+        let k = tree.subs.len();
+        defs.insert(de, k);
+        let name = f.get(2).cloned().filter(|n| !n.is_empty()).unwrap_or_else(|| entries[&de].label.clone());
+        tree.subs.push(if name.is_empty() { format!("Assembly {}", k + 1) } else { name });
+        let n: usize = f.get(3).and_then(|n| n.parse().ok()).unwrap_or(0);
+        for member in f.iter().skip(4).take(n).filter_map(|x| x.parse::<usize>().ok()) {
+            let Some(e) = entries.get(&member) else { continue };
+            match e.kind {
+                186 => tree.children.push((Some(k), IgesChild::Solid(solid(member, e)))),
+                408 => {
+                    let def = fields(member).get(1).and_then(|x| x.parse::<usize>().ok());
+                    if let Some(s) = def.and_then(|def| def_of(def, tree, defs, entries, fields, solid, depth + 1)) {
+                        tree.children.push((Some(k), IgesChild::Sub(s)));
+                    }
+                }
+                _ => {}
+            }
+        }
+        Some(k)
+    }
+    for (&de, e) in entries.iter().filter(|(_, e)| e.independent) {
+        match e.kind {
+            186 => tree.children.push((None, IgesChild::Solid(solid(de, e)))),
+            408 => {
+                let def = fields(de).get(1).and_then(|x| x.parse::<usize>().ok());
+                if let Some(s) = def.and_then(|def| def_of(def, &mut tree, &mut defs, &entries, &fields, &solid, 0)) {
+                    tree.children.push((None, IgesChild::Sub(s)));
+                }
+            }
+            _ => {}
+        }
+    }
+    Some(tree)
+}
+
+/// An IGES entity's parameters ("308,1,4HName,2,211,317;"): split at commas up to the semicolon, Hollerith strings
+/// ("4HName") read as their text.
+fn iges_params(data: &str) -> Vec<String> {
+    let b = data.as_bytes();
+    let (mut out, mut i) = (Vec::new(), 0);
+    while i < b.len() {
+        let start = i;
+        while i < b.len() && b[i].is_ascii_digit() {
+            i += 1;
+        }
+        if i > start && i < b.len() && b[i] == b'H' {
+            let n: usize = data[start..i].parse().unwrap_or(0);
+            let text = data.get(i + 1..(i + 1 + n).min(data.len())).unwrap_or("");
+            out.push(text.to_string());
+            i = (i + 1 + n).min(b.len());
+        } else {
+            while i < b.len() && b[i] != b',' && b[i] != b';' {
+                i += 1;
+            }
+            out.push(data[start..i].trim().to_string());
+        }
+        if i < b.len() && b[i] == b';' {
+            break;
+        }
+        i += 1;
+    }
+    out
+}
+
 /// An IGES file whose roots are shared shapes placed (subfigure instances,
 /// as Onshape exports an assembly): its sending product id, distinct parts
 /// (named and coloured, in `unit`) and placed instances (file order,
@@ -198,13 +371,18 @@ pub fn read_iges_assembly(path: &Path, unit: LengthUnit) -> Result<Option<StepAs
 /// `unit`) and every placed body instance (file order, metres). `None` for
 /// files of bodies only.
 pub fn read_parasolid_assembly(path: &Path, unit: LengthUnit) -> Result<Option<StepAssembly>> {
+    Ok(read_parasolid_assembly_nested(path, unit)?.map(|(a, _)| a))
+}
+
+/// [`read_parasolid_assembly`] with its subassembly tree (live 2511 (2): a Parasolid assembly splits as a STEP one).
+pub fn read_parasolid_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option<(StepAssembly, StepNesting)>> {
     let t = ck(ffi::read_parasolid_tree(path_str(path)?))?;
     if t.instances.is_empty() {
         return Ok(None);
     }
     // Parasolid is in metres (as `read_parasolid`; qa XT-ASM-SCALE: the
     // parts came in 1000× too small).
-    Ok(Some((t.root.clone(), step_shapes(&t.parts, 1e3 / unit.mm_per_unit())?, pvz_instances_of(&t.instances))))
+    Ok(Some(((t.root.clone(), step_shapes(&t.parts, 1e3 / unit.mm_per_unit())?, pvz_instances_of(&t.instances)), nesting_of(&t))))
 }
 
 /// A shape to export with optional name and color.
@@ -1043,3 +1221,4 @@ mod serde_bytes_compat {
         d.deserialize_byte_buf(Bytes)
     }
 }
+

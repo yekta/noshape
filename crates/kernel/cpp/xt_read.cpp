@@ -2481,8 +2481,14 @@ std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree)
     gp_Trsf   place;
   };
   std::vector<Pending> pending;
-  // Part: a body (with its placement), or an assembly's instances.
-  std::function<void(long long, const gp_Trsf&, int)> visit = [&](long long idx, const gp_Trsf& place, int depth) {
+  // Subassembly definitions by their node, in the order first met.
+  std::map<long long, int> sub_of;
+  // Part: a body (with its placement), or an assembly's instances. `owner`:
+  // the subassembly holding it (-1 the top); `record`: its owner is met for
+  // the first time, so its children go in the tree; `local`: its placement
+  // in its owner.
+  std::function<void(long long, const gp_Trsf&, int, int, bool, const gp_Trsf&)> visit =
+    [&](long long idx, const gp_Trsf& place, int depth, int owner, bool record, const gp_Trsf& local) {
     if (depth > 64 || !p.has(idx))
       return;
     const XNode& n = p.at_index(idx);
@@ -2492,6 +2498,8 @@ std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree)
       part.shape = b.body_raw(idx);
       b.attributes(idx, part.name, part.colour, part.has_colour);
       pending.push_back({idx, place});
+      if (tree && record && depth > 0)
+        tree->nest.push_back({owner, idx, -1, -1, part.name, local});
       out.push_back(std::move(part));
     }
     else if (n.type == 10)
@@ -2505,13 +2513,32 @@ std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree)
         if (tree->root.empty())
           tree->root = "Assembly";
       }
+      int  def   = owner;
+      bool first = record;
+      if (tree && depth > 0)
+      {
+        const auto found = sub_of.find(idx);
+        first            = found == sub_of.end();
+        def              = first ? (int)tree->subs.size() : found->second;
+        if (first)
+        {
+          std::string           name;
+          std::array<double, 3> c{};
+          bool                  has = false;
+          b.attributes(idx, name, c, has);
+          sub_of[idx] = def;
+          tree->subs.push_back(name.empty() ? "Assembly " + std::to_string(def + 1) : name);
+        }
+        if (record)
+          tree->nest.push_back({owner, 0, -1, def, tree->subs[(size_t)def], local});
+      }
       for (long long inst = n.ptr("sub_instance"); inst && p.has(inst); inst = p.at_index(inst).ptr("next_in_part"))
       {
         const XNode& I = p.at_index(inst);
-        gp_Trsf      t = place;
+        gp_Trsf      here;
         if (p.has(I.ptr("transform")))
-          t = place * transform_of(p.at_index(I.ptr("transform")));
-        visit(I.ptr("part"), t, depth + 1);
+          here = transform_of(p.at_index(I.ptr("transform")));
+        visit(I.ptr("part"), place * here, depth + 1, def, first, here);
       }
     }
   };
@@ -2523,11 +2550,11 @@ std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree)
       referenced.insert(n.ptr("part"));
   const XNode& root = p.at_index(1);
   if (root.type == 12 || root.type == 10)
-    visit(1, gp_Trsf(), 0);
+    visit(1, gp_Trsf(), 0, -1, true, gp_Trsf());
   else
     for (const auto& [i, n] : p.nodes)
       if ((n.type == 12 || n.type == 10) && !referenced.count(i))
-        visit(i, gp_Trsf(), 0);
+        visit(i, gp_Trsf(), 0, -1, true, gp_Trsf());
   // Heal the bodies in parallel (an instanced body once: its instances share
   // its edges), each under its own crash guard (unhealed if it crashes).
   {
@@ -2566,6 +2593,9 @@ std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree)
       tree->instances.emplace_back(part_of[pending[k].body], pending[k].place);
       tree->names.push_back(out[k].name);
     }
+    for (XtChild& c : tree->nest)
+      if (c.sub < 0)
+        c.part = part_of[c.body];
   }
   for (size_t k = 0; k < pending.size(); ++k)
   {

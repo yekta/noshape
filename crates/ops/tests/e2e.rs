@@ -1933,6 +1933,99 @@ fn documents_import_splits_a_step_assembly_into_linked_documents() {
     assert_eq!(e.param.as_deref(), Some("combine"));
 }
 
+/// Split into multiple documents of a STEP with loose parts (live 2511 (1), live's own file): a folder named after
+/// the file with one document "parts3.step": its Assembly "parts3" placing each part once, a Part Studio per part.
+#[test]
+fn documents_import_splits_loose_step_parts_into_one_document() {
+    let dir = scratch("docs-import-split-parts");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let dir = dir.canonicalize().unwrap();
+    let mut ctx = Ctx::new();
+    ctx.documents = Some(dir.clone());
+    let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../kernel/tests/data/step/parts3.step");
+    let r = call(&mut ctx, "documents_import", json!({ "files": [file], "mode": "split" }));
+    let folder = dir.join("parts3.step");
+    assert_eq!(r["folder"], folder.display().to_string(), "{r}");
+    let top = folder.join("parts3.step.noshape");
+    assert_eq!(r["documents"], json!([top.display().to_string()]), "{r}");
+    call(&mut ctx, "document_open", json!({ "path": top.to_str().unwrap() }));
+    let mut tabs: Vec<String> = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    assert_eq!(tabs.remove(0), "parts3", "the Assembly first, named after the file");
+    tabs.sort();
+    assert_eq!(tabs, ["Part 1", "Part 2", "Part 3"]);
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "parts3" }));
+    let mut names: Vec<String> = list["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap().to_string()).collect();
+    names.sort();
+    assert_eq!(names, ["Part 1 <1>", "Part 2 <1>", "Part 3 <1>"], "{list}");
+    call(&mut ctx, "document_close", json!({}));
+}
+
+/// Split into multiple documents of a Parasolid assembly (live 2511 (2), live's own file): as a STEP one, a folder
+/// "asm2.x_t" with "Sub" (its Assembly and Part Studios) and "asm2.x_t" whose Assembly 1 uses Sub's at its V1.
+#[test]
+fn documents_import_splits_a_parasolid_assembly() {
+    let dir = scratch("docs-import-split-xt");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let dir = dir.canonicalize().unwrap();
+    let mut ctx = Ctx::new();
+    ctx.documents = Some(dir.clone());
+    let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../kernel/tests/data/xt-asm/asm2.x_t");
+    let r = call(&mut ctx, "documents_import", json!({ "files": [file], "mode": "split" }));
+    let folder = dir.join("asm2.x_t");
+    let (sub, top) = (folder.join("Sub.noshape"), folder.join("asm2.x_t.noshape"));
+    assert_eq!(r["documents"], json!([sub.display().to_string(), top.display().to_string()]), "{r}");
+    let tabs = |ctx: &mut Ctx| -> Vec<String> { call(ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| t["name"].as_str().unwrap().to_string()).collect() };
+    call(&mut ctx, "document_open", json!({ "path": sub.to_str().unwrap() }));
+    let mut sub_tabs = tabs(&mut ctx);
+    assert_eq!(sub_tabs.remove(0), "Sub");
+    sub_tabs.sort();
+    assert_eq!(sub_tabs, ["Part 2", "Part 3"]);
+    call(&mut ctx, "document_open", json!({ "path": top.to_str().unwrap() }));
+    assert_eq!(tabs(&mut ctx), ["Assembly 1", "Part 1"]);
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    let mut names: Vec<String> = list["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap().to_string()).collect();
+    names.sort();
+    assert_eq!(names, ["Part 1 <1>", "Sub <1>"], "{list}");
+    assert_eq!(list["occurrences"].as_array().unwrap().len(), 3, "{list}");
+    call(&mut ctx, "document_close", json!({}));
+    call(&mut ctx, "document_close", json!({}));
+}
+
+/// Split into multiple documents of an IGES assembly (live 2511 (3), live's own file): its subfigure is the
+/// subassembly's document ("Assembly 1": IGES names none), and the top Assembly is named after the file ("asm2"; live's
+/// shows the sender's product id).
+#[test]
+fn documents_import_splits_an_iges_assembly() {
+    let dir = scratch("docs-import-split-igs");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let dir = dir.canonicalize().unwrap();
+    let mut ctx = Ctx::new();
+    ctx.documents = Some(dir.clone());
+    let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../kernel/tests/data/iges/asm2.igs");
+    let r = call(&mut ctx, "documents_import", json!({ "files": [file], "mode": "split" }));
+    let folder = dir.join("asm2.igs");
+    let (sub, top) = (folder.join("Assembly 1.noshape"), folder.join("asm2.igs.noshape"));
+    assert_eq!(r["documents"], json!([sub.display().to_string(), top.display().to_string()]), "{r}");
+    let tabs = |ctx: &mut Ctx| -> Vec<String> { call(ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| t["name"].as_str().unwrap().to_string()).collect() };
+    call(&mut ctx, "document_open", json!({ "path": sub.to_str().unwrap() }));
+    let mut sub_tabs = tabs(&mut ctx);
+    assert_eq!(sub_tabs.remove(0), "Assembly 1");
+    sub_tabs.sort();
+    assert_eq!(sub_tabs, ["Part 2", "Part 3"]);
+    call(&mut ctx, "document_open", json!({ "path": top.to_str().unwrap() }));
+    assert_eq!(tabs(&mut ctx), ["asm2", "Part 1"]);
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "asm2" }));
+    let mut names: Vec<String> = list["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap().to_string()).collect();
+    names.sort();
+    assert_eq!(names, ["Assembly 1 <1>", "Part 1 <1>"], "{list}");
+    assert_eq!(list["occurrences"].as_array().unwrap().len(), 3, "{list}");
+    call(&mut ctx, "document_close", json!({}));
+    call(&mut ctx, "document_close", json!({}));
+}
+
 #[test]
 fn import_step_round_trip() {
     let mut ctx = Ctx::new();

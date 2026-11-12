@@ -2457,6 +2457,20 @@ StepTree read_parasolid_tree(rust::Str path)
         inst.transform.push_back(m.Value(r, k));
     out.instances.push_back(std::move(inst));
   }
+  for (const std::string& s : t.subs)
+    out.sub_names.push_back(rust::String(s));
+  for (const XtChild& c : t.nest)
+  {
+    StepChild ch;
+    ch.owner = c.owner;
+    ch.part  = c.part;
+    ch.sub   = c.sub;
+    ch.name  = rust::String(c.name);
+    for (int r = 1; r <= 3; ++r)
+      for (int k = 1; k <= 4; ++k)
+        ch.transform.push_back(c.local.Value(r, k));
+    out.nest.push_back(std::move(ch));
+  }
   return out;
 }
 

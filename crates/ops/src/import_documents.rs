@@ -53,19 +53,17 @@ pub fn import_single(paths: &[PathBuf], choice: &ImportChoice, place: &Path, new
     Ok((target, errors))
 }
 
-/// Split a STEP assembly into a folder named after the file (live 1742 (B), 2424): one document per subassembly
-/// ("Sub": its Assembly, one Part Studio per part not made before, CAD Imports with their Parasolid files), deepest
-/// first, and the top one named after the file (Assembly 1, its own parts' Part Studios, CAD Imports with the file),
+/// Split a STEP, Parasolid or IGES assembly into a folder named after the file (live 1742 (B), 2424, 2511): one
+/// document per subassembly ("Sub": its Assembly, one Part Studio per part not made before, CAD Imports with their
+/// Parasolid files), deepest first, and the top one named after the file (Assembly 1, its own parts' Part Studios, CAD Imports with the file),
 /// each with V1; an assembly uses another document's subassembly and Part Studios at that V1 (a flat assembly is one
 /// document). `per_part`: every part its own document too ("Part 1.x_t"), used at its V1. `None` when the file is no
 /// assembly (one document then, as Import to a single document).
 pub fn import_split(path: &Path, choice: &ImportChoice, per_part: bool, place: &Path, new_doc: &dyn Fn() -> Document) -> anyhow::Result<Option<Imported>> {
-    use noshape_kernel as k;
-    let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
-    if choice.combine || !matches!(ext.as_str(), "step" | "stp") {
+    if choice.combine {
         return Ok(None);
     }
-    let Some(((root, parts, _), nesting)) = k::read_step_assembly_nested(path, k::LengthUnit::Meter)? else { return Ok(None) };
+    let Some(((root, parts, _), nesting)) = read_nested(path)? else { return Ok(None) };
     // (A flat assembly is split too: one document, a Part Studio per part, live 2424 (3).)
     if nesting.subs.is_empty() && nesting.children.len() < 2 && !per_part {
         return Ok(None);
@@ -157,6 +155,36 @@ pub fn import_documents(paths: &[PathBuf], choice: &ImportChoice, how: PageImpor
         }
     }
     (made, failed)
+}
+
+/// A file's assembly tree for a split: a STEP, Parasolid or IGES assembly's (live 2511 (2), (3): they split alike);
+/// loose STEP parts (two or more) as a flat assembly named after the file (live 2511 (1): one document "parts3.step"
+/// with its Assembly "parts3", a Part Studio per part).
+fn read_nested(path: &Path) -> anyhow::Result<Option<(noshape_kernel::StepAssembly, noshape_kernel::StepNesting)>> {
+    use noshape_kernel as k;
+    let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+    if matches!(ext.as_str(), "x_t" | "x_b" | "xmt_txt" | "xmt_bin") {
+        return Ok(k::read_parasolid_assembly_nested(path, k::LengthUnit::Meter)?);
+    }
+    // IGES names no product: the top Assembly after the file, as a STEP of loose parts (live 2511 (3) shows the
+    // sender's product id, an Onshape shortcoming; lead 11-11).
+    if matches!(ext.as_str(), "igs" | "iges") {
+        let (stem, _) = import::import_names(path);
+        return Ok(k::read_iges_assembly_nested(path, k::LengthUnit::Meter)?.map(|((_, parts, inst), nesting)| ((stem, parts, inst), nesting)));
+    }
+    if !matches!(ext.as_str(), "step" | "stp") {
+        return Ok(None);
+    }
+    if let Some(tree) = k::read_step_assembly_nested(path, k::LengthUnit::Meter)? {
+        return Ok(Some(tree));
+    }
+    let parts = k::read_step(path, k::LengthUnit::Meter)?;
+    if parts.len() < 2 {
+        return Ok(None);
+    }
+    let (stem, _) = import::import_names(path);
+    let children = (0..parts.len()).map(|p| (None, k::NestChild { part: Some(p), sub: None, name: String::new(), transform: glam::DMat4::IDENTITY })).collect();
+    Ok(Some(((stem, parts, Vec::new()), k::StepNesting { subs: Vec::new(), children })))
 }
 
 /// What every document of a split shares.

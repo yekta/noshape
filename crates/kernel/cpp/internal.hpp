@@ -374,12 +374,27 @@ std::vector<XtPart> read_xt_data(std::string data);
 // (healed, in their own coordinates) and every placed body instance (index
 // into `parts`, placement in metres, the body's name), in file order. No
 // instances without an assembly.
+// A direct child of an assembly in a Parasolid file: a body (`part`, its index
+// in XtTree::parts) or a subassembly (`sub`), placed in its owner (`owner`: a
+// `subs` index, -1 the top assembly).
+struct XtChild
+{
+  int         owner = -1;
+  long long   body  = 0;
+  int         part  = -1;
+  int         sub   = -1;
+  std::string name;
+  gp_Trsf     local;
+};
 struct XtTree
 {
   std::string                          root;
   std::vector<XtPart>                  parts;
   std::vector<std::pair<int, gp_Trsf>> instances;
   std::vector<std::string>             names;
+  // The subassemblies' names and every assembly's direct children.
+  std::vector<std::string>             subs;
+  std::vector<XtChild>                 nest;
 };
 XtTree read_xt_tree(const std::string& path);
 // Pcurves, tolerances, seams and apexes for an imported body (xt_read.cpp),
