@@ -152,7 +152,8 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, jo
         // `muted`: grey text right after the label (live: "…assembly(not recommended)", no space).
         let label_width = if page { PAGE_LABEL_WIDTH } else { LABEL_WIDTH };
         let check = |id: &'static str, label: &'static str, muted: Option<&'static str>, tip: &'static str, on: bool, set: fn(&mut Choice, bool), choice: Rc<Cell<Choice>>| {
-            noshape_app_core::ui_script::note_modal_field(|| serde_json::json!({ "label": label, "kind": "checkbox", "value": on }));
+            // (Live's reader reads the muted part with the label: "…assembly(not recommended)".)
+            noshape_app_core::ui_script::note_modal_field(|| serde_json::json!({ "label": format!("{label}{}", muted.unwrap_or("")), "kind": "checkbox", "value": on }));
             h_flex()
                 .id(id)
                 .map(|d| noshape_app_core::ui_script::mark(d, move || format!("checkbox:{label}")))

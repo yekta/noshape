@@ -1265,16 +1265,22 @@ impl Workspace {
                 doc.update(cx, |d, cx| {
                     d.edit_document(&format!("Import {file}"), cx, |d| {
                         let f = crate::file_tab_view::add_file_tab(d, noshape_model::file_tab::FileTab::new(&file, &bytes, noshape_model::file_tab::now()), None, after);
-                        last = Some(f);
+                        last = Some((f, file.clone()));
                     })
                 });
             }
-            let ws2 = ws.clone();
+            // Live doc-plus-import-png: the open tab stays, the file's tab goes after it, and the import's toast links to it.
+            if let Some((id, file)) = last.clone() {
+                doc.update(cx, |d, cx| {
+                    let me = cx.entity().downgrade();
+                    d.info_with_link(format!("{file} has been imported."), "Open document", move |_, cx| {
+                        let _ = me.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(id))));
+                    }, cx);
+                });
+            }
+            let _ = ws;
             cx.defer(move |cx| {
                 let _ = handle.update(cx, |_, window, cx| {
-                    if let Some(id) = last {
-                        ws2.update(cx, |this, cx| this.activate(id, window, cx));
-                    }
                     if !cad.is_empty() {
                         // Live: the view stays on the open tab (the new tabs go after it).
                         crate::import_dialog::open(doc, cad, after, true, |_, _, _| {}, window, cx)
@@ -2232,7 +2238,14 @@ fn ui_tab_kind(c: &TabContent) -> &'static str {
         TabContent::VariableStudio(_) => "variablestudio",
         TabContent::FeatureStudio(_) => "featurestudio",
         TabContent::MaterialLibrary(_) => "materiallibrary",
-        TabContent::File(_) => "file",
+        // Live's element types for the file kinds its recordings show; "file" for the others.
+        TabContent::File(f) => match f.file_name.rsplit('.').next().map(str::to_lowercase).as_deref() {
+            Some("png" | "jpg" | "jpeg" | "gif" | "bmp") => "image-element",
+            Some("pdf") => "pdf-element",
+            Some("step" | "stp") => "step-element",
+            Some("txt") => "txt-element",
+            _ => "file",
+        },
     }
 }
 
