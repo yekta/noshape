@@ -9,7 +9,12 @@ cli-chamfer-hang-pre's Linear pattern 2 "Select a pattern direction." (Ok on v0.
 the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
-- **On:** (1) a fast gate, `tools/bool/gate.sh <branch>` (below); (2) spheres and tori in our Boolean:
+- **On now (lead 11-12 14:00 UTC):** Boolean coverage by real-document time: the documents whose OCCT Booleans cost
+  the most seconds over live's time for the whole document, biggest first. Candidates: c2-impeller-loft (8 of 13 on
+  OCCT), c2-sm-corner-break (23), c2-sm-louver (20), cf-sheet-metal-model-plus (7), cf-setback-fillet (5/5),
+  cf-o-ring-generator (4). bool: you're on the sections-ahead speed group. I take declines (cases OCCT runs) and stay
+  off our own time where we already take a case. If a decline I take is one you have WIP on, say so here.
+- **Done before:** (1) a fast gate, `tools/bool/gate.sh <branch>` (below); (2) spheres and tori in our Boolean:
   learning-center-michael's ring cut (lcm 41701bb2) and Fillet 2's ball / torus cut (f71e381d, vibe4
   ~/agents/bool-corpora/mf2), which `fillet_by_tools` (features.cpp) sends straight to OCCT (`others`). cf-surface-pattern's
   Surface Pattern 3 is bool's (c7c9d0ff).
