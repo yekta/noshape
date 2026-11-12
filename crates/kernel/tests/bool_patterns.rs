@@ -667,6 +667,32 @@ fn a_cavity_touching_a_face_along_a_circle_cut_as_live() {
     assert_eq!(counts, (c.summary.faces, c.summary.edges, c.summary.vertices));
 }
 
+/// A tyre's treads cut by 32 tools (asm-infento-subs' Boolean 2, recorded): each tool's flat face meets its arc
+/// tangentially along a knife edge, which pierces the tyre's side torus; OCCT breaks the torus's section with the arc
+/// 42 um before that edge, and the flat's section, within the tolerance of it there, was split at that break and
+/// merged with it: one curve on three faces (OCCT's own result has an edge on three faces there; live's is manifold).
+/// noshape's Boolean takes the cut, valid and manifold, OCCT's volume (to its area times 1e-7).
+#[test]
+fn a_tyres_treads_cut_at_a_tangent_knife_edge() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "38ca533e88b7e299").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    let shared = r.shape.edge_faces().unwrap().into_iter().map(|mut fs| {
+        fs.sort_unstable();
+        fs.dedup();
+        fs.len()
+    });
+    assert_eq!(shared.max(), Some(2), "an edge on more than two faces");
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
+}
+
 /// A document's cuts by a pattern of 8 cutters (recorded, parity): noshape's Boolean declines the first late (a short
 /// section from a cutter's corner, found after OCCT's sections), so in its feature type's scope the next cut goes
 /// straight to OCCT's; OCCT's results both.

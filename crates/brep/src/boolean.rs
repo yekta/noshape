@@ -5294,8 +5294,38 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // (Each chain's parameters on its curve where split_params found it (not one turned from another period's):
     // pieces_at then skips finding them again, a B-spline's point search each.)
     let section_ts: Vec<std::sync::OnceLock<Vec<f64>>> = (0..cx.sections.len()).map(|_| std::sync::OnceLock::new()).collect();
+    // (A new vertex where two sections of one face pair meet, one going on as the other (OCCT's curve broken where its
+    // marching stopped: asm-infento-subs' tyre, a torus's section with a tread tool's arc broken 42 um before the
+    // arc's edge tangent to the tool's flat face) splits no section of another pair running along it there (the
+    // flat's, within its tolerance where the faces are tangent): it isn't on it. One crossing it there still does.)
+    let mut sec_ends: HashMap<u32, Vec<(usize, usize)>> = HashMap::default();
+    for (k, (sg, _, _)) in cx.sections.iter().enumerate() {
+        if sg.v[0] != sg.v[1] {
+            sec_ends.entry(sg.v[0]).or_default().push((k, 0));
+            sec_ends.entry(sg.v[1]).or_default().push((k, 1));
+        }
+    }
+    let pair = |k: usize| (cx.sections[k].1.min(cx.sections[k].2), cx.sections[k].1.max(cx.sections[k].2));
+    let out_of = |k: usize, end: usize| {
+        let sg = &cx.sections[k].0;
+        let (a, b) = if end == 0 { (0.0, 1e-3) } else { (1.0, 1.0 - 1e-3) };
+        (cx.seg_at(sg, b) - cx.seg_at(sg, a)).normalize_or_zero()
+    };
+    let joints: HashMap<u32, ((usize, usize), DVec3)> = sec_ends
+        .iter()
+        .filter(|(w, ks)| ks.len() == 2 && cx.pool.inputs[**w as usize].is_empty() && pair(ks[0].0) == pair(ks[1].0) && out_of(ks[0].0, ks[0].1).dot(out_of(ks[1].0, ks[1].1)) < -0.999)
+        .map(|(w, ks)| (*w, (pair(ks[0].0), out_of(ks[0].0, ks[0].1))))
+        .collect();
+    let along_joint = |k: usize, w: u32, t: f64| {
+        let Some(&(p, d)) = joints.get(&w) else { return false };
+        let sg = &cx.sections[k].0;
+        p != pair(k) && (cx.seg_at(sg, (t + 1e-4).min(1.0)) - cx.seg_at(sg, (t - 1e-4).max(0.0))).normalize_or_zero().dot(d).abs() > 0.999
+    };
     let section_chains = by_period(cx.sections.len(), &|k| cx.sections[k].0, &|k| {
         let (chain, ts) = cx.split_params(&cx.sections[k].0, &by_x, sec_acc(&cx.sections[k].0), false)?;
+        let n = chain.len();
+        let keep: Vec<bool> = (0..n).map(|i| i == 0 || i + 1 == n || !along_joint(k, chain[i], ts[i])).collect();
+        let (chain, ts): (Vec<u32>, Vec<f64>) = chain.into_iter().zip(ts).zip(keep).filter(|x| x.1).map(|x| x.0).unzip();
         let _ = section_ts[k].set(ts);
         Ok(chain)
     })?;
