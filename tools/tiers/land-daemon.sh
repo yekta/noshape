@@ -20,7 +20,10 @@ repo=$HOME/projects/noshape; me=$(readlink -f "$0"); bin=$(dirname "$me")
 inst=$(basename "$LD")   # refs/landq/<inst>/… in the shared repo
 . "$HOME/noshape-env.sh"
 . "$bin/slots.sh"
-export LAND_SLOTS=$(( $(nproc) / 5 > 2 ? $(nproc) / 5 : 2 ))
+# Slots: one per ~5 cores, at most one per ~12 GB of memory (vibe5, 16 cores and 29 GB, OOM-killed builds at 3).
+cpu_slots=$(( $(nproc) / 5 > 2 ? $(nproc) / 5 : 2 ))
+mem_slots=$(( $(awk '/MemTotal/ { print int($2 / 1048576) }' /proc/meminfo) / 12 ))
+export LAND_SLOTS=${LAND_SLOTS:-$(( mem_slots < 1 ? 1 : (mem_slots < cpu_slots ? mem_slots : cpu_slots) ))}
 export CARGO_BUILD_JOBS=$(( $(nproc) / LAND_SLOTS + 1 ))
 export GIT_COMMITTER_NAME=yekta GIT_COMMITTER_EMAIL=ngyekta@gmail.com
 mkdir -p "$LD"/{jobs,pending,splits,run,results,outbox,done,bin,outcome,failed} || { echo "land-daemon: can't make its dirs in $LD"; exit 1; }
