@@ -1,0 +1,65 @@
+{
+ "name": "sheet-metal-model-edit-reedit",
+ "about": "Edit Sheet metal model 1: Thickness 3 mm, ✓; re-edit shows 3 mm; Esc",
+ "area": "psui",
+ "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Sheet metal model 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Thickness"
+   }
+  },
+  {
+   "do": "type",
+   "text": "3"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Sheet metal model 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

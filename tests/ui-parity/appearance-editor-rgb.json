@@ -1,0 +1,67 @@
+{
+ "name": "appearance-editor-rgb",
+ "about": "Part 1 › Edit appearance…: R 10, Tab, G 200, Tab, B 30, Enter, Esc",
+ "area": "psui",
+ "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit appearance…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "R"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "10"
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "200"
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "30"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

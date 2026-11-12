@@ -1,0 +1,51 @@
+{
+ "name": "edge-rclick-chamfer",
+ "about": "Select the edge, right-click it the right top edge › Chamfer…: a Chamfer with that edge; Esc",
+ "area": "psui",
+ "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     40,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "edge": [
+     40,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Chamfer…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,35 @@
+{
+ "name": "part-row-rclick-copy-paste",
+ "about": "Parts list Part 1 › Copy Part 1, then Ctrl+V in the graphics",
+ "area": "psui",
+ "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+v"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,33 @@
+{
+ "name": "appearance-editor-hex",
+ "about": "Part 1 › Edit appearance…: the popup's hex field is focused; type FF0000, Enter, Esc",
+ "area": "psui",
+ "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit appearance…"
+   }
+  },
+  {
+   "do": "type",
+   "text": "FF0000"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

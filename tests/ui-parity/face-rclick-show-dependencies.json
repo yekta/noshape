@@ -1,0 +1,29 @@
+{
+ "name": "face-rclick-show-dependencies",
+ "about": "Right-click the fillet face › Show dependencies of Fillet 1…: the rows it depends on",
+ "area": "psui",
+ "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     0.586,
+     9.414
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show dependencies of Fillet 1…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

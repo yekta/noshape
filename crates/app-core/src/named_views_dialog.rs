@@ -118,6 +118,7 @@ pub fn render<V: 'static>(props: Props, input: &Entity<InputState>, key: &'stati
                         .pt(px(3.))
                         .border_b_1()
                         .border_color(pal.accent)
+                        .map(|d| crate::ui_script::mark(d, || "field:New view name".into()))
                         .child(crate::ui::input_with_placeholder(input, "New view name", cx).appearance(false).small().text_size(px(13.33)).pl(px(3.)))
                         .child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.accent)),
                 )

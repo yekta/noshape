@@ -1,0 +1,23 @@
+{
+ "name": "parts-row-dblclick-rename-escape",
+ "about": "Double-click Part 1 in the parts list, type a name, Esc: the name stays",
+ "area": "psui",
+ "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Body"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1486,6 +1486,7 @@ impl PartStudioView {
                     .when(on, |d| d.text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
                     .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(pal.border))
                     .child(label)
+                    .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.ui.mass_faces = faces;
                         cx.notify();

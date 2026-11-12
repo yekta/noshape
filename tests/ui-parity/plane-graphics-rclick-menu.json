@@ -1,0 +1,33 @@
+{
+ "name": "plane-graphics-rclick-menu",
+ "about": "Right-click the Front plane in the graphics: its menu; Offset plane… opens a Plane on it",
+ "area": "psui",
+ "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "plane": "Front"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Offset plane…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

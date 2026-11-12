@@ -1,0 +1,32 @@
+{
+ "name": "face-rclick-select-tangent-connected",
+ "about": "Right-click the top face › Select › Tangent connected faces: the top face and the fillet",
+ "area": "psui",
+ "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Select"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Tangent connected faces"
+   }
+  }
+ ]
+}
