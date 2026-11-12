@@ -9,7 +9,7 @@ A role's replay (kernel binary KBIN) and suite (ops binary OBIN, '-' for none) r
 for its key: ~/agents/bool-gate/cache/<RKEY>-replay.tsv, <SKEY>-suite.tsv. OCCT's results, which only change with
 what OCCT's path is built from (OKEY), are kept by case in ~/agents/bool-gate/occt/<OKEY> (NOSHAPE_BREP_OCCT_CACHE). Run on the host (gate.sh does it through rb.sh).
 """
-import argparse, hashlib, json, os, re, shutil, subprocess, sys, threading, time
+import argparse, hashlib, json, os, re, shutil, subprocess, sys, time
 from concurrent.futures import ThreadPoolExecutor
 
 HOME = os.path.expanduser("~")
@@ -23,9 +23,9 @@ REPLAY = ("bool-corpus corpus2 corpus3 corpus4 corpus5 corpus6 direct-corpus sh-
           "kall k10-25 k10-25-12 k25-15 k25-25 k25-71-12 cf-spur-gear gears gpf").split()
 VS_OCCT = {"parity56"}
 # Corpora whose cases can take many GB each (Shell's slab fuses, knurls, gears: the memory budget is 16 GB a
-# process, as whyall.sh's): their own shards, two at a time. Eight such at once were killed for memory on vibe4.
+# process, as whyall.sh's): their own shards, in a pool of two. Eight such at once were killed for memory on vibe4.
 HEAVY = {"shfall", "kall", "k10-25", "k10-25-12", "k25-15", "k25-25", "k25-71-12", "cf-spur-gear", "gears", "gpf"}
-HEAVY_AT_ONCE = threading.BoundedSemaphore(2)
+HEAVY_AT_ONCE = 2
 SPEED = ["k25-15", "k25-25", "cf-spur-gear"]
 CASE = re.compile(r"^([0-9a-f]{16})")
 
@@ -241,39 +241,33 @@ def available_gb():
 
 
 def run_task(t, out, threads):
-    """Runs one shard: a heavy one only two at a time, each only once the host has memory free for it (a heavy one
-    16 GB, its budget; another 4 GB); its peak memory and exit kept with it."""
+    """Runs one shard once the host has memory free for it (a heavy one 16 GB, its budget; another 4 GB); its peak
+    memory and exit kept with it."""
     log = os.path.join(out, t["role"], "logs", f"{t['kind']}-{t['id']}.log")
     tmp = os.path.join(out, t["role"], "tmp", f"{t['kind']}-{t['id']}")
     os.makedirs(os.path.dirname(log), exist_ok=True)
     os.makedirs(tmp, exist_ok=True)
     env = dict(os.environ, RAYON_NUM_THREADS=str(threads), TMPDIR=tmp, **t["env"])
     heavy = t.get("heavy", False)
-    if heavy:
-        HEAVY_AT_ONCE.acquire()
-    try:
-        while available_gb() < (16 if heavy else 4):
-            time.sleep(5)
-        t0 = time.time()
-        with open(log, "w") as o, open(log + ".err", "w") as e:
-            p = subprocess.Popen(t["cmd"], stdout=o, stderr=e, env=env)
-            deadline = t0 + 5400
-            while True:
-                pid, status, usage = os.wait4(p.pid, os.WNOHANG)
-                if pid:
-                    rc = os.waitstatus_to_exitcode(status)
-                    t["peak_gb"] = usage.ru_maxrss / 1e6
-                    break
-                if time.time() > deadline:
-                    p.kill()
-                    rc = "timeout"
-                    os.wait4(p.pid, 0)
-                    break
-                time.sleep(0.5)
-            p.returncode = 0
-    finally:
-        if heavy:
-            HEAVY_AT_ONCE.release()
+    while available_gb() < (16 if heavy else 4):
+        time.sleep(5)
+    t0 = time.time()
+    with open(log, "w") as o, open(log + ".err", "w") as e:
+        p = subprocess.Popen(t["cmd"], stdout=o, stderr=e, env=env)
+        deadline = t0 + 5400
+        while True:
+            pid, status, usage = os.wait4(p.pid, os.WNOHANG)
+            if pid:
+                rc = os.waitstatus_to_exitcode(status)
+                t["peak_gb"] = usage.ru_maxrss / 1e6
+                break
+            if time.time() > deadline:
+                p.kill()
+                rc = "timeout"
+                os.wait4(p.pid, 0)
+                break
+            time.sleep(0.5)
+        p.returncode = 0
     shutil.rmtree(tmp, ignore_errors=True)
     t["rc"], t["secs"], t["log"] = rc, time.time() - t0, log
     return t
@@ -472,10 +466,12 @@ def main():
                 t["key"] = skey
             tasks += ts
     print(f"gate-host: {len(tasks)} shards on {a.jobs} jobs x {a.threads} threads", flush=True)
-    done = []
-    with ThreadPoolExecutor(a.jobs) as pool:
-        for t in pool.map(lambda t: run_task(t, a.out, a.threads), sorted(tasks, key=lambda t: -t["weight"])):
-            done.append(t)
+    # (The heavy shards in a pool of their own, HEAVY_AT_ONCE at a time; the rest beside them; each longest first.)
+    heavy = sorted((t for t in tasks if t.get("heavy")), key=lambda t: -t["weight"])
+    light = sorted((t for t in tasks if not t.get("heavy")), key=lambda t: -t["weight"])
+    with ThreadPoolExecutor(HEAVY_AT_ONCE) as hp, ThreadPoolExecutor(max(1, a.jobs - HEAVY_AT_ONCE)) as lp:
+        futures = [hp.submit(run_task, t, a.out, a.threads) for t in heavy] + [lp.submit(run_task, t, a.out, a.threads) for t in light]
+        done = [f.result() for f in futures]
     results = [(key, "replay", collect_replay(ts, cases, "")) for key, (ts, cases) in replays.items()]
     for skey in {t["key"] for t in done if t["kind"] == "suite"}:
         rows = collect_suite([t for t in done if t["kind"] == "suite" and t["key"] == skey])
