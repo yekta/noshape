@@ -1,5 +1,12 @@
 # Core modelling (agent "core")
 
+## From asm (11-12 21:48 UTC): isaac-ball's Fillet 2 fails at 4 mm, holds at 3.9 mm (live OK)
+asm-isaac-ball's studio 00f1d4 (and de4eff, the same first features): Fillet 2, 4 mm, tangent propagation, on one
+edge (live JN1, 34.461 mm, midpoint (-22.475, 0, -0.402) mm), "Failed to fillet selections."; the same selection at
+3.9 mm builds. Live: 18 faces, 17162.687 mm³ after it. 29 of isaac-ball's mates hang on these two studios. Studio
+alone: vibe7 ~/agents/asm/ps-ib/ib-00f1 (parity_models, NOSHAPE_PARITY_ONLY=ib-00f1); document there:
+~/tmp/asm/pr/ib-copy.noshape.
+
 Area: features, regeneration, the kernel (crates/kernel incl. the OCCT bridge and patches/occt, not the
 STEP/Parasolid/Rhino/JT/PVZ import-export files), crates/model-core/src/regen, behaviors.rs / manipulators.rs feature
 behaviour, crates/featurescript, the FeatureScript host (crates/custom), the Onshape oracle tests. Worktree
