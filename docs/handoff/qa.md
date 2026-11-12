@@ -33,6 +33,15 @@ Gehäuse), as do its later features; the knife's Chamfer 1 builds since blend's 
 cf-surface-pattern's Surface Pattern 3 is 12× live while Pattern 4 is under live; blend's fast-finish (4dc4f0964) and dx's
 mesh fix (fcd0b283f) came after this green: the 11-12 02:00 window re-measures.
 
+**11-12 02:47: the 02:00 window:** the user's Mac mini hat on green 3c8c7c1c against the 02:00 (11-11) baseline: "Mac mini hat" 16.4
+-> 3.0 s wall (regen 14.9 -> 2.8 s; the union 8.2 -> 0.63 s, the STEP reference 1.5 -> 0.07, the chamfers 2.2 -> 0.29 / 1.1 -> 0.04),
+"Mac-mini-2024" 1.6 -> 0.21 s; all 137 features Ok. Speed of the 19:57 run (e3552a6d) 91.8 % debug / 91.5 % release, index 93.0
+(window log's "e3a19f63" label is a hard-coded typo in vibe5-window.sh: the run measured is the one named in "speed stage on").
+vibe5 had load 2–8 in the window (a rustc of someone's). hat15 P0 (core's fix not on main at 02:46) heads the 05:00 list;
+bin/compat-check.sh <last release> <candidate> runs the new release checks (user documents, hat15 vs v0.4.43, the 47 ticket
+documents, qa's authored documents on vibe4 ~/tmp/qa/compat-v0443). qa-os's footer workaround removal waits in worktree
+qa-footer (agent/qa-footer) for studios' 02da93d9.
+
 **11-11 21:03:** the result store (core, stages 2–4 + STORE-FACE-SPLIT fix 255b927a6) checked: go (corpus / mutations /
 corruption: ~/tmp/qa on vibe5, bin/{sig,corpus,mutate,corrupt,mkdocs}.py, bin/store-all.sh <binary> <tag> runs all three).
 v0.4.44 cut from 44ff040aa (17:00 list); its Linux job failed at upload-artifact (GitHub's artifact service), the lead's watcher

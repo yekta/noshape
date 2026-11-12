@@ -145,6 +145,7 @@ mirror-face-type (a live DOM detail).
 | 2026-11-11 | e3a19f63 (15:02 run; speed in the lead's clean vibe5 window 02:01–02:08, load 1.0–2.6 per document, debug as the suite; release 91.6 %; the other areas from the 15:02 run) | 91.4 | 86.3 | 97.8 | 72.8 | 95.7 | 94.4 | 100.0 | 92.7 | 91.3 | 96.6 | 98.5 | 93.9 | 95.7 |
 | 2026-11-11 | 6364f3c4 (00:54 run: models on vibe5, assemblies / exchange on vibe4; speed from the clean 02:00 vibe5 window on the same green, load 1.0–2.6; the run's own speed, vibe5 at load up to 18.9 after the window, 88.3 %) | 91.7 | 86.6 | 98.1 | 72.8 | 96.0 | 94.4 | 100.0 | 92.7 | 91.7 | 96.8 | 97.7 | 94.7 | 96.2 |
 | 2026-11-11 | 96359491 (07:57 run: interaction on vibe5, 6 shards; models on vibe5; assemblies / exchange redone on vibe5 (vibe4 at load 40, then a SIGTERM after 17 of 24: the 7 left run again and merged); speed under vibe5 load 9.5–24.7, median 14.7: the clean figure comes from the 02:00 window) | 91.2 | 86.7 | 98.1 | 73.1 | 96.1 | 93.6 | 100.0 | 92.7 | 87.7 | 96.7 | 97.7 | 94.5 | 95.0 |
+| 2026-11-12 | e3552a6d (19:57 run; speed from the 02:00 vibe5 window, load 2–8, median 5.7: someone's build ran there; vs 96359491b: assembly results 73.1 -> 84.6 % (dx's suite placing subassembly instances and configurations, 1266 -> 1465 occurrences), speed 87.7 -> 91.8 %, geometry 86.7 -> 87.2 %, versions / documents / drawing interaction up) | 93.0 | 87.2 | 98.1 | 84.6 | 96.6 | 95.1 | 100.0 | 92.7 | 91.8 | 97.1 | 97.9 | 96.8 | 96.6 |
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
