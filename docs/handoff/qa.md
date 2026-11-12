@@ -33,6 +33,14 @@ Gehäuse), as do its later features; the knife's Chamfer 1 builds since blend's 
 cf-surface-pattern's Surface Pattern 3 is 12× live while Pattern 4 is under live; blend's fast-finish (4dc4f0964) and dx's
 mesh fix (fcd0b283f) came after this green: the 11-12 02:00 window re-measures.
 
+**11-12 08:59: standing jobs (detached):** bin/compat-loop.sh v0445 runs bin/compat-check.sh on every new watcher green against the
+last release (user documents hat8 / hat15 / dock, hat15 also against v0.4.43, the 47 ticket documents, qa's authored documents
+from qa-scratch/compat-docs/v0443 copied to vibe4 each run: vibe4's ~/tmp is pruned); a changed feature status writes
+qa-scratch/compat/ALERT-<sha> (tell the lead and the committing agent at once). Change its release tag at each release (stop:
+touch compat/stop-loop, restart with the new tag). bin/vibe5-window.sh is armed for 02:00 (hat A/B, speed). bin/land-footer.sh
+lands qa-footer's qa-os change when studios' 02da93d9 reaches main. v0.4.45 (hotfix) checked: no blocker; WIN-SHOW-IN-EXPLORER
+verified. Open: core's P1 slow1151 (214116a5d's alias narrowing).
+
 **11-12 02:46: the 02:00 window:** the user's Mac mini hat on green 3c8c7c1c against the 02:00 (11-11) baseline: "Mac mini hat" 16.4
 -> 3.0 s wall (regen 14.9 -> 2.8 s; the union 8.2 -> 0.63 s, the STEP reference 1.5 -> 0.07, the chamfers 2.2 -> 0.29 / 1.1 -> 0.04),
 "Mac-mini-2024" 1.6 -> 0.21 s; all 137 features Ok. Speed of the 19:57 run (e3552a6d) 91.8 % debug / 91.5 % release, index 93.0
