@@ -10,6 +10,19 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**2026-11-12 17:33 UTC (user P0s in sketch mode, hat15b's Sketch 1):** the pick pass widened lines and points by 8 × dpr on
+top of the shaders' own × dpr (16 CSS px on a Retina display): landed 2f1d29dd (`PICK_EXTRA_CSS_PX`). Then: a sketch
+tool's click acts on the hovered entity when the pick buffer still has it under the click (`Viewport::hover_is_at`;
+the 6 px / 10 px `near` re-check only when it can't tell); a drawing tool re-infers when the GPU's Hover arrives
+(`snap_to_hover`: a hovered model edge / vertex snaps); live's reach (behaviours "sketch snapping and hover"): a
+curve 7.5 px, a point 8.5 px (`inference::POINT_REACH`), a midpoint 6 px, a dragged point's drop the same on screen;
+in sketch mode sketch points / curves win the pick over model vertices / edges (`PickMap::priority_fn_sketching`). Tests: sketch_ui_tests `a_line_ends_on_the_hovered_point_at_scale_1/2`, `a_dragged_point_lands_on_a_line_within_7_px` (T1),
+`the_dimension_tool_takes_the_hovered_line_at_scale_2` (T2, a real GPU pick), `an_open_under_defined_sketch_has_the_rows_badge`.
+Next (live's look): the snap target's yellow-orange square outline (points, midpoints; none on a line), no hover
+recolour of the target mid-draw, the hover disc 10–11 px translucent centred on the point. Open: the P1 "hover not orange" on hat8 (debug patch /root/psui-scratch/hover/hoverdbg.patch: logs highlighted_hover;
+suspect more than one highlighted reference -> no single_hover), the open sketch's row badge on hat15b against live's
+capture.
+
 **2026-11-12 13:54 UTC:** live recorded 48 of batch 1 (b8a8a5da, 95db6cbb; copies in /root/psui-scratch/cov/live48 until they land).
 Ours 28 -> 35/48 (627/716 states) with: Split's tool field takes a face (part_for_field only takes a body kind the
 field takes), Thicken's operation from the model before the feature, Sweep's Add (evCollision: equal solids are

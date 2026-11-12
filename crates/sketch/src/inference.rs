@@ -206,9 +206,16 @@ fn excluded(sk: &Sketch, ctx: &InferenceContext, id: EntityId) -> bool {
     ctx.exclude.iter().any(|e| sk.entity(*e).is_some_and(|x| x.point_refs().contains(&id)))
 }
 
+/// How far a point reaches next to a curve's [`InferenceContext::snap_radius`]: live (behaviours "sketch snapping and
+/// hover", 11-12) snaps a line's end onto a line from 7 px, not 8, onto a point from 8–9 px.
+pub const POINT_REACH: f64 = 8.5 / 7.5;
+/// A line's midpoint snaps within 5–7 px along the line (live, the same capture); further out the end is on the line.
+pub const MIDPOINT_REACH: f64 = 6.0 / 7.5;
+
 /// Computes inference candidates, best first.
 pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inference> {
     let r = ctx.snap_radius.max(1e-15);
+    let (r_point, r_mid) = (r * POINT_REACH, r * MIDPOINT_REACH);
     let ra = ctx.align_radius.unwrap_or(r);
     // Lengths on screen when the view is known: live draws each inference (a point, the horizontal or vertical
     // through one) into a pick pass and picks the pointer's pixel, so its reach is the pointer's distance on screen to
@@ -241,7 +248,7 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
         match &e.geometry {
             Geometry::Point { pos } => {
                 let d = seen(*pos - cursor);
-                if d <= r {
+                if d <= r_point {
                     let kind = if centers.contains(&e.id) { InferenceKind::Center } else { InferenceKind::Endpoint };
                     push(&mut out, kind, *pos, Some(e.id), None, vec![AutoConstraint::CoincidentPoint(e.id)], 0);
                 }
@@ -251,10 +258,10 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                 }
                 let dx = off_x(cursor - *pos);
                 let dy = off_y(cursor - *pos);
-                if dx <= ra && d > r && best_v.is_none_or(|b| dx < b.0) {
+                if dx <= ra && d > r_point && best_v.is_none_or(|b| dx < b.0) {
                     best_v = Some((dx, e.id, *pos));
                 }
-                if dy <= ra && d > r && best_h.is_none_or(|b| dy < b.0) {
+                if dy <= ra && d > r_point && best_h.is_none_or(|b| dy < b.0) {
                     best_h = Some((dy, e.id, *pos));
                 }
             }
@@ -267,13 +274,13 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                 match &c {
                     Curve2::Line { a, b } => {
                         let m = (*a + *b) * 0.5;
-                        if seen(m - cursor) <= r {
+                        if seen(m - cursor) <= r_mid {
                             push(&mut out, InferenceKind::Midpoint, m, Some(e.id), None, vec![AutoConstraint::MidpointOf(e.id)], 1);
                         }
                     }
                     Curve2::Arc { start_angle, end_angle, .. } => {
                         let m = c.point(0.5 * (start_angle + end_angle));
-                        if seen(m - cursor) <= r {
+                        if seen(m - cursor) <= r_mid {
                             push(&mut out, InferenceKind::Midpoint, m, Some(e.id), None, vec![AutoConstraint::MidpointOf(e.id)], 1);
                         }
                     }
@@ -316,7 +323,7 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
     // the sketch origin (unless a point already sits on it)
     if ctx.origin && !sk.entities().any(|e| matches!(e.geometry, Geometry::Point { pos } if pos.length() < 1e-12)) {
         let d = seen(cursor);
-        if d <= r {
+        if d <= r_point {
             push(&mut out, InferenceKind::Endpoint, DVec2::ZERO, Some(ORIGIN), None, vec![AutoConstraint::CoincidentPoint(ORIGIN)], 0);
         } else {
             let (dx, dy) = (off_x(cursor), off_y(cursor));

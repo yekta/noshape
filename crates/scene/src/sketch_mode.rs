@@ -1488,6 +1488,13 @@ impl SketchEditor {
         best
     }
 
+    /// The snap again once the GPU hover the last move asked for arrives (a model edge or vertex it lit snaps too).
+    pub fn reinfer(&mut self, sk: &Sketch) {
+        let Some(p) = self.cursor.filter(|_| self.tool.draws()) else { return };
+        self.external_snap = None;
+        self.inference = self.infer(sk, p, self.shift_held);
+    }
+
     /// Current anchor of the tool (last click; a chained line starts at the
     /// solved position of the chain end, which a typed dimension may move).
     fn anchor_pos(&self, sk: &Sketch) -> Option<DVec2> {
@@ -3771,21 +3778,27 @@ impl SketchEditor {
     /// Point or curve under a dragged point (coincident on release).
     fn point_drop_target(&self, sk: &Sketch, id: EntityId) -> Option<(EntityId, DVec2, Drop)> {
         let pos = sk.point(id)?;
-        let r = self.world_per_px * 9.0;
+        // Live (behaviours "sketch snapping and hover", 11-12): a dragged point lands on a line from 7 px, not 9; the
+        // reach of a drawn line's end (points and midpoints as there).
+        let r = self.world_per_px * INFERENCE_PX;
+        let (r_point, r_mid) = (r * noshape_sketch::inference::POINT_REACH, r * noshape_sketch::inference::MIDPOINT_REACH);
+        // (On screen, as live measures it: in an iso view a pixel across the plane's foreshortened axis is longer in it.)
+        let metric = self.screen_metric();
+        let seen = |v: DVec2| metric.as_ref().map_or(v.length(), |m| m.len(v));
         let users: Vec<EntityId> = sk.users_of_point(id);
         // Points of curves using the dragged point would collapse those curves.
         let siblings: Vec<EntityId> = users.iter().filter_map(|u| sk.entity(*u)).flat_map(|e| e.point_refs()).collect();
         let best_pt = sk
             .entities()
             .filter(|e| e.kind() == EntityKind::Point && e.id != id && !siblings.contains(&e.id))
-            .filter_map(|e| sk.point(e.id).map(|q| (e.id, q, (q - pos).length())))
-            .filter(|x| x.2 <= r)
+            .filter_map(|e| sk.point(e.id).map(|q| (e.id, q, seen(q - pos))))
+            .filter(|x| x.2 <= r_point)
             .min_by(|a, b| a.2.total_cmp(&b.2));
         if let Some((e, q, _)) = best_pt {
             return Some((e, q, Drop::Merge));
         }
         // The sketch origin (a fixed point is created on drop).
-        if pos.length() <= r && !sk.entity(id).is_some_and(|e| e.external) {
+        if seen(pos) <= r_point && !sk.entity(id).is_some_and(|e| e.external) {
             return Some((noshape_sketch::ORIGIN, DVec2::ZERO, Drop::Merge));
         }
         let curves = || sk.entities().filter(|e| e.kind() != EntityKind::Point && !users.contains(&e.id) && !e.point_refs().contains(&id));
@@ -3794,8 +3807,8 @@ impl SketchEditor {
             .filter_map(|e| {
                 let Some(Curve2::Line { a, b }) = sk.curve(e.id) else { return None };
                 let q = (a + b) * 0.5;
-                let d = (q - pos).length();
-                (d <= r).then_some((e.id, q, d))
+                let d = seen(q - pos);
+                (d <= r_mid).then_some((e.id, q, d))
             })
             .min_by(|a, b| a.2.total_cmp(&b.2));
         if let Some((e, q, _)) = mid {
@@ -3804,7 +3817,11 @@ impl SketchEditor {
         curves()
             .filter_map(|e| {
                 let c = sk.curve(e.id)?;
-                let (_, q, d) = c.closest(pos);
+                let q = match (&c, &metric) {
+                    (Curve2::Line { a, b }, Some(m)) => m.closest_on_segment(*a, *b, pos),
+                    _ => c.closest(pos).1,
+                };
+                let d = seen(q - pos);
                 (d <= r).then_some((e.id, q, d))
             })
             .min_by(|a, b| a.2.total_cmp(&b.2))

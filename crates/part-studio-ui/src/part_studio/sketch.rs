@@ -497,9 +497,12 @@ impl PartStudioView {
 
     /// Snap candidate from the hovered model vertex/edge (sketching on parts).
     fn model_snap(&self, cursor: DVec2, vp: &Viewport) -> Option<ExternalSnap> {
+        self.model_snap_of(self.hover.as_ref()?, cursor, vp)
+    }
+
+    fn model_snap_of(&self, r: &Reference, cursor: DVec2, vp: &Viewport) -> Option<ExternalSnap> {
         let ed = self.sketch.as_ref()?;
         let frame = ed.frame;
-        let r = self.hover.as_ref()?;
         let radius_px = 10.0;
         let to_screen = |w: DVec3| vp.project(w);
         let cursor_s = to_screen(frame.to_world(cursor))?;
@@ -534,6 +537,28 @@ impl PartStudioView {
                 ((s - cursor_s).length() <= radius_px).then_some(ExternalSnap::Edge { position: q, reference: r.clone() })
             }
             _ => None,
+        }
+    }
+
+    fn snap_to_hover(&mut self, hover: Option<&Reference>, cx: &mut Context<Self>) {
+        if !self.sketch.as_ref().is_some_and(|ed| ed.tool.draws()) {
+            return;
+        }
+        let Some(data) = self.sketch_data(cx) else { return };
+        let before = self.sketch.as_ref().and_then(|ed| ed.inference.clone());
+        let Some(ed) = self.sketch.as_mut() else { return };
+        ed.reinfer(&data.sketch);
+        let (cursor, shift) = (ed.cursor, ed.shift_held);
+        if !shift
+            && let (Some(c), Some(r)) = (cursor, hover)
+            && let Some(snap) = self.model_snap_of(r, c, self.viewport.read(cx))
+            && let Some(ed) = &mut self.sketch
+        {
+            ed.apply_external_snap(snap);
+        }
+        if self.sketch.as_ref().and_then(|ed| ed.inference.as_ref()) != before.as_ref() {
+            self.refresh_scene(false, cx);
+            cx.notify();
         }
     }
 
@@ -688,6 +713,7 @@ impl PartStudioView {
                         ed.hover_region = None;
                         ed.hover = None;
                     }
+                    self.snap_to_hover(None, cx);
                     return true;
                 }
                 if let Some(ed) = &mut self.sketch {
@@ -707,6 +733,8 @@ impl PartStudioView {
                         cx.notify();
                     }
                 }
+                // A drawing tool snaps to what is now drawn hovered (the pick arrives after the move).
+                self.snap_to_hover(r.as_ref(), cx);
                 // The GPU hover result arrives after PointerMove. Refresh Use
                 // here as well, so stopping on an edge still previews it.
                 if self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Use) {
@@ -789,8 +817,11 @@ impl PartStudioView {
                         (None, None) => d.text_of_entity(e).is_some() || d.sketch.curve(e).is_some_and(|c| c.closest(p).2 <= r),
                     }
                 };
-                // A stale hover (the pick lags behind fast moves) doesn't count.
-                let hovered = self.hovered_sketch_entity(cx).filter(|e| near(self, *e, cx)).or_else(|| {
+                // The tool acts on what is highlighted under the pointer (the user's Dimension clicks and snaps on a
+                // Retina display: the hover reached further than this re-check, so the click dropped what it showed);
+                // only a stale hover (the pick lags behind fast moves) is checked again, by distance.
+                let hover_here = vp.read(cx).hover_is_at(*position);
+                let hovered = self.hovered_sketch_entity(cx).filter(|e| hover_here || near(self, *e, cx)).or_else(|| {
                     let ed = self.sketch.as_ref()?;
                     if ed.tool.draws() {
                         return None;

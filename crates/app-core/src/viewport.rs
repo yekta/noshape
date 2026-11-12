@@ -740,6 +740,12 @@ impl Viewport {
         self.pointer_inside
     }
 
+    /// The hover shown is what the pick buffer has at `local` (viewport px): a press there acts on exactly what is
+    /// highlighted (the user's sketch clicks re-checked the hovered entity by a different reach and lost it).
+    pub fn hover_is_at(&self, local: DVec2) -> bool {
+        self.pick_at(local) == Some(self.hover)
+    }
+
     /// A hover query is in flight (what is under the pointer isn't known yet).
     pub fn hover_pending(&self) -> bool {
         self.hover_query

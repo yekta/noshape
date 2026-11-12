@@ -2888,7 +2888,7 @@ impl FeatureDialog {
                     // the select sits 3 px down in a 31 px row.
                     let icon_row = s.hints.has(Hints::SHOW_LABEL) && param_icon(self.ty.id, s.id).is_some();
                     let cur_shown = options.iter().find(|(id, _)| *id == cur.as_str()).map(|(_, l)| crate::i18n::spec(l)).unwrap_or_default();
-                    let dd = div().id(SharedString::from(format!("sel-{path}"))).map(|d| crate::ui_script::mark(d, || format!("dropdown:{cur_shown}"))).flex_1().min_w_0().when(icon_row, |d| d.mt(px(3.))).tooltip(crate::ui::user_tooltip(crate::i18n::spec(s.label))).child(dd);
+                    let dd = div().id(SharedString::from(format!("sel-{path}"))).map(|d| crate::ui_script::mark_first(d, || format!("dropdown:{cur_shown}"))).flex_1().min_w_0().when(icon_row, |d| d.mt(px(3.))).tooltip(crate::ui::user_tooltip(crate::i18n::spec(s.label))).child(dd);
                     // Live (dom/dialog-extrude-new.txt): the select fills the dialog's
                     // first 194 px column flush with its left edge (the body has 2 px
                     // padding); flips sit in the 26 px right column.

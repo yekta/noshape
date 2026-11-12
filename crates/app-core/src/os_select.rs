@@ -251,7 +251,7 @@ impl OsSelect {
                 }));
         }
         let shown = label.to_string();
-        crate::ui_script::mark(el, || format!("dropdown:{shown}"))
+        crate::ui_script::mark_first(el, || format!("dropdown:{shown}"))
             .w_full()
             .h(px(self.height))
             // Live (dialogs/chamfer-01): the value and caret sit 1 px below

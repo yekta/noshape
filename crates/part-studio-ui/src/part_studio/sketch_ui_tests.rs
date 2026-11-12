@@ -1021,6 +1021,159 @@ fn line_then_dimension_tool(cx: &mut TestAppContext, name: &str) -> (AnyWindowHa
     (window, view)
 }
 
+/// User P0 11-12 (hat15b, 5th report): a line's end over a point, hovered, then clicked: the end is the point.
+/// Live (behaviours "sketch snapping and hover"): a point takes the end from 8–9 px (a line from 7); here 7.8 px.
+fn a_line_ends_on_the_hovered_point(cx: &mut TestAppContext, scale: f32) {
+    let (window, view) = sketch_with(cx, &format!("hover-snap-{scale}"), Tool::Point);
+    cx.update_window(window, |_, w, _| w.set_scale_factor(scale)).unwrap();
+    draw(cx, window);
+    // (Off the origin's horizontal and vertical, which it would snap to.)
+    click(cx, window, &view, (700., 250.));
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    draw(cx, window);
+    let found = |cx: &gpui_kit::App| {
+        let v = view.read(cx);
+        let data = v.sketch_data(cx)?;
+        // (The placed point: the first is the origin's hidden one.)
+        let point = data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).last()?.id;
+        let r = Reference::SketchEntity { sketch: v.sketch.as_ref()?.feature, entity: point.0 };
+        Some((point, v.built.as_ref()?.picks.ids_for(&r).first().copied()?))
+    };
+    wait_until(cx, window, |cx| found(cx).is_some());
+    let (point, pick) = cx.update(|cx| found(cx)).expect("the point is pickable");
+    click(cx, window, &view, (450., 170.));
+    let at = DVec2::new(706., 255.);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            for ev in [
+                ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() },
+                // The GPU's hover pick, after the move.
+                ViewportEvent::Hover(Some(pick)),
+                ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 },
+                ViewportEvent::ToolUp { position: at, modifiers: Modifiers::default() },
+            ] {
+                v.on_viewport_event(&vp, &ev, w, cx);
+            }
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    let (ends, at_point, coincident) = cx.update(|cx| {
+        let data = view.read(cx).sketch_data(cx).unwrap();
+        let ends = data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).filter_map(|e| e.endpoints()).collect::<Vec<_>>();
+        let end = ends.first().map(|e| e.1);
+        let at_point = end.and_then(|e| Some((data.sketch.point(e)? - data.sketch.point(point)?).length()));
+        let coincident = end.is_some_and(|e| e == point || data.sketch.constraints().any(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Coincident { a, b } if (a, b) == (e, point) || (a, b) == (point, e))));
+        (ends, at_point, coincident)
+    });
+    assert_eq!(ends.len(), 1, "one line: {ends:?}");
+    assert!(coincident && at_point.is_some_and(|d| d < 1e-12), "the line ends on the hovered point (scale {scale}): {at_point:?} off, coincident {coincident}");
+}
+
+#[gpui::test]
+fn a_line_ends_on_the_hovered_point_at_scale_1(cx: &mut TestAppContext) {
+    a_line_ends_on_the_hovered_point(cx, 1.0);
+}
+
+#[gpui::test]
+fn a_line_ends_on_the_hovered_point_at_scale_2(cx: &mut TestAppContext) {
+    a_line_ends_on_the_hovered_point(cx, 2.0);
+}
+
+/// Live (behaviours "sketch snapping and hover", 11-12): a point dragged to 7 px off a line lands on it, coincident;
+/// at 9 px it stays where it is dropped.
+#[gpui::test]
+fn a_dragged_point_lands_on_a_line_within_7_px(cx: &mut TestAppContext) {
+    for (off, lands) in [(7.0, true), (9.0, false)] {
+        let (window, view) = sketch_with(cx, &format!("drag-onto-line-{off}"), Tool::Line);
+        click(cx, window, &view, (450., 150.));
+        click(cx, window, &view, (750., 150.));
+        keys(cx, window, &["escape", "escape"]);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Point, w, cx))).unwrap();
+        draw(cx, window);
+        click(cx, window, &view, (620., 250.));
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+        draw(cx, window);
+        drag(cx, window, &view, (620., 250.), (620., 150. + off), 8);
+        let (on_line, coincident, dbg) = cx.update(|cx| {
+            let data = view.read(cx).sketch_data(cx).unwrap();
+            let line = data.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+            let point = data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).map(|e| e.id).max().unwrap();
+            let q = data.sketch.point(point).unwrap();
+            let on_line = data.sketch.curve(line).unwrap().closest(q).2 < 1e-12;
+            let coincident = data.sketch.constraints().any(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Coincident { a, b } if (a, b) == (point, line) || (a, b) == (line, point)));
+            (on_line, coincident, format!("{q:?} {:?} {:?}", data.sketch.curve(line), view.read(cx).sketch.as_ref().map(|e| e.world_per_px)))
+        });
+        assert_eq!((on_line, coincident), (lands, lands), "a point dropped {off} px off the line: {dbg}");
+    }
+}
+
+/// User P0 11-12 (hat15b, 7th report): the Dimension tool's hover lit a line but the click started nothing. With the
+/// GPU's own hover pick at scale 2, a click on the line's drawn centre, and one 8 px beside it (still hovered), starts
+/// a dimension of it.
+#[gpui::test]
+#[ignore = "T2: GPU picks (macOS CI's readback came out white, run 42333748082)"]
+fn the_dimension_tool_takes_the_hovered_line_at_scale_2(cx: &mut TestAppContext) {
+    let _gpu = noshape_ops::doc::gpu_lock();
+    if let Err(e) = Gpu::headless_rendering() {
+        return eprintln!("GPU picks skipped: {e}");
+    }
+    RENDERING.set(true);
+    for off in [0.0, 8.0] {
+        let (window, view) = line_then_dimension_tool(cx, &format!("dim-hover-{off}"));
+        cx.update_window(window, |_, w, _| w.set_scale_factor(2.0)).unwrap();
+        draw(cx, window);
+        let (line, centre) = cx.update(|cx| {
+            let v = view.read(cx);
+            let data = v.sketch_data(cx).unwrap();
+            let ed = v.sketch.as_ref().unwrap();
+            let line = data.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+            let Some(noshape_sketch::Curve2::Line { a, b }) = data.sketch.curve(line) else { panic!("a line") };
+            (line, v.viewport.read(cx).project(ed.frame.to_world((a + b) * 0.5)).unwrap())
+        });
+        // Off the line across it (it runs from (500, 400) to (640, 360) on screen).
+        let at = centre + DVec2::new(40., 140.).normalize() * off;
+        let vp = cx.update(|cx| view.read(cx).viewport.clone());
+        let origin = cx.update(|cx| vp.read(cx).origin());
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_mouse_move(gpui_kit::point(origin.x + px(at.x as f32), origin.y + px(at.y as f32)), None, Modifiers::default());
+        let t = std::time::Instant::now();
+        while !cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.hover == Some(line))) && t.elapsed() < std::time::Duration::from_secs(15) {
+            cx.update(|cx| vp.update(cx, |v, cx| v.request_frame(cx)));
+            cx.update(|cx| view.read(cx).gpu.deliver_frames());
+            draw(cx, window);
+            cx.executor().advance_clock(std::time::Duration::from_millis(20));
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert!(cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.hover == Some(line))), "the line is hovered {off} px off it");
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+                v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: at, modifiers: Modifiers::default() }, w, cx);
+            });
+        })
+        .unwrap();
+        draw(cx, window);
+        assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().tool_picks()), vec![line], "the click {off} px off picks the hovered line");
+    }
+}
+
+/// User 11-12 (hat15b, 6th report): an open sketch that is under defined shows the feature list's under-defined
+/// badge on its row, as once it is closed.
+#[gpui::test]
+fn an_open_under_defined_sketch_has_the_rows_badge(cx: &mut TestAppContext) {
+    let (window, view) = line_then_dimension_tool(cx, "open-underdefined");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let under = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        let id = v.sketch.as_ref().unwrap().feature;
+        v.display.feature_state(id).map(|s| (s.status, s.underdefined))
+    });
+    assert_eq!(under(cx), Some((noshape_model::display::FeatureStatus::Ok, true)), "the open sketch's state");
+}
+
 /// Parity sketch.md 7.3: the Dimension tool's pick and placement clicks open
 /// the value box, which takes the typed value from the first key; Enter
 /// applies it.

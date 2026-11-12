@@ -4,6 +4,13 @@
  "area": "psui",
  "source": "psui coverage audit 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
  "start": "pin",
+ "remembered": {
+  "externalThread": {
+   "length:Millimeter": {
+    "threadDepth": "5 mm"
+   }
+  }
+ },
  "steps": [
   {
    "do": "click",

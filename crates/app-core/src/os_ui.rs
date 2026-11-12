@@ -656,7 +656,7 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
         .child(div().flex_1().truncate().map(|d| if current >= user_from { d.child(crate::ui::user_text(label)) } else { d.child(label) }))
         .child(glyph(GLYPH_CARET, 8., gpui_kit::rgb_static(0x777777))) // live assembly/181-182: `#777` (also in dark, prefs/dk-904)
         .on_click(move |_, window, cx| open(window, cx));
-    crate::ui_script::mark(field, || format!("dropdown:{shown}"))
+    crate::ui_script::mark_first(field, || format!("dropdown:{shown}"))
 }
 
 /// A solid circled × (Named views "Remove view", live psb/nv-911): the disc
