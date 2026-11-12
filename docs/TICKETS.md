@@ -5,6 +5,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## studios, 2026-11-12
+- [ ] P2 IGES-SUBFIGURE-ONE-PART (dx; studios 2026-11-12 00:11 UTC) **an IGES subfigure of several solids imports as one
+  part.** Live's own export of Assembly 1 = Part 1 + Sub(Part 2, Part 3) as IGES (crates/kernel/tests/data/iges/asm2.igs:
+  a 308 definition of the solids DE 211 "Part 2" and DE 317 "Part 3", placed by one 408): `read_iges_parts` gives two
+  parts, "Part 1" and "Part 2", the second a compound of both solids (io.cpp read_iges_tree: "a subfigure is a
+  compound", named after its first solid), so Import files… to a single document makes 2 parts where the file has 3.
+  Live (behaviours "studios (2511)" (3), Split) has Part 1, Part 2 and Part 3, each its own; check live's single
+  import of the file. The Split path splits the compound itself (io.rs `read_iges_assembly_nested`).
+
 ## qa, 2026-11-11
 - [x] (verified by qa 2026-11-11 14:43 on green 44ff040aa, core 255b927a6: the whole check again: corpus 87 / 87 equal with no store, cold and warm (incl. c2-helical-sweep, c2-housing-draft, c2-valve-config); the six mutations equal, face counts too; corruption 13 / 13 on c2-hunting-knife and on c2-helical-sweep. feature_list over all tabs 63.7 s without, 66.2 cold, 26.3 warm (c2-impeller-loft 14.8 -> 0.02 s, cf-surface-pattern 9.0 -> 0.37). Store: go for the 17:00 build.) P0 STORE-FACE-SPLIT (core; qa 2026-11-11 11:51, the lead's result-cache check) **a part read back from the persistent
   result cache has a periodic face split into pieces that share one id**: green 1bfbaacdb, NOSHAPE_RESULT_STORE set, the same
@@ -1569,7 +1578,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   polygon's first corner) and 26d817465 (a section with fewer vertices gets the others' corners spread evenly); neither
   under legacy_topology or a ScopeRule. If the new loft is live's, documents made from now on are right, but ones saved
   before change on open. qa's CLI sweeps don't have this document (only the GUI rows): added to qa's watch list. (qa 2026-11-07 08:51, v0.4.34)
-- [ ] P1 WIN-SHOW-IN-EXPLORER (studios) **a document row's "Show in Explorer" does nothing on Windows, in v0.4.36** (new in this
+- [x] (studios b343dadc9: the path is handed to Explorer without canonicalising's `\\?\` prefix, `file_dialogs::os_path`; qa-os.yml run 43111545612 on main 27018fe16, windows-latest: a real right-click › Show in Explorer opened the documents folder with "uip Bracket.noshape" selected; the job still fails on P3 UIS-RCLICK-WINDOWS) P1 WIN-SHOW-IN-EXPLORER (studios) **a document row's "Show in Explorer" does nothing on Windows, in v0.4.36** (new in this
   release; macOS's Show in Finder and the footer link on all three work). qa-os.yml on v0.4.36 (run 42459360425, windows-latest):
   a real right-click on "uip Bracket" opens the row menu, Show in Explorer is clicked, no Explorer window opens, and the app logs
   `Revealing path \\?\C:\Users\runneradmin\Documents\noshape\uip Bracket.noshape in explorer: The parameter is incorrect.

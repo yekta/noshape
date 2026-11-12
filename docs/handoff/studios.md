@@ -28,6 +28,38 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-11 23:18 UTC: speed in studios' area (lead 11-11: PLAN 2.7), Show in Explorer confirmed on Windows
+Measured with the ui-parity driver's timing mode (`NOSHAPE_UI_TIMING=1 NOSHAPE_PERF=1`: each step's recording gets
+`timing` = dispatch / first painted frame / idle, ms from the action) on fixtures from /root/studios-scratch/bin/mkperf.py
+(hist.noshape: 2000 edits, V1–V50, B1–B3, 8 tabs; vs500.noshape: 500 variables; docs/: 1000 documents), scenarios in
+/root/studios-scratch/perf/, runner bin/perfrun.py (vibe3, ~/tmp/studios; that folder is pruned of files a few hours old:
+re-copy the scripts). vibe3 at load 33–41 (8 cores): relative numbers, same run. Live's timings asked (REQUESTS 2518).
+
+| Operation | first frame (ms) | idle (ms) | after the fix |
+|---|---|---|---|
+| Tab switch (Part Studio / Assembly / Variable / Feature Studio) | 14–63 | 11–560 | – |
+| Versions and history open (2000 entries, 50 versions) | 22–114 | 250–750 | – |
+| Compare a version / Open a version / switch to B1 and back | 48–138 | 470–820 | – |
+| Variable Studio, 500 variables: open, cell click, Ctrl+A, Enter, Esc | 249 / 283 / 507 / 478 / 496 | 480–730 | 42 / 33 / 78 / 73 / 69 |
+| Documents page, 1000 documents: sort by Name, click Search | 310–385 / 263 | – | 29–47 / 21 |
+| Documents page read (1000 documents) | first 480–570, then 20–30 | | |
+
+Fixed (the two worst): the Variable Studio table and the documents list built every row each frame. Both now build
+the rows on screen and 600 px around them (a zero-height probe above the rows records their top and the visible clip
+as they're painted; a scroll that shows other rows asks for the next frame; spacers keep the height; a row with the
+selection, an edit or a type search is always built). Next: the history panel (frames to 138 ms, idle to 820 ms).
+- WIN-SHOW-IN-EXPLORER closed: qa-os.yml 43111545612 (windows-latest, main 27018fe16): a real right-click › Show in
+  Explorer opened the folder with the document selected. The job still fails on P3 UIS-RCLICK-WINDOWS (the UI
+  script's rclick opens no row menu on Windows; a real one does).
+- IMPORT-SPLIT-DOCUMENTS (live 2511): Split now takes a STEP of loose parts (one document in a folder, its Assembly
+  named after the file), a Parasolid assembly (xt_read.cpp records subassemblies and each child's placement, as the
+  STEP tree) and an IGES one (kernel `read_iges_assembly_nested`: subfigure definitions 308 / instances 408 read
+  from the file, solids matched to the reader's parts by label; the top Assembly named after the file, lead 11-11).
+  e2e: documents_import_splits_loose_step_parts_into_one_document, _a_parasolid_assembly, _an_iges_assembly (live's
+  files in crates/kernel/tests/data). The IGES reader keeps a subfigure as one compound part (ticket
+  IGES-SUBFIGURE-ONE-PART, dx): the split breaks it into its solids by the definition's order. Not yet: an IGES
+  subfigure placed twice (not split).
+
 ### 2026-11-11 21:50 UTC: Feature Studio undo steps and the notices count (lead 11-11)
 - Undo: a typed run up to a pause (700 ms, the save delay) is one step; psui's "first character its own step" (2480)
   dropped (lead: live's recorder types at 90 ms a key and 3 of 4 takes undo the run whole). UI test
