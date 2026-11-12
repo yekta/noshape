@@ -13,6 +13,8 @@
 # lands they are main's). FAIL: a case that differs from OCCT or fails where main's doesn't, a crash, a document
 # matching fewer features. CHECK: a case main takes declined, a document's outcome changed, a timing case >5 % slower.
 # The full output: /root/<caller>-scratch/gate-<sha>.log. One gate at a time per host (a lock); builds through rb.sh.
+# gate.sh --main: main's results (replay, suite) worked out and cached ahead of the next gate, nothing done when they
+# are (an hourly cron: main's kernel moves several times a day, and the first gate after each paid main's side).
 # gate.sh --nightly-kall: kall's knurls (45-50 GB a process, not in the per-change gate) replayed on main alone, one
 # case at a time, against the night before: bool2's cron at 04:30 UTC (lead 11-12). Its verdict line goes to
 # /tmp/lead/kall-status and /root/<caller>-scratch/kall-nightly.log, a FAIL also to /root/bool-scratch/KALL-FAIL.
@@ -22,8 +24,9 @@ repo=$(git -C "$here" rev-parse --show-toplevel)
 caller=$(basename "$repo")
 [ $# -ge 1 ] || { sed -n '2,13p' "$0"; exit 2; }
 target=$1; shift
-jobs=8; threads=2; suite=1; spd=1; host=vibe4; nightly=0
+jobs=8; threads=2; suite=1; spd=1; host=vibe4; nightly=0; mainonly=0
 [ "$target" = --nightly-kall ] && { nightly=1; target=origin/main; suite=0; spd=0; }
+[ "$target" = --main ] && { mainonly=1; target=origin/main; spd=0; }
 while [ $# -gt 0 ]; do
   case $1 in
     --jobs) jobs=$2; shift;; --threads) threads=$2; shift;; --host) host=$2; shift;;
@@ -89,6 +92,23 @@ cached() { ssh -o BatchMode=yes "$host" "test -s ~/agents/bool-gate/cache/$1-$2.
 lock=/root/projects/noshape-wt/.bool-gate-$host.lock
 exec 9> "$lock"
 flock -n 9 || { say "waiting for another gate on $host"; flock 9; }
+
+# Main alone, cached ahead of gates.
+if [ $mainonly = 1 ]; then
+  if cached "$bkey_r" replay && cached "$bkey_s" suite; then say "main ${base:0:9}: already cached"; exit 0; fi
+  wt_base=/root/projects/noshape-wt/bool-gate-base
+  [ -d "$wt_base" ] || git -C "$repo" worktree add -q --detach "$wt_base" origin/main >> "$log" 2>&1
+  git -C "$wt_base" checkout -q -f --detach "$base" && git -C "$wt_base" clean -fdq
+  ops=0; cached "$bkey_s" suite || ops=1
+  cmd="cargo test --release -p noshape-kernel --test all --no-run"; [ $ops = 1 ] && cmd="$cmd && cargo test --release -p noshape-ops --test all --no-run"
+  (cd "$wt_base" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "$cmd" > "$scratch/gate-build-base.log" 2>&1) || { say "main doesn't build"; exit 1; }
+  bins=$(grep -E 'Executable tests/all.rs' "$scratch/gate-build-base.log" | sed -n 's|.*(\(.*\)).*|\1|p')
+  bk=$(echo "$bins" | sed -n 1p); bo=-; [ $ops = 1 ] && bo=$(echo "$bins" | sed -n 2p)
+  ssh -o BatchMode=yes "$host" "mkdir -p ~/agents/bool-gate/bin ~/agents/bool-gate/runs" && scp -q "$here/gate-host.py" "$host:agents/bool-gate/bin/gate-host.py"
+  (cd "$wt_base" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && python3 agents/bool-gate/bin/gate-host.py run --out agents/bool-gate/runs/main-${base:0:9} --jobs $jobs --threads $threads --role base:$bkey_r:$bkey_s:$bkey_o:$bk:$bo") >> "$log" 2>&1
+  say "main ${base:0:9}: replay $(cached "$bkey_r" replay && echo cached || echo 'not cached (a shard without results)'), suite $(cached "$bkey_s" suite && echo cached || echo 'not cached'), $(( ($(date +%s) - t0) / 60 )) min"
+  exit 0
+fi
 
 # The nightly kall run: main's kernel tests built in main's worktree, kall replayed alone, compared with the night before.
 if [ $nightly = 1 ]; then
