@@ -33,7 +33,7 @@ Gehäuse), as do its later features; the knife's Chamfer 1 builds since blend's 
 cf-surface-pattern's Surface Pattern 3 is 12× live while Pattern 4 is under live; blend's fast-finish (4dc4f0964) and dx's
 mesh fix (fcd0b283f) came after this green: the 11-12 02:00 window re-measures.
 
-**11-12 08:59: standing jobs (detached):** bin/compat-loop.sh v0445 runs bin/compat-check.sh on every new watcher green against the
+**11-12 08:58: standing jobs (detached):** bin/compat-loop.sh v0445 runs bin/compat-check.sh on every new watcher green against the
 last release (user documents hat8 / hat15 / dock, hat15 also against v0.4.43, the 47 ticket documents, qa's authored documents
 from qa-scratch/compat-docs/v0443 copied to vibe4 each run: vibe4's ~/tmp is pruned); a changed feature status writes
 qa-scratch/compat/ALERT-<sha> (tell the lead and the committing agent at once). Change its release tag at each release (stop:
