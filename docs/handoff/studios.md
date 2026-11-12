@@ -28,6 +28,19 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-12 00:57 UTC: the first key after a click drew a whole frame first (lead: the 40 ms Escape / Ctrl+A)
+- Cause (vendored gpui-pre window.rs): a key that switches the input modality from mouse to keyboard called
+  `refresh()` before dispatching, and `dispatch_key_event` draws a dirty window before handling a key: a full
+  synchronous frame for every first key after a click, then another for its result. NOSHAPE PATCH (agent studios):
+  the refresh comes after the key's dispatch (only hover and focus-visible styling follow the modality). Escape after
+  Compare: dispatch 43 -> 0 ms, its frame 83 -> 53; Escape / Ctrl+A in a Variable Studio cell 36-40 -> 0 ms.
+  Every scenario with a key or type step (876, all areas) running on vibe3 (~/tmp/studios/uip-keys) before landing.
+- vibe3's ~/tmp/studios is pruned of files older than 2 h while its disk is over 80 % (lead's remote-disk-loop.sh):
+  touch the app copy and fixtures during long runs, or re-copy them (bin/mkperf.py rebuilds the speed fixtures).
+- UIS-RCLICK-WINDOWS: footer.py says the UI script's left clicks don't select rows on Windows either (the footer
+  link's click works), so it's the documents list, not the right button. Diagnostic qa-os.yml run 43130109140 on
+  branch studios-diag-rclick (page driver logs each click's point, viewport, scale, window bounds, menu state).
+
 ### 2026-11-11 23:18 UTC: speed in studios' area (lead 11-11: PLAN 2.7), Show in Explorer confirmed on Windows
 Measured with the ui-parity driver's timing mode (`NOSHAPE_UI_TIMING=1 NOSHAPE_PERF=1`: each step's recording gets
 `timing` = dispatch / first painted frame / idle, ms from the action) on fixtures from /root/studios-scratch/bin/mkperf.py
