@@ -136,11 +136,8 @@ impl HistoryPanel {
             cx.subscribe_in(&search, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
                 match ev {
                     InputEvent::Change => {
+                        // The search runs on Enter only; emptying the box keeps the results (live ver-search-clear).
                         this.query = st.read(cx).value().to_string();
-                        // Emptied: the history again.
-                        if this.query.trim().is_empty() {
-                            this.applied_query.clear();
-                        }
                         cx.notify();
                     }
                     InputEvent::PressEnter { .. } => {
@@ -1503,7 +1500,9 @@ impl Render for HistoryPanel {
                         };
                         // Live rp-904/905: change and version rows, and a merge's point in its workspace (not the
                         // source's point, 2383); from a Part Studio only (live fs-compare).
-                        let m = if kind == RowKind::Merged || !repair_here {
+                        // Another workspace's version (live ver-merge-version: V2 made on B1, from Main) has Merge
+                        // instead of View in repair and Restore.
+                        let m = if kind == RowKind::Merged || !repair_here || other_version {
                             m
                         } else {
                             m.item(crate::os_menu::OsMenuItem::new("View in repair").on_click(move |_, _, cx| {
@@ -1515,7 +1514,7 @@ impl Render for HistoryPanel {
                         };
                         // A version's Restore to <workspace>… opens the restore dialog; a change row has none (live 2351).
                         let (dr, rn) = (d.clone(), name.clone());
-                        let m = if matches!(kind, RowKind::Change | RowKind::Merged) { m } else { m.item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, window, cx| crate::merge_dialog::open_restore(dr.clone(), mv, rn.to_string(), window, cx))) };
+                        let m = if matches!(kind, RowKind::Change | RowKind::Merged) || other_version { m } else { m.item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, window, cx| crate::merge_dialog::open_restore(dr.clone(), mv, rn.to_string(), window, cx))) };
                         // Live rp-904: a change row ends with "Create version here…".
                         let dc = d.clone();
                         let m = if point { m.item(crate::os_menu::OsMenuItem::new("Create version here…").on_click(move |_, window, cx| open_create_version_at(dc.clone(), mv, window, cx))) } else { m };

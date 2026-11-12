@@ -202,9 +202,10 @@ impl Document {
         self.folder(id).is_some()
     }
 
-    /// Next default folder name ("Folder 1").
-    pub fn next_folder_name(&self) -> String {
-        (1..).map(|n| format!("Folder {n}")).find(|n| !self.settings.folders.iter().any(|f| f.name == *n)).unwrap_or_default()
+    /// Next default folder name ("Folder 1") among the folders in `parent` (None: the root): live numbers each
+    /// level on its own (doc-folder-create-inside: a folder made inside Folder 1 is Folder 1 too).
+    pub fn next_folder_name(&self, parent: Option<TabId>) -> String {
+        (1..).map(|n| format!("Folder {n}")).find(|n| !self.settings.folders.iter().any(|f| f.name == *n && self.parent_of(f.id) == parent)).unwrap_or_default()
     }
 
     /// A new folder inside `parent` (None: the root), placed after `after`.

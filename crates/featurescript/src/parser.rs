@@ -19,11 +19,14 @@ use std::sync::Arc;
 pub struct ParseError {
     pub pos: Pos,
     pub message: String,
+    /// The `(` of a top-level initializer's call whose function argument held the error: Onshape adds "Error in
+    /// initializer function arguments" there (live: `opExt` typed in a defineFeature body gives two notices).
+    pub cascade: Option<Pos>,
 }
 
 impl From<LexError> for ParseError {
     fn from(e: LexError) -> Self {
-        ParseError { pos: e.pos, message: e.message }
+        ParseError { pos: e.pos, message: e.message, cascade: None }
     }
 }
 
@@ -109,7 +112,7 @@ impl<'a> Parser<'a> {
     }
 
     fn err<T>(&self, message: impl Into<String>) -> PResult<T> {
-        Err(ParseError { pos: self.pos(), message: message.into() })
+        Err(ParseError { pos: self.pos(), message: message.into(), cascade: None })
     }
 
     /// Error for an unexpected token where `expected` (already quoted) was
@@ -293,9 +296,15 @@ impl<'a> Parser<'a> {
                     let ty = if self.eat_kw(Kw::Is) { Some(self.type_name()?) } else { None };
                     self.expect_op(Op::Assign)?;
                     if self.is_op(Op::Semi) {
-                        return Err(ParseError { pos: name_pos, message: "Missing initializer expression".into() });
+                        return Err(ParseError { pos: name_pos, message: "Missing initializer expression".into(), cascade: None });
                     }
-                    let init = self.expr()?;
+                    let call_paren = (matches!(self.peek(), Tok::Ident(_)) && matches!(self.peek_at(1), Tok::Op(Op::LParen)) && matches!(self.peek_at(2), Tok::Kw(Kw::Function))).then(|| self.toks[self.i + 1].pos);
+                    let init = self.expr().map_err(|mut e| {
+                        if call_paren.is_some_and(|p| e.pos > p) {
+                            e.cascade = call_paren;
+                        }
+                        e
+                    })?;
                     self.expect_top_semi()?;
                     TopKind::Const { name, ty, init }
                 }
@@ -546,7 +555,7 @@ impl<'a> Parser<'a> {
         let ty = if self.eat_kw(Kw::Is) { Some(self.type_name()?) } else { None };
         let init = if self.eat_op(Op::Assign) {
             if self.is_op(Op::Semi) {
-                return Err(ParseError { pos: name_pos, message: "Missing initializer expression".into() });
+                return Err(ParseError { pos: name_pos, message: "Missing initializer expression".into(), cascade: None });
             }
             Some(self.expr()?)
         } else {
@@ -995,7 +1004,7 @@ impl<'a> Parser<'a> {
                 // Like ANTLR's prediction, the input quoted starts at the
                 // binary operator whose operand is missing (`'+ ;'`).
                 let from = if start > 0 && is_binary_op(&self.toks[start - 1].tok) { start - 1 } else { start };
-                return Err(ParseError { pos, message: format!("no viable alternative at input '{}'", self.text_through(from)) });
+                return Err(ParseError { pos, message: format!("no viable alternative at input '{}'", self.text_through(from)), cascade: None });
             }
         };
         Ok(Expr::new(pos, kind))
@@ -1119,5 +1128,17 @@ export type T typecheck canBeT;
     fn missing_semicolon() {
         let e = parse("function f() { var x = 1 }").unwrap_err();
         assert_eq!(e.message, "missing ';' at '}'");
+        assert_eq!(e.cascade, None);
+    }
+
+    /// Live (fs-ac-fn-paren-closes): a statement left unfinished in a defineFeature body is two notices, the error
+    /// and "Error in initializer function arguments" at the call's `(`.
+    #[test]
+    fn an_error_in_an_initializer_function_cascades() {
+        let e = parse("export const f = defineFeature(function(context is Context)\n    {\n        opExt\n        if (true) return;\n    });").unwrap_err();
+        assert_eq!((e.message.as_str(), e.pos.line), ("missing ';' at 'if'", 4));
+        assert_eq!(e.cascade, Some(Pos { line: 1, col: 31 }));
+        // Not for an error outside the call.
+        assert_eq!(parse("export const f = 1 +;").unwrap_err().cascade, None);
     }
 }

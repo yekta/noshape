@@ -28,6 +28,25 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-12 17:52 UTC: live's 37 takes of the gap scenarios (7e6701f4), fixed
+- Run against the takes before they landed (`git show 7e6701f4:…`, copied into vibe3's tests/ui-parity/live/ after
+  every rb.sh, whose --delete drops them): 13/37 at first.
+- Fixed: Restore (and the merge notice's Revert) leaves nothing to undo (`Session::restore*` forget the stack);
+  another workspace's version row has Merge into current workspace… instead of View in repair / Restore; a parse
+  error inside an initializer's function is two notices (+ "Error in initializer function arguments" at the call's
+  `(`, `ParseError::cascade`); a call snippet keeps a `@requiredif` map field that has an `@eg` (opExtrude: endDepth,
+  six lines); a rich tooltip is recorded as title then description; default folder names count the folder's own
+  level (Folder 1 inside Folder 1); a folder chip's double-click only opens it; the Tab manager's Add selection to
+  folder / a folder's Add selected to folder make "New folder" around the selection; the history search keeps its
+  results when the box is emptied (Enter searches); a key no binding takes while the window itself has the focus (a
+  click in a panel) goes to the active tab's editor, as from the tab bar (↓ rotates the view after a history row).
+- Asked live (REQUESTS 16:12): Undo after a merge that follows an edit (live keeps Undo on; ours forgets the stack,
+  our state-based undo would drop the merge), a tab dropped on 🏠, "opE"'s order (contradicts behaviours "(A)"),
+  Export… in the Tab manager's Part Studio row menu (two takes disagree). doc-folder-unpack-open and
+  doc-folder-dblclick-rename changed, re-records asked.
+- For psui: on doc-branches' B1, Extrude 3's (a cut) row menu has no "Add appearance to feature…" (live has it; still
+  missing 2.5 s after the switch). Left: doc-tm-sort-type / fs-ac-fn-overloads highlighted rows (the pointer).
+
 ### 2026-11-12 13:48 UTC: the drawing UI is studios' (lead 11-12: from dx); drawing gap audit
 - Area now also crates/drawing-ui and the drw-* scenarios (dx.md's notes: 161/173 scenarios, 1367/1384 states; the
   misses are mostly live's pixel reader, see dx.md 11-11). Drawing scenarios keep `"area": "dx"` (the area decides

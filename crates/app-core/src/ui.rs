@@ -251,7 +251,11 @@ const RICH_TOOLTIP_W: f32 = 400.;
 
 impl Render for RichTooltip {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        crate::ui_script::note_tooltip(&self.title);
+        // Live's recorder reads the whole tooltip, title then description (fs-co-complete-off, fs-ps-ws-feature-tooltip).
+        if crate::ui_script::active() {
+            let text = if self.description.is_empty() { self.title.to_string() } else { format!("{} {}", self.title, self.description) };
+            crate::ui_script::note_tooltip(&text);
+        }
         let pal = p();
         // Live (part-studio/10, 11; dom/hover-states.json): both states sit
         // 3 px under the tool, centered on it; a 26 px title row, 12 px / 500,

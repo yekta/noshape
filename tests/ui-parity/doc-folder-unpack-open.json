@@ -1,6 +1,6 @@
 {
  "name": "doc-folder-unpack-open",
- "about": "in Folder 1, its crumb's menu › Unpack: the bar back at the root with Part Studio 3 loose",
+ "about": "open Folder 1, back to All tabs by the crumbs' home, then the folder tab's own menu › Unpack: Part Studio 3 loose at the root (live: Unpack is on the folder tab's menu at the root, not on its crumb)",
  "area": "studios",
  "source": "studios 11-12 (gap audit)",
  "start": "doc-tabs",
@@ -12,9 +12,15 @@
    }
   },
   {
+   "do": "click",
+   "on": {
+    "button": "All tabs"
+   }
+  },
+  {
    "do": "rclick",
    "on": {
-    "crumb": "Folder 1"
+    "doc_tab": "Folder 1"
    }
   },
   {

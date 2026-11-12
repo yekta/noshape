@@ -6939,6 +6939,9 @@ fn history_restore_keeps_the_picked_tabs() {
     assert_eq!((count(&mut ctx, "A"), count(&mut ctx, "B")), (0, 1));
     let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
     assert!(last.starts_with("Restore ") && last.contains("s back: \""), "{last}");
+    // Nothing to undo after a Restore (live ver-restore-undo).
+    let u = call(&mut ctx, "history_undo", json!({}));
+    assert_eq!((u["undone"].as_bool(), u["can_undo"].as_bool()), (Some(false), Some(false)), "{u}");
     call(&mut ctx, "history_restore", json!({ "to": "V1" }));
     assert_eq!(count(&mut ctx, "B"), 0);
     let e = try_call(&mut ctx, "history_restore", json!({ "to": "V1", "keep": ["nope"] })).unwrap_err();

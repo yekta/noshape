@@ -206,15 +206,16 @@ impl TabManager {
         if self.multi.contains(&id) { self.multi.clone() } else { vec![id] }
     }
 
-    /// Add selection to folder: a new folder (in the first item's folder)
-    /// holding `ids`, then its name field.
+    /// Add selection to folder (a folder's Add selected to folder too): a new folder "New folder" (live
+    /// doc-tm-add-selection-to-folder, doc-tm-folder-add-selected) in the first item's folder, holding `ids`, then its
+    /// name field.
     fn add_to_new_folder(&mut self, ids: Vec<TabId>, window: &mut Window, cx: &mut Context<Self>) {
         let Some(first) = ids.first().copied() else { return };
         let mut made = None;
         self.doc.update(cx, |doc, cx| {
             doc.edit_document("Add selection to folder", cx, |d| {
                 let parent = d.parent_of(first);
-                let f = d.add_folder(&d.next_folder_name(), parent);
+                let f = d.add_folder("New folder", parent);
                 d.move_in_order(f, Some(first));
                 for id in &ids {
                     d.set_parent(*id, Some(f));
@@ -230,23 +231,6 @@ impl TabManager {
 
     fn unpack(&mut self, folder: TabId, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| doc.edit_document("Unpack folder", cx, |d| d.unpack_folder(folder)));
-        cx.notify();
-    }
-
-    /// Folder › Add selected to folder: the panel's selection goes into `folder` (not the folder itself).
-    fn add_selected_to(&mut self, folder: TabId, cx: &mut Context<Self>) {
-        let ids: Vec<TabId> = self.multi.iter().chain(self.selected.iter()).copied().filter(|t| *t != folder).collect();
-        if ids.is_empty() {
-            return;
-        }
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_document("Move to folder", cx, |d| {
-                for t in &ids {
-                    d.set_parent(*t, Some(folder));
-                }
-            })
-        });
-        self.multi.clear();
         cx.notify();
     }
 
@@ -320,7 +304,10 @@ impl TabManager {
                     None => menu,
                 };
                 menu.item(I::new("Rename").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.start_rename(id, w, cx))))
-                    .item(I::new("Add selected to folder").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.add_selected_to(id, cx))))
+                    .item(I::new("Add selected to folder").on_click(move |_, w, cx| v4.update(cx, |t, cx| {
+                        let ids = t.targets(id);
+                        t.add_to_new_folder(ids, w, cx)
+                    })))
                     .item(I::new("Unpack").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.unpack(id, cx))))
                     .item(I::new("Move to document…").on_click(move |_, w, cx| {
                         let doc = v3.read(cx).doc.clone();

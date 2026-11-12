@@ -625,11 +625,12 @@ impl Session {
         Ok(())
     }
 
+    /// Not an undo step, and nothing before it can be undone (live ver-restore-confirm, ver-restore-undo: Undo off
+    /// after a Restore, as after a reload; the merge notice's Revert is one too).
     pub fn restore(&mut self, to: MicroversionId) -> Result<()> {
         self.ensure_unprotected()?;
-        let before = self.head()?;
         let after = self.store.restore(self.branch, to)?;
-        self.undo.record(before, after, "Restore");
+        self.forget_undo();
         self.viewing = None;
         self.reload(after)
     }
@@ -664,7 +665,7 @@ impl Session {
             }
         }
         let after = self.store.commit(self.branch, &changes, &description)?;
-        self.undo.record(before, after, "Restore");
+        self.forget_undo();
         self.viewing = None;
         self.reload(after)
     }

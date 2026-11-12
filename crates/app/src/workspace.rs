@@ -635,11 +635,14 @@ impl Workspace {
     }
 
     /// A key no binding took while a navbar or tab bar control has the focus
-    /// (after Tab left a dialog, or a click on a tab): Onshape's shortcuts
-    /// are document-wide, so it goes to the active tab's editor. Tab, Enter,
-    /// Space and Esc stay with the focused control; typing in a field too.
+    /// (after Tab left a dialog, or a click on a tab), or the window itself (a
+    /// click in a panel, live ver-history-keyboard: ↓ rotates the view after a
+    /// history row's click): Onshape's shortcuts are document-wide, so it goes
+    /// to the active tab's editor. Tab, Enter, Space and Esc stay with the
+    /// focused control; typing in a field too.
     fn forward_chrome_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.chrome_focus.iter().any(|f| f.contains_focused(window, cx)) || window.context_stack().iter().any(|c| c.contains("Input")) {
+        let chrome = self.chrome_focus.iter().any(|f| f.contains_focused(window, cx)) || self.focus.is_focused(window);
+        if !chrome || window.context_stack().iter().any(|c| c.contains("Input")) {
             return;
         }
         let k = &ev.keystroke;
@@ -2750,9 +2753,9 @@ impl Workspace {
         let mut new_id = None;
         self.doc.update(cx, |doc, cx| {
             doc.edit_document("Create folder", cx, |d| {
-                let name = d.next_folder_name();
-                let id = d.add_folder(&name, None);
                 let parent = open.or_else(|| after.and_then(|a| d.parent_of(a)));
+                let name = d.next_folder_name(parent);
+                let id = d.add_folder(&name, None);
                 if let Some(a) = after.filter(|a| d.parent_of(*a) == parent) {
                     place_after(d, id, Some(a));
                 } else {
@@ -2816,7 +2819,7 @@ impl Workspace {
         cx.notify();
     }
 
-    /// A folder on the tab bar: click opens it, double-click renames;
+    /// A folder on the tab bar: a click opens it (a double-click too: live doc-folder-dblclick-rename, no rename);
     /// right-click: Rename, Unpack, Move to document… (live qa5 TABS3).
     fn folder_tab(&self, id: TabId, name: String, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
@@ -2830,13 +2833,9 @@ impl Workspace {
             .on_drag(TabDrag { id, name: name.clone(), icon: None, width: px(0.) }, start_tab_drag(cx.entity().downgrade()))
             .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
             .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.drop_into(drag.id, Some(id), cx)))
-            .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
-                if e.click_count() >= 2 {
-                    this.start_tab_rename(id, window, cx);
-                } else {
-                    this.open_folder = Some(id);
-                    cx.notify();
-                }
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                this.open_folder = Some(id);
+                cx.notify();
             }))
             .os_context_menu(self.folder_menu(id, cx))
     }

@@ -269,7 +269,7 @@ fn load_std(version: u32, name: &str, cache: &mut StdCache, pending: Option<&Pen
     };
     // (From the parse in progress when this release's first module was asked for; else parsed here.)
     let tree = pending.and_then(|p| p.take(name)).unwrap_or_else(|| crate::parser::parse(src));
-    let ast = Arc::new(tree.map_err(|e| vec![CompileError { module: path.clone(), pos: e.pos, message: e.message, parse: true, level: Level::Error }])?);
+    let ast = Arc::new(tree.map_err(|e| parse_errors(&path, e))?);
     let mut imports = Vec::new();
     for item in &ast.items {
         if let TopKind::Import { path: p, version: v, .. } = &item.kind {
@@ -290,6 +290,16 @@ fn load_std(version: u32, name: &str, cache: &mut StdCache, pending: Option<&Pen
     Ok(m)
 }
 
+/// A parse error's notices: the error, then (an initializer's function argument held it) Onshape's "Error in
+/// initializer function arguments" at the call's `(` (behaviours 1621).
+fn parse_errors(path: &Arc<str>, e: crate::parser::ParseError) -> Vec<CompileError> {
+    let mut out = vec![CompileError { module: path.clone(), pos: e.pos, message: e.message, parse: true, level: Level::Error }];
+    if let Some(pos) = e.cascade {
+        out.push(CompileError { module: path.clone(), pos, message: "Error in initializer function arguments".into(), parse: true, level: Level::Error });
+    }
+    out
+}
+
 // ---------------------------------------------------------------- user modules
 
 /// Compile a module (a Feature Studio) from source. Standard library
@@ -302,7 +312,7 @@ pub fn compile_module(path: &str, src: &str, resolver: &dyn Resolver) -> Result<
 /// `built`: the modules this compile has made, so a module imported twice
 /// (directly and through another's `export import`) is one module.
 fn compile_with(path: Arc<str>, src: &str, resolver: &dyn Resolver, loading: &mut Vec<String>, built: &mut HashMap<Arc<str>, Arc<CompiledModule>>) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
-    let ast = Arc::new(crate::parser::parse(src).map_err(|e| vec![CompileError { module: path.clone(), pos: e.pos, message: e.message, parse: true, level: Level::Error }])?);
+    let ast = Arc::new(crate::parser::parse(src).map_err(|e| parse_errors(&path, e))?);
     let mut imports = Vec::new();
     for item in &ast.items {
         let TopKind::Import { path: p, version, .. } = &item.kind else {

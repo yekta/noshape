@@ -79,8 +79,10 @@ struct DocParam {
 }
 
 impl DocParam {
+    /// Left out of a call's map: `@optional`, or `@requiredif` without an example (live opExtrude: endDepth, a
+    /// `@requiredif` with `@eg 1 * inch`, is in; opBoolean's targets isn't).
     fn optional(&self) -> bool {
-        self.text.contains("@optional") || self.text.contains("@requiredif")
+        self.text.contains("@optional") || (self.text.contains("@requiredif") && !self.text.contains("@eg") && !self.text.contains("@autocomplete"))
     }
     /// The value a call puts in: `@autocomplete`, else the first `@eg`, else the name.
     fn value(&self) -> String {
@@ -762,6 +764,10 @@ mod tests {
         let b = &find("opBoolean").snippet;
         assert!(b.contains("\"tools\" : tools,\n        \"operationType\" : BooleanOperationType.UNION\n}"), "{b}");
         assert!(!b.contains("targets"), "{b}");
+        // Live fs-ac-fn-enter-call: the call is six lines, endDepth (its example) included.
+        let x = &find("opExtrude").snippet;
+        assert_eq!(x.lines().count(), 6, "{x}");
+        assert!(x.contains("\"endDepth\" : 1 * inch") && !x.contains("endBoundEntity"), "{x}");
         let d = &find("opExtractWires").doc;
         assert!(d.contains("Generates wire bodies from the supplied edges.") && d.contains("PARAMETER INFO") && d.contains("**edges** is Query"), "{d}");
         assert_eq!(find("opExtractWires").kind, "function");

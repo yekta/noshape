@@ -245,7 +245,7 @@ fn tab_folder_create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let parent = a.opt_str("folder")?.map(|f| find_folder(od.doc(), f, "folder")).transpose()?;
     let name = match a.opt_str("name")? {
         Some(n) => n.to_string(),
-        None => od.doc().next_folder_name(),
+        None => od.doc().next_folder_name(parent),
     };
     if parent.is_some_and(|p| od.doc().ancestors(p).len() + 2 > noshape_model::document::MAX_FOLDER_DEPTH) {
         return Err(OpError::invalid("folders don't nest that deep").with_param("folder"));
