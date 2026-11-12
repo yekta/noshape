@@ -2002,6 +2002,35 @@ fn a_fillets_ball_and_ring_cut_as_occt() {
     assert_eq!(records(&r), records(&o));
 }
 
+/// c2-impeller-loft's flange fuse (recorded): the Shell's offset wall carries two edges inside it, apart from each
+/// other. In one wire they were BRepCheck's NotConnected, the face unorientable ("an invalid result", and the part
+/// studio's later fuses of the feature then went straight to OCCT). A wire each: noshape's Boolean takes the fuse,
+/// valid, OCCT's result and history.
+#[test]
+fn a_face_with_two_edges_inside_it_apart_fused_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "1556cc26fa37b9d7").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).unwrap();
+    k::set_rust_boolean(None);
+    let mut d = k::bool_corpus::Summary::of(&r).differences(&k::bool_corpus::Summary::of(&o));
+    d.retain(|x| x != "history differs");
+    assert_eq!(d, Vec::<String>::new());
+    let records = |x: &k::OpResult| {
+        let mut v: Vec<String> = x.history.records.iter().map(|h| format!("{} {:?}{} {:?} {:?}", h.arg, h.input_kind, h.input_index, h.relation, h.output_kind)).collect();
+        v.sort();
+        v
+    };
+    assert_eq!(records(&r), records(&o));
+}
+
 /// cf-surface-pattern's Surface Pattern 3 (recorded: a part cut by 85 stamp bodies): near a target's vertex of 4.9 um
 /// a tool's face has two sections between the same two vertices, 2-6 um apart (with the target's face and with another
 /// tool's): one edge within both curves' errors and the vertices' tolerance, as OCCT's existing pave block (left as two,

@@ -1971,15 +1971,36 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     const bool mirrored = round && !frame.Direct() && std::adjacent_find(used.begin(), used.end()) != used.end();
     for (uint32_t l = b.face_loops[i]; l < b.face_loops[i + 1]; ++l)
     {
-      TopoDS_Wire w;
-      bb.MakeWire(w);
       const uint32_t u0 = b.loop_uses[l], u1 = b.loop_uses[l + 1];
-      // (The edges inside it: INTERNAL, as OCCT's builder leaves an edge ending inside a face.)
+      // (The edges inside it: INTERNAL, as OCCT's builder leaves an edge ending inside a face; a wire for each
+      // connected run of them, as OCCT's: two apart in one wire were BRepCheck's NotConnected, the face's wires
+      // then unorientable (c2-impeller-loft's flange fuse: its Shell's offset wall carries two).)
       if (inner_loop && l + 1 == b.face_loops[i + 1])
       {
-        for (uint32_t k = u0; k < u1; ++k)
-          bb.Add(w, es[b.uses[k] / 2].Oriented(TopAbs_INTERNAL));
-        bb.Add(f, w);
+        std::vector<uint32_t> run(u1 - u0);
+        for (uint32_t k = 0; k < u1 - u0; ++k)
+          run[k] = k;
+        std::function<uint32_t(uint32_t)> top = [&](uint32_t k) { return run[k] == k ? k : run[k] = top(run[k]); };
+        for (uint32_t x = 0; x < u1 - u0; ++x)
+          for (uint32_t y = x + 1; y < u1 - u0; ++y)
+          {
+            TopoDS_Vertex xa, xb, ya, yb;
+            TopExp::Vertices(es[b.uses[u0 + x] / 2], xa, xb);
+            TopExp::Vertices(es[b.uses[u0 + y] / 2], ya, yb);
+            if (xa.IsSame(ya) || xa.IsSame(yb) || xb.IsSame(ya) || xb.IsSame(yb))
+              run[top(x)] = top(y);
+          }
+        for (uint32_t r0 = 0; r0 < u1 - u0; ++r0)
+        {
+          if (top(r0) != r0)
+            continue;
+          TopoDS_Wire wi;
+          bb.MakeWire(wi);
+          for (uint32_t k = 0; k < u1 - u0; ++k)
+            if (top(k) == r0)
+              bb.Add(wi, es[b.uses[u0 + k] / 2].Oriented(TopAbs_INTERNAL));
+          bb.Add(f, wi);
+        }
         continue;
       }
       // (A loop through one vertex twice, no edge twice (a hole touching the boundary at a point): on a reversed
