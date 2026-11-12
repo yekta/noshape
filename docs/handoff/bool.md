@@ -170,6 +170,8 @@ The gate today (scripts in /root/bool-scratch, outside the repo; copy what you n
   <new wt>`, then compare each document's "N/M features" line.
 - `gate-wt4.sh <tag> <worktree>` runs whyall4 + kg + kt + shfall in a row; about 1.5-2 h, most of it builds per call
   and serial replays.
+- (11-12, lead) The gate runs the branch's kernel, model and model-core tests too (tools/bool/gate.sh): a model test
+  is what no corpus has (Rotieren 1's first land failed on a round's torus split at its seam).
 
 ## 11-11 21:30 UTC: louver, infento, the seam fix
 - **c2-sm-louver Extrude 3 (landed d95c1a0b):** not touching pieces in live (REQUESTS 2277): one of its regions held a

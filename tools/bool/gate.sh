@@ -5,7 +5,8 @@
 #  - every Boolean corpus, parity56, shfall, the knurls and gears replayed (docs/handoff/bool.md's gate), each
 #    distinct case once, in shards over the host's cores;
 #  - the model suite, its documents in shards;
-#  - our time on k25-15, k25-25 and cf-spur-gear, main's binary and the branch's alternating (best of 3).
+#  - our time on k25-15, k25-25 and cf-spur-gear, main's binary and the branch's alternating (best of 3);
+#  - the branch's kernel, model and model-core tests (FAIL on any).
 # Main's results are cached on the host by what they are built from (the crates' git trees, Cargo.lock, the OCCT
 # libraries, the corpora, the models), so a gate usually replays the branch alone; the branch's are kept too (once it
 # lands they are main's). FAIL: a case that differs from OCCT or fails where main's doesn't, a crash, a document
@@ -121,6 +122,15 @@ bo=-; no=-
 [ -n "$bk" ] && [ -n "$nk" ] || { echo "VERDICT FAIL: no test binary in the build output ($scratch/gate-build-*.log)"; exit 1; }
 say "built in $(( $(date +%s) - t0 )) s; running"
 
+# The branch's own tests of the crates the Boolean reaches, as the land queue runs them (a model test catches what no
+# corpus has: a round's torus split at its seam, 11-12): the kernel's, the model's, model-core's. Before the run (one
+# sync of the worktree at a time).
+tests="cargo test --release -p noshape-kernel --test all && cargo test --release -p noshape-model --test all && cargo test --release -p noshape-model-core --lib"
+(cd "$wt_new" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "$tests" > "$scratch/gate-tests.log" 2>&1); rt=$?
+grep -E '^test result|FAILED$' "$scratch/gate-tests.log" >> "$log"
+failed=$(grep -E '^test .* FAILED$' "$scratch/gate-tests.log" | sed 's/^test //; s/ \.\.\. FAILED$//' | head -3 | paste -sd, -)
+say "crate tests: $([ $rt = 0 ] && echo pass || echo "fail ${failed:-(build or run; $scratch/gate-tests.log)}")"
+
 # The run: the gate's host script (this checkout's) from the branch's worktree.
 ssh -o BatchMode=yes "$host" "mkdir -p ~/agents/bool-gate/bin ~/agents/bool-gate/runs" && scp -q "$here/gate-host.py" "$host:agents/bool-gate/bin/gate-host.py"
 out="agents/bool-gate/runs/$caller-${new:0:9}-$(date -u +%m%d-%H%M%S)"
@@ -132,5 +142,6 @@ args=(--out "$out" --jobs "$jobs" --threads "$threads" --cmp base new
 ssh -o BatchMode=yes "$host" "find ~/agents/bool-gate/runs -mindepth 1 -maxdepth 1 -mtime +2 -exec rm -rf {} +" 2>/dev/null
 v=$(grep '^VERDICT' "$log" | tail -1)
 [ -n "$v" ] || v="VERDICT FAIL: the run gave no verdict (see $log)"
+[ $rt = 0 ] || v="VERDICT FAIL: crate tests: ${failed:-see $scratch/gate-tests.log} (the run: ${v#VERDICT })"
 echo "$v (branch ${new:0:9} vs main ${base:0:9}, $(( ($(date +%s) - t0) / 60 )) min; $log)"
 case $v in "VERDICT PASS"*) exit 0;; "VERDICT CHECK"*) exit 3;; *) exit 1;; esac
