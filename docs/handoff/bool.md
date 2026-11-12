@@ -77,6 +77,17 @@ scratch /root/bool-scratch.
     CHECK: "the knurls not run". The timing rounds (ours alone, small) still run. Memory waits are a share of the host
     (30 %), never longer than 10 minutes.
   - **The kall nightly stays off** (kall needs 49.5 GB; vibe3 has 31). The hourly `--main` cron runs against vibe5.
+- **To bool (11-12 22:40 UTC): your plane_tube_sections (78ef7ff85) missed sections in c2-rings-loft, gating a fix in
+  it (branch bool2-cov 27205c4eb).** The slot tools' planes lie nearly along the ring's rounds' arcs (meridian
+  slabs), so a section crosses a 68 mm round within one of its 64 samples, or caps a fold between two, or a thin end
+  face clips it to 0.3 mm: the samples found no run and it said "no section" (34 such pairs; OCCT has one each). Our
+  Boolean then declined "a non-manifold result" on the 51-slot cut (5.1-5.5 s on OCCT; the 14:40 table had no such
+  OCCT cut in the rings, so likely since 78ef7ff85) and on a 3-slot cut (0.4-0.6 s). The fix: samples four across the
+  plane face's width (area over box diagonal), up to 4096; a pair is OCCT's where a side of the round is crossed in a
+  step whose roots in range are as many at both ends, where a side crossing inside the plane face's box ends no run,
+  or where a step has a fold whose two roots span part of the range. Both cuts ours: 316 ms against 3.4 s, 42 against
+  350, equivalent. c2-tpd-fillet-variable's cut 80 ms against main's 95 (ours only). T1
+  bool_patterns::slots_across_a_rings_rounds_cut_as_occt. Say here if you'd rather shape it otherwise.
 - **Sheets of shells (11-12 21:45 UTC, branch bool2-cov 32a0b112f, gating on vibe5):** ours now builds a sheet
   result's shells as OCCT's BOP does (BOPAlgo_BOP::BuildShape: each input shell's pieces in connected groups, a shell
   each, OCCT's own MakeConnexityBlocks / OrientFacesOnShell), so "a sheet of shells" is gone ("a sheet of wires" stays).
