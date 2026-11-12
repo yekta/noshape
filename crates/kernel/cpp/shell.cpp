@@ -56,6 +56,8 @@
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepExtrema_ShapeProximity.hxx>
+#include <BRepExtrema_TriangleSet.hxx>
+#include <BVH_Tools.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
@@ -154,6 +156,7 @@
 #include <Geom_CylindricalSurface.hxx>
 #include <ShapeFix_Edge.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
+#include <GCPnts_TangentialDeflection.hxx>
 #include <GeomAPI_IntSS.hxx>
 #include <OSD_Parallel.hxx>
 #include <TopAbs.hxx>
@@ -3421,14 +3424,7 @@ protected:
       drop[(size_t)k].assign((size_t)myLists(k).Length(), 0);
     for (const EF& x : efs)
       drop[(size_t)x.list][(size_t)x.at] = x.apart;
-    for (int k = 0; k < myLists.Length(); ++k)
-    {
-      NCollection_DynamicArray<BOPDS_Pair> kept;
-      for (int i = 0; i < myLists(k).Length(); ++i)
-        if (!drop[(size_t)k][(size_t)i])
-          kept.Append(myLists(k)(i));
-      myLists(k) = std::move(kept);
-    }
+    remove(drop);
   }
 
 private:
@@ -3506,6 +3502,165 @@ private:
       }
       myLists(k) = std::move(kept);
     }
+    drop_far_edges(face_at, meshed);
+  }
+
+  // The pairs marked in `drop` (by list and place) taken out.
+  void remove(const std::vector<std::vector<char>>& drop)
+  {
+    for (int k = 0; k < myLists.Length(); ++k)
+    {
+      NCollection_DynamicArray<BOPDS_Pair> kept;
+      for (int i = 0; i < myLists(k).Length(); ++i)
+        if (!drop[(size_t)k][(size_t)i])
+          kept.Append(myLists(k)(i));
+      myLists(k) = std::move(kept);
+    }
+  }
+
+  // Edge / face pairs left that don't touch, and vertex / face pairs: points along the edge a tenth of the wall apart
+  // (the vertex's) against the face's mesh, apart when none comes within 3 tenths of it (c2-rings-loft's Shell 1: 703
+  // of 867 such edges, OCCT's exact distance 7 ms each, and 726 vertices).
+  void drop_far_edges(const NCollection_DataMap<const void*, int>& face_at, const std::vector<TopoDS_Face>& meshed)
+  {
+    struct Left
+    {
+      int  list, at, shape, face;
+      bool apart = false;
+    };
+    std::vector<Left>                     left;
+    std::vector<TopoDS_Shape>             shapes;
+    NCollection_DataMap<const void*, int> shape_at;
+    std::vector<int>                      face_set(meshed.size(), -1);
+    std::vector<int>                      set_face;
+    for (int k = 0; k < myLists.Length(); ++k)
+      for (int i = 0; i < myLists(k).Length(); ++i)
+      {
+        int n1, n2;
+        myLists(k)(i).Indices(n1, n2);
+        const TopAbs_ShapeEnum t1 = myDS->ShapeInfo(n1).ShapeType(), t2 = myDS->ShapeInfo(n2).ShapeType();
+        const TopAbs_ShapeEnum other = t1 == TopAbs_FACE ? t2 : t1;
+        if ((t1 == TopAbs_FACE) == (t2 == TopAbs_FACE) || (other != TopAbs_EDGE && other != TopAbs_VERTEX))
+          continue;
+        const TopoDS_Shape& e  = t1 == TopAbs_FACE ? myDS->Shape(n2) : myDS->Shape(n1);
+        const TopoDS_Shape& f  = t1 == TopAbs_FACE ? myDS->Shape(n1) : myDS->Shape(n2);
+        const int*          fi = face_at.Seek(f.TShape().get());
+        if (fi == nullptr || (e.ShapeType() == TopAbs_EDGE && BRep_Tool::Degenerated(TopoDS::Edge(e))))
+          continue;
+        bool touch = false;
+        for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More() && !touch; v.Next())
+          for (TopExp_Explorer w(f, TopAbs_VERTEX); w.More() && !touch; w.Next())
+            touch = v.Current().IsSame(w.Current());
+        if (touch)
+          continue;
+        if (!shape_at.IsBound(e.TShape().get()))
+        {
+          shape_at.Bind(e.TShape().get(), static_cast<int>(shapes.size()));
+          shapes.push_back(e);
+        }
+        if (face_set[(size_t)*fi] < 0)
+        {
+          face_set[(size_t)*fi] = static_cast<int>(set_face.size());
+          set_face.push_back(*fi);
+        }
+        left.push_back({k, i, shape_at.Find(e.TShape().get()), face_set[(size_t)*fi]});
+      }
+    if (left.empty())
+      return;
+    // (Empty: not sampled, the pair kept.)
+    const double                        step = apart_, defl = 0.5 * apart_;
+    std::vector<std::vector<BVH_Vec3d>> points(shapes.size());
+    OSD_Parallel::For(0, static_cast<int>(shapes.size()), [&](int j) {
+      std::vector<BVH_Vec3d>& out = points[(size_t)j];
+      if (shapes[(size_t)j].ShapeType() == TopAbs_VERTEX)
+      {
+        const gp_Pnt P = BRep_Tool::Pnt(TopoDS::Vertex(shapes[(size_t)j]));
+        out.emplace_back(P.X(), P.Y(), P.Z());
+        return;
+      }
+      try
+      {
+        const BRepAdaptor_Curve     c(TopoDS::Edge(shapes[(size_t)j]));
+        GCPnts_TangentialDeflection td(c, 0.5, defl, 2);
+        if (td.NbPoints() < 2)
+          return;
+        // (Each chord within the deflection of its piece of the edge, cut into steps.)
+        for (int q = 1; q < td.NbPoints(); ++q)
+        {
+          const gp_XYZ a = td.Value(q).XYZ(), b = td.Value(q + 1).XYZ();
+          const double n = std::ceil((b - a).Modulus() / step);
+          if (!(n < 1e5))
+          {
+            out.clear();
+            return;
+          }
+          for (int i = 0; i < (int)n; ++i)
+          {
+            const gp_XYZ P = a + (b - a) * (i / n);
+            out.emplace_back(P.X(), P.Y(), P.Z());
+          }
+        }
+        const gp_Pnt last = td.Value(td.NbPoints());
+        out.emplace_back(last.X(), last.Y(), last.Z());
+      }
+      catch (const Standard_Failure&)
+      {
+        out.clear();
+      }
+    });
+    std::vector<occ::handle<BRepExtrema_TriangleSet>> sets(set_face.size());
+    OSD_Parallel::For(0, static_cast<int>(set_face.size()), [&](int j) {
+      NCollection_DynamicArray<TopoDS_Shape> one;
+      one.Append(meshed[(size_t)set_face[(size_t)j]]);
+      occ::handle<BRepExtrema_TriangleSet> set = new BRepExtrema_TriangleSet(one);
+      if (set->Size() > 0 && !set->BVH().IsNull())
+        sets[(size_t)j] = set;
+    });
+    // (A point stands for its chord within half a step, the chord for the edge within its deflection; the mesh lies
+    // within its own, half a tenth, of the face: taken twice.)
+    const double r2 = std::pow(apart_ + 0.5 * step + defl + 2 * 0.5 * apart_, 2);
+    OSD_Parallel::For(0, static_cast<int>(left.size()), [&](int j) {
+      Left&                                       l   = left[(size_t)j];
+      const occ::handle<BRepExtrema_TriangleSet>& set = sets[(size_t)l.face];
+      const std::vector<BVH_Vec3d>&               pts = points[(size_t)l.shape];
+      if (set.IsNull() || pts.empty())
+        return;
+      const occ::handle<BVH_Tree<double, 3>>& tree = set->BVH();
+      for (const BVH_Vec3d& p : pts)
+      {
+        int stack[128];
+        int top      = 0;
+        stack[top++] = 0;
+        while (top > 0)
+        {
+          const int n = stack[--top];
+          if (BVH_Tools<double, 3>::PointBoxSquareDistance(p, tree->MinPoint(n), tree->MaxPoint(n)) > r2)
+            continue;
+          if (!tree->IsOuter(n))
+          {
+            if (top + 2 > 128)
+              return;
+            stack[top++] = tree->template Child<0>(n);
+            stack[top++] = tree->template Child<1>(n);
+            continue;
+          }
+          for (int t = tree->BegPrimitive(n); t <= tree->EndPrimitive(n); ++t)
+          {
+            BVH_Vec3d a, b, c;
+            set->GetVertices(t, a, b, c);
+            if (BVH_Tools<double, 3>::PointTriangleSquareDistance(p, a, b, c) <= r2)
+              return;
+          }
+        }
+      }
+      l.apart = true;
+    });
+    std::vector<std::vector<char>> drop((size_t)myLists.Length());
+    for (int k = 0; k < myLists.Length(); ++k)
+      drop[(size_t)k].assign((size_t)myLists(k).Length(), 0);
+    for (const Left& l : left)
+      drop[(size_t)l.list][(size_t)l.at] = l.apart;
+    remove(drop);
   }
 
   const ShapeIMap& old_;
