@@ -1,6 +1,6 @@
 {
  "scenario": "drw-view-move-to-sheet-ok",
- "recorded": "2026-11-12T17:00:15.450Z",
+ "recorded": "2026-11-12T20:18:46.601Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,12 +8,12 @@
   "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "1692b7f77b3b1c08cf42a805",
+  "document": "38e54affc51d506498f8ecd2",
+  "workspace": "24db5f467e1ccbd8d405a2a9",
+  "element": "f5606133794159885ecd89d1",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "ff2245ce846878221ff975e1",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -204,7 +204,7 @@
      "selection": []
     }
    },
-   "t": 226713
+   "t": 229135
   },
   {
    "step": 2,
@@ -308,7 +308,7 @@
      "selection": []
     }
    },
-   "t": 250954
+   "t": 254043
   },
   {
    "step": 3,
@@ -604,7 +604,7 @@
      "selection": []
     }
    },
-   "t": 275454
+   "t": 280395
   },
   {
    "step": 4,
@@ -715,7 +715,7 @@
      "selection": []
     }
    },
-   "t": 300803
+   "t": 304890
   },
   {
    "step": 5,
@@ -812,7 +812,7 @@
      "selection": []
     }
    },
-   "t": 326129
+   "t": 329654
   },
   {
    "step": 6,
@@ -915,7 +915,7 @@
      ]
     }
    },
-   "t": 350989
+   "t": 354339
   },
   {
    "step": 7,
@@ -1018,7 +1018,7 @@
      ]
     }
    },
-   "t": 377860
+   "t": 379559
   },
   {
    "step": 8,
@@ -1116,7 +1116,7 @@
      ]
     }
    },
-   "t": 402874
+   "t": 404696
   },
   {
    "step": 9,
@@ -1132,7 +1132,7 @@
     1408,
     413
    ],
-   "via": "native select in the drawing: marked for the next menu step (its popup is not in the DOM)",
+   "via": "native select in the drawing: option picked by its label",
    "state": {
     "focus": {
      "kind": "other",
@@ -1221,7 +1221,7 @@
      ]
     }
    },
-   "t": 417762
+   "t": 419503
   },
   {
    "step": 10,
@@ -1263,7 +1263,7 @@
     "sketch": null,
     "drawing": {
      "tab": "Part 1 Drawing 1",
-     "sheet": "Sheet1",
+     "sheet": "Sheet2",
      "sheets": [
       "Sheet1",
       "Sheet2"
@@ -1271,60 +1271,252 @@
      "tool": null,
      "views": [
       {
-       "name": "Front",
-       "kind": "base",
-       "position": [
-        81,
-        81
-       ],
-       "parent": null,
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Isometric",
-       "kind": "isometric",
-       "position": [
-        198.4,
-        160.8
-       ],
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
        "name": "Right",
        "kind": "projected",
        "position": [
         198.4,
         81
        ],
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Top",
-       "kind": "projected",
-       "position": [
-        81,
-        160.8
-       ],
-       "parent": "Front",
+       "parent": null,
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
-     "annotations": [],
-     "selection": [
+     "annotations": [
       {
-       "kind": "VIEW",
-       "owner": "Right"
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "line",
+       "text": null,
+       "position": null
+      },
+      {
+       "kind": "note",
+       "text": "-",
+       "position": [
+        266.3,
+        12.1
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "----",
+       "position": [
+        198,
+        12.1
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "1",
+       "position": [
+        209.6,
+        4.8
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "1",
+       "position": [
+        209.6,
+        211.1
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "1:1",
+       "position": [
+        236.2,
+        12.1
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "2",
+       "position": [
+        69.9,
+        4.8
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "2",
+       "position": [
+        69.9,
+        211.1
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "2 of 2",
+       "position": [
+        253.8,
+        12.1
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "A",
+       "position": [
+        4.8,
+        54
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "A",
+       "position": [
+        274.6,
+        54
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "A",
+       "position": [
+        223.1,
+        12.1
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "B",
+       "position": [
+        4.8,
+        161.9
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "B",
+       "position": [
+        274.6,
+        161.9
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "DWG NO.",
+       "position": [
+        195.8,
+        13.6
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "REV.",
+       "position": [
+        266.2,
+        13.7
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "SCALE",
+       "position": [
+        234.9,
+        13.6
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "SHEET",
+       "position": [
+        252.8,
+        13.6
+       ]
+      },
+      {
+       "kind": "note",
+       "text": "SIZE",
+       "position": [
+        221.9,
+        13.6
+       ]
       }
-     ]
+     ],
+     "selection": []
     }
    },
-   "t": 442126
+   "t": 444031
   }
  ]
 }

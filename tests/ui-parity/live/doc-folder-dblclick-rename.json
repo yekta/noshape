@@ -1,6 +1,6 @@
 {
  "scenario": "doc-folder-dblclick-rename",
- "recorded": "2026-11-12T14:48:18.229Z",
+ "recorded": "2026-11-12T20:27:36.879Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,12 +8,12 @@
   "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
  },
  "live": {
-  "document": "32eb11a0e2a8dcbe2e0bec61",
-  "workspace": "a5e01da4103b3edda8d49825",
-  "element": "f3efb83319dba5f6f38f6175",
+  "document": "48a6d7f3ef34b10438b27a29",
+  "workspace": "0c12e718f794fcebf6ad3773",
+  "element": "0f485af406480775f8301773",
   "start": "doc-tabs",
-  "startElement": "f3efb83319dba5f6f38f6175",
-  "runner": "live2 "
+  "startElement": "0f485af406480775f8301773",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -62,6 +62,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -162,6 +189,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -206,7 +260,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 67281
+   "t": 57431
   },
   {
    "step": 2,
@@ -268,6 +322,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -287,165 +368,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 69477
-  },
-  {
-   "step": 3,
-   "do": {
-    "do": "type",
-    "text": "Fixtures"
-   },
-   "ok": true,
-   "state": {
-    "focus": {
-     "kind": "none"
-    },
-    "dialog": null,
-    "dialogs": [],
-    "panels": null,
-    "list": null,
-    "selection": {
-     "count": 0,
-     "items": []
-    },
-    "features": {
-     "rows": [
-      {
-       "name": "Sketch 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
-      },
-      {
-       "name": "Extrude 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      }
-     ],
-     "rollbackAfter": "Extrude 1"
-    },
-    "parts": [
-     "Part 1"
-    ],
-    "partsHeading": "Parts (1)",
-    "undo": {
-     "undo": false,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": null,
-    "drawing": null,
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 3",
-       "kind": "partstudio",
-       "active": false
-      }
-     ],
-     "folder": "Folder 1",
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
-   },
-   "t": 73014
-  },
-  {
-   "step": 4,
-   "do": {
-    "do": "key",
-    "key": "Enter"
-   },
-   "ok": true,
-   "pointer": {
-    "at": [
-     1189,
-     975
-    ],
-    "hover": [],
-    "element": "tab-list.os-tab-bar-tablist"
-   },
-   "state": {
-    "focus": {
-     "kind": "none"
-    },
-    "dialog": null,
-    "dialogs": [],
-    "panels": null,
-    "list": null,
-    "selection": {
-     "count": 0,
-     "items": []
-    },
-    "features": {
-     "rows": [
-      {
-       "name": "Sketch 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
-      },
-      {
-       "name": "Extrude 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      }
-     ],
-     "rollbackAfter": "Extrude 1"
-    },
-    "parts": [
-     "Part 1"
-    ],
-    "partsHeading": "Parts (1)",
-    "undo": {
-     "undo": false,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": null,
-    "drawing": null,
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 3",
-       "kind": "partstudio",
-       "active": false
-      }
-     ],
-     "folder": "Folder 1",
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
-   },
-   "t": 74836
+   "t": 60099
   }
  ]
 }

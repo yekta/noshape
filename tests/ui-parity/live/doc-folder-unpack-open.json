@@ -1,6 +1,6 @@
 {
- "scenario": "ver-merge-drawing-open",
- "recorded": "2026-11-12T18:00:56.351Z",
+ "scenario": "doc-folder-unpack-open",
+ "recorded": "2026-11-12T20:26:05.562Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,12 +8,12 @@
   "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
  },
  "live": {
-  "document": "a1303c68048d3cec890bcda3",
-  "workspace": "d4f700b58a5606624a5adc91",
-  "element": "00fa18419411c7a52c8d48c0",
-  "start": "merge-drawing",
-  "startElement": "00fa18419411c7a52c8d48c0",
-  "runner": "live2 .nstate-uip-1.json"
+  "document": "eede3279e8b3a03c73b21025",
+  "workspace": "ceed6c6cfd2fcf39a25c692b",
+  "element": "e17a9c90941cf059183c6005",
+  "start": "doc-tabs",
+  "startElement": "e17a9c90941cf059183c6005",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -100,13 +100,28 @@
      "active": true
     },
     {
-     "name": "Part 1 Drawing 1",
-     "kind": "drawing",
+     "name": "Assembly 1",
+     "kind": "assembly",
      "active": false
     },
     {
-     "name": "Assembly 1",
-     "kind": "assembly",
+     "name": "Part Studio 2",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Variable Studio 1",
+     "kind": "variablestudio",
+     "active": false
+    },
+    {
+     "name": "Feature Studio 1",
+     "kind": "featurestudio",
+     "active": false
+    },
+    {
+     "name": "Folder 1",
+     "kind": "folder",
      "active": false
     }
    ],
@@ -124,13 +139,13 @@
    "do": {
     "do": "click",
     "on": {
-     "button": "Versions and history"
+     "doc_tab": "Folder 1"
     }
    },
    "ok": true,
    "at": [
-    20,
-    57
+    1189,
+    976
    ],
    "state": {
     "focus": {
@@ -200,7 +215,7 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
@@ -208,23 +223,115 @@
     "measure": null,
     "document": {
      "workspace": "Main",
-     "history": [
+     "history": null,
+     "compare": null,
+     "tabs": [
       {
-       "name": "Main",
-       "kind": "workspace",
-       "selected": true
-      },
-      {
-       "name": "B1",
-       "kind": "workspace",
-       "selected": false
-      },
-      {
-       "name": "Start",
-       "kind": "start",
-       "selected": false
+       "name": "Part Studio 3",
+       "kind": "partstudio",
+       "active": false
       }
      ],
+     "folder": "Folder 1",
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 59537
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "All tabs"
+    }
+   },
+   "ok": true,
+   "at": [
+    91,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
      "compare": null,
      "tabs": [
       {
@@ -233,38 +340,53 @@
        "active": true
       },
       {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
+       "name": "Assembly 1",
+       "kind": "assembly",
        "active": false
       },
       {
-       "name": "Assembly 1",
-       "kind": "assembly",
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
        "active": false
       }
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Versions and history",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 28594
+   "t": 62213
   },
   {
-   "step": 2,
+   "step": 3,
    "do": {
     "do": "rclick",
     "on": {
-     "history_row": "B1"
+     "doc_tab": "Folder 1"
     }
    },
    "ok": true,
    "at": [
-    197,
-    253
+    1189,
+    976
    ],
    "state": {
     "focus": {
@@ -276,14 +398,9 @@
     "list": {
      "kind": "context-menu",
      "rows": [
-      "Open",
-      "Open in new browser tab",
-      "Copy link",
-      "Compare",
-      "Merge into current workspace…",
-      "Workspace protection…",
-      "Properties…",
-      "Delete"
+      "Rename",
+      "Unpack",
+      "Move to document…"
      ],
      "highlighted": null,
      "disabled": []
@@ -348,7 +465,7 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
@@ -356,23 +473,7 @@
     "measure": null,
     "document": {
      "workspace": "Main",
-     "history": [
-      {
-       "name": "Main",
-       "kind": "workspace",
-       "selected": true
-      },
-      {
-       "name": "B1",
-       "kind": "workspace",
-       "selected": false
-      },
-      {
-       "name": "Start",
-       "kind": "start",
-       "selected": false
-      }
-     ],
+     "history": null,
      "compare": null,
      "tabs": [
       {
@@ -381,191 +482,54 @@
        "active": true
       },
       {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
-       "active": false
-      },
-      {
        "name": "Assembly 1",
        "kind": "assembly",
        "active": false
-      }
-     ],
-     "folder": null,
-     "renaming": null,
-     "panel": "Versions and history",
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
-   },
-   "t": 31345
-  },
-  {
-   "step": 3,
-   "do": {
-    "do": "click",
-    "on": {
-     "menu": "Merge into current workspace…"
-    }
-   },
-   "ok": true,
-   "at": [
-    315,
-    379
-   ],
-   "state": {
-    "focus": {
-     "kind": "other",
-     "tag": "div"
-    },
-    "dialog": {
-     "kind": "modal",
-     "title": "Merging changes into Main from B1",
-     "fields": [
-      {
-       "label": "Replace with B1",
-       "kind": "input",
-       "value": ""
       },
       {
-       "label": "Replace with B1",
-       "kind": "input",
-       "value": ""
-      }
-     ],
-     "buttons": [
-      "Merge",
-      "Cancel"
-     ],
-     "text": "Overall merge strategy Keep Main 1 tab has changes Compare with base Replace with B1 2 tabs have changes Compare with base Tabs 2 tabs have changes Changes in Main Changes in B1 Tab merge strategy Part Studio 1 No changes Edited Replace with B1 Part 1 Drawing 1 Edited Edited Replace with B1 1 tab has no changes Assembly 1"
-    },
-    "dialogs": [],
-    "panels": null,
-    "list": null,
-    "selection": {
-     "count": 0,
-     "items": []
-    },
-    "features": {
-     "rows": [
-      {
-       "name": "Sketch 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
-      },
-      {
-       "name": "Extrude 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      }
-     ],
-     "rollbackAfter": "Extrude 1"
-    },
-    "parts": [
-     "Part 1"
-    ],
-    "partsHeading": "Parts (1)",
-    "undo": {
-     "undo": false,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": null,
-    "drawing": null,
-    "camera": {
-     "direction": [
-      -0.433013,
-      0.75,
-      -0.5
-     ],
-     "up": [
-      -0.25,
-      0.433013,
-      0.866025
-     ],
-     "target_mm": [
-      0,
-      0,
-      0
-     ],
-     "eye_mm": [
-      67.5,
-      -116.913,
-      77.942
-     ],
-     "width_mm": 355.772,
-     "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
-     "orthographic": true
-    },
-    "measure": null,
-    "document": {
-     "workspace": "Main",
-     "history": [
-      {
-       "name": "Main",
-       "kind": "workspace",
-       "selected": true
-      },
-      {
-       "name": "B1",
-       "kind": "workspace",
-       "selected": false
-      },
-      {
-       "name": "Start",
-       "kind": "start",
-       "selected": false
-      }
-     ],
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 1",
+       "name": "Part Studio 2",
        "kind": "partstudio",
-       "active": true
-      },
-      {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
        "active": false
       },
       {
-       "name": "Assembly 1",
-       "kind": "assembly",
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
        "active": false
       }
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Versions and history",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 34885
+   "t": 64812
   },
   {
    "step": 4,
    "do": {
     "do": "click",
     "on": {
-     "button": "Open in B1"
+     "menu": "Unpack"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"button\":\"Open in B1\"}",
+   "ok": true,
+   "at": [
+    1156,
+    927
+   ],
    "state": {
     "focus": {
      "kind": "none"
@@ -634,7 +598,7 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
@@ -642,23 +606,7 @@
     "measure": null,
     "document": {
      "workspace": "Main",
-     "history": [
-      {
-       "name": "Main",
-       "kind": "workspace",
-       "selected": true
-      },
-      {
-       "name": "B1",
-       "kind": "workspace",
-       "selected": false
-      },
-      {
-       "name": "Start",
-       "kind": "start",
-       "selected": false
-      }
-     ],
+     "history": null,
      "compare": null,
      "tabs": [
       {
@@ -667,25 +615,40 @@
        "active": true
       },
       {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
+       "name": "Assembly 1",
+       "kind": "assembly",
        "active": false
       },
       {
-       "name": "Assembly 1",
-       "kind": "assembly",
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 3",
+       "kind": "partstudio",
        "active": false
       }
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Versions and history",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 38998
+   "t": 68213
   }
  ]
 }

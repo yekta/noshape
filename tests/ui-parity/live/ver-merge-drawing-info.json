@@ -1,6 +1,6 @@
 {
  "scenario": "ver-merge-drawing-info",
- "recorded": "2026-11-12T17:59:29.135Z",
+ "recorded": "2026-11-12T20:24:22.495Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,12 +8,12 @@
   "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
  },
  "live": {
-  "document": "2f98b70408fb2ee1a62300e8",
-  "workspace": "c2a0fa0bd0c45353a26ec7ee",
-  "element": "989bd5b3196e9d1393271083",
+  "document": "cba5868607870820a68eaa0c",
+  "workspace": "ff481bf010161100fd0649b9",
+  "element": "113903a100c1b51779ddaa95",
   "start": "merge-drawing",
-  "startElement": "989bd5b3196e9d1393271083",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "113903a100c1b51779ddaa95",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -251,7 +251,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 24407
+   "t": 27853
   },
   {
    "step": 2,
@@ -399,7 +399,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 27080
+   "t": 30605
   },
   {
    "step": 3,
@@ -554,18 +554,21 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 30462
+   "t": 34171
   },
   {
    "step": 4,
    "do": {
     "do": "hover",
     "on": {
-     "button": "Part 1 Drawing 1 is out of date in Main and B1"
+     "button": "For this tab type, edits from separate branches cannot be merged."
     }
    },
-   "ok": false,
-   "error": "target not found: {\"button\":\"Part 1 Drawing 1 is out of date in Main and B1\"}",
+   "ok": true,
+   "at": [
+    658,
+    294
+   ],
    "state": {
     "focus": {
      "kind": "other",
@@ -631,7 +634,7 @@
      "redo": false
     },
     "message": null,
-    "tooltip": null,
+    "tooltip": "For this tab type, edits from separate branches cannot be merged.",
     "sketch": null,
     "drawing": null,
     "camera": {
@@ -706,7 +709,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 44336
+   "t": 49829
   }
  ]
 }
