@@ -1,0 +1,33 @@
+{
+ "name": "ver-merge-drawing-open",
+ "about": "Merge from B1, then the drawing row's Open in B1: the dialog closes and the run is in B1",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit: the merge dialog's drawing row)",
+ "start": "merge-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Open in B1"
+   }
+  }
+ ]
+}

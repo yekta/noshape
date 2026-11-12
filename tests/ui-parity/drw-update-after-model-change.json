@@ -1,0 +1,102 @@
+{
+ "name": "drw-update-after-model-change",
+ "about": "a dimension on Front's right edge (.394), then Part Studio 1's Extrude 1 depth 10 -> 20 mm, back to the drawing (no automatic update), Update from this workspace: the dimension reads the new height",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L14904-14906, L25820)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      40,
+      0,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      48,
+      0,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "20"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part 1 Drawing 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Update from this workspace"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

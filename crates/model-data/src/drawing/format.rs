@@ -209,13 +209,16 @@ pub fn overridden_text(f: &DimFormat, symbol: &str, value: &str, expand: &dyn Fn
 
 pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, symbol: &str) -> DimText {
     let p = &drawing.props;
+    // A tolerance keeps the drawing's tolerance precision whatever the value's (live: 0.12 with Symmetrical .01
+    // reads "1.97±.010" on an inch drawing).
     let num_with = |v: f64, tol: bool| -> String {
+        let own = if tol { None } else { f.precision };
         if angular {
             // Unset: Onshape's template defaults (0.1°, tolerances 0°).
-            format!("{}°", angle_number(drawing, v.to_degrees(), f.precision.or(if tol { p.angular_tolerance_precision.or(Some(0)) } else { p.angular_precision.or(Some(1)) })))
+            format!("{}°", angle_number(drawing, v.to_degrees(), own.or(if tol { p.angular_tolerance_precision.or(Some(0)) } else { p.angular_precision.or(Some(1)) })))
         } else {
             let u = length_units(drawing, f);
-            unit_number(drawing, v, u, f.precision, if tol { p.tolerance_precision.or(p.precision) } else { p.precision }, tol)
+            unit_number(drawing, v, u, own, if tol { p.tolerance_precision.or(p.precision) } else { p.precision }, tol)
         }
     };
     let num = |v: f64| num_with(v, false);
@@ -710,6 +713,11 @@ mod tests {
         assert_eq!(dim_text(&d, &f, 0.0125, false, "Ø").main, "Ø12.500");
         let f = DimFormat { tolerance: Tolerance::Symmetric { value: 0.00005 }, precision: Some(2), ..Default::default() };
         assert_eq!(dim_text(&d, &f, 0.01, false, "").main, "10.00±0.05");
+        let mut inch = Drawing::default();
+        inch.props.units = Some(DimUnits::Inch);
+        crate::drawing::templates::template_precisions(&mut inch.props, true);
+        let f = DimFormat { tolerance: Tolerance::Symmetric { value: 0.000254 }, precision: Some(2), ..Default::default() };
+        assert_eq!(dim_text(&inch, &f, 0.05, false, "").main, "1.97±.010");
         let f = DimFormat { tolerance: Tolerance::Deviation { upper: 0.0001, lower: -0.00005 }, ..Default::default() };
         let t = dim_text(&d, &f, 0.01, false, "");
         assert_eq!((t.main.as_str(), t.upper.as_deref(), t.lower.as_deref()), ("10", Some("+0.1"), Some("-0.05")));

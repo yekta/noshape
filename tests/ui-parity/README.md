@@ -105,6 +105,8 @@ as the app's own config files, written into the run's config directory before it
 - `{"do": "pick_files", "files": ["uip-asm.step"]}`: answers the file dialog the step before opened with files of
   `files/` (no dialog shows on either side: live's runner intercepts the browser's, ours the app's while a scenario
   runs); the step fails with "no file dialog is open" when none waits.
+  A save dialog (Export, Download) doesn't show while a scenario runs: ours saves at once into the run's documents
+  folder, as live's browser downloads.
 - `{"do": "wait", "until": "regenerated" | "dialog" | "ms", "ms": 500}`. Each side also waits, after every step,
   until its regeneration is idle (at most 30 s), so timing never decides a result.
 
@@ -328,7 +330,11 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   the merge dialog's footer ? `{"button": "Merge help"}`; Workspace protection's link
   `{"button": "Learn more about workspace protection"}` (help links open a browser tab: the state stays);
   `"branches": [{"name": "B1", "features": [...]}]`: workspace B1 branched
-  from Main's head after the versions, its own `features` in it, the run back on Main (start `doc-branches`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
+  from Main's head after the versions, its own `features` in it, the run back on Main (start `doc-branches`). A drawing
+  with `"first": true` is made before the versions and workspaces; `"drawing_notes": [{"text", "position": [x, y]}]`
+  (sheet mm) adds notes to it, in a workspace's entry on that workspace, at the start's top level on Main after the
+  workspaces (start `merge-drawing`: the drawing edited on both sides; targets the merge row's ⓘ by its tooltip's first
+  line `{"button": "Part 1 Drawing 1 is out of date in Main and B1"}` and `{"button": "Open in B1"}`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
   (the workspace "Main", a version, a history entry), `{"button": "Show changes:Main"}` a row's Show changes…, the
   panel header's buttons by tooltip (`"Create version…"`, `"Compare history entries"`, `"Close"`), the left rail's
   (`"Versions and history"`, `"Create version…"`).

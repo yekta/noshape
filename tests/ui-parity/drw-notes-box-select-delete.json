@@ -1,0 +1,92 @@
+{
+ "name": "drw-notes-box-select-delete",
+ "about": "two notes, a box dragged from empty sheet around both, Delete: both gone",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L24314, L15038)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Note"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     60,
+     40
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "ONE"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     240,
+     190
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Note"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     60,
+     28
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "TWO"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     240,
+     190
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sheet_point": [
+     30,
+     18
+    ]
+   },
+   "to": {
+    "sheet_point": [
+     110,
+     52
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  }
+ ]
+}

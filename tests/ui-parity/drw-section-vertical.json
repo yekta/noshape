@@ -1,0 +1,45 @@
+{
+ "name": "drw-section-vertical",
+ "about": "Section view with its default Vertical tab: a snap point on Top's bottom edge midpoint, the view placed to the right of Top",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L5600, L5603)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Section view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      80,
+      15,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -139,6 +139,10 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
     if has("tabs") || has("files") || start.get("feature_studio").is_some() || start.get("linked").is_some() {
         call(ctx, "tab_activate", json!({ "tab": "Part Studio 1" }))?;
     }
+    // `"drawing": {"first": true}`: the drawing before the versions and workspaces, each of which may note it.
+    if start["drawing"]["first"].as_bool().unwrap_or(false) {
+        build_drawing(ctx, start, &asm_tab)?;
+    }
     // Versions (README "Versions and history"): each made after what comes before it, then its own `features` in Main.
     for v in start["versions"].as_array().into_iter().flatten() {
         let name = v["name"].as_str().ok_or_else(|| format!("a start version without a name: {v}"))?;
@@ -153,24 +157,46 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
         call(ctx, "history_switch_branch", json!({ "branch": "Main" })).map_err(|e| format!("start workspace {name}: {e}"))?;
         call(ctx, "history_create_branch", json!({ "name": name })).map_err(|e| format!("start workspace {name}: {e}"))?;
         add_features(ctx, &b["features"])?;
+        add_drawing_notes(ctx, start, &b["drawing_notes"])?;
     }
     if !branches.is_empty() {
         call(ctx, "history_switch_branch", json!({ "branch": "Main" }))?;
     }
-    // A drawing of a part (README "### Drawings"): Create Drawing of it, the run opening on its tab ("Part 1 Drawing 1").
-    if let Some(d) = start.get("drawing") {
-        let template = d["template"].as_str().unwrap_or("ANSI_A_INCH.dwt");
-        let suggested = d["views"].as_str() == Some("suggested");
-        // A part's drawing, or (`"assembly": true`) the start's assembly's.
-        // `"part": null`: Create Drawing of Part Studio 1 (all its parts).
-        let made = if d["assembly"] == true {
-            call(ctx, "drawing_create", json!({ "source": asm_tab, "template": template, "suggested_views": suggested }))
-        } else if d.get("part").is_some_and(Value::is_null) {
-            call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": template, "suggested_views": suggested }))
-        } else {
-            call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "part": d["part"].as_str().unwrap_or("Part 1"), "template": template, "suggested_views": suggested }))
-        };
-        made.map_err(|e| format!("start drawing: {e}"))?;
+    add_drawing_notes(ctx, start, &start["drawing_notes"])?;
+    if !start["drawing"]["first"].as_bool().unwrap_or(false) {
+        build_drawing(ctx, start, &asm_tab)?;
+    }
+    Ok(())
+}
+
+/// The start's drawing (README "### Drawings"): Create Drawing of a part, the run opening on its tab ("Part 1 Drawing 1").
+fn build_drawing(ctx: &mut Ctx, start: &Value, asm_tab: &str) -> Result<(), String> {
+    let Some(d) = start.get("drawing") else { return Ok(()) };
+    let template = d["template"].as_str().unwrap_or("ANSI_A_INCH.dwt");
+    let suggested = d["views"].as_str() == Some("suggested");
+    // A part's drawing, or (`"assembly": true`) the start's assembly's.
+    // `"part": null`: Create Drawing of Part Studio 1 (all its parts).
+    let made = if d["assembly"] == true {
+        call(ctx, "drawing_create", json!({ "source": asm_tab, "template": template, "suggested_views": suggested }))
+    } else if d.get("part").is_some_and(Value::is_null) {
+        call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": template, "suggested_views": suggested }))
+    } else {
+        call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "part": d["part"].as_str().unwrap_or("Part 1"), "template": template, "suggested_views": suggested }))
+    };
+    made.map_err(|e| format!("start drawing: {e}"))?;
+    Ok(())
+}
+
+/// The start drawing's name, as `build_drawing` makes it.
+fn drawing_name(start: &Value) -> String {
+    let d = &start["drawing"];
+    if d.get("part").is_some_and(Value::is_null) { "Part Studio 1 Drawing 1".to_string() } else { format!("{} Drawing 1", d["part"].as_str().unwrap_or("Part 1")) }
+}
+
+/// `"drawing_notes": [{"text", "position": [x, y]}]` (sheet mm) on the start's drawing, in the workspace the run is in.
+fn add_drawing_notes(ctx: &mut Ctx, start: &Value, notes: &Value) -> Result<(), String> {
+    for n in notes.as_array().into_iter().flatten() {
+        call(ctx, "drawing_note", json!({ "drawing": drawing_name(start), "text": n["text"], "position": n["position"] })).map_err(|e| format!("start drawing note: {e}"))?;
     }
     Ok(())
 }

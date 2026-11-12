@@ -1,0 +1,31 @@
+{
+ "name": "drw-view-dblclick-edge-properties",
+ "about": "double-click Front's top edge: View properties of Front (a double-click on empty view area would only hover); Escape",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L23413, L6022)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

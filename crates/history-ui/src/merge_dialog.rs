@@ -505,13 +505,14 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                         // type, edits from separate branches cannot be merged.", and "Open in <source>".
                         .when(r.unmergeable_type, |d| {
                             let (doc, side) = (doc.clone(), plan.source_side);
-                            d.child(div().id(SharedString::from(format!("merge-info-{i}"))).flex_none().tooltip(crate::ui::user_tooltip(format!("{} is out of date in {} and {}\n{}", r.name, plan.target, plan.source, crate::i18n::tr("For this tab type, edits from separate branches cannot be merged.")))).child(crate::ui::glyph("info", 14., rgb(0x4d8ccf))))
+                            let stale = format!("{} is out of date in {} and {}", r.name, plan.target, plan.source);
+                            let open_in = format!("Open in {}", plan.source);
+                            d.child(crate::ui_script::mark(div().id(SharedString::from(format!("merge-info-{i}"))), { let s = stale.clone(); move || format!("button:{s}") }).flex_none().tooltip(crate::ui::user_tooltip(format!("{stale}\n{}", crate::i18n::tr("For this tab type, edits from separate branches cannot be merged.")))).child(crate::ui::glyph("info", 14., rgb(0x4d8ccf))))
                                 .child(
-                                    div()
-                                        .id(SharedString::from(format!("merge-open-{i}")))
+                                    crate::ui_script::mark(div().id(SharedString::from(format!("merge-open-{i}"))), { let o = open_in.clone(); move || format!("button:{o}") })
                                         .flex_none()
                                         .cursor_pointer()
-                                        .tooltip(crate::ui::tooltip(format!("Open in {}", plan.source)))
+                                        .tooltip(crate::ui::tooltip(open_in))
                                         .child(crate::assets::icon("open-external", 14., cx))
                                         .on_click(move |_, window, cx| {
                                             window.close_dialog(cx);

@@ -1,0 +1,60 @@
+{
+ "name": "drw-insert-view-top-1to1",
+ "about": "Insert view of Part 1 on an empty drawing: View orientation Front -> Top, View scale 2:1 (the 40 mm block's default) -> 1:1, placed, Escape",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L31976-31978, L36276)",
+ "start": "block-drawing-empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Front",
+    "pick": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "2:1",
+    "pick": "1:1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     90,
+     110
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

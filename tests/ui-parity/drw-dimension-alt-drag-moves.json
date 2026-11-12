@@ -1,0 +1,62 @@
+{
+ "name": "drw-dimension-alt-drag-moves",
+ "about": "Alt+drag the 1.575 dimension's text: moved, still one dimension (an Alt+dragged note is copied)",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L38513)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      18
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "annotation": "1.575"
+   },
+   "to": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      30,
+      0,
+      28
+     ]
+    }
+   },
+   "mods": "alt"
+  }
+ ]
+}

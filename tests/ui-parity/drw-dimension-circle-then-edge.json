@@ -1,0 +1,58 @@
+{
+ "name": "drw-dimension-circle-then-edge",
+ "about": "Dimension: the hole circle in Top (a diameter preview), then Top's right edge instead of the sheet: a linear distance from the hole centre, placed below",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L1537)",
+ "start": "hole-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      3.5355,
+      3.5355,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      20,
+      10,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      10,
+      -30,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

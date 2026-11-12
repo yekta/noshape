@@ -546,8 +546,7 @@ impl Render for CreateDrawingDialog {
         };
         let has_source = self.source.is_some();
         let option = |id: &'static str, label: &'static str, on: bool, enabled: bool, icon: &'static str, cx: &mut Context<Self>, value: bool| {
-            v_flex()
-                .id(id)
+            crate::ui_script::mark(v_flex().id(id), move || format!("button:{label}"))
                 .w(px(140.))
                 .h(px(90.))
                 .items_center()

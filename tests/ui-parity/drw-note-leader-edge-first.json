@@ -1,0 +1,58 @@
+{
+ "name": "drw-note-leader-edge-first",
+ "about": "Note tool: click Front's top edge, then the place: a leadered note EDGE NOTE",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L14883, L1415)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Note"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      50,
+      0,
+      25
+     ]
+    }
+   }
+  },
+  {
+   "do": "type",
+   "text": "EDGE NOTE"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     240,
+     190
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

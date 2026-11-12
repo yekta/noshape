@@ -1,0 +1,60 @@
+{
+ "name": "drw-export-cancel-not-kept",
+ "about": "Export...: Format PDF -> DXF, Cancel; Export... again opens on the last exported format, not DXF",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L35240)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part 1 Drawing 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "PDF",
+    "pick": "DXF"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "cancel"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part 1 Drawing 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "cancel"
+   }
+  }
+ ]
+}

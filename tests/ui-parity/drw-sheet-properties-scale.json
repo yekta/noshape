@@ -1,0 +1,83 @@
+{
+ "name": "drw-sheet-properties-scale",
+ "about": "a dimension on Front, then the sheet menu > Sheet properties... (Scale focused and selected), 1:2 typed, OK: the views follow the sheet scale and the dimension follows its edge",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L22000, L24562)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      18
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     150,
+     110
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Sheet properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "type",
+   "text": "1:2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

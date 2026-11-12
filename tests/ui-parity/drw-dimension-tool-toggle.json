@@ -1,0 +1,29 @@
+{
+ "name": "drw-dimension-tool-toggle",
+ "about": "d, d again (tool off); Dimension button, the button again (tool off)",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L19515)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  }
+ ]
+}

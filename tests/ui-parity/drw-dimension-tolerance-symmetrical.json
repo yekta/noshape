@@ -1,0 +1,107 @@
+{
+ "name": "drw-dimension-tolerance-symmetrical",
+ "about": "1.575's palette: Precision 0.12, Tolerance Symmetrical, .01 typed in the tolerance field, closed by a click on the sheet",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L29910)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      18
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "annotation": "1.575"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Precision: 0.123 (Drawing)"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "0.12"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Tolerance: None"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Symmetrical"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Tolerance"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": ".01"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     150,
+     110
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,73 @@
+{
+ "name": "drw-note-dblclick-edit",
+ "about": "a note TEMP, then double-clicked: the Note editor; End, type 2, click away: TEMP2",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L2861)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Note"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     60,
+     40
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "TEMP"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     240,
+     190
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "annotation": "TEMP"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "key",
+   "key": "End"
+  },
+  {
+   "do": "type",
+   "text": "2"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     240,
+     190
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,54 @@
+{
+ "name": "drw-view-properties-scale-typed",
+ "about": "Front > View properties..., Scale typed as 2 (read as 2:1), OK: Front 2:1 and its projected views follow",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L3064, L12660)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "view": "Front"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Scale"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

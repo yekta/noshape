@@ -37,6 +37,20 @@ pub use noshape_ops::drawing::PRECISIONS;
 /// Tolerance lists (D35; hole callouts have no Basic).
 pub use noshape_ops::drawing::{DIM_TOLERANCES, HOLE_TOLERANCES};
 
+/// The palette's Precision list as live's (behaviours D31): 0 to 6 decimals, the drawing's own ("0.12 (Drawing)")
+/// right after the row of the same decimals.
+fn precision_list(own: u8) -> Vec<(String, Option<u8>)> {
+    let example = |k: u8| if k == 0 { "0".to_string() } else { format!("0.{}", &"123456"[..k as usize]) };
+    let mut out = Vec::new();
+    for k in 0..=6u8 {
+        out.push((example(k), Some(k)));
+        if k == own.min(6) {
+            out.push((format!("{} (Drawing)", example(k)), None));
+        }
+    }
+    out
+}
+
 impl PaletteDlg {
     /// Open it at `at` (editor px; the launcher puts it over itself).
     pub fn set_at(&mut self, at: [f32; 2]) {
@@ -472,8 +486,12 @@ impl DrawingEditor {
             .map(|&(l, v)| (l.to_string(), fmt.dual == v, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.dual = v) as Act))
             .collect();
         let precision = fmt.precision;
-        let prec_items: Vec<(String, bool, Act)> = PRECISIONS.iter().map(|&(l, v)| (l.to_string(), precision == v, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.precision = v) as Act)).collect();
-        let prec_label = if d.varies_precision() { VARIES } else { PRECISIONS.iter().find(|x| x.1 == precision).map(|x| x.0).unwrap_or("(Drawing)") };
+        let angular = matches!(d.cur.kind, AnnotationKind::AngularDimension { .. });
+        let props = &self.drawing.props;
+        let own = if angular { props.angular_precision.unwrap_or(1) } else { props.precision.unwrap_or(3) };
+        let precisions = precision_list(own);
+        let prec_items: Vec<(String, bool, Act)> = precisions.iter().map(|(l, v)| { let v = *v; (l.clone(), precision == v, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.precision = v) as Act) }).collect();
+        let prec_label = if d.varies_precision() { VARIES.to_string() } else { precisions.iter().find(|x| x.1 == precision).map(|x| x.0.clone()).unwrap_or_default() };
         // Live 1744: a tolerance the selection differs in: «Varies», no field.
         let tol = if d.varies_tolerance() { VARIES } else { d.tol };
         // A hole callout's values other than the hole Ø take no fits (live
@@ -593,7 +611,7 @@ impl DrawingEditor {
                 .h(px(30.))
                 .ml(px(10.))
                 .child(div().w(px(85.)).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xdddddd)).rounded_l(px(4.)).bg(crate::theme::light().panel).flex().items_center().px(px(6.)).text_color(gpui_kit::rgb(0x555555)).child(Input::new(&d.value).appearance(false).xsmall().text_size(px(14.)).text_center()))
-                .child(pbutton("dp-prec", div().into_any_element(), 20., prec_items.clone(), true));
+                .child(crate::ui_script::mark(div().id("dp-prec-tip"), { let t = format!("Precision: {prec_label}"); move || format!("button:{t}") }).tooltip(crate::ui::tooltip(format!("Precision: {prec_label}"))).child(pbutton("dp-prec", div().into_any_element(), 20., prec_items.clone(), true)));
             let tol_icon = v_flex()
                 .items_center()
                 .line_height(px(8.))
@@ -607,8 +625,8 @@ impl DrawingEditor {
                 .child(field(&d.prefix, Some(80.), 30.))
                 .child(value_combo)
                 // Live drawing-hole-callout-panel: "Tolerance: <type>".
-                .child(div().id("dp-tol-tip").tooltip(crate::ui::tooltip(format!("Tolerance: {tol}"))).child(pbutton("dp-tol", tol_icon, 45., tol_items.clone(), false)))
-                .child(pbutton("dp-units", div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(ink).child(unit_label).into_any_element(), 60., unit_items, false))
+                .child(crate::ui_script::mark(div().id("dp-tol-tip"), { let t = format!("Tolerance: {tol}"); move || format!("button:{t}") }).tooltip(crate::ui::tooltip(format!("Tolerance: {tol}"))).child(pbutton("dp-tol", tol_icon, 45., tol_items.clone(), false)))
+                .child(crate::ui_script::mark(div().id("dp-units-tip"), || "button:Dimension units".into()).tooltip(crate::ui::tooltip("Dimension units")).child(pbutton("dp-units", div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(ink).child(unit_label).into_any_element(), 60., unit_items, false)))
                 .child(field(&d.suffix, Some(80.), 30.))
         };
         // The dual row (live asbdd-9, a dimension showing its dual): "[ 0.39 ▾
@@ -805,8 +823,8 @@ impl DrawingEditor {
         let tol_row = h_flex()
             .gap(px(4.))
             .pt(px(3.))
-            .when(hole, |e| e.child(menu("dp-hprec", small(prec_label.to_string()), 110., prec_items)).child(menu("dp-htol", small(tol.to_string()), 150., tol_items)))
-            .when(matches!(tol, "Symmetrical" | "Deviation" | "Limits"), |e| e.child(field(&d.tol_a, Some(70.), 26.)))
+            .when(hole, |e| e.child(menu("dp-hprec", small(prec_label.clone()), 110., prec_items)).child(menu("dp-htol", small(tol.to_string()), 150., tol_items)))
+            .when(matches!(tol, "Symmetrical" | "Deviation" | "Limits"), |e| e.child(crate::ui_script::wrap(field(&d.tol_a, Some(70.), 26.).into_any_element(), || "field:Tolerance".into())))
             .when(matches!(tol, "Deviation" | "Limits"), |e| e.child(flip("dp-flip-a", true, cx)).child(field(&d.tol_b, Some(70.), 26.)).child(flip("dp-flip-b", false, cx)));
         Some(
             v_flex()

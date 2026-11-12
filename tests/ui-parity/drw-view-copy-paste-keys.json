@@ -1,0 +1,37 @@
+{
+ "name": "drw-view-copy-paste-keys",
+ "about": "select Front, Ctrl+C, click the empty sheet, Ctrl+V: pasted at once at that point, selected",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L22934)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "view": "Front"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+c"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     230,
+     40
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+v"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  }
+ ]
+}

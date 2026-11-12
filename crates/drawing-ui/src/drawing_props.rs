@@ -783,13 +783,14 @@ impl DrawingEditor {
         let line = gpui_kit::rgb(0xdddddd);
         let label = |w: f32, t: &'static str| div().w(px(w)).flex_none().pl(px(5.)).pt(px(7.)).text_size(px(12.)).text_color(ink).child(t);
         let info_row = |t: &'static str, body: AnyElement| h_flex().items_start().min_h(px(25.)).child(label(76., t)).child(div().flex_1().min_w_0().pl(px(5.)).pt(px(7.)).text_size(px(12.)).text_color(ink).child(body)).into_any_element();
-        let row = |t: &'static str, body: AnyElement| h_flex().items_start().min_h(px(26.)).child(label(136., t)).child(div().w(px(120.)).flex_none().mt(px(1.)).child(body)).into_any_element();
+        let row = |t: &'static str, body: AnyElement| h_flex().items_start().min_h(px(26.)).child(label(136., t)).child(crate::ui_script::mark(div().w(px(120.)).flex_none().mt(px(1.)), || format!("field:{t}")).child(body)).into_any_element();
         let text = |s: String| div().truncate().child(s).into_any_element();
         let value = |s: String| div().pl(px(5.)).pt(px(6.)).text_size(px(12.)).text_color(ink).child(s).into_any_element();
         let view = cx.entity();
         // Onshape's select: white, 120 x 25, a #ddd bottom line, ▾ at the right.
         let select = |id: &'static str, current: String, items: Vec<(String, bool, PropsAct)>, enabled: bool| {
             let view = view.clone();
+            let shown = current.clone();
             let b = Button::new(id).label(current).ghost().xsmall().w_full().h(px(25.)).rounded(px(0.)).border_b_1().border_color(line).text_color(field_ink).text_size(px(13.33)).dropdown_caret(true);
             if !enabled {
                 return div().opacity(0.5).child(b).into_any_element();
@@ -808,6 +809,7 @@ impl DrawingEditor {
                 }
                 menu
             })
+            .map(|b| crate::ui_script::mark(b, move || format!("dropdown:{shown}")))
             .into_any_element()
         };
         let field = |input: &Entity<InputState>| div().h(px(25.)).border_b_1().border_color(line).text_color(field_ink).child(Input::new(input).appearance(false).xsmall().text_size(px(13.33))).into_any_element();

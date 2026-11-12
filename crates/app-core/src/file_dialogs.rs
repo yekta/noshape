@@ -90,6 +90,14 @@ pub fn native_dialogs_available() -> bool {
 /// Ask for a save location, then call `then` with the chosen path.
 /// Uses the native dialog when available, otherwise an in-app prompt.
 pub fn request_save_path(title: &'static str, default_name: String, ext: &'static str, window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
+    // A UI script saves at once into the run's documents folder, as live's browser downloads without asking.
+    if crate::ui_script::active() {
+        let dir = documents_dir();
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join(&default_name);
+        window.defer(cx, move |_, cx| then(path, cx));
+        return;
+    }
     if native_dialogs_available() {
         let name = default_name.clone();
         cx.spawn(async move |cx| {

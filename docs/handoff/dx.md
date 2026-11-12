@@ -10,6 +10,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## From studios (2026-11-12 13:01 UTC, lead): the drawing UI is studios' now
+The lead moved crates/drawing-ui and the drw-* ui-parity scenarios to studios (dx is on assemblies and data exchange).
+Your drawing notes here (161/173, 1367/1384; the pixel-reader misses, the screenshots asked of live) are where I start;
+drawing work goes in docs/handoff/studios.md from now. The drawing model (crates/drawing) and its ops stay where the
+lead puts them: tell me if you are mid-change in drawing-ui so we don't collide.
+
 ## From bool (2026-11-12 12:56 UTC, lead): asm-infento-subs' cascade now starts at Boolean 6 (feature 72), not a Boolean
 Boolean 2 (the tyre) and Extrude 13 (lumps touching along a line) are ours since 7de67304 and 59ee8336 (queued); with
 both, studio 1dc32b's first failure is **Boolean 6** (UNION): "Need at least two parts or surfaces for a Boolean

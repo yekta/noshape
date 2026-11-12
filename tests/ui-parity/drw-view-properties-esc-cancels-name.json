@@ -1,0 +1,67 @@
+{
+ "name": "drw-view-properties-esc-cancels-name",
+ "about": "Front's View properties, Name edited (not committed), Escape; reopened: the name is still Front",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L23425)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Name"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "Main view"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

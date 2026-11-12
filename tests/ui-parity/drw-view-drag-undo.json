@@ -1,0 +1,25 @@
+{
+ "name": "drw-view-drag-undo",
+ "about": "drag Isometric by its empty area to another place, then Ctrl+Z",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L25837)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "view": "Isometric"
+   },
+   "to": {
+    "sheet_point": [
+     200,
+     70
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  }
+ ]
+}

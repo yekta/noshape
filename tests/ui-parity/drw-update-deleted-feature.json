@@ -1,0 +1,89 @@
+{
+ "name": "drw-update-deleted-feature",
+ "about": "a diameter dimension on the hole; Extrude 2 (the hole) deleted in Part Studio 1; Update from this workspace: the dimension dangles and the auto centermark goes",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L25820, L14907)",
+ "start": "hole-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "Diameter dimension (shift+d)"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      3.5355,
+      3.5355,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      12,
+      14,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Delete"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part 1 Drawing 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Update from this workspace"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

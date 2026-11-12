@@ -28,6 +28,32 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-12 13:48 UTC: the drawing UI is studios' (lead 11-12: from dx); drawing gap audit
+- Area now also crates/drawing-ui and the drw-* scenarios (dx.md's notes: 161/173 scenarios, 1367/1384 states; the
+  misses are mostly live's pixel reader, see dx.md 11-11). Drawing scenarios keep `"area": "dx"` (the area decides
+  how a run opens: "studios" opens on the first tab).
+- Audit (/root/studios-scratch/drw-audit/audit.md): every tool, menu item, shortcut and format is clicked somewhere,
+  but almost no edit cycle is finished (1 drag, 1 double-click, 1 undo, no field edited in a drawing panel, no
+  model change then Update, no Export committed). 33 scenarios for the biggest gaps (source "studios 11-12 (drawing
+  gap audit, …)"): Update after a model change / a deleted feature, the dimension palette (Precision, Tolerance,
+  Esc twice), double-click edits (note, a view's edge, a sheet row, a table cell), view selection (Esc, Shift),
+  View properties (Scale typed, Esc cancels a Name), Move to sheet ✓, copy / paste, sheet rows dragged with undo /
+  redo, Insert view's orientation and scale, Create Drawing with Suggested views, a Vertical section, Export
+  committed / remembered / Cancel not kept / DXF custom sheets. A hole callout's second leader waits on a `hole`
+  feature in starts (live's two-leader capture used a Hole feature; an extruded cut gives no callout on either side).
+- Marks added for them: Insert view's and View properties' dropdowns (`dropdown:<shown>`), View properties' rows
+  (`field:<label>`), Move to sheet's Sheet, the Update tool (`tool:Update from this workspace`), the Note panel's
+  popups and Create Drawing's tiles (`button:<label>`), the dimension palette's ▾s by live's tooltips
+  ("Precision: 0.123 (Drawing)", "Tolerance: None", "Dimension units", the tooltips were missing).
+- Fixed: the palette's Precision list is live's (0 to 6 decimals, "<the drawing's> (Drawing)" after its row; was
+  0 to 8 with a fixed "(Drawing)"). A tolerance keeps the drawing's tolerance precision, not the value's (live:
+  0.12 + Symmetrical .01 reads "1.97±.010"; ours read "1.97±.01"; T1 numbers_and_tolerances). A save dialog in a
+  UI script saves at once into the run's documents folder (live's browser downloads; the stand-in blocked every later
+  step).
+- Audit notes not acted on yet: state has no view / annotation positions (drags not comparable), live reads a
+  table's text as null and the palette's fields barely; "Sheet range cannot be empty" (DXF custom sheets) isn't in
+  ours; live's notes disagree on a table cell's double-click (Note editor L5499 / Cell panel L3302).
+
 ### 2026-11-12 08:49 UTC: release management: approvals (lead: full workflow, local approvers), associated drawings, live's strings
 - Live 2522 ("release strings (client code)", "studios: the Release candidate dialog's item messages…") gives the
   dialog's texts; used verbatim: the rows' blue INFO messages ("Item has not changed since its last revision.",

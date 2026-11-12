@@ -1,0 +1,41 @@
+{
+ "name": "drw-create-suggested-views",
+ "about": "right-click Part 1 > Create Drawing of Part 1..., the Suggested views tile, OK: the four views",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L1407, L33187)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create Drawing of Part 1…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Suggested views"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

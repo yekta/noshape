@@ -1,0 +1,77 @@
+{
+ "name": "drw-datum-copy-paste",
+ "about": "datum A, its menu > Copy, the empty sheet's menu > Paste: a free copy A",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L24107-24109)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Datum"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      -8
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "annotation": "A",
+    "kind": "datum"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     230,
+     40
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Paste"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

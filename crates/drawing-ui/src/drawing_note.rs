@@ -208,8 +208,7 @@ impl DrawingEditor {
         };
         // 45 × 30 popup buttons: the icon and a 8 × 4 caret.
         let popup = |id: &'static str, icon: &'static str, tip: &'static str, enabled: bool, cx: &App| {
-            div()
-                .id(id)
+            crate::ui_script::mark(div().id(id), move || format!("button:{tip}"))
                 .w(px(45.))
                 .h(px(30.))
                 .p(px(1.))

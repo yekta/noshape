@@ -1,0 +1,77 @@
+{
+ "name": "drw-dimension-dblclick-precision",
+ "about": "double-click the placed 1.575 dimension: the palette; Precision drop-down -> 0.1; a click on the empty sheet closes it: the dimension text follows the precision",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L19528-19534, L29907)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      18
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "annotation": "1.575"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Precision: 0.123 (Drawing)"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "0.1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     150,
+     110
+    ]
+   }
+  }
+ ]
+}

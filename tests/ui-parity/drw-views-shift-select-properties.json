@@ -1,0 +1,43 @@
+{
+ "name": "drw-views-shift-select-properties",
+ "about": "click Front, Shift+click Top: both selected; Top's menu > View properties...: Multiple views selected; Escape",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L6004-6010)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "view": "Front"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view": "Top"
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "view": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

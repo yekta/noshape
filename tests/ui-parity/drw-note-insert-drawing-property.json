@@ -1,0 +1,49 @@
+{
+ "name": "drw-note-insert-drawing-property",
+ "about": "Note: Insert drawing property > Drawing name: the drawing's name, upper-cased, committed",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L24003-24006, L5310)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Note"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     60,
+     40
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert drawing property"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Drawing name"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     240,
+     190
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

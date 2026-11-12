@@ -1,0 +1,64 @@
+{
+ "name": "drw-view-move-to-sheet-ok",
+ "about": "Insert sheet, back to Sheet1 by its row, Right > Move to sheet... > Sheet2 > OK: Right on Sheet2 and Sheet2 active",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L23511, L1451)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "key",
+   "key": "ctrl+s"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert sheet"
+   }
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "sheet_tab": "Sheet1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "ctrl+s"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "view": "Right"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move to sheet..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Sheet1",
+    "pick": "Sheet2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  }
+ ]
+}

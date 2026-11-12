@@ -247,7 +247,8 @@ impl DrawingEditor {
         let select = |id: &'static str, current: String, items: Vec<(String, bool, Act)>, user_from: usize| {
             let ed = ed.clone();
             let user = items.iter().position(|i| i.1).is_some_and(|i| i >= user_from);
-            Button::new(id)
+            let shown = current.clone();
+            let button = Button::new(id)
                 .when(!user, |b| b.label(current.clone()))
                 .when(user, |b| b.child(div().min_w_0().whitespace_nowrap().text_ellipsis().child(crate::ui::user_text(current))))
                 .ghost()
@@ -265,8 +266,8 @@ impl DrawingEditor {
                         menu = menu.item(item.checked(*checked).on_click(move |_, _, cx| e.update(cx, |this, cx| f(this, cx))));
                     }
                     menu
-                })
-                .into_any_element()
+                });
+            crate::ui_script::mark(button, move || format!("dropdown:{shown}")).into_any_element()
         };
         // Source dropdown: the whole Part Studio or one of its parts.
         let mut src_items: Vec<(String, bool, Act)> = Vec::new();

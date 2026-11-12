@@ -1,0 +1,79 @@
+{
+ "name": "drw-table-cell-dblclick-type",
+ "about": "a 2 x 2 table; its top-right cell double-clicked (live's notes disagree: Note editor L5499 or Cell panel L3302), AB typed, click away",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L5499, L3302)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Table"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     150,
+     150
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "sheet_point": [
+     148,
+     148
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "type",
+   "text": "AB"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     240,
+     190
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

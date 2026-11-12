@@ -297,7 +297,7 @@ impl DrawingEditor {
             .pl(px(4.))
             .child(crate::ui::undo_redo_with(&self.doc, CELL, ("Undo (ctrl+z)", "Redo (ctrl+y)"), cx))
             .child(sep())
-            .child(
+            .child(crate::ui_script::wrap(
                 // Onshape: the update button is highlighted (#fcda7f, #fab601 border) when out of date.
                 crate::ui::tool_button("dr-update", "drawing-update", false, cx)
                     .w(px(CELL))
@@ -309,8 +309,10 @@ impl DrawingEditor {
                         if !up_to_date {
                             this.update_drawing(cx)
                         }
-                    })),
-            );
+                    }))
+                    .into_any_element(),
+                || "tool:Update from this workspace".into(),
+            ));
         for (gi, mut g) in groups.into_iter().enumerate() {
             // Compact: views…centerlines fold side by side (one separator
             // before them), the inserts fold too.

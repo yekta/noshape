@@ -1,0 +1,48 @@
+{
+ "name": "drw-sheet-row-drag-undo-redo",
+ "about": "three sheets; Sheet3's row dragged above Sheet1 (Sheet3, Sheet1, Sheet2), Ctrl+Z restores the order, Ctrl+Y re-applies it",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L23756-23765, L22416)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "key",
+   "key": "ctrl+s"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert sheet"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert sheet"
+   }
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sheet_tab": "Sheet3"
+   },
+   "to": {
+    "sheet_tab": "Sheet1",
+    "edge": "top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "key",
+   "key": "mod+y"
+  }
+ ]
+}

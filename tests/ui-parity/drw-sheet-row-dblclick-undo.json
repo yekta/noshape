@@ -1,0 +1,34 @@
+{
+ "name": "drw-sheet-row-dblclick-undo",
+ "about": "Sheets panel, Insert sheet (Sheet2 active), double-click Sheet1's row: Sheet1 active; Ctrl+Z undoes only the activation (Sheet2 active again)",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L2965, L22419)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "key",
+   "key": "ctrl+s"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert sheet"
+   }
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "sheet_tab": "Sheet1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  }
+ ]
+}

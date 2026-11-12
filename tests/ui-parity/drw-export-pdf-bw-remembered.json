@@ -1,0 +1,72 @@
+{
+ "name": "drw-export-pdf-bw-remembered",
+ "about": "Export...: PDF, Color -> Black and white, Export (the bubble); Export... again shows PDF with Black and white; then Color restored and exported",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L14938, L35233)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part 1 Drawing 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Color",
+    "pick": "Black and white"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Export"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part 1 Drawing 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Black and white",
+    "pick": "Color"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Export"
+   }
+  }
+ ]
+}

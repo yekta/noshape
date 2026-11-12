@@ -1,0 +1,50 @@
+{
+ "name": "drw-export-dxf-custom-sheets-empty",
+ "about": "Export...: DXF, Sheets -> Custom sheets: the range box and the red 'Sheet range cannot be empty'; Cancel",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L1545)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part 1 Drawing 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "PDF",
+    "pick": "DXF"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "All sheets",
+    "pick": "Custom sheets"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "cancel"
+   }
+  }
+ ]
+}

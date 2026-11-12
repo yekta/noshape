@@ -1,0 +1,56 @@
+{
+ "name": "drw-datum-select-delete",
+ "about": "datum A on Front's bottom edge, then clicked and Delete: removed",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L3088, L3091)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Datum"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      -8
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "annotation": "A",
+    "kind": "datum"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  }
+ ]
+}

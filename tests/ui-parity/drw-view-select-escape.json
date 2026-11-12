@@ -1,0 +1,19 @@
+{
+ "name": "drw-view-select-escape",
+ "about": "click Front (selected), Escape: nothing selected",
+ "area": "dx",
+ "source": "studios 11-12 (drawing gap audit, behaviours L36076)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "view": "Front"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
