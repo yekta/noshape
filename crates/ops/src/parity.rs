@@ -5531,9 +5531,12 @@ pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
             }
         }
     }
+    // (Not the in-context entities' stand-ins: no parts in live, deleted after the last feature.)
+    let helpers: Vec<String> = t.context_helpers.iter().map(|h| format!("body:{}.", h.trim_start_matches("feature:"))).collect();
     Ok(parts_from_query(&r)
         .into_iter()
         .zip(r["parts"].as_array().into_iter().flatten())
+        .filter(|(_, p)| !p["id"].as_str().is_some_and(|id| helpers.iter().any(|h| id.starts_with(h.as_str()))))
         .map(|(mut s, p)| {
             s.face_types = p["id"].as_str().map(|id| faces.get(id).cloned().unwrap_or_default());
             s.edge_types = p["id"].as_str().map(|id| edges.get(id).cloned().unwrap_or_default());
