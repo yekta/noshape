@@ -431,10 +431,13 @@ impl PartStudioView {
             perspective: cam.projection == noshape_render::Projection::Perspective,
             section: super::section::encode(&self.ui.section),
         };
+        // Not an undo step (live ui-parity named-views-add: Undo stays off after the view is saved).
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, &format!("Save view : {name}"), cx, |ps| {
-                ps.named_views.retain(|v| v.name != view.name);
-                ps.named_views.push(view);
+            doc.edit_tab_not_undoable(self.tab, &format!("Save view : {name}"), cx, |c| {
+                if let noshape_model::TabContent::PartStudio(ps) = c {
+                    ps.named_views.retain(|v| v.name != view.name);
+                    ps.named_views.push(view);
+                }
             });
         });
     }
@@ -497,7 +500,11 @@ impl PartStudioView {
             Action::Remove => {
                 let Some(name) = self.named_view_picked.take() else { return };
                 self.doc.update(cx, |doc, cx| {
-                    doc.edit_studio(self.tab, &format!("Delete view : {name}"), cx, |ps| ps.named_views.retain(|v| v.name != name));
+                    doc.edit_tab_not_undoable(self.tab, &format!("Delete view : {name}"), cx, |c| {
+                        if let noshape_model::TabContent::PartStudio(ps) = c {
+                            ps.named_views.retain(|v| v.name != name);
+                        }
+                    });
                 });
                 cx.notify();
             }

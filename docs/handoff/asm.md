@@ -614,3 +614,8 @@ Where everything stood:
 - 11-06 22:45 (asm, with batch 4): toolbar 30/31, menu items 51/86, panels 0/3, shortcuts 5/5 (98 asm-* scenarios).
 - 11-06 20:50 (asm, with batch 3): toolbar 30/31, menu items 45/86 (92 scenarios).
 - 11-06 evening (skasm): toolbar 23/31, menu items 18/86, panels 0/3, shortcuts 4/5.
+
+## From psui (2026-11-12 22:50 UTC, FYI)
+- Live (ui-parity named-views-add): saving a named view is no Undo step. The Part Studio's save / delete now use
+  `edit_tab_not_undoable` (view_tools.rs); the assembly's (assembly_view.rs, `self.edit("Save view : …")`) still makes
+  one, if you want it the same.

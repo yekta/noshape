@@ -1,6 +1,6 @@
 //! Boolean, Variable and Delete part (Plane: see `cplane`).
 
-use crate::regen::eval::{EvalCtx, FResult, NamedShape, err};
+use crate::regen::eval::{EvalCtx, FResult, NamedShape, err, err_at};
 use noshape_kernel as k;
 use noshape_units::Dim;
 
@@ -13,9 +13,9 @@ const TOUCHING_INTERSECT: &str = "The parts either do not intersect or are total
 pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
     let tools_idx = ev.resolve_bodies(ev.query("tools"));
     if tools_idx.is_empty() {
-        // As Onshape's opBoolean (no field marked; the empty required
-        // field turns pink in the dialog by itself).
-        return err("Cannot resolve entities.");
+        // As Onshape's opBoolean, its `tools` at fault (live ui-parity boolean-new-edit-reedit: with Keep tools
+        // remembered on, the new dialog runs and Tools is red).
+        return err_at(&["tools"], "Cannot resolve entities.");
     }
     let op = ev.enum_("operationType").to_string();
     match op.as_str() {

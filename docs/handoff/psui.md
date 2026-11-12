@@ -15,6 +15,16 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**2026-11-12 22:50 UTC (live's batch-1 takes, vibe6):** 40/49 → 46/49 of my recorded audit scenarios. Fixed: a stale
+selection readout after a dialog's OK (menus.rs clears `measure_readout`), Boolean's empty Tools blamed (`tools`), a
+side panel live read unloaded not compared (run.py), Split with one side kept drops / keeps a part it doesn't cut by
+its side (model suite: no document worse, 848/947 vs qa's 847), a Part Studio's named view saved / deleted outside Undo
+(the assembly's still undoable: asm.md), and a crash: right-clicking a default plane in the graphics (00203ee9; the
+menu read the view while it was updated). Open: parts-row-dblclick-rename-escape (live REQUESTS 22:00: y with nothing
+selected?), external-thread-new-edit-reedit step 11 (live makes an Undo step when a typed field commits to the same
+value: our dialog steps only on a changed parameter). Scripts: /root/psui-scratch/cov/shards.sh (3 shards on vibe6),
+run-new.sh (APP= the dev build; release links get SIGTERM under load).
+
 **2026-11-12 19:28 UTC (user P1 "hovered lines don't turn orange"):** a curved face's silhouette picks as the face, and
 the silhouette pass masked the face's hover / selection, so the line under the pointer stayed black while the face's
 boundary edges lit elsewhere. Live (EDGE-HIGHLIGHT-LOOK (d)) lights the silhouette as the boundary: the silhouette

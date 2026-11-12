@@ -1087,7 +1087,13 @@ impl PartStudioView {
         // Live (ui-mass/07): Mass properties keeps the readout for the active
         // field's contents; a pinned Measure panel replaces it.
         let mass_ref = mass_on && self.ui.mass_ref_active;
-        let readout = (!measure_on && self.edit.is_none() && (mass_ref || !self.selection.is_empty())).then(|| self.selection_readout(cx)).flatten();
+        let readout = if !measure_on && self.edit.is_none() && (mass_ref || !self.selection.is_empty()) {
+            self.selection_readout(cx)
+        } else {
+            // (The state's readout goes with it: a dialog's OK clears the selection, live's measure is then null.)
+            self.ui.measure_readout.clear();
+            None
+        };
         h_flex()
             .id("eval-tools")
             .occlude()

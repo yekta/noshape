@@ -363,3 +363,23 @@ fn one_remove_through_several_bodies_names_each_wall_apart() {
     let shared: Vec<_> = names.iter().filter(|(_, c)| **c > 1).collect();
     assert!(shared.is_empty(), "{} parts, names on several: {shared:?}", r.context.bodies.len());
 }
+
+/// Live ui-parity split-new-edit-reedit: with one side kept, a part the tool doesn't cut stays or goes by the side it
+/// lies on (Part 1 wholly behind Part 2's top face was deleted once Keep both sides was off); with both sides kept it
+/// stays, with the info that nothing was split.
+#[test]
+fn a_one_sided_split_keeps_or_drops_a_part_it_doesnt_cut_by_its_side() {
+    for (both, front, parts, info) in [(true, true, 1, true), (false, true, 0, false), (false, false, 1, false)] {
+        let mut t = T::new();
+        t.block();
+        let above = t.plane(DatumPlane::Top, "30 mm");
+        let r = t.ok();
+        let body = Reference::Body(r.context.bodies[0].id.clone());
+        t.add("splitPart", &[("targets", q(vec![body])), ("tool", q(vec![above])), ("keepBothSides", ParamValue::Bool(both)), ("keepFront", ParamValue::Bool(front))]);
+        let r = t.ok();
+        assert_eq!(r.context.bodies.len(), parts, "both sides {both}, front {front}");
+        let split = r.display.features.last().unwrap();
+        let nothing = split.message.as_deref().is_some_and(|m| m.contains("does not split"));
+        assert_eq!(nothing, info, "both sides {both}, front {front}: {:?}", split.message);
+    }
+}

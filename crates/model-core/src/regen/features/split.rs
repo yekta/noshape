@@ -184,6 +184,15 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
             })
             .collect();
         if pieces.len() < 2 {
+            // One side kept: a part the tool doesn't cut stays or goes by the side it lies on (live ui-parity
+            // split-new-edit-reedit: Part 1 wholly behind Part 2's top face is gone once Keep both sides is off).
+            if !both {
+                changed = true;
+                let side = side_of(&tool, piece_center(&target.shape));
+                if (front && side < 0.0) || (!front && side > 0.0) {
+                    remove_bodies(ev, std::slice::from_ref(id));
+                }
+            }
             continue;
         }
         changed = true;

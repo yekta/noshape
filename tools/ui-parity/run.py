@@ -663,6 +663,12 @@ def compare(live, ours, whole_document=True):
             for x, y in zip(ta, tb):
                 if isinstance(x, dict) and isinstance(y, dict) and x.get("kind") == "file" and x.get("name") == y.get("name"):
                     y["kind"] = "file"
+        # A side panel live read before it had loaded (its text still empty: face-rclick-assign-material's Material panel
+        # filled by the next step) shows ours' loaded one: not compared there.
+        ad = (a or {}).get("dialog")
+        if isinstance(ad, dict) and isinstance(bd, dict) and ad.get("kind") == "panel" and bd.get("kind") == "panel" \
+                and ad.get("title") == bd.get("title") and ad.get("text") == [] and bd.get("text"):
+            b = dict(b, dialog=dict(bd, text=[]))
         # A toast shows from the action that raised it: after the step before's reading (ver-protection-enable: live's
         # was gone 3.4 s after the reading that first showed it, 7.5 s after the step before).
         if isinstance((a or {}).get("message"), str) and t is not None:
