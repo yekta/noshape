@@ -1,19 +1,19 @@
 {
  "scenario": "doc-units-pressure",
- "recorded": "2026-11-08T05:06:34.948Z",
+ "recorded": "2026-11-12T20:25:46.715Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
  },
  "live": {
-  "document": "f63add6e9b740bed96a5c82f",
-  "workspace": "6aebede235c1789048cc1a78",
-  "element": "99d1fb103ee235f70f0f69b3",
+  "document": "a5a69682c601544843e0fce5",
+  "workspace": "ab7bb0be60bd7b376a342b1b",
+  "element": "e4044eca7ab2f43546b3aaf9",
   "start": "doc-tabs",
-  "startElement": "99d1fb103ee235f70f0f69b3",
-  "runner": "live2 "
+  "startElement": "e4044eca7ab2f43546b3aaf9",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -62,6 +62,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -222,6 +249,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -266,7 +320,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 57344
+   "t": 59612
   },
   {
    "step": 2,
@@ -314,6 +368,118 @@
       "Display decimals",
       "Energy default unit",
       "Display decimals"
+     ],
+     "fields": [
+      {
+       "label": "Length default unit",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Length display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Linear acceleration default unit",
+       "kind": "select",
+       "value": "Inch per second squared"
+      },
+      {
+       "label": "Linear acceleration display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Angle default unit",
+       "kind": "select",
+       "value": "Degree"
+      },
+      {
+       "label": "Angle display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Angular velocity default unit",
+       "kind": "select",
+       "value": "Degree per second"
+      },
+      {
+       "label": "Angular velocity display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Mass default unit",
+       "kind": "select",
+       "value": "Pound"
+      },
+      {
+       "label": "Mass display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Density default unit",
+       "kind": "select",
+       "value": "Pound per cubic inch"
+      },
+      {
+       "label": "Density display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Force default unit",
+       "kind": "select",
+       "value": "Pound-force"
+      },
+      {
+       "label": "Force display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Frequency default unit",
+       "kind": "select",
+       "value": "Hertz"
+      },
+      {
+       "label": "Frequency display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Moment default unit",
+       "kind": "select",
+       "value": "Inch-pound"
+      },
+      {
+       "label": "Moment display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Pressure default unit",
+       "kind": "select",
+       "value": "Pound per square inch"
+      },
+      {
+       "label": "Pressure display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Energy default unit",
+       "kind": "select",
+       "value": "Foot-pound force"
+      },
+      {
+       "label": "Energy display decimals",
+       "kind": "select",
+       "value": "0.123"
+      }
      ]
     },
     "dialogs": [],
@@ -365,6 +531,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -409,7 +602,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 63827
+   "t": 63336
   },
   {
    "step": 3,
@@ -459,6 +652,118 @@
       "Display decimals",
       "Energy default unit",
       "Display decimals"
+     ],
+     "fields": [
+      {
+       "label": "Length default unit",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Length display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Linear acceleration default unit",
+       "kind": "select",
+       "value": "Inch per second squared"
+      },
+      {
+       "label": "Linear acceleration display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Angle default unit",
+       "kind": "select",
+       "value": "Degree"
+      },
+      {
+       "label": "Angle display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Angular velocity default unit",
+       "kind": "select",
+       "value": "Degree per second"
+      },
+      {
+       "label": "Angular velocity display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Mass default unit",
+       "kind": "select",
+       "value": "Pound"
+      },
+      {
+       "label": "Mass display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Density default unit",
+       "kind": "select",
+       "value": "Pound per cubic inch"
+      },
+      {
+       "label": "Density display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Force default unit",
+       "kind": "select",
+       "value": "Pound-force"
+      },
+      {
+       "label": "Force display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Frequency default unit",
+       "kind": "select",
+       "value": "Hertz"
+      },
+      {
+       "label": "Frequency display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Moment default unit",
+       "kind": "select",
+       "value": "Inch-pound"
+      },
+      {
+       "label": "Moment display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Pressure default unit",
+       "kind": "select",
+       "value": "Pound per square inch"
+      },
+      {
+       "label": "Pressure display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Energy default unit",
+       "kind": "select",
+       "value": "Foot-pound force"
+      },
+      {
+       "label": "Energy display decimals",
+       "kind": "select",
+       "value": "0.123"
+      }
      ]
     },
     "dialogs": [],
@@ -510,6 +815,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -554,7 +886,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 69610
+   "t": 65863
   },
   {
    "step": 4,
@@ -604,6 +936,118 @@
       "Display decimals",
       "Energy default unit",
       "Display decimals"
+     ],
+     "fields": [
+      {
+       "label": "Length default unit",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Length display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Linear acceleration default unit",
+       "kind": "select",
+       "value": "Inch per second squared"
+      },
+      {
+       "label": "Linear acceleration display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Angle default unit",
+       "kind": "select",
+       "value": "Degree"
+      },
+      {
+       "label": "Angle display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Angular velocity default unit",
+       "kind": "select",
+       "value": "Degree per second"
+      },
+      {
+       "label": "Angular velocity display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Mass default unit",
+       "kind": "select",
+       "value": "Pound"
+      },
+      {
+       "label": "Mass display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Density default unit",
+       "kind": "select",
+       "value": "Pound per cubic inch"
+      },
+      {
+       "label": "Density display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Force default unit",
+       "kind": "select",
+       "value": "Pound-force"
+      },
+      {
+       "label": "Force display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Frequency default unit",
+       "kind": "select",
+       "value": "Hertz"
+      },
+      {
+       "label": "Frequency display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Moment default unit",
+       "kind": "select",
+       "value": "Inch-pound"
+      },
+      {
+       "label": "Moment display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Pressure default unit",
+       "kind": "select",
+       "value": "Pound per square inch"
+      },
+      {
+       "label": "Pressure display decimals",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "Energy default unit",
+       "kind": "select",
+       "value": "Foot-pound force"
+      },
+      {
+       "label": "Energy display decimals",
+       "kind": "select",
+       "value": "0.123"
+      }
      ]
     },
     "dialogs": [],
@@ -655,6 +1099,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -699,7 +1170,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 74707
+   "t": 68031
   },
   {
    "step": 5,
@@ -761,6 +1232,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -805,7 +1303,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 80941
+   "t": 71502
   },
   {
    "step": 6,
@@ -922,6 +1420,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -966,7 +1491,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 85894
+   "t": 74124
   },
   {
    "step": 7,
@@ -1014,6 +1539,118 @@
       "Display decimals",
       "Energy default unit",
       "Display decimals"
+     ],
+     "fields": [
+      {
+       "label": "Length default unit",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Length display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Linear acceleration default unit",
+       "kind": "select",
+       "value": "Inch per second squared"
+      },
+      {
+       "label": "Linear acceleration display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Angle default unit",
+       "kind": "select",
+       "value": "Degree"
+      },
+      {
+       "label": "Angle display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Angular velocity default unit",
+       "kind": "select",
+       "value": "Degree per second"
+      },
+      {
+       "label": "Angular velocity display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Mass default unit",
+       "kind": "select",
+       "value": "Pound"
+      },
+      {
+       "label": "Mass display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Density default unit",
+       "kind": "select",
+       "value": "Pound per cubic inch"
+      },
+      {
+       "label": "Density display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Force default unit",
+       "kind": "select",
+       "value": "Pound-force"
+      },
+      {
+       "label": "Force display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Frequency default unit",
+       "kind": "select",
+       "value": "Hertz"
+      },
+      {
+       "label": "Frequency display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Moment default unit",
+       "kind": "select",
+       "value": "Inch-pound"
+      },
+      {
+       "label": "Moment display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Pressure default unit",
+       "kind": "select",
+       "value": "Pound per square inch"
+      },
+      {
+       "label": "Pressure display decimals",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "Energy default unit",
+       "kind": "select",
+       "value": "Foot-pound force"
+      },
+      {
+       "label": "Energy display decimals",
+       "kind": "select",
+       "value": "0.123"
+      }
      ]
     },
     "dialogs": [],
@@ -1065,6 +1702,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -1109,7 +1773,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 92238
+   "t": 77748
   }
  ]
 }
