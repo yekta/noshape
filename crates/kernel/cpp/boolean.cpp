@@ -118,6 +118,8 @@
 #include <math_Vector.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <ShapeFix_Edge.hxx>
+#include <Geom_Ellipse.hxx>
+#include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <BRep_Builder.hxx>
 #include <TColStd_PackedMapOfInteger.hxx>
 #include <NCollection_DataMap.hxx>
@@ -8963,6 +8965,121 @@ OpOut op_unify_edges(const OcShape& s)
 // tolerance reaching both old ends, as Parasolid leaves a blend's sliver end (c2-hunting-knife's Chamfer 1: a strip
 // 0.011 mm wide where the chamfer meets the slope ends in one vertex, live 2462's JZQ). Edges between two faces;
 // unchanged when the result isn't valid.
+// The edges with their middle within `tol` of one of `pts` lying within `tol` of one of `conics` (11 numbers each:
+// centre, normal, major axis direction, major and minor radius), rebuilt on it on the same vertices with their
+// pcurves anew: a blend's contact curves built as B-splines where they are conics (c2-hunting-knife's Fillet 3: a
+// rolling ball between a plane and a cylinder touches each along an ellipse, as live's). The shape unchanged where the
+// result isn't valid.
+OpOut op_canonical_edges(const OcShape& s, rust::Slice<const double> pts, rust::Slice<const double> conics, double tol)
+{
+  std::vector<gp_Pnt> at;
+  for (size_t i = 0; i + 2 < pts.size(); i += 3)
+    at.emplace_back(pts[i], pts[i + 1], pts[i + 2]);
+  std::vector<occ::handle<Geom_Curve>> candidates;
+  for (size_t i = 0; i + 10 < conics.size(); i += 11)
+  {
+    const double* q = &conics[i];
+    const gp_Ax2  ax(gp_Pnt(q[0], q[1], q[2]), gp_Dir(q[3], q[4], q[5]), gp_Dir(q[6], q[7], q[8]));
+    // (Only a true circle: live's tip contact on c2-hunting-knife, 3.5001 x 3.5, is an ellipse.)
+    if (q[9] - q[10] <= 1e-9 * q[9])
+      candidates.push_back(occ::handle<Geom_Curve>(new Geom_Circle(gp_Circ(ax, q[10]))));
+    else
+      candidates.push_back(occ::handle<Geom_Curve>(new Geom_Ellipse(gp_Elips(ax, q[9], q[10]))));
+  }
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  BRep_Builder                   B;
+  bool                           any = false;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const TopoDS_Edge e = TopoDS::Edge(ef.FindKey(i).Oriented(TopAbs_FORWARD));
+    if (BRep_Tool::Degenerated(e))
+      continue;
+    const BRepAdaptor_Curve c(e);
+    const GeomAbs_CurveType type = c.GetType();
+    if (type == GeomAbs_Line || type == GeomAbs_Circle || type == GeomAbs_Ellipse)
+      continue;
+    const double f0 = c.FirstParameter(), f1 = c.LastParameter();
+    const gp_Pnt mid = c.Value(0.5 * (f0 + f1));
+    if (std::none_of(at.begin(), at.end(), [&](const gp_Pnt& p) { return p.Distance(mid) <= tol; }))
+      continue;
+    bool seam = false;
+    for (const TopoDS_Shape& f : ef(i))
+      seam = seam || BRep_Tool::IsClosed(e, TopoDS::Face(f));
+    if (seam)
+      continue;
+    occ::handle<Geom_Curve> g;
+    for (const occ::handle<Geom_Curve>& cand : candidates)
+    {
+      bool on = true;
+      for (int k = 0; k <= 8 && on; ++k)
+      {
+        GeomAPI_ProjectPointOnCurve pr(c.Value(f0 + (f1 - f0) * k / 8.0), cand);
+        on = pr.NbPoints() > 0 && pr.LowerDistance() <= tol;
+      }
+      if (on)
+      {
+        g = occ::down_cast<Geom_Curve>(cand->Copy());
+        break;
+      }
+    }
+    if (g.IsNull())
+      continue;
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    GeomAPI_ProjectPointOnCurve p0(BRep_Tool::Pnt(v0), g), p1(BRep_Tool::Pnt(v1), g);
+    if (p0.NbPoints() == 0 || p1.NbPoints() == 0)
+      continue;
+    double a = p0.LowerDistanceParameter(), b = p1.LowerDistanceParameter();
+    // Along the old curve.
+    gp_Pnt q;
+    gp_Vec d, d_old;
+    g->D1(a, q, d);
+    c.D1(f0, q, d_old);
+    if (d.Dot(d_old) < 0)
+    {
+      a = g->ReversedParameter(a);
+      b = g->ReversedParameter(b);
+      g = g->Reversed();
+    }
+    while (b <= a)
+      b += g->Period();
+    const double gap = std::max(BRep_Tool::Pnt(v0).Distance(g->Value(a)), BRep_Tool::Pnt(v1).Distance(g->Value(b)));
+    const double te  = std::max(BRep_Tool::Tolerance(e), 1.5 * gap);
+    TopoDS_Edge  ne;
+    B.MakeEdge(ne, g, te);
+    // The vertices widened to reach the new curve's ends.
+    auto vertex = [&](const TopoDS_Vertex& v) {
+      const TopoDS_Shape fv = v.Oriented(TopAbs_FORWARD);
+      if (rs->IsRecorded(fv))
+        return TopoDS::Vertex(rs->Value(fv));
+      if (BRep_Tool::Tolerance(v) >= te)
+        return v;
+      TopoDS_Vertex nv;
+      B.MakeVertex(nv, BRep_Tool::Pnt(v), te);
+      rs->Replace(fv, nv);
+      return nv;
+    };
+    B.Add(ne, vertex(v0).Oriented(TopAbs_FORWARD));
+    B.Add(ne, vertex(v1).Oriented(TopAbs_REVERSED));
+    B.Range(ne, a, b);
+    ShapeFix_Edge fix;
+    for (const TopoDS_Shape& f : ef(i))
+      fix.FixAddPCurve(ne, TopoDS::Face(f), false, tol);
+    fix.FixSameParameter(ne);
+    fix.FixVertexTolerance(ne);
+    rs->Replace(e, ne);
+    any = true;
+  }
+  if (!any)
+    return make_result({s.shape}, s.shape, nullptr);
+  const TopoDS_Shape out = rs->Apply(s.shape);
+  if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+    return make_result({s.shape}, s.shape, nullptr);
+  return make_result({s.shape}, out, rs->History().get());
+}
+
 OpOut op_collapse_short_edges(const OcShape& s, rust::Slice<const double> pts, double len)
 {
   if (pts.size() % 3 != 0)

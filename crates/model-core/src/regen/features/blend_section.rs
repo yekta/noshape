@@ -156,14 +156,21 @@ fn chain(shape: &Shape, edges: &[usize]) -> FResult<Vec<ChainEdge>> {
     // Free ends: points used by exactly one edge.
     let ends: Vec<DVec3> = items.iter().flat_map(|it| [it.2, it.3]).collect();
     let count = |p: DVec3| ends.iter().filter(|q| near(**q, p)).count();
-    let mut start = items.iter().flat_map(|it| [it.2, it.3]).filter(|p| count(*p) == 1).fold(None, |m: Option<DVec3>, p| match m {
-        Some(q) if !lt(p, q) => Some(q),
-        _ => Some(p),
-    });
+    let first_free = |left: &[(usize, Shape, DVec3, DVec3, f64)]| {
+        left.iter().flat_map(|it| [it.2, it.3]).filter(|p| count(*p) == 1).fold(None, |m: Option<DVec3>, p| match m {
+            Some(q) if !lt(p, q) => Some(q),
+            _ => Some(p),
+        })
+    };
+    let mut start = first_free(&items);
     let mut out = Vec::new();
     let mut left = items;
     while !left.is_empty() {
-        let at = start.unwrap_or(left[0].2);
+        // (Several chains: each from its own free end.)
+        let at = match start.filter(|s| left.iter().any(|it| near(it.2, *s) || near(it.3, *s))) {
+            Some(s) => s,
+            None => first_free(&left).unwrap_or(left[0].2),
+        };
         let pos = left.iter().position(|it| near(it.2, at) || near(it.3, at)).unwrap_or(0);
         let (index, shape, a, b, length) = left.remove(pos);
         let forward = near(a, at) || !near(b, at);
@@ -557,6 +564,18 @@ pub fn partial_point(shape: &Shape, edges: &[usize], fraction: f64) -> Option<(D
 
 /// Blend `edges` of body `bi` with `spec` (see the module docs).
 pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec) -> FResult<()> {
+    sections(ev, bi, edges, spec, false)
+}
+
+/// A round of radius `r` whose sections on curved faces are exact rolling balls, one face per edge, running on past
+/// the chains' free ends until off the part (live c2-hunting-knife's Fillet 3: the tip's rolling-ball faces where
+/// OCCT's pinch, the corners' single faces trimmed by the side planes where OCCT's split in two).
+pub fn rolling_ball_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) -> FResult<()> {
+    let spec = BlendSpec { section: Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: false, cliff: false, sides: None, overflow: false, reference: None };
+    sections(ev, bi, edges, &spec, true)
+}
+
+fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball: bool) -> FResult<()> {
     use super::sheetmetal_util::{body_named, bool_named};
     let body = ev.ctx.bodies[bi].clone();
     let shape = &body.shape;
@@ -765,7 +784,30 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
     // Each cut's chain edge (its rim, for the direct build).
     let mut cut_edges: Vec<usize> = Vec::new();
     let mut refaced: Vec<(usize, Shape)> = Vec::new();
-    for &(lo, hi, held) in &ranges {
+    let mut conics = Vec::new();
+    if ball {
+        let (tools, contacts) = ball_tools(shape, &chain, &ef, &faces, spec.r1, scale)?;
+        conics = contacts;
+        for (ci, tool) in tools.into_iter().enumerate() {
+            let fs = &ef[chain[ci].index];
+            let supports = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+            let ename = body.edges[chain[ci].index].clone();
+            let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
+            let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
+            let names = tool
+                .faces()
+                .iter()
+                .map(|f| match super::helpers_a::point_on_face(f) {
+                    Some(q) if supports.iter().any(|s| s.contains_point(q, scale * 1e-6).unwrap_or(false)) => generated.clone(),
+                    Some(_) if f.is_planar() => generated.clone(),
+                    _ => blend.clone(),
+                })
+                .collect();
+            cuts.push(NamedShape::new(tool, names));
+            cut_edges.push(chain[ci].index);
+        }
+    }
+    for &(lo, hi, held) in ranges.iter().filter(|_| !ball) {
     if general || held {
         const N: usize = 64;
         let whole = (chain[0].start - chain[chain.len() - 1].end).length() < 1e-9 && lo <= 1e-12 && hi >= total - 1e-12;
@@ -1015,19 +1057,24 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
     }
     // Held blends (hold lines) built directly where they can be: the loft's sides only approximate a curved wall, and a
     // cut by them leaves slivers (c2-variable-fillet-faceblend's rounded ends).
-    if ranges.iter().any(|r| r.2) && adds.is_empty() && !cuts.is_empty() {
+    if (ball || ranges.iter().any(|r| r.2)) && adds.is_empty() && !cuts.is_empty() {
         let tools: Vec<Shape> = cuts.iter().map(|t| t.shape.clone()).collect();
         let rims = cut_edges.iter().map(|&e| shape.sub_shape(ShapeType::Edge, e)).collect::<Result<Vec<_>, _>>()?;
         match k::blend_direct(shape, &tools, &rims) {
             Ok(res) if res.shape.is_valid() && res.shape.count(ShapeType::Solid) == 1 => {
                 let names = body.shape_names();
                 let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&|n: &Name| Role::Blend(n.clone())));
-                ev.replace_body(bi, res.shape, face_names);
+                let (shape, face_names) = if ball { conic_contacts(ev, shape, &chain.iter().map(|c| c.shape.clone()).collect::<Vec<_>>(), &conics, res.shape, face_names, spec.r1)? } else { (res.shape, face_names) };
+                ev.replace_body(bi, shape, face_names);
                 return Ok(());
             }
             other => {
                 if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
                     eprintln!("section blend: direct build declined: {:?}", other.map(|r| (r.shape.is_valid(), r.shape.count(ShapeType::Solid))).map_err(|e| e.to_string()));
+                }
+                // (A rolling ball's sides only approximate its curved faces: a boolean by them leaves slivers.)
+                if ball {
+                    return Err(fail("the rolling balls' direct build declined"));
                 }
             }
         }
@@ -1079,6 +1126,401 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
     }
     ev.replace_body(bi, shape, names);
     Ok(())
+}
+
+/// A face a rolling ball touches; a plane or cylinder extended past the face's boundary (a ball running on past a
+/// chain's free end).
+#[derive(Clone)]
+enum Support {
+    Plane { o: DVec3, n: DVec3 },
+    Cylinder { o: DVec3, a: DVec3, r: f64, s: f64 },
+    Face(Shape, f64),
+}
+
+impl Support {
+    /// `inward`: the normal into the material at `p` on the face.
+    fn of(face: &Shape, p: DVec3, inward: DVec3) -> FResult<Support> {
+        Ok(match face.face_surface()? {
+            k::Surface::Plane(pl) => {
+                let n = pl.unit_normal();
+                Support::Plane { o: pl.origin, n: if n.dot(inward) < 0.0 { -n } else { n } }
+            }
+            k::Surface::Cylinder { origin, axis, radius, .. } => {
+                let a = axis.normalize();
+                let v = p - origin;
+                let s = if (v - a * v.dot(a)).dot(inward) < 0.0 { -1.0 } else { 1.0 };
+                Support::Cylinder { o: origin, a, r: radius, s }
+            }
+            _ => Support::Face(face.clone(), if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 }),
+        })
+    }
+
+    /// The point nearest `q` and the unit normal into the material there.
+    fn foot(&self, q: DVec3) -> FResult<(DVec3, DVec3)> {
+        Ok(match self {
+            Support::Plane { o, n } => (q - *n * (q - *o).dot(*n), *n),
+            Support::Cylinder { o, a, r, s } => {
+                let v = q - *o;
+                let along = *a * v.dot(*a);
+                let radial = (v - along).normalize_or_zero();
+                if radial == DVec3::ZERO {
+                    return Err(fail("a ball centred on a cylinder's axis"));
+                }
+                (*o + along + radial * *r, radial * *s)
+            }
+            Support::Face(f, s) => {
+                let pr = f.project_point(q)?;
+                (pr.point, f.normal_at_uv(pr.u, pr.v)?.normalize() * *s)
+            }
+        })
+    }
+}
+
+/// The ball of radius `r` inside the material touching both supports, its centre in the plane through `origin` across
+/// `normal`: its centre and contacts.
+fn rolling_ball(origin: DVec3, normal: DVec3, sup: &[Support; 2], r: f64, guess: DVec3) -> FResult<(DVec3, [DVec3; 2])> {
+    let t = normal.normalize();
+    let e1 = t.any_orthonormal_vector();
+    let e2 = t.cross(e1);
+    let mut c = guess - t * (guess - origin).dot(t);
+    for _ in 0..60 {
+        // (c - foot) · n = r on both, c = origin + a e1 + b e2 (each foot's tangent plane).
+        let row = |(f, n): (DVec3, DVec3)| (n.dot(e1), n.dot(e2), r + (f - origin).dot(n));
+        let ((a0, b0, r0), (a1, b1, r1)) = (row(sup[0].foot(c)?), row(sup[1].foot(c)?));
+        let det = a0 * b1 - a1 * b0;
+        if det.abs() < 1e-12 {
+            return Err(fail("the faces at the edge are tangent"));
+        }
+        let next = origin + e1 * ((r0 * b1 - r1 * b0) / det) + e2 * ((a0 * r1 - a1 * r0) / det);
+        let moved = (next - c).length();
+        c = next;
+        if moved < r * 1e-12 {
+            return Ok((c, [sup[0].foot(c)?.0, sup[1].foot(c)?.0]));
+        }
+    }
+    Err(fail("no rolling ball fits"))
+}
+
+/// A ball's section: the region between its arc (contact 0 to 1) and the edge, its sides on the supports (a line on a
+/// plane, an arc through three points on a curved face) from the contacts to the edge's point in the section's plane
+/// (the direct build's strips on the part's faces), as its wire (a loft's section; a face cost 0.8 ms). With its first
+/// vertex (for the loft).
+fn ball_section(c: DVec3, [t0, t1]: [DVec3; 2], sup: &[Support; 2], r: f64) -> FResult<(Shape, DVec3)> {
+    let (v0, v1) = ((t0 - c).normalize(), (t1 - c).normalize());
+    let half = v0.dot(v1).clamp(-1.0, 1.0).acos() / 2.0;
+    if half < 1e-6 || half > std::f64::consts::FRAC_PI_2 - 1e-6 {
+        return Err(fail("the faces at the edge are tangent"));
+    }
+    let n = v0.cross(v1).normalize();
+    let in_plane = |x: DVec3| x - n * (x - c).dot(n);
+    // The edge's point: on both supports, in the plane (Newton from the tangent lines' corner).
+    let mut p = c + (v0 + v1).normalize() * (r / half.cos());
+    for _ in 0..40 {
+        let ((f0, n0), (f1, n1)) = (sup[0].foot(p)?, sup[1].foot(p)?);
+        let (d0, d1) = ((p - f0).dot(n0), (p - f1).dot(n1));
+        let (g0, g1) = (in_plane(c + n0) - c, in_plane(c + n1) - c);
+        // Solve g0·x = -d0, g1·x = -d1 for x in the plane (spanned by g0, g1).
+        let (a, b, e) = (g0.dot(g0), g0.dot(g1), g1.dot(g1));
+        let det = a * e - b * b;
+        if det.abs() < 1e-24 {
+            return Err(fail("the faces at the edge are tangent"));
+        }
+        let (k0, k1) = ((-d0 * e + d1 * b) / det, (-d1 * a + d0 * b) / det);
+        let step = g0 * k0 + g1 * k1;
+        p += step;
+        if step.length() < r * 1e-13 {
+            break;
+        }
+    }
+    let side = |s: &Support, from: DVec3, to: DVec3| -> FResult<Shape> {
+        if matches!(s, Support::Plane { .. }) {
+            return Ok(k::make_line(from, to)?);
+        }
+        let mut m = (from + to) / 2.0;
+        for _ in 0..20 {
+            m = in_plane(s.foot(m)?.0);
+        }
+        // (A cylinder cut along its axis: straight.)
+        if (m - (from + to) / 2.0).length() < (to - from).length() * 1e-5 {
+            return Ok(k::make_line(from, to)?);
+        }
+        Ok(k::make_arc_3pts(from, m, to)?)
+    };
+    let arc = k::make_arc_3pts(t0, c + (v0 + v1).normalize() * r, t1)?;
+    Ok((k::make_wire(&[side(&sup[0], p, t0)?, arc, side(&sup[1], t1, p)?])?, p))
+}
+
+/// A shared ball's section with its contacts in the order of `own` (an edge's own contacts there).
+fn ball_section_as(shared: &(DVec3, [DVec3; 2]), own: [DVec3; 2], sup: &[Support; 2], r: f64) -> FResult<(Shape, DVec3)> {
+    let (c, [a, b]) = *shared;
+    let swap = (a - own[1]).length() + (b - own[0]).length() < (a - own[0]).length() + (b - own[1]).length();
+    ball_section(c, if swap { [b, a] } else { [a, b] }, sup, r)
+}
+
+/// One chain edge's rolling ball: its supports, the normals into the material at its middle, and whether it is a line
+/// between planes (its round a cylinder: one section extruded).
+struct BallEdge {
+    faces: [usize; 2],
+    sup: [Support; 2],
+    inward: DVec3,
+    straight: bool,
+}
+
+fn ball_edge(shape: &Shape, c: &ChainEdge, faces: [usize; 2], ff: [&Shape; 2], scale: f64) -> FResult<BallEdge> {
+    let info = c.shape.edge_info()?;
+    // (Oriented where the classifier answers: at the middle of c2-hunting-knife's corner edge it didn't.)
+    for f in [0.5, 0.3, 0.7] {
+        let t = info.first_param + (info.last_param - info.first_param) * f;
+        let (p, tangent) = (c.shape.point_at(t)?, c.shape.tangent_at(t)?.normalize());
+        let Ok(fr) = frame_at(shape, ff, p, tangent, scale) else { continue };
+        if fr.u[0].dot(fr.m[1]) <= 0.0 {
+            return Err(fail("a concave edge's rolling ball"));
+        }
+        let sup = [Support::of(ff[0], p, fr.m[0])?, Support::of(ff[1], p, fr.m[1])?];
+        let straight = matches!(info.curve, k::Curve::Line { .. }) && sup.iter().all(|s| matches!(s, Support::Plane { .. }));
+        return Ok(BallEdge { faces, sup, inward: (fr.m[0] + fr.m[1]).normalize(), straight });
+    }
+    Err(fail("could not orient a face at the edge"))
+}
+
+/// The ball where two chain edges meet whose faces other than a common one are tangent along an edge there (a line's
+/// plane running on into a round): the ball touching the common face and that edge, the boundary between the two
+/// edges' rounds (live's circle KjpB between c2-hunting-knife's spine round and corner face). None otherwise.
+fn tangency_ball(shape: &Shape, ef: &[Vec<u32>], [a, b]: [&BallEdge; 2], q: DVec3, r: f64, scale: f64) -> FResult<Option<(DVec3, [DVec3; 2])>> {
+    let common: Vec<usize> = a.faces.iter().copied().filter(|f| b.faces.contains(f)).collect();
+    let [s] = common[..] else { return Ok(None) };
+    let (ks, kp) = if a.faces[0] == s { (0, 1) } else { (1, 0) };
+    let p = a.faces[kp];
+    let Some(qf) = b.faces.iter().copied().find(|f| *f != s) else { return Ok(None) };
+    // Their common edge through the vertex.
+    let found = ef.iter().enumerate().find_map(|(e, fs)| {
+        let pair = fs.len() == 2 && ((fs[0] as usize == p && fs[1] as usize == qf) || (fs[0] as usize == qf && fs[1] as usize == p));
+        let edge = shape.sub_shape(ShapeType::Edge, e).ok().filter(|_| pair)?;
+        let info = edge.edge_info().ok()?;
+        let t = if (info.start - q).length() < scale * 1e-9 || (info.end - q).length() < scale * 1e-9 {
+            if (edge.point_at(info.first_param).ok()? - q).length() < scale * 1e-9 { info.first_param } else { info.last_param }
+        } else {
+            return None;
+        };
+        Some((edge, t, (info.last_param - info.first_param).abs()))
+    });
+    let Some((edge, mut t, span)) = found else { return Ok(None) };
+    let ball_at = |t: f64| -> FResult<(f64, DVec3, DVec3)> {
+        let g = edge.point_at(t)?;
+        let c = g + a.sup[kp].foot(g)?.1 * r;
+        let (f, n) = a.sup[ks].foot(c)?;
+        Ok(((c - f).dot(n) - r, c, g))
+    };
+    let h = span * 1e-6;
+    for _ in 0..30 {
+        let (f, c, g) = ball_at(t)?;
+        if f.abs() < r * 1e-12 {
+            let touch = a.sup[ks].foot(c)?.0;
+            return Ok(Some((c, if ks == 0 { [touch, g] } else { [g, touch] })));
+        }
+        let slope = (ball_at(t + h)?.0 - f) / h;
+        if slope.abs() < 1e-300 {
+            return Ok(None);
+        }
+        t -= f / slope;
+    }
+    Ok(None)
+}
+
+/// The cutting tools of a convex chain's rolling-ball round, one per edge: a line between planes one section extruded,
+/// other edges a loft of exact ball sections (more where the edge turns). Two edges meeting share one section there
+/// (the straight edge's), so their tools meet exactly; at a free end the ball rolls on along its supports until it is
+/// off the part.
+fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shape], r: f64, scale: f64) -> FResult<(Vec<Shape>, Vec<k::Conic>)> {
+    let near = |a: DVec3, b: DVec3| (a - b).length() < scale * 1e-9;
+    let edges = chain
+        .iter()
+        .map(|c| {
+            let fs = ef.get(c.index).filter(|f| f.len() == 2).ok_or_else(|| fail("the edge doesn't have two faces"))?;
+            ball_edge(shape, c, [fs[0] as usize, fs[1] as usize], [&faces[fs[0] as usize], &faces[fs[1] as usize]], scale)
+        })
+        .collect::<FResult<Vec<_>>>()?;
+    // The ball at a chain vertex shared by two edges; None at a free end.
+    let junction = |q: DVec3| -> FResult<Option<(DVec3, [DVec3; 2])>> {
+        let at: Vec<(usize, bool)> = chain.iter().enumerate().filter_map(|(i, c)| if near(c.start, q) { Some((i, true)) } else if near(c.end, q) { Some((i, false)) } else { None }).collect();
+        if at.len() != 2 {
+            return Ok(None);
+        }
+        let (i, is_start) = at.iter().copied().find(|(i, _)| edges[*i].straight).unwrap_or(at[0]);
+        let j = if at[0].0 == i { at[1].0 } else { at[0].0 };
+        if let Some(b) = tangency_ball(shape, ef, [&edges[i], &edges[j]], q, r, scale)? {
+            return Ok(Some(b));
+        }
+        Ok(Some(rolling_ball(q, tangent_dir(&chain[i], is_start)?, &edges[i].sup, r, q + edges[i].inward * r)?))
+    };
+    // A section off the part: its corners and their middle outside.
+    let off = |wire: &Shape| -> FResult<bool> {
+        let out = |p: DVec3| shape.classify_point(p, scale * 1e-9).is_ok_and(|k| k == k::PointClass::Outside);
+        let corners: Vec<DVec3> = wire.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect();
+        Ok(!corners.is_empty() && corners.iter().all(|p| out(*p)) && out(corners.iter().sum::<DVec3>() / corners.len() as f64))
+    };
+    // Each edge's tool on its own (in parallel: c2-hunting-knife's six lofts took 200 ms one after another).
+    let build = |c: &ChainEdge, e: &BallEdge| -> FResult<Shape> {
+        let ends = [junction(c.start)?, junction(c.end)?];
+        let outs = [-tangent_dir(c, true)?, tangent_dir(c, false)?];
+        let rolls_on = |end: usize| ends[end].is_none() && !tangent_continues(shape, if end == 0 { c.start } else { c.end }, outs[end], c.index);
+        if e.straight {
+            let d = (c.end - c.start).normalize();
+            let ball = |q: DVec3| rolling_ball(q, d, &e.sup, r, q + e.inward * r);
+            let section = |q: DVec3| -> FResult<(Shape, DVec3)> {
+                let (c, t) = ball(q)?;
+                ball_section(c, t, &e.sup, r)
+            };
+            // Run on past a free end until the section is off the part.
+            let mut ext = [0.0f64; 2];
+            for end in 0..2 {
+                if !rolls_on(end) {
+                    continue;
+                }
+                let q = if end == 0 { c.start } else { c.end };
+                for k in 1..=12 {
+                    ext[end] = 0.5 * r * k as f64;
+                    if off(&section(q + outs[end] * ext[end])?.0)? {
+                        break;
+                    }
+                }
+            }
+            // From the ball at its start to the one at its end (a junction's ball off the vertex's plane).
+            let s0 = match &ends[0] {
+                Some(j) => (j.0 - c.start).dot(d),
+                None => -ext[0],
+            };
+            let s1 = match &ends[1] {
+                Some(j) => (j.0 - c.start).dot(d),
+                None => (c.end - c.start).dot(d) + ext[1],
+            };
+            let (first, _) = match &ends[0] {
+                Some(j) => ball_section_as(j, ball(c.start + d * s0)?.1, &e.sup, r)?,
+                None => section(c.start + d * s0)?,
+            };
+            return Ok(k::extrude(&k::make_face_from_wire(&first, true)?, d * (s1 - s0))?.shape);
+        }
+        let info = c.shape.edge_info()?;
+        let at = |f: f64| -> FResult<(DVec3, DVec3)> {
+            let t = info.first_param + (info.last_param - info.first_param) * if c.forward { f } else { 1.0 - f };
+            Ok((c.shape.point_at(t)?, c.shape.tangent_at(t)?.normalize()))
+        };
+        let mut turn = 0.0;
+        let mut prev = at(0.0)?.1;
+        for i in 1..=32 {
+            let t = at(i as f64 / 32.0)?.1;
+            turn += prev.dot(t).clamp(-1.0, 1.0).acos();
+            prev = t;
+        }
+        let closed = near(c.start, c.end);
+        let n = ((turn / 0.05).ceil() as usize).clamp(8, 240);
+        let (mut secs, mut starts, mut centres) = (Vec::new(), Vec::new(), Vec::new());
+        let mut guess = at(0.0)?.0 + e.inward * r;
+        for k in 0..if closed { n } else { n + 1 } {
+            let f = if closed { (k as f64 / n as f64 + 0.25).fract() } else { k as f64 / n as f64 };
+            let (p, t) = at(f)?;
+            let (centre, touch) = rolling_ball(p, t, &e.sup, r, guess)?;
+            guess = centre;
+            centres.push(centre);
+            let shared = if closed { None } else if k == 0 { ends[0].as_ref() } else if k == n { ends[1].as_ref() } else { None };
+            let (face, start) = match shared {
+                Some(j) => ball_section_as(j, touch, &e.sup, r)?,
+                None => ball_section(centre, touch, &e.sup, r)?,
+            };
+            secs.push(face);
+            starts.push(start);
+        }
+        // Past a free end the ball rolls on along the supports' surfaces, each station a step on from the last centre.
+        let extends = e.sup.iter().all(|s| !matches!(s, Support::Face(..)));
+        for (end, out) in outs.into_iter().enumerate() {
+            if closed || !extends || !rolls_on(end) {
+                continue;
+            }
+            let (mut last, mut dir) = (if end == 0 { centres[0] } else { centres[centres.len() - 1] }, out);
+            let (mut more, mut more_starts) = (Vec::new(), Vec::new());
+            for _ in 0..12 {
+                let q = last + dir * (0.5 * r);
+                let (centre, touch) = rolling_ball(q, dir, &e.sup, r, q)?;
+                let (face, start) = ball_section(centre, touch, &e.sup, r)?;
+                dir = (centre - last).normalize();
+                last = centre;
+                let done = off(&face)?;
+                more.push(face);
+                more_starts.push(start);
+                if done {
+                    break;
+                }
+            }
+            if end == 0 {
+                more.reverse();
+                more_starts.reverse();
+                secs.splice(0..0, more);
+                starts.splice(0..0, more_starts);
+            } else {
+                secs.extend(more);
+                starts.extend(more_starts);
+            }
+        }
+        let tool = k::loft(&secs, &k::LoftOptions { solid: true, closed, start_points: Some(starts), ..Default::default() })?;
+        if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+            eprintln!("ball loft: {} sections ({n} on the edge, turning {turn:.3}): valid {} volume {:?}", secs.len(), tool.shape.is_valid(), tool.shape.volume());
+        }
+        Ok(tool.shape)
+    };
+    use rayon::prelude::*;
+    let legacy = k::kernel_legacy();
+    let tools = chain.par_iter().zip(edges.par_iter()).map(|(c, e)| k::with_kernel_legacy(legacy.clone(), || build(c, e))).collect::<FResult<Vec<_>>>()?;
+    let conics = edges.iter().flat_map(|e| plane_cylinder_contacts(&e.sup, r)).collect();
+    Ok((tools, conics))
+}
+
+/// The contact curves of a ball of radius `r` rolling between a plane and a cylinder: the plane offset by `r` meets the
+/// cylinder offset by `r` along the ball's centres, an ellipse; its contact with the plane is that ellipse moved onto
+/// the plane, its contact with the cylinder (radially in) the cylinder's section by a plane through the same axis
+/// point, tilted R'/R as much (live c2-hunting-knife's Jjt: 3.015587 x 3). None where the plane runs along the axis.
+fn plane_cylinder_contacts(sup: &[Support; 2], r: f64) -> Vec<k::Conic> {
+    let (plane, cyl) = match sup {
+        [p @ Support::Plane { .. }, c @ Support::Cylinder { .. }] | [c @ Support::Cylinder { .. }, p @ Support::Plane { .. }] => (p, c),
+        _ => return Vec::new(),
+    };
+    let (Support::Plane { o: po, n }, Support::Cylinder { o: co, a, r: rc, s }) = (plane, cyl) else { return Vec::new() };
+    let na = n.dot(*a);
+    if na.abs() < 1e-9 {
+        return Vec::new();
+    }
+    let spine = rc + s * r;
+    let o = *co + *a * ((*po + *n * r - *co).dot(*n) / na);
+    let ellipse = |centre: DVec3, normal: DVec3, minor: f64| {
+        let normal = normal.normalize();
+        let along = *a - normal * a.dot(normal);
+        let major_dir = if along.length() < 1e-12 { normal.any_orthonormal_vector() } else { along.normalize() };
+        k::Conic { centre, normal, major_dir, major: minor / a.dot(normal).abs(), minor }
+    };
+    let tilted = (*n - *a * na) * (spine / rc) + *a * na;
+    vec![ellipse(o - *n * r, *n, spine), ellipse(o, tilted, *rc)]
+}
+
+/// A rolling ball's new edges on the result rebuilt as the conics they are (`conics`, its contacts with planes and
+/// cylinders: live's contact edges of c2-hunting-knife's Fillet 3), within 0.004 r.
+fn conic_contacts(ev: &EvalCtx, before: &Shape, chain: &[Shape], conics: &[k::Conic], shape: Shape, names: Vec<Name>, r: f64) -> FResult<(Shape, Vec<Name>)> {
+    let old = before.edges();
+    let near_chain = |p: DVec3| k::make_vertex(p).is_ok_and(|v| chain.iter().any(|c| k::distance(&v, c).is_ok_and(|d| d.distance < 4.0 * r)));
+    let mids: Vec<DVec3> = shape
+        .edges()
+        .iter()
+        .filter(|e| !old.iter().any(|o| o.is_same(e)))
+        .filter_map(|e| {
+            let i = e.edge_info().ok()?;
+            e.point_at(0.5 * (i.first_param + i.last_param)).ok()
+        })
+        .filter(|p| near_chain(*p))
+        .collect();
+    if mids.is_empty() || conics.is_empty() {
+        return Ok((shape, names));
+    }
+    let res = k::canonical_edges(&shape, &mids, conics, 0.004 * r)?;
+    let names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &res.history, &res.shape, &BTreeMap::new(), None);
+    Ok((res.shape, names))
 }
 
 /// The radius a hold line sets at a station: the circle touching the face the hold line is on at its crossing of the
@@ -2959,4 +3401,43 @@ pub fn chamfer_offsets(shape: &Shape, e: usize, faces: [&Shape; 2], chamfer: Cha
         return Ok(None);
     }
     Ok(Some(Some([curves[0](x[0]).0.length(), curves[1](x[1]).0.length()])))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Support, plane_cylinder_contacts, rolling_ball};
+    use glam::DVec3;
+
+    /// Live c2-hunting-knife's Fillet 3 (mm): the 0.5 ball between the bottom plane and the R3 cove, and its contacts'
+    /// ellipses: Kj1B on the plane 3.502620 x 3.5, KjtB on the cove 3.003056 x 3 (and the top's Jj1 3.513369, Jjt
+    /// 3.015587).
+    #[test]
+    fn a_rolling_ball_between_a_plane_and_a_cylinder_touches_both_along_live_ellipses() {
+        let axis = DVec3::new(4.768546, -4.899886, 0.0);
+        let cove = Support::Cylinder { o: axis, a: DVec3::Z, r: 3.0, s: 1.0 };
+        for (point, outward, majors) in [
+            (DVec3::new(2.828121, -2.0, -10.390551), DVec3::new(0.038671, 0.0, -0.999252), (3.502620, 3.003056)),
+            (DVec3::new(2.852363, -2.0, 5.250451), DVec3::new(0.087156, 0.0, 0.996195), (3.513369, 3.015587)),
+        ] {
+            let n = -outward.normalize();
+            let plane = Support::Plane { o: point, n };
+            let sup = [plane, cove.clone()];
+            // Across the edge (the plane's line on the cove) halfway along it.
+            let round = axis + DVec3::new(-0.4, 2.973, 0.0).normalize() * 3.0;
+            let on_edge = round.with_z(point.z - n.x * (round.x - point.x) / n.z);
+            let tangent = DVec3::Z.cross(on_edge - axis).normalize();
+            let (c, [t0, t1]) = rolling_ball(on_edge, tangent, &sup, 0.5, on_edge + (n + (on_edge - axis).with_z(0.0).normalize()) * 0.3).unwrap();
+            assert!(((c - point).dot(n) - 0.5).abs() < 1e-9, "the ball's centre is off the plane by {}", (c - point).dot(n));
+            assert!(((c - axis).with_z(0.0).length() - 3.5).abs() < 1e-9);
+            let conics = plane_cylinder_contacts(&sup, 0.5);
+            assert_eq!(conics.len(), 2);
+            assert!((conics[0].major - majors.0).abs() < 2e-6 && (conics[0].minor - 3.5).abs() < 1e-9, "{:?}", conics[0]);
+            assert!((conics[1].major - majors.1).abs() < 2e-6 && (conics[1].minor - 3.0).abs() < 1e-9, "{:?}", conics[1]);
+            for (t, e) in [(t0, &conics[0]), (t1, &conics[1])] {
+                let v = t - e.centre;
+                let (x, y) = (v.dot(e.major_dir), v.dot(e.normal.cross(e.major_dir)));
+                assert!(v.dot(e.normal).abs() < 1e-9 && ((x / e.major).powi(2) + (y / e.minor).powi(2) - 1.0).abs() < 1e-9, "a contact off its ellipse: {t:?}");
+            }
+        }
+    }
 }

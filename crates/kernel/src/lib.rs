@@ -60,7 +60,7 @@ pub use noshape_brep::nurbs::NurbsSurface;
 pub use brep_bridge::{brep_body, last_blend_decline, last_rust_decline, reset_blend_decline, set_rust_blend, set_rust_boolean, set_rust_boolean_only, with_occt_boolean};
 pub use boolean::{
     BooleanOp, BooleanOptions, Glue, boolean, common, cut, fuse, fuse_all, imprint, imprint_kept, mark_kept_edges, project_curves, section,
-    kernel_profile_mark, last_boolean_path, set_kernel_profile, last_unify_path, section_caps, set_parallel_booleans, section_plane, section_wires, split, split_by_plane, split_on, unify_same_domain, unify_same_domain_whole, join_edges, join_edges_at, collapse_short_edges, join_target_seam_splits, unify_edges, with_blend_budget, with_call_budget, with_section_work, last_section_work, with_cancel, with_deadline, thread_cancelled, DeclineMemo, DeclineScope,
+    kernel_profile_mark, last_boolean_path, set_kernel_profile, last_unify_path, section_caps, set_parallel_booleans, section_plane, section_wires, split, split_by_plane, split_on, unify_same_domain, unify_same_domain_whole, join_edges, join_edges_at, collapse_short_edges, canonical_edges, Conic, join_target_seam_splits, unify_edges, with_blend_budget, with_call_budget, with_section_work, last_section_work, with_cancel, with_deadline, thread_cancelled, DeclineMemo, DeclineScope,
 };
 pub use construct::*;
 pub use error::{KernelError, Result};

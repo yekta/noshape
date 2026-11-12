@@ -462,6 +462,26 @@ pub fn collapse_short_edges(shape: &Shape, points: &[DVec3], len: f64) -> Result
     Ok(OpResult::from_ffi(ck(ffi::op_collapse_short_edges(shape.raw(), &flat, len))?))
 }
 
+/// A conic: an ellipse (a circle where its radii are equal) in the plane through `centre` across `normal`, its major
+/// axis along `major_dir`.
+#[derive(Debug, Clone, Copy)]
+pub struct Conic {
+    pub centre: DVec3,
+    pub normal: DVec3,
+    pub major_dir: DVec3,
+    pub major: f64,
+    pub minor: f64,
+}
+
+/// The edges with their middle within `tol` of one of `points` lying within `tol` of one of `conics` rebuilt on it, on
+/// the same vertices (a blend's contact curves built as B-splines where they are conics); the shape unchanged where
+/// the result isn't valid.
+pub fn canonical_edges(shape: &Shape, points: &[DVec3], conics: &[Conic], tol: f64) -> Result<OpResult> {
+    let flat: Vec<f64> = points.iter().flat_map(|p| [p.x, p.y, p.z]).collect();
+    let cs: Vec<f64> = conics.iter().flat_map(|c| [c.centre.x, c.centre.y, c.centre.z, c.normal.x, c.normal.y, c.normal.z, c.major_dir.x, c.major_dir.y, c.major_dir.z, c.major, c.minor]).collect();
+    Ok(OpResult::from_ffi(ck(ffi::op_canonical_edges(shape.raw(), &flat, &cs, tol))?))
+}
+
 pub fn join_edges_at(shape: &Shape, points: &[DVec3], tol: f64) -> Result<OpResult> {
     let flat: Vec<f64> = points.iter().flat_map(|p| [p.x, p.y, p.z]).collect();
     Ok(OpResult::from_ffi(ck(ffi::op_join_edges_at(shape.raw(), &flat, tol))?))

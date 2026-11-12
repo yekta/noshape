@@ -469,6 +469,15 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             Err(_) if !width && ev.bool("allowEdgeOverflow") && all_lines(&shapes) && super::blend_section::section_blend(ev, bi, &edges, &super::blend_section::BlendSpec { overflow: true, ..unpropagated(radius) }).is_ok() => continue,
             Err(e) => return Err(fillet_failed(e)),
         };
+        // OCCT's round of an edge in several faces (a tip's pinched at its apex, a corner's split where it runs past the
+        // chain's end): rolling balls, one face per edge as live's (c2-hunting-knife's Fillet 3).
+        if !width && split_blends(&res) {
+            match super::blend_section::rolling_ball_blend(ev, bi, &edges, radius) {
+                Ok(()) => continue,
+                Err(e) if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() => eprintln!("rolling balls declined: {}", e.message),
+                Err(_) => {}
+            }
+        }
         let t1 = std::time::Instant::now();
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
@@ -490,6 +499,15 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         log::debug!("fillet: kernel {:?}, naming {:?}, body {:?} (history records {})", t1 - t0, t2 - t1, t2.elapsed(), res.history.records.len());
     }
     Ok(())
+}
+
+/// Whether OCCT's fillet left some edge's round in more than one face.
+fn split_blends(res: &k::OpResult) -> bool {
+    let mut made: BTreeMap<u32, usize> = BTreeMap::new();
+    for r in res.history.records.iter().filter(|r| r.relation == k::Relation::Generated && r.input_kind == ShapeType::Edge && r.output_kind == ShapeType::Face) {
+        *made.entry(r.input_index).or_default() += 1;
+    }
+    made.values().any(|n| *n > 1)
 }
 
 /// Whether every edge is a straight line.
