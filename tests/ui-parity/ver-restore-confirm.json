@@ -1,0 +1,33 @@
+{
+ "name": "ver-restore-confirm",
+ "about": "V1 › Restore to Main…, then Restore: Main back to V1 (Extrude 2 gone) and a Restore entry in the history",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Restore to Main…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  }
+ ]
+}

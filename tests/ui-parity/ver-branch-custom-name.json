@@ -1,0 +1,35 @@
+{
+ "name": "ver-branch-custom-name",
+ "about": "V1 › Branch to create workspace…, type a name over B2, Enter: the new workspace opens under that name",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Branch to create workspace…"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Feature work"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

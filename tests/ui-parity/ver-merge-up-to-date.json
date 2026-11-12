@@ -1,0 +1,45 @@
+{
+ "name": "ver-merge-up-to-date",
+ "about": "merge B1, then B1's Merge into current workspace… again: Main is already up to date with B1",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Merge"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  }
+ ]
+}

@@ -1,0 +1,43 @@
+{
+ "name": "ver-merge-row-menu",
+ "about": "after merging B1, the Merge from B1 row's menu",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Merge"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "Merge from B1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

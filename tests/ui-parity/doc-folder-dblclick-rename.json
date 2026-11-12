@@ -1,0 +1,28 @@
+{
+ "name": "doc-folder-dblclick-rename",
+ "about": "double-click the Folder 1 chip on the tab bar, type, Enter: renamed inline (or opened)",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "doc_tab": "Folder 1"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Fixtures"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "name": "ver-show-changes-hide",
+ "about": "Main's Show changes… then the same link again (Hide changes…): the list closes",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show changes:Main"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show changes:Main"
+   }
+  }
+ ]
+}

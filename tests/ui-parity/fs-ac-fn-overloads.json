@@ -1,0 +1,41 @@
+{
+ "name": "fs-ac-fn-overloads",
+ "about": "inside a function type qCreatedBy: one row per overload; Down, Enter inserts the second",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "code": "println"
+   }
+  },
+  {
+   "do": "key",
+   "key": "End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "type",
+   "text": "qCreatedBy"
+  },
+  {
+   "do": "key",
+   "key": "ArrowDown"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

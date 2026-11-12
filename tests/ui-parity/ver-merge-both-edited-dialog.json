@@ -1,0 +1,39 @@
+{
+ "name": "ver-merge-both-edited-dialog",
+ "about": "Extrude 2 suppressed in Main, then B1's Merge into current workspace…: Part Studio 1 edited on both sides, the Merge changes card",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Suppress"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  }
+ ]
+}

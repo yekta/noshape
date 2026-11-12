@@ -1,0 +1,27 @@
+{
+ "name": "doc-nested-folder-to-parent",
+ "about": "in Folder 1, Folder 2's menu › Move to parent folder: Folder 2 to the root",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-nested",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Folder 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move to parent folder"
+   }
+  }
+ ]
+}

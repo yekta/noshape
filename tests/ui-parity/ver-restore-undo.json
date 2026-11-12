@@ -1,0 +1,39 @@
+{
+ "name": "ver-restore-undo",
+ "about": "restore Main to V1, then the toolbar's Undo",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Restore to Main…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Undo"
+   }
+  }
+ ]
+}

@@ -1,0 +1,29 @@
+{
+ "name": "ver-search-no-results",
+ "about": "Search history 'zzz' + Enter: No changes found",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Search history"
+   }
+  },
+  {
+   "do": "type",
+   "text": "zzz"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

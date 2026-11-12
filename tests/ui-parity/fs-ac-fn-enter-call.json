@@ -1,0 +1,41 @@
+{
+ "name": "fs-ac-fn-enter-call",
+ "about": "inside a function type opExtrude, Enter inserts the whole call with its first value selected, Tab moves to the next stop",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "code": "println"
+   }
+  },
+  {
+   "do": "key",
+   "key": "End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "type",
+   "text": "opExtrude"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  }
+ ]
+}

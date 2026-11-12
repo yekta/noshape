@@ -1,0 +1,29 @@
+{
+ "name": "ver-history-keyboard",
+ "about": "click V1's row, then ArrowDown and Enter: whether the history list moves by key",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "ArrowDown"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "prefs-labs-consent-cancel",
+ "about": "Onshape Labs: tick the checkbox, the consent modal, Cancel: stays unticked",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Onshape Labs › Enable users to access experimental, proof of concept features."
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

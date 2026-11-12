@@ -1,0 +1,27 @@
+{
+ "name": "doc-folder-unpack-open",
+ "about": "in Folder 1, its crumb's menu › Unpack: the bar back at the root with Part Studio 3 loose",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "crumb": "Folder 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Unpack"
+   }
+  }
+ ]
+}

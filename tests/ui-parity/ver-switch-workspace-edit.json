@@ -1,0 +1,39 @@
+{
+ "name": "ver-switch-workspace-edit",
+ "about": "switch to B1, suppress its Extrude 3, back to Main: Main untouched, B1's row moved up with the edit",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 3"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Suppress"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "Main"
+   }
+  }
+ ]
+}

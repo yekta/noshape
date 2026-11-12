@@ -1,0 +1,37 @@
+{
+ "name": "ver-search-clear",
+ "about": "search V1 + Enter, then select all and Backspace: the full graph again",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Search history"
+   }
+  },
+  {
+   "do": "type",
+   "text": "V1"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "key",
+   "key": "Backspace"
+  }
+ ]
+}

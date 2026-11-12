@@ -49,8 +49,18 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   another pending candidate. Not applicable locally: Require approval from all approvers (one possible approver),
   Restrict approvers (no users), Prevent if an item has a pending task (tasks are cloud), approval delegation, admin
   overrides, sharing with approvers.
-- Not done: "Discard Release candidate" (live's string: "The Release candidate will be discarded and all items will be
-  returned to their initial states."), "Approved by / Rejected by <name>" lines, Comments.
+- Then (11-12 11:13): Discard (a Pending or Rejected candidate's Discard, live's confirmation "Discard Release candidate"
+  / "The Release candidate will be discarded and all items will be returned to their initial states."; state
+  Discarded), "Approved by / Rejected by <name>" in the title row (`Package::decided_by`), Comments (the dialog's
+  Comments view with "Back to Release properties"; `Package::comments`, local), Delete draft's confirmation ("Delete
+  release candidate draft?"). Ops release_discard, release_comment.
+- Gap audit (lead 11-12): 34 scenarios (source "studios 11-12 (gap audit)") for merges with both sides edited, a
+  version merged, merge + Undo, restore confirmed / its cards / + Undo, branches with names and versions on them, history
+  search and keys, tab folders and the Tab manager's folder rows, Feature Studio autocomplete inside a function body,
+  Monitor ▾ profile stop, Preferences' shortcut tabs and Labs. All run on ours; live asked (REQUESTS 10:36). Missing
+  marks the audit found: the merge notice's "Revert to before this merge" link (os_ui.rs:541), the Co-complete switch
+  (feature_studio.rs:1473), the Tab manager's Sort rows (tab_manager.rs:690). ver-crow-restore clicks a change row's
+  "Restore to Main…", which ours leaves out on purpose (live 2351).
 
 ### 2026-11-12 07:33 UTC: release management against Onshape's help (lead 11-12; behaviours "lead (2026-11-11 02:15 UTC)")
 Audited field by field (release-ui, ops release, drawing revision table). Present: entry points (Parts list, tab

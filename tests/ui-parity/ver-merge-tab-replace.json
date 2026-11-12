@@ -1,0 +1,52 @@
+{
+ "name": "ver-merge-tab-replace",
+ "about": "both sides edited Part Studio 1; its tab strategy set to Replace with B1, Merge: Main's suppression lost",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Suppress"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part Studio 1",
+    "pick": "Replace with B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Merge"
+   }
+  }
+ ]
+}

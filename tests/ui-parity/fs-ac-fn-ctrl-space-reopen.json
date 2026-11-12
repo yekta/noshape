@@ -1,0 +1,41 @@
+{
+ "name": "fs-ac-fn-ctrl-space-reopen",
+ "about": "inside a function type opExt, Escape closes the list, Ctrl+Space opens it again",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "code": "println"
+   }
+  },
+  {
+   "do": "key",
+   "key": "End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "type",
+   "text": "opExt"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "ctrl+space"
+  }
+ ]
+}

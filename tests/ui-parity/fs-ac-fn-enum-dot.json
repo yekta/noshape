@@ -1,0 +1,45 @@
+{
+ "name": "fs-ac-fn-enum-dot",
+ "about": "inside a function type EntityType. : its values in declaration order; Down twice, Enter inserts the third",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "code": "println"
+   }
+  },
+  {
+   "do": "key",
+   "key": "End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "type",
+   "text": "EntityType."
+  },
+  {
+   "do": "key",
+   "key": "ArrowDown"
+  },
+  {
+   "do": "key",
+   "key": "ArrowDown"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

@@ -1,0 +1,24 @@
+{
+ "name": "doc-folder-drag-to-all-tabs",
+ "about": "in Folder 1, drag Part Studio 3 onto the All tabs crumb: out of the folder to the root",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 1"
+   }
+  },
+  {
+   "do": "drag",
+   "from": {
+    "doc_tab": "Part Studio 3"
+   },
+   "to": {
+    "button": "All tabs"
+   }
+  }
+ ]
+}

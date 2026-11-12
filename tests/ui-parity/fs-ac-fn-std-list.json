@@ -1,0 +1,33 @@
+{
+ "name": "fs-ac-fn-std-list",
+ "about": "inside uip Feature's body (end of the println line, Enter) type opE: std's list, prefix matches then fuzzy ones, with kinds",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "code": "println"
+   }
+  },
+  {
+   "do": "key",
+   "key": "End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "type",
+   "text": "opE"
+  }
+ ]
+}

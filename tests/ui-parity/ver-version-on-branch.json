@@ -1,0 +1,33 @@
+{
+ "name": "ver-version-on-branch",
+ "about": "on B1, Create version… › Create: V2 on B1's lane in the graph",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  }
+ ]
+}

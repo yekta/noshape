@@ -1,0 +1,57 @@
+{
+ "name": "ver-merge-version",
+ "about": "V2 made on B1, then from Main V2's Merge into current workspace… › Merge: merging a version, not a workspace head",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "Main"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Merge"
+   }
+  }
+ ]
+}

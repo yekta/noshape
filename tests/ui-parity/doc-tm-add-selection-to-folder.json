@@ -1,0 +1,35 @@
+{
+ "name": "doc-tm-add-selection-to-folder",
+ "about": "Tab manager: Part Studio 2's menu › Add selection to folder, name it, Enter: a new folder holding it",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "panel_row": "Part Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Add selection to folder"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Fixtures"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

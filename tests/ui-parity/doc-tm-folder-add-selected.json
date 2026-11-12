@@ -1,0 +1,33 @@
+{
+ "name": "doc-tm-folder-add-selected",
+ "about": "Tab manager: select Part Studio 2, Folder 1's menu › Add selected to folder",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "panel_row": "Part Studio 2"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "panel_row": "Folder 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Add selected to folder"
+   }
+  }
+ ]
+}

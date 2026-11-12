@@ -1,0 +1,33 @@
+{
+ "name": "prefs-shortcuts-tabs",
+ "about": "Keyboard shortcuts: General, Assembly, Sketch and Drawing tabs (rows of each)",
+ "area": "studios",
+ "source": "studios 11-12 (gap audit)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › General"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Assembly"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Drawing"
+   }
+  }
+ ]
+}
