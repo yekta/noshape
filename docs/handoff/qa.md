@@ -51,7 +51,7 @@ Gehäuse), as do its later features; the knife's Chamfer 1 builds since blend's 
 cf-surface-pattern's Surface Pattern 3 is 12× live while Pattern 4 is under live; blend's fast-finish (4dc4f0964) and dx's
 mesh fix (fcd0b283f) came after this green: the 11-12 02:00 window re-measures.
 
-**11-12 19:58 (lead): vibe4 removed.** Everything of qa's runs on vibe5 now, vibe3 kept light for the watcher: qa-suites.sh's
+**11-12 19:54 (lead): vibe4 removed.** Everything of qa's runs on vibe5 now, vibe3 kept light for the watcher: qa-suites.sh's
 assembly / exchange stage (`QA_SUITES_HOST`, default vibe5, after the speed stage when on the same host), the interaction stage
 (`QA_UI_HOST` vibe5), bin/compat-check.sh (rewritten for vibe5: the private user documents hat15 / hat15b / hat8 / dock in vibe5
 ~/lead-private (700, files 600), the 47 ticket documents in ~/qa/tickets, release CLIs in ~/qa-rel/<version>/noshape-cli, the
