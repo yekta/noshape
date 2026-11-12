@@ -49,9 +49,10 @@ pub struct LiveRef {
     /// The live part a face, edge or vertex is on (two parts can have one there: cf-fill-pattern's sheet metal
     /// part and the solid both have the hole its Fill pattern patterns).
     pub body: Option<String>,
-    /// The feature parameter live evaluated it for (refs.jsonl `parameter`): a query live's fetch gave no ids for
-    /// (Flange 6's edges in c2-sm-louver) is these.
-    pub parameter: Option<String>,
+    /// The feature parameters live evaluated it for (refs.jsonl `parameter`, or `parameters` when two of the feature's
+    /// queries name it: Delete part's entities and nonCompositeEntities): a query live's fetch gave no ids for (Flange
+    /// 6's edges in c2-sm-louver) is these.
+    pub parameters: Vec<String>,
     /// Its point is its plane's origin (live's evPlane, refs.jsonl `origin`), not a point on the face.
     pub plane_origin: bool,
     /// Of live's sketch bodies file (`sketches.json`, live 2267): a sketch region as its sketch made it (a per-feature
@@ -232,7 +233,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         // and area, a sketch's line as its `mid` and `length` (live 2313, `bodyType` SKETCH).
         let point = f3(&v["point"]).or_else(|| f3(&v["origin"])).or_else(|| f3(&v["centroid"])).or_else(|| f3(&v["mid"]));
         let bbox = v["box"].as_array().and_then(|b| Some([f3(b.first()?)?, f3(b.get(1)?)?]));
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameter: v["parameter"].as_str().map(str::to_string), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string) };
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string) };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -1710,7 +1711,7 @@ impl<'a> Translator<'a> {
                 let mut queries: Vec<Value> = p["queries"].as_array().cloned().unwrap_or_default();
                 // A query live's fetch names no ids for, evaluated by live for this parameter (refs.jsonl): its ids.
                 let pid = p["parameterId"].as_str().unwrap_or("");
-                let mut evaluated: Vec<String> = self.refs.iter().filter(|((i, _), r)| *i == k && r.parameter.as_deref() == Some(pid)).map(|((_, id), _)| id.clone()).collect();
+                let mut evaluated: Vec<String> = self.refs.iter().filter(|((i, _), r)| *i == k && r.parameters.iter().any(|p| p == pid)).map(|((_, id), _)| id.clone()).collect();
                 evaluated.sort();
                 if !evaluated.is_empty() {
                     for q in queries.iter_mut().filter(|q| q["deterministicIds"].as_array().is_none_or(|a| a.is_empty())) {

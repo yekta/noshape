@@ -855,6 +855,12 @@ fn parity_models() {
             (None, 0) => "; nothing compared".into(),
             (None, _) => "; matches to the end".into(),
         });
+        // NOSHAPE_PARITY_DIFFERING: every feature that differs, not only the first.
+        if std::env::var_os("NOSHAPE_PARITY_DIFFERING").is_some() {
+            for d in &r.differing {
+                println!("  DIFF {d}");
+            }
+        }
         if r.custom_compared > 0 || !r.custom.is_empty() {
             println!("  custom features: {}/{} match", r.custom_matching, r.custom_compared);
         }
@@ -1185,6 +1191,20 @@ fn a_list_configuration_and_its_configured_values_are_built() {
     assert!((volume(&mut t) - pi * 25.0 * 10.0).abs() < 1e-3, "Default: Ø10 × 10 mm");
     t.call("config_activate", json!({ "values": { "List_abc": "Long" } })).unwrap();
     assert!((volume(&mut t) - pi * 100.0 * 30.0).abs() < 1e-3, "Long: Ø20 × 30 mm");
+}
+
+/// A refs.jsonl line names every parameter live evaluated it for: one (`parameter`) or several (`parameters`, when two
+/// of a feature's queries name the same entity: Delete part's entities and nonCompositeEntities, an extrude's two end
+/// faces up to one face); each of those parameters gets it.
+#[test]
+fn a_live_reference_for_two_parameters_serves_both() {
+    let r = parse_refs(concat!(
+        r#"{"index": 5, "id": "JHD", "kind": "BODY", "parameters": ["entities", "nonCompositeEntities"]}"#,
+        "\n",
+        r#"{"index": 6, "id": "JHH", "kind": "FACE", "parameter": "endBoundEntityFace"}"#
+    ));
+    assert_eq!(r[&(5, "JHD".to_string())].parameters, ["entities", "nonCompositeEntities"]);
+    assert_eq!(r[&(6, "JHH".to_string())].parameters, ["endBoundEntityFace"]);
 }
 
 /// A Derived feature from a Part Studio fetched beside the document (derived/<element>/): that studio built in a
