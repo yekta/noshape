@@ -745,6 +745,11 @@ impl Viewport {
         self.hover_query
     }
 
+    /// What is lit is the pick under the pointer: no hover pick in flight, none waiting for a fast move to pause.
+    pub fn hover_settled(&self) -> bool {
+        !self.hover_query && self.paused_hover.is_none()
+    }
+
     /// World-space ray through a viewport-local position.
     pub fn ray(&self, local: DVec2) -> (DVec3, DVec3) {
         self.camera.ray(local, self.size())

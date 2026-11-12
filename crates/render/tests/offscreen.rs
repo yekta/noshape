@@ -605,8 +605,8 @@ fn a_point_picks_round_its_drawn_centre_at_any_pixel_ratio() {
 /// Our 3D pick reach outside sketch mode, as the viewport picks (the nearest id within PICK_RADIUS 5 CSS px of the
 /// pointer, vertices before edges before faces), measured on the pick buffer at a pixel ratio of 1 and 2: a part
 /// edge (drawn 1 px, picked PICK_EXTRA_CSS_PX wider) lights from 9 px off it; a vertex (a 6 px sprite) from 11 px,
-/// and beats the edge it ends. (In the app an edge reaches only 5 px over its own face: the GPU test
-/// `a_click_beside_an_edge_selects_what_is_lit`.) Live's are being measured (REQUESTS 11-12 23:25); these move with them.
+/// and beats the edge it ends. (In the app an edge reaches only 5 px over its own face: part-studio-ui
+/// `feel::a_click_beside_an_edge_selects_what_is_lit`.) docs/parity/interaction-feel.md; these move with live's numbers.
 #[test]
 fn our_3d_pick_reach_for_edges_and_vertices() {
     let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());

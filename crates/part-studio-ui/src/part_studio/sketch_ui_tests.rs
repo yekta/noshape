@@ -1164,59 +1164,6 @@ fn a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach(cx: &
     assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().selection.clone()), vec![circle], "the click selects the circle");
 }
 
-/// User P0 11-12 (hat15b, 7th report): the Dimension tool's hover lit a line but the click started nothing. With the
-/// GPU's own hover pick at scale 2, what lights is what the click takes, within live's reach: on the line's drawn
-/// centre and 4 px beside it the line is lit and a click starts its dimension; 8 px beside it (live: 5 mm off a line
-/// at sketch-offset-key's zoom is a miss) nothing is lit or taken.
-#[gpui::test]
-#[ignore = "T2: GPU picks (macOS CI's readback came out white, run 42333748082)"]
-fn the_dimension_tool_takes_the_hovered_line_at_scale_2(cx: &mut TestAppContext) {
-    let _gpu = noshape_ops::doc::gpu_lock();
-    if let Err(e) = Gpu::headless_rendering() {
-        return eprintln!("GPU picks skipped: {e}");
-    }
-    RENDERING.set(true);
-    for (off, lit) in [(0.0, true), (4.0, true), (8.0, false)] {
-        let (window, view) = line_then_dimension_tool(cx, &format!("dim-hover-{off}"));
-        cx.update_window(window, |_, w, _| w.set_scale_factor(2.0)).unwrap();
-        draw(cx, window);
-        let (line, centre) = cx.update(|cx| {
-            let v = view.read(cx);
-            let data = v.sketch_data(cx).unwrap();
-            let ed = v.sketch.as_ref().unwrap();
-            let line = data.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
-            let Some(noshape_sketch::Curve2::Line { a, b }) = data.sketch.curve(line) else { panic!("a line") };
-            (line, v.viewport.read(cx).project(ed.frame.to_world((a + b) * 0.5)).unwrap())
-        });
-        // Off the line across it (it runs from (500, 400) to (640, 360) on screen).
-        let at = centre + DVec2::new(40., 140.).normalize() * off;
-        let vp = cx.update(|cx| view.read(cx).viewport.clone());
-        let origin = cx.update(|cx| vp.read(cx).origin());
-        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
-        vcx.simulate_mouse_move(gpui_kit::point(origin.x + px(at.x as f32), origin.y + px(at.y as f32)), None, Modifiers::default());
-        // (Until the pick under the pointer arrives: a hover of the line, or none 8 px off.)
-        let t = std::time::Instant::now();
-        let settled = |cx: &mut TestAppContext| cx.update(|cx| vp.read(cx).pick_under_pointer().is_some() && !vp.read(cx).hover_pending());
-        while (!settled(cx) || (lit && !cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.hover == Some(line))))) && t.elapsed() < std::time::Duration::from_secs(15) {
-            cx.update(|cx| vp.update(cx, |v, cx| v.request_frame(cx)));
-            cx.update(|cx| view.read(cx).gpu.deliver_frames());
-            draw(cx, window);
-            cx.executor().advance_clock(std::time::Duration::from_millis(20));
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.hover == Some(line))), lit, "the line lit {off} px off it");
-        cx.update_window(window, |_, w, cx| {
-            view.update(cx, |v, cx| {
-                v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
-                v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: at, modifiers: Modifiers::default() }, w, cx);
-            });
-        })
-        .unwrap();
-        draw(cx, window);
-        let picks = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().tool_picks());
-        assert_eq!(picks.contains(&line), lit, "the click {off} px off takes the line: {picks:?}");
-    }
-}
 
 /// User 11-12 (hat15b, 6th report): an open sketch that is under defined shows the feature list's under-defined
 /// badge on its row, as once it is closed.
@@ -3981,65 +3928,5 @@ fn every_kind_of_plane_right_clicked_in_the_graphics_opens_its_menu(cx: &mut Tes
     }
 }
 
-/// Outside sketch mode a click acts on exactly what is lit (lead 11-12, after the sketch reach fix): with the GPU's
-/// own hover pick, the pointer 5 to 12 px either side of a part edge (a quarter along it), the click selects what lights
-/// there. The edge lights from 5 px off it on both sides, not from 12; today it reaches 9 px over the background but
-/// only 5 over its own face (live's reach is being measured, REQUESTS 11-12 23:25).
-#[gpui::test]
-#[ignore = "T2: GPU picks (macOS CI's readback came out white, run 42333748082)"]
-fn a_click_beside_an_edge_selects_what_is_lit(cx: &mut TestAppContext) {
-    let _gpu = noshape_ops::doc::gpu_lock();
-    if let Err(e) = Gpu::headless_rendering() {
-        return eprintln!("GPU picks skipped: {e}");
-    }
-    RENDERING.set(true);
-    let (window, view, _top, _) = block_part(cx, "click-is-hover");
-    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
-    let vp = cx.update(|cx| view.read(cx).viewport.clone());
-    // The top face's longest edge on screen (all four are seen from the iso view), a point on it and the direction across it.
-    let (edge, mid, across) = cx.update(|cx| {
-        let v = view.read(cx);
-        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
-        let vp = vp.read(cx);
-        let s = |p: &[f32; 3]| vp.project(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
-        let top_z = b.mesh.positions.iter().map(|p| p[2]).fold(f32::MIN, f32::max);
-        b.edge_refs
-            .iter()
-            .zip(&b.mesh.edges)
-            .filter(|(_, pl)| pl.iter().all(|p| (p[2] - top_z).abs() < 1e-7))
-            .filter_map(|(r, pl)| {
-                let (a, z) = (s(pl.first()?)?, s(pl.last()?)?);
-                // (A quarter along: by its middle a rest lights the edge's midpoint target, live 1954.)
-                Some((r.clone(), a + (z - a) * 0.25, (z - a).perp().normalize(), (z - a).length()))
-            })
-            .max_by(|a, b| a.3.total_cmp(&b.3))
-            .map(|(r, m, n, _)| (r, m, n))
-            .unwrap()
-    });
-    let origin = cx.update(|cx| vp.read(cx).origin());
-    for off in [-12.0, -9.0, -8.0, -6.0, -5.0, 5.0, 6.0, 8.0, 9.0, 12.0f64] {
-        cx.update_window(window, |_, _, cx| view.update(cx, |v, _| v.selection.clear())).unwrap();
-        let at = mid + across * off;
-        let win = gpui_kit::point(origin.x + px(at.x as f32), origin.y + px(at.y as f32));
-        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
-        vcx.simulate_mouse_move(win, None, Modifiers::default());
-        let t = std::time::Instant::now();
-        while !cx.update(|cx| vp.read(cx).pick_under_pointer().is_some() && !vp.read(cx).hover_pending()) && t.elapsed() < std::time::Duration::from_secs(15) {
-            cx.update(|cx| vp.update(cx, |v, cx| v.request_frame(cx)));
-            cx.update(|cx| view.read(cx).gpu.deliver_frames());
-            draw(cx, window);
-            cx.executor().advance_clock(std::time::Duration::from_millis(20));
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        let lit = cx.update(|cx| view.read(cx).hover.clone());
-        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
-        vcx.simulate_click(win, Modifiers::default());
-        draw(cx, window);
-        let selected = cx.update(|cx| view.read(cx).selection.clone());
-        assert_eq!(selected, lit.clone().into_iter().collect::<Vec<_>>(), "{off} px off the edge: the click selects what was lit");
-        if off.abs() <= 5.0 || off.abs() >= 12.0 {
-            assert_eq!(lit.as_ref() == Some(&edge), off.abs() <= 5.0, "{off} px off the edge: lit {lit:?}");
-        }
-
-    }
-}
+#[path = "feel_tests.rs"]
+mod feel;
