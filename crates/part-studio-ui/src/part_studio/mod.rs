@@ -1864,6 +1864,25 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ viewport events
 
+    /// The hover the viewport's pick found (`id`; sketch mode holds it to live's reach first).
+    pub(super) fn apply_hover_pick(&mut self, id: Option<u32>, vp: &Entity<Viewport>, window: &mut Window, cx: &mut Context<Self>) {
+        // Live: with a dialog field active, what it doesn't take isn't
+        // highlighted; on a plane's resize ring nothing is.
+        let id = id.filter(|_| self.ui.plane_ring_hover.is_none());
+        self.ui.hover_raw = id.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
+        let cap = id.and_then(noshape_render::section_cap_of_pick).filter(|_| !self.ui.section.is_empty());
+        let left = id.is_none() && !vp.read(cx).pointer_inside();
+        let cap_changed = !left && cap != self.ui.cap_hover;
+        if cap_changed {
+            self.ui.cap_hover = cap;
+        }
+        let shift = window.modifiers().shift;
+        if self.rehover(cx) | self.update_inference(shift, cx) | cap_changed {
+            self.refresh_scene(false, cx);
+        }
+        self.schedule_midpoint_dwell(cx);
+    }
+
     fn on_viewport_event(&mut self, vp: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
         // Clicking the graphics area takes the keyboard focus from any text
         // field (a panel cell, which then commits, the feature-list filter, a
@@ -2303,23 +2322,7 @@ impl PartStudioView {
         match ev {
             // Picking under the pointer is off while Select other is open.
             ViewportEvent::Hover(_) if self.ui.select_other.is_some() => {}
-            ViewportEvent::Hover(id) => {
-                // Live: with a dialog field active, what it doesn't take isn't
-                // highlighted; on a plane's resize ring nothing is.
-                let id = id.filter(|_| self.ui.plane_ring_hover.is_none());
-                self.ui.hover_raw = id.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
-                let cap = id.and_then(noshape_render::section_cap_of_pick).filter(|_| !self.ui.section.is_empty());
-                let left = id.is_none() && !vp.read(cx).pointer_inside();
-                let cap_changed = !left && cap != self.ui.cap_hover;
-                if cap_changed {
-                    self.ui.cap_hover = cap;
-                }
-                let shift = window.modifiers().shift;
-                if self.rehover(cx) | self.update_inference(shift, cx) | cap_changed {
-                    self.refresh_scene(false, cx);
-                }
-                self.schedule_midpoint_dwell(cx);
-            }
+            ViewportEvent::Hover(id) => self.apply_hover_pick(*id, vp, window, cx),
             // Shown dimensions: a click elsewhere hides them (Onshape).
             ViewportEvent::Click { .. } if self.ui.shown_dims.is_some() => {
                 self.hide_dimensions(window, cx);

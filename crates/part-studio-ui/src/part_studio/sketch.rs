@@ -540,6 +540,65 @@ impl PartStudioView {
         }
     }
 
+    /// Whether sketch entity `e` is within live's pick reach of plane point `p`, on screen
+    /// (SKETCH-SCREEN-SPACE-REACH): a point 10 px; a curve within the 5 px square round the pointer (woolsthorpe
+    /// MOUSE_PICK_RADIUS_PX) counting its 2 px drawn width (ui-parity sketch-offset hits a line 3 mm off it,
+    /// sketch-offset-key misses one 5 mm off). Our pick pass reaches further (lines and points 8 px wider).
+    fn in_sketch_reach(&self, e: noshape_sketch::EntityId, p: DVec2, cx: &App) -> bool {
+        let Some(ed) = self.sketch.as_ref() else { return false };
+        let Some(d) = self.sketch_data(cx) else { return false };
+        let r = ed.world_per_px * 10.0;
+        let curve_r = ed.world_per_px * 6.0;
+        let screen = ed.screen_metric();
+        match (d.sketch.point(e), screen) {
+            (Some(q), Some(m)) => m.len(q - p) <= r,
+            (Some(q), None) => (q - p).length() <= r,
+            // Text box lines stand for their glyphs; keep them.
+            (None, Some(m)) => d.text_of_entity(e).is_some() || d.sketch.screen_box_distance_to(e, p, &m).is_some_and(|x| x <= curve_r),
+            (None, None) => d.text_of_entity(e).is_some() || d.sketch.curve(e).is_some_and(|c| c.closest(p).2 <= r),
+        }
+    }
+
+    /// The open sketch's entity a click at plane point `p` takes when the hover doesn't (none for a drawing tool).
+    fn sketch_pick_at(&self, p: DVec2, cx: &App) -> Option<noshape_sketch::EntityId> {
+        let ed = self.sketch.as_ref()?;
+        if ed.tool.draws() {
+            return None;
+        }
+        let r = ed.world_per_px * 5.0;
+        let data = self.sketch_data(cx)?;
+        let screen = ed.screen_metric();
+        match self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)) {
+            Some(s) => data.sketch.pick_with_report_on_screen(p, r, &s.report, screen.as_ref()),
+            None => data.sketch.pick_on_screen(p, r, screen.as_ref()),
+        }
+    }
+
+    /// The GPU's hover pick in sketch mode, held to live's reach: the open sketch's entity it found beyond it gives way
+    /// to what a click there takes (the user's lit line whose click did nothing; a circle's centre 5 mm off lit and
+    /// taken over the circle under the pointer), so what lights is what a click acts on.
+    fn sketch_hover_id(&self, id: Option<u32>, cx: &App) -> Option<u32> {
+        let ed = self.sketch.as_ref()?;
+        let built = self.built.as_ref()?;
+        let own = |id: u32| match built.picks.get(id).map(|t| &t.reference) {
+            Some(Reference::SketchEntity { sketch, entity }) if *sketch == ed.feature => Some(noshape_sketch::EntityId(*entity)),
+            _ => None,
+        };
+        let Some(e) = id.and_then(own) else { return id };
+        let vp = self.viewport.read(cx);
+        let Some(p) = self.ui.pointer.and_then(|pos| {
+            let (o, d) = vp.ray(pos + DVec2::splat(0.5));
+            ed.plane_point(o, d)
+        }) else {
+            return id;
+        };
+        if self.in_sketch_reach(e, p, cx) {
+            return id;
+        }
+        let other = self.sketch_pick_at(p, cx)?;
+        built.picks.ids_for(&Reference::SketchEntity { sketch: ed.feature, entity: other.0 }).first().copied()
+    }
+
     fn snap_to_hover(&mut self, hover: Option<&Reference>, cx: &mut Context<Self>) {
         if !self.sketch.as_ref().is_some_and(|ed| ed.tool.draws()) {
             return;
@@ -692,7 +751,8 @@ impl PartStudioView {
                 }
                 true
             }
-            ViewportEvent::Hover(id) => {
+            ViewportEvent::Hover(gpu_id) => {
+                let id = &self.sketch_hover_id(*gpu_id, cx);
                 // While a glyph/label is hovered, the geometry under it isn't.
                 if self.sketch.as_ref().is_some_and(|s| s.hover_constraint.is_some()) {
                     if self.hover.take().is_some() {
@@ -744,7 +804,11 @@ impl PartStudioView {
                     cx.notify();
                     return true;
                 }
-                false
+                // (Picking under the pointer is off while Select other is open.)
+                if self.ui.select_other.is_none() {
+                    self.apply_hover_pick(*id, vp, window, cx);
+                }
+                true
             }
             ViewportEvent::PointerMove { position, modifiers } => {
                 let Some(p) = to_plane(self, *position, cx) else { return false };
@@ -798,42 +862,9 @@ impl PartStudioView {
                     }
                 }
                 let Some(p) = to_plane(self, *position, cx) else { return true };
-                // The GPU hover pick may lag behind a quick click: fall back to
-                // a geometric pick for tools that act on existing entities.
-                let near = |this: &Self, e: noshape_sketch::EntityId, cx: &App| -> bool {
-                    let Some(ed) = this.sketch.as_ref() else { return false };
-                    let Some(d) = this.sketch_data(cx) else { return false };
-                    let r = ed.world_per_px * 10.0;
-                    // On screen, as live's pick (SKETCH-SCREEN-SPACE-REACH): a curve within the 5 px square round the
-                    // pointer (woolsthorpe MOUSE_PICK_RADIUS_PX), counting its 2 px drawn width (ui-parity
-                    // sketch-offset hits a line 3 mm off it, sketch-offset-key misses one 5 mm off).
-                    let curve_r = ed.world_per_px * 6.0;
-                    let screen = ed.screen_metric();
-                    match (d.sketch.point(e), screen) {
-                        (Some(q), Some(m)) => m.len(q - p) <= r,
-                        (Some(q), None) => (q - p).length() <= r,
-                        // Text box lines stand for their glyphs; keep them.
-                        (None, Some(m)) => d.text_of_entity(e).is_some() || d.sketch.screen_box_distance_to(e, p, &m).is_some_and(|x| x <= curve_r),
-                        (None, None) => d.text_of_entity(e).is_some() || d.sketch.curve(e).is_some_and(|c| c.closest(p).2 <= r),
-                    }
-                };
-                // The tool acts on what is highlighted under the pointer (the user's Dimension clicks and snaps on a
-                // Retina display: the hover reached further than this re-check, so the click dropped what it showed);
-                // only a stale hover (the pick lags behind fast moves) is checked again, by distance.
-                let hover_here = vp.read(cx).hover_is_at(*position);
-                let hovered = self.hovered_sketch_entity(cx).filter(|e| hover_here || near(self, *e, cx)).or_else(|| {
-                    let ed = self.sketch.as_ref()?;
-                    if ed.tool.draws() {
-                        return None;
-                    }
-                    let r = ed.world_per_px * 5.0;
-                    let data = self.sketch_data(cx)?;
-                    let screen = ed.screen_metric();
-                    match self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)) {
-                        Some(s) => data.sketch.pick_with_report_on_screen(p, r, &s.report, screen.as_ref()),
-                        None => data.sketch.pick_on_screen(p, r, screen.as_ref()),
-                    }
-                });
+                // What is lit is within live's reach (the hover checks it too); the GPU hover pick may lag behind a
+                // quick click: checked again here, else the geometric pick for tools that act on existing entities.
+                let hovered = self.hovered_sketch_entity(cx).filter(|e| self.in_sketch_reach(*e, p, cx)).or_else(|| self.sketch_pick_at(p, cx));
                 // Dimensions and constraints to planes, model edges / vertices and
                 // other sketches: a linked external reference entity stands in.
                 let tool_now = self.sketch.as_ref().map(|s| s.tool);

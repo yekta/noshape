@@ -1110,9 +1110,64 @@ fn a_dragged_point_lands_on_a_line_within_7_px(cx: &mut TestAppContext) {
     }
 }
 
+/// ui-parity sketch-constraint-refusals step 58 (qa 11-12): a click on a small circle's rim, its centre 11 px away. Our
+/// pick pass reaches a point from about 12 px and points win, so the GPU's hover was the centre; held to live's reach
+/// (a point 10 px) the circle under the pointer is what lights and what the click selects, as live.
+#[gpui::test]
+fn a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "rim-not-centre", Tool::Circle);
+    click(cx, window, &view, (600., 400.));
+    click(cx, window, &view, (611., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    draw(cx, window);
+    let ids = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        let data = v.sketch_data(cx)?;
+        let feature = v.sketch.as_ref()?.feature;
+        let circle = data.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Circle)?.id;
+        let centre = data.sketch.entity(circle)?.center()?;
+        let pick = v.built.as_ref()?.picks.ids_for(&Reference::SketchEntity { sketch: feature, entity: centre.0 }).first().copied()?;
+        Some((circle, pick))
+    });
+    wait_until(cx, window, |_| true);
+    let (circle, centre_pick) = ids(cx).expect("the circle and its centre's pick");
+    // The rim point farthest from the centre on screen (the view is isometric): beyond a point's 10 px reach.
+    let (at, off) = cx.update(|cx| {
+        let v = view.read(cx);
+        let (vp, frame) = (v.viewport.read(cx), v.sketch.as_ref().unwrap().frame);
+        let Some(noshape_sketch::Curve2::Circle { center, radius }) = v.sketch_data(cx).unwrap().sketch.curve(circle) else { panic!("a circle") };
+        // (A pointer pixel stands for its centre: the point under it is half a pixel on.)
+        let screen = |q: DVec2| vp.project(frame.to_world(q)).unwrap() - DVec2::splat(0.5);
+        let c = screen(center);
+        (0..72).map(|k| screen(center + DVec2::from_angle(k as f64 * 5f64.to_radians()) * radius)).map(|s| (s, (s - c).length())).max_by(|a, b| a.1.total_cmp(&b.1)).unwrap()
+    });
+    assert!(off > 10.5, "the rim {off} px from the centre");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::Hover(Some(centre_pick)), w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover), Some(circle), "the circle lights, not its centre");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: at, modifiers: Modifiers::default() }, w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().selection.clone()), vec![circle], "the click selects the circle");
+}
+
 /// User P0 11-12 (hat15b, 7th report): the Dimension tool's hover lit a line but the click started nothing. With the
-/// GPU's own hover pick at scale 2, a click on the line's drawn centre, and one 8 px beside it (still hovered), starts
-/// a dimension of it.
+/// GPU's own hover pick at scale 2, what lights is what the click takes, within live's reach: on the line's drawn
+/// centre and 4 px beside it the line is lit and a click starts its dimension; 8 px beside it (live: 5 mm off a line
+/// at sketch-offset-key's zoom is a miss) nothing is lit or taken.
 #[gpui::test]
 #[ignore = "T2: GPU picks (macOS CI's readback came out white, run 42333748082)"]
 fn the_dimension_tool_takes_the_hovered_line_at_scale_2(cx: &mut TestAppContext) {
@@ -1121,7 +1176,7 @@ fn the_dimension_tool_takes_the_hovered_line_at_scale_2(cx: &mut TestAppContext)
         return eprintln!("GPU picks skipped: {e}");
     }
     RENDERING.set(true);
-    for off in [0.0, 8.0] {
+    for (off, lit) in [(0.0, true), (4.0, true), (8.0, false)] {
         let (window, view) = line_then_dimension_tool(cx, &format!("dim-hover-{off}"));
         cx.update_window(window, |_, w, _| w.set_scale_factor(2.0)).unwrap();
         draw(cx, window);
@@ -1139,15 +1194,17 @@ fn the_dimension_tool_takes_the_hovered_line_at_scale_2(cx: &mut TestAppContext)
         let origin = cx.update(|cx| vp.read(cx).origin());
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
         vcx.simulate_mouse_move(gpui_kit::point(origin.x + px(at.x as f32), origin.y + px(at.y as f32)), None, Modifiers::default());
+        // (Until the pick under the pointer arrives: a hover of the line, or none 8 px off.)
         let t = std::time::Instant::now();
-        while !cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.hover == Some(line))) && t.elapsed() < std::time::Duration::from_secs(15) {
+        let settled = |cx: &mut TestAppContext| cx.update(|cx| vp.read(cx).pick_under_pointer().is_some() && !vp.read(cx).hover_pending());
+        while (!settled(cx) || (lit && !cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.hover == Some(line))))) && t.elapsed() < std::time::Duration::from_secs(15) {
             cx.update(|cx| vp.update(cx, |v, cx| v.request_frame(cx)));
             cx.update(|cx| view.read(cx).gpu.deliver_frames());
             draw(cx, window);
             cx.executor().advance_clock(std::time::Duration::from_millis(20));
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        assert!(cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.hover == Some(line))), "the line is hovered {off} px off it");
+        assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.hover == Some(line))), lit, "the line lit {off} px off it");
         cx.update_window(window, |_, w, cx| {
             view.update(cx, |v, cx| {
                 v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
@@ -1156,7 +1213,8 @@ fn the_dimension_tool_takes_the_hovered_line_at_scale_2(cx: &mut TestAppContext)
         })
         .unwrap();
         draw(cx, window);
-        assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().tool_picks()), vec![line], "the click {off} px off picks the hovered line");
+        let picks = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().tool_picks());
+        assert_eq!(picks.contains(&line), lit, "the click {off} px off takes the line: {picks:?}");
     }
 }
 
