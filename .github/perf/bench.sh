@@ -90,6 +90,8 @@ one() {
   wait_for 'BENCH SUMMARY' "$log" $((DELAY + 600)) || echo "::warning::no BENCH SUMMARY for $mode $kind"
   kill "$pid" 2>/dev/null; sleep 2; kill -9 "$pid" 2>/dev/null
   grep -a "viewport frames\|GPU:\|orbit bench\|BENCH FIRST\|BENCH SUMMARY\|regen\[\|panicked\|ERROR" "$log" | cut -c1-400
+  # The run's GPU statistics (whole run: the summary line above is cut before them), each pass's with NOSHAPE_PERF_PASSES.
+  grep -a "\] r\.gpu_ms \|\] r\.pass\.\|\] r\.draw_calls " "$log" || true
   rm -rf "$work"
 }
 n=0
