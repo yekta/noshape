@@ -3190,6 +3190,42 @@ fn feature_mirror_of_a_side_wall_pocket_lands_on_the_opposite_wall() {
     assert_eq!(b.count(noshape_kernel::ShapeType::Face), 10);
 }
 
+/// asm-scissor-lift's Mirror 6 (live: the base, both blocks and both mirrors one part of 483192 mm³): a part mirror with
+/// Add and a merge scope takes its seeds into the merge too (std subfeatureToolsTargets). A 40 × 20 × 5 base with two
+/// 5 × 5 × 5 blocks standing on it, mirrored across its middle: one part, 4000 + 4 × 125 mm³. Saved before
+/// (legacy_pattern_seeds), the blocks stay parts of their own.
+#[test]
+fn part_mirror_add_merges_its_seeds_into_the_merge_scope() {
+    for legacy in [false, true] {
+        let mut t = T::new();
+        // (Set as a saved studio has it when it opens, before anything regenerates.)
+        t.ps.legacy_pattern_seeds = legacy;
+        let base = t.block(40.0, 20.0, 5.0);
+        let up = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("offset", e("5 mm"))]);
+        let mut sk = noshape_sketch::Sketch::new();
+        for (x, y) in [(2.0, 2.0), (2.0, 13.0)] {
+            let pts: Vec<_> = [(x, y), (x + 5.0, y), (x + 5.0, y + 5.0), (x, y + 5.0)].iter().map(|(a, b)| sk.add_point(DVec2::new(a * 1e-3, b * 1e-3))).collect();
+            for i in 0..4 {
+                sk.add_line_between(pts[i], pts[(i + 1) % 4]).unwrap();
+            }
+        }
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(up)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+        let blocks = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("NEW"))]);
+        let seeds: Vec<Reference> = t.regen().context.bodies.iter().filter(|b| b.id.feature == blocks).map(|b| Reference::Body(b.id.clone())).collect();
+        assert_eq!(seeds.len(), 2);
+        let mid = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("offset", e("20 mm"))]);
+        let part = |feature: FeatureId, index: u32| Reference::Body(noshape_model::reference::BodyId { feature, index });
+        let m = t.add("mirror", &[("patternType", en("PART")), ("entities", q(seeds)), ("mirrorPlane", q(vec![Reference::FeaturePlane(mid)])), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(false)), ("booleanScope", q(vec![part(base, 0)]))]);
+        let r = t.ok(m);
+        let mut vols: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap() * 1e9).collect();
+        vols.sort_by(|a, b| b.total_cmp(a));
+        let want: &[f64] = if legacy { &[4250.0, 125.0, 125.0] } else { &[4500.0] };
+        assert!(vols.len() == want.len() && vols.iter().zip(want).all(|(v, w)| (v - w).abs() < 1e-6), "legacy {legacy}: {vols:?}");
+    }
+}
+
 /// MIRROR-FEATURE-UP-TO (clamp-hms, live OK): a boss of two squares raised
 /// 5 mm, the second square then raised to 10 mm by another Extrude (their
 /// sides merge), both mirrored as features (Reapply off) across Right + 30:

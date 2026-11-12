@@ -685,6 +685,9 @@ pub struct Context {
     pub legacy_plane_sketch_frames: bool,
     /// The studio's sketch regions' edges run their loops' way ([`crate::partstudio::PartStudio::legacy_edge_directions`]).
     pub legacy_edge_directions: bool,
+    /// The studio's part patterns' Add with a merge scope leaves the seeds apart
+    /// ([`crate::partstudio::PartStudio::legacy_pattern_seeds`]).
+    pub legacy_pattern_seeds: bool,
     pub bodies: Bodies,
     pub sketches: Vec<Arc<SketchResult>>,
     /// Sketches a Derived feature brought in from its source: (the Derived
@@ -875,6 +878,7 @@ impl Context {
             legacy_tilted_face_frames,
             legacy_plane_sketch_frames,
             legacy_edge_directions,
+            legacy_pattern_seeds,
             bodies: _,
             sketches,
             derived_sketches,
@@ -916,6 +920,7 @@ impl Context {
             && *legacy_tilted_face_frames == o.legacy_tilted_face_frames
             && *legacy_plane_sketch_frames == o.legacy_plane_sketch_frames
             && *legacy_edge_directions == o.legacy_edge_directions
+            && *legacy_pattern_seeds == o.legacy_pattern_seeds
             && same_arcs(sketches, &o.sketches)
             && *derived_sketches == o.derived_sketches
             && *sketch_copies == o.sketch_copies

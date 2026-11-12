@@ -588,8 +588,23 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
         }
         return Ok(());
     }
-    let tools: Vec<NamedShape> = copies.into_iter().filter(|c| c.2 == BodyKind::Solid).map(|c| c.3).collect();
+    let mut tools: Vec<NamedShape> = copies.into_iter().filter(|c| c.2 == BodyKind::Solid).map(|c| c.3).collect();
     let scope = super::extrude::scope(ev);
+    // std subfeatureToolsTargets: the seeds are tools too, so an Add merges the seeds that meet the merge scope into it
+    // with the copies (asm-scissor-lift's Mirror 6: two blocks and their mirrors into the base); studios saved before
+    // keep their seeds apart (ScopeRule 16).
+    let scope = match scope {
+        Some(sc) if op == "ADD" && !ev.ctx.legacy_pattern_seeds => {
+            let seeds: Vec<usize> = bodies.iter().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Solid && !sc.contains(&i)).collect();
+            let targets: Vec<BodyId> = sc.iter().map(|&i| ev.ctx.bodies[i].id.clone()).collect();
+            let target_bodies: Vec<Arc<Body>> = sc.iter().map(|&i| ev.ctx.bodies[i].clone()).collect();
+            let joining: Vec<Arc<Body>> = seeds.iter().map(|&i| ev.ctx.bodies[i].clone()).filter(|s| !crate::regen::eval::touching(&target_bodies, std::slice::from_ref(&s.shape), true).is_empty()).collect();
+            remove_bodies(ev, &joining.iter().map(|b| b.id.clone()).collect::<Vec<_>>());
+            tools.extend(joining.iter().map(|b| body_named(b)));
+            Some(targets.iter().filter_map(|id| index_of_body(ev, id)).collect())
+        }
+        s => s,
+    };
     // std (subfeatureToolsTargets): an Add with nothing in its merge scope unions the instances with the seed.
     let scope = if op == "ADD" && scope.is_none() { Some(bodies.iter().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Solid).collect()) } else { scope };
     ev.apply_operation(tools, &op, scope, BodyKind::Solid)

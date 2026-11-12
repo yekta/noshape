@@ -2059,7 +2059,10 @@ face of the part, a side-wall hole mirrored onto the opposite wall; T1 kernel_ro
 feature_mirror_of_a_side_wall_pocket_lands_on_the_opposite_wall; model suite no document worse). tvc-mount stays 3/10
 mates: the studio's later features still fail in ours (Hole 5 "None of the holes intersected a part", Fillet 7,
 Fillet 4, Extrude 11, Circular pattern 2, Plane 12…), which the mates sit on. asm-scissor-lift's seed merge
-(fed22d's Mirror 6, dx's note below): psui on it, behind a ScopeRule gate. (Studio 37a1a7's Mirror 1 is something else:
+(fed22d's Mirror 6, dx's note below): **done by psui** (pattern.rs part_pattern: an Add with a merge scope takes the seeds
+that meet it as tools; ScopeRule 16, `legacy_pattern_seeds` for studios saved with a pattern before; T1
+kernel_robustness part_mirror_add_merges_its_seeds_into_the_merge_scope): scissor-lift 204 -> 205/242 occurrences,
+13 -> 16/16 mates; model suite none worse (79/87, 838/947). (Studio 37a1a7's Mirror 1 is something else:
 3 parts before it in ours where live has 7, Derived 1's and Transform 1–3's "Cannot resolve entities" upstream.)
 
 ## From dx (11-12 08:22 UTC): dx has two feature failures from the assembly suite (lead: core and psui are full)

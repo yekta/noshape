@@ -177,13 +177,14 @@ impl Feature {
 /// 12, a rounded hole's seams off the rims it trims ([`PartStudio::legacy_rim_seams`]); 13, noshape's full rounds,
 /// ridges and rounds rolling over a narrow face ([`PartStudio::legacy_blend_pairs`]); 14, collinear sketch lines one
 /// edge though a stub bounding no region ends at their joint ([`PartStudio::legacy_stub_joints`]); 15, a tilted planar
-/// face's frame from its normal's largest component ([`PartStudio::legacy_tilted_face_frames`]); 0, older studios.
+/// face's frame from its normal's largest component ([`PartStudio::legacy_tilted_face_frames`]); 16, a part pattern's
+/// Add with a merge scope merges its seeds too ([`PartStudio::legacy_pattern_seeds`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(15)
+        ScopeRule(16)
     }
 }
 
@@ -428,6 +429,11 @@ pub struct PartStudio {
     /// from them stay where they were.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_tilted_face_frames: bool,
+    /// Saved with a part pattern or mirror before an Add with a merge scope merged its seeds too (ScopeRule < 16:
+    /// asm-scissor-lift's Mirror 6, std subfeatureToolsTargets): the seeds stay parts of their own, as later features
+    /// found them.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_pattern_seeds: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -665,6 +671,9 @@ impl PartStudio {
         // And with x = Z × n on tilted planar faces.
         if self.scope_rule.0 < 15 && !self.features.is_empty() {
             self.legacy_tilted_face_frames = true;
+        }
+        if self.scope_rule.0 < 16 && self.features.iter().any(|f| matches!(f.type_id.as_str(), "linearPattern" | "circularPattern" | "curvePattern" | "mirror")) {
+            self.legacy_pattern_seeds = true;
         }
         self.scope_rule = ScopeRule::default();
     }
