@@ -436,7 +436,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     qa's authored ones all equal (they don't reach hat15's thin-wall split face: a gap, being widened).
   - Rule: any feature whose status or message changes in a document saved by an earlier release is a blocker unless its owner
     shows the new result is live's.
-- qa 01:38, both checks on green 686c50acf against v0.4.44 (bin/compat-check.sh v0444 686c50ac; core's hat15 fix not on main
+- qa 01:37, both checks on green 686c50acf against v0.4.44 (bin/compat-check.sh v0444 686c50ac; core's hat15 fix not on main
   yet, so hat15 / slow1151 are broken in both and read the same): user documents and the 47 ticket documents the same; qa's
   authored faces-thin-open-spline (a thin wall on an open fit spline) Part 1 16 -> 14 faces, 42 -> 40 edges, same volume, every
   feature (its sketches on every face too) still resolving: bisected to **core's 4c50a1c38** (an extrusion surface and its
