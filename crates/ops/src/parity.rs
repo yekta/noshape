@@ -6390,7 +6390,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     args["rotation_axis"] = json!(axis.to_lowercase());
                 }
             }
-            trace(&format!("mate {}", args["name"]));
+            trace(&format!("mate {} {args}", args["name"]));
             match placer.call("assembly_mate", args) {
                 Ok(_) => {
                     if k == 0 {

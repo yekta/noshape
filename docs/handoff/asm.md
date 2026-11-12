@@ -35,6 +35,18 @@ Studio f79298 (Gear Selector Ring Gear) built alone (vibe3 ~/agents/asm/ps-ring/
   mate of a conflicting Fastened/Revolute loop (behaviours "request 1798" a2, a3, f79), so they are likely its
   collateral (and Planar 11's chamfer); recheck once the ring gear is live's.
 
+## From dx (11-11 23:44 UTC): assembly implicit connectors on circular edges point by the circle's own axis, not live 1708's rule
+asm-robotic-arm (1/29 mates): at live's placements every connector of ours lies on live's point (0.000-0.008 mm), but
+the Z axes don't follow one rule. On the M3 screws ours always points the opposite way from live's matedCS. On the
+cover's holes (nắp đế) ours flips from hole to hole: Revolute 2 / 9 / 12 agree with live, Cylindrical 6 / 7 and Revolute
+11 are reversed. So within one mate the two ends can disagree and it can't hold ("overdefines" / "not consistent").
+`implicit.rs` takes a circle edge's Z from the circle's axis (the kernel's sense); Part Studio connectors
+(`refgeom.rs`) follow live 1708 (Z = outward normal of the planar face the rim bounds). Applying the same in
+`implicit.rs` (plain `face_plane().unit_normal()`) left robotic-arm at 1/29, so the face's orientation, the X axis or
+the translator's flip needs a closer look. Existing Noshape assemblies with mates on circular edges would solve
+differently after such a change, so it needs a legacy gate (as `legacy_rim_seams`). Yours if the lead agrees; dx's
+comparison script: /root/dx-scratch/ra/cmp.py (our connector vs live's matedCS per mate end).
+
 ## From dx (11-11 21:44 UTC): asm-hand-drill-pinslot's 30 "Mate overdefines the assembly" (live OK), FYI
 29 of them have the Gearbox Housing (studio e0abe1, which builds without a feature error) at one end, 12 a 4mm
 Bearing Pin, 6 a 4mm Ball Bearing: Cylindrical / Planar / Pin slot / Ball mates that live solves. Either our solver

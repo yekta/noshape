@@ -265,7 +265,6 @@ pub fn is_imprint_entity(id: u32) -> bool {
 /// sketch's own regions, and the face's pieces outside them are regions too (sketch faces that qSketchRegion leaves
 /// out). The regions, which of them are such pieces, and the sketch's own regions that were split.
 fn imprint(ev: &EvalCtx, frame: &crate::display::PlaneFrame, sk: &noshape_sketch::Sketch, own: Vec<Region>) -> (Vec<Region>, Vec<bool>, Vec<Region>) {
-    use noshape_kernel as k;
     let plain = |own| (own, Vec::new(), Vec::new());
     use crate::reference::{Reference, Source};
     let Some(plane) = ev.query("sketchPlane").first().cloned() else { return plain(own) };
@@ -285,22 +284,19 @@ fn imprint(ev: &EvalCtx, frame: &crate::display::PlaneFrame, sk: &noshape_sketch
         let Some(c) = face_edge_curve(e, frame) else { return plain(own) };
         extra.push((noshape_sketch::EntityId(IMPRINT_ENTITY + i as u32), c));
     }
-    let size = face.bounding_box(false).map(|b| (b.max - b.min).length()).unwrap_or(1.0);
-    let on_face = |p: glam::DVec2| k::make_vertex(frame.to_world(p)).ok().and_then(|v| k::distance(&face, &v).ok()).is_some_and(|d| d.distance <= 1e-6 * size);
     let ids: std::collections::HashSet<&noshape_sketch::regions::RegionId> = own.iter().map(|o| &o.id).collect();
     let boxes: Vec<_> = own.iter().map(|o| o.bbox()).collect();
+    // Every closed piece is a region: the face's, those the sketch's curves close with the face's edges off it (live:
+    // c2-duct-multipart's Sketch 5 triangles between a dangling line, a diagonal and the face's edge), and a hole's
+    // inside, closed by the face's edges alone (live: asm-robotic-arm's Sketch 3 on a frame's face: JPC inside JPG).
     let (mut regions, mut imprinted) = (Vec::new(), Vec::new());
     for r in sk.regions_with(&extra) {
-        let p = (!ids.contains(&r.id)).then(|| r.interior_point());
-        let inside = p.is_none_or(|p| own.iter().zip(&boxes).any(|(o, b)| b.contains(p) && o.contains(p)));
-        // Off the face and outside the sketch's loops, a region the sketch's curves help close is one too (live: c2-duct-
-        // multipart's Sketch 5 triangles between a dangling line, a diagonal and the face's edge); one of the face's
-        // edges alone (its hole) isn't.
-        let closed_by_sketch = || r.id.entities().iter().any(|e| !is_imprint_entity(e.0));
-        if inside || p.is_some_and(on_face) || closed_by_sketch() {
-            regions.push(r);
-            imprinted.push(!inside);
-        }
+        let inside = ids.contains(&r.id) || {
+            let p = r.interior_point();
+            own.iter().zip(&boxes).any(|(o, b)| b.contains(p) && o.contains(p))
+        };
+        regions.push(r);
+        imprinted.push(!inside);
     }
     let kept: std::collections::HashSet<noshape_sketch::regions::RegionId> = regions.iter().map(|r| r.id.clone()).collect();
     let split = own.into_iter().filter(|o| !kept.contains(&o.id)).collect();

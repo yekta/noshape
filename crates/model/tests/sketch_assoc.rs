@@ -203,6 +203,42 @@ fn text_style_edit_regenerates_with_a_cached_regenerator() {
     assert!(w2 > w1 * 1.02, "bold glyphs are wider after regen: {w1} -> {w2}");
 }
 
+/// An empty sketch on a frame's face (a 60 x 40 mm plate with a 40 x 20 mm opening, 10 mm): the face and the
+/// opening's inside are both sketch faces, as live's (asm-robotic-arm's Sketch 3: JPG the frame's face, JPC inside
+/// it, which its Extrude 4 picks), neither of them qSketchRegion's.
+#[test]
+fn a_sketch_on_a_face_with_a_hole_has_the_holes_inside_too() {
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.corner_rectangle(DVec2::ZERO, DVec2::new(0.06, 0.04));
+    sk.corner_rectangle(DVec2::new(0.01, 0.01), DVec2::new(0.05, 0.03));
+    let mut sketch = ps.new_feature("sketch", &units).unwrap();
+    sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    let sketch_id = sketch.id;
+    ps.features.push(sketch);
+    let regions = regen(&ps, &units).display.sketches[0].regions.clone();
+    let ring = regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).expect("the frame's region").key.clone();
+    let mut ex = ps.new_feature("extrude", &units).unwrap();
+    ex.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sketch_id, key: ring }]));
+    ex.params.set("depth", ParamValue::Expr(ExprValue::new("10 mm")));
+    ps.features.push(ex);
+    let r = regen(&ps, &units);
+    let top = r.context.bodies[0].faces.iter().find(|n| format!("{n:?}").contains("CapEnd")).expect("top cap face").clone();
+    let mut f = ps.new_feature("sketch", &units).unwrap();
+    f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Face((*top).clone())]));
+    f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: noshape_sketch::Sketch::new(), ..Default::default() })));
+    let id = f.id;
+    ps.features.push(f);
+    let r = regen(&ps, &units);
+    let s = r.context.sketches.iter().find(|s| s.feature == id).unwrap();
+    let mut areas: Vec<f64> = s.regions.iter().map(|g| g.area() * 1e6).collect();
+    areas.sort_by(f64::total_cmp);
+    assert!(areas.len() == 2 && (areas[0] - 800.0).abs() < 1e-6 && (areas[1] - 1600.0).abs() < 1e-6, "{areas:?}");
+    assert!(s.imprinted.iter().all(|i| *i), "{:?}", s.imprinted);
+}
+
 /// A sketch on a face imprints the face's edges, as live 11-03 (core's probe in "live 1812 drawing scale", a 60 x 40 x
 /// 10 mm block from (0, 0) on Top, sketches on its top face): the face's pieces are sketch faces, the sketch's own
 /// regions are split by the face's edges, and only those are qSketchRegion's; off the face, what the sketch's curves

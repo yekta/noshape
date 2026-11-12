@@ -30,6 +30,16 @@ new); most are the selection after a step (`.drawing.selection.length` live 1 / 
 - drw-view-align-vertically: step 1 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (4/6 states)
 - drw-view-replicate-annotations: step 8 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (8/10 states)
 
+## 11-12 01:56 UTC: a sketch on a face has its holes' insides as regions; IGES subfigures one part per solid
+- Imprint: a hole's inside, closed by the face's edges alone, is a sketch face too (live: asm-robotic-arm's Sketch 3,
+  JPC inside JPG; T1 sketch_assoc a_sketch_on_a_face_with_a_hole_has_the_holes_inside_too). Model suite 826 -> 827/947
+  vs qa's e3552a6d run, none lower. Assembly suite: robotic-arm's cover (eed029) now as live up to Draft 1, but its
+  mates 3 -> 1/29 (1483 occ, 282/470 mates): the cover's connectors now resolve and show the circular-edge connector Z
+  problem (asm.md: implicit connectors take a circle's own axis, not live 1708's rule; a legacy gate needed).
+- asm-isaac-ball: Fillet 2 of 00f1d4 / de4eff is a kernel fillet failure on live's edge (core.md).
+- IGES-SUBFIGURE-ONE-PART: a subfigure of several labelled solids reads as one part per solid (asm2.igs: Part 1-3).
+- A two-vertex fit spline's edge and ends keep v0.4.44's names (index-based wire names; test extended, lead).
+
 ## 11-11 23:09 UTC: assembly suite 1450 -> 1483/1731 occurrences, mates 249 -> 284/470 (vibe5, all 24, none worse)
 - Placing at live's transform always sets the rotation (an unrotated one kept a mate's snap: isaac-ball's fixed
   parts); fixed instances are placed again after the mates too. isaac-ball 100 -> 105/121, infento-subs mates 37 -> 67,
