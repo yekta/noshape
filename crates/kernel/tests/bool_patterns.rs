@@ -626,16 +626,18 @@ fn a_25_by_25_knurl() {
 }
 
 /// A cut leaving two lumps that touch along a line (asm-infento-subs' Extrude 13, recorded: a wheel house's sides cut
-/// by two tools whose arcs are tangent to its step's plane there; live makes them two parts): noshape's Boolean
-/// declines it ("a non-manifold result"; taking it moved an older release's saved references, qa's
-/// cli-chamfer-hang-pre), OCCT's two solids sharing the edge, its counts and volume.
+/// by two tools whose arcs are tangent to its step's plane there; live makes them two parts): noshape's Boolean pairs
+/// the four faces at that edge across the material and takes it, two solids sharing the edge, OCCT's counts and volume.
 #[test]
 fn lumps_touching_along_a_line_are_two_solids() {
     let _ = k::set_working_scale(1000.0);
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
     let c = k::bool_corpus::load(&dir, "c8039d7caebe0624").expect("the recorded cut");
-    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's cut");
-    assert_eq!(k::last_rust_decline(), "a non-manifold result");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
     assert!(r.shape.is_valid());
     assert_eq!(r.shape.solids().len(), 2);
     let counts = (r.shape.count(k::ShapeType::Face), r.shape.count(k::ShapeType::Edge), r.shape.count(k::ShapeType::Vertex));

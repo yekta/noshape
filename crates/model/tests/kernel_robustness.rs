@@ -3050,6 +3050,23 @@ fn a_region_slit_by_a_line_extrudes() {
     assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), 4);
 }
 
+/// CUT-LUMPS-TOUCHING (live: asm-infento-subs' Extrude 13 makes two parts of a cut whose lumps meet along a line): a
+/// 20 x 20 x 10 block cut through by two 10 mm squares meeting at a corner leaves two cubes touching along an edge:
+/// two parts, not Parasolid's non-manifold refusal (that is for one body touching itself).
+#[test]
+fn a_cut_leaving_lumps_touching_along_an_edge_makes_two_parts() {
+    let mut t = T::new();
+    t.block(20.0, 20.0, 10.0);
+    let (_, regions) = t.sketch(&[&[(10.0, 0.0), (20.0, 0.0), (20.0, 10.0), (10.0, 10.0)], &[(0.0, 10.0), (10.0, 10.0), (10.0, 20.0), (0.0, 20.0)]], &[]);
+    let x = t.add("extrude", &[("entities", q(regions)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
+    let r = t.ok(x);
+    assert_eq!(r.context.bodies.len(), 2);
+    for b in &r.context.bodies {
+        let v = b.shape.volume().unwrap() * 1e9;
+        assert!((v - 1000.0).abs() < 1e-6, "{v}");
+    }
+}
+
 /// EXTRUDE-UP-TO-FACE-BEYOND (dx; live ends on the face's surface): a Ø10 circle at (50, 0) on Top, beside a 20 × 20
 /// × 10 block, extruded New up to the block's top face: a Ø10 × 10 cylinder.
 #[test]
