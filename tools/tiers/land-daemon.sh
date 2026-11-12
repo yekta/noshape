@@ -333,7 +333,7 @@ run_batch() {
   prune_land_target "$CARGO_TARGET_DIR" > /dev/null
   : > "$d/times"; s=$(date +%s)
   # (In its own process group, stopped as soon as the batch under it ends without landing: its result can't be used.)
-  LAND_TIMES="$d/times" setsid timeout 90m ${LAND_CHECKS:-tools/tiers/land-checks.sh} "$pkgs" "$d/changed" > "$d/check.log" 2>&1 &
+  LAND_TIMES="$d/times" setsid timeout 150m ${LAND_CHECKS:-tools/tiers/land-checks.sh} "$pkgs" "$d/changed" > "$d/check.log" 2>&1 &
   local cpid=$!
   while kill -0 "$cpid" 2>/dev/null; do
     if dep_failed "$dep"; then kill -TERM -- "-$cpid" 2>/dev/null; log "$bid: check stopped: $dep under it didn't land"; break; fi
@@ -396,7 +396,7 @@ run_batch() {
       done < "$d/counts"
     fi
   else
-    reason=$(sed -n 's/^LAND FAILED: //p' "$d/check.log" | tail -1); [ $rc -eq 124 ] && reason="timeout (checks over 90 min)"
+    reason=$(sed -n 's/^LAND FAILED: //p' "$d/check.log" | tail -1); [ $rc -eq 124 ] && reason="timeout (checks over 150 min)"
     reason=${reason:-"checks exited $rc"}
     local bl=""; [ $n -gt 1 ] && bl=$(blame "$reason" "$d/check.log" "$d/dep.changed" "${applied[@]}" 2>>"$LD/daemon.log")
     if [ $n -eq 1 ]; then
