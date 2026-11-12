@@ -834,6 +834,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
         }
         let closed = whole && pieces.len() == 1;
         let last_piece = pieces.len() - 1;
+        let mut jobs = Vec::new();
         for (pi, &(plo, phi, ci)) in pieces.iter().enumerate() {
             // (A chamfer as sections: a ruled face, fewer sections; its cut took most of its time.)
             let total_n = if spec.reference.is_some() { 24 } else { N };
@@ -883,8 +884,17 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     starts.push(q);
                 }
             }
+            jobs.push((pi, ci, secs, starts, convex));
+        }
+        // The lofts in parallel (c2-variable-fillet-faceblend's eight took 425 ms one after another).
+        use rayon::prelude::*;
+        let legacy = k::kernel_legacy();
+        let lofts = jobs
+            .par_iter()
             // Every section starts at its corner: a curvature section's B-spline wires twisted otherwise.
-            let tool = k::loft(&secs, &k::LoftOptions { solid: true, closed, start_points: Some(starts), ..Default::default() })?;
+            .map(|(_, _, secs, starts, _)| k::with_kernel_legacy(legacy.clone(), || k::loft(secs, &k::LoftOptions { solid: true, closed, start_points: Some(starts.clone()), ..Default::default() })))
+            .collect::<Result<Vec<_>, _>>()?;
+        for ((pi, ci, secs, _, convex), tool) in jobs.into_iter().zip(lofts) {
             if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
                 eprintln!("section blend: loft of {} sections (closed {closed}, chain {} edges): valid {} volume {:?} faces {}", secs.len(), chain.len(), tool.shape.is_valid(), tool.shape.volume(), tool.shape.count(ShapeType::Face));
             }
