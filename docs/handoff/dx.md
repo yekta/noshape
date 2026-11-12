@@ -30,6 +30,18 @@ new); most are the selection after a step (`.drawing.selection.length` live 1 / 
 - drw-view-align-vertically: step 1 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (4/6 states)
 - drw-view-replicate-annotations: step 8 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (8/10 states)
 
+## 11-12 05:58 UTC: assembly mates 286 -> 320/509, occurrences 1486/1731 (vibe5, all 24, none lower)
+- Assembly mate connectors on the assembly origin (Origin's ORIGIN_X / Y / Z: "Assembly XZ plane" …) are made in ours
+  and mates use them by name; a Part Studio's Mate connector feature on an instance is used as ours ("mc:<ours>.0").
+  T1 parity a_mate_to_an_assembly_origin_connector_is_translated. clamp-pattern now counts all 32 mates (14 match).
+- A connector whose query read as another part of the studio than the instance's takes the instance's own entity at
+  live's point. gearbox-std mates 6 -> 20/20, isaac-ball 58 -> 63, bjr-config 3 -> 9/9, config-assembly 4/4.
+- Left, by owner: tvc-mount 7 mates on studio 7bc9d8, whose Mirror 4 of a custom fastener hole fails (core.md);
+  bjr-config's studio 5d8bc1 Extrude 12 (REMOVE up to a face) fails in ours; config-assembly's studio 08590a Hole 1
+  is placed by a connector on sheet metal derived edges we don't map; keyboard-pattern and rack-pinion's Derived /
+  Import sources and corexy's in-feature connectors wait on live (REQUESTS); robotic-arm's last mates wait on live's
+  rim-connector probe (REQUESTS); 3-level per-path positions (bjr-config, xdev-subs) are asm's.
+
 ## 11-12 03:53 UTC: circular-edge centre connectors point out of the material as live (gated); assembly suite 1484, mates 286
 - New connectors on a circular edge (`Inference::CenterOutward`, id "center") point as live 1708: out through the
   planar face the rim bounds, a cone/cylinder rim against the cone (robotic-arm's countersunk screws and holes). Saved

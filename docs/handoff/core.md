@@ -2049,6 +2049,14 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From dx (11-12 05:00 UTC): asm-tvc-mount's Mirror 4 (a feature mirror of a custom fastener hole) fails, live removes 89 mm³
+Studio 7bc9d8 of asm-tvc-mount: Mirror 4 is patternType FEATURE over a custom feature ("#featureName", a fastener
+hole: "Fastener fit will not be applied…"), mirrorPlane a face (JEC). Ours: "Could not create all instances as entered.
+Try selecting "Reapply features" option."; live OK (its 4th part 6825 -> 6736 mm³). Everything before matches live's
+volumes. 7 of tvc-mount's 10 mates sit on parts of this studio (their connectors find nothing on our part at live's
+point after it), so it's worth most of the assembly's mates. Repro: the assembly suite on asm-tvc-mount, tab
+"Studio 7bc9d8".
+
 ## From dx (11-11 23:20 UTC): asm-isaac-ball's Fillet 2 (4 mm, one concave arc) fails in ours, live adds 98 mm³
 Studios 00f1d4 and de4eff of asm-isaac-ball (the same design): after Fillet 1 our part is live's to the hundredth
 (17064.68 mm³); Fillet 2 rounds one edge, a 34.47 mm circle arc at (-20.36, 0, -0.40) mm (live's JN1, 34.46 mm,

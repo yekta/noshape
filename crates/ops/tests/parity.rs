@@ -2224,6 +2224,44 @@ fn an_assembly_is_rebuilt_as_lives() {
 /// cylinder and Sub's instance, turned 30° and stacked on it by a Revolute from the root cylinder's top edge to the
 /// nested cylinder's bottom edge (its connector's path through Sub). Every occurrence, the nested one too, placed as
 /// live's; the mate as live's.
+/// An assembly's own mate connector on its origin ("Assembly XY plane": Origin's ORIGIN_Z, as live's clamp-pattern
+/// has three of them) is made in ours under its name, and a mate to it is translated and holds: a cylinder standing
+/// on the XY plane (its bottom rim's centre, Planar, flipped).
+#[test]
+fn a_mate_to_an_assembly_origin_connector_is_translated() {
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": "FS1", "entityType": "FACE" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "20 mm" }] }
+    ] });
+    let parts = json!([{ "partId": "JHD", "name": "Part 1" }]);
+    let origin = json!({ "btType": "BTMMateConnector-66", "featureType": "mateConnector", "featureId": "MXY", "name": "Assembly XY plane", "parameters": [
+        { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "originQuery", "queries": [{ "btType": "BTMFeatureQueryWithOccurrence-157", "path": [], "queryData": "ORIGIN_Z", "featureId": "Origin" }] }] });
+    let rim = json!({ "btType": "BTMMateConnector-66", "featureId": "MB", "implicit": true, "parameters": [
+        { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "originQuery", "queries": [{ "btType": "BTMInferenceQueryWithOccurrence-1083", "inferenceType": "CENTER", "path": ["IA"],
+          "entityQuery": "query=qContainsPoint(qEverything(EntityType.EDGE), vector(4, 0, 0) * millimeter);" }] }] });
+    let asm = json!({
+        "rootAssembly": {
+            "instances": [{ "id": "IA", "name": "Part 1 <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }],
+            "occurrences": [{ "path": ["IA"], "fixed": false, "transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }] },
+        "features": { "features": [origin, { "btType": "BTMMate-64", "featureId": "M1", "name": "Planar 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "mateType", "value": "PLANAR" },
+            { "btType": "BTMParameterBoolean-144", "parameterId": "primaryAxisAlignment", "value": true },
+            { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "mateConnectorsQuery", "queries": [{ "featureId": "MB" }, { "btType": "BTMFeatureQueryWithOccurrence-157", "path": [], "featureId": "MXY" }] }],
+            "mateConnectors": [rim] }],
+          "featureStates": { "M1": { "featureStatus": "OK" } } } });
+    let mut ctx = Ctx::new();
+    let r = rebuild_assembly(&mut ctx, &scratch("origin-connector.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    assert!(r.untranslated.is_empty() && r.differences.is_empty(), "{r:?}");
+    assert_eq!((r.occurrences_matching, r.occurrences, r.mates_matching, r.mates), (1, 1, 1, 1));
+}
+
 #[test]
 fn a_subassembly_is_rebuilt_as_lives() {
     let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [

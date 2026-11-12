@@ -649,9 +649,14 @@ impl<'a> Translator<'a> {
     /// [`Self::connector_entities`] on the part of entity `of` (a studio's other parts may have a circle there too:
     /// asm-scissor-lift's pins in their holes).
     pub fn connector_entities_on_part_of(&mut self, of: &str, inference: &str, origin: [f64; 3]) -> Result<Vec<String>, String> {
-        let r = self.call("query_entities", json!({ "kind": "faces", "of": [of], "limit": 1 }))?;
-        let Some(part) = r["faces"][0]["part"].as_str().map(str::to_string) else { return Ok(Vec::new()) };
+        let Some(part) = self.part_of_entity(of) else { return Ok(Vec::new()) };
         Ok(self.connector_candidates(inference, origin)?.into_iter().filter(|(_, p)| *p == part).map(|(id, _)| id).collect())
+    }
+
+    /// The part (body id) entity `of` is on.
+    fn part_of_entity(&mut self, of: &str) -> Option<String> {
+        let r = self.call("query_entities", json!({ "kind": "faces", "of": [of], "limit": 1 })).ok()?;
+        r["faces"][0]["part"].as_str().map(str::to_string)
     }
 
     /// (id, part) of each entity whose implicit connector of `inference` lies at `origin`.
@@ -5970,6 +5975,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     let mut tabs: HashMap<String, String> = HashMap::new();
     // Each studio's List and Checkbox inputs built in ours (live's ids), which its instances' configurations choose.
     let mut choice_ids: HashMap<String, HashSet<String>> = HashMap::new();
+    // Each studio's features, live's id → ours (its Mate connector features, which an assembly's mates use).
+    let mut studio_features: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut part_names: HashMap<(String, String), String> = HashMap::new();
     let mut entities: HashMap<Key, String> = HashMap::new();
     // A studio whose sketch another's Frame takes as its profile first.
@@ -6065,6 +6072,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             built.insert(element.clone(), (tab.clone(), t.feature_ids.clone()));
         }
         choice_ids.insert(element.clone(), t.config_inputs.clone());
+        studio_features.insert(element.clone(), t.feature_ids.clone());
         tabs.insert(element.clone(), t.tab.clone().unwrap_or(name.clone()));
         // Our parts (name, volume m³): live's part names come from its Part Studio's properties, which translation
         // doesn't carry ("Housing" here is our "Part 1"); such a part is ours by its only part or its volume band.
@@ -6165,6 +6173,16 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             // else the one whose point is (asm-hand-drill-pinslot's Gear Triple Connector: its query read as another
             // hole of the pattern, 4.2 mm off the pin's axis, so every mate of the drill failed with it). Not an axis
             // point or a face's centre: the face's end circles have the same point, not the same frame.
+            // On another part of the studio than the instance's (asm-tvc-mount's rings and Revolute 2's two parts read as
+            // one edge): the instance's own entity at live's point.
+            let own = own_part(&path_end);
+            let found = match found {
+                Ok(e) if own.as_ref().is_some_and(|part| t.part_of_entity(&e).is_some_and(|p| p != *part)) && connector_origins.contains_key(key) => {
+                    let (part, o) = (own.clone().unwrap_or_default(), connector_origins[key]);
+                    Ok(t.connector_candidates(inference, o).ok().and_then(|c| c.into_iter().find(|(_, p)| *p == part).map(|(id, _)| id)).unwrap_or(e))
+                }
+                found => found,
+            };
             let found = match (found, connector_origins.get(key)) {
                 (Err(_), Some(o)) => t.connector_entity(inference, *o),
                 // Nothing on its part there: the query read as another part's edge (asm-welding-config's Part 8 cap
@@ -6339,6 +6357,26 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
             Some(names.join(" > "))
         };
+        // Its own mate connectors on the assembly origin ("Assembly XZ plane": Origin's ORIGIN_X / Y / Z, Z along that
+        // axis; their X left ours, the Planar mates using them don't turn about it).
+        let mut origin_connectors: HashMap<String, String> = HashMap::new();
+        for f in l.features.iter().filter(|f| f["featureType"] == "mateConnector") {
+            let origin = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "originQuery").and_then(|p| p["queries"].as_array()).and_then(|q| q.first());
+            let Some(axis) = origin.filter(|q| q["featureId"] == "Origin").and_then(|q| q["queryData"].as_str()) else { continue };
+            let (Some(id), Some(name)) = (f["featureId"].as_str(), f["name"].as_str()) else { continue };
+            let mut args = json!({ "tab": l.tab, "on": { "origin": true }, "name": name });
+            match axis {
+                "ORIGIN_X" => args["offset"] = json!({ "rotation": "90 deg", "rotation_axis": "y" }),
+                "ORIGIN_Y" => args["offset"] = json!({ "rotation": "-90 deg", "rotation_axis": "x" }),
+                _ => {}
+            }
+            match placer.call("assembly_mate_connector", args) {
+                Ok(_) => {
+                    origin_connectors.insert(id.to_string(), name.to_string());
+                }
+                Err(e) => res.untranslated.push(format!("{name}: {e}")),
+            }
+        }
         // The mates, between the same connectors.
         for f in l.features.iter().filter(|f| f["btType"].as_str().is_some_and(|t| t.starts_with("BTMMate-"))) {
             let name = f["name"].as_str().unwrap_or("").to_string();
@@ -6352,7 +6390,17 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 .into_iter()
                 .flatten()
                 .map(|q| {
-                    let key = (l.element.clone(), q["featureId"].as_str()?.to_string());
+                    let id = q["featureId"].as_str()?;
+                    if let Some(name) = origin_connectors.get(id) {
+                        return Some(json!({ "connector": name }));
+                    }
+                    // A Part Studio's Mate connector on an instance: ours there.
+                    if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMPartStudioMateConnectorQuery")) {
+                        let path = ids(&q["path"]);
+                        let ours = path.last().and_then(|i| element_of.get(i)).and_then(|e| studio_features.get(e)).and_then(|f| f.get(id))?;
+                        return Some(json!({ "instance": path_names(&path)?, "reference": format!("mc:{}.0", ours.trim_start_matches("mc:")) }));
+                    }
+                    let key = (l.element.clone(), id.to_string());
                     let (path, inf, _) = connectors.get(&key)?;
                     let mut c = json!({ "instance": path_names(path)?, "entity": entities.get(&key)? });
                     if let Some(i) = inference(inf) {
