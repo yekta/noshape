@@ -27,6 +27,8 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <numeric>
 #include <thread>
 #include <unordered_map>
@@ -343,10 +345,26 @@ void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool 
 // them all): chunks of bodies near each other on the sheet, each hidden in
 // its own algo, in parallel, by itself and by the bodies whose projected
 // boxes overlap its own; a chunk draws its own bodies' edges. False if a
-// chunk failed.
+// chunk failed (`spent`: one ran past the exact pass's work bound).
 constexpr size_t kChunkedBodies = 64, kChunkBodies = 32;
 
-bool exact_chunked(Emitter& em, const std::vector<TopoDS_Shape>& bodies, const HLRAlgo_Projector& proj, const gp_Ax2& ax)
+// The exact pass's work bound (OCCT's break-hook checks in Update and Hide, counted per thread: the same on every
+// machine): 2.4 times the most an exact view of the exchange corpus takes (motor-mount-jack's Top, 409k, 1.9 s);
+// cf-wave-spring's Front passes 20M unfinished (288 s). Past it the view is hidden on the triangulation instead, at
+// the exact pass's deflection. NOSHAPE_WORK_TRACE=1 prints each pass's work.
+constexpr uint64_t kExactHideWork = 1000000;
+// set_hlr_exact_work's (tests): this thread's bound instead (0: kExactHideWork).
+thread_local uint64_t t_exact_work = 0;
+
+uint64_t exact_work() { return t_exact_work != 0 ? t_exact_work : kExactHideWork; }
+
+void trace_work(const ScopedWork& work)
+{
+  if (std::getenv("NOSHAPE_WORK_TRACE"))
+    std::fprintf(stderr, "work: hlr.exact %llu steps%s\n", (unsigned long long)work.w.used, work.w.hit ? " (spent)" : "");
+}
+
+bool exact_chunked(Emitter& em, const std::vector<TopoDS_Shape>& bodies, const HLRAlgo_Projector& proj, const gp_Ax2& ax, std::atomic<bool>& spent)
 {
   // Projected box; z toward the viewer.
   struct Box2
@@ -397,6 +415,7 @@ bool exact_chunked(Emitter& em, const std::vector<TopoDS_Shape>& bodies, const H
   const size_t        chunks = std::clamp<size_t>(n / kChunkBodies, 1, 4 * hw);
   std::vector<HlrOut> outs(chunks);
   std::atomic<bool>   failed{false};
+  const uint64_t      bound = exact_work();
   // Own threads: OCCT's pool runs a nested or concurrent For (the other
   // views of a sheet, computed at the same time) on the calling thread.
   auto hide_chunk = [&](size_t c) {
@@ -411,6 +430,7 @@ bool exact_chunked(Emitter& em, const std::vector<TopoDS_Shape>& bodies, const H
     for (size_t j = 0; j < n; ++j)
       if (!mine[j] && cb.hidden_by(box[j]) && std::any_of(members.begin(), members.end(), [&](size_t m) { return box[m].hidden_by(box[j]); }))
         others.push_back(j);
+    ScopedWork work(bound);
     try
     {
       BRep_Builder    bb;
@@ -430,6 +450,13 @@ bool exact_chunked(Emitter& em, const std::vector<TopoDS_Shape>& bodies, const H
       algo->Hide(1);
       if (!others.empty())
         algo->Hide(1, 2);
+      trace_work(work);
+      if (work.w.hit)
+      {
+        spent  = true;
+        failed = true;
+        return;
+      }
       occ::handle<HLRBRep_Data> DS = algo->DataStructure();
       if (DS.IsNull())
         return;
@@ -444,6 +471,8 @@ bool exact_chunked(Emitter& em, const std::vector<TopoDS_Shape>& bodies, const H
     }
     catch (const Standard_Failure&)
     {
+      if (work.w.hit)
+        spent = true;
       failed = true;
     }
   };
@@ -474,6 +503,13 @@ bool exact_chunked(Emitter& em, const std::vector<TopoDS_Shape>& bodies, const H
 
 } // namespace
 
+uint64_t set_hlr_exact_work(uint64_t steps)
+{
+  const uint64_t was = t_exact_work;
+  t_exact_work       = steps;
+  return was;
+}
+
 HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflection)
 {
   require_non_null(s.shape, "shape");
@@ -502,22 +538,39 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
     if (s.shape.ShapeType() == TopAbs_COMPOUND)
       for (TopoDS_Iterator it(s.shape); it.More(); it.Next())
         bodies.push_back(it.Value());
-    if (bodies.size() >= kChunkedBodies && exact_chunked(em, bodies, proj, ax))
+    std::atomic<bool> spent{false};
+    if (bodies.size() >= kChunkedBodies && exact_chunked(em, bodies, proj, ax, spent))
       return out;
-    occ::handle<HLRBRep_Algo> algo = new HLRBRep_Algo();
-    algo->Add(s.shape);
-    algo->Projector(proj);
-    algo->Update();
-    algo->Hide();
-    occ::handle<HLRBRep_Data> DS = algo->DataStructure();
-    if (DS.IsNull())
-      return out;
-    DS->Projector().Scaled(true);
-    for (bool visible : {true, false})
-      for (int typ : {5, 2, 3, 4})
-        exact_pass(em, DS, typ, visible);
-    DS->Projector().Scaled(false);
-    return out;
+    if (!spent)
+    {
+      ScopedWork                work(exact_work());
+      occ::handle<HLRBRep_Algo> algo = new HLRBRep_Algo();
+      try
+      {
+        algo->Add(s.shape);
+        algo->Projector(proj);
+        algo->Update();
+        algo->Hide();
+      }
+      catch (const Standard_Failure&)
+      {
+        if (!work.w.hit)
+          throw;
+      }
+      trace_work(work);
+      if (!work.w.hit)
+      {
+        occ::handle<HLRBRep_Data> DS = algo->DataStructure();
+        if (DS.IsNull())
+          return out;
+        DS->Projector().Scaled(true);
+        for (bool visible : {true, false})
+          for (int typ : {5, 2, 3, 4})
+            exact_pass(em, DS, typ, visible);
+        DS->Projector().Scaled(false);
+        return out;
+      }
+    }
   }
 
   // Polygonal HLR on the triangulation.

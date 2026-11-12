@@ -206,3 +206,29 @@ fn a_paste_puts_the_copied_box_lower_left_at_the_point(cx: &mut TestAppContext) 
     let corner = corner.expect("the pasted view drawn");
     assert!((corner[0] - 230.0).abs() < 0.5 && (corner[1] - 40.0).abs() < 0.5, "the frame's lower-left at the point: {corner:?}");
 }
+
+/// Lead 11-12 (drawing speed): a zoom's lines (pen widths are in pixels) are remade off the UI thread, the frame
+/// drawing the old ones meanwhile (the parts drawing's 14-27 ms per wheel step on the UI thread).
+#[gpui::test]
+fn a_zoom_remakes_the_lines_off_the_ui_thread(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "zoom-lines");
+    for _ in 0..1500 {
+        if cx.update(|cx| editor.read(cx).real_sheet_in()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, window);
+    }
+    let (before, _) = cx.update(|cx| editor.read(cx).lines_state());
+    assert!(before > 0.0, "the sheet's lines made");
+    cx.update(|cx| editor.update(cx, |e, cx| e.zoom_by(1.5, [600.0, 600.0], cx)));
+    cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+    let (drawn, remaking) = cx.update(|cx| editor.read(cx).lines_state());
+    assert!(remaking && drawn == before, "the frame drew the old lines, the new ones being made");
+    cx.run_until_parked();
+    let zoom = cx.update(|cx| editor.read(cx).zoom);
+    let (after, remaking) = cx.update(|cx| editor.read(cx).lines_state());
+    assert!(!remaking && after == zoom && zoom > before * 1.4, "the lines made for the new zoom: {before} -> {after} ({zoom})");
+}

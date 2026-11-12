@@ -60,6 +60,19 @@ pub fn project_hlr_with(shape: &Shape, view_dir: DVec3, up: DVec3, exact: bool, 
     Ok(merge_fragments(drop_covered_hidden(raw, cover_tol), join_tol))
 }
 
+/// Runs `f` with this thread's exact HLR bounded by `steps` of work (OCCT's break-hook checks; tests), past which a
+/// view is hidden on its triangulation instead; 0 for the default bound.
+pub fn with_hlr_exact_work<T>(steps: u64, f: impl FnOnce() -> T) -> T {
+    struct Restore(u64);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            ffi::set_hlr_exact_work(self.0);
+        }
+    }
+    let _restore = Restore(ffi::set_hlr_exact_work(steps));
+    f()
+}
+
 /// Unprocessed HLR fragments (see [`project_hlr_with`]).
 pub fn project_hlr_raw(shape: &Shape, view_dir: DVec3, up: DVec3, exact: bool, deflection: f64) -> Result<Vec<ProjectedEdge>> {
     let out = ck(ffi::project_hlr(shape.raw(), p3(view_dir), p3(up), exact, deflection))?;

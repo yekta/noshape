@@ -1082,6 +1082,7 @@ bool                     is_mesh(const OcShape& s);
 bool                     has_triangulation(const OcShape& s);
 
 // ---- HLR (hlr.cpp)
+uint64_t set_hlr_exact_work(uint64_t steps);
 HlrOut project_hlr(const OcShape& s, P3 dir, P3 up,
                    bool exact, double deflection);
 

@@ -188,3 +188,33 @@ fn an_edge_between_faces_of_one_surface_is_not_drawn() {
         assert_eq!(across.count(), 0, "exact={exact}:\n{}", dump(&e));
     }
 }
+
+/// Lead 11-12 (drawing speed): an exact view past its work bound (cf-wave-spring's ran 35 min and on) is hidden on
+/// the triangulation at the same deflection instead, so the drawing finishes; the bound is work, the same everywhere.
+#[test]
+fn an_exact_view_past_its_work_bound_is_hidden_on_the_triangulation() {
+    let plate = plate_with_holes(8.0, &[(-25.0, 0.0), (25.0, 0.0)]);
+    let (dir, up) = (DVec3::new(-1.0, 1.0, -1.0), DVec3::Z);
+    let exact = project_hlr_with(&plate, dir, up, true, 0.05).unwrap();
+    let poly = project_hlr_with(&plate, dir, up, false, 0.05).unwrap();
+    assert_ne!(dump(&exact), dump(&poly), "within its bound the view is exact");
+    let spent = with_hlr_exact_work(10, || project_hlr_with(&plate, dir, up, true, 0.05).unwrap());
+    assert_eq!(dump(&spent), dump(&poly), "past it, the triangulation's");
+    let again = project_hlr_with(&plate, dir, up, true, 0.05).unwrap();
+    assert_eq!(dump(&again), dump(&exact), "the default bound back after");
+}
+
+/// cf-wave-spring (the exchange corpus' wave spring, 6 B-spline faces): OCCT's exact Hide ran 35 min and on; the
+/// views finish (on the triangulation, past the exact pass's work bound).
+#[test]
+#[ignore = "T2: the exact pass runs to its work bound, ~25 s"]
+fn the_wave_springs_exact_views_finish() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/hlr/wave-spring.brep");
+    let spring = read_brep(&path).unwrap();
+    for (dir, up) in [(DVec3::Y, DVec3::Z), (DVec3::NEG_Z, DVec3::Y)] {
+        let exact = project_hlr_with(&spring, dir, up, true, 0.0).unwrap();
+        let poly = project_hlr_with(&spring, dir, up, false, 0.0).unwrap();
+        assert_eq!(exact.len(), poly.len(), "hidden on the triangulation");
+        assert!(exact.iter().any(|e| e.visibility == Visibility::Visible) && exact.iter().any(|e| e.visibility == Visibility::Hidden));
+    }
+}

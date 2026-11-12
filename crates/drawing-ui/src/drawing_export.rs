@@ -267,8 +267,13 @@ impl DrawingEditor {
             // Vector output (or SVG for rasterizing) per sheet, off the UI thread.
             let result: Result<Vec<(String, Vec<u8>)>, String> = cx
                 .background_spawn(async move {
+                    let t = std::time::Instant::now();
                     let files = noshape_ops::drawing_export::export_files(&drawing, &sheets, &settings, &sources, &cache, &info, &extras)?;
-                    if f.raster() { files.into_iter().map(|(n, svg)| Ok((n, noshape_ops::drawing_export::rasterize(&svg, f)?))).collect() } else { Ok(files) }
+                    let out = if f.raster() { files.into_iter().map(|(n, svg)| Ok((n, noshape_ops::drawing_export::rasterize(&svg, f)?))).collect() } else { Ok(files) };
+                    if noshape_render::perf::enabled() {
+                        noshape_render::perf::milestone(&format!("drawing: export {} written in {:.1} ms", f.label(), t.elapsed().as_secs_f64() * 1000.0));
+                    }
+                    out
                 })
                 .await;
             this.update(cx, |this, cx| {

@@ -30,6 +30,7 @@ use noshape_model::drawing::build::{BuiltSheet, PickTarget, SheetInfo, assemble_
 use noshape_model::drawing::views::{self, SourceKey, Sources, ViewCache, ViewGeometry};
 use noshape_model::drawing::*;
 use noshape_model::regen::Regenerator;
+use noshape_render::renderer::Uploader;
 use noshape_render::worker::RenderJob;
 use noshape_render::{Camera, Drawable, Instance, LinesHandle, MeshHandle, PointsHandle, Projection as CamProjection, Scene, Style, state};
 use parking_lot::Mutex;
@@ -40,6 +41,14 @@ use std::sync::Arc;
 // The tool, pick, selection and drag types are GUI-free (shared with the
 // agent API): noshape_scene::drawing_tools.
 pub use noshape_scene::drawing_tools::{Button, DimTool, Drag, Pick, PickedPoint, Sel, TableTool, Tool};
+
+/// A sheet's lines drawn at one zoom, and its shaded views' edges (hovered or selected, plain).
+type ZoomedLines = (Option<LinesHandle>, Vec<(ViewId, LinesHandle, LinesHandle)>);
+
+/// The pick ids of dangling annotations (drawn red).
+fn dangling_picks(built: &BuiltSheet) -> HashSet<u32> {
+    built.picks.iter().enumerate().filter(|(_, t)| matches!(t, PickTarget::Annotation(a) if built.dangling.contains(a))).map(|(i, _)| i as u32).collect()
+}
 
 /// The drag's mouse button.
 pub fn drag_button(b: MouseButton) -> Button {
@@ -297,6 +306,8 @@ pub struct DrawingEditor {
     /// `sources_at` and the sources still made from it until Update (qa5 D17).
     old_state: Option<(noshape_model::Document, Vec<SourceKey>)>,
     pub cache: Arc<ViewCache>,
+    /// When the views' pending work started (perf log).
+    work_since: Option<std::time::Instant>,
     pub geoms: HashMap<ViewId, Arc<ViewGeometry>>,
     compute_task: Option<Task<()>>,
     compute_again: bool,
@@ -312,6 +323,8 @@ pub struct DrawingEditor {
     // Rendering.
     lines: Option<LinesHandle>,
     lines_zoom: f64,
+    /// The lines remade for a new zoom, off the UI thread.
+    lines_task: Option<Task<()>>,
     fills: Option<MeshHandle>,
     /// Filled sheet text: (ink, dangling).
     texts: [Option<MeshHandle>; 2],
@@ -665,6 +678,7 @@ impl DrawingEditor {
             out_of_date: false,
             old_state: None,
             cache: Arc::new(ViewCache::new()),
+            work_since: None,
             geoms: HashMap::new(),
             compute_task: None,
             compute_again: false,
@@ -676,6 +690,7 @@ impl DrawingEditor {
             fitted: false,
             lines: None,
             lines_zoom: 0.0,
+            lines_task: None,
             fills: None,
             texts: [None, None],
             watermark: None,
@@ -1101,6 +1116,7 @@ impl DrawingEditor {
                     })
                     .await;
                 this.update(cx, |this, cx| {
+                    let t_in = std::time::Instant::now();
                     this.regenerating.remove(&key);
                     match src {
                         Some(src) => {
@@ -1136,6 +1152,9 @@ impl DrawingEditor {
                         }
                     }
                     this.refresh(cx);
+                    if noshape_render::perf::enabled() {
+                        noshape_render::perf::milestone(&format!("drawing: a source in, {:.1} ms on the UI thread", t_in.elapsed().as_secs_f64() * 1000.0));
+                    }
                 })
                 .ok();
             })
@@ -1145,6 +1164,7 @@ impl DrawingEditor {
     }
 
     pub fn update_drawing(&mut self, cx: &mut Context<Self>) {
+        self.work_since.get_or_insert_with(std::time::Instant::now);
         // The views are made from the current document from now on, also
         // when it is reopened.
         if self.out_of_date || self.old_state.is_some() {
@@ -1217,12 +1237,21 @@ impl DrawingEditor {
         let shown = sourced && self.regenerating.is_empty() && !need_fast;
         let complete = shown && !need_exact && !self.computing;
         self.note_open_sheet(shown, complete, cx);
+        // The perf log's "views ready": from the work's start (an Update, views to compute) to every view exact.
+        if complete && let Some(t) = self.work_since.take() && noshape_render::perf::enabled() {
+            noshape_render::perf::milestone(&format!("drawing: views ready {:.1} ms after the work started", t.elapsed().as_secs_f64() * 1000.0));
+        }
         if need_fast {
             self.schedule_compute(false, cx);
         } else if need_exact && !interactive {
             self.schedule_compute(true, cx);
         }
+        let t_assemble = std::time::Instant::now();
         let built = assemble_sheet(&d, si, &self.geoms, &self.sources, &self.info);
+        let ms = t_assemble.elapsed().as_secs_f64() * 1000.0;
+        if ms > 10.0 && noshape_render::perf::enabled() {
+            noshape_render::perf::milestone(&format!("drawing: sheet assembled on the UI thread in {ms:.1} ms"));
+        }
         let mut built = self.sheet_to_show(si, built, complete, cx);
         // Model space (live behaviours "Imported DWG/DXF drawings"): no paper,
         // the canvas in the model-space colour; on Dark view the foreground
@@ -1255,6 +1284,7 @@ impl DrawingEditor {
     }
 
     fn schedule_compute(&mut self, exact: bool, cx: &mut Context<Self>) {
+        self.work_since.get_or_insert_with(std::time::Instant::now);
         if self.compute_task.is_some() {
             self.compute_again = true;
             return;
@@ -1269,7 +1299,11 @@ impl DrawingEditor {
                 // Below the UI thread and the frames (threads.rs).
                 noshape_render::threads::lower_priority();
                 if let Some(s) = d.sheets.get(si) {
+                    let t = std::time::Instant::now();
                     views::compute_sheet_views(&d, s, &sources, &cache, exact);
+                    if noshape_render::perf::enabled() {
+                        noshape_render::perf::milestone(&format!("drawing: {} views computed ({}) in {:.1} ms", s.views.len(), if exact { "exact" } else { "polygonal" }, t.elapsed().as_secs_f64() * 1000.0));
+                    }
                 }
             })
             .await;
@@ -1347,20 +1381,11 @@ impl DrawingEditor {
             let paper = up.upload_mesh(&drawing_scene::quad(0.0, 0.0, w, h, -1.0));
             self.paper = Some((shadow, paper, [w, h]));
         }
-        let dangling: HashSet<u32> = built
-            .picks
-            .iter()
-            .enumerate()
-            .filter(|(_, t)| matches!(t, PickTarget::Annotation(a) if built.dangling.contains(a)))
-            .map(|(i, _)| i as u32)
-            .collect();
-        // Shaded views with their picture: the edges only show hovered or
-        // selected (live behaviours "Shaded drawing views").
-        let shaded: Vec<(ViewId, std::ops::Range<usize>)> = built.geometry.view_edges.iter().filter(|(v, r)| !r.is_empty() && self.shaded.images.contains_key(v)).cloned().collect();
-        self.shaded.edges = shaded.iter().map(|(v, r)| (*v, up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), self.zoom, true)), up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), self.zoom, false)))).collect();
-        let skip: Vec<std::ops::Range<usize>> = shaded.into_iter().map(|(_, r)| r).collect();
-        self.lines = Some(up.upload_lines(&drawing_scene::sheet_lines(&built, self.zoom, &dangling, &skip, self.model_bg.is_none())));
+        let dangling = dangling_picks(&built);
+        let lines = self.zoomed_lines(&built);
+        (self.lines, self.shaded.edges) = lines(self.zoom, up);
         self.lines_zoom = self.zoom;
+        self.lines_task = None;
         self.fills = Some(up.upload_mesh(&drawing_scene::sheet_fills(&built)));
         self.watermark_mesh = self.watermark.as_ref().and_then(|t| {
             let (pts, idx) = noshape_model::drawing::font::text_fill_font(&crate::drawing_watermark::geometry(t, w, h), None);
@@ -1381,6 +1406,53 @@ impl DrawingEditor {
         self.backdrops = drawing_scene::sheet_backdrops(&built).iter().map(|(m, c)| (up.upload_mesh(m), lin(*c))).collect();
         self.geometry_dirty = false;
         self.sync_images();
+    }
+
+    /// What draws the sheet's lines at a zoom (pen widths are in pixels): the lines, and the shaded views' edges.
+    fn zoomed_lines(&self, built: &Arc<BuiltSheet>) -> impl Fn(f64, &Uploader) -> ZoomedLines + Send + 'static {
+        let built = built.clone();
+        let dangling = dangling_picks(&built);
+        // Shaded views with their picture: the edges only show hovered or
+        // selected (live behaviours "Shaded drawing views").
+        let shaded: Vec<(ViewId, std::ops::Range<usize>)> = built.geometry.view_edges.iter().filter(|(v, r)| !r.is_empty() && self.shaded.images.contains_key(v)).cloned().collect();
+        let paper = self.model_bg.is_none();
+        move |zoom, up| {
+            let edges = shaded.iter().map(|(v, r)| (*v, up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), zoom, true)), up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), zoom, false)))).collect();
+            let skip: Vec<std::ops::Range<usize>> = shaded.iter().map(|(_, r)| r.clone()).collect();
+            (Some(up.upload_lines(&drawing_scene::sheet_lines(&built, zoom, &dangling, &skip, paper))), edges)
+        }
+    }
+
+    /// Tests: the zoom the lines were made for, and whether new ones are being made.
+    #[cfg(test)]
+    pub(crate) fn lines_state(&self) -> (f64, bool) {
+        (self.lines_zoom, self.lines_task.is_some())
+    }
+
+    /// The zoom moved more than 8% from the lines' (their pixel widths show): the lines remade off the UI thread,
+    /// the old ones drawn meanwhile.
+    fn reline_for_zoom(&mut self, cx: &mut Context<Self>) {
+        if self.geometry_dirty || self.lines_task.is_some() || self.lines_zoom <= 0.0 || (self.zoom / self.lines_zoom - 1.0).abs() <= 0.08 {
+            return;
+        }
+        let Some(built) = self.built.clone() else { return };
+        let lines = self.zoomed_lines(&built);
+        let (zoom, up) = (self.zoom, self.gpu.uploader().clone());
+        self.lines_task = Some(cx.spawn(async move |this, cx| {
+            let made = cx.background_spawn(async move { lines(zoom, &up) }).await;
+            this.update(cx, |this, cx| {
+                this.lines_task = None;
+                // A new sheet since: its lines are made with it.
+                if this.built.as_ref().is_none_or(|b| !Arc::ptr_eq(b, &built)) || this.geometry_dirty {
+                    return;
+                }
+                (this.lines, this.shaded.edges) = made;
+                this.lines_zoom = zoom;
+                this.frame_dirty = true;
+                cx.notify();
+            })
+            .ok();
+        }));
     }
 
     fn rebuild_overlay(&mut self) {
@@ -1620,8 +1692,13 @@ impl DrawingEditor {
         if w < 2 || h < 2 {
             return;
         }
-        if self.geometry_dirty || (self.lines_zoom > 0.0 && (self.zoom / self.lines_zoom - 1.0).abs() > 0.08) {
+        if self.geometry_dirty {
+            let t = std::time::Instant::now();
             self.rebuild_render_data();
+            let ms = t.elapsed().as_secs_f64() * 1000.0;
+            if ms > 10.0 && noshape_render::perf::enabled() {
+                noshape_render::perf::milestone(&format!("drawing: render data rebuilt on the UI thread in {ms:.1} ms (zoom {:.2})", self.zoom));
+            }
         }
         self.rebuild_overlay();
         let mut style = Style::default();
@@ -1823,6 +1900,7 @@ impl DrawingEditor {
         if !self.fitted && self.size_px()[0] > 10.0 {
             self.zoom_to_fit(cx);
         }
+        self.reline_for_zoom(cx);
         if self.geometry_dirty || self.frame_dirty {
             self.submit(window);
         }

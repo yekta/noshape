@@ -898,6 +898,9 @@ pub(crate) mod ffi {
         // ---- HLR
         fn project_hlr(s: &OcShape, dir: P3, up: P3, exact: bool, deflection: f64)
         -> Result<HlrOut>;
+        /// The work an exact HLR may take on this thread before it is redone on the triangulation (0: the default
+        /// bound); returns the previous.
+        fn set_hlr_exact_work(steps: u64) -> u64;
     }
 }
 
