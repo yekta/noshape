@@ -77,7 +77,16 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
 - **c2-extension-spring's 84884726 (0.23-0.53 s):** "a short section from a corner" is bool's deliberate decline.
   OCCT's builder takes a 10-100 tol stub from a corner to a branch point into the vertex; ours doesn't model that.
   Recording vibe4 ~/tmp/bool2/es.
-- **After those:** c2-fan-blade-sweep 07831a00 (0.51 s, non-manifold), cf-setback-fillet's five sheet fuses ("a sheet
+- **c2-fan-blade-sweep after the thread fix (recorded vibe4 ~/tmp/bool2/fan2):** 07831a00 is the thread fuse itself, ours
+  = live, OCCT different (not in any corpus). Left on OCCT:
+  - 05cd5358 (Revolve 1's cut of the threaded Bolt, 205 ms, "a section without ends"): the shaft cylinder is now a
+    helical strip (face 14). A coaxial cone's circle crosses it at x -51.75 mm and runs on across the circle's own
+    start angle, the strip having no edge there at that height. Its interval ends Open at t1 on both faces and would
+    have to join the first one across the wrap; neither intervals_on nor section_from does that. WIP (the open-end
+    probe, not the join): /root/bool2-scratch/fan-revolve-wrap-wip.patch.
+  - fb562f41 (a 2-tool cut, 891 ms, "a face lost"): not looked at.
+  - 3bf5867d (26 ms, "an internal face").
+- **After those:** cf-setback-fillet's five sheet fuses ("a sheet
   of shells"), the sheet-metal documents' "coplanar sheets" (many, under 15 ms each).
 - **Done before:** (1) a fast gate, `tools/bool/gate.sh <branch>` (below); (2) spheres and tori in our Boolean:
   learning-center-michael's ring cut (lcm 41701bb2) and Fillet 2's ball / torus cut (f71e381d, vibe4
