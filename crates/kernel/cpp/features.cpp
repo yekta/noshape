@@ -106,6 +106,7 @@
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_ReShape.hxx>
+#include <TopoDS_Iterator.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_TFace.hxx>
@@ -9287,6 +9288,124 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> defeature_by_region(const T
 // about axes along it, each deleted one a cylinder whose two neighbours (lines or arcs in the caps) run on to where
 // they meet, edited in place (cf-lighten's Lighten rounds its tools again: OCCT's Defeaturing took 35-70 ms per tool);
 // false where the shape isn't such a prism or a neighbour would be cut back.
+// Faces whose every edge with the rest of the solid lies on inner loops of the kept faces, each loop all theirs (a boss,
+// a pocket, a hole through a wall): they go, and each such loop is dropped from its face, which goes on across it on its
+// own surface, as OCCT's defeaturing heals them, without its intersections of the whole solid (c2-impeller-loft's
+// Delete face 1, a tube's boss on a shelled loft's offset wall: 2 s). False when an edge to a kept face is on an outer
+// wire or on a wire with other edges (the faces next to it must be extended: OCCT's).
+static bool delete_inner_loops(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& del, TopoDS_Shape& out, HHist& hist)
+{
+  if (solid.ShapeType() != TopAbs_SOLID || del.empty())
+    return false;
+  int shells = 0;
+  for (TopExp_Explorer x(solid, TopAbs_SHELL); x.More(); x.Next())
+    ++shells;
+  if (shells != 1)
+    return false;
+  ShapeIMap fm, dm;
+  TopExp::MapShapes(solid, TopAbs_FACE, fm);
+  for (const TopoDS_Shape& f : del)
+    dm.Add(f);
+  if (dm.Extent() >= fm.Extent())
+    return false;
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+  // The edges between a deleted face and a kept one, and the kept faces along them.
+  ShapeIMap bnd, kept;
+  for (int i = 1; i <= dm.Extent(); ++i)
+    for (TopExp_Explorer x(dm(i), TopAbs_EDGE); x.More(); x.Next())
+    {
+      const int k = ef.FindIndex(x.Current());
+      if (k == 0)
+        return false;
+      for (const TopoDS_Shape& f : ef(k))
+        if (!dm.Contains(f))
+        {
+          bnd.Add(x.Current());
+          kept.Add(f);
+        }
+    }
+  if (bnd.IsEmpty())
+    return false;
+  BRepTools_ReShape rs;
+  ShapeIMap         dropped;
+  std::vector<TopoDS_Face> rebuilt;
+  for (int i = 1; i <= kept.Extent(); ++i)
+  {
+    // (Its wires as stored, the face's location applied to compare them with the solid's edges.)
+    const TopoDS_Face k     = TopoDS::Face(kept(i).Oriented(TopAbs_FORWARD));
+    const TopoDS_Wire outer = BRepTools::OuterWire(k);
+    TopoDS_Face       nk    = TopoDS::Face(k.EmptyCopied());
+    BRep_Builder      bb;
+    for (TopoDS_Iterator w(k, false, false); w.More(); w.Next())
+    {
+      const TopoDS_Shape placed = w.Value().Moved(k.Location());
+      int                ours = 0, other = 0;
+      for (TopExp_Explorer x(placed, TopAbs_EDGE); x.More(); x.Next())
+        (bnd.Contains(x.Current()) && !BRep_Tool::IsClosed(TopoDS::Edge(x.Current()), k) ? ours : other)++;
+      if (ours > 0 && (other > 0 || placed.IsSame(outer)))
+        return false;
+      if (ours > 0)
+        for (TopExp_Explorer x(placed, TopAbs_EDGE); x.More(); x.Next())
+          dropped.Add(x.Current());
+      else
+        bb.Add(nk, w.Value());
+    }
+    rs.Replace(k, nk);
+    rebuilt.push_back(nk);
+  }
+  if (dropped.Extent() != bnd.Extent())
+    return false;
+  for (int i = 1; i <= dm.Extent(); ++i)
+    rs.Remove(dm(i));
+  const TopoDS_Shape result = rs.Apply(solid);
+  if (result.IsNull())
+    return false;
+  ShapeIMap rf;
+  TopExp::MapShapes(result, TopAbs_FACE, rf);
+  if (rf.Extent() != fm.Extent() - dm.Extent())
+    return false;
+  // Closed: every edge used twice, by two faces or as one face's seam (a seam's second pcurve may be missing, which
+  // BRep_Tool::IsClosed asks for: the shelled loft's offset wall), save degenerate ones and a face's internal ones.
+  NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> uses;
+  for (TopExp_Explorer x(result, TopAbs_EDGE); x.More(); x.Next())
+    if (!BRep_Tool::Degenerated(TopoDS::Edge(x.Current())) && x.Current().Orientation() != TopAbs_INTERNAL &&
+        x.Current().Orientation() != TopAbs_EXTERNAL)
+    {
+      int* n = uses.ChangeSeek(x.Current());
+      n ? ++*n : (uses.Bind(x.Current(), 1), 0);
+    }
+  for (NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher>::Iterator it(uses); it.More(); it.Next())
+    if (it.Value() != 2)
+      return false;
+  for (const TopoDS_Face& f : rebuilt)
+    if (!BRepCheck_Analyzer(f).IsValid())
+      return false;
+  hist = new BRepTools_History();
+  ShapeIMap em, vm;
+  TopExp::MapShapes(solid, TopAbs_EDGE, em);
+  TopExp::MapShapes(solid, TopAbs_VERTEX, vm);
+  ShapeIMap re, rv;
+  TopExp::MapShapes(result, TopAbs_EDGE, re);
+  TopExp::MapShapes(result, TopAbs_VERTEX, rv);
+  for (int i = 1; i <= fm.Extent(); ++i)
+  {
+    const TopoDS_Shape v = rs.Value(fm(i));
+    if (v.IsNull() || dm.Contains(fm(i)))
+      hist->Remove(fm(i));
+    else if (!v.IsSame(fm(i)))
+      hist->AddModified(fm(i), v);
+  }
+  for (int i = 1; i <= em.Extent(); ++i)
+    if (!re.Contains(em(i)))
+      hist->Remove(em(i));
+  for (int i = 1; i <= vm.Extent(); ++i)
+    if (!rv.Contains(vm(i)))
+      hist->Remove(vm(i));
+  out = result;
+  return true;
+}
+
 static bool delete_prism_rounds(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& del, TopoDS_Shape& out, HHist& hist)
 {
   if (solid.ShapeType() != TopAbs_SOLID || del.empty())
@@ -9609,7 +9728,8 @@ static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
   {
     TopoDS_Shape prism;
     HHist        ph;
-    if (!std::getenv("NOSHAPE_DEFEATURE_OCCT") && delete_prism_rounds(s.shape, faces.items, prism, ph))
+    if (!std::getenv("NOSHAPE_DEFEATURE_OCCT") &&
+        (delete_inner_loops(s.shape, faces.items, prism, ph) || delete_prism_rounds(s.shape, faces.items, prism, ph)))
     {
       std::vector<TopoDS_Shape> args{s.shape};
       return make_result(args, prism, ph.get());

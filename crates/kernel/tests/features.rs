@@ -333,6 +333,34 @@ fn delete_and_offset_faces() {
     assert!(matches!(replace_face(&b, &[], &b), Err(KernelError::Unsupported(_))));
 }
 
+/// A boss's side and cap, and a pocket's side and floor, deleted: each one's loop dropped from the top face, which goes on
+/// across it, the block whole again (6 faces, 1000 mm³) and valid.
+#[test]
+fn a_boss_and_a_pocket_are_deleted_by_closing_their_loops() {
+    let b = box10();
+    let boss = make_cylinder(&Plane::new(DVec3::new(3.0, 3.0, 10.0), DVec3::Z, DVec3::X), 1.5, 3.0, 2.0 * PI).unwrap();
+    let pocket = make_cylinder(&Plane::new(DVec3::new(7.0, 7.0, 6.0), DVec3::Z, DVec3::X), 1.5, 5.0, 2.0 * PI).unwrap();
+    let s = cut(&fuse(&b, &boss).unwrap().shape, &pocket).unwrap().shape;
+    let faces = s.faces();
+    assert_eq!(faces.len(), 10);
+    let at = |x: f64, y: f64| -> Vec<Shape> {
+        faces.iter().filter(|f| f.bounding_box(true).unwrap().center().truncate().distance(glam::DVec2::new(x, y)) < 1e-6).cloned().collect()
+    };
+    let (boss_faces, pocket_faces) = (at(3.0, 3.0), at(7.0, 7.0));
+    assert_eq!((boss_faces.len(), pocket_faces.len()), (2, 2));
+    for (del, v) in [(&boss_faces, 1000.0 - PI * 2.25 * 4.0), (&pocket_faces, 1000.0 + PI * 2.25 * 3.0)] {
+        let r = delete_faces(&s, del).unwrap().shape;
+        assert!(r.is_valid());
+        assert_eq!(r.faces().len(), 8);
+        assert!(close(r.volume().unwrap(), v, 1e-6), "{}", r.volume().unwrap());
+    }
+    let all: Vec<Shape> = boss_faces.iter().chain(&pocket_faces).cloned().collect();
+    let r = delete_faces(&s, &all).unwrap().shape;
+    assert!(r.is_valid());
+    assert_eq!(r.faces().len(), 6);
+    assert!(close(r.volume().unwrap(), 1000.0, 1e-6), "{}", r.volume().unwrap());
+}
+
 /// c2-impeller-loft's Delete face 1 (metres): a Ø20 tube's outer cylinder and end cap, standing out of the housing's
 /// lofted wall. OCCT's defeaturing can't remove them (UnableToRemoveTheFeature) and gives the part back; the region
 /// they enclose with the hole in the wall, cut away: live removes 23,474.97 mm³ (its part 95,009.49 -> 71,534.52;
@@ -1178,7 +1206,8 @@ fn defeature_dump_probe() {
     for _ in 0..2 {
         let t = std::time::Instant::now();
         let r = delete_faces(&s, &shapes);
-        println!("delete: {:?} in {:?}", r.as_ref().map(|r| (r.shape.is_valid(), r.shape.faces().len(), r.shape.volume().unwrap_or(0.0))).map_err(|e| e.to_string()), t.elapsed());
+        let took = t.elapsed();
+        println!("delete: {:?} in {took:?}", r.as_ref().map(|r| (r.shape.is_valid(), r.shape.faces().len(), r.shape.volume().unwrap_or(0.0))).map_err(|e| e.to_string()));
     }
 }
 
