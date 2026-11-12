@@ -2262,3 +2262,12 @@ fn a_circle_and_a_line_crossing_have_no_common() {
     let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
     assert_eq!(k::bool_corpus::Summary::of(&r), c.summary, "OCCT's result and history");
 }
+
+/// Sheet metal's coplanar sheets (c2-sm-corner-break, recorded): a flat face fused with three strips lying 0.86 mm
+/// over its edge, unified into one face; and a flat face in common with a box whose face it lies on. Coinciding pieces
+/// are OCCT's same-domain faces ("coplanar sheets" before): the same counts as OCCT's.
+#[test]
+fn coplanar_sheets_fused_and_on_a_box_as_occt() {
+    valid_as_occt("05812712d8ae43d8", 1e-9);
+    valid_as_occt("040e7d4edf9355a0", 1e-9);
+}

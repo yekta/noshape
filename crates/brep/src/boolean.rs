@@ -4153,6 +4153,11 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // Sheets: a fuse of sheets alone, or a sheet cut by solids or in common with them (else not yet).
     let sheet_arg: Vec<bool> = (0..args.len()).map(|a| cx.solids.iter().any(|s| s.sheet && s.arg == a as u32)).collect();
     let sheets = sheet_arg.iter().any(|&x| x);
+    // (Coincident sheets as OCCT's same-domain faces: in a fuse of sheets alone the first argument's piece of any two
+    // coinciding, in a sheet's common with a solid its pieces on the solid's faces either way (sheet metal's flat
+    // strips fused with unify, a flat face against a box: c2-sm-corner-break's 21, c2-sm-louver's 12).)
+    let sheets_on = (op == Op::Fuse && cx.solids.iter().all(|x| x.sheet))
+        || (op == Op::Common && args.len() == 2 && cx.solids.iter().all(|x| x.sheet == (x.arg == 0)));
     if sheets && !sheet_common && !sheet_cut && !((op == Op::Fuse && sheet_arg.iter().all(|&x| x)) || (op != Op::Fuse && sheet_arg[0] && !sheet_arg[1..].iter().any(|&x| x))) {
         return Err(Decline("sheets with solids"));
     }
@@ -4658,7 +4663,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // left two strips overlapping by 5 µm, one's corner on the other's edge, as they were: 0c538d2c).
     for k in 0..cx.coplanar.len() {
         let (f, g) = cx.coplanar[k];
-        if (!cx.solids[cx.faces[f].solid].sheet && !cx.solids[cx.faces[g].solid].sheet) || sheet_common || sheet_cut {
+        if (!cx.solids[cx.faces[f].solid].sheet && !cx.solids[cx.faces[g].solid].sheet) || sheet_common || sheet_cut || sheets_on {
             continue;
         }
         for (a, b) in [(f, g), (g, f)] {
@@ -6022,7 +6027,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             }
         }
         let ons: Vec<(usize, State)> = states.iter().copied().filter(|x| matches!(x.1, State::OnSame | State::OnOpposite)).collect();
-        if !ons.is_empty() && (cx.solids[s].sheet || ons.iter().any(|&(t, _)| cx.solids[t].sheet)) && !sheet_common && !sheet_cut {
+        if !ons.is_empty() && (cx.solids[s].sheet || ons.iter().any(|&(t, _)| cx.solids[t].sheet)) && !sheet_common && !sheet_cut && !sheets_on {
             return Err(Decline("sheets coincident"));
         }
         // (A sheet cut by sheets: the object's pieces on none of theirs, as they were.)
@@ -6071,7 +6076,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         }
         keep[pi] = match op {
             // Coincident pieces facing one way: the first argument's is kept; facing each other: none.
-            Op::Fuse => (!in_any && ons.iter().all(|&(t, st)| st == State::OnSame && cx.solids[t].arg > arg)).then_some(false),
+            Op::Fuse => (!in_any && ons.iter().all(|&(t, st)| (st == State::OnSame || sheets_on) && cx.solids[t].arg > arg)).then_some(false),
             Op::Cut => {
                 if arg == 0 {
                     match on {
@@ -6090,6 +6095,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             Op::Common => match on {
                 None => (in_any).then_some(false),
                 Some((_, State::OnSame)) => (arg == 0).then_some(false),
+                Some((_, State::OnOpposite)) if sheets_on => (arg == 0).then_some(false),
                 _ => None,
             },
         };
