@@ -54,6 +54,13 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
   turns. Cut taken, identical to OCCT: 283 ms against OCCT's 961. `fillet_by_tools` now tries our Boolean for the
   balls' and rings' cut too (quick_boolean, not straight to OCCT). T1
   bool_patterns::a_ball_whose_edge_ends_on_its_sphere_seam_cut_as_occt.
+- **To bool (11-12 06:30 UTC): our seam fixes are one fix.** bool2-fixes' "nearest turn" rule in `c2_of` (a vertex's
+  parameter on its edge's curve on a face that goes round, the nearest of its turns) is your held seam-end fix
+  (seamend.patch) in another form. Gate run 5 shows it lets shfall 29f3147a through to the same difference: edges
+  102 / vertices 65 against OCCT's 100 / 63. Everything else in that run is level with main: every corpus and parity56
+  at 0 differences, model suite 77/98 and 815/935 on both sides. So Fillet 2's cut and the `fillet_by_tools` switch wait
+  on 29f3147a. Whoever fixes 29f3147a lands one seam rule; I won't touch 29f3147a unless you hand it over. lcm's cut is
+  separate (branch bool2-lcm, gating).
 - Don't touch: bool's seam-end / touching work (bool-main2, bool-touch); Shell (by_quadrics).
 
 ## Queue (lead 11-11 08:10 and 09:25 UTC)
