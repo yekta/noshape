@@ -6,8 +6,11 @@
 
 #include <chrono>
 #include <optional>
+#include <set>
 
 #include <BOPAlgo_BuilderFace.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
 #include <ElCLib.hxx>
 #include <gp_Circ.hxx>
 #include <BOPTools_AlgoTools3D.hxx>
@@ -32,10 +35,13 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <Geom2dAPI_InterCurveCurve.hxx>
+#include <IntRes2d_IntersectionSegment.hxx>
 #include <Geom2d_Curve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
+#include <GeomAPI_IntCS.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <Geom_TrimmedCurve.hxx>
 #include <GeomLib.hxx>
 #include <GeomProjLib.hxx>
 #include <Geom_BoundedCurve.hxx>
@@ -59,7 +65,7 @@ bool debug() { return std::getenv("NOSHAPE_BLEND_DIRECT_DEBUG") != nullptr; }
 
 // Whether two blend faces meet only tangentially along a circle both end on (the rounds of a tangent chain, one after
 // another): their section is that circle, which their bounds already carry (IntSS takes ~5 ms over two tori there).
-bool tangent_along_shared_circle(const TopoDS_Face& a, const TopoDS_Face& b, double tol)
+bool tangent_along_shared_circle(const TopoDS_Face& a, const TopoDS_Face& b, double tol, double angle = 1e-6)
 {
   std::vector<gp_Circ> circles;
   for (TopExp_Explorer x(a, TopAbs_EDGE); x.More(); x.Next())
@@ -88,7 +94,7 @@ bool tangent_along_shared_circle(const TopoDS_Face& a, const TopoDS_Face& b, dou
       BRep_Tool::Surface(a)->D1(ua, va, q, a1, a2);
       BRep_Tool::Surface(b)->D1(ub, vb, q, b1, b2);
       const gp_Vec na = a1.Crossed(a2), nb = b1.Crossed(b2);
-      if (na.Magnitude() > 0 && nb.Magnitude() > 0 && na.IsParallel(nb, 1e-6))
+      if (na.Magnitude() > 0 && nb.Magnitude() > 0 && na.IsParallel(nb, angle))
         return true;
     }
   }
@@ -139,6 +145,51 @@ bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, double tol)
   return true;
 }
 
+// Whether free-form face `t` (a lofted tool's side) lies on part face `g` where it covers it: of its sample points over
+// `g` near its surface (within 50 atol: farther ones are other parts of `t`), at least three and every one within `atol`,
+// normals within 0.02 rad (a loft's side spans a wall's planes and cylinders, each only approximately:
+// c2-variable-fillet-faceblend's held face blend, ~0.005 mm and ~0.009 rad off). Its largest distance in `dev`.
+bool lies_on(const TopoDS_Face& t, const TopoDS_Face& g, double atol, double& dev)
+{
+  const GeomAbs_SurfaceType k = BRepAdaptor_Surface(t, false).GetType();
+  if (k != GeomAbs_BSplineSurface && k != GeomAbs_BezierSurface)
+    return false;
+  const TopoDS_Face               tf = TopoDS::Face(t.Oriented(TopAbs_FORWARD)), gf = TopoDS::Face(g.Oriented(TopAbs_FORWARD));
+  double                          u0, u1, v0, v1;
+  BRepTools::UVBounds(tf, u0, u1, v0, v1);
+  BRepTopAdaptor_FClass2d         in_t(tf, 1e-9), in_g(gf, 1e-9);
+  const occ::handle<Geom_Surface> st = BRep_Tool::Surface(tf), sg = BRep_Tool::Surface(gf);
+  constexpr int                   N    = 12;
+  int                             over = 0;
+  dev                                  = 0;
+  for (int a = 0; a < N; ++a)
+    for (int c = 0; c < N; ++c)
+    {
+      const gp_Pnt2d uv(u0 + (u1 - u0) * (a + 0.5) / N, v0 + (v1 - v0) * (c + 0.5) / N);
+      if (in_t.Perform(uv, false) != TopAbs_IN)
+        continue;
+      gp_Pnt q;
+      gp_Vec du, dv;
+      st->D1(uv.X(), uv.Y(), q, du, dv);
+      GeomAPI_ProjectPointOnSurf pr(q, sg);
+      if (pr.NbPoints() == 0 || pr.LowerDistance() > 50 * atol)
+        continue;
+      double ug, vg;
+      pr.LowerDistanceParameters(ug, vg);
+      if (in_g.Perform(gp_Pnt2d(ug, vg), false) != TopAbs_IN)
+        continue;
+      gp_Pnt qg;
+      gp_Vec dug, dvg;
+      sg->D1(ug, vg, qg, dug, dvg);
+      const gp_Vec nt = du.Crossed(dv), ng = dug.Crossed(dvg);
+      if (pr.LowerDistance() > atol || nt.Magnitude() < 1e-300 || ng.Magnitude() < 1e-300 || !gp_Dir(nt).IsParallel(gp_Dir(ng), 0.02))
+        return false;
+      dev = std::max(dev, pr.LowerDistance());
+      ++over;
+    }
+  return over >= 3;
+}
+
 // A curve to split a face by: its 3D curve and its curve in the face's parameters, over [f, l].
 struct Cut
 {
@@ -148,6 +199,25 @@ struct Cut
   // At least this edge tolerance (a blend's touch edge: OCCT's, which later Shells read as its tangency's slack).
   double                    tol = 0;
 };
+
+// Whether every cut runs along the face's own boundary (a blend held to the face's edge takes it whole: a pocket's
+// rim under c2-variable-fillet-faceblend's hold lines): nothing to split.
+bool cuts_on_boundary(const TopoDS_Face& f, const std::vector<Cut>& cuts, double tol)
+{
+  TopoDS_Compound edges;
+  BRep_Builder    b;
+  b.MakeCompound(edges);
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+    b.Add(edges, x.Current());
+  for (const Cut& c : cuts)
+    for (const double t : {0.25, 0.5, 0.75})
+    {
+      BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(c.c3->Value(c.f + (c.l - c.f) * t)).Vertex(), edges);
+      if (!d.IsDone() || d.Value() > std::max(10 * tol, c.tol))
+        return false;
+    }
+  return !cuts.empty();
+}
 
 struct Split
 {
@@ -280,8 +350,18 @@ struct Domain
       const occ::handle<Geom2d_Curve> bb = sh == 0 ? b : occ::down_cast<Geom2d_Curve>(b->Translated(gp_Vec2d(sh, 0)));
       const occ::handle<Geom2d_TrimmedCurve> ta = new Geom2d_TrimmedCurve(a, af, al), tb = new Geom2d_TrimmedCurve(bb, bf, bl);
       Geom2dAPI_InterCurveCurve ix(ta, tb, tol2);
-      if (ix.NbSegments() > 0)
-        return false;
+      // (An overlap is one along most of `a`; a short tangent zone (a run-out meeting an edge at a shallow angle:
+      // c2-variable-fillet-faceblend's under its walls) is one crossing, at its middle.)
+      for (int k = 1; k <= ix.Intersector().NbSegments(); ++k)
+      {
+        const IntRes2d_IntersectionSegment& sg = ix.Intersector().Segment(k);
+        if (!sg.HasFirstPoint() || !sg.HasLastPoint())
+          return false;
+        const double p0 = sg.FirstPoint().ParamOnFirst(), p1 = sg.LastPoint().ParamOnFirst();
+        if (std::abs(p1 - p0) > 0.1 * std::abs(al - af))
+          return false;
+        hit(0.5 * (p0 + p1), 0.5 * (sg.FirstPoint().ParamOnSecond() + sg.LastPoint().ParamOnSecond()));
+      }
       for (int k = 1; k <= ix.NbPoints(); ++k)
       {
         const IntRes2d_IntersectionPoint& ip = ix.Intersector().Point(k);
@@ -320,8 +400,24 @@ std::vector<TopoDS_Face> split_face(const TopoDS_Face& face_in, const std::vecto
   // A cut along the face's own edge, or along another cut (two tools' end caps on one line): left out.
   {
     std::vector<bool> drop(cuts.size(), false);
+    // (Or within `snap` of the boundary all along: a held blend's hold line, lofted, a few µm off the rim it follows.)
+    TopoDS_Compound bound_edges;
+    BRep_Builder    bb;
+    bb.MakeCompound(bound_edges);
+    for (const Domain::Bound& bd : bounds)
+      bb.Add(bound_edges, bd.e);
+    auto along_boundary = [&](const Cut& c) {
+      for (const double t : {0.1, 0.3, 0.5, 0.7, 0.9})
+      {
+        BRepExtrema_DistShapeShape dd(BRepBuilderAPI_MakeVertex(c.c3->Value(c.f + (c.l - c.f) * t)).Vertex(), bound_edges);
+        if (!dd.IsDone() || dd.Value() > snap)
+          return false;
+      }
+      return true;
+    };
     for (size_t i = 0; i < cuts.size(); ++i)
     {
+      drop[i] = along_boundary(cuts[i]);
       for (const Domain::Bound& bd : bounds)
         drop[i] = drop[i] || !d.cross(cuts[i].c2, cuts[i].f, cuts[i].l, bd.c2, bd.f, bd.l, [](double, double) {});
       for (size_t j = 0; j < i && !drop[i]; ++j)
@@ -632,7 +728,7 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
   const double size = std::sqrt(pb.SquareExtent());
   const double tol  = 1e-7 * size;
   // Where curves meet the same point (OCCT's blend faces are ~1e-6 m off their supports).
-  const double snap = (std::getenv("BD_SNAP") ? std::atof(std::getenv("BD_SNAP")) : 1e-4) * size;
+  double snap = (std::getenv("BD_SNAP") ? std::atof(std::getenv("BD_SNAP")) : 1e-4) * size;
   ShapeIMap    pfaces;
   TopExp::MapShapes(P, TopAbs_FACE, pfaces);
   std::vector<Bnd_Box> pboxes(pfaces.Extent() + 1);
@@ -645,20 +741,85 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
   std::map<int, std::vector<Cut>>       on_part;
   std::vector<std::vector<Cut>>         on_blend;
   std::vector<std::vector<int>>         coincident(tools.size());
+  // A lofted side on part faces it only approximates: (side, part face) and how far off it is.
+  std::vector<std::tuple<TopoDS_Face, int, double>> approx;
+  auto on_face = [&](const TopoDS_Face& t, int j, double& slack) {
+    slack = 0;
+    if (same_surface(t, TopoDS::Face(pfaces(j)), 10 * tol))
+      return true;
+    for (const auto& [a, aj, d] : approx)
+      if (aj == j && a.IsSame(t))
+      {
+        slack = d;
+        return true;
+      }
+    return false;
+  };
+  // Planar faces where two tools meet (a held blend's pieces, end to end): inside the blends' region, no blend and no
+  // cut.
+  ShapeIMap                             internal;
+  std::set<std::pair<size_t, size_t>>   meet; // (tools meeting there, lower first)
+  {
+    std::vector<std::pair<size_t, TopoDS_Face>> planes;
+    for (size_t i = 0; i < tools.size(); ++i)
+      for (TopExp_Explorer x(tools[i], TopAbs_FACE); x.More(); x.Next())
+        if (BRepAdaptor_Surface(TopoDS::Face(x.Current()), false).GetType() == GeomAbs_Plane)
+          planes.emplace_back(i, TopoDS::Face(x.Current()));
+    for (size_t a = 0; a < planes.size(); ++a)
+      for (size_t b = a + 1; b < planes.size(); ++b)
+      {
+        if (planes[a].first == planes[b].first)
+          continue;
+        // (Within 1e-6 rad: at a chain's vertex each piece's end section is a hair inside its own edge, an arc's ~1e-8
+        // rad round.)
+        const gp_Pln pa = BRepAdaptor_Surface(planes[a].second, false).Plane(), pb = BRepAdaptor_Surface(planes[b].second, false).Plane();
+        if (!pa.Axis().Direction().IsParallel(pb.Axis().Direction(), 1e-6) || pa.Distance(pb.Location()) > 10 * tol)
+          continue;
+        Bnd_Box ba, bb;
+        BRepBndLib::Add(planes[a].second, ba);
+        BRepBndLib::Add(planes[b].second, bb);
+        // (Not two tools' strips on one part face: those lie on it.)
+        bool on_part_face = false;
+        for (int j = 1; j <= pfaces.Extent() && !on_part_face; ++j)
+          on_part_face = same_surface(planes[a].second, TopoDS::Face(pfaces(j)), 10 * tol);
+        if (ba.IsOut(bb) || on_part_face)
+          continue;
+        internal.Add(planes[a].second);
+        internal.Add(planes[b].second);
+        meet.insert(std::minmax(planes[a].first, planes[b].first));
+      }
+    if (dbg && !internal.IsEmpty())
+      std::fprintf(stderr, "blend direct: %d faces where tools meet\n", internal.Extent());
+  }
   for (size_t i = 0; i < tools.size(); ++i)
   {
     ShapeIMap strips;
+    Bnd_Box   tb;
+    BRepBndLib::Add(tools[i], tb);
     for (TopExp_Explorer x(tools[i], TopAbs_FACE); x.More(); x.Next())
     {
       const TopoDS_Face t = TopoDS::Face(x.Current());
+      if (internal.Contains(t))
+        continue;
       bool              on = false;
       for (int j = 1; j <= pfaces.Extent(); ++j)
-        if (same_surface(t, TopoDS::Face(pfaces(j)), 10 * tol))
+      {
+        double dev = 0;
+        bool   here = same_surface(t, TopoDS::Face(pfaces(j)), 10 * tol);
+        if (!here && !tb.IsOut(pboxes[j]) && lies_on(t, TopoDS::Face(pfaces(j)), 1e-4 * size, dev))
+        {
+          here = true;
+          approx.emplace_back(t, j, dev);
+          if (dbg)
+            std::fprintf(stderr, "blend direct: tool %zu's side lies on part face %d within %.2e mm\n", i, j, dev * 1e3);
+        }
+        if (here)
         {
           on = true;
           if (std::find(coincident[i].begin(), coincident[i].end(), j) == coincident[i].end())
             coincident[i].push_back(j);
         }
+      }
       if (on)
         strips.Add(t);
       else
@@ -678,16 +839,23 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
         const TopoDS_Edge e = TopoDS::Edge(x.Current());
         if (BRep_Tool::Degenerated(e))
           continue;
+        // (Not between two strips where one only approximates its faces: that corner is the part's own edge, its
+        // approximate copy no cut.)
+        auto approximate = [&](const TopoDS_Shape& f) {
+          return std::any_of(approx.begin(), approx.end(), [&](const auto& a) { return std::get<0>(a).IsSame(f); });
+        };
         bool off = false;
         if (const ShapeList* fl = tef.Seek(e))
           for (ShapeList::Iterator it(*fl); it.More(); it.Next())
-            off = off || (!it.Value().IsSame(strips(s)) && !same_surface(TopoDS::Face(it.Value()), TopoDS::Face(strips(s)), 10 * tol));
+            off = off || (!it.Value().IsSame(strips(s)) && !internal.Contains(it.Value()) && !same_surface(TopoDS::Face(it.Value()), TopoDS::Face(strips(s)), 10 * tol) &&
+                          !(strips.Contains(it.Value()) && (approximate(it.Value()) || approximate(strips(s)))));
         if (!off)
           continue;
         for (int j : coincident[i])
         {
           const TopoDS_Face g = TopoDS::Face(pfaces(j));
-          if (!same_surface(TopoDS::Face(strips(s)), g, 10 * tol))
+          double            slack = 0;
+          if (!on_face(TopoDS::Face(strips(s)), j, slack))
             continue;
           Bnd_Box eb;
           BRepBndLib::Add(e, eb);
@@ -696,13 +864,45 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
           Cut c;
           if (!cut_of(e, g, c))
             no("a touch curve with no curve on its face");
-          c.tol = BRep_Tool::Tolerance(e);
-          on_part[j].push_back(c);
+          c.tol = std::max(BRep_Tool::Tolerance(e), 1.5 * slack);
+          if (slack == 0)
+          {
+            on_part[j].push_back(c);
+            continue;
+          }
+          // (On a face the side only approximates: the stretches of the curve near its surface, each projected; a
+          // loop round a wall would also bring the opposite wall's stretch onto a plane.)
+          const occ::handle<Geom_Surface> sg = BRep_Tool::Surface(g);
+          constexpr int                   M  = 400;
+          double                          from = 0;
+          bool                            open = false;
+          for (int m = 0; m <= M; ++m)
+          {
+            const double               t = c.f + (c.l - c.f) * m / M;
+            GeomAPI_ProjectPointOnSurf pr(c.c3->Value(t), sg);
+            const bool                 close = pr.NbPoints() > 0 && pr.LowerDistance() < 5e-3 * size;
+            if (close && !open)
+              from = m == 0 ? c.f : c.f + (c.l - c.f) * (m - 1) / M;
+            if ((!close || m == M) && open)
+            {
+              Cut part = c;
+              part.f   = from;
+              part.l   = close ? c.l : t;
+              part.c2  = GeomProjLib::Curve2d(c.c3, part.f, part.l, sg);
+              if (part.c2.IsNull())
+                no("a touch curve with no curve on its face");
+              on_part[j].push_back(part);
+            }
+            open = close;
+          }
         }
       }
     }
   }
   t_tools.reset();
+  // (A side only approximating its faces: its curves' ends and the run-outs' twice as loose.)
+  if (!approx.empty())
+    snap *= 2;
   const occ::handle<IntTools_Context> ctx = new IntTools_Context();
   BRepClass3d_SolidClassifier in_part(P);
   const double                eps = 1e-5 * size;
@@ -813,7 +1013,11 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     const Domain* pa = domain_of(a);
     const Domain* pb = domain_of(bface);
     if (pa == nullptr || pb == nullptr)
+    {
+      if (dbg)
+        std::fprintf(stderr, "  no domain for the %s\n", pa == nullptr ? "part face" : "blend");
       return false;
+    }
     const Domain &da = *pa, &db = *pb;
     // (A section edge as loose as the blend's own edges, as OCCT's Boolean leaves it.)
     double slack = 0;
@@ -859,6 +1063,65 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
           lb = GeomProjLib::Curve2d(c3, c3->FirstParameter(), c3->LastParameter(), BRep_Tool::Surface(bface));
           if (la.IsNull() || lb.IsNull())
             return false;
+        }
+      }
+      // A blend running out onto a part face at a shallow angle: the section stops short of the blend's boundary (its
+      // touch curve) where that crosses the face (c2-variable-fillet-faceblend's run-out under the wall, ~0.06 mm); it
+      // runs on to that crossing.
+      if (run_to == nullptr)
+      {
+        const occ::handle<Geom_Curve>   c3_was = c3;
+        const occ::handle<Geom2d_Curve> la_was = la, lb_was = lb;
+        bool                            longer = false;
+        for (const bool after : {false, true})
+        {
+          const gp_Pnt end  = c3->Value(after ? c3->LastParameter() : c3->FirstParameter());
+          gp_Pnt       best;
+          double       d    = 1e-3 * size;
+          bool         near_bound = false;
+          for (const Domain::Bound& bd : db.bounds)
+          {
+            double                        bf, bl;
+            const occ::handle<Geom_Curve> bc = BRep_Tool::Curve(bd.e, bf, bl);
+            if (bc.IsNull())
+              continue;
+            GeomAPI_ProjectPointOnCurve on(end, bc, bf, bl);
+            if (on.NbPoints() == 0 || on.LowerDistance() >= 1e-3 * size)
+              continue;
+            if (on.LowerDistance() < snap)
+            {
+              near_bound = false;
+              d          = 0;
+              break;
+            }
+            near_bound = true;
+            GeomAPI_IntCS ics(new Geom_TrimmedCurve(bc, bf, bl), BRep_Tool::Surface(a));
+            for (int k = 1; ics.IsDone() && k <= ics.NbPoints(); ++k)
+              if (const double dk = ics.Point(k).Distance(end); dk < d)
+              {
+                d    = dk;
+                best = ics.Point(k);
+              }
+          }
+          occ::handle<Geom_BoundedCurve> bc = occ::down_cast<Geom_BoundedCurve>(c3);
+          if (!near_bound || d >= 1e-3 * size || d < snap || bc.IsNull())
+            continue;
+          bc = occ::down_cast<Geom_BoundedCurve>(bc->Copy());
+          GeomLib::ExtendCurveToPoint(bc, best, 1, after);
+          c3     = bc;
+          longer = true;
+        }
+        if (longer)
+        {
+          la = GeomProjLib::Curve2d(c3, c3->FirstParameter(), c3->LastParameter(), BRep_Tool::Surface(a));
+          lb = GeomProjLib::Curve2d(c3, c3->FirstParameter(), c3->LastParameter(), BRep_Tool::Surface(bface));
+          // (Where it won't project, the section as it was.)
+          if (la.IsNull() || lb.IsNull())
+          {
+            c3 = c3_was;
+            la = la_was;
+            lb = lb_was;
+          }
         }
       }
       const double f = c3->FirstParameter(), l = c3->LastParameter();
@@ -955,8 +1218,39 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     });
     frozen = false;
   }
+  // Whether a blend's boundary edge runs along an edge of part face `g` (a held blend's hold line on the pocket's rim:
+  // the blend meets the pocket's wall only there, tangent to the top, and their section fails along it).
+  auto meets_along_edge = [&](const TopoDS_Face& g, const TopoDS_Face& blend) {
+    TopoDS_Compound gedges;
+    BRep_Builder    bb;
+    bb.MakeCompound(gedges);
+    for (TopExp_Explorer x(g, TopAbs_EDGE); x.More(); x.Next())
+      bb.Add(gedges, x.Current());
+    for (TopExp_Explorer x(blend, TopAbs_EDGE); x.More(); x.Next())
+    {
+      double                        f, l;
+      const occ::handle<Geom_Curve> c = BRep_Tool::Curve(TopoDS::Edge(x.Current()), f, l);
+      if (c.IsNull())
+        continue;
+      bool along = true;
+      for (const double t : {0.2, 0.5, 0.8})
+      {
+        BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(c->Value(f + (l - f) * t)).Vertex(), gedges);
+        along = along && d.IsDone() && d.Value() < snap;
+      }
+      if (along)
+        return true;
+    }
+    return false;
+  };
   for (Pair& pr : pairs)
   {
+    if (!pr.ok && meets_along_edge(TopoDS::Face(pfaces(pr.j)), all_blends[pr.k]))
+    {
+      if (dbg)
+        std::fprintf(stderr, "blend direct: part face %d meets blend %zu only along an edge\n", pr.j, pr.k);
+      continue;
+    }
     if (!pr.ok)
     {
       if (dbg)
@@ -978,20 +1272,29 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     tool_boxes[i].Enlarge(snap);
   }
   // Inside another tool of the same kind (taken away / added).
+  // (OCCT's IN checked by rays: its classifier puts a family of points inside a lofted tool now and then, its ray through
+  // one of the tool's edges (c2-variable-fillet-faceblend's pocket walls); a clean ray's OUT wins.)
+  std::vector<std::unique_ptr<RayClassifier>> rays_in(tools.size());
   auto inside_kind = [&](const gp_Pnt& p, size_t skip, bool add) {
     for (size_t i = 0; i < tools.size(); ++i)
       if (i != skip && added[i] == add && !tool_boxes[i].IsOut(p))
       {
         const KernelTimer t1("blend.direct.classify");
         in_tool[i]->Perform(p, tol);
-        if (in_tool[i]->State() == TopAbs_IN)
+        if (in_tool[i]->State() != TopAbs_IN)
+          continue;
+        if (!rays_in[i])
+          rays_in[i] = std::make_unique<RayClassifier>(tools[i], tol, 10 * tol);
+        if (rays_in[i]->Perform(p) != TopAbs_OUT)
           return true;
       }
     return false;
   };
   std::vector<TopoDS_Vertex>   vertices;
   HHist                        h = new BRepTools_History();
-  BRepBuilderAPI_Sewing        sew(10 * tol);
+  // (A loft's side only approximating its faces: its blend's other boundary, a hold line, is as loose against the part's
+  // edge there, ~0.01 mm on c2-variable-fillet-faceblend's pocket rim.)
+  BRepBuilderAPI_Sewing        sew(approx.empty() ? 10 * tol : 1e-4 * size);
   std::vector<std::pair<TopoDS_Shape, TopoDS_Face>> made; // (from, piece)
   // The part's faces: split where curves fall on them, the pieces kept outside every tool.
   Bnd_Box tb;
@@ -1010,6 +1313,8 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     {
       const KernelTimer t1("blend.direct.split");
       pieces = it == on_part.end() ? std::vector<TopoDS_Face>{g} : split_face(g, it->second, tol, snap, vertices);
+      if (pieces.empty() && it != on_part.end() && cuts_on_boundary(g, it->second, tol))
+        pieces = {g};
     }
     if (dbg)
       std::fprintf(stderr, "blend direct: part face %d (%d): %zu curves, %zu pieces\n", j, (int)BRepAdaptor_Surface(g).GetType(), it == on_part.end() ? 0 : it->second.size(), pieces.size());
@@ -1031,7 +1336,11 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
       // (A piece on a taken tool's face goes with it (just inside the material); one an added tool covers, too (just
       // outside).)
       if (inside_kind(p.Translated(n * -eps), tools.size(), false) || inside_kind(p.Translated(n * eps), tools.size(), true))
+      {
+        if (dbg)
+          std::fprintf(stderr, "    dropped: its point (%.3f %.3f %.3f) is in a tool\n", p.X() * 1e3, p.Y() * 1e3, p.Z() * 1e3);
         continue;
+      }
       ++kept;
       sew.Add(piece);
       if (!piece.IsSame(g))
@@ -1054,14 +1363,18 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
       if (bb.IsOut(mb))
         continue;
       const KernelTimer t_bb("blend.direct.section.blends");
-      if (tangent_along_shared_circle(all_blends[k], all_blends[m], tol))
+      // (Two pieces of a held blend, end to end: they meet along their shared section, its slope there each loft's own.)
+      const bool ends_meet = meet.count(std::minmax(blend_tool[k], blend_tool[m])) > 0;
+      if (ends_meet ? tangent_along_shared_circle(all_blends[k], all_blends[m], 100 * tol, M_PI / 2) : tangent_along_shared_circle(all_blends[k], all_blends[m], tol))
       {
         if (dbg)
           std::fprintf(stderr, "  section of blends %zu and %zu: tangent along their shared circle\n", k, m);
         continue;
       }
       if (!section(all_blends[k], all_blends[m], on_blend[k], on_blend[m], &vertices))
+      {
         no("two blends' section");
+      }
     }
   }
   for (size_t k = 0; k < all_blends.size(); ++k)

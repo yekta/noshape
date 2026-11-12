@@ -638,8 +638,10 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
     // Stations along the chain: the point, its frame, whether its first face is side 1, the chain's tangent.
     // A chamfer as sections: each edge's frame oriented once, at its middle (classifying points at every section took
     // half its time); the sections only follow the faces' normals.
-    let edge_frames: Vec<Option<Frame>> = match spec.reference {
-        Some(_) => chain
+    // (A held blend's too: ~450 stations to find its pieces, c2-variable-fillet-faceblend's Face blend 1.)
+    let held_any = spec.sides.as_ref().is_some_and(|s| !s.hold.is_empty());
+    let edge_frames: Vec<Option<Frame>> = match spec.reference.is_some() || held_any {
+        true => chain
             .iter()
             .map(|c| {
                 let info = c.shape.edge_info().ok()?;
@@ -648,7 +650,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                 frame_at(shape, [&faces[fs[0] as usize], &faces[fs[1] as usize]], c.shape.point_at(m).ok()?, c.shape.tangent_at(m).ok()?.normalize(), scale).ok()
             })
             .collect(),
-        None => Vec::new(),
+        false => Vec::new(),
     };
     let station = |s: f64| -> FResult<(DVec3, Frame, bool, DVec3)> {
         let mut acc = 0.0;
@@ -673,7 +675,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                     Some(rf) => {
                         let mut fr = Frame { u: rf.u, m: rf.m, extent: rf.extent };
                         for (k, face) in ff.iter().enumerate() {
-                            let n = if face.is_planar() { rf.m[k] } else { face.normal_at_point(p)?.normalize() };
+                            let n = if face.is_planar() { rf.m[k] } else { surface_normal(face, p)? };
                             let dir = n.cross(tangent).normalize();
                             fr.u[k] = if dir.dot(rf.u[k]) < 0.0 { -dir } else { dir };
                             fr.m[k] = if n.dot(rf.m[k]) < 0.0 { -n } else { n };
@@ -751,20 +753,33 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         None => spec,
     };
     let ranges = hold_ranges(spec, lo, hi, scale, &station)?;
+    if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+        eprintln!("section blend: ranges {ranges:?} of {total}");
+    }
     let partial = spec.partial.is_some() || ranges.len() > 1;
     // Other curves (live NE: an elliptic boss's foot): sections along the
     // whole chain, lofted into one tool (live's blend face is one spline).
     let general = chain.iter().any(|c| c.shape.edge_info().is_ok_and(|i| !matches!(i.curve, k::Curve::Line { .. } | k::Curve::Circle { .. })));
     let feature = ev.feature;
     let (mut cuts, mut adds) = (Vec::new(), Vec::new());
+    // Each cut's chain edge (its rim, for the direct build).
+    let mut cut_edges: Vec<usize> = Vec::new();
     let mut refaced: Vec<(usize, Shape)> = Vec::new();
     for &(lo, hi, held) in &ranges {
     if general || held {
         const N: usize = 64;
-        let closed = (chain[0].start - chain[chain.len() - 1].end).length() < 1e-9 && lo <= 1e-12 && hi >= total - 1e-12;
+        let whole = (chain[0].start - chain[chain.len() - 1].end).length() < 1e-9 && lo <= 1e-12 && hi >= total - 1e-12;
         // A chamfer as sections: one loft (one face) per edge, as live's; others one along the chain.
         let mut pieces = vec![(lo, hi, 0)];
-        if spec.reference.is_some() && !closed && chain.len() > 1 {
+        if held && spec.reference.is_none() {
+            // A held blend: one loft (one face) per chain edge and hold line edge, as live's (c2-variable-fillet-
+            // faceblend: 8 faces round a pocket's rim); its radius bends where either changes, a loft through such a
+            // bend needs ~4x the sections.
+            pieces = held_pieces(spec, &chain, lo, hi, scale, &station)?;
+            if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+                eprintln!("section blend: held pieces {pieces:?}");
+            }
+        } else if spec.reference.is_some() && !whole && chain.len() > 1 {
             pieces.clear();
             let mut acc = 0.0f64;
             for (ci, c) in chain.iter().enumerate() {
@@ -775,10 +790,12 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                 }
             }
         }
+        let closed = whole && pieces.len() == 1;
         let last_piece = pieces.len() - 1;
         for (pi, &(plo, phi, ci)) in pieces.iter().enumerate() {
             // (A chamfer as sections: a ruled face, fewer sections; its cut took most of its time.)
             let total_n = if spec.reference.is_some() { 24 } else { N };
+            let total_n = if held && pieces.len() > 1 { total_n.max(24 * pieces.len()) } else { total_n };
             let n = if pieces.len() > 1 { ((total_n as f64 * (phi - plo) / (hi - lo)).ceil() as usize).max(6) } else { total_n };
             // (Stations a hair inside a piece: one at its end vertex belongs to its own edge.)
             let nudge = if pieces.len() > 1 { 1e-9 * total } else { 0.0 };
@@ -829,18 +846,33 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
             if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
                 eprintln!("section blend: loft of {} sections (closed {closed}, chain {} edges): valid {} volume {:?} faces {}", secs.len(), chain.len(), tool.shape.is_valid(), tool.shape.volume(), tool.shape.count(ShapeType::Face));
             }
-            // The face touching neither support is the blend face.
+            // The face touching neither support is the blend face (a held blend's later pieces on one edge: its splits).
             let ename = body.edges[chain[ci].index].clone();
-            let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
+            let on_edge = pieces[..pi].iter().filter(|q| q.2 == ci).count();
+            let blend = match on_edge {
+                0 => Arc::new(TopoName::face(feature, Role::Blend(ename.clone()))),
+                k => Arc::new(TopoName::face(feature, Role::Blend(Arc::new(TopoName::Split { parent: ename.clone(), by: feature, ordinal: k as u16 })))),
+            };
             let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
             let supports: Vec<&Shape> = chain.iter().flat_map(|c| ef.get(c.index).cloned().unwrap_or_default()).map(|f| &faces[f as usize]).collect();
-            let on = |f: &Shape, s: &Shape| -> bool {
-                let Some(q) = super::helpers_a::point_on_face(f) else { return false };
-                s.contains_point(q, scale * 1e-6).unwrap_or(false)
-            };
-            let names: Vec<Name> = tool.shape.faces().iter().map(|f| if (f.is_planar() && secs.iter().any(|s| on(f, s))) || supports.iter().any(|s| on(f, s)) { generated.clone() } else { blend.clone() }).collect();
+            // (A point on each face found once: per section it was ~1,000 projections in c2-variable-fillet-faceblend.)
+            let names: Vec<Name> = tool
+                .shape
+                .faces()
+                .iter()
+                .map(|f| {
+                    let Some(q) = super::helpers_a::point_on_face(f) else { return blend.clone() };
+                    let on = |s: &Shape| s.contains_point(q, scale * 1e-6).unwrap_or(false);
+                    if (f.is_planar() && secs.iter().any(on)) || supports.iter().any(|s| on(s)) { generated.clone() } else { blend.clone() }
+                })
+                .collect();
             let named = NamedShape::new(tool.shape, names);
-            if convex { cuts.push(named) } else { adds.push(named) }
+            if convex {
+                cuts.push(named);
+                cut_edges.push(chain[ci].index);
+            } else {
+                adds.push(named);
+            }
         }
     }
     let mut at = 0.0;
@@ -973,8 +1005,32 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
             _ => return Err(fail("only lines and arcs")),
         };
         let named = NamedShape::new(tool, names);
-        if convex { cuts.push(named) } else { adds.push(named) }
+        if convex {
+            cuts.push(named);
+            cut_edges.push(chain[ci].index);
+        } else {
+            adds.push(named);
+        }
     }
+    }
+    // Held blends (hold lines) built directly where they can be: the loft's sides only approximate a curved wall, and a
+    // cut by them leaves slivers (c2-variable-fillet-faceblend's rounded ends).
+    if ranges.iter().any(|r| r.2) && adds.is_empty() && !cuts.is_empty() {
+        let tools: Vec<Shape> = cuts.iter().map(|t| t.shape.clone()).collect();
+        let rims = cut_edges.iter().map(|&e| shape.sub_shape(ShapeType::Edge, e)).collect::<Result<Vec<_>, _>>()?;
+        match k::blend_direct(shape, &tools, &rims) {
+            Ok(res) if res.shape.is_valid() && res.shape.count(ShapeType::Solid) == 1 => {
+                let names = body.shape_names();
+                let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&|n: &Name| Role::Blend(n.clone())));
+                ev.replace_body(bi, res.shape, face_names);
+                return Ok(());
+            }
+            other => {
+                if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+                    eprintln!("section blend: direct build declined: {:?}", other.map(|r| (r.shape.is_valid(), r.shape.count(ShapeType::Solid))).map_err(|e| e.to_string()));
+                }
+            }
+        }
     }
     let mut named = body_named(&body);
     for (i, on) in &refaced {
@@ -1028,12 +1084,20 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
 /// The radius a hold line sets at a station: the circle touching the face the hold line is on at its crossing of the
 /// section plane (through `p` across `tangent`) and the other face. None where no hold line crosses the section.
 fn hold_radius(hold: &[Shape], p: DVec3, tangent: DVec3, f: &Frame, scale: f64) -> FResult<Option<f64>> {
-    let mut best: Option<f64> = None;
-    for e in hold {
+    Ok(hold_of(hold, p, tangent, f, scale)?.map(|(r, _)| r))
+}
+
+/// [`hold_radius`] and the hold line's edge (its index in `hold`) that sets it.
+fn hold_of(hold: &[Shape], p: DVec3, tangent: DVec3, f: &Frame, scale: f64) -> FResult<Option<(f64, usize)>> {
+    let mut best: Option<(f64, usize)> = None;
+    for (ei, e) in hold.iter().enumerate() {
         let info = e.edge_info()?;
         let (t0, t1) = (info.first_param, info.last_param);
         let g = |t: f64| -> FResult<f64> { Ok((e.point_at(t)? - p).dot(tangent)) };
         const N: usize = 32;
+        // Where the section's plane crosses it, and an end on the plane (a hold line ending where the chain's edges
+        // meet: the sign test misses an end at 0 to rounding).
+        let mut at: Vec<f64> = [t0, t1].into_iter().filter(|&t| g(t).is_ok_and(|v| v.abs() <= scale * 1e-9)).collect();
         let mut prev = (t0, g(t0)?);
         for i in 1..=N {
             let t = t0 + (t1 - t0) * i as f64 / N as f64;
@@ -1049,20 +1113,23 @@ fn hold_radius(hold: &[Shape], p: DVec3, tangent: DVec3, f: &Frame, scale: f64) 
                         b = (m, gm);
                     }
                 }
-                let v = e.point_at(0.5 * (a.0 + b.0))? - p;
-                for u in f.u {
-                    let s = v.dot(u);
-                    if s > 0.0 && (v - u * s).length() < scale * 1e-6 && best.is_none_or(|b| s < b) {
-                        best = Some(s);
-                    }
-                }
+                at.push(0.5 * (a.0 + b.0));
             }
             prev = cur;
+        }
+        for t in at {
+            let v = e.point_at(t)? - p;
+            for u in f.u {
+                let s = v.dot(u);
+                if s > 0.0 && (v - u * s).length() < scale * 1e-6 && best.is_none_or(|b| s < b.0) {
+                    best = Some((s, ei));
+                }
+            }
         }
     }
     // Equal offsets d from both sides touch each at (d + d·cos θ) / sin θ from the edge (see [`Sides`]).
     let c = f.u[0].dot(f.u[1]).clamp(-1.0, 1.0);
-    Ok(best.map(|s| s * (1.0 - c * c).sqrt() / (1.0 + c)))
+    Ok(best.map(|(s, ei)| (s * (1.0 - c * c).sqrt() / (1.0 + c), ei)))
 }
 
 /// A held station's spec: the radius the hold line sets, capped by the entered one.
@@ -1073,6 +1140,76 @@ fn held_spec(spec: &BlendSpec, p: DVec3, tangent: DVec3, f: &Frame, scale: f64) 
 }
 
 type Station<'a> = dyn Fn(f64) -> FResult<(DVec3, Frame, bool, DVec3)> + 'a;
+
+/// A face's surface normal at `p` on it, either way round: a cylinder's straight from its axis (projecting onto the face
+/// took ~0.3 ms, 800 times in c2-variable-fillet-faceblend's held Face blend 1), others projected.
+fn surface_normal(face: &Shape, p: DVec3) -> FResult<DVec3> {
+    if let Ok(k::Surface::Cylinder { origin, axis, .. }) = face.face_surface() {
+        let v = p - origin;
+        if let Some(n) = (v - axis * v.dot(axis)).try_normalize() {
+            return Ok(n);
+        }
+    }
+    Ok(face.normal_at_point(p)?.normalize())
+}
+
+/// A held range [lo, hi] of the chain in pieces (from, to, chain edge): split at the chain's vertices and where the
+/// hold line's edge that sets the radius changes.
+fn held_pieces(spec: &BlendSpec, chain: &[ChainEdge], lo: f64, hi: f64, scale: f64, station: &Station) -> FResult<Vec<(f64, f64, usize)>> {
+    let hold = spec.sides.as_ref().map(|s| s.hold.as_slice()).unwrap_or(&[]);
+    let which = |s: f64| -> FResult<Option<usize>> {
+        let (p, fr, _, tangent) = station(s)?;
+        Ok(hold_of(hold, p, tangent, &fr, scale)?.map(|h| h.1))
+    };
+    let span = hi - lo;
+    let mut at: Vec<f64> = Vec::new();
+    let mut acc = 0.0;
+    for c in chain {
+        acc += c.length;
+        if acc > lo + 1e-9 * span && acc < hi - 1e-9 * span {
+            at.push(acc);
+        }
+    }
+    const M: usize = 64;
+    let mut prev = (lo, which(lo)?);
+    for i in 1..=M {
+        let s = lo + span * i as f64 / M as f64;
+        let cur = (s, which(s)?);
+        if cur.1 != prev.1 {
+            let (mut a, mut b) = (prev.0, cur.0);
+            for _ in 0..30 {
+                let m = 0.5 * (a + b);
+                if which(m)? == prev.1 {
+                    a = m;
+                } else {
+                    b = m;
+                }
+            }
+            at.push(0.5 * (a + b));
+        }
+        prev = cur;
+    }
+    at.sort_by(f64::total_cmp);
+    at.dedup_by(|b, a| (*b - *a).abs() < 1e-6 * span);
+    let mut out = Vec::new();
+    let mut from = lo;
+    for to in at.into_iter().chain([hi]) {
+        if to - from > 1e-9 * span {
+            let mid = 0.5 * (from + to);
+            let (mut acc, mut ci) = (0.0, chain.len() - 1);
+            for (i, c) in chain.iter().enumerate() {
+                if mid <= acc + c.length {
+                    ci = i;
+                    break;
+                }
+                acc += c.length;
+            }
+            out.push((from, to, ci));
+        }
+        from = to;
+    }
+    Ok(out)
+}
 
 /// The chain's range [lo, hi] in pieces, each held (a hold line nearer the edge than the radius: its section follows
 /// the hold line) or not (the plain round). Live 2233: the entered radius caps the hold line's.

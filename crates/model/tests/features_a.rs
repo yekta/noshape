@@ -904,6 +904,57 @@ fn a_face_blend_follows_its_tangent_hold_line_as_live() {
     }
 }
 
+/// A stadium-shaped plate (sides 60 long, ends R 25, 20 high) with a stadium pocket inset 8 mm (5 deep): a face blend
+/// from its top to its walls held by the pocket's rim (a hold line on the top's boundary with another face, as
+/// c2-variable-fillet-faceblend's) takes the whole top, a round of 8 all round. One blend face per rim edge and wall, as
+/// live's; the volume a corner of 8 less its quarter circle swept along the walls (Pappus round the ends).
+#[test]
+fn a_face_blend_held_by_a_pockets_rim_takes_the_whole_top() {
+    let slot = |r: f64| {
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = [DVec2::new(-0.03, -r), DVec2::new(0.03, -r), DVec2::new(0.03, r), DVec2::new(-0.03, r)];
+        let pts: Vec<_> = p.iter().map(|q| sk.add_point(*q)).collect();
+        let (c1, c2) = (sk.add_point(DVec2::new(0.03, 0.0)), sk.add_point(DVec2::new(-0.03, 0.0)));
+        sk.add_line_between(pts[0], pts[1]).unwrap();
+        sk.add_arc_between(c1, pts[1], pts[2]).unwrap();
+        sk.add_line_between(pts[2], pts[3]).unwrap();
+        sk.add_arc_between(c2, pts[3], pts[0]).unwrap();
+        sk
+    };
+    let mut t = T::new();
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), slot(0.025));
+    let r = t.regions(s)[0].clone();
+    t.extrude(r, "20 mm", "NEW");
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("20 mm"))]);
+    let s = t.sketch(Reference::FeaturePlane(pl), slot(0.017));
+    let r = t.regions(s)[0].clone();
+    let pocket = t.extrude(r, "5 mm", "REMOVE");
+    t.set(pocket, "oppositeDirection", b(true));
+    let res = t.ok();
+    let b0 = &res.context.bodies[0];
+    let (top, wall) = (face_with_normal(b0, DVec3::Z), face_with_normal(b0, -DVec3::Y));
+    // (By each edge's middle point: the pocket's end arcs share their chords' middles with the plate's.)
+    let rim: Vec<Reference> = [DVec3::new(0.0, -0.017, 0.02), DVec3::new(0.0, 0.017, 0.02), DVec3::new(0.047, 0.0, 0.02), DVec3::new(-0.047, 0.0, 0.02)]
+        .into_iter()
+        .map(|p| {
+            let edges = b0.shape.edges();
+            let mid = |e: &noshape_kernel::Shape| e.edge_info().and_then(|i| e.point_at(0.5 * (i.first_param + i.last_param))).map_or(f64::INFINITY, |m| m.distance(p));
+            let i = (0..edges.len()).min_by(|&a, &b| mid(&edges[a]).total_cmp(&mid(&edges[b]))).unwrap();
+            Reference::Edge((*b0.edges[i]).clone())
+        })
+        .collect();
+    t.add("faceBlend", &[("side1", q(vec![top])), ("side2", q(vec![wall])), ("radius", e("20 mm")), ("propagation", b(true)), ("propagationType", en("TANGENT")), ("tangentHoldLines", b(true)), ("tangentEdges", q(rim))]);
+    let res = t.ok();
+    let (d, rr) = (0.008, 0.025);
+    let corner = d * d * (1.0 - PI / 4.0);
+    let c = d * (10.0 - 3.0 * PI) / (12.0 - 3.0 * PI);
+    let plate = 0.06 * 2.0 * rr * 0.02 + PI * rr * rr * 0.02 - (0.06 * 2.0 * 0.017 + PI * 0.017f64.powi(2)) * 0.005;
+    let want = plate - corner * (2.0 * 0.06 + 2.0 * PI * (rr - c));
+    let v = total_volume(&res.context);
+    assert!(near(v, want, 2e-4), "{} mm³, want {}", v * 1e9, want * 1e9);
+    assert_eq!(res.context.bodies[0].faces.len(), 14);
+}
+
 /// Live 2306 A–C: a 40 × 30 × 20 block, Face blend R 4 from its top (side 1) to its front (side 2). Adjacent
 /// propagation (or Custom past 90°) walks round all four top edges; Tangent or Custom 45° only the front one.
 /// Detached leaves the block and adds the blend as a surface; attached Long / No trim are refused.

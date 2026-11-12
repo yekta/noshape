@@ -729,11 +729,6 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
             true => ev.resolve_edges(ev.query("tangentEdges")).into_iter().filter(|(x, _)| *x == bi).map(|(_, e)| e).collect(),
             false => Vec::new(),
         };
-        // A hold line on a side's boundary with another face (c2-variable-fillet-faceblend: a pocket's rim): not yet.
-        let ef = body.shape.edge_faces()?;
-        if hold_edges.iter().any(|&e| ef.get(e).is_none_or(|fs| fs.iter().any(|&f| !a.contains(&(f as usize)) && !b.contains(&(f as usize))))) {
-            return err("Tangent hold lines on a face's boundary are not supported yet");
-        }
         let hold: Vec<Shape> = hold_edges.iter().filter_map(|&e| body.shape.sub_shape(ShapeType::Edge, e).ok()).collect();
         let spec = super::blend_section::BlendSpec { sides: Some(super::blend_section::Sides { side1: a.clone(), ratio, hold: hold.clone() }), ..spec };
         if ev.bool("propagation") && ev.is("propagationType", "TANGENT") {
