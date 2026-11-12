@@ -890,6 +890,23 @@ fn hole_dialog_table_values_then_edits() {
 
 // ------------------------------------------------------------------ edit curve
 
+/// Elevate on a sketch line: std's elevateDegree takes a Vector's sub-array as a Vector (it failed with "Error
+/// regenerating.", ui-parity edit-curve-new-edit-reedit). The line becomes a degree 3 curve along the same line.
+#[test]
+fn edit_curve_elevates_a_line() {
+    noshape_model::custom::register();
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let line = sk.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.04, 0.0));
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    t.add("editCurve", &[("wire", q(vec![Reference::SketchEntity { sketch: s, entity: line.0 }])), ("elevate", b(true))]);
+    let res = t.ok();
+    let wire = res.context.bodies.iter().find(|b| b.kind == BodyKind::Wire).unwrap();
+    let d = wire.shape.edges()[0].edge_bspline().unwrap();
+    assert_eq!(d.degree, 3);
+    assert!(d.poles.iter().all(|p| p.y.abs() < 1e-12 && p.z.abs() < 1e-12) && (wire.shape.length().unwrap() - 0.04).abs() < 1e-9, "{d:?}");
+}
+
 #[test]
 fn edit_curve_moves_control_points() {
     // std's editCurve runs on the FeatureScript host, as in the app.

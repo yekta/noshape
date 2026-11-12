@@ -176,7 +176,9 @@ fn sub_array(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     if start < 0 || end < start || end as usize > arr.len() {
         return Err(i.error(format!("subArray range {start}..{end} is invalid for an array of size {}", arr.len())));
     }
-    Ok(Value::array(arr[start as usize..end as usize].to_vec()))
+    // Typed as its input: a Vector's part is a Vector (std nurbsUtils separatePointsAndWeights divides it).
+    let tag = a.first().map_or(Tag::NONE, Value::tag);
+    Ok(Value::Array(Arc::new(arr[start as usize..end as usize].to_vec()), tag))
 }
 
 fn concatenate_arrays(i: &mut Interp, a: Vec<Value>) -> R<Value> {

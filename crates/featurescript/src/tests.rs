@@ -320,6 +320,13 @@ fn ids_and_vectors() {
     assert_eq!(run_str("function f() { return norm(vector(3, 4) * meter) == 5 * meter; }"), "true");
 }
 
+/// A Vector's sub-array is a Vector (std nurbsUtils separatePointsAndWeights divides one: Edit curve's Elevate).
+#[test]
+fn a_sub_array_of_a_vector_is_a_vector() {
+    assert_eq!(run_str("function f() { return toString(subArray(vector([2, 4, 6, 2]), 0, 3) / 2); }"), "(1, 2, 3)");
+    assert_eq!(run_str("function f() { return subArray([1, 2, 3], 1) is Vector; }"), "false");
+}
+
 #[test]
 fn whole_standard_library_compiles() {
     let t = std::time::Instant::now();

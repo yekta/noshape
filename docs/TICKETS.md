@@ -13,7 +13,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P3 REPLACE-FACE-SHEET-SMALL-MSG (psui; 2026-11-12 11:50 UTC) a Replace face template that doesn't cover the face fails with
   "Could not replace faces as requested." (`direct.rs` replace_face maps every error to it); std's REPLACE_FACE_SHEET_SMALL
   reads "Surface to replace with needs to extend size of faces." Which one live shows: asked (REQUESTS 2026-11-12 11:50).
-- [ ] P3 EDIT-CURVE-ELEVATE-LINE (FeatureScript host; psui 2026-11-12 11:50 UTC) **Edit curve with Elevate on a sketch line: "Error
+- [x] (psui 11-12: our subArray dropped its input's type, so a Vector's part was a plain array that std's separatePointsAndWeights couldn't divide; T1 featurescript tests::a_sub_array_of_a_vector_is_a_vector, engine::edit_curve_elevates_a_line; model suite no document worse, 78/87, 837/947) P3 EDIT-CURVE-ELEVATE-LINE (FeatureScript host; psui 2026-11-12 11:50 UTC) **Edit curve with Elevate on a sketch line: "Error
   regenerating."** (start `curves`, Sketch 3's line, `elevate` true, target degree 3): a runtime error inside std
   editCurve.fs elevateDegree in our interpreter (std's wrapper turns it into REGEN_ERROR). Ops repro: feature_add
   editCurve {"wire": [the line], "elevate": true}.
