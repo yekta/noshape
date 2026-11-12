@@ -6994,6 +6994,38 @@ fn release_parts_and_revision_history() {
     assert_eq!(all["packages"].as_array().unwrap().len(), 2, "{all}");
 }
 
+/// The Release candidate dialog's drafts and row actions through the API (Onshape help "Typical Release Workflow"):
+/// Save draft keeps a candidate without its checks, Release drafts lists it, Review Release releases it (and the draft
+/// goes), the State column's Revert keeps the released revision, Delete draft.
+#[test]
+fn release_drafts_revert_and_generate() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "release-drafts.noshape");
+    // Saved without a part number: a draft has no checks but its name.
+    let d = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "D1", "notes": "draft", "draft": true }));
+    assert_eq!(d["draft"], "D1", "{d}");
+    let list = call(&mut ctx, "release_drafts", json!({}));
+    assert_eq!(list["drafts"].as_array().unwrap().len(), 1, "{list}");
+    assert_eq!(list["drafts"][0]["items"][0]["name"], "Part 1", "{list}");
+    // Reopened and released with a part number: revision A, and the draft is gone.
+    let r = call(&mut ctx, "release_create", json!({ "from_draft": "D1", "part_numbers": { "Part 1": "PRT-0007" } }));
+    assert_eq!(r["release"], "D1", "{r}");
+    assert_eq!(r["items"][0]["revision"], "A", "{r}");
+    assert!(call(&mut ctx, "release_drafts", json!({}))["drafts"].as_array().unwrap().is_empty());
+    // Revert: the item keeps its released revision A in the next candidate.
+    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R2", "draft": true, "revert": ["Part 1"] }));
+    assert_eq!(r["items"][0]["revision"], "A", "reverted to the last released revision: {r}");
+    let e = try_call(&mut ctx, "release_draft_delete", json!({ "name": "nope" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("name"));
+    call(&mut ctx, "release_draft_delete", json!({ "name": "R2" }));
+    assert!(call(&mut ctx, "release_drafts", json!({}))["drafts"].as_array().unwrap().is_empty());
+    // Nothing named: `tab` or `from_draft` is needed; generating needs a sequential numbering scheme.
+    let e = try_call(&mut ctx, "release_create", json!({ "name": "R3" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("tab"));
+    let e = try_call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R3", "generate_part_numbers": true, "revert": [] })).err();
+    assert!(e.as_ref().is_none_or(|e| e.param.as_deref() == Some("generate_part_numbers")), "{e:?}");
+}
+
 /// qa DWG-DIM-TWO-EDGES: Line to line on two parallel view edges clicked at
 /// their middles (where snap points and other targets sit on top) dimensions
 /// the distance between them.

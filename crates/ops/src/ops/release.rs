@@ -18,10 +18,15 @@ pub fn ops() -> Vec<Op> {
             description: "Release… (a tab's menu, or a part's): the Release candidate dialog with its items, then Release. Items as the dialog lists them: a Part Studio's parts (or `parts` only), an Assembly with its Bill of Materials, a Drawing with what its views show, a Variable Studio or file itself; `include_drawings` adds the drawings showing them. Each item's part number is its own (Properties) unless `part_numbers` gives one ({item name or part id: number}); its revision is the next of the revision scheme (A, B, …; `revisions` overrides, {item name or part id: revision}). The dialog's checks refuse it with their messages (a part number missing, a revision too low, Company settings' release conditions). Releasing writes the part numbers onto the parts (\"Release <name>\"), records the release at a new version named `name`; with Company settings' automatic obsoletion on, a new revision obsoletes the part number's previous one.",
             fields: vec![
                 doc_field(),
-                req("tab", s(), "The tab to release (name or id)."),
+                opt("tab", s(), "The tab to release (name or id). Required unless `from_draft` gives the items."),
+                opt("tabs", strings(), "More tabs whose items join the candidate (the dialog's + Add items)."),
+                opt("from_draft", s(), "Start from this saved draft's items, name and notes (Release drafts › Review Release); the other fields change them."),
+                opt("draft", json!({ "type": "boolean" }), "Save draft instead of releasing: the candidate is kept in the document by its name (no checks but the name)."),
+                opt("generate_part_numbers", json!({ "type": "boolean" }), "Generate part numbers for the items without one (Company settings' sequential numbering scheme)."),
+                opt("revert", strings(), "Items (names or part ids) reverted to their last released revision (the State column's Revert)."),
                 opt("parts", strings(), "Part Studio: only these parts (ids or names)."),
                 opt("instance", s(), "Assembly: only this instance's (its Release…): its part, another document's part at its version (linked to that version), or a subassembly's contents."),
-                req("name", s(), "Release name (the version's name)."),
+                opt("name", s(), "Release name (the version's name); required unless `from_draft` names it."),
                 opt("notes", s(), "Release notes (the version's description)."),
                 opt("part_numbers", json!({ "type": "object" }), "{item name or part id: part number}."),
                 opt("revisions", json!({ "type": "object" }), "{item name or part id: revision}."),
@@ -30,6 +35,26 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: create,
+        },
+        Op {
+            group: "release",
+            verb: "drafts",
+            summary: "The saved Release candidate drafts",
+            description: "Release drafts (the document's panel): each saved candidate's name, notes, time and items. Reopen one with release_create `from_draft`, delete it with release_draft_delete.",
+            fields: vec![doc_field()],
+            mutates: false,
+            destructive: false,
+            run: drafts,
+        },
+        Op {
+            group: "release",
+            verb: "draft_delete",
+            summary: "Delete a saved Release candidate draft",
+            description: "Review Release › Save draft ▾ › Delete draft: the draft named `name` is removed.",
+            fields: vec![doc_field(), req("name", s(), "The draft's name.")],
+            mutates: true,
+            destructive: true,
+            run: draft_delete,
         },
         Op {
             group: "release",
@@ -78,16 +103,37 @@ fn instance_items(od: &crate::OpenDoc, tab: noshape_model::document::TabId, key:
 
 fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
-    let tab = crate::doc::find_tab(od.doc(), a.str("tab")?)?;
     let provider = crate::derived::DocStudios::new(od.doc().clone(), od.studio_cache.clone());
-    let mut items = match a.opt_str("instance")? {
-        Some(k) => instance_items(od, tab, k)?,
-        None => rel::tab_items(&od.session, &*provider, tab),
+    let draft = match a.opt_str("from_draft")? {
+        Some(n) => Some(rel::release_log(&od.session).drafts.iter().find(|d| d.name == n).cloned().ok_or_else(|| OpError::param("from_draft", &format!("no draft `{n}`")))?),
+        None => None,
     };
+    let tab = match a.opt_str("tab")? {
+        Some(t) => Some(crate::doc::find_tab(od.doc(), t)?),
+        None if draft.is_some() => None,
+        None => return Err(OpError::param("tab", "the tab to release (or `from_draft`)")),
+    };
+    let mut items = match (&draft, tab, a.opt_str("instance")?) {
+        (_, Some(tab), Some(k)) => instance_items(od, tab, k)?,
+        (_, Some(tab), None) => rel::tab_items(&od.session, &*provider, tab),
+        (Some(d), None, _) => d.items.clone(),
+        (None, None, _) => Vec::new(),
+    };
+    // A draft's items with the tab's: the tab's join them.
+    if let (Some(d), Some(_)) = (&draft, tab) {
+        let extra: Vec<_> = std::mem::take(&mut items).into_iter().filter(|i| !d.items.iter().any(|x| x.same_object(i))).collect();
+        items = d.items.iter().cloned().chain(extra).collect();
+    }
+    for (i, t) in a.opt_array("tabs")?.into_iter().flatten().enumerate() {
+        let id = crate::doc::find_tab(od.doc(), t.as_str().unwrap_or_default()).map_err(|_| OpError::param(&format!("tabs[{i}]"), "no such tab"))?;
+        let extra: Vec<_> = rel::tab_items(&od.session, &*provider, id).into_iter().filter(|x| !items.iter().any(|i| i.same_object(x))).collect();
+        items.extend(extra);
+    }
     if items.is_empty() {
         return Err(OpError::param("tab", "nothing to release in this tab"));
     }
     if let Some(list) = a.opt_array("parts")? {
+        let Some(tab) = tab else { return Err(OpError::param("parts", "parts of a Part Studio `tab`")) };
         if !matches!(od.doc().tab(tab).map(|t| &t.content), Some(TabContent::PartStudio(_))) {
             return Err(OpError::param("parts", "parts of a Part Studio tab"));
         }
@@ -120,9 +166,46 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         it.part_number = v;
     })?;
     pick("revisions", &mut items, &|it, v| it.revision = v)?;
-    let name = a.str("name")?.trim().to_string();
+    // The header's "Generate missing part numbers".
+    if a.bool_or("generate_part_numbers", false)? {
+        for it in items.iter_mut().filter(|it| it.part_number.trim().is_empty()) {
+            let ty = it.kind.prefix_index();
+            let Some(n) = rel::next_number(|s| s.release_objects.generate(ty)) else {
+                return Err(OpError::param("generate_part_numbers", "Company settings › Numbering schemes has no sequential part number scheme"));
+            };
+            if !it.not_revision_managed {
+                it.revision = log.next_revision(&n);
+            }
+            it.part_number = n;
+        }
+    }
+    for (i, v) in a.opt_array("revert")?.into_iter().flatten().enumerate() {
+        let k = v.as_str().unwrap_or_default();
+        let it = items.iter_mut().find(|it| it.part.as_ref().is_some_and(|b| crate::refs::body_id(b) == k) || it.name == k).ok_or_else(|| OpError::param(&format!("revert[{i}]"), &format!("no item `{k}`")))?;
+        let Some(rev) = log.latest_revision(&it.part_number) else { return Err(OpError::param(&format!("revert[{i}]"), &format!("`{k}` has no released revision"))) };
+        it.reverted = true;
+        it.revision = rev;
+    }
+    let name = a.opt_str("name")?.map(str::to_string).or_else(|| draft.as_ref().map(|d| d.name.clone())).unwrap_or_default().trim().to_string();
     if name.is_empty() {
         return Err(OpError::param("name", "a release name"));
+    }
+    let notes = a.opt_str("notes")?.map(str::to_string).or_else(|| draft.as_ref().map(|d| d.notes.clone())).unwrap_or_default();
+    let created = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+    // Save draft: kept by its name, no checks but the name (the dialog's).
+    if a.bool_or("draft", false)? {
+        let pkg = Package { id: 0, kind: PackageKind::Release, name: name.clone(), notes, created, version: None, items, re_releasable: false };
+        let mut log = rel::release_log(&od.session);
+        log.save_draft(pkg.clone());
+        if let Some(old) = draft.as_ref().filter(|d| d.name != name) {
+            log.delete_draft(&old.name);
+        }
+        rel::save_log(&mut od.session, &log).map_err(|e| OpError::new("release", format!("{e:#}")))?;
+        return Ok(json!({ "draft": name, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>() }).into());
+    }
+    // Company settings › Release management › "Require a note in the Release dialog".
+    if crate::release_settings::release_settings().require_note && notes.trim().is_empty() {
+        return Err(OpError::param("notes", "Required field must not be empty."));
     }
     // The dialog's checks.
     let mut issues = log.validate(&items);
@@ -133,10 +216,28 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if !problems.is_empty() {
         return Err(OpError::invalid(format!("the release candidate needs attention: {}", problems.join(" | "))));
     }
-    let created = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
-    let pkg = Package { id: 0, kind: PackageKind::Release, name, notes: a.opt_str("notes")?.unwrap_or("").to_string(), created, version: None, items, re_releasable: false };
+    let pkg = Package { id: 0, kind: PackageKind::Release, name, notes, created, version: None, items, re_releasable: false };
     let pkg = rel::commit(&mut od.session, pkg).map_err(|e| OpError::new("release", format!("{e:#}")))?;
     Ok(json!({ "release": pkg.name, "version": pkg.version, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>() }).into())
+}
+
+fn drafts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let log = rel::release_log(&od.session);
+    let drafts: Vec<Value> = log.drafts.iter().map(|d| json!({ "name": d.name, "notes": d.notes, "created": d.created, "items": d.items.iter().map(item_json).collect::<Vec<_>>() })).collect();
+    Ok(json!({ "drafts": drafts }).into())
+}
+
+fn draft_delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let name = a.str("name")?;
+    let mut log = rel::release_log(&od.session);
+    if !log.drafts.iter().any(|d| d.name == name) {
+        return Err(OpError::param("name", &format!("no draft `{name}`; drafts: {}", log.drafts.iter().map(|d| d.name.clone()).collect::<Vec<_>>().join(", "))));
+    }
+    log.delete_draft(name);
+    rel::save_log(&mut od.session, &log).map_err(|e| OpError::new("release", format!("{e:#}")))?;
+    Ok(json!({ "deleted": name }).into())
 }
 
 fn history(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

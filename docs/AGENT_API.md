@@ -336,7 +336,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_edit_joint`](#sheetmetal_edit_joint), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
-- **release**: [`release_create`](#release_create), [`release_revision_history`](#release_revision_history)
+- **release**: [`release_create`](#release_create), [`release_drafts`](#release_drafts), [`release_draft_delete`](#release_draft_delete), [`release_revision_history`](#release_revision_history)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image), [`render_print`](#render_print), [`render_file_page`](#render_file_page)
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
@@ -6871,19 +6871,59 @@ Examples:
 ```json
 {"tab": "Part Studio 1", "name": "Release 1", "part_numbers": {"Part 1": "PRT-0001"}}
 {"tab": "Assembly 1", "name": "R2", "notes": "first build", "include_drawings": true}
+{"tab": "Part Studio 1", "tabs": ["Drawing 1"], "name": "Release 2", "generate_part_numbers": true, "draft": true}
+{"from_draft": "Release 2"}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string | required | The tab to release (name or id). |
+| `tab` | string |  | The tab to release (name or id). Required unless `from_draft` gives the items. |
+| `tabs` | array of string |  | More tabs whose items join the candidate (the dialog's + Add items). |
+| `from_draft` | string |  | Start from this saved draft's items, name and notes (Release drafts › Review Release); the other fields change them. |
+| `draft` | boolean |  | Save draft instead of releasing: the candidate is kept in the document by its name (no checks but the name). |
+| `generate_part_numbers` | boolean |  | Generate part numbers for the items without one (Company settings' sequential numbering scheme). |
+| `revert` | array of string |  | Items (names or part ids) reverted to their last released revision (the State column's Revert). |
 | `parts` | array of string |  | Part Studio: only these parts (ids or names). |
 | `instance` | string |  | Assembly: only this instance's (its Release…): its part, another document's part at its version (linked to that version), or a subassembly's contents. |
-| `name` | string | required | Release name (the version's name). |
+| `name` | string |  | Release name (the version's name); required unless `from_draft` names it. |
 | `notes` | string |  | Release notes (the version's description). |
 | `part_numbers` | object |  | {item name or part id: part number}. |
 | `revisions` | object |  | {item name or part id: revision}. |
 | `include_drawings` | boolean |  | Include associated drawings. |
+
+#### release_drafts
+
+The saved Release candidate drafts.
+
+Release drafts (the document's panel): each saved candidate's name, notes, time and items. Reopen one with release_create `from_draft`, delete it with release_draft_delete.
+
+Examples:
+
+```json
+{}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+
+#### release_draft_delete
+
+Delete a saved Release candidate draft (edits the document (one undoable history entry); deletes or overwrites).
+
+Review Release › Save draft ▾ › Delete draft: the draft named `name` is removed.
+
+Examples:
+
+```json
+{"name": "Release 2"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `name` | string | required | The draft's name. |
 
 #### release_revision_history
 
