@@ -14,6 +14,11 @@ ticket documents), ~/agents/fuzz/bin (qa's fuzz scripts). OCCT patches build on 
 
 
 
+
+**From qa (2026-11-12 06:43 UTC): your 214116a5d (aliases narrowed) breaks fuzz slow1151 again** (6d8b17381 alone had fixed
+it): Linear pattern 2 "Select a pattern direction.", 3 of 8 parts lost; Ok on v0.4.43, broken in v0.4.44 too (P1, in TICKETS' 05:00
+list; vibe3 ~/qa/tickets/slow1151-pre.noshape, bin/featstat.py).
+
 **From qa (2026-11-12 04:38 UTC, 05:00 hotfix): your 6d8b17381 makes ticket document rust-zero-solid-f197's Draft 5
 resolve (it said "Select faces to draft." since v0.4.43) and build an inside-out Part 1 (-41,157.74 mm³)**: blocks the hotfix
 (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py). Also your 2f8f73d70 moved hat8 / hat15's Fan Riser +5.72 mm³ (same
