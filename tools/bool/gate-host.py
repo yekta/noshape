@@ -30,6 +30,8 @@ VS_OCCT = {"parity56"}
 HEAVY = {"shfall", "cf-spur-gear", "gears", "gpf"}
 SOLO = {"kall", "k10-25", "k10-25-12", "k25-15", "k25-25", "k25-71-12"}
 HEAVY_AT_ONCE = 2
+# The cases timed, ours alone, main's binary and the branch's alternating.
+SPEED = ["k25-15", "k25-25", "cf-spur-gear"]
 # (A case is named by its file: a recorded one by its 16-digit hash, a hand-made one (kall's k25x2) any way.)
 NAME = r"[\w.-]+"
 CASE = re.compile(rf"^({NAME})( \(|: failed)")
