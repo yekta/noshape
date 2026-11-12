@@ -41,26 +41,25 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
 - **Host:** vibe4 sits at load 25-100 from the land queue's slots, psui, blend and dx suites and bool's replays, so
   16 gate threads get a fraction of 16 cores. Proposal to the lead: a gate lane on vibe4 (rb.sh pins other jobs to cores
   0-9, gates to 10-15), or gates on vibe5 at night.
-- **lcm (branch bool2-fixes, gating):** OCCT's section of a round and a ring, both tangent to the top plane at a corner, crosses
-  the round's straight edge at about 50 degrees 23 um before the corner, runs 8 um out and hooks back into the corner.
-  OCCT's own pcurve on the round has the same hook. OCCT puts no vertex there: the edge only touches the ring. Ours now
-  treats it as no crossing, starts the section's 2D curve on that face at the crossing (so it leaves the corner
-  inside), merges the curve's start into a crossing within its tolerance (OCCT's pave), and lets a made cylinder face
-  pass its input's angles by up to 1000 tolerances. Cut taken, identical to OCCT. The app's Boolean: 0.9-1.2 s (our
-  decline + OCCT) -> 0.6 s. T1 bool_patterns::a_section_hooking_over_an_edge_into_a_corner_cut_as_occt.
-- **mf2 (branch bool2-fixes, gating):** the mitre ball (box minus sphere) has its equator ending on the sphere's seam:
-  its curve on the sphere ends at 2π, the vertex placed at 0, so both its ends came out at one place and the ball's
-  lower piece was lost. A vertex's parameter on an edge's curve on a face that goes round is now the nearest of its
-  turns. Cut taken, identical to OCCT: 283 ms against OCCT's 961. `fillet_by_tools` now tries our Boolean for the
-  balls' and rings' cut too (quick_boolean, not straight to OCCT). T1
-  bool_patterns::a_ball_whose_edge_ends_on_its_sphere_seam_cut_as_occt.
-- **To bool (11-12 06:30 UTC): our seam fixes are one fix.** bool2-fixes' "nearest turn" rule in `c2_of` (a vertex's
-  parameter on its edge's curve on a face that goes round, the nearest of its turns) is your held seam-end fix
-  (seamend.patch) in another form. Gate run 5 shows it lets shfall 29f3147a through to the same difference: edges
-  102 / vertices 65 against OCCT's 100 / 63. Everything else in that run is level with main: every corpus and parity56
-  at 0 differences, model suite 77/98 and 815/935 on both sides. So Fillet 2's cut and the `fillet_by_tools` switch wait
-  on 29f3147a. Whoever fixes 29f3147a lands one seam rule; I won't touch 29f3147a unless you hand it over. lcm's cut is
-  separate (branch bool2-lcm, gating).
+- **kall (lead 11-12):** out of the per-change gate. `gate.sh --nightly-kall` replays it on main alone, one case at a
+  time, against the night before (bool2's session cron, 04:30 UTC). Verdict line: /tmp/lead/kall-status; a FAIL is
+  also appended to /root/bool-scratch/KALL-FAIL, so bool sees it. kall 324c79d1 took 49.5 GB alone on vibe4 and
+  earlyoom ended it: until vibe4 has that free, it is reported, not checked.
+- **lcm: landed c054329b (11-12 09:41).** OCCT's section of a round and a ring, both tangent to the top plane at a
+  corner, crosses the round's straight edge at about 50 degrees 23 um before the corner, runs 8 um out and hooks back
+  into the corner (OCCT's own pcurve on the round too). OCCT puts no vertex there, the edge only touching the ring. Ours:
+  - no crossing there;
+  - the section's 2D curve on that face starts at the crossing, so it leaves the corner inside;
+  - a curve's start merged into a crossing within its tolerance (OCCT's pave);
+  - a made cylinder face may pass its input's angles by 1000 tolerances.
+  Cut taken, identical to OCCT: the app's Boolean 0.9-1.2 s (our decline + OCCT) -> 0.6 s. Gate run 6: CHECK only for
+  the 4 knurl cases neither side could finish for memory; model suite identical (77/98, 817/935). T1
+  bool_patterns::a_section_hooking_over_an_edge_into_a_corner_cut_as_occt.
+- **Fillet 2 (branch bool2-seam, gating):** bool's b4c45d3f2 (an open edge's end across a free-form face's seam takes
+  its own parameter; a section's touch near a face's vertex is that vertex) takes the ball / ring cut and fixed shfall
+  29f3147a. My "nearest turn" rule is dropped, and 29f3147a needs nothing more: shfall is 58 taken, its known 2 differ.
+  What lands: `fillet_by_tools` asks our Boolean first for the balls' and rings' cut (143 ms, OCCT's 406), T1
+  bool_patterns::a_fillets_ball_and_ring_cut_as_occt.
 - Don't touch: bool's seam-end / touching work (bool-main2, bool-touch); Shell (by_quadrics).
 
 ## Queue (lead 11-11 08:10 and 09:25 UTC)
