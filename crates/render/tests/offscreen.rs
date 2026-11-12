@@ -2321,6 +2321,53 @@ fn culled_silhouettes_draw_as_the_plain_ones() {
     assert_eq!(plain, culled);
 }
 
+/// User P1 11-12 ("hovered lines don't turn orange, though I can click them"): a curved face's silhouette picks as the
+/// face, and hovering it lit only the face's boundary edges, so the line under the pointer stayed black. Live (behaviours
+/// EDGE-HIGHLIGHT-LOOK (d)): a hovered face lights its silhouette too, as its boundary: opaque #FFC685; selected, #FFA90A.
+#[test]
+fn a_hovered_or_selected_faces_silhouette_is_lit() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (240u32, 180u32);
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Isometric);
+    cam.fit_sphere(glam::DVec3::ZERO, 0.03, w as f64 / h as f64);
+    // The rulings of a cylinder's face (pick id 1), each between the facets either side of it.
+    let n = 48;
+    let at = |k: f32| {
+        let t = std::f32::consts::TAU * k / n as f32;
+        [t.cos(), t.sin()]
+    };
+    let segments: Vec<SilhouetteSegment> = (0..n)
+        .map(|k| {
+            let [x, y] = at(k as f32);
+            let ([a, b], [c, d]) = (at(k as f32 - 0.5), at(k as f32 + 0.5));
+            SilhouetteSegment { a: [0.01 * x, 0.01 * y, -0.02], b: [0.01 * x, 0.01 * y, 0.02], n1: [a, b, 0.0], n2: [c, d, 0.0], pick_id: 1, width: 1.25 }
+        })
+        .collect();
+    let lines = r.upload_silhouettes(&SilhouetteData { segments });
+    let frame = |r: &mut Renderer, st: u32| {
+        let mut scene = Scene { instances: vec![Instance::new(Drawable::Lines(lines.clone())).with_color([0.0, 0.0, 0.0, 1.0])], ..Default::default() };
+        if st != 0 {
+            scene.set_state(1, st);
+        }
+        r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style { msaa: 1, ..Style::default() }, pick: false }).unwrap().bgra
+    };
+    let count = |b: &[u8], want: [u8; 3]| b.as_chunks::<4>().0.iter().filter(|p| (p[2] as i32 - want[0] as i32).abs() <= 4 && (p[1] as i32 - want[1] as i32).abs() <= 4 && (p[0] as i32 - want[2] as i32).abs() <= 4).count();
+    let rest = frame(&mut r, 0);
+    assert!(count(&rest, [0, 0, 0]) > 50, "the silhouettes drawn black at rest");
+    for (st, colour) in [(state::HOVER, [255, 198, 133]), (state::SELECTED, [255, 169, 10])] {
+        let lit = frame(&mut r, st);
+        assert!(count(&lit, colour) > 50, "state {st}: the silhouettes in {colour:?}: {} px", count(&lit, colour));
+    }
+}
+
 /// Translucent mode as live 11-02: only a part's front faces blend, each at 25 % (a box seen from above: its top
 /// over the white background moves each channel a quarter of the way from white to the top's shaded color; the
 /// bottom face behind adds nothing).

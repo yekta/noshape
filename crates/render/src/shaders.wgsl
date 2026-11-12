@@ -755,7 +755,7 @@ fn vs_line(@builtin(vertex_index) index: u32, l: LineIn) -> LineOut {
     // Six vertices (two triangles) per segment and slot: corners (t, side).
     let slot = index / 6u;
     load_inst(slot);
-    return line_vertex(index, l, 0xffffffffu);
+    return line_vertex(index, l, 0xffffffffu, 0u);
 }
 
 // NOSHAPE_PERF_LINES=minimal (benchmarks only): the segment projected and widened, nothing else (no state, lift,
@@ -897,8 +897,12 @@ fn silhouette_vertex(index: u32, s: SilhouetteIn) -> LineOut {
     l.width = s.width;
     // Lifted: a hovered part's silhouette over the part edges it runs on.
     l.style = 32u;
-    // A face's hover and selection show on its boundary edges, not here.
-    return line_vertex(index, l, ~(HOVER | SELECTED));
+    // A hovered or selected face's silhouette is part of its outline (live behaviours EDGE-HIGHLIGHT-LOOK (d):
+    // "lights both of its long edges ... including the silhouette"): the face band its boundary edges get. A whole
+    // part's state isn't drawn here (its outline is its own).
+    let fst = state_of(global_pick(s.pick));
+    let face_lit = (fst & (HOVER | SELECTED)) != 0u && (fst & BODY) == 0u;
+    return line_vertex(index, l, select(~(HOVER | SELECTED), 0xffffffffu, face_lit), select(0u, OUTLINE, face_lit));
 }
 
 // `w` moved toward the eye by `px` physical pixels' worth of world length
@@ -914,7 +918,7 @@ fn toward_eye(w: vec3<f32>, px: f32) -> vec3<f32> {
     return w + dir * (px / max(per_unit, 1e-9));
 }
 
-fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
+fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOut {
     let slot = index / 6u;
     let vi = index % 6u;
     var ts = array<f32, 6>(0.0, 0.0, 1.0, 0.0, 1.0, 1.0);
@@ -924,7 +928,7 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
 
     let half_vp = g.viewport.xy * 0.5;
     let pick = global_pick(l.pick);
-    let st = state_of(pick) & state_mask;
+    let st = (state_of(pick) | state_add) & state_mask;
     var width = l.width * inst.extra.x + g.viewport.w;
     // Live (selection/03, 06b, 07b): highlighted edges and face outlines
     // put ~3.5–4.5 px of colour down (4 px here at the default width).

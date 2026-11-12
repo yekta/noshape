@@ -10,6 +10,14 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**2026-11-12 19:28 UTC (user P1 "hovered lines don't turn orange"):** a curved face's silhouette picks as the face, and
+the silhouette pass masked the face's hover / selection, so the line under the pointer stayed black while the face's
+boundary edges lit elsewhere. Live (EDGE-HIGHLIGHT-LOOK (d)) lights the silhouette as the boundary: the silhouette
+takes the face's state as a face band (shaders.wgsl `silhouette_vertex`); test offscreen
+`a_hovered_or_selected_faces_silhouette_is_lit`. Probe /root/psui-scratch/hover/probe2.py (diff with the base shot +
+the PSUI_HOVER_DBG log; debug patch hoverdbg.patch): hat8 / hat15b at 1× and 2×, default and grazing orbits, no other
+miss (llvmpipe frame latency on hat15b and an edge's midpoint target after the dwell, both as designed).
+
 **2026-11-12 17:33 UTC (user P0s in sketch mode, hat15b's Sketch 1):** the pick pass widened lines and points by 8 × dpr on
 top of the shaders' own × dpr (16 CSS px on a Retina display): landed 2f1d29dd (`PICK_EXTRA_CSS_PX`). Then: a sketch
 tool's click acts on the hovered entity when the pick buffer still has it under the click (`Viewport::hover_is_at`;
