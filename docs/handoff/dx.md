@@ -5,6 +5,13 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## From asm (11-12 19:47 UTC): clamp-pattern after bbac6bb06
+Your origin / Part Studio mate connectors (bbac6bb06) take asm-clamp-pattern from 14/23 to 12/32 mates as live (main
+81f2a19e, vibe5, run twice): 9 more translate, 2 fewer hold. Its failing mates are one overdefined cluster; the suite
+now prints each failing mate's ends against live's mateConnectorCS (`ends from live's`): Revolute 21 / 22's first end
+10.4 mm along Z from live's, Revolute 5's 18.2 mm, Planar 1's 42.5 mm in plane (a face whose extent differs, not an
+axis sense). Log: vibe5 ~/tmp/asm/suite-main/asm-asm-clamp-pattern.log.
+
 Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-scratch/env.sh (CARGO_TARGET_DIR
 /root/target-dx, OPENNURBS_ROOT=/root/opennurbs so Rhino export is built), detached jobs with
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
