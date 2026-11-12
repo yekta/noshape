@@ -156,7 +156,7 @@ impl PartStudioView {
         // the axis.
         let anchor = if move_face {
             let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
-            p.query("moveFaces").iter().find_map(|r| noshape_model::select::face_anchor(ctx, r)).map(|(b, _)| b)?
+            p.query("moveFaces").iter().find_map(|r| self.face_anchor(ctx, r)).map(|(b, _)| b)?
         } else {
             p.query("entities").iter().find_map(|r| match r {
                 Reference::SketchRegion { sketch, key } => {
@@ -225,8 +225,8 @@ impl PartStudioView {
         }
         let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
         let r = p.query("neutralPlane").first()?;
-        let (o, nn) = self.frame_of_ref(r).map(|f| (f.origin, f.normal)).or_else(|| noshape_model::select::face_anchor(ctx, r))?;
-        let (pt, nf) = noshape_model::select::face_anchor(ctx, p.query("draftFaces").first()?)?;
+        let (o, nn) = self.frame_of_ref(r).map(|f| (f.origin, f.normal)).or_else(|| self.face_anchor(ctx, r))?;
+        let (pt, nf) = self.face_anchor(ctx, p.query("draftFaces").first()?)?;
         let origin = pt - nn * nn.dot(pt - o);
         let axis = nf.cross(nn).try_normalize()?;
         let radial = pt - origin;
@@ -256,7 +256,7 @@ impl PartStudioView {
             Some(r) => match self.axis_of(r) {
                 Some((o2, d2)) if d2.cross(axis).length() < 1e-9 => o2 - o,
                 Some((_, d2)) => d2,
-                None => match self.frame_of_ref(r).map(|f| f.normal).or_else(|| noshape_model::select::face_anchor(ctx, r).map(|(_, n)| n)) {
+                None => match self.frame_of_ref(r).map(|f| f.normal).or_else(|| self.face_anchor(ctx, r).map(|(_, n)| n)) {
                     Some(n) => axis.cross(n),
                     None => noshape_model::regen::measure::resolve_shapes(ctx, r).first().and_then(|s| s.vertex_point().ok())? - o,
                 },
@@ -304,7 +304,7 @@ impl PartStudioView {
             [a, b, ..] => *b - *a,
             _ => match shapes.iter().find_map(|s| s.endpoints().ok()) {
                 Some((a, b)) => b - a,
-                None => refs.iter().find_map(|r| self.frame_of_ref(r).map(|f| f.normal).or_else(|| noshape_model::select::face_anchor(ctx, r).map(|(_, n)| n)))?,
+                None => refs.iter().find_map(|r| self.frame_of_ref(r).map(|f| f.normal).or_else(|| self.face_anchor(ctx, r).map(|(_, n)| n)))?,
             },
         }
         .try_normalize()?;
@@ -361,7 +361,7 @@ impl PartStudioView {
                 let reg = sk.regions.iter().find(|g| &g.key == key)?;
                 Some((region_anchor(&reg.positions, &reg.indices)?, sk.frame.normal))
             }
-            r => noshape_model::select::face_anchor(ctx?, r),
+            r => self.face_anchor(ctx?, r),
         })?;
         let mut dir = normal;
         if d.feature.params.bool("oppositeDirection") {
@@ -461,7 +461,7 @@ impl PartStudioView {
             // face's normal, Translate drives translationDistance along the
             // direction (Blind only); the base is the first face.
             "moveFace" if p.is("limitType", "BLIND") && !p.is("moveFaceType", "ROTATE") => {
-                let (base, n) = p.query("moveFaces").iter().find_map(|r| noshape_model::select::face_anchor(ctx, r))?;
+                let (base, n) = p.query("moveFaces").iter().find_map(|r| self.face_anchor(ctx, r))?;
                 let sign = if p.bool("oppositeDirection") { -1.0 } else { 1.0 };
                 if p.is("moveFaceType", "OFFSET") {
                     return Some(Arrow { base, dir: n * sign, length: value("offsetDistance")?, param: "offsetDistance", flip: Some("oppositeDirection"), secondary: false });
@@ -479,7 +479,7 @@ impl PartStudioView {
                         let reg = sk.regions.iter().find(|g| &g.key == key)?;
                         Some((region_anchor(&reg.positions, &reg.indices)?, sk.frame.normal))
                     }
-                    r => noshape_model::select::face_anchor(ctx, r),
+                    r => self.face_anchor(ctx, r),
                 })?;
                 let dir = if p.bool("oppositeDirection") { -n } else { n };
                 Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false })
@@ -487,7 +487,7 @@ impl PartStudioView {
             // replaceFace.fs: on the face to replace with, along its normal
             // (Flip alignment turns it twice there: not at all).
             "replaceFace" => {
-                let (base, n) = p.query("templateFace").iter().find_map(|r| noshape_model::select::face_anchor(ctx, r).or_else(|| self.frame_of_ref(r).map(|f| (f.origin, f.normal))))?;
+                let (base, n) = p.query("templateFace").iter().find_map(|r| self.face_anchor(ctx, r).or_else(|| self.frame_of_ref(r).map(|f| (f.origin, f.normal))))?;
                 let dir = if p.bool("oppositeDirection") { -n } else { n };
                 Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false })
             }
@@ -573,7 +573,7 @@ impl PartStudioView {
             // along its normal for the front.
             "splitPart" if p.is("splitType", "PART") && !p.bool("keepBothSides") => {
                 let r = p.query("tool").first()?;
-                let (o, n) = self.frame_of_ref(r).map(|f| (f.origin, f.normal)).or_else(|| noshape_model::select::face_anchor(ctx, r))?;
+                let (o, n) = self.frame_of_ref(r).map(|f| (f.origin, f.normal)).or_else(|| self.face_anchor(ctx, r))?;
                 let (lo, hi) = self.parts_box("targets", cx)?;
                 let c = (lo + hi) * 0.5;
                 let base = c - n * n.dot(c - o);

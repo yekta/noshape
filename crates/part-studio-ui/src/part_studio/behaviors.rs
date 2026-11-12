@@ -152,6 +152,9 @@ pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, Vec<Reference>, usize,
 /// A removed part's outline's key: the model before the feature (by address) and the part's faces.
 pub type RemovedOutlineKey = (usize, Vec<Reference>);
 
+/// Manipulator anchors of faces, by face, for the context they were computed in.
+type FaceAnchors = (Arc<noshape_model::regen::context::Context>, std::collections::HashMap<Reference, Option<(glam::DVec3, glam::DVec3)>>);
+
 /// The shown faces each feature made.
 type FeatureFaces = std::collections::HashMap<FeatureId, Vec<Reference>>;
 
@@ -451,6 +454,8 @@ pub struct UiState {
     /// Every feature name this view has shown, a deleted feature's too (a missing pick reads as the feature that made
     /// it, live fillet-chip-clear-missing: "Extrude 1" after Extrude 1 was deleted).
     pub feature_names: std::collections::HashMap<FeatureId, String>,
+    /// Faces' manipulator anchors (centroid on the face, normal) for one context (`face_anchor`).
+    pub face_anchors: std::cell::RefCell<Option<FaceAnchors>>,
     /// The shown faces each feature made, for the display applied as `display_seq` (`feature_geometry`).
     pub feature_faces: std::cell::RefCell<Option<(u64, FeatureFaces)>>,
     /// The outline of a part the open feature removes, over its preview: for the model before it (by address) and
@@ -817,6 +822,7 @@ impl UiState {
             preview_before: None,
             feature_names: Default::default(),
             feature_faces: Default::default(),
+            face_anchors: Default::default(),
             removed_outline: None,
             before_context: None,
             decal_sized: None,
@@ -955,6 +961,17 @@ impl PartStudioView {
             out.extend(faces.iter().cloned());
         }
         out
+    }
+
+    /// [`noshape_model::select::face_anchor`] once per face and context: it integrates the face's area for its
+    /// centroid, and the manipulators asked again every time an open dialog's display landed (hat8: on the UI thread).
+    pub(super) fn face_anchor(&self, ctx: &Arc<noshape_model::regen::context::Context>, r: &Reference) -> Option<(glam::DVec3, glam::DVec3)> {
+        let mut cache = self.ui.face_anchors.borrow_mut();
+        if cache.as_ref().is_none_or(|(c, _)| !Arc::ptr_eq(c, ctx)) {
+            *cache = Some((ctx.clone(), Default::default()));
+        }
+        let map = &mut cache.as_mut().expect("just set").1;
+        *map.entry(r.clone()).or_insert_with(|| noshape_model::select::face_anchor(ctx, r))
     }
 
     /// Faces standing for a whole part (parts list hover/selection).
@@ -4262,7 +4279,7 @@ impl PartStudioView {
                 }
             }
             "replaceFace" if !user_set.contains("oppositeSense") => {
-                let normal = |r: &Reference| ctx.and_then(|c| noshape_model::select::face_anchor(c, r)).map(|x| x.1).or_else(|| self.frame_of_ref(r).map(|f| f.normal));
+                let normal = |r: &Reference| ctx.and_then(|c| self.face_anchor(c, r)).map(|x| x.1).or_else(|| self.frame_of_ref(r).map(|f| f.normal));
                 if let (Some(a), Some(b)) = (params.query("replaceFaces").first().and_then(normal), params.query("templateFace").first().and_then(normal)) {
                     let want = a.dot(b) < 0.0;
                     if params.bool("oppositeSense") != want {
