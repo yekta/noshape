@@ -16,6 +16,25 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
 **c2-rings-loft stops at feature 20, Extrude 5 (core's):** the engraving cut's edges are split at the revolved ring's
 seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs live 335/206); Parasolid has no seams.
 
+## 11-12 20:28 UTC: impeller Fillet 1 speed, rings-loft Chamfer 3, the knife's Fillet 3 (michael parked)
+- blend-impspeed (queued 3c52dc84): the tube-end round splits its faces in 2D (`k::split_on`, BRepFeat_SplitShape: each
+  touch curve projected onto its face, cut where it crosses a seam, ends shared) and checks its touches by (u, v)
+  (`Shape::contains_uv`): c2-impeller-loft's Fillet 1 ~657 -> ~212 ms (live 38), results identical. Since 0029 OCCT's
+  own fillet also builds it within band (121 ms), but ~1% R off the exact round: the exact route stays.
+- blend-chamfercut (67819a61a, gates on vibe5): `planar_chamfer_cut` (detail.rs chamfer, after sections): equal chamfers
+  of straight convex edges between planes that run past their edges' ends are cuts by each chamfer's prism along its
+  edge (declined unless every piece taken touches its edge). c2-rings-loft 22 -> 29 of 32 (next: Loft 1, not blend's).
+  T1 `features_c::chamfers_running_past_their_edges_ends_cut_the_prism_as_live` (live's 14/36/24, 9761.261 mm³).
+- **c2-hunting-knife Fillet 3** (44/108/65, live 38/96/59; volume and area in band): (1) the tip (x ~74): OCCT's round
+  pinches to a point at the apex (all four boundary halves end at (74.45, ±1.04, -4.24)), two faces a side; live's
+  keeps its width there (its two edges 0.7 mm apart), one face (JjG / JjC 7.8173). Suspect the tip cylinder's seam at
+  the apex; WIP blend-knifetip (patch knife-fillet3-analytic-wip.patch: analytic faces accepted by each face's gap x
+  area, tori pieces merged) doesn't help as they don't share an edge. (2) The corners near x ~3.85: live's vertex
+  patch starts 0.68 mm further along the bottom edge (its line 0.906 mm, ours 1.583) and is one face where OCCT's is
+  two: capture asked of live (REQUESTS 19:55). 
+- learning-center-michael Fillet 2 parked (lead 11-12): branch blend-michael b24981eeb, patch michael-direct-ball-wip2.
+- Hosts: vibe4 gone; vibe5 one job at a time, CARGO_BUILD_JOBS=6, dev profile (release LTO builds got SIGTERM'd).
+
 ## 11-12 08:03 UTC: rings-loft speed landed; FACEBLEND-HOLD-RIM built directly (c2-variable-fillet-faceblend 7 -> 8 of 8)
 - Landed: blend-ringtips (7106535b), blend-ringspeed (11f138b5: a ring's rounds built directly, Fillet 1 ~423 -> ~97 ms;
   the notch arcs' off-part check by a ray, Chamfer 1 ~244 -> ~183 ms; live 23 / 30). The rest of Chamfer 1 is noshape's
@@ -31,11 +50,17 @@ seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs li
   sews / snaps twice as loose when a side is approximate. Result 20 faces, 136,948.64 mm³ (live 136,943.82). T1
   `features_a::a_face_blend_held_by_a_pockets_rim_takes_the_whole_top` (a stadium plate with a concentric pocket:
   Pappus volume, 14 faces). Face blend 1 ~366 ms (live 25): the 8 lofts ~205 ms, the direct build ~56 ms.
-- learning-center-michael's Fillet 2 (603 ms, live 46): 530 ms is OCCT's cut by its 6 tori and 6 mitre balls. Glued:
-  169 ms but wrong (40 faces, live 44); the tools fused into a ring first: 2.3 s and an error; through blend_direct
-  (patch /root/blend-scratch/patches/michael-direct-ball-wip.patch: balls exactly r so their outer faces lie on the
-  part, a tool off the part skipped): two mitre balls don't fit taken / added (one past the slot's end, one with the
-  part on both sides of its faces). Needs the balls' own handling in the direct build.
+- learning-center-michael's Fillet 2 (603 ms, live 46): 530 ms is OCCT's cut by its 6 tori (the two holes' rim rounds,
+  top and bottom) and 6 mitre balls (where Fillet 1's end rounds meet, same radius 14.485). OCCT's own fillet still
+  fails it with 0029 ("Unfilleted edge overlapped by fillet.", 1 s). Glued cut 169 ms but wrong (40 faces, live 44);
+  tools fused first 2.3 s and wrong. Through blend_direct (branch blend-michael b24981eeb, patch
+  /root/blend-scratch/patches/michael-direct-ball-wip2.patch, switches ZZ_DIRECT_BALL / ZZ_SEED_VERTICES / ZZ_SP):
+  the ball tool as cube ∩ both rounds' cylinders less the sphere (its faces then lie on the two rounds; the plain cube's
+  lay on planes the rounded corner no longer has), the part's vertices seeded (a cut ending at a face's corner closes a
+  piece), a vertex shared by two cuts takes in both curves' ends, an intersection curve on a torus that won't
+  SameParameter re-projected, a sliver piece with no inside point left out: every face now splits, but sewing leaves
+  free edges where the holes' rim rounds run out onto the end rounds at a shallow angle and into the mitre balls (four
+  symmetric places) and along the top line rounds. Next: those three-blend meetings (torus x end round x sphere).
 
 ## 11-11 23:23 UTC: rings-loft's pattern tips done without crates/brep (17 -> 19 of 32)
 - Landed: blend-lcm, blend-filletspeed, the knife's sliver end (af254976; knife 15 -> 16 of 52).
