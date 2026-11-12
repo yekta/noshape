@@ -4,9 +4,26 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-**From qa (2026-11-12 04:38 UTC, 05:00 hotfix): your af34f732b breaks a stored pattern direction**: ticket document
-cli-chamfer-hang-pre's Linear pattern 2 "Select a pattern direction." (Ok on v0.4.43 / v0.4.44), 5 of 11 parts gone; blocks
-the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
+## bool, now (11-12 19:43 UTC; lead: the tangent fillet-tool pairs, then tpd's sections, then rings-loft's Shell 1)
+- **Landed 11-12:** d93e7f6f (the knife's Mirror 1: faces apart across a slab, Boolean 242 -> 31 ms), 31d0d8ba
+  (cf-snap-hook's Fillet 5: circle-profile revolutions against coaxial tori in exact circles, 57-69 -> 21-23 ms),
+  78ef7ff8 (c2-tpd-fillet-variable's Fillet 1: `plane_tube_sections`, a plane against a one-span quadratic B-spline
+  round, sections ahead 56-62 -> 34-36 ms). qa's af34f732b pattern-direction P0: fixed and landed in the morning.
+- **Gating (bool-hat, vibe5): c2-rings-loft's Shell 1 (by_quadrics), two commits, results byte-identical on the
+  rings-loft and impeller Shell dumps (vibe4 ~/agents/bool-cases/{rl,imp}-dump):**
+  - the self-interference check tests edge / face pairs that don't touch, and vertex / face pairs, as points against
+    the face's mesh (BVH range query, `quad::mesh_within`): 703 + 726 pairs out, the check 232-266 -> 124-134 ms,
+    the Shell 952-1015 -> 853-880 ms (vibe5 alternated);
+  - the repair's "no nearer a kept face than the wall" takes the kept face's mesh (made when first asked, a
+    twentieth of the wall) and measures exactly only near the wall: 250 -> 58 exact distances, the repair ~10 %.
+- **Left in Shell 1 (probe laps, ms):** repair ~500 (traces 190: `quad::eval`'s projections onto offset B-splines;
+  joins 75), self-interference ~130 (the 164 edge / face pairs that share a vertex with the face: OCCT's
+  BeanFaceIntersector, one pair 71 ms), edges 215 (GeomAPI_IntSS), faces 135, corners 115. Live 235 ms for the
+  feature.
+- **Candidate, not kept yet:** `quad::eval` asks NextValueOfUV with maxpreci 1e-9 for points a wall off the surface,
+  so every call also runs UVFromIso's iso projections. Without it rings-loft's traces 225-285 -> 124-130 ms, but the
+  Shell's total didn't move under load 23 (vibe4, alternated) and the result changes in the last digits (centroid
+  5.894733 -> 5.894734 mm): needs a quiet A/B and its own gate.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
 - **On now (lead 11-12 14:00 UTC):** Boolean coverage by real-document time: the documents whose OCCT Booleans cost
