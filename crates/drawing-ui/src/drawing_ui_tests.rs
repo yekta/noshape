@@ -165,3 +165,44 @@ fn a_cached_sheet_stands_in_until_the_real_one_is_complete(cx: &mut TestAppConte
     assert!(cx.update(|cx| matches!(editor.read(cx).tool, noshape_scene::drawing_tools::Tool::Centermark)), "the tool started once the real sheet was in");
 }
 
+
+/// Live2 (drw-view-copy-paste-keys, drw-datum-copy-paste): a paste puts the copied items' drawn box with its lower-left
+/// corner at the point (a view's frame: its geometry and a 2 mm margin), not their centre.
+#[gpui::test]
+fn a_paste_puts_the_copied_box_lower_left_at_the_point(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "paste-corner");
+    let settle = |cx: &mut TestAppContext| {
+        for _ in 0..1500 {
+            if cx.update(|cx| editor.read(cx).real_sheet_in()) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            cx.executor().advance_clock(std::time::Duration::from_millis(50));
+            draw(cx, window);
+        }
+    };
+    settle(cx);
+    let before: Vec<_> = cx.update(|cx| editor.read(cx).current_sheet().views.iter().map(|v| v.id).collect());
+    let front = before[0];
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.selection = vec![Sel::View(front)];
+        e.copy_views(None, cx);
+        e.cursor = [230.0, 40.0];
+        e.paste_views(cx);
+    }));
+    let pasted = cx.update(|cx| editor.read(cx).current_sheet().views.iter().map(|v| v.id).find(|v| !before.contains(v))).expect("a view pasted");
+    let mut corner = None;
+    for _ in 0..1500 {
+        corner = cx.update(|cx| editor.read(cx).copy_corner(&[pasted], &[], &[]));
+        if corner.is_some() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, window);
+    }
+    let corner = corner.expect("the pasted view drawn");
+    assert!((corner[0] - 230.0).abs() < 0.5 && (corner[1] - 40.0).abs() < 0.5, "the frame's lower-left at the point: {corner:?}");
+}

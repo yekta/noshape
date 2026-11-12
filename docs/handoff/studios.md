@@ -40,9 +40,10 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   provide only necessary views…" shows under Suggested views (not only with MBD); its name field has no label; Export's
   Custom sheets lists the Sheets select and its box first; the merge dialog's drawing ⓘ says only "For this tab type,
   edits from separate branches cannot be merged." (no Open in, lead 11-12); merge-drawing opens on Part Studio 1.
-- Open: a paste (keys or menu) puts the pasted items' box with its lower-left corner at the point (live: view
-  +21.8/+8.8, datum +13.5/+10.5 from the click; ours centres them): needs the pasted items' drawn box. Dragging a view
-  leaves nothing selected in live (ours selects it). Positions: a section label 3.4 mm lower in ours, a leadered note
+- Then (20:10): a paste puts the copied items' drawn box (a view's frame: geometry + 2 mm) with its lower-left corner
+  at the point (`copy_corner`, the clipboard's anchor; T1 a_paste_puts_the_copied_box_lower_left_at_the_point); a view
+  dragged without being selected first ends unselected. Left: a pasted datum lands 10 mm short of live's (live's datum
+  box is wider than its ink, its leader?); after Ctrl+C a click on the empty sheet keeps the view selected in live. Positions: a section label 3.4 mm lower in ours, a leadered note
   14 mm off, a table 7.9 mm off (x). Asked live2 (REQUESTS 19:04): drw-view-move-to-sheet-ok re-record (its Sheet pick
   failed), palette click-away, the dimension text after a sheet scale change.
 

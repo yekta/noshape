@@ -14,6 +14,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::TabContent;
 use noshape_model::drawing::views;
+use noshape_model::drawing::build::PickTarget;
 use noshape_model::drawing::*;
 
 pub use noshape_scene::drawing_tools::view_edit::{ORIENTATIONS, TangentMode, default_view_name, orientation_name, set_standard_orientation};
@@ -415,6 +416,7 @@ impl DrawingEditor {
             // Live (qa DWG-INFO-TOASTS, request 1569): no bubble.
             Ok(mut c) => {
                 c.origin = Some(noshape_ops::drawing::clip_origin(&self.doc.read(cx).session));
+                c.anchor = self.copy_corner(&ids, &[], &[]);
                 cx.write_to_clipboard(ClipboardItem::new_string(c.to_json()));
             }
             Err(e) => self.status = Some(e.into()),
@@ -428,13 +430,30 @@ impl DrawingEditor {
         let tables: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Table(t) = s { Some(*t) } else { None }).collect();
         let sketch: Vec<u32> = self.selection.iter().filter_map(|s| if let Sel::Sketch(e) = s { Some(*e) } else { None }).collect();
         let images: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Image(i) = s { Some(*i) } else { None }).collect();
-        if let Ok(c) = self.drawing.copy_selection(self.sheet, &anns, &tables, &sketch, &images) {
+        if let Ok(mut c) = self.drawing.copy_selection(self.sheet, &anns, &tables, &sketch, &images) {
+            c.anchor = self.copy_corner(&[], &anns, &tables).or(c.anchor);
             cx.write_to_clipboard(ClipboardItem::new_string(c.to_json()));
             cx.notify();
         }
     }
 
-    /// Paste (view menu, Ctrl+V): copied views centered on the cursor.
+    /// The lower-left corner of what is copied as drawn (views' frames, the geometry and a 2 mm margin; annotations'
+    /// and tables' ink; sheet mm): a paste puts it at the point (live2 drw-view-copy-paste-keys, drw-datum-copy-paste).
+    pub(crate) fn copy_corner(&self, views: &[ViewId], anns: &[u64], tables: &[u64]) -> Option<[f64; 2]> {
+        let b = self.built.as_ref()?;
+        let mine = |pick: u32| match b.picks.get(pick as usize) {
+            Some(PickTarget::Annotation(a)) => anns.contains(a),
+            Some(PickTarget::Table(t)) => tables.contains(t),
+            _ => false,
+        };
+        let mut pts: Vec<[f64; 2]> = views.iter().filter_map(|v| self.placement(*v)).map(|p| [p.min[0] - 2.0, p.min[1] - 2.0]).collect();
+        pts.extend(b.geometry.lines.iter().filter(|l| mine(l.pick)).flat_map(|l| l.points.iter().copied()));
+        pts.extend(b.geometry.texts.iter().filter(|t| mine(t.pick)).flat_map(noshape_model::drawing::font::text_box));
+        let first = *pts.first()?;
+        Some(pts.iter().fold(first, |m, p| [m[0].min(p[0]), m[1].min(p[1])]))
+    }
+
+    /// Paste (view menu, Ctrl+V): copied views with their drawn box's lower-left corner at the cursor.
     pub fn paste_views(&mut self, cx: &mut Context<Self>) {
         let Some(clip) = view_clipboard(cx) else { return };
         let (document, workspace) = noshape_ops::drawing::clip_origin(&self.doc.read(cx).session);

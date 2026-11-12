@@ -1310,7 +1310,7 @@ impl DrawingEditor {
                 self.drag = Drag::Pan { last_px: lp };
                 self.redraw(cx);
             }
-            Drag::MoveViews { start, orig, constraint } => {
+            Drag::MoveViews { start, orig, constraint, .. } => {
                 let mut d = sub(self.cursor, start);
                 if let Some((axis, _)) = constraint {
                     let t = dot(d, axis);
@@ -1572,9 +1572,13 @@ impl DrawingEditor {
                 }
             }
             Drag::Pending { button: Button::Right, pick, .. } => self.open_context_menu(pick, e.position, window, cx),
-            Drag::MoveViews { .. } => {
+            Drag::MoveViews { fresh, .. } => {
                 if let Some(p) = self.preview.take() {
                     self.commit("Move view", p, cx);
+                }
+                if fresh {
+                    self.selection.clear();
+                    self.redraw(cx);
                 }
             }
             Drag::MoveAnnotation { orig, .. } => {
@@ -1871,7 +1875,8 @@ impl DrawingEditor {
         }
         // Nothing there: a box select (qa DRAWING-BOX-SELECT).
         let Some(sel) = self.sel_at(pick, start) else { return Drag::SelectBox { start } };
-        if !self.selection.contains(&sel) {
+        let fresh = !self.selection.contains(&sel);
+        if fresh {
             self.selection = vec![sel];
         }
         let sheet = &self.drawing.sheets[self.sheet];
@@ -1895,7 +1900,7 @@ impl DrawingEditor {
                     }
                     _ => None,
                 };
-                Drag::MoveViews { start, orig, constraint }
+                Drag::MoveViews { start, orig, constraint, fresh }
             }
             Sel::Annotation(aid) => match self.built.as_ref().and_then(|b| b.resolved.annotations.iter().find(|a| a.id == aid).cloned()) {
                 Some(a) if !matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. }) => Drag::MoveAnnotation { start, orig: a },

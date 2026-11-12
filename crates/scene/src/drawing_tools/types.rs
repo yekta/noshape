@@ -256,7 +256,8 @@ pub enum Drag {
     Pan { last_px: [f64; 2] },
     /// Drag zoom about `anchor` (mouse-control presets with a zoom drag).
     Zoom { anchor: [f64; 2], last_px: [f64; 2] },
-    MoveViews { start: [f64; 2], orig: Vec<(ViewId, [f64; 2])>, constraint: Option<([f64; 2], [f64; 2])> },
+    /// `fresh`: the press selected the view (it wasn't before): released, nothing stays selected (live2 drw-view-drag-undo).
+    MoveViews { start: [f64; 2], orig: Vec<(ViewId, [f64; 2])>, constraint: Option<([f64; 2], [f64; 2])>, fresh: bool },
     MoveAnnotation { start: [f64; 2], orig: Annotation },
     /// A jog snap point of a linear dimension (extension line `k`; `far`:
     /// the diagonal's end).
