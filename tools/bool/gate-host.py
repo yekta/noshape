@@ -246,6 +246,13 @@ def parse_suite(log, docs):
 
 # ---- running -------------------------------------------------------------------------------------------------------
 
+def total_gb():
+    for l in read_lines("/proc/meminfo"):
+        if l.startswith("MemTotal:"):
+            return int(l.split()[1]) / 1e6
+    return 1e9
+
+
 def available_gb():
     for l in read_lines("/proc/meminfo"):
         if l.startswith("MemAvailable:"):
@@ -254,16 +261,17 @@ def available_gb():
 
 
 def run_task(t, out, threads):
-    """Runs one shard once the host has memory free for it (a knurl's 36 GB, waiting at most 5 minutes; another heavy
-    one 16 GB, its budget; another 4 GB); its peak memory and exit kept with it."""
+    """Runs one shard once the host has memory free for it (a knurl's 36 GB, another heavy one 16 GB, its budget,
+    another 4 GB; on a smaller host 30 % of it at most), waiting at most 10 minutes; its peak memory and exit kept."""
     log = os.path.join(out, t["role"], "logs", f"{t['kind']}-{t['id']}.log")
     tmp = os.path.join(out, t["role"], "tmp", f"{t['kind']}-{t['id']}")
     os.makedirs(os.path.dirname(log), exist_ok=True)
     os.makedirs(tmp, exist_ok=True)
     env = dict(os.environ, RAYON_NUM_THREADS=str(threads), TMPDIR=tmp, **t["env"])
-    need = {"solo": 36, "heavy": 16}.get(t.get("heavy") or "", 4)
+    # (On a smaller host (vibe5: 29 GB) a share of it; never more than 10 minutes' wait.)
+    need = min({"solo": 36, "heavy": 16}.get(t.get("heavy") or "", 4), 0.3 * total_gb())
     waited = time.time()
-    while available_gb() < need and (need < 36 or time.time() - waited < 300):
+    while available_gb() < need and time.time() - waited < 600:
         time.sleep(5)
     t0 = time.time()
     with open(log, "w") as o, open(log + ".err", "w") as e:
@@ -492,6 +500,11 @@ def main():
     a.out = os.path.abspath(a.out) if a.out else a.out
     if a.corpora:
         REPLAY[:] = a.corpora.split(",")
+    # (A host without the memory a knurl's OCCT cut takes (35-50 GB a process; vibe5 has 29): the knurls left out,
+    # said so in the verdict.)
+    small = total_gb() < 48
+    if small:
+        REPLAY[:] = [c for c in REPLAY if c not in SOLO]
     if a.cmd == "fp":
         print(json.dumps(fingerprints()))
         return
@@ -567,6 +580,9 @@ def main():
         verdict, why, info = compare(get(b, "replay"), get(n, "replay"), get(b, "suite"), get(n, "suite"), spd)
         for l in info:
             print(l)
+        if small:
+            why.append(f"the knurls ({', '.join(sorted(SOLO))}) not run: this host has {total_gb():.0f} GB, a knurl's OCCT cut takes 35-50")
+            verdict = "CHECK" if verdict == "PASS" else verdict
         print(f"VERDICT {verdict}" + (f": {'; '.join(why)}" if why else ""))
 
 if __name__ == "__main__":

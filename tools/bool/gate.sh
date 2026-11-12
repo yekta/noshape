@@ -30,7 +30,8 @@ repo=$(git -C "$here" rev-parse --show-toplevel)
 caller=$(basename "$repo")
 [ $# -ge 1 ] || { sed -n '2,13p' "$0"; exit 2; }
 target=$1; shift
-jobs=8; threads=2; suite=1; spd=1; host=vibe4; nightly=0; mainonly=0
+# (vibe4 left 11-12 19:55; the land queue and the gates moved to vibe5.)
+jobs=8; threads=2; suite=1; spd=1; host=${NOSHAPE_GATE_HOST:-${NOSHAPE_RB_HOST:-vibe5}}; nightly=0; mainonly=0
 [ "$target" = --nightly-kall ] && { nightly=1; target=origin/main; suite=0; spd=0; }
 [ "$target" = --main ] && { mainonly=1; target=origin/main; spd=0; }
 while [ $# -gt 0 ]; do

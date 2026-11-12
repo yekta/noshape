@@ -47,16 +47,29 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
       one), so no gain yet.
     - 8b9436aa (2.4 s) is the Shell's inlet rim: a 0.24 m B-spline edge that lies on the flange's free-form face but
       doesn't project within 4 tol (bool: your Shell rim, JKF, up to 50 um off live's).
+- **vibe4 removed (user, 11-12 19:55 UTC); everything moved to vibe5.** Until 522b51a6 lands, export
+  NOSHAPE_LAND_QUEUE_HOST=vibe5 NOSHAPE_LAND_HOSTS="vibe5 vibe3" NOSHAPE_RB_HOST=vibe5 for rb.sh, land.sh and gate.sh.
+  gate.sh's host is now NOSHAPE_GATE_HOST, else NOSHAPE_RB_HOST, else vibe5.
+  - The corpora vibe5 lacked (valve2, snap, sp-cut, kall, k10-25, k10-25-12, gears) and mf2 / lcm were copied from
+    vibe4 before it went; copies in /root/bool2-scratch/v4copy. My recordings (impy, hk, rings, es, fan, fan2) are in
+    vibe5 ~/tmp/bool2.
+  - Lost with vibe4: gate.sh's main-result cache and OCCT cache. Both are rebuilt on vibe5 by the first gate (or
+    `gate.sh --main`). Gate run 12 (bool2-rings) died with it: rerun on vibe5.
+  - **vibe5 has 29 GB.** A knurl's OCCT cut takes 35-50 GB a process, and vibe5 runs earlyoom. So on a host under 48 GB,
+    gate-host.py leaves the knurl corpora (kall, k10-25, k10-25-12, k25-15, k25-25, k25-71-12) out and the verdict says
+    CHECK: "the knurls not run". The timing rounds (ours alone, small) still run. Memory waits are a share of the host
+    (30 %), never longer than 10 minutes.
+  - **The kall nightly stays off** (kall needs 49.5 GB; vibe3 has 31). The hourly `--main` cron runs against vibe5.
 - **Restart state (11-12 19:20 UTC; lead moves bool2 to the Unbind account ~21:00):**
   - **Worktrees:** /root/projects/noshape-wt/bool2 (branch bool2-rings; uncommitted switches X_SHARED and DBG_SH in
     rust_boolean.cpp, experiment only). bool2-gate and bool-gate-base are gate.sh's. bool2-nightly is the crons'
-    checkout. bool2-doc is for docs-only lands. vibe4 targets: bool2, bool2-gate, bool-gate-base (the three allowed).
+    checkout. bool2-doc is for docs-only lands. Targets (now on vibe5): bool2, bool2-gate, bool-gate-base (the three
+    allowed).
   - **Session crons, gone with the session; recreate them:**
     - every hour at :17: `git -C /root/projects/noshape-wt/bool2-nightly fetch -q origin && git -C
       /root/projects/noshape-wt/bool2-nightly checkout -q -f --detach origin/main && bash
       /root/projects/noshape-wt/bool2-nightly/tools/bool/gate.sh --main` (main's results cached ahead of gates);
-    - daily 04:33 UTC: the same with `--nightly-kall`. First run Nov 13; verdict in /tmp/lead/kall-status, a FAIL also
-      in /root/bool-scratch/KALL-FAIL.
+    - (the kall nightly, daily 04:33 UTC with `--nightly-kall`, is off until a host has ~50 GB free: see above.)
   - **Recordings:** vibe4 ~/tmp/bool2/ (impy: impeller, hk: hunting knife, rings: rings-loft, all exact, from
     NOSHAPE_RECORD_BOOLEANS + NOSHAPE_RECORD_EXACT on one document); bydoc: all 98 documents (text BREP).
     /root/bool2-scratch/bool-by-doc.py makes the per-document table.
