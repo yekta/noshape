@@ -48,6 +48,14 @@ fn fail(msg: &str) -> ! {
 pub fn prepare() -> Option<PathBuf> {
     let path = scenario_path();
     let scenario = read_json(&path).unwrap_or_else(|e| fail(&e));
+    // A speed scenario's document (`"start_file"`: a copy of it is opened).
+    if let Some(file) = scenario["start_file"].as_str() {
+        let dir = std::env::temp_dir().join(format!("noshape-uip-{}", std::process::id()));
+        let doc = dir.join(Path::new(file).file_name().unwrap_or_default());
+        let copied = std::fs::create_dir_all(&dir).and_then(|_| std::fs::copy(file, &doc));
+        copied.unwrap_or_else(|e| fail(&format!("start_file {file}: {e}")));
+        return Some(doc);
+    }
     let name = scenario["start"].as_str().unwrap_or("empty").to_string();
     let starts_path = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
     let starts = if name == "empty" { json!({}) } else { read_json(&starts_path).unwrap_or_else(|e| fail(&e)) };
@@ -304,10 +312,68 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
 /// Presses at `at`, where the pointer already is (a pointer that doesn't move sends no second move: a repeated
 /// one would snap an edge's midpoint).
 fn mouse(window: &mut Window, cx: &mut App, at: Point<Pixels>, button: MouseButton, modifiers: Modifiers, clicks: usize) {
-    for n in 1..=clicks {
-        window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button, position: at, modifiers, click_count: n, first_mouse: false }), cx);
-        window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button, position: at, modifiers, click_count: n }), cx);
+    timed(window, cx, |window, cx| {
+        for n in 1..=clicks {
+            window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button, position: at, modifiers, click_count: n, first_mouse: false }), cx);
+            window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button, position: at, modifiers, click_count: n }), cx);
+        }
+    });
+}
+
+/// `NOSHAPE_UI_TIMING=1`: each step's recording gets `timing`, in ms from its action (a click or a key): `dispatch`
+/// (the action's handlers), `frame` (the end of the first frame drawn after it; its draw time needs `NOSHAPE_PERF=1`)
+/// and `idle` (the window's work done: a regeneration, a background load; in a document window only).
+fn timing_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("NOSHAPE_UI_TIMING").is_ok_and(|v| v == "1"))
+}
+
+/// The timed step's action: when it was dispatched, how long its handlers took, its first frame's end.
+struct StepClock {
+    t0: Instant,
+    dispatch: f32,
+    frame: std::sync::Arc<std::sync::Mutex<Option<f32>>>,
+}
+
+thread_local! {
+    static CLOCK: std::cell::RefCell<Option<StepClock>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The frame stages GPUI times (`noshape_render::perf`).
+const FRAME_STAGES: [&str; 3] = ["gpui.request_layout", "gpui.prepaint", "gpui.paint"];
+
+/// Runs the action `f`, timed when `NOSHAPE_UI_TIMING` is on.
+fn timed(window: &mut Window, cx: &mut App, f: impl FnOnce(&mut Window, &mut App)) {
+    if !timing_on() {
+        f(window, cx);
+        return;
     }
+    let ms = |t: Instant| t.elapsed().as_secs_f32() * 1e3;
+    for st in FRAME_STAGES {
+        noshape_render::perf::series_start(st);
+    }
+    let t0 = Instant::now();
+    f(window, cx);
+    let dispatch = ms(t0);
+    let frame = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let tx = frame.clone();
+    // The next frame draws the action: its start, then its layout, prepaint and paint.
+    window.on_next_frame(move |w, _| {
+        let start = ms(t0);
+        w.on_next_frame(move |_, _| {
+            let draw: f32 = FRAME_STAGES.iter().map(|st| noshape_render::perf::series_take(st).first().copied().unwrap_or(0.0)).sum();
+            *tx.lock().unwrap_or_else(|e| e.into_inner()) = Some(start + draw);
+        });
+    });
+    CLOCK.with(|c| *c.borrow_mut() = Some(StepClock { t0, dispatch, frame }));
+}
+
+/// The last timed action's `timing` (`idle`: when the window's work was done).
+fn take_timing(idle: Option<Instant>) -> Option<Value> {
+    let c = CLOCK.with(|c| c.borrow_mut().take())?;
+    let frame = *c.frame.lock().unwrap_or_else(|e| e.into_inner());
+    let idle = idle.map(|i| i.saturating_duration_since(c.t0).as_secs_f32() * 1e3);
+    Some(json!({ "dispatch": c.dispatch, "frame": frame, "idle": idle }))
 }
 
 /// Run the scenario in `window` (the document window of `ws`).
@@ -328,10 +394,11 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         let sleep = async |cx: &mut AsyncWindowContext, ms: u64| cx.background_executor().timer(Duration::from_millis(ms)).await;
         let studio = |cx: &mut AsyncWindowContext| -> Studio { ws.update(cx, |w, _| w.active_part_studio()).ok().flatten() };
         // Settled: the regeneration done, and a few frames for picks and menus.
-        let settle = async |cx: &mut AsyncWindowContext| {
+        let settle = async |cx: &mut AsyncWindowContext| -> Instant {
             let t = Instant::now();
+            let idle;
             loop {
-                sleep(cx, 120).await;
+                sleep(cx, if timing_on() { 10 } else { 120 }).await;
                 let drawing = ws.update(cx, |w, _| w.active_drawing()).ok().flatten();
                 let busy = match (studio(cx), drawing) {
                     (Some(ps), _) => cx.update(|_, cx| ps.read(cx).ui_busy()).unwrap_or(false),
@@ -339,10 +406,12 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     (None, None) => ws.update(cx, |w, cx| w.ui_view_pending(cx)).unwrap_or(false),
                 };
                 if !busy || t.elapsed() > Duration::from_secs(30) {
+                    idle = Instant::now();
                     break;
                 }
             }
             sleep(cx, 400).await;
+            idle
         };
         // (An assembly tab's state when no Part Studio is shown: skasm's
         // assembly scenarios.)
@@ -588,7 +657,9 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 }
                 "key" => match keystroke(step["key"].as_str().unwrap_or("")) {
                     Some(ks) => {
-                        let _ = cx.update(|window, cx| window.dispatch_keystroke(ks, cx));
+                        let _ = cx.update(|window, cx| timed(window, cx, |window, cx| {
+                            window.dispatch_keystroke(ks, cx);
+                        }));
                         Ok(())
                     }
                     None => Err(format!("unknown key {}", step["key"])),
@@ -617,9 +688,12 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 }
                 other => Err(format!("unknown step {other}")),
             };
-            settle(cx).await;
+            let idle = settle(cx).await;
             let state_now = read(cx).await;
             let mut rec = json!({ "step": i + 1, "do": step, "ok": result.is_ok(), "state": state_now });
+            if let Some(t) = take_timing(Some(idle)) {
+                rec["timing"] = t;
+            }
             if let Err(e) = result {
                 eprintln!("UI-SCRIPT step {}: {e}", i + 1);
                 rec["error"] = json!(e);
@@ -856,7 +930,9 @@ pub fn start_page(cx: &mut App) {
                 }
                 "key" => match keystroke(step["key"].as_str().unwrap_or("")) {
                     Some(ks) => {
-                        let _ = w.update(cx, |_, window, cx| window.dispatch_keystroke(ks, cx));
+                        let _ = w.update(cx, |_, window, cx| timed(window, cx, |window, cx| {
+                            window.dispatch_keystroke(ks, cx);
+                        }));
                         Ok(())
                     }
                     None => Err(format!("unknown key {}", step["key"])),
@@ -893,6 +969,9 @@ pub fn start_page(cx: &mut App) {
             let Some(w) = follow(cx) else { break };
             let state_now = read(w, cx).await;
             let mut rec = json!({ "step": i + 1, "do": step, "ok": result.is_ok(), "state": state_now });
+            if let Some(t) = take_timing(None) {
+                rec["timing"] = t;
+            }
             if let Err(e) = result {
                 eprintln!("UI-SCRIPT step {}: {e}", i + 1);
                 rec["error"] = json!(e);

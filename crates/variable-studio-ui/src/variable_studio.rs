@@ -59,6 +59,8 @@ pub struct VariableStudioView {
     completion: Option<crate::var_complete::VarCompletion>,
     /// The rows last drawn, as the ui-parity state lists them (`ui_rows`).
     ui_drawn: Vec<serde_json::Value>,
+    /// Where the rows started and what of the window was visible around them, at the last paint (`rows_on_screen`).
+    rows_clip: std::rc::Rc<std::cell::Cell<Option<RowsClip>>>,
     /// The right edge's Configuration panel (variable_config.rs).
     config_open: bool,
     cfg_cell: Option<variable_config::CfgEdit>,
@@ -165,6 +167,7 @@ impl VariableStudioView {
             cell_editing: None,
             completion: None,
             ui_drawn: Vec::new(),
+            rows_clip: Default::default(),
             config_open: false,
             cfg_cell: None,
             cfg_folded: HashSet::new(),
@@ -561,6 +564,26 @@ impl Render for VsColDrag {
 /// Onshape's variable types in its Variable type select's order (behaviours.md, Variable Studio).
 const TYPE_KINDS: [VarKind; 5] = [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any, VarKind::FromImport];
 
+/// The first row's top and the visible part of the window around the table (window y, px).
+#[derive(Clone, Copy)]
+struct RowsClip {
+    top: f32,
+    clip: (f32, f32),
+}
+
+/// Rows drawn before the table's place is known (a window's height of them).
+const FIRST_ROWS: usize = 60;
+/// Rows drawn above and below the visible ones (px), for a wheel step before the next frame.
+const ROWS_MARGIN: f32 = 600.;
+
+/// The rows (by their place in the table) to build: those on screen and a margin (a 500-variable table built every row
+/// each frame, ~250 ms).
+fn rows_on_screen(clip: Option<RowsClip>) -> (usize, usize) {
+    let Some(c) = clip else { return (0, FIRST_ROWS) };
+    let row = |y: f32| ((y - c.top) / ROW_H).max(0.);
+    (row(c.clip.0 - ROWS_MARGIN).floor() as usize, row(c.clip.1 + ROWS_MARGIN).ceil() as usize)
+}
+
 fn cell_div(c: usize) -> Div {
     div().w(px(col_w(c))).h(px(ROW_H)).flex_none().flex().items_center().bg(p().bg_senary).border_r_1().border_b_1().border_color(rgb(RULE))
 }
@@ -875,9 +898,28 @@ impl VariableStudioView {
             _ => Default::default(),
         };
         let mut drawn: Vec<serde_json::Value> = Vec::new();
+        let on_screen = rows_on_screen(self.rows_clip.get());
+        // A row holding the selection, an edit or a type search is built wherever it is.
+        let row_of = |key: &Option<String>| key.as_deref().and_then(|k| k.get(1..)).and_then(|n| n.parse::<usize>().ok());
+        let busy_rows = [row_of(&self.cell_selected), row_of(&self.cell_editing), self.type_search.as_ref().map(|t| t.0)];
+        // Rows not built in a row: one spacer of their height.
+        let mut skipped = 0usize;
+        let mut place = 0usize;
         for (i, v) in studio.variables.iter().enumerate() {
             if only.as_ref().is_some_and(|o| !o.contains(&v.name)) {
                 continue;
+            }
+            place += 1;
+            if !(on_screen.0..on_screen.1).contains(&(place - 1)) && !busy_rows.contains(&Some(i)) {
+                skipped += 1;
+                if crate::ui_script::active() {
+                    drawn.push(serde_json::json!({ "name": v.name, "type": kind_label(v.kind.unwrap_or(VarKind::Any)), "value": noshape_units::localize(&v.expr.text), "description": v.description }));
+                }
+                continue;
+            }
+            if skipped > 0 {
+                rows.push(div().h(px(ROW_H * skipped as f32)).flex_none().into_any_element());
+                skipped = 0;
             }
             let name = self.cell(format!("n{i}"), v.name.clone(), window, cx, move |this, val, cx| this.rename_variable(i, val, cx));
             // Live (qa4 10-20): a bare number gets the workspace unit of a Length
@@ -1158,6 +1200,28 @@ impl VariableStudioView {
                     .into_any_element(),
             );
         }
+        if skipped > 0 {
+            rows.push(div().h(px(ROW_H * skipped as f32)).flex_none().into_any_element());
+        }
+        // The rows' place and the visible window around them, read as they're painted: a scroll or a resize that
+        // shows other rows draws again.
+        let probe = {
+            let clip = self.rows_clip.clone();
+            canvas(
+                move |b, window, _| {
+                    let mask = window.content_mask().bounds;
+                    let now = RowsClip { top: f32::from(b.top()), clip: (f32::from(mask.top()), f32::from(mask.bottom())) };
+                    let wanted = rows_on_screen(Some(now));
+                    clip.set(Some(now));
+                    if wanted != on_screen {
+                        window.request_animation_frame();
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .w_full()
+            .h(px(0.))
+        };
         // The last row: an italic "Name" cell; typing a name adds a Length
         // variable set to 0 in the document's length unit.
         let add_units = units;
@@ -1362,6 +1426,7 @@ impl VariableStudioView {
                         })),
                 )
                 .children(self.col_drag.map(|(_, x)| div().absolute().top(px(35.)).bottom_0().left(px(x)).w(px(1.)).bg(rgb(0x000000))))
+                .child(probe)
                 .children(rows)
                 .when(only.is_none(), |t| {
                     // The add row's other columns are one borderless cell band

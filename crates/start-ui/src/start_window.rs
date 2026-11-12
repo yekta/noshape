@@ -258,6 +258,25 @@ impl Default for Prefs {
     }
 }
 
+/// A documents list row's height.
+const DOC_ROW_H: f32 = 42.;
+
+/// The first row's top and the visible part of the window around the list (window y, px), at the last paint.
+#[derive(Clone, Copy)]
+struct RowsClip {
+    top: f32,
+    clip: (f32, f32),
+}
+
+/// The rows (by their place in the list) to build: those on screen and a screen's margin; before the list's place is
+/// known, a window's height of them.
+fn rows_on_screen(clip: Option<RowsClip>) -> (usize, usize) {
+    const MARGIN: f32 = 600.;
+    let Some(c) = clip else { return (0, 40) };
+    let row = |y: f32| ((y - c.top) / DOC_ROW_H).max(0.);
+    (row(c.clip.0 - MARGIN).floor() as usize, row(c.clip.1 + MARGIN).ceil() as usize)
+}
+
 fn prefs_path() -> PathBuf {
     crate::paths::config_dir().join("start.json")
 }
@@ -343,6 +362,8 @@ pub struct StartView {
     /// The "Folders" section of "Owned by me" is expanded.
     /// A document's name being renamed inline in its row (row menu › Rename; live: no modal).
     renaming: Option<(PathBuf, Entity<InputState>, Subscription)>,
+    /// Where the documents list's rows started and what of it was visible, at the last paint (`rows_on_screen`).
+    rows_clip: Rc<std::cell::Cell<Option<RowsClip>>>,
     folders_open: bool,
     /// "Last opened by me" is expanded.
     recent_open: bool,
@@ -549,6 +570,7 @@ impl StartView {
             history_dates,
             folders_open: prefs.folders_open,
             renaming: None,
+            rows_clip: Default::default(),
             recent_open: true,
             notifications_open: false,
             sub_open: true,
@@ -594,8 +616,10 @@ impl StartView {
         self.scan_task = Some(cx.spawn(async move |this, cx| {
             let (input, result) = cx
                 .background_spawn(async move {
+                    let t = std::time::Instant::now();
                     let input = ScanInput::current();
                     let result = library.scan(&input);
+                    log::info!(target: "perf", "documents page: {} documents read in {:.0} ms", result.docs.len(), t.elapsed().as_secs_f32() * 1e3);
                     (input, result)
                 })
                 .await;
@@ -3598,12 +3622,24 @@ impl StartView {
         // Onshape writes the signed-in user as "me".
         let me = self.me.clone();
         let who = move |name: &str| if name.is_empty() || me.iter().any(|m| m == name) { "me".to_string() } else { name.to_string() };
+        // Only the rows on screen (and a margin) are built: 1000 documents built every row each frame (~260 ms).
+        let on_screen = rows_on_screen(self.rows_clip.get());
+        let mut skipped = 0usize;
         let rows: Vec<AnyElement> = if let Some(hits) = &hits {
             self.hit_rows(hits, &cols, cx)
         } else {
-            docs
-            .iter()
-            .map(|d| {
+            let mut rows = Vec::new();
+            for (k, d) in docs.iter().enumerate() {
+                let keep = (on_screen.0..on_screen.1).contains(&k) || self.selected.as_ref() == Some(&d.path) || self.renaming.as_ref().is_some_and(|r| r.0 == d.path);
+                if !keep {
+                    skipped += 1;
+                    continue;
+                }
+                if skipped > 0 {
+                    rows.push(div().h(px(DOC_ROW_H * skipped as f32)).flex_none().into_any_element());
+                    skipped = 0;
+                }
+                rows.push({
                 let selected = self.selected.as_ref() == Some(&d.path);
                 let open = crate::doc_files::is_document_open(&d.path, cx);
                 let v2 = cx.entity();
@@ -3614,7 +3650,7 @@ impl StartView {
                     // A row is its document (a row that slides up under the pointer is another one: its tooltip shows).
                     .id(SharedString::from(format!("row-{}", d.path.display())))
                     .map(|r| crate::ui_script::mark(r, || format!("doc_row:{}", d.name)))
-                    .h(px(42.))
+                    .h(px(DOC_ROW_H))
                     .flex_none()
                     .cursor_pointer()
                     .text_size(px(14.))
@@ -3682,10 +3718,32 @@ impl StartView {
                         Self::doc_menu(v2.clone(), d2.clone(), in_recent, menu)
                     })
                     .into_any_element()
-            })
-            .collect()
+                });
+            }
+            if skipped > 0 {
+                rows.push(div().h(px(DOC_ROW_H * skipped as f32)).flex_none().into_any_element());
+            }
+            rows
         };
         let empty = rows.is_empty();
+        // The rows' place and the visible list around them, read as they're painted: a scroll or a resize that shows
+        // other rows draws again.
+        let probe = {
+            let clip = self.rows_clip.clone();
+            canvas(
+                move |b, window, _| {
+                    let mask = window.content_mask().bounds;
+                    let now = RowsClip { top: f32::from(b.top()), clip: (f32::from(mask.top()), f32::from(mask.bottom())) };
+                    clip.set(Some(now));
+                    if rows_on_screen(Some(now)) != on_screen {
+                        window.request_animation_frame();
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .w_full()
+            .h(px(0.))
+        };
         v_flex()
             .size_full()
             .pl(px(10.))
@@ -3704,7 +3762,7 @@ impl StartView {
                         .child(if empty {
                             self.render_empty(cx)
                         } else {
-                            div().id("doc-list").flex_1().min_h_0().overflow_y_scrollbar().child(v_flex().children(rows)).into_any_element()
+                            div().id("doc-list").flex_1().min_h_0().overflow_y_scrollbar().child(v_flex().child(probe).children(rows)).into_any_element()
                         }),
                 ),
             )
