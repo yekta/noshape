@@ -979,6 +979,37 @@ pub fn open_properties(spec: MetaSpec, on_save: impl Fn(MetaValues, &mut Window,
     name.update(cx, |s, cx| s.focus(window, cx));
 }
 
+/// [`open_properties`] with the Release icon at the top left (`on_release` opens the Create Release candidate dialog;
+/// Onshape help "Typical Release Workflow": any Properties dialog).
+pub fn open_properties_with_release(spec: MetaSpec, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, on_release: impl Fn(&mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    let on_save: SaveFn = Rc::new(on_save);
+    let on_release: ReleaseFn = Rc::new(on_release);
+    let form = cx.new(|cx| {
+        let mut f = MetaForm::new(spec, on_save, window, cx);
+        f.on_release = Some(on_release);
+        f
+    });
+    let name = form.read(cx).name.clone();
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
+    name.update(cx, |s, cx| s.focus(window, cx));
+}
+
+/// [`open_properties_with_release`] whose computed mass arrives later (`mass`, as [`open_properties_mass_later`]):
+/// an Assembly's Properties.
+pub fn open_properties_mass_later_with_release(spec: MetaSpec, mass: Task<Option<String>>, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, on_release: impl Fn(&mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    let on_save: SaveFn = Rc::new(on_save);
+    let on_release: ReleaseFn = Rc::new(on_release);
+    let form = cx.new(|cx| {
+        let mut f = MetaForm::new(spec, on_save, window, cx);
+        f.on_release = Some(on_release);
+        f
+    });
+    mass_arrives_later(&form, mass, window, cx);
+    let name = form.read(cx).name.clone();
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
+    name.update(cx, |s, cx| s.focus(window, cx));
+}
+
 /// [`open_properties`] whose computed mass arrives later (`mass`, worked out off the UI thread: an assembly's from
 /// its tab's menu): Calculate value says "Calculating…" until then, and shows it when it comes.
 pub fn open_properties_mass_later(spec: MetaSpec, mass: Task<Option<String>>, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {

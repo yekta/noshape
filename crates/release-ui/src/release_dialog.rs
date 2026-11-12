@@ -1558,6 +1558,8 @@ impl Render for ReleaseDialog {
                 Mode::Release if row.item.reverted => "Released",
                 Mode::Release => "In progress",
             };
+            // Help: the State column's Revert when only the item's metadata changed; the header's Revert takes every
+            // unchanged item.
             let since = row.since.filter(|_| self.mode == Mode::Release);
             let reverted = row.item.reverted;
             let missing = row_issues.contains(&Issue::MissingPartNumber);
@@ -1647,7 +1649,7 @@ impl Render for ReleaseDialog {
                         }),
                 )
                 .child(div().w(px(COL_REVISION)).flex_none().flex().justify_end().px(px(10.)).child(div().w(px(64.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Revision:{n}")) }).child(field(&row.revision, row_issues.iter().any(|x| matches!(x, Issue::InvalidRevision | Issue::RevisionTooLow { .. })), editing && !row.item.not_revision_managed, reverted))))
-                .child(h_flex().w(px(COL_STATE)).flex_none().px(px(10.)).gap(px(6.)).child(state).when(since.is_some(), |d| {
+                .child(h_flex().w(px(COL_STATE)).flex_none().px(px(10.)).gap(px(6.)).child(state).when(matches!(since, Some(SinceRelease::MetadataChanged)) || (reverted && since.is_some()), |d| {
                     d.child(
                         boxed(SharedString::from(format!("rel-revert-{i}")), "undo", if reverted { "Use the workspace item" } else { "Revert to last revision" }, cx)
                             .when(reverted, |d| d.bg(gpui_kit::rgb(0xeaeaea)))

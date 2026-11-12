@@ -184,7 +184,7 @@ impl DrawingEditor {
         let Some(t) = self.drawing.sheets[self.sheet].table(id) else { return out };
         // The revision of the row under the cursor (row 0 is the header).
         let data = noshape_model::drawing::tables::table_data_with(&self.drawing, t, None, None, None, &self.info, &|s| s.to_string());
-        let row_rev = cell.and_then(|(r, _)| r.checked_sub(1)).and_then(|r| data.rows.get(r)).map(|r| r[0].trim_end_matches('*').to_string());
+        let row_rev = cell.and_then(|(r, _)| r.checked_sub(1)).and_then(|r| data.rows.get(r)).and_then(|r| row_revision(r));
         let rev = row_rev.clone().unwrap_or_else(|| self.latest_revision());
         out.push(MenuEntry::item("Add revision callout", move |t, _, cx| t.set_tool(Tool::RevisionCallout { revision: rev.clone() }, cx)));
         if let (Some(rev), TableKind::Revision { hidden, .. }) = (row_rev, &t.kind) {
@@ -216,7 +216,11 @@ impl DrawingEditor {
         let (row, col, text) = match (in_title, l.cell_at(self.cursor)) {
             (true, _) => (usize::MAX, 0, data.title.clone().unwrap_or_default()),
             (false, Some((0, c))) => (0, c, data.header.as_ref().and_then(|h| h.get(c)).cloned().unwrap_or_default()),
-            (false, Some((r, _))) => (r, 1, data.rows.get(r - 1).and_then(|x| x.get(1)).cloned().unwrap_or_default()),
+            // A revision's description (its column in the company template).
+            (false, Some((r, _))) => {
+                let Some(c) = noshape_model::drawing::tables::revision_columns().1 else { return };
+                (r, c, data.rows.get(r - 1).and_then(|x| x.get(c)).cloned().unwrap_or_default())
+            }
             (false, None) => return,
         };
         let input = self.textarea(&text, 2, window, cx);
@@ -229,7 +233,7 @@ impl DrawingEditor {
         // The row's revision (descriptions are kept per revision).
         let rev = self.drawing.sheets[self.sheet].table(table).and_then(|t| {
             let data = noshape_model::drawing::tables::table_data_with(&self.drawing, t, None, None, None, &self.info, &|s| s.to_string());
-            data.rows.get(row.wrapping_sub(1)).map(|r| r[0].trim_end_matches('*').to_string())
+            data.rows.get(row.wrapping_sub(1)).and_then(|r| row_revision(r))
         });
         self.edit_table(table, "Edit revision table", cx, |t| {
             let TableKind::Revision { title, headers, descriptions, .. } = &mut t.kind else { return };
@@ -368,4 +372,12 @@ impl DrawingEditor {
                 .into_any_element(),
         )
     }
+}
+
+/// A revision table row's revision (its Revision column, without the unreleased suffix).
+fn row_revision(row: &[String]) -> Option<String> {
+    let c = noshape_model::drawing::tables::revision_columns().0?;
+    let cell = row.get(c)?;
+    let suffix = noshape_model::drawing::tables::unreleased_suffix();
+    Some(cell.strip_suffix(suffix.as_str()).unwrap_or(cell).to_string())
 }

@@ -2020,6 +2020,14 @@ impl DrawingEditor {
         out.push(MenuEntry::Submenu("Text height".into(), text));
         out.push(MenuEntry::item("Fit to content", move |t, _, cx| t.edit_table(id, "Fit table", cx, noshape_scene::drawing_tools::table_edit::fit_to_content)));
         out.push(MenuEntry::Separator);
+        // A revision table's menu has Copy and Paste (Onshape help "Revision Table").
+        if let TableKind::Revision { .. } = t.kind {
+            out.push(MenuEntry::item("Copy", move |t, _, cx| {
+                t.selection = vec![Sel::Table(id)];
+                t.copy_entities(cx);
+            }));
+            out.push(crate::drawing_props::paste_always());
+        }
         out.push(MenuEntry::item("Delete table", move |t, _, cx| {
             t.selection.clear();
             t.edit_sheet("Delete table", cx, |s| s.tables.retain(|x| x.id != id));

@@ -199,7 +199,7 @@ impl RevisionTemplate {
     /// other properties are empty.
     fn cell(column: &str, row: &RevisionRow, desc: &str) -> String {
         match column {
-            "Revision" if row.pending => format!("{}*", row.revision),
+            "Revision" if row.pending => pending_label(&row.revision),
             "Revision" => row.revision.clone(),
             "Revision description" => desc.to_string(),
             "Date approved" => row.date.clone(),
@@ -213,6 +213,38 @@ impl RevisionTemplate {
 
 static REVISION_TEMPLATE: std::sync::RwLock<Option<RevisionTemplate>> = std::sync::RwLock::new(None);
 
+/// Release management's "Unreleased revision suffix" (Onshape's default `*`): set with the template.
+static UNRELEASED_SUFFIX: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
+
+/// The company's unreleased revision suffix (None: `*`).
+pub fn set_unreleased_suffix(s: Option<String>) {
+    *UNRELEASED_SUFFIX.write().unwrap_or_else(|e| e.into_inner()) = s;
+}
+
+/// A pending revision's mark ("B*").
+pub fn unreleased_suffix() -> String {
+    UNRELEASED_SUFFIX.read().unwrap_or_else(|e| e.into_inner()).clone().unwrap_or_else(|| "*".into())
+}
+
+/// A pending revision's label: `rev` and the unreleased suffix.
+fn pending_label(rev: &str) -> String {
+    format!("{rev}{}", unreleased_suffix())
+}
+
+/// The revision table's Revision and Revision description columns (the company template orders them; None: not
+/// shown).
+pub fn revision_columns() -> (Option<usize>, Option<usize>) {
+    revision_columns_in(REVISION_TEMPLATE.read().unwrap_or_else(|e| e.into_inner()).as_ref())
+}
+
+/// [`revision_columns`] for a template (None: Onshape's default).
+fn revision_columns_in(template: Option<&RevisionTemplate>) -> (Option<usize>, Option<usize>) {
+    match template {
+        Some(t) => (t.columns.iter().position(|c| c == "Revision"), t.columns.iter().position(|c| c == "Revision description")),
+        None => (Some(0), Some(1)),
+    }
+}
+
 /// The company's revision table template (the app sets it from its release
 /// settings); None: Onshape's default.
 pub fn set_revision_template(t: Option<RevisionTemplate>) {
@@ -220,7 +252,7 @@ pub fn set_revision_template(t: Option<RevisionTemplate>) {
 }
 
 /// Content of a revision table: the last `visible_rows` revisions in the
-/// table's order, pending revisions marked "*".
+/// table's order, pending revisions marked with the unreleased suffix ("*").
 fn revision_data(kind: &TableKind, revisions: &[RevisionRow]) -> TableData {
     let template = REVISION_TEMPLATE.read().unwrap_or_else(|e| e.into_inner()).clone();
     revision_data_with(kind, revisions, template.as_ref())
@@ -248,7 +280,7 @@ fn revision_data_with(kind: &TableKind, revisions: &[RevisionRow], template: Opt
             let rows = shown
                 .iter()
                 .map(|r| {
-                    let rev = if r.pending { format!("{}*", r.revision) } else { r.revision.clone() };
+                    let rev = if r.pending { pending_label(&r.revision) } else { r.revision.clone() };
                     vec![rev, desc_of(r), r.date.clone(), r.approved.clone()]
                 })
                 .collect();
@@ -259,7 +291,7 @@ fn revision_data_with(kind: &TableKind, revisions: &[RevisionRow], template: Opt
     TableData { title: Some(title.clone().unwrap_or_else(|| "REVISION HISTORY".into())), header: Some(header), rows, pending, padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), ..Default::default() }
 }
 
-/// Label of a revision callout: the revision, "*" while pending; None
+/// Label of a revision callout: the revision, with the unreleased suffix while pending; None
 /// when the drawing has no revision table, the row's callouts are hidden,
 /// or "Hide revision callouts no longer shown in the table" applies.
 pub fn revision_callout_label(drawing: &Drawing, revisions: &[RevisionRow], rev: &str) -> Option<String> {
@@ -273,7 +305,7 @@ pub fn revision_callout_label(drawing: &Drawing, revisions: &[RevisionRow], rev:
         return None;
     }
     let pending = revisions.iter().rev().find(|r| r.revision == rev).is_some_and(|r| r.pending);
-    Some(if pending { format!("{rev}*") } else { rev.to_string() })
+    Some(if pending { pending_label(rev) } else { rev.to_string() })
 }
 
 /// The pointer table "See sheet 1" shows on the other sheets.
@@ -1268,6 +1300,12 @@ mod tests {
         assert_eq!(d.header.as_deref(), Some(&["REVISION".to_string(), "PART NUMBER".into(), "REVISION DESCRIPTION".into()][..]));
         assert_eq!(d.rows[0], vec!["C*".to_string(), "DRW-1".into(), "PENDING".into()]);
         assert!(RevisionTemplate::default().is_default());
+        // A reordered template: the description is edited, and the row's revision read, in their own columns.
+        let moved = RevisionTemplate { name: "Moved".into(), columns: vec!["Revision description".into(), "Approver".into(), "Revision".into()], all_caps: false };
+        assert_eq!(revision_columns_in(Some(&moved)), (Some(2), Some(0)));
+        assert_eq!(revision_columns_in(None), (Some(0), Some(1)));
+        let no_desc = RevisionTemplate { name: "Short".into(), columns: vec!["Revision".into()], all_caps: false };
+        assert_eq!(revision_columns_in(Some(&no_desc)), (Some(0), None));
         // The pending row gets a blue backdrop.
         let mut g = SheetGeometry::new(420.0, 297.0);
         render(&mut g, &t, &d, &layout(&t, &d), 1);

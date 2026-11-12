@@ -1257,6 +1257,7 @@ fn open_assembly_metadata_with(doc: Entity<crate::doc_model::DocModel>, tab: nos
             drawing: None,
         },
     };
+    let release_doc = doc.clone();
     let on_save = move |v: crate::properties_dialog::MetaValues, _: &mut Window, cx: &mut App| {
         doc.update(cx, |d, cx| {
             d.edit_document(&format!("Properties : {}", v.name), cx, |document| {
@@ -1274,9 +1275,14 @@ fn open_assembly_metadata_with(doc: Entity<crate::doc_model::DocModel>, tab: nos
             })
         });
     };
+    // The Release icon (Onshape help: any Properties dialog), as the tab's Release….
+    let on_release = move |window: &mut Window, cx: &mut App| {
+        let items = crate::assembly_hooks::release_tab_items(release_doc.read(cx), tab);
+        crate::assembly_hooks::open_release_candidate(release_doc.clone(), items, window, cx)
+    };
     match mass_later {
-        Some(mass) => crate::properties_dialog::open_properties_mass_later(spec, mass, on_save, window, cx),
-        None => crate::properties_dialog::open_properties(spec, on_save, window, cx),
+        Some(mass) => crate::properties_dialog::open_properties_mass_later_with_release(spec, mass, on_save, on_release, window, cx),
+        None => crate::properties_dialog::open_properties_with_release(spec, on_save, on_release, window, cx),
     }
 }
 

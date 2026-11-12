@@ -28,6 +28,37 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-12 07:33 UTC: release management against Onshape's help (lead 11-12; behaviours "lead (2026-11-11 02:15 UTC)")
+Audited field by field (release-ui, ops release, drawing revision table). Present: entry points (Parts list, tab
+menus, Versions and history, assembly menus, part Properties), titles Create Release candidate / Review Release, Refresh,
+error count + attention toggle, change triangles, in-dialog Undo / Redo, + Add items, search, filter, row × / Revision
+(raise, not lower) / Part number / Edit properties / Export / Revert, Release name / notes, Save draft / Delete draft,
+drafts panel, revision schemes (alphabetical skipping I O Q S X Z, numerical, custom ≥ 50), release conditions (feature
+errors, rollback, instance errors / pending updates, drawing pending update, obsolete references); the Revision table's
+insert dialog (Linked / See sheet 1, visible rows, order, hide callouts, corner, click to place), pending rows blue,
+its menu, callouts "B*" grouping with dimensions, the company template's columns.
+Gaps, most hit first:
+1. No approval workflow: no Approvers / Observers fields, no Submit, no Pending / Rejected states; require-approver,
+   creator-not-approver and all-approvers settings stored but unused. (Design question to the lead: who approves in a
+   local app.)
+2. The agent API: release_create and release_revision_history only. Missing: drafts (save / list / open / delete),
+   revert, generate part numbers / release name, several tabs or other documents' items, Release management / numbering /
+   template settings, revision descriptions, a row's callouts hide / show, a callout grouped with a dimension; and
+   release_create skips "require a note".
+3. Generate icons only with sequential numbering; the header's Generate part numbers fills only missing ones.
+4. The version is made at Release, not when the candidate is created; drafts point at the workspace.
+5. Include associated drawings: no outdated-drawing warning; drawings of another workspace's version not left out.
+6. Revision description editing: any row (help: pending rows; released ones admin-only); reads columns 0 / 1 (wrong
+   with a reordered template).
+7. Entry points: no Release icon in assembly / drawing / Variable Studio / file Properties; no "Release all
+   configurations". (No Release on the Part Studio tab menu: live's rmb-tab-partstudio-2 has none, kept.)
+8. Edit properties opens a second modal, no Go back.
+9. Revision table menu: no Copy / Paste; Size / Resize only with a cell under the pointer.
+10. The unreleased revision suffix setting is unused ("*" hard-coded); no "require a new revision" blue message.
+11. Conditions never applied: part number in another pending candidate, pending task.
+12. Small: dialog not resizable; filter toggles differ from help (no Part Studio); the State column's Revert shows for
+    unchanged items too; ▴ instead of ▾; the name link stays in this window.
+
 ### 2026-11-12 07:06 UTC: documents coverage 304 -> 310 of 313 (pick_files), a CAD file tab's Update…
 - `{"do": "pick_files", "files": [...]}` (tests/ui-parity/README.md): while a scenario runs, the app's file dialogs
   (`file_dialogs::request_open_path(s)`) show nothing and wait for it (app-core `ui_script::await_pick` /

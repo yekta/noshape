@@ -652,7 +652,8 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
             drawing_info: Some(info),
             values: MetaValues { name, description: m.description.clone(), part_number: m.number.clone(), revision: m.revision.clone(), meta: item, mass_override: None, bom: 0, drawing: Some(fields) },
         };
-        noshape_app_core::properties_dialog::open_properties(
+        let release = release_from_properties(&doc, tab);
+        noshape_app_core::properties_dialog::open_properties_with_release(
             spec,
             move |v, _, cx| {
                 doc.update(cx, |d, cx| {
@@ -677,6 +678,7 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
                     })
                 });
             },
+            release,
             window,
             cx,
         );
@@ -709,6 +711,9 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
         noshape_app_core::properties_dialog::MetaValues { name, description: text("tab_description"), part_number: text("tab_part_number"), revision: text("tab_revision"), meta, ..Default::default() }
     };
     let spec = noshape_app_core::properties_dialog::MetaSpec { category, material: None, computed_mass: None, bom_options: None, drawing_info: None, values };
+    // The Release icon for the tabs whose menu has Release… (a Variable Studio, a file).
+    let releasable = matches!(doc.read(cx).session.doc.tab(tab).map(|t| &t.content), Some(TabContent::VariableStudio(_) | TabContent::File(_)));
+    let release = release_from_properties(&doc, tab);
     let save = move |v: noshape_app_core::properties_dialog::MetaValues, _: &mut Window, cx: &mut App| {
             let r = doc.update(cx, |d, _| -> anyhow::Result<()> {
                 let store = &mut d.session.store;
@@ -736,8 +741,19 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
     if category == "Onshape Part Studio" {
         let card = noshape_app_core::properties_dialog::ItemCard { kind: "Part Studio", thumb };
         noshape_app_core::properties_dialog::open_properties_with_card(spec, card, save, window, cx);
+    } else if releasable {
+        noshape_app_core::properties_dialog::open_properties_with_release(spec, save, release, window, cx);
     } else {
         noshape_app_core::properties_dialog::open_properties(spec, save, window, cx);
+    }
+}
+
+/// A tab's Properties' Release icon: the Create Release candidate dialog with the tab's items, as its menu's Release….
+fn release_from_properties(doc: &Entity<DocModel>, tab: noshape_model::document::TabId) -> impl Fn(&mut Window, &mut App) + 'static {
+    let doc = doc.clone();
+    move |window, cx| {
+        let items = crate::release_dialog::tab_items(doc.read(cx), tab);
+        crate::release_dialog::open_release_candidate(doc.clone(), items, window, cx)
     }
 }
 
