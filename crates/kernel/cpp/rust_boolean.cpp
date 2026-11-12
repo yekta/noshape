@@ -1079,6 +1079,76 @@ static occ::handle<Geom2d_Curve> parallel_pcurve(const TopoDS_Edge& e, const Top
   return occ::handle<Geom2d_Curve>();
 }
 
+// A line lying on a surface of revolution within `bound` (a rib's edge along a revolved cavity's wall it touches,
+// c2-housing-draft's Rotieren 1): its curve on face `f`, straight between its points' (u, v) at 1 to 64 even steps of
+// its own parameters, the fewest whose middles are as close as those points, and in `dev` how far it is from the
+// surface (its tolerance, as OCCT's projection raises it); null otherwise. (OCCT's projection took 5 ms each.)
+static occ::handle<Geom2d_Curve> revolution_line_pcurve(const TopoDS_Edge& e, const TopoDS_Face& f, double bound, double& dev)
+{
+  double                  a = 0, z = 0;
+  TopLoc_Location         el, fl;
+  occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, el, a, z);
+  while (const occ::handle<Geom_TrimmedCurve> tc = occ::down_cast<Geom_TrimmedCurve>(c))
+    c = tc->BasisCurve();
+  const occ::handle<Geom_Line>    li = occ::down_cast<Geom_Line>(c);
+  const occ::handle<Geom_Surface> s  = BRep_Tool::Surface(f, fl);
+  occ::handle<Geom_Surface>       base = s;
+  while (const occ::handle<Geom_RectangularTrimmedSurface> tr = occ::down_cast<Geom_RectangularTrimmedSurface>(base))
+    base = tr->BasisSurface();
+  if (li.IsNull() || occ::down_cast<Geom_SurfaceOfRevolution>(base).IsNull() || z - a < 1e-12)
+    return occ::handle<Geom2d_Curve>();
+  const gp_Lin          l = li->Lin().Transformed((fl.Inverted() * el).Transformation());
+  ShapeAnalysis_Surface sas(s);
+  double                umin = 0, umax = 0, vmin = 0, vmax = 0;
+  BRepTools::UVBounds(f, umin, umax, vmin, vmax);
+  const double eps    = 1e-9 * (1 + std::abs(umin) + std::abs(umax));
+  const double period = base->IsUPeriodic() ? base->UPeriod() : 0.0;
+  const double tol_e  = BRep_Tool::Tolerance(e);
+  // (Each point's u the turn nearest the one before, the first's nearest the face's middle.)
+  std::vector<gp_Pnt2d> uv;
+  const auto at = [&](double t) {
+    gp_Pnt2d q = sas.ValueOfUV(ElCLib::Value(t, l), 0.01 * tol_e);
+    if (period > 0)
+    {
+      const double prev = uv.empty() ? 0.5 * (umin + umax) : uv.back().X();
+      q.SetX(q.X() + period * std::round((prev - q.X()) / period));
+    }
+    return q;
+  };
+  const auto off = [&](const gp_XY& q, double t) { return s->Value(q.X(), q.Y()).Distance(ElCLib::Value(t, l)); };
+  for (int n = 1; n <= 64; n *= 2)
+  {
+    uv.clear();
+    for (int j = 0; j <= n; ++j)
+      uv.push_back(at(a + (z - a) * j / n));
+    double knots_off = 0, mids_off = 0;
+    bool   inside    = true;
+    for (int j = 0; j <= n; ++j)
+    {
+      knots_off = std::max(knots_off, off(uv[j].XY(), a + (z - a) * j / n));
+      inside    = inside && uv[j].X() >= umin - eps && uv[j].X() <= umax + eps;
+    }
+    for (int j = 0; j < n; ++j)
+      mids_off = std::max(mids_off, off(0.5 * (uv[j].XY() + uv[j + 1].XY()), a + (z - a) * (j + 0.5) / n));
+    if (!inside || knots_off > bound)
+      return occ::handle<Geom2d_Curve>();
+    if (mids_off > knots_off + 0.1 * tol_e)
+      continue;
+    dev = std::max(knots_off, mids_off);
+    NCollection_Array1<gp_Pnt2d> poles(1, n + 1);
+    NCollection_Array1<double>   knots(1, n + 1);
+    NCollection_Array1<int>      mults(1, n + 1);
+    for (int j = 0; j <= n; ++j)
+    {
+      poles(j + 1) = uv[j];
+      knots(j + 1) = a + (z - a) * j / n;
+      mults(j + 1) = j == 0 || j == n ? 2 : 1;
+    }
+    return new Geom2d_BSplineCurve(poles, knots, mults, 1);
+  }
+  return occ::handle<Geom2d_Curve>();
+}
+
 thread_local FreeSections* t_free = nullptr;
 
 // A section's tolerance as the pave filler gives it: its own, at least the faces' (ToleranceFF), at least 5e-6
@@ -1709,6 +1779,13 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         // as OCCT's builder makes it.)
         if (pf.IsNull())
         {
+          // (A line on a surface of revolution: made straight in its parameters, its tolerance to cover it.)
+          double dev = 0;
+          if (const occ::handle<Geom2d_Curve> rl = BRep_Tool::IsClosed(se, sf) ? occ::handle<Geom2d_Curve>() : revolution_line_pcurve(es[k], sf, 1e-6, dev); !rl.IsNull())
+          {
+            bb.UpdateEdge(es[k], rl, s, loc, std::max(BRep_Tool::Tolerance(es[k]), 1.05 * dev + 1e-12));
+            continue;
+          }
           BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace(es[k], sf);
           continue;
         }

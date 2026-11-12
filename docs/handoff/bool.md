@@ -195,7 +195,10 @@ The gate today (scripts in /root/bool-scratch, outside the repo; copy what you n
 - **c2-housing-draft's Rotieren 1 (branch bool-rot2):** the revolved cavity touching the top face along the r 15.2
   circle (live 2342: a zero-thickness edge) is ours: a piece along a tangent face goes by its points' signed distances, an edge tangent to a face at one end is off it, a flat revolution without a seam is a
   plane (`as_plane`; with a seam it stays: a revolved base's top disc). Rotieren 1 215 -> 118 ms (vibe5), document
-  265 -> 168 ms (live 105); of the 118, 208 / 274 ms on vibe4 is the C++ build of the 41-face result: next.
+  265 -> 168 ms (live 105). Then its build: OCCT's projection of 8 rib edges onto the revolved wall they touch
+  (0.24 um off it) was 80 %: a line on a surface of revolution gets its curve there straight between its points'
+  (u, v) at the fewest even steps (`revolution_line_pcurve`), its tolerance raised to cover it as OCCT's projection
+  does: Rotieren 1 115 -> 46 ms, the document 168 -> 102 ms (live 105).
 - **The tyre after the seam fix:** declines "an ellipse on another face": a section ellipse assigned to a third face
   (a plane) it only passes near; to look into next.
 
