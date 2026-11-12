@@ -688,11 +688,19 @@ bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullpt
     const ShapeList& es = ve(i);
     if (es.Extent() != 2 || (sc != nullptr && !sc->seeds.Contains(ve.FindKey(i))))
       continue;
-    double                        f1, l1, f2, l2;
-    const occ::handle<Geom_Curve> c1 = BRep_Tool::Curve(TopoDS::Edge(es.First()), f1, l1);
-    const occ::handle<Geom_Curve> c2 = BRep_Tool::Curve(TopoDS::Edge(es.Last()), f2, l2);
+    // (Their curves as stored and their locations once: the located curve taken from BRep_Tool::Curve(e, f, l) moved
+    // again by the location put an edge in a located shape off its line, c2-sm-louver's Extrude 3, whose sheet's edge
+    // then stayed in three. Through trims too.)
+    double                  f1, l1, f2, l2;
+    TopLoc_Location         l1o, l2o;
+    occ::handle<Geom_Curve> c1 = BRep_Tool::Curve(TopoDS::Edge(es.First()), l1o, f1, l1);
+    occ::handle<Geom_Curve> c2 = BRep_Tool::Curve(TopoDS::Edge(es.Last()), l2o, f2, l2);
     if (c1.IsNull() || c2.IsNull())
       continue;
+    while (const auto t = occ::down_cast<Geom_TrimmedCurve>(c1))
+      c1 = t->BasisCurve();
+    while (const auto t = occ::down_cast<Geom_TrimmedCurve>(c2))
+      c2 = t->BasisCurve();
     occ::handle<Geom_Line> a = occ::down_cast<Geom_Line>(c1), b = occ::down_cast<Geom_Line>(c2);
     if (a.IsNull() != b.IsNull())
       continue;
@@ -708,9 +716,6 @@ bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullpt
         return true;
       continue;
     }
-    TopLoc_Location l1o, l2o;
-    BRep_Tool::Curve(TopoDS::Edge(es.First()), l1o, f1, l1);
-    BRep_Tool::Curve(TopoDS::Edge(es.Last()), l2o, f2, l2);
     const gp_Lin la = a->Lin().Transformed(l1o.Transformation()), lb = b->Lin().Transformed(l2o.Transformation());
     if (la.Direction().IsParallel(lb.Direction(), 1e-9) && la.Distance(lb.Location()) < 1e-7)
       return true;

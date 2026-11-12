@@ -1301,3 +1301,64 @@ fn shape_faces_probe() {
         println!("face {i}: {} area {:.3} mm² box {:.2?} {:.2?}", format!("{:?}", f.face_surface().unwrap()).chars().take(60).collect::<String>(), f.area().unwrap() * 1e6, b.min * 1e3, b.max * 1e3);
     }
 }
+
+/// Probe: a flat sheet cut by a box that only touches a stretch of one of its edges from outside, and by one that
+/// cuts a notch: the sheet's edges after (a sheet metal definition sheet's cut, c2-sm-louver's Extrude 3).
+#[test]
+#[ignore = "T2: probe"]
+fn sheet_cut_touching_edge_probe() {
+    let sheet = make_plane_face(&Plane::xy(), 0.0, 0.1, 0.0, 0.05).unwrap();
+    for (what, tool) in [
+        ("touching", make_box_corners(DVec3::new(0.02, 0.05, -0.01), DVec3::new(0.03, 0.06, 0.01)).unwrap()),
+        ("notch", make_box_corners(DVec3::new(0.02, 0.045, -0.01), DVec3::new(0.03, 0.06, 0.01)).unwrap()),
+        ("touching and notch", fuse(&make_box_corners(DVec3::new(0.02, 0.05, -0.01), DVec3::new(0.03, 0.06, 0.01)).unwrap(), &make_box_corners(DVec3::new(0.06, 0.045, -0.01), DVec3::new(0.07, 0.06, 0.01)).unwrap()).unwrap().shape),
+    ] {
+        let r = cut(&sheet, &tool).unwrap().shape;
+        let flat = |x0: f64, y0: f64, x1: f64, y1: f64| make_plane_face(&Plane::xy(), x0, x1, y0, y1).unwrap();
+        let sheet_tool = match what {
+            "touching" => flat(0.02, 0.05, 0.03, 0.06),
+            "notch" => flat(0.02, 0.045, 0.03, 0.06),
+            _ => Shape::compound(&[flat(0.02, 0.05, 0.03, 0.06), flat(0.06, 0.045, 0.07, 0.06)]),
+        };
+        let rs = cut(&sheet, &sheet_tool).unwrap().shape;
+        let us = unify_same_domain(&rs).unwrap().shape;
+        println!("  by a sheet: faces {} edges {} area {:.6}; unified: faces {} edges {}", rs.faces().len(), rs.edges().len(), rs.area().unwrap() * 1e4, us.faces().len(), us.edges().len());
+        let u = unify_same_domain(&r).unwrap().shape;
+        println!("{what}: faces {} edges {} area {:.6}; unified: edges {}", r.faces().len(), r.edges().len(), r.area().unwrap() * 1e4, u.edges().len());
+    }
+}
+
+/// Probe: unify dumps (NOSHAPE_PROBE_DIR) holding a sheet in the plane x = NOSHAPE_PROBE_X mm: its edges along y =
+/// NOSHAPE_PROBE_Y mm with each end's edge count, before and after the unify (c2-sm-louver's Extrude 3).
+#[test]
+#[ignore = "T2: probe"]
+fn sheet_edges_along_a_line_probe() {
+    let (Ok(dir), Ok(x), Ok(y)) = (std::env::var("NOSHAPE_PROBE_DIR"), std::env::var("NOSHAPE_PROBE_X"), std::env::var("NOSHAPE_PROBE_Y")) else { return };
+    let (x, y): (f64, f64) = (x.parse::<f64>().unwrap() * 1e-3, y.parse::<f64>().unwrap() * 1e-3);
+    let mut files: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|e| e == "brep")).collect();
+    files.sort();
+    for p in files {
+        let Ok(s) = read_brep(&p) else { continue };
+        let on_plane = s.faces().iter().any(|f| f.bounding_box(false).is_ok_and(|b| (b.min.x - x).abs() < 1e-6 && (b.max.x - x).abs() < 1e-6));
+        if !on_plane || s.count(ShapeType::Solid) > 0 {
+            continue;
+        }
+        let show = |what: &str, s: &Shape| {
+            let ve = s.ancestor_map(ShapeType::Vertex, ShapeType::Edge).unwrap().to_vecs();
+            let verts = s.vertices();
+            let valence = |pt: DVec3| verts.iter().position(|v| v.vertex_point().is_ok_and(|q| (q - pt).length() < 1e-9)).map_or(0, |i| ve[i].len());
+            println!("{} {what}: {} faces {} edges", p.display(), s.faces().len(), s.edges().len());
+            for e in s.edges() {
+                let Ok(i) = e.edge_info() else { continue };
+                if (i.start.y - y).abs() < 1e-6 && (i.end.y - y).abs() < 1e-6 {
+                    let c = format!("start ({:.9}, {:.9}) end ({:.9}, {:.9}) mm", i.start.x * 1e3, i.start.y * 1e3, i.end.x * 1e3, i.end.y * 1e3);
+                    println!("  z {:.3} -> {:.3} ({} / {} edges at the ends) {c}", i.start.z * 1e3, i.end.z * 1e3, valence(i.start), valence(i.end));
+                }
+            }
+        };
+        show("as dumped", &s);
+        show("unified", &unify_same_domain(&s).unwrap().shape);
+        show("unified whole", &unify_same_domain_whole(&s).unwrap().shape);
+        show("edges unified", &unify_edges(&s).unwrap().shape);
+    }
+}

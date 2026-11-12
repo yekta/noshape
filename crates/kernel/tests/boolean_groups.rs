@@ -340,6 +340,23 @@ fn a_curved_side_and_its_mirror_image_unify_into_one_face() {
     assert!(s.is_valid() && (s.volume().unwrap() - v).abs() < 1e-9 * v);
 }
 
+/// A sheet placed by a location (its edges located, as a sheet metal definition sheet in a part) with a notch, cut
+/// down to the notch's floor: the cut's new edges and the floor (the sheet's own, located) are one line after the
+/// unify, the sheet a rectangle again (c2-sm-louver's Extrude 3: its side face stayed in three, live one).
+#[test]
+fn a_located_sheets_new_edge_and_its_own_on_one_line_unify() {
+    let p = |x: f64, y: f64| DVec2::new(x, y);
+    let pts = [p(0.0, 0.0), p(100.0, 0.0), p(100.0, 50.0), p(30.0, 50.0), p(30.0, 40.0), p(20.0, 40.0), p(20.0, 50.0), p(0.0, 50.0)];
+    let segs: Vec<Segment2d> = (0..pts.len()).map(|i| Segment2d::Line { a: pts[i], b: pts[(i + 1) % pts.len()] }).collect();
+    let sheet = make_face_2d(&Plane::xy(), &segs, &[]).unwrap().translated(DVec3::new(0.0, 0.0, 5.0)).unwrap();
+    let tool = make_box_corners(DVec3::new(-10.0, 40.0, 0.0), DVec3::new(110.0, 60.0, 10.0)).unwrap();
+    let cut_sheet = cut(&sheet, &tool).unwrap().shape;
+    let u = unify_same_domain(&cut_sheet).unwrap().shape;
+    // A 100 x 40 rectangle's four edges.
+    assert_eq!(u.edges().len(), 4, "{} edges (cut: {})", u.edges().len(), cut_sheet.edges().len());
+    assert!((u.area().unwrap() - 4000.0).abs() < 1e-9);
+}
+
 /// with_call_budget: a section that takes longer than its budget fails with
 /// "section took too long" (std's collision checks in editing logic give up
 /// on such a pair, qa MIRROR-HANG-402); without one it runs to the end. The
