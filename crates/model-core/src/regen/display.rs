@@ -729,7 +729,7 @@ fn mesh_bounds(mesh: &Arc<crate::display::MeshBuffers>) -> Option<(DVec3, DVec3)
     {
         return *b;
     }
-    let b = scan_bounds(mesh);
+    let b = mesh_box(mesh);
     let mut boxes = BOXES.lock().unwrap_or_else(|e| e.into_inner());
     if boxes.len() > 4096 {
         boxes.retain(|_, (w, _)| w.strong_count() > 0);
@@ -738,7 +738,8 @@ fn mesh_bounds(mesh: &Arc<crate::display::MeshBuffers>) -> Option<(DVec3, DVec3)
     b
 }
 
-fn scan_bounds(mesh: &crate::display::MeshBuffers) -> Option<(DVec3, DVec3)> {
+/// The box of a display mesh's points and edge polylines (what it draws).
+pub fn mesh_box(mesh: &crate::display::MeshBuffers) -> Option<(DVec3, DVec3)> {
     let mut points = mesh.positions.iter().chain(mesh.edges.iter().flatten()).chain(&mesh.vertices);
     let first = DVec3::from(points.next()?.map(f64::from));
     Some(points.fold((first, first), |(lo, hi), p| {

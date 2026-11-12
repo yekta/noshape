@@ -47,15 +47,17 @@ impl PartStudioView {
         let tip = h.start + w * r;
         // Live (part-studio/433–435): the knee and shelf sit at the edge of
         // the part, where the leader leaves it.
-        let edge = ctx
+        // (The parts' drawn boxes: OCCT's quick box bounds a B-spline face by its control points.)
+        let edge = self
+            .display
             .bodies
             .iter()
-            .filter_map(|b| b.shape.bounding_box(false).ok())
-            .find(|bb| (0..3).all(|i| h.start[i] >= bb.min[i] - 1e-6 && h.start[i] <= bb.max[i] + 1e-6))
-            .map(|bb| {
+            .filter_map(|b| b.bounds)
+            .find(|(lo, hi)| (0..3).all(|i| h.start[i] >= lo[i] - 1e-6 && h.start[i] <= hi[i] + 1e-6))
+            .map(|(lo, hi)| {
                 (0..3)
                     .filter(|&i| w[i].abs() > 1e-9)
-                    .map(|i| ((if w[i] > 0.0 { bb.max[i] } else { bb.min[i] }) - h.start[i]) / w[i])
+                    .map(|i| ((if w[i] > 0.0 { hi[i] } else { lo[i] }) - h.start[i]) / w[i])
                     .fold(f64::INFINITY, f64::min)
             })
             .filter(|t| t.is_finite());

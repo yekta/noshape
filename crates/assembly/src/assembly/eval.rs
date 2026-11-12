@@ -1237,7 +1237,8 @@ pub fn sketch_wire_result(studio: &RegenResult, sketch: FeatureId) -> Option<Reg
             region_refs.push(Reference::SketchRegion { sketch, key: r.key.clone() });
         }
     }
-    let bounds = shape.bounding_box(false).ok().map(|b| (b.min, b.max));
+    // What it draws, not OCCT's quick box (a spline's control points).
+    let bounds = crate::regen::mesh_box(&mesh).or_else(|| shape.bounding_box(false).ok().map(|b| (b.min, b.max)));
     let mut ctx: Context = (*studio.context).clone();
     let display_body = crate::display::BodyDisplay {
         id,

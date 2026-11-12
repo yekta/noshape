@@ -182,7 +182,8 @@ pub fn display_bodies(c: &AssemblyContext, bodies: &[Arc<Body>]) -> Vec<crate::d
     for (i, b) in bodies.iter().enumerate() {
         let Some(src) = c.bodies.get(i) else { continue };
         let mesh = crate::regen::tessellate_shape(&b.shape, 1.0).unwrap_or_default();
-        let bounds = b.shape.bounding_box(false).ok().map(|x| (x.min, x.max));
+        // What it draws (OCCT's quick box bounds B-spline faces by their control points: Zoom to fit framed those).
+        let bounds = crate::regen::mesh_box(&mesh).or_else(|| b.shape.bounding_box(false).ok().map(|x| (x.min, x.max)));
         out.push(crate::display::BodyDisplay {
             id: b.id.clone(),
             name: src.instance.clone(),

@@ -1062,12 +1062,12 @@ impl PartStudioView {
             });
             let on: Vec<glam::DVec3> = match flat_face {
                 Some((_, i)) => {
-                    let b = f.flat_view_solid()?.faces().get(i)?.bounding_box(false).ok()?;
+                    let b = f.flat_view_solid()?.faces().get(i)?.bounding_box(true).ok()?;
                     (0..4).map(|k| glam::DVec3::new([b.min.x, b.max.x][k & 1], [b.min.y, b.max.y][(k >> 1) & 1], b.max.z)).collect()
                 }
                 None => {
                     let faces: Vec<_> = plane.iter().flat_map(|r| noshape_model::regen::measure::resolve_shapes(ctx, r)).collect();
-                    let b = faces.first()?.bounding_box(false).ok()?;
+                    let b = faces.first()?.bounding_box(true).ok()?;
                     let on: Vec<glam::DVec3> = (0..8).map(|k| f.to_flat_view(glam::DVec3::new([b.min.x, b.max.x][k & 1], [b.min.y, b.max.y][(k >> 1) & 1], [b.min.z, b.max.z][(k >> 2) & 1]))).collect();
                     // Only a face lying on the flat's sheet (its top or bottom).
                     let on_sheet = |z: f64| z.abs() < 1e-6 || (z.abs() - f.thickness).abs() < 1e-6;

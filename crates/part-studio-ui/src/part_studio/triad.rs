@@ -77,10 +77,14 @@ impl PartStudioView {
                 Reference::Body(b) => Some(b.clone()),
                 r => self.body_of(r),
             };
-            let Some(b) = id.and_then(|id| ctx.bodies.iter().find(|b| b.id == id)) else { continue };
-            if let Ok(bb) = b.shape.bounding_box(false) {
-                lo = lo.min(bb.min);
-                hi = hi.max(bb.max);
+            let Some(id) = id else { continue };
+            // The box of what the part draws (the display's, before the feature); OCCT's quick box bounds a B-spline
+            // face by its control points, which can sit far off the part.
+            let shown = self.ui.preview_before.as_deref().unwrap_or(&self.display).body(&id).and_then(|b| b.bounds);
+            let quick = || ctx.bodies.iter().find(|b| b.id == id).and_then(|b| b.shape.bounding_box(false).ok()).map(|bb| (bb.min, bb.max));
+            if let Some((a, c)) = shown.or_else(quick) {
+                lo = lo.min(a);
+                hi = hi.max(c);
             }
         }
         (lo.x <= hi.x).then_some((lo, hi))
