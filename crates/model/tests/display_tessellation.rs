@@ -149,3 +149,37 @@ fn a_used_bspline_shows_only_its_ends() {
     let d = regen(&ps).display;
     assert_eq!(d.sketches[0].points.len(), 2, "only the spline's two ends: {:?}", d.sketches[0].points.iter().map(|p| p.position).collect::<Vec<_>>());
 }
+
+/// A part's display box is what it draws (c2-impeller-loft: OCCT's quick box bounded the loft's B-spline faces by
+/// control points 3 m out, and Zoom to fit framed that): a closed fit spline through a star's points, extruded.
+#[test]
+fn a_bspline_parts_display_box_is_its_drawn_box() {
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let star: Vec<DVec2> = (0..=10).map(|i| {
+        let a = i as f64 * std::f64::consts::PI / 5.0;
+        DVec2::new(a.cos(), a.sin()) * if i % 2 == 0 { 0.05 } else { 0.012 }
+    }).collect();
+    sk.add_closed_fit_spline(&star).unwrap();
+    let mut sketch = ps.new_feature("sketch", &units).unwrap();
+    sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    let sid = sketch.id;
+    ps.features.push(sketch);
+    let key = regen(&ps).display.sketches[0].regions[0].key.clone();
+    let mut ex = ps.new_feature("extrude", &units).unwrap();
+    ex.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
+    ex.params.set("depth", ParamValue::Expr(ExprValue::new("10 mm")));
+    ps.features.push(ex);
+    let r = regen(&ps);
+    let b = &r.display.bodies[0];
+    let (lo, hi) = b.bounds.expect("bounds");
+    let drawn = b.mesh.positions.iter().fold((glam::DVec3::splat(f64::INFINITY), glam::DVec3::splat(f64::NEG_INFINITY)), |(l, h), p| {
+        let p = glam::DVec3::from(p.map(f64::from));
+        (l.min(p), h.max(p))
+    });
+    let quick = r.context.bodies[0].shape.bounding_box(false).unwrap();
+    assert!((quick.max - quick.min).max_element() > (drawn.1 - drawn.0).max_element() * 1.05, "the case: OCCT's quick box is looser than the drawn part ({:?} vs {drawn:?})", (quick.min, quick.max));
+    assert!((lo - drawn.0).abs().max_element() < 1e-4 && (hi - drawn.1).abs().max_element() < 1e-4, "display box {:?}, drawn {drawn:?}", (lo, hi));
+}

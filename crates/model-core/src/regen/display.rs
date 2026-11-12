@@ -504,7 +504,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             b.faces.iter().map(|n| ctx.face_appearance.iter().rev().find(|(id, f, _)| *id == b.id && n.descends_from(f)).map(|(_, _, c)| *c)).collect()
         };
         let face_colors = if face_colors.iter().any(Option::is_some) { face_colors } else { Vec::new() };
-        let bounds = b.shape.bounding_box(false).ok().map(|x| (x.min, x.max));
+        let bounds = mesh_bounds(&mesh).or_else(|| b.shape.bounding_box(false).ok().map(|x| (x.min, x.max)));
         d.bodies.push(BodyDisplay {
             id: b.id.clone(),
             name: props.and_then(|p| p.name.clone()).unwrap_or_else(|| b.name.clone()),
@@ -713,6 +713,18 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
         })
         .collect();
     SketchDisplay { feature: s.feature, name: s.name.clone(), frame, curves, points, regions, dimensions: Vec::new(), glyphs: Vec::new(), hidden: false, on_flat: false, dof, color: None, images }
+}
+
+/// The box of what a body's display draws: its mesh's points and edge polylines. OCCT's quick box bounds a B-spline face
+/// by its control points, which a loft can throw far out (c2-impeller-loft's Part 2: x from -3157 mm for a part from
+/// -34 mm, so Zoom to fit framed 3.3 m around a 17 cm model).
+fn mesh_bounds(mesh: &crate::display::MeshBuffers) -> Option<(DVec3, DVec3)> {
+    let mut points = mesh.positions.iter().chain(mesh.edges.iter().flatten()).chain(&mesh.vertices);
+    let first = DVec3::from(points.next()?.map(f64::from));
+    Some(points.fold((first, first), |(lo, hi), p| {
+        let p = DVec3::from(p.map(f64::from));
+        (lo.min(p), hi.max(p))
+    }))
 }
 
 #[cfg(test)]
