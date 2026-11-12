@@ -1220,7 +1220,7 @@ impl<'a> Translator<'a> {
     /// drawn as the other entities.
     /// Returns how far ours lies from live's stored entity (our sketch's metres), for a circle or point; a Use that
     /// doesn't land where live's is stored comes back to be drawn (`moved_uses`).
-    fn use_projected(&mut self, oid: &str, id: &str, u: Use, problems: &mut Vec<String>) -> Result<Option<[f64; 2]>, Use> {
+    fn use_projected(&mut self, oid: &str, id: &str, u: Use, problems: &mut Vec<String>) -> Result<Option<[f64; 2]>, Box<Use>> {
         let map = self.sketch_map;
         let top = |t: &mut Self| t.ctx.doc(None).ok().and_then(|od| od.session.undo_tops().0);
         let mark = top(self);
@@ -1261,14 +1261,14 @@ impl<'a> Translator<'a> {
         if made.is_some() && top(self) != mark {
             let _ = self.call("history_undo", json!({}));
         }
-        Err(u)
+        Err(Box::new(u))
     }
 
     /// Live's Uses that ours can't make where they're stored (no model geometry named, or ours lands elsewhere),
     /// drawn where they're stored: where they were when drawn, before the model moved. When every Use of the sketch
     /// that ours made moved by the same step (infento-subs' Multi angle joint, Sketch 4: its hole circle 0.5 mm from
     /// where it's stored, the pocket's two arcs with it), they're drawn moved by it too.
-    fn moved_uses(&mut self, oid: &str, id: &str, model_frame: bool, unnamed: Vec<(String, Value, Option<[[f64; 2]; 2]>)>, moved: &[[f64; 2]], problems: &mut Vec<String>) {
+    fn moved_uses(&mut self, oid: &str, id: &str, model_frame: bool, unnamed: Vec<Use>, moved: &[[f64; 2]], problems: &mut Vec<String>) {
         if unnamed.is_empty() {
             return;
         }
@@ -1294,7 +1294,7 @@ impl<'a> Translator<'a> {
             }).collect::<Vec<_>>())
         };
         let key = |eid: &str| (oid.to_string(), eid.to_string());
-        for (eid, mut shape, ends) in unnamed {
+        for Use { eid, mut shape, ends, .. } in unnamed {
             if let Some(pts) = shape["points"].as_array().map(|a| a.iter().map(shift).collect::<Vec<_>>()) {
                 shape["points"] = json!(pts);
             }
@@ -3730,7 +3730,7 @@ impl<'a> Translator<'a> {
             })
             .collect();
         let mut uses: Vec<Use> = Vec::new();
-        let mut unnamed_uses: Vec<(String, Value, Option<[[f64; 2]; 2]>)> = Vec::new();
+        let mut unnamed_uses: Vec<Use> = Vec::new();
         for e in f["entities"].as_array().into_iter().flatten() {
             // Where live's solve put it (`sketches` geomEntities): stored
             // geometry can lag its variables (cf-parameter-pattern).
@@ -3862,7 +3862,7 @@ impl<'a> Translator<'a> {
                     uses.push(Use { eid, reference: used.unwrap_or_default(), shape: s, ends: end_points, point });
                 }
                 // A Use whose model geometry isn't named: drawn after the Uses ours makes (`moved_uses`).
-                Some(s) if projected.contains_key(&eid) => unnamed_uses.push((eid, s, end_points)),
+                Some(s) if projected.contains_key(&eid) => unnamed_uses.push(Use { eid, reference: String::new(), shape: s, ends: end_points, point: None }),
                 Some(s) => {
                     shapes.push(s);
                     local.push(eid);
@@ -3872,10 +3872,10 @@ impl<'a> Translator<'a> {
             }
         }
         if uses.is_empty() {
-            for (eid, s, e) in unnamed_uses.drain(..) {
-                shapes.push(s);
-                local.push(eid);
-                ends.push(e);
+            for u in unnamed_uses.drain(..) {
+                shapes.push(u.shape);
+                local.push(u.eid);
+                ends.push(u.ends);
             }
         }
         // Curves first, then the free points, so each reply lists ours in
@@ -3918,7 +3918,7 @@ impl<'a> Translator<'a> {
         for u in uses {
             match self.use_projected(&oid, &id, u, problems) {
                 Ok(step) => moved.extend(step),
-                Err(u) => unnamed_uses.push((u.eid, u.shape, u.ends)),
+                Err(u) => unnamed_uses.push(*u),
             }
         }
         self.moved_uses(&oid, &id, frame.is_some(), unnamed_uses, &moved, problems);
