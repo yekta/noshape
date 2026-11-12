@@ -3884,7 +3884,10 @@ impl PartStudioView {
                         let t = this.list_target(&r3);
                         this.pick(t, cx);
                     }))
-                    .os_context_menu(move |menu, _, cx| default_geometry_menu(menu, &view, r.clone(), hidden, cx))
+                    .os_context_menu(move |menu, _, cx| {
+                        let selected = view.read(cx).selection.contains(&r);
+                        default_geometry_menu(menu, &view, r.clone(), hidden, selected, cx)
+                    })
                     .into_any_element(),
                 move || format!("feature:{label}"),
             ));
@@ -7550,8 +7553,9 @@ pub(super) fn drop_off_thread<T: Send + 'static>(x: T, cx: &App) {
 }
 
 /// A default plane's or the Origin's menu: its feature list row's, and a default plane's in the graphics (live
-/// ui-parity plane-graphics-rclick-menu).
-pub(super) fn default_geometry_menu(menu: crate::os_menu::OsMenu, view: &Entity<PartStudioView>, r: Reference, hidden: bool, cx: &App) -> crate::os_menu::OsMenu {
+/// ui-parity plane-graphics-rclick-menu). `selected`: whether it is selected, from the caller (the graphics menu is
+/// built while the view is being updated: reading it here crashed).
+pub(super) fn default_geometry_menu(menu: crate::os_menu::OsMenu, view: &Entity<PartStudioView>, r: Reference, hidden: bool, selected: bool, cx: &App) -> crate::os_menu::OsMenu {
     // Onshape (live): plane rows: Rename | New sketch…,
     // Offset plane…, Size to Part Studio | Hide, Hide other
     // planes, Hide all planes | Zoom to selection, View
@@ -7560,7 +7564,6 @@ pub(super) fn default_geometry_menu(menu: crate::os_menu::OsMenu, view: &Entity<
     let is_plane = matches!(r, Reference::Plane(_));
     // Live (behaviours "6.28 Default planes can't be deleted", PLANE-MENU-SELECTED): a selected
     // plane's menu adds Clear selection.
-    let selected = view.read(cx).selection.contains(&r);
     let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
     let (r1, r2, r3, r4) = (r.clone(), r.clone(), r.clone(), r.clone());
     let (vn, rn) = (view.clone(), r.clone());

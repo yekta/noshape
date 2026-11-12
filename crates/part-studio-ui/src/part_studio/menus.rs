@@ -65,6 +65,7 @@ impl PartStudioView {
         let sketch_swatch = creator.map(|id| self.sketch_swatch(id, cx));
         let source_sketch = creator.and_then(|id| studio.and_then(|s| s.feature(id).and_then(|f| noshape_model::interaction::source_sketch(&s.features, f)).and_then(|sid| s.feature(sid).map(|g| (sid, g.name.clone())))));
         let has_selection = !self.selection.is_empty() || !self.selected_features.is_empty();
+        let target_selected = target_ref.as_ref().is_some_and(|r| self.selection.contains(r));
         let isolate = self.ui.isolate.as_ref().map(|i| i.mode);
         let parts_hidden = self.display.bodies.iter().any(|b| b.hidden);
         let section = !self.ui.section.is_empty();
@@ -263,7 +264,7 @@ impl PartStudioView {
                 }
                 // A default plane: its feature list row's menu (live ui-parity plane-graphics-rclick-menu).
                 (Some(r @ Reference::Plane(_)), Some(PickKind::Plane)) => {
-                    m = super::default_geometry_menu(m, &v, r, false, cx);
+                    m = super::default_geometry_menu(m, &v, r, false, target_selected, cx);
                 }
                 // Feature planes.
                 (Some(r), Some(PickKind::Plane)) => {
