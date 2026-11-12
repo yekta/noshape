@@ -23,10 +23,10 @@ REPLAY = ("bool-corpus corpus2 corpus3 corpus4 corpus5 corpus6 direct-corpus sh-
           "kall k10-25 k10-25-12 k25-15 k25-25 k25-71-12 cf-spur-gear gears gpf").split()
 VS_OCCT = {"parity56"}
 # Corpora whose cases can take many GB each (Shell's slab fuses, knurls, gears: the memory budget is 16 GB a
-# process, as whyall.sh's; 8.3 GB the most seen in one shard): their own shards, in a pool of four. Eight such at
-# once were killed for memory on vibe4.
+# process, as whyall.sh's; 10.6 GB the most seen in one shard): their own shards, in a pool of three. Eight such at
+# once were killed for memory on vibe4; one killed shard is run again alone after the rest.
 HEAVY = {"shfall", "kall", "k10-25", "k10-25-12", "k25-15", "k25-25", "k25-71-12", "cf-spur-gear", "gears", "gpf"}
-HEAVY_AT_ONCE = 4
+HEAVY_AT_ONCE = 3
 SPEED = ["k25-15", "k25-25", "cf-spur-gear"]
 CASE = re.compile(r"^([0-9a-f]{16})")
 
@@ -349,7 +349,7 @@ def compare(base_r, new_r, base_s, new_s, spd):
         b = {r[0]: r for r in base_r}
         n = {r[0]: r for r in new_r}
         per = {}
-        new_bad, lost, gained, fixed, reasons = [], [], [], [], 0
+        new_bad, lost, gained, fixed, reasons, unknown = [], [], [], [], 0, []
         for key in sorted(set(b) | set(n)):
             rb, rn = b.get(key), n.get(key)
             if rn is None or rb is None:
@@ -363,7 +363,9 @@ def compare(base_r, new_r, base_s, new_s, spd):
                 p[2] += sn in TAKEN
                 p[3] += sb in BAD
                 p[4] += sn in BAD
-            if sn in BAD and not (sb == sn and rb[4] == rn[4]):
+            if sb == "noresult":
+                unknown.append(f"{rn[2].split(',')[0]} {rn[1]}: {rb[4]}")
+            elif sn in BAD and not (sb == sn and rb[4] == rn[4]):
                 new_bad.append(f"{rn[2].split(',')[0]} {rn[1]}: {sn}: {rn[4]} (main: {sb} {rb[4]})".strip())
             elif sb in TAKEN and sn == "declined":
                 lost.append(f"{rn[2].split(',')[0]} {rn[1]}: now declined: {rn[4]}")
@@ -373,6 +375,9 @@ def compare(base_r, new_r, base_s, new_s, spd):
                 fixed.append(f"{rn[1]} ({sn})")
             elif sb == sn == "declined" and rb[4] != rn[4]:
                 reasons += 1
+        if unknown:
+            fail.append(f"{len(unknown)} cases without main's result (its replay crashed or timed out there: run again)")
+            info += ["  no main result: " + x for x in unknown[:10]]
         if new_bad:
             fail.append(f"{len(new_bad)} cases differ from OCCT or fail that didn't on main")
             info += ["  new: " + x for x in new_bad[:40]]
@@ -473,6 +478,11 @@ def main():
     with ThreadPoolExecutor(HEAVY_AT_ONCE) as hp, ThreadPoolExecutor(max(1, a.jobs - HEAVY_AT_ONCE)) as lp:
         futures = [hp.submit(run_task, t, a.out, a.threads) for t in heavy] + [lp.submit(run_task, t, a.out, a.threads) for t in light]
         done = [f.result() for f in futures]
+    # (A shard killed without its results (for memory, beside the others): again, alone.)
+    for t in done:
+        if t["rc"] not in (0, 101):
+            print(f"gate-host: {t['role']} {t['kind']}-{t['id']} ended {t['rc']} without its results: again alone", flush=True)
+            run_task(t, a.out, a.threads)
     results = [(key, "replay", collect_replay(ts, cases, "")) for key, (ts, cases) in replays.items()]
     for skey in {t["key"] for t in done if t["kind"] == "suite"}:
         rows = collect_suite([t for t in done if t["kind"] == "suite" and t["key"] == skey])
