@@ -43,7 +43,9 @@
 #include <ElCLib.hxx>
 #include <ElSLib.hxx>
 #include <Geom2d_Line.hxx>
+#include <gp_Circ.hxx>
 #include <gp_Lin.hxx>
+#include <gp_Pln.hxx>
 #include <gp_Ax22d.hxx>
 #include <Geom2dAPI_Interpolate.hxx>
 #include <gp_Ax2d.hxx>
@@ -4256,6 +4258,51 @@ bool shape_inside_out(const OcShape& s)
   return false;
 }
 
+// Two arguments of edges alone (a fill pattern's probes: an instance's circle against a boundary's line) whose lines
+// and circles can't run together along a length: lines not on one line, circles not one circle, a line not all but
+// tangent to a circle in its plane. Their common is empty, as OCCT's (crossing points aren't a common of edges).
+static bool edges_apart(const OcShape& a, const OcShape& b)
+{
+  if (a.map(TopAbs_FACE).Extent() != 0 || b.map(TopAbs_FACE).Extent() != 0 || a.map(TopAbs_EDGE).Extent() == 0 || b.map(TopAbs_EDGE).Extent() == 0)
+    return false;
+  const ShapeIMap& ea = a.map(TopAbs_EDGE);
+  const ShapeIMap& eb = b.map(TopAbs_EDGE);
+  for (int i = 1; i <= ea.Extent(); ++i)
+    for (int j = 1; j <= eb.Extent(); ++j)
+    {
+      const TopoDS_Edge& x = TopoDS::Edge(ea(i));
+      const TopoDS_Edge& y = TopoDS::Edge(eb(j));
+      if (BRep_Tool::Degenerated(x) || BRep_Tool::Degenerated(y))
+        return false;
+      const double            reach = std::max(1e-6, 100 * (BRep_Tool::Tolerance(x) + BRep_Tool::Tolerance(y)));
+      const BRepAdaptor_Curve cx(x), cy(y);
+      const GeomAbs_CurveType tx = cx.GetType(), ty = cy.GetType();
+      if ((tx != GeomAbs_Line && tx != GeomAbs_Circle) || (ty != GeomAbs_Line && ty != GeomAbs_Circle))
+        return false;
+      if (tx == GeomAbs_Line && ty == GeomAbs_Line)
+      {
+        const gp_Lin l = cx.Line(), m = cy.Line();
+        if (l.Direction().IsParallel(m.Direction(), 1e-6) && l.Distance(m.Location()) <= reach)
+          return false;
+        continue;
+      }
+      if (tx == GeomAbs_Circle && ty == GeomAbs_Circle)
+      {
+        const gp_Circ c = cx.Circle(), d = cy.Circle();
+        if (c.Location().Distance(d.Location()) <= reach && std::abs(c.Radius() - d.Radius()) <= reach && c.Axis().Direction().IsParallel(d.Axis().Direction(), 1e-6))
+          return false;
+        continue;
+      }
+      const gp_Lin  l = tx == GeomAbs_Line ? cx.Line() : cy.Line();
+      const gp_Circ c = tx == GeomAbs_Circle ? cx.Circle() : cy.Circle();
+      const gp_Pln  plane(c.Location(), c.Axis().Direction());
+      const bool    in_plane = std::abs(l.Direction().Dot(c.Axis().Direction())) <= 1e-6 && plane.Distance(l.Location()) <= reach;
+      if (in_plane && std::abs(l.Distance(c.Location()) - c.Radius()) <= reach)
+        return false;
+    }
+  return true;
+}
+
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy, bool touching_only, bool scaled_inputs)
@@ -4279,6 +4326,23 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       own.push_back(std::make_unique<OcShape>(args[i]));
       srcs[i] = own.back().get();
     }
+  if (op == 2 && args.size() == 2 && edges_apart(*srcs[0], *srcs[1]))
+  {
+    BRep_Builder    bb;
+    TopoDS_Compound empty;
+    bb.MakeCompound(empty);
+    out  = empty;
+    hist = new BRepTools_History();
+    for (const OcShape* x : srcs)
+      for (const TopAbs_ShapeEnum t : {TopAbs_EDGE, TopAbs_VERTEX})
+      {
+        const ShapeIMap& m = x->map(t);
+        for (int k = 1; k <= m.Extent(); ++k)
+          hist->Remove(m(k));
+      }
+    t_built.set = false;
+    return true;
+  }
   // A tool that's inside out (a mirror's image not turned back: c2-sm-louver's Mirror 2 cutter, its volume below
   // zero): ours classifies every point against its faces' normals the wrong way round and declines late ("no clean
   // ray", 0.35 s; OCCT takes it as it is). Declined first; found once a shape. (An object inside out is taken alike:

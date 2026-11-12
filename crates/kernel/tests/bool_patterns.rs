@@ -2246,3 +2246,19 @@ fn sheets_of_shells_fused_into_shells_as_occt() {
 fn slots_across_a_rings_rounds_cut_as_occt() {
     valid_as_occt("d3b24561b7688e74", 1e-8);
 }
+
+/// cf-fill-pattern's probes (recorded, 140 of them): an instance's circle in common with a boundary's line, edges
+/// alone, crossing at points: OCCT's common is empty, every input edge and vertex removed. Ours the same, without
+/// OCCT ("an argument without solids" before).
+#[test]
+fn a_circle_and_a_line_crossing_have_no_common() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "00d2e5fe3c9f93b0").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert_eq!(k::bool_corpus::Summary::of(&r), c.summary, "OCCT's result and history");
+}
