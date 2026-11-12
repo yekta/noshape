@@ -2069,7 +2069,10 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     {
       double sa = 0, sz = 0, sv1 = 0, sv2 = 0;
       BRepTools::UVBounds(TopoDS::Face(input(srcs, r.face_origin[3 * i + 1], TopAbs_FACE, r.face_origin[3 * i + 2])), sa, sz, sv1, sv2);
-      if (a < sa - round_off || z > sz + round_off)
+      // (Its curves past the input's angles by up to a thousand tolerances round the axis: OCCT's section hooking
+      // out over the face's edge into its end, as OCCT's own result has it (learning-center-michael's ring cut).)
+      const double past = radius > 1e-9 ? std::max(round_off, 1000 * tol / radius) : round_off;
+      if (a < sa - past || z > sz + past)
         return "a piece across its surface's seam angle";
     }
     if (z - a > 2 * M_PI + 1e-6)

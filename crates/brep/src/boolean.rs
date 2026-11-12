@@ -969,6 +969,9 @@ struct Ctx<'a> {
     on_surface: HashMap<(usize, usize), R<bool>>,
     /// NURBS curves (`Geo::Nurbs`), and where OCCT's sections of free-form faces come from.
     ncurves: Vec<NCurve>,
+    /// Sections hooking out over a face's boundary into their end (`intervals_on`'s grazes): the curve, the face,
+    /// where it crosses back and its end.
+    hooks: std::sync::Mutex<Vec<(u32, usize, f64, f64)>>,
     src: Option<&'a dyn SectionSource>,
 }
 
@@ -1494,11 +1497,38 @@ impl Ctx<'_> {
         let pts = self.faces[f].bound_pts.get_or_init(|| bound.iter().map(|_| crate::curve2::Samples::new()).collect());
         // (Those across the boundary at a clear angle: the side flips there.)
         let mut across: Vec<f64> = Vec::new();
+        // (Where it crosses the boundary at a clear angle and hooks back into its own end on that boundary curve,
+        // never farther from it than half the way there, that boundary's edge along the other face (OCCT's section of a round and a ring
+        // tangent to one plane at a corner: 8 um outside the round's straight edge for its last 23 um). No crossing:
+        // OCCT puts no vertex there, the edge only touching the other face, at the corner.)
+        let mut grazes: Vec<(f64, f64)> = Vec::new();
+        let mut crossings: Vec<f64> = Vec::new();
         for (b, theirs) in bound.iter().zip(pts) {
             for (u, ub) in c2.intersections_with(b, tol, &samples, theirs) {
                 let t = t0 + (t1 - t0) * u;
+                // (The boundary's edge only touching the other face there, along it: OCCT's edge / face pave is where it
+                // touches, the section's end.)
+                let touching = || {
+                    let Some(g) = other else { return false };
+                    let (p, q) = (self.faces[f].to3(b.at((ub - 1e-4).max(0.0))), self.faces[f].to3(b.at((ub + 1e-4).min(1.0))));
+                    (q - p).normalize_or_zero().dot(self.normal_at(g, path.at(t))).abs() <= 0.02
+                };
+                let crosses = c2.tangent(u).perp_dot(b.tangent(ub)).abs() > 0.1;
+                let graze = [0.0, 1.0].into_iter().filter(|_| crosses).find(|&e: &f64| {
+                    let (q, chord) = (c2.at(e), (path.at(t0 + (t1 - t0) * e) - path.at(t)).length());
+                    chord > GREY * vtol && chord <= 1000.0 * self.tol && b.distance(q) <= tol && (1..16).all(|k| b.distance(c2.at(u + (e - u) * k as f64 / 16.0)) <= 0.5 * chord) && touching()
+                });
+                if let Some(e) = graze {
+                    let te = t0 + (t1 - t0) * e;
+                    grazes.push((t.min(te), t.max(te)));
+                    if let Path::Nurbs { id, .. } = path {
+                        self.hooks.lock().unwrap_or_else(|p| p.into_inner()).push((*id, f, t, te));
+                    }
+                    continue;
+                }
                 cuts.push((t, End::Point(path.at(t))));
-                if c2.tangent(u).perp_dot(b.tangent(ub)).abs() > 0.1 {
+                crossings.push(t);
+                if crosses {
                     across.push(t);
                 }
             }
@@ -1563,7 +1593,11 @@ impl Ctx<'_> {
         for c in cuts {
             match merged.last_mut() {
                 Some(last) if apart(last.0, c.0) <= vtol => {
-                    if c.1.rank() > last.1.rank() {
+                    // (Its curve's start and a crossing of the boundary there: the crossing, OCCT's pave where the
+                    // boundary's edge meets the other face, its curve's end merged into it (0.7 um apart, a section
+                    // of 0.78 um tolerance: learning-center-michael's ring cut).)
+                    let start_then_crossing = last.0 == t0 && c.1.rank() == last.1.rank() && matches!(c.1, End::Point(_)) && crossings.contains(&c.0);
+                    if c.1.rank() > last.1.rank() || start_then_crossing {
                         *last = c;
                     }
                     *alone.last_mut().expect("one per cut") = false;
@@ -1658,7 +1692,7 @@ impl Ctx<'_> {
                         }
                     }
                     let t = 0.5 * (lo + hi);
-                    if apart(a.0, t) > margin && apart(t, b.0) > margin && d(t) <= GREY * tol {
+                    if apart(a.0, t) > margin && apart(t, b.0) > margin && d(t) <= GREY * tol && !grazes.iter().any(|g| t >= g.0 - margin / scale && t <= g.1 + margin / scale) {
                         return Err(Decline("a section touching a face's boundary"));
                     }
                 }
@@ -3750,6 +3784,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         polylines: HashMap::default(),
         on_surface: HashMap::default(),
         ncurves: Vec::new(),
+        hooks: Default::default(),
         src,
     };
     // (Inputs that carry their own tolerances (the kernel's): OCCT's least, 1e-7, in a pair test.)
@@ -5318,6 +5353,20 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 // (The origin that is this face's own edge: its curve on a free-form face is that edge's.)
                 let own = sedges[si].origins.iter().copied().find(|&e| cx.faces[f].edges.iter().any(|x| x.0 == e)).or(sedges[si].origins.first().copied());
                 let c = cx.c2_of(f, &s, copy, own)?;
+                // (A section hooking out over the face's boundary into its end: here from where it crosses back, so it
+                // leaves that vertex inside the face, as OCCT's loops have it.)
+                let c = match (s.g, &c) {
+                    (Geo::Nurbs { id, t0, t1 }, C2::Mapped { .. }) => {
+                        let near = |a: f64, b: f64| (a - b).abs() <= 1e-9 * (t1 - t0).abs().max(1e-300);
+                        let hook = cx.hooks.lock().unwrap_or_else(|p| p.into_inner()).iter().find(|h| h.0 == id && h.1 == f && (near(h.3, t0) || near(h.3, t1)) && (h.2 - t0) * (h.2 - t1) < 0.0).copied();
+                        match hook {
+                            Some((_, _, tc, te)) if near(te, t1) => free::mapped(&cx.faces[f], &cx.ncurves[id as usize].c, t0, tc)?,
+                            Some((_, _, tc, _)) => free::mapped(&cx.faces[f], &cx.ncurves[id as usize].c, tc, t1)?,
+                            None => c,
+                        }
+                    }
+                    _ => c,
+                };
                 let mut ends = [0u32; 2];
                 for (k, (w, q)) in [(s.v[0], c.start()), (s.v[1], c.end())].into_iter().enumerate() {
                     // A vertex on a seam (or a cone's apex) is at two places in the parameter plane (any other at one,

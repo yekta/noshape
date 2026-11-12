@@ -1916,6 +1916,36 @@ fn an_arc_shorter_than_the_tolerance_cut_as_occt() {
     assert_eq!(k::bool_corpus::Summary::of(&r).differences(&c.summary), Vec::<String>::new());
 }
 
+/// learning-center-michael's Fillet 2 (recorded: a part cut by its hole rims' rings, tori, round a box's corners):
+/// OCCT's section of a round and a ring, both tangent to the top plane at a corner, runs 8 um out over the round's
+/// straight edge for its last 23 um and back into the corner (OCCT's own curve on the round hooks so too). No vertex
+/// there, as OCCT's (its curve's start merged into the crossing 0.7 um on, OCCT's pave): noshape's Boolean takes the
+/// cut ("a non-manifold result" before), OCCT's result and history.
+#[test]
+fn a_section_hooking_over_an_edge_into_a_corner_cut_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "41701bb23cc08305").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).unwrap();
+    k::set_rust_boolean(None);
+    // (The history's hash rounds centroids: each record's input and relation instead, as OCCT's.)
+    let mut d = k::bool_corpus::Summary::of(&r).differences(&k::bool_corpus::Summary::of(&o));
+    d.retain(|x| x != "history differs");
+    assert_eq!(d, Vec::<String>::new());
+    let records = |x: &k::OpResult| {
+        let mut v: Vec<String> = x.history.records.iter().map(|h| format!("{} {:?}{} {:?} {:?}", h.arg, h.input_kind, h.input_index, h.relation, h.output_kind)).collect();
+        v.sort();
+        v
+    };
+    assert_eq!(records(&r), records(&o));
+}
+
 /// cf-surface-pattern's Surface Pattern 3 (recorded: a part cut by 85 stamp bodies): near a target's vertex of 4.9 um
 /// a tool's face has two sections between the same two vertices, 2-6 um apart (with the target's face and with another
 /// tool's): one edge within both curves' errors and the vertices' tolerance, as OCCT's existing pave block (left as two,
