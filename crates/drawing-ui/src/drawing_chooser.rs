@@ -1179,6 +1179,7 @@ fn chooser_square(id: &'static str, icon: &'static str, tip: &'static str, on: b
         .when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
         .child(crate::assets::icon(icon, 20., cx))
         .tooltip(crate::ui::tooltip(tip))
+        .map(|d| crate::ui_script::mark(d, || format!("button:{tip}")))
 }
 
 /// A row picture (Onshape: about 56 × 32 px), blank until rendered.

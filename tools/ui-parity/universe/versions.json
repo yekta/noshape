@@ -3147,7 +3147,7 @@
     [
      {
       "on": {
-       "button": "Revert unchanged items to their last revision"
+       "button": "re:^Revert unchanged items to (their )?last revision$"
       }
      }
     ]

@@ -2050,7 +2050,7 @@
      },
      {
       "on": {
-       "menu": "re:Unconfigure from .+"
+       "menu": "re:^Unconfigure( from .+)?$"
       }
      }
     ]

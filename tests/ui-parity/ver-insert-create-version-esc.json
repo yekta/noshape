@@ -1,0 +1,31 @@
+{
+ "name": "ver-insert-create-version-esc",
+ "about": "drawing Insert view › Insert (Select a part or assembly picker) › Create version…, then Escape: only the Create version modal closes, the picker stays (behaviours asb (c))",
+ "area": "studios",
+ "source": "universe versions sc-esc-create-version (studios 11-12)",
+ "start": "block-drawing-empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

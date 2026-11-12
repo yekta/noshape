@@ -60,7 +60,12 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   Monitor ▾ profile stop, Preferences' shortcut tabs and Labs. All run on ours; live asked (REQUESTS 10:36). The marks
   the audit found missing are in (11:40): a notice's link is `button:<link>`, the Co-complete switch
   `checkbox:Co-complete`, the Tab manager's Sort rows `menu:<label>`; 4 more scenarios use them (ver-merge-revert-link,
-  doc-tm-sort-name-desc, doc-tm-sort-type, fs-co-complete-off). ver-crow-restore clicks a change row's
+  doc-tm-sort-name-desc, doc-tm-sort-type, fs-co-complete-off). Coverage after (12:09): versions 166/167
+  (rel-rc-revert's and vs-value-unconfigure's `via` were wrong: live's "Unconfigure" with one input), Variable Studio
+  98/98; ver-insert-create-version-esc (the drawing picker's Create version… had no mark: its squares are
+  `button:<tooltip>` now). Left: mg-tab-info (the merge dialog's drawing row ⓘ, now "<tab> is out of date in <target>
+  and <source>" over live's second line) needs a start with a drawing edited on both sides. The drawing page's state
+  has no `dialogs` (neither has live's drawing recorder), so a modal over a drawing shows only through `dialog`. ver-crow-restore clicks a change row's
   "Restore to Main…", which ours leaves out on purpose (live 2351).
 
 ### 2026-11-12 07:33 UTC: release management against Onshape's help (lead 11-12; behaviours "lead (2026-11-11 02:15 UTC)")

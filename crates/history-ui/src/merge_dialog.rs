@@ -501,11 +501,11 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                         .text_color(pal.text)
                         .child(crate::assets::icon(r.icon, 18., cx))
                         .child(div().min_w_0().truncate().child(crate::ui::user_text(r.name.clone())))
-                        // Live mg-903: ⓘ "For this tab type, edits from separate
-                        // branches cannot be merged." and "Open in <source>".
+                        // Live mg-903: ⓘ "<tab> is out of date in <target> and <source>" over "For this tab
+                        // type, edits from separate branches cannot be merged.", and "Open in <source>".
                         .when(r.unmergeable_type, |d| {
                             let (doc, side) = (doc.clone(), plan.source_side);
-                            d.child(div().id(SharedString::from(format!("merge-info-{i}"))).flex_none().tooltip(crate::ui::tooltip("For this tab type, edits from separate branches cannot be merged.")).child(crate::ui::glyph("info", 14., rgb(0x4d8ccf))))
+                            d.child(div().id(SharedString::from(format!("merge-info-{i}"))).flex_none().tooltip(crate::ui::user_tooltip(format!("{} is out of date in {} and {}\n{}", r.name, plan.target, plan.source, crate::i18n::tr("For this tab type, edits from separate branches cannot be merged.")))).child(crate::ui::glyph("info", 14., rgb(0x4d8ccf))))
                                 .child(
                                     div()
                                         .id(SharedString::from(format!("merge-open-{i}")))
