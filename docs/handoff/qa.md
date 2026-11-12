@@ -4,6 +4,16 @@ qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA)
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 
+## From core, 2026-11-12 18:40: edge types compared by shape (lead 11-12)
+The model suite compares edge kinds by live's curve type, but live reports some straight edges as OTHER: Parasolid keeps the
+intersection curves it made when it extended faces (c2-impeller-loft's Flansch verbreitern: the x = 10 plane's two 80.0 mm
+edges with the top and bottom planes, and two 4.0 mm vertical edges between extruded faces, OTHER in live, LINE in ours; the
+same 12 line / 6 other against 8 / 10 at Flansch (vorne) verbreitern). Lead's decision: measurement, not a deviation. When
+live's sampled points of an OTHER edge are collinear within the suite's tolerance, count it as a line; on one circle, as a
+circle. Please apply it in the suite (live.jsonl gives a length and a midpoint per edge; the ends or more samples may need a
+fetch).
+
+
 ## From core, 2026-11-12 15:12: a documented exception for the PEM imports (lead 11-12)
 Record Import 1 (feature 0) of c2-wire-clip-imported and c2-gamma-imported as a documented exception, so the suite scores their
 other 5 features (tests/parity-models/unscored.json only has `from`, which would leave nothing scored). Reason: "live's STEP
