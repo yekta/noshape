@@ -1091,6 +1091,54 @@ fn block_model() -> (Value, Vec<Value>, String) {
     (features, live, refs)
 }
 
+/// Two parts' coplanar faces of one size (c2-wire-clip-imported's two Micro Columns' tops): a face live gives as its
+/// plane (origin on the face, normal, area) maps to the one of ours at live's origin, not to the first of the two.
+#[test]
+fn a_face_on_a_plane_two_parts_share_is_the_one_at_lives_origin() {
+    let line = |id: &str, (x0, y0): (f64, f64), (x1, y1): (f64, f64)| {
+        let l = ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)).sqrt();
+        json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "isConstruction": false, "startParam": 0.0, "endParam": l,
+            "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": x0, "pntY": y0, "dirX": (x1 - x0) / l, "dirY": (y1 - y0) / l } })
+    };
+    let square = |p: &str, x: f64| vec![line(&format!("{p}0"), (x, 0.0), (x + 0.02, 0.0)), line(&format!("{p}1"), (x + 0.02, 0.0), (x + 0.02, 0.02)), line(&format!("{p}2"), (x + 0.02, 0.02), (x, 0.02)), line(&format!("{p}3"), (x, 0.02), (x, 0.0))];
+    let q = |id: &str, v: &str| json!({ "btType": "BTMParameterQuantity-147", "parameterId": id, "expression": v });
+    let ids = |id: &str, ds: &[&str]| json!({ "btType": "BTMParameterQueryList-148", "parameterId": id, "queries": ds.iter().map(|d| json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [d] })).collect::<Vec<_>>() });
+    let entities: Vec<Value> = square("a", 0.0).into_iter().chain(square("b", 0.04)).collect();
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"], "queryString": "query=qCompressed(1.0,\"%B5$QueryM4S…TopplaneOp…\",id);" }] }],
+          "entities": entities, "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterEnum-145", "parameterId": "domain", "value": "MODEL" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "deterministicIds": ["JGA", "JGB"], "featureId": "FS1" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" }, q("depth", "10 mm")] },
+        { "btType": "BTMFeature-134", "featureType": "moveFace", "featureId": "FM1", "name": "Move face 1", "parameters": [
+            ids("moveFaces", &["JTB"]),
+            { "btType": "BTMParameterEnum-145", "parameterId": "moveFaceType", "value": "OFFSET" }, q("offsetDistance", "1 mm")] }
+    ] });
+    let refs = [
+        json!({ "index": 0, "id": "JDC", "kind": "PLANE", "point": [0.0, 0.0, 0.0], "normal": [0.0, 0.0, 1.0] }),
+        json!({ "index": 1, "id": "JGA", "kind": "SKETCH_REGION", "point": [0.01, 0.01, 0.0], "measure": 0.0004 }),
+        json!({ "index": 1, "id": "JGB", "kind": "SKETCH_REGION", "point": [0.05, 0.01, 0.0], "measure": 0.0004 }),
+        json!({ "index": 2, "id": "JTB", "kind": "FACE", "surfaceType": "PLANE", "origin": [0.05, 0.01, 0.01], "normal": [0.0, 0.0, 1.0], "area": 0.0004 }),
+    ]
+    .iter()
+    .map(|v| v.to_string())
+    .collect::<Vec<_>>()
+    .join("\n");
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("coplanar-faces.noshape"), &features, parse_refs(&refs)).unwrap();
+    for k in 0..3 {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.problems.is_empty(), "{}: {:?}", s.name, s.problems);
+    }
+    let parts = t.call("query_parts", json!({})).unwrap();
+    let mut tops: Vec<(f64, f64)> = parts["parts"].as_array().unwrap().iter().map(|p| (p["bounding_box"]["min"][0].as_f64().unwrap(), p["bounding_box"]["max"][2].as_f64().unwrap())).collect();
+    tops.sort_by(|a, b| a.0.total_cmp(&b.0));
+    assert_eq!(tops, [(0.0, 10.0), (40.0, 11.0)], "the part at x 40 mm moved up, the one at 0 not");
+}
+
 /// Live's selected regions as pieces of one of ours (the sketch's face split by edges we don't have, asm-isaac-ball):
 /// the circle's region live reports as 30 % and 70 % of it, both selected, is ours whole.
 #[test]

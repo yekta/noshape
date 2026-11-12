@@ -3478,7 +3478,13 @@ impl<'a> Translator<'a> {
             dot(fn_, n).abs() > 1.0 - 1e-6 && dot([c[0] - o[0], c[1] - o[1], c[2] - o[2]], n).abs() < 1e-7
         };
         let area = |e: &&Value| e["area"].as_f64().map_or(f64::INFINITY, |a| r.measure.map_or(0.0, |m| (a * k * k - m).abs()));
-        let part = reply["faces"].as_array()?.iter().filter(on).min_by(|a, b| area(a).total_cmp(&area(b))).cloned();
+        // Of faces as near live's area, the nearest live's origin (two parts' coplanar faces of one size: c2-wire-clip-
+        // imported's two Micro Columns' tops, live's origin on each).
+        let from_origin = |e: &&Value| f3(&e["centroid"]).map_or(f64::INFINITY, |c| (0..3).map(|i| (c[i] * k - o[i]).powi(2)).sum::<f64>());
+        let on_plane: Vec<&Value> = reply["faces"].as_array()?.iter().filter(on).collect();
+        let nearest_area = on_plane.iter().map(area).fold(f64::INFINITY, f64::min);
+        let tie = 1e-3 * r.measure.unwrap_or(0.0) + 1e-12;
+        let part = on_plane.into_iter().filter(|e| area(e) <= nearest_area + tie).min_by(|a, b| from_origin(a).total_cmp(&from_origin(b))).cloned();
         // None of the right size there: a face of a sheet metal flat (live 2468: c2-sm-louver's Sketch 9 on Sheet metal
         // model 2's flat).
         let fits = |e: &Value| r.measure.zip(e["area"].as_f64()).is_none_or(|(m, a)| (a * k * k - m).abs() <= 1e-3 * m);
