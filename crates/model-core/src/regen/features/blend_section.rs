@@ -1513,7 +1513,8 @@ fn rims_of(shape: &Shape, edges: &[usize], scale: f64) -> FResult<Vec<(Rim, usiz
                 rim.arc.push(if (am - a0).rem_euclid(TAU) < sweep { (a0, sweep) } else { (a1, TAU - sweep) });
             }
             let (x, y) = rim.frame();
-            // (Off the part's box is off the part, without a classification: each takes ~0.7 ms on rounds' faces.)
+            // (Off the part's box is off the part, without a classification: each takes ~0.7 ms on rounds' faces,
+            // ~1.4 on c2-rings-loft's ring after its Fillet 1.)
             let bb = shape.bounding_box(false)?;
             let pad = DVec3::splat(scale * 1e-6);
             const N: usize = 32;
@@ -1522,8 +1523,8 @@ fn rims_of(shape: &Shape, edges: &[usize], scale: f64) -> FResult<Vec<(Rim, usiz
                 if rim.on_arc(a) {
                     continue;
                 }
-                let q = rim.at(x, y, a).0;
-                if q.cmpge(bb.min - pad).all() && q.cmple(bb.max + pad).all() && shape.classify_point(q, scale * 1e-9)? != k::PointClass::Outside {
+                let (q, radial) = rim.at(x, y, a);
+                if q.cmpge(bb.min - pad).all() && q.cmple(bb.max + pad).all() && !off_part(shape, q, (rim.np + radial * 0.3).normalize(), scale)? {
                     return Err(fail("not a whole rim"));
                 }
             }
@@ -1605,6 +1606,17 @@ pub fn rims_overflow(rims: &Rims, shape: &Shape, sizes: &[f64], kind: RimBlend) 
     false
 }
 
+/// Whether `q` is off the solid: the first face a ray from it along `dir` crosses is one into the material (or none);
+/// classified where the ray's crossings aren't clear (one at its start, on a face's edge or tangent).
+fn off_part(shape: &Shape, q: DVec3, dir: DVec3, scale: f64) -> FResult<bool> {
+    if let Ok(hits) = shape.line_crossings(q, dir, 2.0 * scale)
+        && hits.iter().all(|&(t, tr, on)| !on && tr != 0 && t > scale * 1e-7)
+    {
+        return Ok(hits.iter().min_by(|a, b| a.0.total_cmp(&b.0)).is_none_or(|h| h.1 == 1));
+    }
+    Ok(shape.classify_point(q, scale * 1e-9)? == k::PointClass::Outside)
+}
+
 /// Whether any rim's plane is tilted to its cylinder's axis (the faces' angle varies along it: an equal-distance
 /// chamfer's setback then follows the angle, live 2441).
 pub fn rims_tilted(rims: &Rims) -> bool {
@@ -1673,6 +1685,25 @@ pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], siz
             .map(|f| if matches!(f.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. })) { generated.clone() } else { blend.clone() })
             .collect();
         cuts.push(NamedShape::new(tool, names));
+    }
+    // A round built directly where it can be (the tools' touch curves put on the part's faces, no cut: c2-rings-loft's
+    // Fillet 1 375 -> ~95 ms), else the cut.
+    let tools: Vec<Shape> = cuts.iter().map(|c| c.shape.clone()).collect();
+    let rim_edges = rims.0.iter().map(|(_, i)| shape.sub_shape(ShapeType::Edge, edges[*i])).collect::<Result<Vec<_>, _>>()?;
+    // (A chamfer's lofted tools: the direct build classifies against them slower than the cut, 255 vs 226 ms on
+    // c2-rings-loft's Chamfer 1.)
+    if kind == RimBlend::Round
+        && let Ok(res) = k::blend_direct(shape, &tools, &rim_edges)
+        && res.shape.count(ShapeType::Solid) == 1
+        && res.shape.is_valid()
+    {
+        let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), Some(&super::detail::blend_role));
+        let un = k::unify_same_domain(&res.shape)?;
+        if un.shape.is_valid() && un.shape.count(ShapeType::Solid) == 1 {
+            let names = ev.name_result(&[&crate::regen::eval::names_for(&res.shape, names)], &un.history, &un.shape, &BTreeMap::new(), None);
+            ev.replace_body(bi, un.shape, names);
+            return Ok(());
+        }
     }
     let (cut, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &cuts)?;
     let cut = NamedShape::new(cut, names);
@@ -2394,9 +2425,16 @@ fn rim_chamfer_tool(rim: &Rim, edge: &Shape, d: f64, wedge: &Shape, seam: DVec3,
     let sheet = k::loft(&chords, &k::LoftOptions { solid: false, closed: true, ..Default::default() })?.shape;
     let (p, t1, t2) = ball(a_mid, r);
     let inside = (p + t1 + t2) / 3.0;
-    k::split(std::slice::from_ref(wedge), std::slice::from_ref(&sheet), &k::BooleanOptions::default())?
-        .shape
-        .solids()
+    let pieces = k::split(std::slice::from_ref(wedge), std::slice::from_ref(&sheet), &k::BooleanOptions::default())?.shape.solids();
+    // The piece keeping the wedge's rim edge (closed, through the rim's point): no classification against the sheet's
+    // B-spline (~1 ms each, a dozen pieces a rim).
+    let at = k::make_vertex(p)?;
+    let keeps_rim = |piece: &Shape| piece.edges().iter().any(|e| e.edge_info().is_ok_and(|i| i.closed) && k::distance(e, &at).is_ok_and(|d| d.distance < scale * 1e-7));
+    let mut kept = pieces.iter().filter(|piece| keeps_rim(piece));
+    if let (Some(one), None) = (kept.next(), kept.next()) {
+        return Ok(one.clone());
+    }
+    pieces
         .into_iter()
         .find(|piece| piece.classify_point(inside, scale * 1e-9).is_ok_and(|c| c == k::PointClass::Inside))
         .ok_or_else(|| fail("the chamfer's sheet didn't cut the rim off the wedge"))

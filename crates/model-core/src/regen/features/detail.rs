@@ -93,7 +93,7 @@ fn curved_edge_left_open(shape: &k::Shape, edges: &[usize]) -> bool {
     })
 }
 
-fn blend_role(n: &Name) -> Role {
+pub(super) fn blend_role(n: &Name) -> Role {
     Role::Blend(n.clone())
 }
 
