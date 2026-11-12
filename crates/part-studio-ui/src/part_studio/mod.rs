@@ -6784,7 +6784,10 @@ impl PartStudioView {
 
     /// What is drawn over the graphics area and the feature dialog.
     fn render_overlay_slice(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let mut overlay = self.render_viewport_overlay(window, cx);
+        let mut overlay = {
+            let _t = noshape_render::perf::scope("ps.ov_viewport");
+            self.render_viewport_overlay(window, cx)
+        };
         // Live (part-studio/00, 77): the strip is centered 8 px above the
         // viewport's middle (4 or 5 buttons alike).
         overlay.push(div().absolute().top_0().bottom(px(16.)).right_0().flex().items_center().child(self.render_panel_toggles(cx)).into_any_element());
@@ -6804,6 +6807,7 @@ impl PartStudioView {
         if crate::overlay_labels::gpui_labels() {
             overlay.extend(self.render_section_value(cx).filter(|_| self.ui.section_offset_edit.is_none()));
         } else {
+            let _t = noshape_render::perf::scope("ps.ov_labels");
             let mut labels: Vec<_> = self.section_value_label(window, cx).into_iter().collect();
             labels.extend(self.analysis_labels(window, cx));
             labels.extend(self.sketch_dimension_overlay(window, cx));

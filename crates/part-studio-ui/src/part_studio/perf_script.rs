@@ -62,7 +62,7 @@ const FRAME_STAGES_CPU: [&str; 3] = ["gpui.request_layout_cpu", "gpui.prepaint_c
 /// thread for a dialog's preview), the Part Studio's and the dialog's renders, each slice's, then GPUI's phases.
 /// A ui-latency sample: (the action, waiting, the frame, the action's CPU, the frame's CPU), and [`PARTS`].
 type Sample = ([f32; 5], [f32; PARTS.len()]);
-const PARTS: [&str; 15] = ["ps.apply_display", "ps.apply_display_end", "s.build", "ps.render", "fd.render", "ps.slice_toolbar", "ps.slice_underlay", "ps.slice_overlay", "ps.slice_features", "ps.slice_parts", "ps.row_feature", "ps.row_part", "gpui.request_layout", "gpui.prepaint", "gpui.paint"];
+const PARTS: [&str; 17] = ["ps.apply_display", "ps.apply_display_end", "s.build", "ps.render", "fd.render", "ps.slice_toolbar", "ps.slice_underlay", "ps.slice_overlay", "ps.ov_viewport", "ps.ov_labels", "ps.slice_features", "ps.slice_parts", "ps.row_feature", "ps.row_part", "gpui.request_layout", "gpui.prepaint", "gpui.paint"];
 
 impl PartStudioView {
     /// A stage of the step in progress (the regeneration scheduled, its result in, its display applied), logged

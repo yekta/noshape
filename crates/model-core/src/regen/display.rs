@@ -718,7 +718,27 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
 /// The box of what a body's display draws: its mesh's points and edge polylines. OCCT's quick box bounds a B-spline face
 /// by its control points, which a loft can throw far out (c2-impeller-loft's Part 2: x from -3157 mm for a part from
 /// -34 mm, so Zoom to fit framed 3.3 m around a 17 cm model).
-fn mesh_bounds(mesh: &crate::display::MeshBuffers) -> Option<(DVec3, DVec3)> {
+/// Once per mesh (meshes are kept between regenerations: a part's box isn't scanned again on every edit).
+fn mesh_bounds(mesh: &Arc<crate::display::MeshBuffers>) -> Option<(DVec3, DVec3)> {
+    type Boxes = HashMap<usize, (std::sync::Weak<crate::display::MeshBuffers>, Option<(DVec3, DVec3)>)>;
+    static BOXES: std::sync::LazyLock<std::sync::Mutex<Boxes>> = std::sync::LazyLock::new(Default::default);
+    let key = Arc::as_ptr(mesh) as usize;
+    if let Some((w, b)) = BOXES.lock().unwrap_or_else(|e| e.into_inner()).get(&key)
+        && std::ptr::eq(w.as_ptr(), Arc::as_ptr(mesh))
+        && w.strong_count() > 0
+    {
+        return *b;
+    }
+    let b = scan_bounds(mesh);
+    let mut boxes = BOXES.lock().unwrap_or_else(|e| e.into_inner());
+    if boxes.len() > 4096 {
+        boxes.retain(|_, (w, _)| w.strong_count() > 0);
+    }
+    boxes.insert(key, (Arc::downgrade(mesh), b));
+    b
+}
+
+fn scan_bounds(mesh: &crate::display::MeshBuffers) -> Option<(DVec3, DVec3)> {
     let mut points = mesh.positions.iter().chain(mesh.edges.iter().flatten()).chain(&mesh.vertices);
     let first = DVec3::from(points.next()?.map(f64::from));
     Some(points.fold((first, first), |(lo, hi), p| {

@@ -20,6 +20,44 @@ use gpui_kit::*;
 use noshape_render::overlay::{Label, Mask, Quad, Rgba as ORgba};
 use std::sync::Arc;
 
+type RasterKey = (String, SharedString, u32, bool, [u32; 7], [u32; 2]);
+/// A rasterized text line and its origin (device px), `None` if it can't be (emoji, LCD text).
+type Raster = Option<(Mask, [i32; 2])>;
+
+thread_local! {
+    /// Rasterized label text by everything that shapes its pixels: the overlay is rebuilt on every camera move and
+    /// every sketch-mode frame, and rasterizing each dimension label's glyphs anew was most of it (sketch entry on
+    /// cf-straight-spline ~2 ms).
+    static RASTERS: std::cell::RefCell<std::collections::HashMap<RasterKey, Raster>> = Default::default();
+}
+
+/// [`Window::rasterize_text_line`] as a [`Mask`] and its origin, cached.
+fn raster(window: &Window, text: &str, font: Font, size: Pixels, line_height: Pixels, color: Hsla, origin: Point<Pixels>) -> Raster {
+    let key: RasterKey = (
+        text.to_string(),
+        font.family.clone(),
+        font.weight.0.to_bits(),
+        font.style == FontStyle::Italic,
+        [f32::from(size).to_bits(), f32::from(line_height).to_bits(), color.h.to_bits(), color.s.to_bits(), color.l.to_bits(), color.a.to_bits(), window.scale_factor().to_bits()],
+        [f32::from(origin.x).to_bits(), f32::from(origin.y).to_bits()],
+    );
+    if let Some(hit) = RASTERS.with(|c| c.borrow().get(&key).cloned()) {
+        return hit;
+    }
+    let made = window.rasterize_text_line(SharedString::from(text.to_string()), font, size, line_height, color, origin).map(|m| {
+        (Mask { width: m.size.width.0 as u32, height: m.size.height.0 as u32, alpha: Arc::new(m.alpha), offset: [0, 0], density: 1 }, [m.origin.x.0, m.origin.y.0])
+    });
+    RASTERS.with(|c| {
+        let mut c = c.borrow_mut();
+        // (A bound, not an LRU: labels in view are a few hundred at most.)
+        if c.len() > 4096 {
+            c.clear();
+        }
+        c.insert(key, made.clone());
+    });
+    made
+}
+
 /// `NOSHAPE_GPUI_LABELS`: draw the value boxes as GPUI elements (the old
 /// way, for comparing pixels).
 pub fn gpui_labels() -> bool {
@@ -92,9 +130,8 @@ pub fn value_box(window: &Window, cx: &App, b: &ValueBox, anchor: glam::DVec3) -
     // The text, as `paint_line` paints it from the leaf's corner (logical
     // px from the box's corner, which sits on a whole device pixel).
     let origin = point(px(text_x / scale), px(edge / scale));
-    let m = window.rasterize_text_line(SharedString::from(b.text.to_string()), font, size, line_height, b.text_color, origin)?;
-    let mask = Mask { width: m.size.width.0 as u32, height: m.size.height.0 as u32, alpha: Arc::new(m.alpha), offset: [0, 0], density: 1 };
-    Some(Label { anchor, offset: b.offset, rects, masks: vec![(mask, [m.origin.x.0, m.origin.y.0], rgba(b.text_color))], ..Default::default() })
+    let (mask, at) = raster(window, b.text, font, size, line_height, b.text_color, origin)?;
+    Some(Label { anchor, offset: b.offset, rects, masks: vec![(mask, at, rgba(b.text_color))], ..Default::default() })
 }
 
 /// Bold text with a light halo and no box (live's Dihedral "Max: 90 deg").
@@ -113,11 +150,10 @@ pub fn halo_text(window: &Window, cx: &App, t: &HaloText, anchor: glam::DVec3) -
     let scale = window.scale_factor();
     let font = Font { family: cx.theme().font_family.clone(), weight: FontWeight::BOLD, ..Default::default() };
     let line_height = px(text_size * 1.25);
-    let m = window.rasterize_text_line(SharedString::from(text.to_string()), font, px(text_size), line_height, color, point(px(0.), px(0.)))?;
-    let mask = Mask { width: m.size.width.0 as u32, height: m.size.height.0 as u32, alpha: Arc::new(m.alpha), offset: [0, 0], density: 1 };
+    let (mask, origin) = raster(window, text, font, px(text_size), line_height, color, point(px(0.), px(0.)))?;
     let (w, h) = (mask.width as f32 / scale, f32::from(line_height));
     let d = scale.round().max(1.0) as i32;
-    let o = [m.origin.x.0 + d, m.origin.y.0 + d];
+    let o = [origin[0] + d, origin[1] + d];
     let mut masks: Vec<(Mask, [i32; 2], ORgba)> = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)].into_iter().map(|(x, y)| (mask.clone(), [o[0] + x * d, o[1] + y * d], rgba(halo))).collect();
     masks.push((mask, o, rgba(color)));
     Some(Label { anchor, offset: [-w * 0.5 - 1.0, -above - h], masks, ..Default::default() })
@@ -174,9 +210,8 @@ pub fn row_box(window: &Window, cx: &App, b: &RowBox, anchor: glam::DVec3, hit: 
         let top = edge + round_half_down((inner_h - f32::from(line_height) * scale) * 0.5);
         let origin = point(px(x / scale), px(top / scale));
         if !leaf.text.is_empty() {
-            let m = window.rasterize_text_line(SharedString::from(leaf.text.to_string()), font, size, line_height, leaf.color, origin)?;
-            let mask = Mask { width: m.size.width.0 as u32, height: m.size.height.0 as u32, alpha: Arc::new(m.alpha), offset: [0, 0], density: 1 };
-            masks.push((mask, [m.origin.x.0, m.origin.y.0], rgba(leaf.color)));
+            let (mask, at) = raster(window, leaf.text, font, size, line_height, leaf.color, origin)?;
+            masks.push((mask, at, rgba(leaf.color)));
         }
         x += w + (leaf.margin_right * scale).round();
     }

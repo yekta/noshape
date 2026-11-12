@@ -538,17 +538,20 @@ psui open a document": live's box starves Chrome; its sketch drag is server-boun
 | pick = selection change, click to submission | within a frame | p50 0.3-0.6, p95 ≤ 1.0; max 52 ms once (hat8: the first pick pass after a view change, llvmpipe runs it in the submit) | | met |
 | feature row click (selection change from the list) | ≤ 8.3 ms | **5.4 / 21.5 (cf-surface-pattern: the first click on each feature 16-21 ms)** | 5.4 / 6.6 | **fixed** |
 | feature list scroll (a wheel step) | ≤ 8.3 ms | 3.0 / 3.5 | | met |
-| feature dialog open (Edit) | ≤ 8.3 ms | 7.1 / 9.1 (hat8), 7.3 / 8.4 (c2-impeller-loft) | hat8 6.4 / 7.4 | p95 at the edge |
+| feature dialog open (Edit) | ≤ 8.3 ms | 7.1 / 9.1 (hat8), 7.3 / 8.4 (c2-impeller-loft) | hat8 6.4 / 7.4, 7.2 / 13.1 at load 9 (2 of 20 samples' GPUI layout / paint 6-8 ms) | p50 met, p95 at the edge: next |
 | new Fillet with a face of the busiest part selected | ≤ 8.3 ms | 6.2 / 6.6 (hat8) | | met |
-| sketch-mode entry (Edit on a sketch) | ≤ 8.3 ms | 8.3 / 9.9 (cf-straight-spline), 7.4 / 9.4 (hat8) | 9.2 / 11.0, hat8 5.9 / 7.6 | **not met**: GPUI's prepaint ~5 ms + the sketch overlay ~2 ms; next |
+| sketch-mode entry (Edit on a sketch) | ≤ 8.3 ms | 8.3 / 9.9 (cf-straight-spline), 7.4 / 9.4 (hat8) | **6.5 / 7.4, hat8 7.0 / 7.8** (11-12 01:17) | **fixed**: the dimension labels' text was rasterized anew on every overlay build (`overlay_labels::raster` caches it; also every camera move in sketch mode) and the regenerated sketch deep-copied |
 
 Fixed (the worst first): the first selection of a feature's faces built the body mesh's face → edge table on the UI
 thread (`face_edge_table`, 16-21 ms a body on cf-surface-pattern); now built in the background when a display lands
 (`prewarm_face_edges`). A feature's faces are gathered once per display (`UiState::feature_faces`), not by a scan of
 every face on each click. A sketch's data is shared (`ParamValue::Sketch(Arc<SketchData>)`, copy on write): sketch mode
 read it with a deep copy ~35 times a frame (`sketch_data()`), the sketch evaluator copied it twice a regeneration.
-c2-impeller-loft: hover / pick benches find nothing (its fit leaves the model small at the right: something hidden
-counts in Zoom to fit's bounds; to check).
+c2-impeller-loft: Zoom to fit framed 3.3 m around its 17 cm model: a body's display box was OCCT's quick box, which bounds
+a loft's B-spline faces by their control points (Part 2 from x = -3157 mm); now the box of its drawn mesh, once per mesh
+(T1 `display_tessellation::a_bspline_parts_display_box_is_its_drawn_box`). The saved format was checked unchanged by
+faf0a4c7's shared sketch data: hat8, two documents made by the v0.4.43 CLI and three Nov-6 corpus files round-trip
+byte-identical through `to_blobs` (the corpus files' only change is main's existing ScopeRule 13 -> 15 migration).
 
 ### Assembly and drawing tabs with the display cache (11-07 02:36)
 

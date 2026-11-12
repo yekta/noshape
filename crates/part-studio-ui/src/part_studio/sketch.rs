@@ -2998,7 +2998,7 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let vp = self.vp().read(cx);
         let configured: std::collections::HashSet<u32> = data.sketch.constraints().filter(|c| c.is_dimension() && self.dimension_configuration(c.id, cx).is_some()).map(|c| c.id.0).collect();
-        let regenerated = self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)).map(|s| s.sketch.clone());
+        let regenerated = self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)).map(|s| &s.sketch);
         let mut out = Vec::new();
         for (cid, pos, mut text, driving) in ed.dimension_labels(data, &units) {
             let anchor = ed.frame.to_world(pos);
