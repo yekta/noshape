@@ -5,7 +5,8 @@
 #  - every Boolean corpus, parity56, shfall, the knurls and gears replayed (docs/handoff/bool.md's gate), each
 #    distinct case once, in shards over the host's cores;
 #  - the model suite, its documents in shards;
-#  - our time on k25-15, k25-25 and cf-spur-gear, main's binary and the branch's alternating (best of 3);
+#  - our time on k25-15, k25-25 and cf-spur-gear, main's binary and the branch's alternating (best of 5; slower beyond
+#    main's own round-to-round spread is CHECK);
 #  - the branch's kernel, model and model-core tests (FAIL on any).
 # Main's results are cached on the host by what they are built from (the crates' git trees, Cargo.lock, the OCCT
 # libraries, the corpora, the models), so a gate usually replays the branch alone; the branch's are kept too (once it

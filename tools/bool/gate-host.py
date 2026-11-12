@@ -325,10 +325,11 @@ def collect_suite(tasks):
     return sorted(rows)
 
 
-def speed(base_kbin, new_kbin, out, threads, rounds=3):
+def speed(base_kbin, new_kbin, out, threads, rounds=5):
     """Our time alone (NOSHAPE_BREP_OURS_ONLY), main's binary and the branch's alternating, each case's best of
-    `rounds`: {corpus: (base ms, new ms)}."""
-    best = {}
+    `rounds`: {corpus: (base ms, new ms, noise)}, the noise main's own rounds' spread (its slowest round over its
+    fastest, less one: the host's load, which the verdict allows for)."""
+    best, totals = {}, {}
     for r in range(rounds):
         for role, kbin in ([("base", base_kbin), ("new", new_kbin)] if r % 2 == 0 else [("new", new_kbin), ("base", base_kbin)]):
             for c in SPEED:
@@ -338,16 +339,21 @@ def speed(base_kbin, new_kbin, out, threads, rounds=3):
                 t = run_task({"role": "speed", "kind": f"{role}-{c}", "id": str(r), "env": {
                     "NOSHAPE_BOOL_CORPUS": d, "NOSHAPE_BREP_OURS_ONLY": "1", "NOSHAPE_BOOLEAN_MEMORY_MB": "16000"},
                     "cmd": [kbin, "brep_replay::brep_corpus_replay", "--exact", "--ignored", "--nocapture", "--test-threads=1"]}, out, threads)
+                total = 0.0
                 for l in read_lines(t["log"]) + read_lines(t["log"] + ".err"):
                     m = re.match(rf"^({NAME}) (Fuse|Cut|Common) (?:faces \d+ )?tools \d+: ([\d.]+) ms", l)
                     if m:
                         k = (c, m[1], role)
                         best[k] = min(best.get(k, 1e18), float(m[3]))
+                        total += float(m[3])
+                totals.setdefault((c, role), []).append(total)
     res = {}
     for c in SPEED:
         names = {k[1] for k in best if k[0] == c and (c, k[1], "base") in best and (c, k[1], "new") in best}
         if names:
-            res[c] = (sum(best[(c, n, "base")] for n in names), sum(best[(c, n, "new")] for n in names))
+            runs = [x for x in totals.get((c, "base"), []) if x > 0]
+            noise = max(runs) / min(runs) - 1 if len(runs) > 1 else 0.0
+            res[c] = (sum(best[(c, n, "base")] for n in names), sum(best[(c, n, "new")] for n in names), noise)
     return res
 
 
@@ -461,11 +467,11 @@ def compare(base_r, new_r, base_s, new_s, spd):
         if changed:
             check.append(f"{len(changed)} documents' outcome changed")
         info += ["  worse: " + x for x in worse] + ["  changed: " + x for x in changed] + ["  better: " + x for x in better]
-    for c, (bm, nm) in (spd or {}).items():
+    for c, (bm, nm, noise) in (spd or {}).items():
         ratio = nm / max(bm, 1e-9)
-        info.append(f"speed {c}: main {bm:.0f} ms, branch {nm:.0f} ms ({ratio:.2f}x; ours alone, best of 3 alternating)")
-        if ratio > 1.05:
-            check.append(f"{c} {ratio:.2f}x slower")
+        info.append(f"speed {c}: main {bm:.0f} ms, branch {nm:.0f} ms ({ratio:.2f}x; ours alone, best of 5 alternating; main's rounds {noise:.0%} apart)")
+        if ratio > 1 + max(0.05, noise):
+            check.append(f"{c} {ratio:.2f}x slower (beyond main's own {noise:.0%} round to round)")
     verdict = "FAIL" if fail else "CHECK" if check else "PASS"
     return verdict, fail + check, info
 
