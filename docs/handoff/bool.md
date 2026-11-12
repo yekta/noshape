@@ -8,6 +8,23 @@ scratch /root/bool-scratch.
 cli-chamfer-hang-pre's Linear pattern 2 "Select a pattern direction." (Ok on v0.4.43 / v0.4.44), 5 of 11 parts gone; blocks
 the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
 
+## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **On:** (1) a fast gate, `tools/bool/gate.sh <branch>` (below); (2) then spheres and tori in our Boolean:
+  learning-center-michael's round tools (lcm 41701bb2) and Fillet 2's ball / torus cut, which `fillet_by_tools`
+  (features.cpp) sends straight to OCCT (`others`). cf-surface-pattern's Surface Pattern 3 is bool's (c7c9d0ff).
+- **gate.sh** runs bool's gate as one command and prints one verdict line: VERDICT PASS / CHECK / FAIL. It covers every
+  corpus in whyall.sh plus shfall, kg.sh's knurls and gears, and the model suite. It also times k25-15, k25-25 and
+  cf-spur-gear on our side only (`NOSHAPE_BREP_OURS_ONLY`), main's binary and the branch's alternating, best of 3.
+  - Each distinct case is replayed once: the corpora hold 5,327 case files but 2,896 distinct cases (same inputs, op
+    and expected result).
+  - The cases run in shards (directories of links) over a job pool. The model suite runs in shards too, through
+    `NOSHAPE_PARITY_ONLY` lists.
+  - Main's results are cached on the host (~/agents/bool-gate/cache). The key is the git trees the test binary is
+    built from, plus the corpora, OCCT's libraries and the models. A branch's results are cached too: once it lands,
+    they serve as main's.
+  - Host side: tools/bool/gate-host.py. Full log: /root/<caller>-scratch/gate-<sha>.log. One gate per host at a time.
+- Don't touch: bool's seam-end / touching work (bool-main2, bool-touch); Shell (by_quadrics).
+
 ## Queue (lead 11-11 08:10 and 09:25 UTC)
 1. hat8's Mac mini union: landed 310b9fed, 201bd381, 88e0dbcd; now (10:36) the inside point search stops when far
    enough in (`deeper`: 0.7 s on each of two 433-curve faces): our Boolean 2.5-3.3 -> 1.6 s (vibe3, load 17). Left: OCCT's

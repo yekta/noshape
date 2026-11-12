@@ -6,7 +6,8 @@ knurl / gear timing, each case once, in parallel within the host's cores; result
   gate-host.py run --out DIR --role NAME:KEY:KBIN:OBIN ... [--speed BASE_KBIN NEW_KBIN] --cmp BASE_ROLE NEW_ROLE
 
 A role's replay (kernel binary KBIN) and suite (ops binary OBIN, '-' for none) run only when the cache has no result
-for its key: ~/agents/bool-gate/cache/<RKEY>-replay.tsv, <SKEY>-suite.tsv. Run on the host (gate.sh does it through rb.sh).
+for its key: ~/agents/bool-gate/cache/<RKEY>-replay.tsv, <SKEY>-suite.tsv. OCCT's results, which only change with
+what OCCT's path is built from (OKEY), are kept by case in ~/agents/bool-gate/occt/<OKEY> (NOSHAPE_BREP_OCCT_CACHE). Run on the host (gate.sh does it through rb.sh).
 """
 import argparse, hashlib, json, os, re, shutil, subprocess, sys, time
 from concurrent.futures import ThreadPoolExecutor
@@ -90,7 +91,7 @@ def corpus_cases():
     return cases
 
 
-def replay_tasks(role, out, kbin, jobs):
+def replay_tasks(role, out, kbin, jobs, okey):
     """Shards (directories of links to the cases' files) balanced by the recorded times, longest first. A shard
     holds one case of a name and one kind (parity56's against OCCT run here, or not)."""
     cases = corpus_cases()
@@ -106,7 +107,8 @@ def replay_tasks(role, out, kbin, jobs):
     tasks = []
     for (vs, variant), xs in sorted(pools.items()):
         weight = sum(x["ms"] + 30 for x in xs)
-        k = max(1, round(4 * jobs * weight / total))
+        # (By time, and by count: cases recorded with our Boolean on (parity56's) say little of the replay's time.)
+        k = max(1, round(4 * jobs * weight / total), -(-len(xs) // 40))
         bins = [[0.0, []] for _ in range(k)]
         for x in sorted(xs, key=lambda x: -x["ms"]):
             b = min(bins, key=lambda b: b[0])
@@ -123,7 +125,9 @@ def replay_tasks(role, out, kbin, jobs):
             live = [x["live"] for x in members if x["live"]]
             if live:
                 open(os.path.join(sd, "live"), "w").write("\n".join(live) + "\n")
-            env = {"NOSHAPE_BOOL_CORPUS": sd, "NOSHAPE_BREP_WHY": "", "NOSHAPE_BOOLEAN_MEMORY_MB": "16000"}
+            occt = f"{HOME}/agents/bool-gate/occt/{okey}-{FORMAT}"
+            os.makedirs(occt, exist_ok=True)
+            env = {"NOSHAPE_BOOL_CORPUS": sd, "NOSHAPE_BREP_WHY": "", "NOSHAPE_BOOLEAN_MEMORY_MB": "16000", "NOSHAPE_BREP_OCCT_CACHE": occt}
             if vs:
                 env["NOSHAPE_BREP_VS_OCCT"] = "1"
             tasks.append({"role": role, "kind": "replay", "id": os.path.basename(sd), "weight": w, "env": env,
@@ -416,14 +420,14 @@ def main():
     # roles (a branch that leaves those crates alone) is run once.
     roles = {}
     for spec in a.role:
-        role, rkey, skey, kbin, obin = spec.split(":")
+        role, rkey, skey, okey, kbin, obin = spec.split(":")
         roles[role] = {"replay": rkey, "suite": skey}
     tasks, replays, scheduled = [], {}, set()
     for spec in a.role:
-        role, rkey, skey, kbin, obin = spec.split(":")
+        role, rkey, skey, okey, kbin, obin = spec.split(":")
         if kbin != "-" and rkey not in scheduled and not os.path.exists(f"{CACHE}/{rkey}-replay.tsv"):
             scheduled.add(rkey)
-            ts, cases = replay_tasks(role, a.out, kbin, a.jobs)
+            ts, cases = replay_tasks(role, a.out, kbin, a.jobs, okey)
             tasks += ts
             replays[rkey] = (ts, cases)
         if obin != "-" and skey not in scheduled and not os.path.exists(f"{CACHE}/{skey}-suite.tsv"):

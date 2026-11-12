@@ -59,20 +59,24 @@ def closure(crate):
         todo += re.findall(r'^(noshape-[\w-]+)', show(paths[c] + "/Cargo.toml"), re.M)
     return sorted(paths[c] for c in seen)
 common = ["Cargo.lock", "Cargo.toml", "rust-toolchain.toml", ".cargo", "patches/occt", "crates/workspace-hack"]
-for crate, extra in [("noshape-kernel", []), ("noshape-ops", ["tests/parity-models"])]:
-    parts = [f"{p} {tree(p)}" for p in closure(crate) + common + extra]
+# (OCCT's side of a replay: the kernel and the parts of crates/brep it calls with noshape's Boolean off (the mesher
+# op_boolean's grouping meshes with), not the Boolean.)
+occt = ["crates/kernel/src", "crates/kernel/cpp", "crates/kernel/build.rs", "crates/kernel/Cargo.toml", "crates/brep/Cargo.toml", "crates/brep/src/lib.rs", "crates/brep/src/nurbs.rs", "crates/brep/src/mesh"]
+for paths in [closure("noshape-kernel") + common, closure("noshape-ops") + common + ["tests/parity-models"], occt + common]:
+    parts = [f"{p} {tree(p)}" for p in paths]
     print(hashlib.sha1("\n".join(parts).encode()).hexdigest()[:16], end=" ")
 print()
 EOF
 }
-read -r base_rk base_sk < <(keys "$base")
-read -r new_rk new_sk < <(keys "$new")
+read -r base_rk base_sk base_ok < <(keys "$base")
+read -r new_rk new_sk new_ok < <(keys "$new")
 hostfp=$(ssh -o BatchMode=yes "$host" "python3 - fp" < "$here/gate-host.py") || { say "no fingerprint from $host"; echo "VERDICT FAIL: $host unreachable"; exit 1; }
 rfp=$(echo "$hostfp" | python3 -c 'import json,sys; print(json.load(sys.stdin)["replay"][:12])')
 sfp=$(echo "$hostfp" | python3 -c 'import json,sys; print(json.load(sys.stdin)["suite"][:12])')
 key() { echo "$1-$2"; }
 bkey_r=$(key "$base_rk" "$rfp"); nkey_r=$(key "$new_rk" "$rfp")
 bkey_s=$(key "$base_sk" "$sfp"); nkey_s=$(key "$new_sk" "$sfp")
+bkey_o=$(key "$base_ok" "$rfp"); nkey_o=$(key "$new_ok" "$rfp")
 cached() { ssh -o BatchMode=yes "$host" "test -s ~/agents/bool-gate/cache/$1-$2.tsv"; }
 
 # One gate per host at a time: its worktrees, target dirs and cores.
@@ -121,7 +125,7 @@ say "built in $(( $(date +%s) - t0 )) s; running"
 ssh -o BatchMode=yes "$host" "mkdir -p ~/agents/bool-gate/bin ~/agents/bool-gate/runs" && scp -q "$here/gate-host.py" "$host:agents/bool-gate/bin/gate-host.py"
 out="agents/bool-gate/runs/$caller-${new:0:9}-$(date -u +%m%d-%H%M%S)"
 args=(--out "$out" --jobs "$jobs" --threads "$threads" --cmp base new
-  --role "base:$bkey_r:$bkey_s:$bk:$bo" --role "new:$nkey_r:$nkey_s:$nk:$no")
+  --role "base:$bkey_r:$bkey_s:$bkey_o:$bk:$bo" --role "new:$nkey_r:$nkey_s:$nkey_o:$nk:$no")
 # (A branch that leaves the kernel's crates alone times the same as main.)
 [ $spd = 1 ] && [ "$base_rk" != "$new_rk" ] && args+=(--speed "$bk" "$nk")
 (cd "$wt_new" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && python3 agents/bool-gate/bin/gate-host.py run $(printf '%q ' "${args[@]}")") 2>&1 | tee -a "$log" | grep -E '^(gate-host|VERDICT|replay|model suite|speed)' >&2

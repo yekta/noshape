@@ -8,12 +8,14 @@
 //! NOSHAPE_BREP_DIFF=1 prints each mismatch's history records that differ; NOSHAPE_BREP_ONLY=<name> runs one case; NOSHAPE_BREP_SHOW_OCCT=<name>,... prints
 //! OCCT's result and history records for those cases, taken or not; NOSHAPE_BREP_VS_OCCT=1 compares with OCCT run
 //! here instead of the recorded result: for a corpus recorded with this Boolean on; NOSHAPE_BREP_ALWAYS=<dir> writes
-//! every taken case's two results there).
+//! every taken case's two results there; NOSHAPE_BREP_OCCT_CACHE=<dir> keeps OCCT's results there by case
+//! (`occt_result`); NOSHAPE_BREP_OURS_ONLY=1 times ours alone). tools/bool/gate.sh runs it over every corpus.
 
-use noshape_kernel::bool_corpus::{cases, load, Summary};
+use noshape_kernel::bool_corpus::{cases, load, Case, Summary};
 use noshape_kernel::*;
 use std::collections::{BTreeMap, HashSet};
-use std::path::Path;
+use std::cell::OnceCell;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 /// Each history record as text, with its output's place (micrometres; sorted).
@@ -52,33 +54,128 @@ fn same_records(a: &[(String, [i64; 3])], b: &[(String, [i64; 3])]) -> bool {
         })
 }
 
+type Unified = Option<(usize, usize, bool, f64)>;
+
+/// What the comparison reads of a result, each worked out once. OCCT's are kept beside its result
+/// (NOSHAPE_BREP_OCCT_CACHE): its records' centroids, validity and unify were most of a knurl's replay once OCCT's
+/// Boolean itself was kept.
+struct Facts<'a> {
+    r: &'a OpResult,
+    summary: OnceCell<Summary>,
+    records: OnceCell<Vec<(String, [i64; 3])>>,
+    valid: OnceCell<bool>,
+    volume: OnceCell<Option<f64>>,
+    area: OnceCell<Option<f64>>,
+    len: OnceCell<f64>,
+    unified: OnceCell<Unified>,
+}
+
+impl<'a> Facts<'a> {
+    fn new(r: &'a OpResult) -> Facts<'a> {
+        Facts { r, summary: OnceCell::new(), records: OnceCell::new(), valid: OnceCell::new(), volume: OnceCell::new(), area: OnceCell::new(), len: OnceCell::new(), unified: OnceCell::new() }
+    }
+    fn summary(&self) -> &Summary {
+        self.summary.get_or_init(|| Summary::of(self.r))
+    }
+    fn records(&self) -> &[(String, [i64; 3])] {
+        self.records.get_or_init(|| records(self.r))
+    }
+    fn valid(&self) -> bool {
+        *self.valid.get_or_init(|| self.r.shape.is_valid())
+    }
+    fn volume(&self) -> Option<f64> {
+        *self.volume.get_or_init(|| self.r.shape.volume().ok())
+    }
+    fn area(&self) -> Option<f64> {
+        *self.area.get_or_init(|| self.r.shape.area().ok())
+    }
+    fn len(&self) -> f64 {
+        *self.len.get_or_init(|| self.r.shape.sub_shapes(ShapeType::Edge).iter().map(|e| e.length().unwrap_or(0.0)).sum())
+    }
+    /// After the model's next step, merging faces left on one surface: faces, edges, validity, volume.
+    fn unified(&self) -> Unified {
+        *self.unified.get_or_init(|| unify_same_domain(&self.r.shape).map(|u| (u.shape.count(ShapeType::Face), u.shape.count(ShapeType::Edge), u.shape.is_valid(), u.shape.volume().unwrap_or(0.0))).ok())
+    }
+    /// Those worked out, a line each (floats exactly).
+    fn save(&self) -> String {
+        let mut t = String::new();
+        if let Some(s) = self.summary.get() {
+            t += &format!("summary {} {:?} {} {} {} {}\n", s.valid as u8, s.volume, s.faces, s.edges, s.vertices, s.history);
+        }
+        if let Some(v) = self.valid.get() {
+            t += &format!("valid {}\n", *v as u8);
+        }
+        for (k, x) in [("volume", self.volume.get()), ("area", self.area.get())] {
+            if let Some(x) = x {
+                t += &format!("{k} {}\n", x.map_or("none".into(), |x| format!("{x:?}")));
+            }
+        }
+        if let Some(x) = self.len.get() {
+            t += &format!("len {x:?}\n");
+        }
+        if let Some(u) = self.unified.get() {
+            t += &format!("unified {}\n", u.map_or("none".into(), |u| format!("{} {} {} {:?}", u.0, u.1, u.2 as u8, u.3)));
+        }
+        if let Some(rs) = self.records.get() {
+            for (k, p) in rs {
+                t += &format!("rec {} {} {} {k}\n", p[0], p[1], p[2]);
+            }
+        }
+        t
+    }
+    /// Reads back what [`Facts::save`] wrote.
+    fn load(&self, text: &str) {
+        let f = |x: &str| x.parse::<f64>().ok();
+        let mut recs = Vec::new();
+        for l in text.lines() {
+            let (k, rest) = l.split_once(' ').unwrap_or((l, ""));
+            let w: Vec<&str> = rest.split(' ').collect();
+            match k {
+                "summary" if w.len() == 6 => {
+                    let n = |i: usize| w[i].parse::<usize>().unwrap_or(0);
+                    let _ = self.summary.set(Summary { valid: w[0] == "1", volume: f(w[1]).unwrap_or(0.0), faces: n(2), edges: n(3), vertices: n(4), history: w[5].parse().unwrap_or(0) });
+                }
+                "valid" => drop(self.valid.set(rest == "1")),
+                "volume" => drop(self.volume.set(f(rest))),
+                "area" => drop(self.area.set(f(rest))),
+                "len" => drop(self.len.set(f(rest).unwrap_or(0.0))),
+                "unified" if rest == "none" => drop(self.unified.set(None)),
+                "unified" if w.len() == 4 => drop(self.unified.set(Some((w[0].parse().unwrap_or(0), w[1].parse().unwrap_or(0), w[2] == "1", f(w[3]).unwrap_or(0.0))))),
+                "rec" if w.len() > 3 => recs.push((w[3..].join(" "), [w[0].parse().unwrap_or(0), w[1].parse().unwrap_or(0), w[2].parse().unwrap_or(0)])),
+                _ => {}
+            }
+        }
+        if !recs.is_empty() {
+            let _ = self.records.set(recs);
+        }
+    }
+}
+
 /// Where ours differs from OCCT's only by OCCT's arbitrary choices (rounding): the same solids, faces, edges and
 /// vertices, both valid, the volume within the area times the model tolerance and the area within the edges'
 /// length times it, every face record (an input face Kept, Modified or Deleted, to the same output faces within
 /// 2 µm) the same, and the same after the unify. Then the deltas (volume, area, other records apart), else None.
-fn equivalent(r: &OpResult, o: &OpResult) -> Option<String> {
+fn equivalent(r: &Facts, o: &Facts) -> Option<String> {
     const TOL: f64 = 1e-7;
     for k in [ShapeType::Solid, ShapeType::Face, ShapeType::Edge, ShapeType::Vertex] {
-        if r.shape.count(k) != o.shape.count(k) {
+        if r.r.shape.count(k) != o.r.shape.count(k) {
             return None;
         }
     }
-    if !r.shape.is_valid() || !o.shape.is_valid() {
+    if !r.valid() || !o.valid() {
         return None;
     }
-    let (vr, vo) = (r.shape.volume().ok()?, o.shape.volume().ok()?);
-    let (ar, ao) = (r.shape.area().ok()?, o.shape.area().ok()?);
-    let len: f64 = o.shape.sub_shapes(ShapeType::Edge).iter().map(|e| e.length().unwrap_or(0.0)).sum();
-    if (vr - vo).abs() > ao * TOL || (ar - ao).abs() > len * TOL {
+    let (vr, vo) = (r.volume()?, o.volume()?);
+    let (ar, ao) = (r.area()?, o.area()?);
+    if (vr - vo).abs() > ao * TOL || (ar - ao).abs() > o.len() * TOL {
         return None;
     }
     let faces = |x: &[(String, [i64; 3])]| x.iter().filter(|r| r.0.split(' ').nth(1).is_some_and(|w| w.starts_with("Face")) && !r.0.ends_with(" Edge") && !r.0.ends_with(" Vertex")).cloned().collect::<Vec<_>>();
-    let (mine, theirs) = (records(r), records(o));
-    if !same_records(&faces(&mine), &faces(&theirs)) {
+    let (mine, theirs) = (r.records(), o.records());
+    if !same_records(&faces(mine), &faces(theirs)) {
         return None;
     }
-    let unified = |x: &Shape| unify_same_domain(x).map(|u| (u.shape.count(ShapeType::Face), u.shape.count(ShapeType::Edge), u.shape.is_valid(), u.shape.volume().unwrap_or(0.0))).ok();
-    let (ur, uo) = (unified(&r.shape)?, unified(&o.shape)?);
+    let (ur, uo) = (r.unified()?, o.unified()?);
     // (OCCT's unify making its result invalid, ours valid: ours is the reference's (a valid result).)
     let unify_note = if ur.2 && !uo.2 {
         format!(", OCCT's unified result invalid ({} faces against ours {})", uo.0, ur.0)
@@ -93,15 +190,15 @@ fn equivalent(r: &OpResult, o: &OpResult) -> Option<String> {
 
 /// Where OCCT's result is invalid now but was valid when recorded: ours valid with the recorded counts and volume
 /// (its history a hash: not compared) is the reference's (a valid result).
-fn equivalent_to_recorded(r: &OpResult, o: &OpResult, want: &Summary) -> Option<String> {
-    if o.shape.is_valid() || !want.valid || !r.shape.is_valid() {
+fn equivalent_to_recorded(r: &Facts, o: &Facts, want: &Summary) -> Option<String> {
+    if o.valid() || !want.valid || !r.valid() {
         return None;
     }
-    let got = Summary::of(r);
+    let got = r.summary();
     if (got.faces, got.edges, got.vertices) != (want.faces, want.edges, want.vertices) {
         return None;
     }
-    let area = r.shape.area().ok()?;
+    let area = r.area()?;
     if (got.volume - want.volume).abs() > area * 1e-7 {
         return None;
     }
@@ -114,6 +211,65 @@ fn median(v: &mut [f64]) -> f64 {
     }
     v.sort_by(f64::total_cmp);
     v[v.len() / 2]
+}
+
+/// OCCT's result for a case, the way the app ran it (op_boolean's, or OCCT's one Boolean of them all for a case the
+/// app ran outside op_boolean: quick_boolean, Shell's slabs; without op_boolean's tree of fuses for many free-form
+/// tools, whose history says other things), and its milliseconds. NOSHAPE_BREP_OCCT_CACHE=<dir>: kept there (the
+/// shape exactly, its history; what the comparison reads of it beside, `.facts`) and read back on the next run; tools/bool/gate.sh names the directory by what
+/// OCCT's path is built from, so a change to noshape's Boolean alone replays OCCT's side once.
+fn occt_result(c: &Case) -> (Result<OpResult>, f64, Option<PathBuf>) {
+    let direct = c.path.starts_with("direct");
+    let cached = std::env::var_os("NOSHAPE_BREP_OCCT_CACHE").map(|d| Path::new(&d).join(format!("{}{}", c.name, if direct { "-direct" } else { "" })));
+    if let Some(base) = &cached
+        && let (Ok(bin), Ok(hist)) = (std::fs::read(base.with_extension("bin")), std::fs::read_to_string(base.with_extension("hist")))
+        && let Ok(shape) = Shape::from_bin_bytes(&bin)
+    {
+        let mut lines = hist.lines();
+        let ms = lines.next().and_then(|l| l.parse().ok()).unwrap_or(0.0);
+        let kind = |v: u8| [ShapeType::Compound, ShapeType::CompSolid, ShapeType::Solid, ShapeType::Shell, ShapeType::Face, ShapeType::Wire, ShapeType::Edge, ShapeType::Vertex].into_iter().find(|k| *k as u8 == v).unwrap_or(ShapeType::Unknown);
+        let relation = |v: u8| [Relation::Modified, Relation::Generated, Relation::Deleted, Relation::Kept, Relation::First].into_iter().find(|r| *r as u8 == v).unwrap_or(Relation::Last);
+        let records = lines
+            .filter_map(|l| {
+                let v: Vec<u32> = l.split(' ').filter_map(|x| x.parse().ok()).collect();
+                (v.len() == 6).then(|| HistoryRecord { arg: v[0], input_kind: kind(v[1] as u8), input_index: v[2], relation: relation(v[3] as u8), output_kind: kind(v[4] as u8), output_index: v[5] })
+            })
+            .collect();
+        return (Ok(OpResult { shape, history: History { records } }), ms, cached);
+    }
+    if let Some(base) = &cached
+        && let Ok(e) = std::fs::read_to_string(base.with_extension("err"))
+    {
+        return (Err(KernelError::OperationFailed(e)), 0.0, cached);
+    }
+    if direct {
+        unsafe { std::env::set_var("NOSHAPE_BOOL_NO_TREE", "1") };
+    }
+    set_rust_boolean(Some(false));
+    let t = Instant::now();
+    let o = boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let ms = t.elapsed().as_secs_f64() * 1e3;
+    if direct {
+        unsafe { std::env::remove_var("NOSHAPE_BOOL_NO_TREE") };
+    }
+    // (Written aside and renamed: shards running at once may keep the same case.)
+    if let Some(base) = &cached {
+        let put = |ext: &str, bytes: &[u8]| {
+            let tmp = base.with_extension(format!("{ext}.{}", std::process::id()));
+            let _ = std::fs::write(&tmp, bytes).and_then(|_| std::fs::rename(&tmp, base.with_extension(ext)));
+        };
+        match &o {
+            Ok(r) => {
+                if let Ok(bin) = r.shape.to_bin_bytes(false) {
+                    let hist: String = std::iter::once(format!("{ms}")).chain(r.history.records.iter().map(|h| format!("{} {} {} {} {} {}", h.arg, h.input_kind as u8, h.input_index, h.relation as u8, h.output_kind as u8, h.output_index))).collect::<Vec<_>>().join("\n");
+                    put("bin", &bin);
+                    put("hist", hist.as_bytes());
+                }
+            }
+            Err(e) => put("err", e.to_string().as_bytes()),
+        }
+    }
+    (o, ms, cached)
 }
 
 /// (cases, accepted, mismatches, report).
@@ -195,36 +351,29 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
             report += &format!("{name} {:?} tools {}: {ms:.2} ms, ours only\n", c.op, c.tools.len());
             continue;
         }
-        set_rust_boolean(Some(false));
-        // (A case the app ran outside op_boolean (quick_boolean: Shell's slabs, OCCT's one Boolean of them all): OCCT
-        // that way, without op_boolean's tree of fuses for many free-form tools, whose history says other things.)
-        let direct = c.path.starts_with("direct");
-        if direct {
-            unsafe { std::env::set_var("NOSHAPE_BOOL_NO_TREE", "1") };
-        }
-        let t = Instant::now();
-        let o = boolean(c.op, &c.objects, &c.tools, &c.opts);
-        let occt_ms = t.elapsed().as_secs_f64() * 1e3;
-        if direct {
-            unsafe { std::env::remove_var("NOSHAPE_BOOL_NO_TREE") };
-        }
+        let (o, occt_ms, kept) = occt_result(&c);
         set_rust_boolean(None);
+        let ours = Facts::new(&r);
+        let theirs = o.as_ref().ok().map(Facts::new);
+        let known = kept.as_ref().and_then(|k| std::fs::read_to_string(k.with_extension("facts")).ok()).unwrap_or_default();
+        if let Some(t) = &theirs {
+            t.load(&known);
+        }
         // (A corpus recorded with this Boolean on: against OCCT run here.)
-        let mut d = match (&o, std::env::var_os("NOSHAPE_BREP_VS_OCCT")) {
-            (Ok(o), Some(_)) => Summary::of(&r).differences(&Summary::of(o)),
-            _ => Summary::of(&r).differences(&c.summary),
+        let mut d = match (&theirs, std::env::var_os("NOSHAPE_BREP_VS_OCCT")) {
+            (Some(t), Some(_)) => ours.summary().differences(t.summary()),
+            _ => ours.summary().differences(&c.summary),
         };
         // The history's hash rounds centroids: compare with OCCT's records within 2 µm.
-        if d == ["history differs"] && std::env::var_os("NOSHAPE_BREP_EXACT").is_none() && o.as_ref().is_ok_and(|o| same_records(&records(&r), &records(o))) {
+        if d == ["history differs"] && std::env::var_os("NOSHAPE_BREP_EXACT").is_none() && theirs.as_ref().is_some_and(|t| same_records(ours.records(), t.records())) {
             d.clear();
         }
         // What the model does next with a result (merging faces left on one surface) must come out the same.
         if d.is_empty()
-            && let Ok(o) = &o
+            && let (Ok(o), Some(t)) = (&o, &theirs)
         {
             // (Faces, edges, validity; its volume to 1e-9.)
-            let unified = |x: &Shape| unify_same_domain(x).map(|u| (u.shape.count(ShapeType::Face), u.shape.count(ShapeType::Edge), u.shape.is_valid(), u.shape.volume().unwrap_or(0.0))).ok();
-            let alike = |a: &Option<(usize, usize, bool, f64)>, b: &Option<(usize, usize, bool, f64)>| match (a, b) {
+            let alike = |a: &Unified, b: &Unified| match (a, b) {
                 (Some(a), Some(b)) => (a.0, a.1, a.2) == (b.0, b.1, b.2) && (a.3 - b.3).abs() <= 1e-9 * a.3.abs().max(b.3.abs()),
                 _ => a.is_none() && b.is_none(),
             };
@@ -232,7 +381,7 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
                 let _ = std::fs::write(Path::new(&dump).join(format!("{name}-rust.brep")), r.shape.to_brep_bytes().unwrap_or_default());
                 let _ = std::fs::write(Path::new(&dump).join(format!("{name}-occt.brep")), o.shape.to_brep_bytes().unwrap_or_default());
             }
-            let (ur, uo) = (unified(&r.shape), unified(&o.shape));
+            let (ur, uo) = (ours.unified(), t.unified());
             if !alike(&ur, &uo) {
                 d.push(format!("unified differently: {ur:?} vs OCCT {uo:?}"));
             }
@@ -240,11 +389,18 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         // (OCCT's arbitrary choices only: equivalent, its deltas reported, unless NOSHAPE_BREP_EXACT.)
         if !d.is_empty()
             && std::env::var_os("NOSHAPE_BREP_EXACT").is_none()
-            && let Ok(o) = &o
-            && let Some(deltas) = equivalent(&r, o).or_else(|| equivalent_to_recorded(&r, o, &c.summary))
+            && let Some(t) = &theirs
+            && let Some(deltas) = equivalent(&ours, t).or_else(|| equivalent_to_recorded(&ours, t, &c.summary))
         {
             equivalents.push(format!("{name} ({:?}, {} tools): {}; {deltas}", c.op, c.tools.len(), d.join(", ")));
             d.clear();
+        }
+        // (What was worked out of OCCT's result kept beside it, for the next run.)
+        if let (Some(t), Some(k)) = (&theirs, &kept)
+            && t.save() != known
+        {
+            let tmp = k.with_extension(format!("facts.{}", std::process::id()));
+            let _ = std::fs::write(&tmp, t.save()).and_then(|_| std::fs::rename(&tmp, k.with_extension("facts")));
         }
         if !d.is_empty()
             && let Some((_, why)) = live.iter().find(|(c, _)| *c == name)
