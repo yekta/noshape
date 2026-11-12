@@ -476,7 +476,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     gear documents at baseline.
   - Left for core (P1, not worse than v0.4.44): fuzz document slow1151 (-pre, -before-extrude) is broken again by 214116a5d's
     narrowing (6d8b17381 alone had fixed it): Linear pattern 2 "Select a pattern direction.", 3 of 8 parts lost; Ok on v0.4.43.
-- **qa 08:58, v0.4.45 checked (the hotfix; published 08:30, run 43170205236, cut 214116a5d): no blocker.** 11 assets; the Linux
+- **qa 08:57, v0.4.45 checked (the hotfix; published 08:30, run 43170205236, cut 214116a5d): no blocker.** 11 assets; the Linux
   tarballs and .deb match SHA256SUMS. **hat15 on the released CLI = v0.4.43 on all 142 features** (the SSD pad sketches, their
   extrudes and the pocket fillet Ok); hat8 = v0.4.43 on all 139; the dock = v0.4.43 on all 499 features and every part; the
   only part difference in the hats is the Fan Riser's accepted +5.72 mm³. CLI smoke = v0.4.44 (the volume sweep the same); the
