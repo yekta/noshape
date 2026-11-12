@@ -19,6 +19,7 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepAdaptor_Curve.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRepLib.hxx>
@@ -80,6 +81,7 @@
 #include <array>
 #include <algorithm>
 #include <map>
+#include <BOPTools_AlgoTools.hxx>
 #include <BOPTools_AlgoTools2D.hxx>
 #include <gp_Elips.hxx>
 #include <Geom_ConicalSurface.hxx>
@@ -1458,6 +1460,107 @@ const char* ellipse_pcurve(const EllEdge& x, const TopoDS_Face& src, const TopoD
   return "an ellipse on another face";
 }
 
+// An argument's containers as OCCT's BOP collects them (BOPAlgo_BOP's CollectContainers): itself if a wire, shell
+// or compsolid, else those inside its compounds.
+void collect_containers(const TopoDS_Shape& s, uint32_t arg, std::vector<std::pair<uint32_t, TopoDS_Shape>>& out)
+{
+  const TopAbs_ShapeEnum t = s.ShapeType();
+  if (t == TopAbs_WIRE || t == TopAbs_SHELL || t == TopAbs_COMPSOLID)
+  {
+    out.emplace_back(arg, s);
+    return;
+  }
+  if (t != TopAbs_COMPOUND)
+    return;
+  for (TopoDS_Iterator it(s); it.More(); it.Next())
+    collect_containers(it.Value(), arg, out);
+}
+
+// A sheet result's faces as OCCT's BOP gives them (BOPAlgo_BOP::BuildShape): each input shell's pieces in connected
+// groups, a shell each (faces turned by OCCT's own rule, the shell as its input's), a shell holding no more than
+// another dropped; then the faces in none, bare.
+void sheet_shells(const BrepResult& r, const std::vector<const OcShape*>& srcs, const std::vector<TopoDS_Face>& fs, BRep_Builder& bb, TopoDS_Compound& out)
+{
+  std::vector<std::pair<uint32_t, TopoDS_Shape>> shells;
+  for (uint32_t a = 0; a < srcs.size(); ++a)
+    collect_containers(srcs[a]->shape, a, shells);
+  // Each input face's pieces in the result (Kept or Modified), by result index.
+  std::map<std::pair<uint32_t, uint32_t>, std::vector<uint32_t>> pieces;
+  for (uint32_t i = 0; i < fs.size(); ++i)
+    pieces[{r.face_origin[3 * i + 1], r.face_origin[3 * i + 2]}].push_back(i);
+  for (size_t k = 0; k + 5 < r.history.size(); k += 6)
+    if (r.history[k] == 1 && r.history[k + 3] == 0 && r.history[k + 4] == 1)
+      pieces[{r.history[k + 1], r.history[k + 2]}].push_back(r.history[k + 5]);
+  for (auto& [_, v] : pieces)
+  {
+    std::sort(v.begin(), v.end());
+    v.erase(std::unique(v.begin(), v.end()), v.end());
+  }
+  std::vector<TopoDS_Shape> made;
+  for (const auto& [a, sc] : shells)
+  {
+    TopoDS_Compound rc;
+    bb.MakeCompound(rc);
+    std::vector<char> added(fs.size(), 0);
+    for (TopoDS_Iterator it(sc); it.More(); it.Next())
+    {
+      const int fi = srcs[a]->map(TopAbs_FACE).FindIndex(it.Value());
+      const auto p = fi > 0 ? pieces.find({a, static_cast<uint32_t>(fi - 1)}) : pieces.end();
+      if (p == pieces.end())
+        continue;
+      for (const uint32_t i : p->second)
+        if (!added[i])
+        {
+          added[i] = 1;
+          bb.Add(rc, fs[i]);
+        }
+    }
+    NCollection_List<TopoDS_Shape> blocks;
+    BOPTools_AlgoTools::MakeConnexityBlocks(rc, TopAbs_EDGE, TopAbs_FACE, blocks);
+    for (const TopoDS_Shape& block : blocks)
+    {
+      TopoDS_Shape sh;
+      BOPTools_AlgoTools::MakeContainer(TopAbs_SHELL, sh);
+      for (TopoDS_Iterator it(block); it.More(); it.Next())
+        bb.Add(sh, it.Value());
+      BOPTools_AlgoTools::OrientFacesOnShell(sh);
+      sh.Orientation(sc.Orientation());
+      made.push_back(sh);
+    }
+  }
+  // (OCCT's RemoveDuplicates: a shell whose faces are all in another goes.)
+  std::vector<ShapeIMap> faces_of(made.size());
+  for (size_t i = 0; i < made.size(); ++i)
+    TopExp::MapShapes(made[i], TopAbs_FACE, faces_of[i]);
+  std::vector<char> gone(made.size(), 0);
+  auto within = [&](size_t x, size_t y) {
+    for (int k = 1; k <= faces_of[x].Extent(); ++k)
+      if (!faces_of[y].Contains(faces_of[x](k)))
+        return false;
+    return true;
+  };
+  for (size_t i = 0; i < made.size(); ++i)
+    for (size_t j = i + 1; j < made.size() && !gone[i]; ++j)
+    {
+      if (gone[j])
+        continue;
+      if (within(j, i))
+        gone[j] = 1;
+      else if (within(i, j))
+        gone[i] = 1;
+    }
+  ShapeIMap kept;
+  for (size_t i = 0; i < made.size(); ++i)
+    if (!gone[i])
+    {
+      bb.Add(out, made[i]);
+      TopExp::MapShapes(made[i], TopAbs_FACE, kept);
+    }
+  for (const TopoDS_Face& f : fs)
+    if (!kept.Contains(f))
+      bb.Add(out, f);
+}
+
 // The result's shapes and history: `out`, `hist`; or why not.
 const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, double tol, TopoDS_Shape& result, occ::handle<BRepTools_History>& hist)
 {
@@ -2203,10 +2306,9 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     }
     bb.Add(out, sol[s]);
   }
-  // A sheet's result: its faces alone, in the compound (as OCCT's).
+  // A sheet's result: its faces, in shells where its inputs had them (as OCCT's).
   if (b.solid_shells.size() <= 1)
-    for (size_t i = 0; i < nf; ++i)
-      bb.Add(out, fs[i]);
+    sheet_shells(r, srcs, fs, bb, out);
   // A result of edges alone (a line's common with a solid).
   if (nf == 0)
     for (const TopoDS_Edge& e : es)
@@ -4172,11 +4274,16 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       max_tol = ef;
     }
   }
-  // A sheet of shells (not faces): OCCT's result keeps them shells, the Rust Boolean's sheets are faces alone (not
-  // yet).
+  // A sheet's shells are rebuilt as OCCT's (sheet_shells); its wires and compsolids aren't.
   for (size_t i = 0; i < args.size(); ++i)
-    if (srcs[i]->map(TopAbs_SOLID).Extent() == 0 && srcs[i]->map(TopAbs_SHELL).Extent() > 0 && srcs[i]->map(TopAbs_FACE).Extent() > 0)
-      return decline("a sheet of shells");
+  {
+    if (srcs[i]->map(TopAbs_SOLID).Extent() > 0 || srcs[i]->map(TopAbs_FACE).Extent() == 0)
+      continue;
+    std::vector<std::pair<uint32_t, TopoDS_Shape>> cs;
+    collect_containers(args[i], static_cast<uint32_t>(i), cs);
+    if (std::any_of(cs.begin(), cs.end(), [](const auto& c) { return c.second.ShapeType() != TopAbs_SHELL; }))
+      return decline("a sheet of wires");
+  }
   // Tolerant sub-shapes that meet no other argument where their tolerance would matter: each sub-shape of another
   // argument near one (their boxes, grown by the grey band of the tolerances, meeting) is on it exactly (within the
   // rest's tolerance: OCCT and the Boolean put them together alike) or clearly apart (past the grey band of the two
@@ -4435,8 +4542,24 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
     }
   }
   // (A big one's on all threads: a 300-face gear fuse's took 0.2 s on one, half the Boolean's time.)
+  // (Invalid: first its new edges' and vertices' tolerances raised to what they cover (a sheet's coincident edge's
+  // curve on a fillet patch 40 um off it; an input edge's piece 1.1 um off its curves), as OCCT's builder ends,
+  // its arguments left as they are (CorrectTolerances, CorrectShapeTolerances); then checked again.)
   if (full_check && !BRepCheck_Analyzer(out, true, t_built.f.size() > 32).IsValid())
-    return decline("an invalid result");
+  {
+    NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> theirs;
+    for (const OcShape* x : srcs)
+      for (const TopAbs_ShapeEnum t : {TopAbs_VERTEX, TopAbs_EDGE, TopAbs_FACE})
+      {
+        const ShapeIMap& m = x->map(t);
+        for (int k = 1; k <= m.Extent(); ++k)
+          theirs.Add(m(k));
+      }
+    BOPTools_AlgoTools::CorrectTolerances(out, theirs, 0.05, t_built.f.size() > 32);
+    BOPTools_AlgoTools::CorrectShapeTolerances(out, theirs, t_built.f.size() > 32);
+    if (!BRepCheck_Analyzer(out, true, t_built.f.size() > 32).IsValid())
+      return decline("an invalid result");
+  }
   stop();
   if (noshape_should_break() != 0)
     return decline(nullptr);

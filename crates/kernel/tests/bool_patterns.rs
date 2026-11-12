@@ -2199,3 +2199,40 @@ fn variable_rounds_against_a_boxs_planes_cut_as_occt() {
     let v = r.shape.volume().unwrap();
     assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
 }
+
+/// Fuses of sheets that are shells (parity documents' and the corpus's, recorded): OCCT's result keeps each input
+/// shell's pieces in shells, a shell per connected group (BOPAlgo_BOP::BuildShape); ours builds them so ("a sheet
+/// of shells" before): the same counts, shells and faces turned as OCCT's. cf-setback-fillet's corner patch takes the
+/// fillet's arcs, its own edges' curves on it 40 um off them: their tolerances raised to cover it, as OCCT's.
+#[test]
+fn sheets_of_shells_fused_into_shells_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let shells = |s: &k::Shape| {
+        let mut v: Vec<(k::ShapeType, usize, usize)> = s
+            .children()
+            .iter()
+            .map(|c| {
+                let f = c.sub_shapes(k::ShapeType::Face);
+                (c.shape_type(), f.len(), f.iter().filter(|f| f.orientation() == k::Orientation::Reversed).count())
+            })
+            .collect();
+        v.sort_unstable();
+        v
+    };
+    for name in ["f86094f20fca17ec", "00e97ff4a645b20f", "58750beef4286269"] {
+        let c = k::bool_corpus::load(&dir, name).expect("the recorded case");
+        k::set_rust_boolean_only(true);
+        let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+        let why = k::last_rust_decline();
+        k::set_rust_boolean_only(false);
+        let r = r.unwrap_or_else(|e| panic!("{name}: noshape's Boolean declined: {why} ({e})"));
+        k::set_rust_boolean(Some(false));
+        let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+        k::set_rust_boolean(None);
+        assert!(r.shape.is_valid(), "{name}: noshape's result invalid");
+        let counts = |s: &k::Shape| [k::ShapeType::Shell, k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+        assert_eq!(counts(&r.shape), counts(&o.shape), "{name}: shells, faces, edges, vertices");
+        assert_eq!(shells(&r.shape), shells(&o.shape), "{name}: shells' faces and those reversed");
+    }
+}

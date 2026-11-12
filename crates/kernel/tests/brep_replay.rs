@@ -44,6 +44,24 @@ fn records(r: &OpResult) -> Vec<(String, [i64; 3])> {
     v
 }
 
+/// A sheet result's top-level shells and faces: (faces, faces reversed) each, sorted.
+fn shells(x: &Shape) -> Vec<(usize, usize)> {
+    let mut v: Vec<(usize, usize)> = x
+        .children()
+        .iter()
+        .filter(|c| matches!(c.shape_type(), ShapeType::Shell | ShapeType::Face))
+        .map(|c| match c.shape_type() {
+            ShapeType::Face => (1, (c.orientation() == Orientation::Reversed) as usize),
+            _ => {
+                let f = c.sub_shapes(ShapeType::Face);
+                (f.len(), f.iter().filter(|f| f.orientation() == Orientation::Reversed).count())
+            }
+        })
+        .collect();
+    v.sort_unstable();
+    v
+}
+
 /// The same records, places within 2 µm (a centroid rounded the other way).
 fn same_records(a: &[(String, [i64; 3])], b: &[(String, [i64; 3])]) -> bool {
     let mut used = vec![false; b.len()];
@@ -394,6 +412,14 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         {
             equivalents.push(format!("{name} ({:?}, {} tools): {}; {deltas}", c.op, c.tools.len(), d.join(", ")));
             d.clear();
+        }
+        // A sheet's shells as OCCT's: each shell's faces and those of them reversed, and the bare faces.
+        if let Ok(o) = &o
+            && r.shape.count(ShapeType::Solid) == 0
+            && r.shape.count(ShapeType::Face) > 0
+            && shells(&r.shape) != shells(&o.shape)
+        {
+            d.push(format!("shells {:?} (OCCT {:?})", shells(&r.shape), shells(&o.shape)));
         }
         // (What was worked out of OCCT's result kept beside it, for the next run.)
         if let (Some(t), Some(k)) = (&theirs, &kept)
