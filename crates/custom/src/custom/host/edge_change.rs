@@ -376,13 +376,33 @@ fn change_curved_face(f: &Shape, moved: &[(Shape, Move)], all: &[Shape]) -> FRes
     };
     // The new corner at each edge's start where it or the one before moves.
     let mut start: Vec<DVec3> = order.iter().map(|x| x.1).collect();
+    // Where an edge ends when that isn't the next one's start (a step joins them), and the steps at each edge's start.
+    let mut end: Vec<DVec3> = (0..order.len()).map(|k| order[(k + 1) % order.len()].1).collect();
+    let mut steps: Vec<Option<(DVec3, DVec3)>> = vec![None; order.len()];
     for k in 0..m {
         let prev = (k + m - 1) % m;
         if mv(&order[prev].0).is_none() && mv(&order[k].0).is_none() {
             continue;
         }
         if !straight(&order[prev].0) || !straight(&order[k].0) {
-            return err("Only straight edges next to a changed edge can be changed yet");
+            // A moved straight edge beside a curved one kept where it is: a straight step from their old corner to the
+            // moved edge's new end, the curved one as it was (live: asm-config-assembly's Flange 1, a sheet edge tangent
+            // to an R20 arc moved in 4 mm by its alignment, a 4 mm step at the arc's end).
+            let moving = match (straight(&order[prev].0) && mv(&order[k].0).is_none(), straight(&order[k].0) && mv(&order[prev].0).is_none()) {
+                (true, false) => prev,
+                (false, true) => k,
+                _ => return err("Only straight edges next to a changed edge can be changed yet"),
+            };
+            let (p, d) = line(moving);
+            let old = order[k].1;
+            let new = p + d * (old - p).dot(d);
+            if moving == prev {
+                end[prev] = new;
+            } else {
+                start[k] = new;
+            }
+            steps[k] = Some((end[prev], start[k]));
+            continue;
         }
         let ((p0, d0), (p1, d1)) = (line(prev), line(k));
         let c = d0.cross(d1);
@@ -391,12 +411,18 @@ fn change_curved_face(f: &Shape, moved: &[(Shape, Move)], all: &[Shape]) -> FRes
         }
         let t = (p1 - p0).cross(d1).dot(c) / c.length_squared();
         start[k] = p0 + d0 * t;
+        end[prev] = start[k];
     }
     let mut edges = Vec::with_capacity(m);
     let mut segments = Vec::new();
     for k in 0..m {
         let (e, a, b) = &order[k];
-        let (s0, s1) = (start[k], start[(k + 1) % m]);
+        if let Some((from, to)) = steps[k]
+            && from.distance(to) > TOL
+        {
+            edges.push(k::make_line(from, to).map_err(fe)?);
+        }
+        let (s0, s1) = (start[k], end[k]);
         let from = all.iter().position(|x| x.is_same(e));
         if s0.distance(*a) < TOL && s1.distance(*b) < TOL {
             edges.push(e.clone());

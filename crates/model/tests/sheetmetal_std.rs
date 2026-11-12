@@ -1864,6 +1864,49 @@ fn collinear_walls_keep_the_ends_in_pieces() {
     assert!((volume_mm3(&r) - 3211.3274).abs() < 1e-3 && faces == 14, "{} mm³, {faces} faces: {:#?}", volume_mm3(&r), face_report(&r));
 }
 
+/// An Outer flange on a plate's edge that meets a tangent arc at one end (asm-config-assembly's Flange 1: a bracket
+/// whose bottom edge runs into an R20 arc): std moves that edge in by the thickness and bend radius for its alignment,
+/// the arc kept and a straight step joining it to the moved edge, so the flange is as wide as the edge, as live's (its
+/// two 26 x 21 mm flange faces; ours refused "Only straight edges next to a changed edge can be changed yet", so the
+/// flange failed with "Cannot create flange with selected alignment").
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn an_outer_flange_beside_a_tangent_arc_moves_its_edge() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = [(0.0, 0.0), (30.0, 0.0), (30.0, 20.0), (-20.0, 20.0)].iter().map(|&(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y)))).collect();
+    for i in 0..3 {
+        sk.add_line_between(p[i], p[i + 1]).unwrap();
+    }
+    let c = sk.add_point(glam::DVec2::new(0.0, mm(20.0)));
+    sk.add_arc_between(c, p[3], p[0]).unwrap();
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let key = r.display.sketches.iter().find(|g| g.feature == sketch).unwrap().regions[0].key.clone();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("THICKEN"));
+        pv.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        pv.set("thickness", expr("3 mm"));
+        pv.set("radius", expr("1 mm"));
+    });
+    let r = s.ok();
+    let before = volume_mm3(&r);
+    let edge = edge_at(&r, DVec3::new(15.0, 0.0, 3.0));
+    s.add("sheetMetalFlange", |pv| {
+        pv.set("edges", ParamValue::Query(vec![edge]));
+        pv.set("distance", expr("25 mm"));
+        pv.set("flangeAlignment", en("OUTER"));
+    });
+    let r = s.ok();
+    assert!(volume_mm3(&r) > before + 100.0, "the flange: {} mm³ for the plate's {before}: {:#?}", volume_mm3(&r), face_report(&r));
+    // The flange's two faces as wide as the edge (30 mm), 21 mm long (25 less the thickness and bend radius).
+    let walls = r.context.bodies[part(&r)].shape.faces().iter().filter(|f| f.face_plane().ok().flatten().is_some() && f.area().is_ok_and(|a| (a * 1e6 - 30.0 * 21.0).abs() < 1e-3)).count();
+    assert_eq!(walls, 2, "{:#?}", face_report(&r));
+}
+
 /// An Inner flange on a plate's top edge that steps 0.275 mm to a tab at its end (c2-sm-louver's Flange 3: the tab's
 /// edge just off the flange's): the bend ends with the flange at the step, relieved there, not run on past the tab
 /// (ours ran it 32 mm out past the plate's end, a second flange); a flange on the opposite edge then regenerates, the
