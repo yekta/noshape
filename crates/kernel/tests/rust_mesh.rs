@@ -551,10 +551,17 @@ fn a_displaced_top_and_its_wall_mesh_here() {
 #[test]
 fn a_degenerate_face_doesnt_hold_the_display_mesh() {
     let s = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/mesh/fuzz4539-degenerate.brep")).unwrap();
-    let t = std::time::Instant::now();
     let m = tessellate(&s, s.bounding_box(false).unwrap().diagonal(), 2.0 * TAU / 144.0, true).unwrap();
     assert!(!m.indices.is_empty());
-    // (~1 s here; up to 2 s a stopped face.)
+}
+
+/// The same mesh timed (~1 s on a quiet host; up to 2 s a stopped face): a wall-clock bound, so T2.
+#[test]
+#[ignore = "T2: timing"]
+fn a_degenerate_face_meshes_in_bounded_time() {
+    let s = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/mesh/fuzz4539-degenerate.brep")).unwrap();
+    let t = std::time::Instant::now();
+    tessellate(&s, s.bounding_box(false).unwrap().diagonal(), 2.0 * TAU / 144.0, true).unwrap();
     assert!(t.elapsed().as_secs_f64() < 30.0, "{:?}", t.elapsed());
 }
 

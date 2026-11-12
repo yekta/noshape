@@ -466,15 +466,25 @@ fn a_crash_inside_the_kernel_fails_only_that_call() {
     assert!((b.volume().unwrap() - 1.0).abs() < 1e-12);
 }
 
+/// This thread's CPU time (user + system, s): what a CPU budget counts, unlike the wall clock a loaded host stretches
+/// (main red 11-12 at load 79 on 8 cores).
+#[cfg(target_os = "linux")]
+fn thread_cpu_secs() -> f64 {
+    let stat = std::fs::read_to_string("/proc/thread-self/stat").unwrap();
+    let fields: Vec<&str> = stat[stat.rfind(')').unwrap() + 2..].split(' ').collect();
+    // (utime and stime, the stat's fields 14 and 15, in USER_HZ ticks: 100 a second on Linux.)
+    (fields[11].parse::<f64>().unwrap() + fields[12].parse::<f64>().unwrap()) / 100.0
+}
+
 /// A blend that never finishes fails after its CPU budget (qa FILLET-HANG:
 /// OCCT's blend approximation ran > 1 h): here a loop under a 0.3 s budget.
 #[cfg(target_os = "linux")]
 #[test]
 fn a_kernel_call_over_its_budget_fails() {
-    let t = std::time::Instant::now();
+    let t = thread_cpu_secs();
     let e = crash_inside_kernel(3).unwrap_err();
     assert!(e.to_string().contains("took too long"), "{e}");
-    assert!(t.elapsed().as_secs_f64() < 5.0);
+    assert!(thread_cpu_secs() - t < 5.0, "{} s of CPU", thread_cpu_secs() - t);
     assert!((make_box_corners(DVec3::ZERO, DVec3::ONE).unwrap().volume().unwrap() - 1.0).abs() < 1e-12);
 }
 
@@ -504,10 +514,10 @@ fn a_budget_never_stops_a_call_inside_an_occt_thread_pool_loop() {
 #[cfg(target_os = "linux")]
 #[test]
 fn a_budget_still_stops_a_pool_job_of_its_own_thread() {
-    let t = std::time::Instant::now();
+    let t = thread_cpu_secs();
     let e = crash_inside_kernel(7).unwrap_err().to_string();
     assert!(e.contains("budget 1 after 0 of 4"), "{e}");
-    assert!(t.elapsed().as_secs_f64() < 5.0, "{:?}", t.elapsed());
+    assert!(thread_cpu_secs() - t < 5.0, "{} s of CPU", thread_cpu_secs() - t);
 }
 
 /// qa CLI-SUPPRESS-SEGV: a fault inside a budgeted op is caught by the
@@ -519,10 +529,10 @@ fn a_budget_still_stops_a_pool_job_of_its_own_thread() {
 fn a_fault_inside_a_budget_leaves_no_budget_behind() {
     for _ in 0..3 {
         assert!(crash_inside_kernel(8).is_err());
-        let t = std::time::Instant::now();
+        let t = thread_cpu_secs();
         let e = crash_inside_kernel(3).unwrap_err().to_string();
         assert!(e.contains("spin took too long"), "{e}");
-        assert!(t.elapsed().as_secs_f64() < 10.0, "{:?}", t.elapsed());
+        assert!(thread_cpu_secs() - t < 10.0, "{} s of CPU", thread_cpu_secs() - t);
     }
 }
 
@@ -542,10 +552,10 @@ fn a_fault_inside_a_budget_leaves_no_deadline_behind() {
 #[cfg(target_os = "linux")]
 #[test]
 fn a_budget_never_stops_a_call_inside_the_allocator() {
-    let t = std::time::Instant::now();
+    let t = thread_cpu_secs();
     let e = crash_inside_kernel(4).unwrap_err();
     assert!(e.to_string().contains("allocation took too long"), "{e}");
-    assert!(t.elapsed().as_secs_f64() < 20.0);
+    assert!(thread_cpu_secs() - t < 20.0, "{} s of CPU", thread_cpu_secs() - t);
     let v: Vec<u64> = (0..1 << 20).collect();
     assert_eq!(v.len(), 1 << 20);
 }
@@ -581,7 +591,7 @@ fn a_fault_inside_the_c_library_ends_the_process() {
             if let Some(s) = child.try_wait().unwrap() {
                 break s;
             }
-            if t.elapsed().as_secs() > 60 {
+            if t.elapsed().as_secs() > 300 {
                 let _ = child.kill();
                 panic!("{kind}: the child hung");
             }
