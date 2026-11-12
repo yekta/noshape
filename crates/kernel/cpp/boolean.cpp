@@ -3598,12 +3598,17 @@ TopoDS_Shape share_mirrored_extrusions(const TopoDS_Shape& s, HHist& hist)
     if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || kept_edge(ef.FindKey(i)))
       continue;
     const TopoDS_Face a = TopoDS::Face(fs.First()), b = TopoDS::Face(fs.Last());
-    if (moved.Contains(a) || moved.Contains(b) || !a.Location().IsIdentity() || !b.Location().IsIdentity())
+    if (moved.Contains(a) || moved.Contains(b))
       continue;
-    TopLoc_Location la, lb;
-    const auto      ea = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(BRep_Tool::Surface(a, la));
-    const auto      eb = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(BRep_Tool::Surface(b, lb));
-    if (ea.IsNull() || eb.IsNull() || ea == eb || !la.IsIdentity() || !lb.IsIdentity() || !ea->Direction().IsParallel(eb->Direction(), 1e-12))
+    // (Compared where they are: a mirror's image placed by a location, c2-hunting-knife's Mirror 1; the face is made
+    // again on the first one's surface and location.)
+    TopLoc_Location                 la, lb;
+    const occ::handle<Geom_Surface> raw_a = BRep_Tool::Surface(a, la), raw_b = BRep_Tool::Surface(b, lb);
+    if (raw_a.IsNull() || raw_b.IsNull() || (raw_a == raw_b && la.IsEqual(lb)))
+      continue;
+    const auto ea = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(BRep_Tool::Surface(a));
+    const auto eb = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(BRep_Tool::Surface(b));
+    if (ea.IsNull() || eb.IsNull() || !ea->Direction().IsParallel(eb->Direction(), 1e-12))
       continue;
     const double k = ea->Direction().Dot(eb->Direction()) > 0 ? 1.0 : -1.0;
     double       u0, u1, v0, v1;
@@ -3629,9 +3634,11 @@ TopoDS_Shape share_mirrored_extrusions(const TopoDS_Shape& s, HHist& hist)
       t.SetTranslation(gp_Vec2d(0, c));
     else
       t.SetMirror(gp_Ax2d(gp_Pnt2d(0, c / 2), gp_Dir2d(1, 0)));
-    const occ::handle<Geom_Surface> ga(ea);
-    TopoDS_Face                     F;
-    B.MakeFace(F, ga, BRep_Tool::Tolerance(b));
+    const occ::handle<Geom_Surface>& ga = raw_a;
+    // (In b's own frame: the reshape puts it where b's occurrence is.)
+    const TopLoc_Location            to_b = b.Location().Inverted();
+    TopoDS_Face                      F;
+    B.MakeFace(F, ga, to_b * la, BRep_Tool::Tolerance(b));
     const TopoDS_Face bf = TopoDS::Face(b.Oriented(TopAbs_FORWARD));
     bool              ok = true;
     for (TopoDS_Iterator w(bf); w.More() && ok; w.Next())
@@ -3653,7 +3660,8 @@ TopoDS_Shape share_mirrored_extrusions(const TopoDS_Shape& s, HHist& hist)
           B.UpdateEdge(e, occ::down_cast<Geom2d_Curve>(pc->Transformed(t)), ga, la, BRep_Tool::Tolerance(e));
           B.Range(e, ga, la, f0, f1);
         }
-        es.push_back(k > 0 ? e : TopoDS::Edge(e.Reversed()));
+        const TopoDS_Edge here = TopoDS::Edge(e.Moved(to_b));
+        es.push_back(k > 0 ? here : TopoDS::Edge(here.Reversed()));
       }
       if (k < 0)
         std::reverse(es.begin(), es.end());
