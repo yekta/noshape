@@ -112,6 +112,9 @@ pub struct HistoryPanel {
     changed_tabs: HashMap<MicroversionId, Vec<TabId>>,
     /// The rows last drawn, as the ui-parity state lists them (`ui_rows`).
     ui_drawn: std::cell::RefCell<Vec<serde_json::Value>>,
+    /// The rows' top and the visible part of the window around them (window y, px), at the last paint
+    /// (`rows_in_view`).
+    rows_clip: Rc<std::cell::Cell<Option<(f32, f32, f32)>>>,
     /// Result of "Compare": (description of the older point, diff).
     _subs: Vec<Subscription>,
 }
@@ -171,6 +174,7 @@ impl HistoryPanel {
             date_to,
             changed_tabs: HashMap::new(),
             ui_drawn: Default::default(),
+            rows_clip: Default::default(),
             _subs: subs,
         }
     }
@@ -477,6 +481,14 @@ fn history_time(ms: i64) -> String {
 
 /// Workspace, version and Start rows, newest first (Onshape's order), each
 /// with the microversions back to the next row of its branch.
+/// The part of the rows (px from their top) to build: what's on screen and 300 px around it, in 100 px steps (a
+/// small scroll keeps the same rows); before the list's place is known, a window's height.
+fn rows_in_view(clip: Option<(f32, f32, f32)>) -> (f32, f32) {
+    const MARGIN: f32 = 300.;
+    let Some((top, a, b)) = clip else { return (0., 1200.) };
+    (((a - top - MARGIN) / 100.).floor() * 100., ((b - top + MARGIN) / 100.).ceil() * 100.)
+}
+
 fn build_rows(graph: &VersionGraph, lanes: &[BranchId]) -> Vec<Row> {
     let info: HashMap<MicroversionId, &noshape_store::MicroversionInfo> = graph.microversions.iter().map(|m| (m.id, m)).collect();
     let lane_of = |mv: MicroversionId| info.get(&mv).and_then(|m| lanes.iter().position(|b| *b == m.branch)).unwrap_or(0);
@@ -1216,6 +1228,11 @@ impl Render for HistoryPanel {
         // A version made with no change since the row before it shares its
         // microversion (V1 right after Start): the version row is the one meant.
         let version_at = |mv: MicroversionId| placed.iter().any(|p| p.row.kind == RowKind::Version && p.row.mv == mv);
+        // Only the rows on screen (and a margin) are built (a long search's or open list's rows each frame).
+        let in_view = rows_in_view(self.rows_clip.get());
+        let mut skipped = 0.;
+        // A row not built still has its place named for the ui-parity driver, which scrolls to it.
+        let mut ghosts: Vec<(f32, f32, String)> = Vec::new();
         for (ix, pl) in placed.iter().enumerate() {
             let r = pl.row.clone();
             let is_row = |side: crate::compare_mode::Side| match r.kind {
@@ -1245,6 +1262,25 @@ impl Render for HistoryPanel {
                     RowKind::Change => "change",
                 };
                 drawn.push(serde_json::json!({ "name": name, "kind": k, "selected": selected || picked }));
+            }
+            let h = (if pl.change { CHANGE_H } else { ROW_H }) + if more_at.contains_key(&ix) { CHANGE_H } else { 0. };
+            if pl.y + h < in_view.0 || pl.y > in_view.1 {
+                skipped += h;
+                if crate::ui_script::active() {
+                    let row_h = if pl.change { CHANGE_H } else { ROW_H };
+                    ghosts.push((pl.y, row_h, format!("history_row:{}", r.name)));
+                    if more_at.contains_key(&ix) {
+                        ghosts.push((pl.y + row_h, CHANGE_H, "button:Show more changes…".into()));
+                    }
+                }
+                if more_at.contains_key(&ix) && crate::ui_script::active() {
+                    drawn.push(serde_json::json!({ "name": "Show more changes…", "kind": "version", "selected": false }));
+                }
+                continue;
+            }
+            if skipped > 0. {
+                list.push(div().h(px(skipped)).flex_none().into_any_element());
+                skipped = 0.;
             }
             // Clicking a row leaves compare mode and opens it (live 954).
             let repair_label = if kind == RowKind::Change { format!("{current_name} :: {name}") } else { name.clone() };
@@ -1519,6 +1555,30 @@ impl Render for HistoryPanel {
                 );
             }
         }
+        if skipped > 0. {
+            list.push(div().h(px(skipped)).flex_none().into_any_element());
+        }
+        // The rows' place and the visible list around them, read as they're painted: a scroll or a resize that shows
+        // other rows draws again.
+        let probe = {
+            let clip = self.rows_clip.clone();
+            canvas(
+                move |b, window, _| {
+                    let mask = window.content_mask().bounds;
+                    let now = (f32::from(b.top()), f32::from(mask.top()), f32::from(mask.bottom()));
+                    clip.set(Some(now));
+                    if rows_in_view(Some(now)) != in_view {
+                        window.request_animation_frame();
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .top_0()
+            .left_0()
+            .w_full()
+            .h(px(0.))
+        };
         if results && placed.is_empty() {
             // Live's recorder reads this notice row as a version's (its name style).
             drawn.push(serde_json::json!({ "name": "No changes found", "kind": "version", "selected": false }));
@@ -1663,7 +1723,16 @@ impl Render for HistoryPanel {
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
-                    .child(div().relative().w_full().h(px(total_h)).child(v_flex().children(list)).child(graph_canvas)),
+                    .child(
+                        div()
+                            .relative()
+                            .w_full()
+                            .h(px(total_h))
+                            .child(probe)
+                            .child(v_flex().children(list))
+                            .children(ghosts.into_iter().map(|(y, h, name)| crate::ui_script::mark(div().absolute().top(px(y)).left_0().w_full().h(px(h)), move || name)))
+                            .child(graph_canvas),
+                    ),
             )
             // Legend (live document/22): three centred rows, 14 px semibold; the
             // workspace label in its chip, "Change" faint. Then the 31 px `#eee`

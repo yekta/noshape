@@ -28,6 +28,18 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-12 03:25 UTC: the history panel's frame cost (lead 11-12)
+- Timing records now split the first frame into layout / prepaint / paint (`timing.stages`). With Versions and
+  history open a frame's layout took 12–38 ms (1 ms on a plain tab) and prepaint 21–66: the panel built every row.
+  It now builds the rows on screen and 300 px around them (as the Variable Studio table and the documents list).
+  A search listing 2000 changes: a frame 300–350 -> ~60 ms (layout 101–148 -> 15, prepaint 130–151 -> 4); the plain
+  history (55 rows) about the same as before.
+- Rows not built keep a marked placeholder while a UI script runs (history rows, Show more changes…, the Variable
+  Studio's cells), so the driver finds and scrolls to them (ver-show-more-changes, the speed scenario's V10). They
+  cost frames in that mode only (the search's frame ~119 ms under a script). The documents list has none (the page
+  driver doesn't scroll).
+- ver/vs: 210/216, the misses the known live-side ones and ver-create-version-drawings-warning's focus.
+
 ### 2026-11-12 00:57 UTC: the first key after a click drew a whole frame first (lead: the 40 ms Escape / Ctrl+A)
 - Cause (vendored gpui-pre window.rs): a key that switches the input modality from mouse to keyboard called
   `refresh()` before dispatching, and `dispatch_key_event` draws a dirty window before handling a key: a full

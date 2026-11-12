@@ -905,6 +905,8 @@ impl VariableStudioView {
         // Rows not built in a row: one spacer of their height.
         let mut skipped = 0usize;
         let mut place = 0usize;
+        // A row not built still has its cells' places named for the ui-parity driver, which scrolls to them.
+        let mut ghosts: Vec<(usize, String)> = Vec::new();
         for (i, v) in studio.variables.iter().enumerate() {
             if only.as_ref().is_some_and(|o| !o.contains(&v.name)) {
                 continue;
@@ -913,6 +915,7 @@ impl VariableStudioView {
             if !(on_screen.0..on_screen.1).contains(&(place - 1)) && !busy_rows.contains(&Some(i)) {
                 skipped += 1;
                 if crate::ui_script::active() {
+                    ghosts.push((place - 1, v.name.clone()));
                     drawn.push(serde_json::json!({ "name": v.name, "type": kind_label(v.kind.unwrap_or(VarKind::Any)), "value": noshape_units::localize(&v.expr.text), "description": v.description }));
                 }
                 continue;
@@ -1219,9 +1222,19 @@ impl VariableStudioView {
                 },
                 |_, _, _, _| {},
             )
+            .absolute()
+            .top_0()
+            .left_0()
             .w_full()
             .h(px(0.))
         };
+        let probe = div().relative().w_full().h(px(0.)).child(probe).children(ghosts.into_iter().flat_map(|(row, name)| {
+            ["Name", "Variable type", "Value", "Description"].into_iter().enumerate().map(move |(c, col)| {
+                let x: f32 = (0..c).map(col_w).sum();
+                let cell = div().absolute().top(px(ROW_H * row as f32)).left(px(x)).w(px(col_w(c))).h(px(ROW_H));
+                crate::ui_script::mark(cell, || format!("var_cell:{name}:{col}"))
+            })
+        }));
         // The last row: an italic "Name" cell; typing a name adds a Length
         // variable set to 0 in the document's length unit.
         let add_units = units;

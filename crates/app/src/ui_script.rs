@@ -345,7 +345,7 @@ fn timing_on() -> bool {
 struct StepClock {
     t0: Instant,
     dispatch: f32,
-    frame: std::sync::Arc<std::sync::Mutex<Option<f32>>>,
+    frame: std::sync::Arc<std::sync::Mutex<Option<(f32, [f32; 3])>>>,
 }
 
 thread_local! {
@@ -374,8 +374,8 @@ fn timed(window: &mut Window, cx: &mut App, f: impl FnOnce(&mut Window, &mut App
     window.on_next_frame(move |w, _| {
         let start = ms(t0);
         w.on_next_frame(move |_, _| {
-            let draw: f32 = FRAME_STAGES.iter().map(|st| noshape_render::perf::series_take(st).first().copied().unwrap_or(0.0)).sum();
-            *tx.lock().unwrap_or_else(|e| e.into_inner()) = Some(start + draw);
+            let stages = FRAME_STAGES.map(|st| noshape_render::perf::series_take(st).first().copied().unwrap_or(0.0));
+            *tx.lock().unwrap_or_else(|e| e.into_inner()) = Some((start + stages.iter().sum::<f32>(), stages));
         });
     });
     CLOCK.with(|c| *c.borrow_mut() = Some(StepClock { t0, dispatch, frame }));
@@ -386,7 +386,8 @@ fn take_timing(idle: Option<Instant>) -> Option<Value> {
     let c = CLOCK.with(|c| c.borrow_mut().take())?;
     let frame = *c.frame.lock().unwrap_or_else(|e| e.into_inner());
     let idle = idle.map(|i| i.saturating_duration_since(c.t0).as_secs_f32() * 1e3);
-    Some(json!({ "dispatch": c.dispatch, "frame": frame, "idle": idle }))
+    // (`stages`: the frame's layout, prepaint and paint.)
+    Some(json!({ "dispatch": c.dispatch, "frame": frame.map(|f| f.0), "stages": frame.map(|f| f.1), "idle": idle }))
 }
 
 /// Run the scenario in `window` (the document window of `ws`).
