@@ -1,0 +1,443 @@
+{
+ "scenario": "fs-co-complete-off",
+ "recorded": "2026-11-12T15:30:07.344Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+ },
+ "live": {
+  "document": "7f8a72264376ebea3e590027",
+  "workspace": "d8bacfb923d73906d4b86d1d",
+  "element": "12305d450fbc307db7944979",
+  "start": "fs-custom",
+  "startElement": "12305d450fbc307db7944979",
+  "runner": "live2 .nstate-uip-3.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    },
+    {
+     "name": "Feature Studio 1",
+     "kind": "featurestudio",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "doc_tab": "Feature Studio 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    583,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "textarea",
+     "text": "FeatureScript 3112;\n\n",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 517.411,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      0,
+      0
+     ],
+     "line": "FeatureScript 3112;",
+     "lines": 30,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 50656
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "hover",
+    "on": {
+     "checkbox": "Co-complete"
+    }
+   },
+   "ok": true,
+   "at": [
+    911,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "textarea",
+     "text": "FeatureScript 3112;\n\n",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": "Co-complete (must enable Onshape Labs) Enable Onshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.",
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 517.411,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      0,
+      0
+     ],
+     "line": "FeatureScript 3112;",
+     "lines": 30,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 64995
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "checkbox": "Co-complete"
+    }
+   },
+   "ok": true,
+   "at": [
+    911,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 517.411,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      0,
+      0
+     ],
+     "line": "FeatureScript 3112;",
+     "lines": 30,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 77801
+  }
+ ]
+}

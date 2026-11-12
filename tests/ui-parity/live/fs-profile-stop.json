@@ -1,0 +1,649 @@
+{
+ "scenario": "fs-profile-stop",
+ "recorded": "2026-11-12T15:31:36.456Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+ },
+ "live": {
+  "document": "680d46d68c5fee2cebfa39af",
+  "workspace": "066c2d773ca857c4976ec17b",
+  "element": "8884564139f2b67f37d0e78a",
+  "start": "fs-studio",
+  "startElement": "8884564139f2b67f37d0e78a",
+  "runner": "live2 .nstate-uip-3.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": "Default geometry"
+  },
+  "parts": [],
+  "partsHeading": "Parts (0)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    68.58,
+    -118.784,
+    79.189
+   ],
+   "width_mm": 468.057,
+   "height_mm": 247.877,
+   "mmPerPixel": 0.279771,
+   "orthographic": true
+  },
+  "measure": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    },
+    {
+     "name": "Feature Studio 1",
+     "kind": "featurestudio",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "doc_tab": "Feature Studio 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    583,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "textarea",
+     "text": "FeatureScript 3112;\n\n",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 525.69,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.279771,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      0,
+      0
+     ],
+     "line": "FeatureScript 3112;",
+     "lines": 4,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 41854
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Monitor"
+    }
+   },
+   "ok": true,
+   "at": [
+    1500,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Monitor Part Studio 1",
+      "Profile Part Studio 1"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 525.69,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.279771,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      0,
+      0
+     ],
+     "line": "FeatureScript 3112;",
+     "lines": 4,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 54904
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Profile Part Studio 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    1415,
+    121
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "textarea",
+     "text": "FeatureScript 3112;\n\n",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 525.69,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.279771,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      0,
+      0
+     ],
+     "line": "FeatureScript 3112;",
+     "lines": 4,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 68465
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Monitor"
+    }
+   },
+   "ok": true,
+   "at": [
+    1500,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Monitor Part Studio 1",
+      "Profiling Part Studio 1"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 525.69,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.279771,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      0,
+      0
+     ],
+     "line": "FeatureScript 3112;",
+     "lines": 4,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 81334
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Profiling Part Studio 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    1410,
+    121
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "textarea",
+     "text": "FeatureScript 3112;\n\n",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 525.69,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.279771,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": {
+     "caret": [
+      0,
+      0
+     ],
+     "line": "FeatureScript 3112;",
+     "lines": 4,
+     "committed": true,
+     "notices": 0
+    }
+   },
+   "t": 94944
+  }
+ ]
+}

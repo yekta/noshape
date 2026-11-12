@@ -1,0 +1,1184 @@
+{
+ "scenario": "ver-merge-row-menu",
+ "recorded": "2026-11-12T15:07:14.217Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+ },
+ "live": {
+  "document": "20ed10f22f5be6b6673ac36a",
+  "workspace": "ae2cf037888a8c5863f419a3",
+  "element": "7282e30169204be96c36bf7a",
+  "start": "doc-branches",
+  "startElement": "7282e30169204be96c36bf7a",
+  "runner": "live2 .nstate-uip-3.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 2"
+  },
+  "parts": [
+   "Part 1",
+   "Part 2"
+  ],
+  "partsHeading": "Parts (2)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Versions and history"
+    }
+   },
+   "ok": true,
+   "at": [
+    20,
+    57
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": [
+      {
+       "name": "B1",
+       "kind": "workspace",
+       "selected": false
+      },
+      {
+       "name": "Main",
+       "kind": "workspace",
+       "selected": true
+      },
+      {
+       "name": "V1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "Start",
+       "kind": "start",
+       "selected": false
+      }
+     ],
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Versions and history",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 29911
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "history_row": "B1"
+    }
+   },
+   "ok": true,
+   "at": [
+    197,
+    203
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Open",
+      "Open in new browser tab",
+      "Copy link",
+      "Compare",
+      "Merge into current workspace…",
+      "Workspace protection…",
+      "Properties…",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": [
+      {
+       "name": "B1",
+       "kind": "workspace",
+       "selected": false
+      },
+      {
+       "name": "Main",
+       "kind": "workspace",
+       "selected": true
+      },
+      {
+       "name": "V1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "Start",
+       "kind": "start",
+       "selected": false
+      }
+     ],
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Versions and history",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 32490
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Merge into current workspace…"
+    }
+   },
+   "ok": true,
+   "at": [
+    315,
+    329
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Merging changes into Main from B1",
+     "fields": [
+      {
+       "label": "Replace with B1",
+       "kind": "input",
+       "value": ""
+      }
+     ],
+     "buttons": [
+      "Merge",
+      "Cancel"
+     ],
+     "text": "Overall merge strategy Keep Main 0 tabs have changes Compare with base Replace with B1 1 tab has changes Compare with base Tabs 1 tab has changes Changes in Main Changes in B1 Tab merge strategy Part Studio 1 No changes Edited Replace with B1 1 tab has no changes Assembly 1"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": [
+      {
+       "name": "B1",
+       "kind": "workspace",
+       "selected": false
+      },
+      {
+       "name": "Main",
+       "kind": "workspace",
+       "selected": true
+      },
+      {
+       "name": "V1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "Start",
+       "kind": "start",
+       "selected": false
+      }
+     ],
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Versions and history",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 35903
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Merge"
+    }
+   },
+   "ok": true,
+   "at": [
+    1310,
+    543
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "Merged B1 into Main. Revert to before this merge × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": [
+      {
+       "name": "Main",
+       "kind": "workspace",
+       "selected": true
+      },
+      {
+       "name": "Merge from B1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "B1",
+       "kind": "workspace",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Extrude 3",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "V1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "Start",
+       "kind": "start",
+       "selected": false
+      }
+     ],
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Versions and history",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 39763
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "history_row": "Merge from B1"
+    }
+   },
+   "ok": true,
+   "at": [
+    215,
+    253
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Open",
+      "Open in new browser tab",
+      "Copy link",
+      "Compare",
+      "View in repair",
+      "Restore to Main…",
+      "Create version here…"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "Merged B1 into Main. Revert to before this merge × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": [
+      {
+       "name": "Main",
+       "kind": "workspace",
+       "selected": true
+      },
+      {
+       "name": "Merge from B1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "B1",
+       "kind": "workspace",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Extrude 3",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "V1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "Start",
+       "kind": "start",
+       "selected": false
+      }
+     ],
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Versions and history",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 42380
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     215,
+     252
+    ],
+    "hover": [],
+    "element": "div.angular-bootstrap-contextmenu.dropdown"
+   },
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "Merged B1 into Main. Revert to before this merge × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": [
+      {
+       "name": "Main",
+       "kind": "workspace",
+       "selected": true
+      },
+      {
+       "name": "Merge from B1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "B1",
+       "kind": "workspace",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Extrude 3",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "V1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "Start",
+       "kind": "start",
+       "selected": false
+      }
+     ],
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Versions and history",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 46098
+  }
+ ]
+}
