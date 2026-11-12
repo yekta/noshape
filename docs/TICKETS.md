@@ -436,6 +436,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     qa's authored ones all equal (they don't reach hat15's thin-wall split face: a gap, being widened).
   - Rule: any feature whose status or message changes in a document saved by an earlier release is a blocker unless its owner
     shows the new result is live's.
+- qa 01:38, both checks on green 686c50acf against v0.4.44 (bin/compat-check.sh v0444 686c50ac; core's hat15 fix not on main
+  yet, so hat15 / slow1151 are broken in both and read the same): user documents and the 47 ticket documents the same; qa's
+  authored faces-thin-open-spline (a thin wall on an open fit spline) Part 1 16 -> 14 faces, 42 -> 40 edges, same volume, every
+  feature (its sketches on every face too) still resolving: bisected to **core's 4c50a1c38** (an extrusion surface and its
+  mirror image across its curve's plane unify into one face). Not a broken reference; core to say it is live's face count for a
+  thin wall's two sides. From the 05:00 run on, hat15 is also compared with v0.4.43 (its last good release).
 
 ## Release blockers for the 2026-11-11 17:00 release (qa list 15:22, candidate watcher green 44ff040aa, 14:21; CI 43039009971 running; the latest release is v0.4.43)
 - **qa 15:22: no blocker in the code; one naming change for the lead's call (below).** In since v0.4.43 (e2c8da0f9): core's
