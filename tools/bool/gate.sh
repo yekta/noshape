@@ -31,6 +31,8 @@ caller=$(basename "$repo")
 [ $# -ge 1 ] || { sed -n '2,13p' "$0"; exit 2; }
 target=$1; shift
 # (vibe4 left 11-12 19:55; the land queue and the gates moved to vibe5.)
+# Cargo's jobs on the shared host (lead 11-12: 6); main's and the branch's builds at once take half each.
+cj=${NOSHAPE_GATE_BUILD_JOBS:-6}
 jobs=8; threads=2; suite=1; spd=1; host=${NOSHAPE_GATE_HOST:-${NOSHAPE_RB_HOST:-vibe5}}; nightly=0; mainonly=0
 [ "$target" = --nightly-kall ] && { nightly=1; target=origin/main; suite=0; spd=0; }
 [ "$target" = --main ] && { mainonly=1; target=origin/main; spd=0; }
@@ -107,7 +109,7 @@ if [ $mainonly = 1 ]; then
   [ -d "$wt_base" ] || git -C "$repo" worktree add -q --detach "$wt_base" origin/main >> "$log" 2>&1
   git -C "$wt_base" checkout -q -f --detach "$base" && git -C "$wt_base" clean -fdq
   ops=0; cached "$bkey_s" suite || ops=1
-  cmd="cargo test --release -p noshape-kernel --test all --no-run"; [ $ops = 1 ] && cmd="$cmd && cargo test --release -p noshape-ops --test all --no-run"
+  cmd="export CARGO_BUILD_JOBS=$cj; cargo test --release -p noshape-kernel --test all --no-run"; [ $ops = 1 ] && cmd="$cmd && cargo test --release -p noshape-ops --test all --no-run"
   (cd "$wt_base" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "$cmd" > "$scratch/gate-build-base.log" 2>&1) || { say "main doesn't build"; exit 1; }
   bins=$(grep -E 'Executable tests/all.rs' "$scratch/gate-build-base.log" | sed -n 's|.*(\(.*\)).*|\1|p')
   bk=$(echo "$bins" | sed -n 1p); bo=-; [ $ops = 1 ] && bo=$(echo "$bins" | sed -n 2p)
@@ -122,7 +124,7 @@ if [ $nightly = 1 ]; then
   wt_base=/root/projects/noshape-wt/bool-gate-base
   [ -d "$wt_base" ] || git -C "$repo" worktree add -q --detach "$wt_base" origin/main >> "$log" 2>&1
   git -C "$wt_base" checkout -q -f --detach "$base" && git -C "$wt_base" clean -fdq
-  build() { (cd "$1" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cargo test --release -p noshape-kernel --test all --no-run" > "$2" 2>&1); }
+  build() { (cd "$1" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "export CARGO_BUILD_JOBS=$cj; cargo test --release -p noshape-kernel --test all --no-run" > "$2" 2>&1); }
   build "$wt_base" "$scratch/gate-build-base.log" || { echo "VERDICT FAIL: main ${base:0:9} doesn't build" | tee -a "$scratch/kall-nightly.log"; exit 1; }
   bk=$(grep -E 'Executable tests/all.rs' "$scratch/gate-build-base.log" | sed -n 's|.*(\(.*\)).*|\1|p' | head -1)
   ssh -o BatchMode=yes "$host" "mkdir -p ~/agents/bool-gate/bin ~/agents/bool-gate/runs ~/agents/bool-gate/nightly" && scp -q "$here/gate-host.py" "$host:agents/bool-gate/bin/gate-host.py"
@@ -147,7 +149,7 @@ git -C "$wt_new" checkout -q -f --detach "$new" && git -C "$wt_new" clean -fdq
 # Builds: the kernel's tests always (the timing rounds run main's and the branch's), the ops tests when a suite
 # result is missing. Main's and the branch's at once.
 build() { # <worktree> <with ops 0/1> <out file>
-  local cmd="cargo test --release -p noshape-kernel --test all --no-run"
+  local cmd="export CARGO_BUILD_JOBS=$(( (cj + 1) / 2 )); cargo test --release -p noshape-kernel --test all --no-run"
   [ "$2" = 1 ] && cmd="$cmd && cargo test --release -p noshape-ops --test all --no-run"
   (cd "$1" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "$cmd" > "$3" 2>&1)
 }
@@ -174,7 +176,7 @@ say "built in $(( $(date +%s) - t0 )) s; running"
 
 # The branch's own tests of the crates the Boolean reaches, as the land queue runs them (a model test catches what no
 # corpus has: a round's torus split at its seam, 11-12): the kernel's, the model's, model-core's.
-tests="cargo test --release -p noshape-kernel --test all && cargo test --release -p noshape-model --test all && cargo test --release -p noshape-model-core --lib"
+tests="export CARGO_BUILD_JOBS=$cj; cargo test --release -p noshape-kernel --test all && cargo test --release -p noshape-model --test all && cargo test --release -p noshape-model-core --lib"
 # (Beside the run, not before it: 11 min of a 40-min warm gate.)
 (cd "$wt_new" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "$tests" > "$scratch/gate-tests.log" 2>&1) & ptests=$!
 
