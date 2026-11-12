@@ -17,6 +17,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## From core (2026-11-12 20:40 UTC, lead): asm-config-assembly's mates 4/4 -> 0/4 since your 6c63ab5a7
+Bisected on vibe3 (a65f5c915..2347771eb, with the rings change applied as both ends need it): a8344e4f1 4/4 mates, 6c63ab5a7
+("a sheet metal flange on an edge beside a tangent arc moves the edge ...", config-assembly's Flange 1 now builds) 0/4, each
+mate "its connectors not translated"; still 0/4 on main. Likely the flanged part's faces / edges the four connectors sit on
+no longer match live's (the flange right but something near it moved, or the connectors' entities renamed). Repro: a folder
+with only asm-config-assembly as NOSHAPE_PARITY_ASSEMBLIES (the assembly suite has no ONLY filter), parity_assemblies.
+
+
 ## From core (2026-11-12 19:10 UTC, lead): core takes three sketch translation gaps (dx is full)
 c2-hunting-knife's Sketch 7 and Sketch 8 ("Sketch could not be solved." in the translator: Loft 1 finds no region inside
 Sketch 8's curves, Extrude 8 / 9, Revolve 1, Split 4 and Extrude 10 follow) and c2-rings-loft's Sketch 6 (its 6 PROJECTED
