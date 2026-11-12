@@ -21,18 +21,20 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
   `fold_solved` writes every child's solved position into `Instance::nested` (sub-instance frame, as dx's op): the
   moved child's entry is the op's. History text differs: app "Move : Sub <2>", op "Move : Sub <2> > Part 1 <1>".
 
-## In flight (asm, 11-12 07:17 UTC)
-- 4f4f9ba78 (local): Uses ours can't make where stored are drawn moved by the sketch's common Use step. Suite (vibe3,
-  one assembly per process, ~/tmp/asm/suite): clamp-pattern 26 -> 27 occ / 11 -> 13 mates, isaac-ball 100 -> 105,
-  scissor-lift 202 -> 203 / 11 -> 13, tvc-mount 41 -> 42, xdev-subs 239 -> 241, rack-pinion 4 -> 25 (main's), none
-  worse; models 77/87, 827/947. infento-subs: past the 90 min cap: each mate now takes ~30 s (3-4 full solves of a
-  167-part assembly, ~8 s each; 3-7 s before): **speed, P0, to profile** before landing.
-- Suite diagnostic (local): a root mate whose state isn't live's prints each end against live's mateConnectorCS
-  (along Z / in plane, Z angle) and ours as solved. live's matedCS carries the mate's offset and flip.
-- rack-pinion 3/8 mates: Planar 3's rack end resolved to the wrong face (live's JyK 15 mm², ours there 10 mm²: area
-  matched another 15 mm² face 66 mm away): Extrude 5 takes Sketch 6, whose stored lines are 1 mm short of where
-  its 0 cm distance puts them; the translator took our (right) solve back. Now a sketch solve that moved stored
-  geometry is kept when more of our regions then have live's areas (sketches.json). Testing.
+## Landing (asm, 11-12 14:24 UTC): three commits, assembly suite 1451 -> 1508/1731 occurrences, mates 247 -> 323
+- 4f4f9ba78: Uses ours can't make where stored are drawn moved by the sketch's common Use step (infento-subs'
+  Multi angle joint Sketch 4). cdd42c2d2: a mate group that can't all hold skips least_change and stops LM once it
+  stalls (infento-subs' 92-part group 18 s -> 1.3 s; its run 98 -> 45 min). 6b64fd5dc: a sketch solve is kept when
+  it gives more of live's regions (sketches.json) than the stale stored geometry (rack-pinion's rack Sketch 6); the
+  suite prints a mate whose state isn't live's against live's mateConnectorCS.
+- Suite (vibe3, one assembly per process, ~/tmp/asm/suite) vs dx's 11-11 run: infento-subs 111 -> 137/167,
+  mates 37/116 -> 104/172; clamp-pattern 26 -> 27, 11 -> 14/23; isaac-ball 100 -> 105; rack-pinion 4 -> 25 (main's),
+  0/2 -> 3/8; scissor-lift 202 -> 203, 11 -> 13/13; tvc-mount 41 -> 42, 3 -> 4/10; xdev-subs 239 -> 241; none worse.
+  Model suite 77/87, 827/947 per document identical to main 8fb8dffff's.
+- Next (uncommitted): rack-pinion's Cylindrical 2: the rack end is a full round fillet's half cylinder whose axis
+  runs -x in live, +x in ours (OCCT). Its one wrong mate turns its loop red (Planar 2/3, Parallel 1/2). The
+  translator flips an axis-point connector whose Z is opposite to live's mateConnectorCS (`connector_z_local`):
+  parity only, the kernel's axis sense can't be predicted (isaac-ball's mismatches are on extrudes).
 
 ## infento-subs' 28 unresolved mates: studio 74d3d6 (asm, 11-12 00:55 UTC)
 - Every "Mate cannot resolve mate connectors" there has an end on studio 74d3d6 (Multi angle joint, Axle clamp,
