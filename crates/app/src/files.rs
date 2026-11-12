@@ -6,7 +6,7 @@ use gpui_kit::component::TitleBar;
 use gpui_kit::*;
 use std::path::PathBuf;
 
-pub use noshape_app_core::file_dialogs::{documents_dir, native_dialogs_available, request_open_path, request_open_paths, request_save_path};
+pub use noshape_app_core::file_dialogs::{DialogPurpose, documents_dir, native_dialogs_available, remember_choice, request_open_path, request_open_path_for, request_open_paths, request_save_path, start_dir};
 pub use noshape_app_core::doc_files::{OpenDocs, add_recent, canonical, is_document_open, new_document_path, replace_recent, user_name_pref, watched_folders};
 
 /// App-level window lifecycle: keeps the open-document registry current and
@@ -248,15 +248,17 @@ pub fn prompt_open(gpu: Gpu, cx: &mut App) {
         // Deferred: the action is dispatched while that window is being
         // updated, so it can't be borrowed right now.
         cx.defer(move |cx| {
-            let _ = handle.update(cx, |_, window, cx| request_open_path("Open Noshape document", "Noshape document", &["noshape"], window, cx, open));
+            let _ = handle.update(cx, |_, window, cx| request_open_path_for(DialogPurpose::Document, "Open Noshape document", "Noshape document", &["noshape"], window, cx, open));
         });
         return;
     }
-    let dir = documents_dir();
+    // The folder a document was last opened from (user 11-12).
+    let dir = start_dir(DialogPurpose::Document);
     cx.spawn(async move |cx| {
         let file = rfd::AsyncFileDialog::new().set_title("Open Noshape document").set_directory(&dir).add_filter("Noshape document", &["noshape"]).pick_file().await;
         if let Some(f) = file {
             let path = f.path().to_path_buf();
+            remember_choice(DialogPurpose::Document, &path);
             cx.update(|cx| open(path, cx));
         }
     })

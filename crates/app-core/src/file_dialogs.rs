@@ -87,6 +87,62 @@ pub fn native_dialogs_available() -> bool {
         .any(|p| Path::new(p).exists())
 }
 
+/// What a file dialog is for: each starts in the folder last chosen for it (user 11-12: "the native dialog doesn't
+/// remember the last place I selected"), kept in the user's local settings across restarts.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DialogPurpose {
+    /// Export, download, save.
+    Save,
+    /// Import, upload, a file to read.
+    Open,
+    /// Opening a Noshape document.
+    Document,
+}
+
+impl DialogPurpose {
+    fn key(self) -> &'static str {
+        match self {
+            Self::Save => "save",
+            Self::Open => "open",
+            Self::Document => "document",
+        }
+    }
+}
+
+fn dialog_folders() -> PathBuf {
+    crate::paths::config_dir().join("file_dialogs.json")
+}
+
+/// The folder a dialog for `purpose` starts in: the last one chosen for it, else (none yet, or gone since) the
+/// documents folder.
+pub fn start_dir(purpose: DialogPurpose) -> PathBuf {
+    start_dir_in(&dialog_folders(), purpose, &documents_dir())
+}
+
+/// [`start_dir`] with the settings file and the fallback given.
+pub fn start_dir_in(store: &Path, purpose: DialogPurpose, fallback: &Path) -> PathBuf {
+    let v: serde_json::Value = std::fs::read(store).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+    v[purpose.key()].as_str().map(PathBuf::from).filter(|d| d.is_dir()).unwrap_or_else(|| fallback.to_path_buf())
+}
+
+/// Remember the folder of `chosen` (the file saved or picked) for `purpose`'s next dialog.
+pub fn remember_choice(purpose: DialogPurpose, chosen: &Path) {
+    remember_choice_in(&dialog_folders(), purpose, chosen);
+}
+
+/// [`remember_choice`] into the settings file given.
+pub fn remember_choice_in(store: &Path, purpose: DialogPurpose, chosen: &Path) {
+    let Some(dir) = chosen.parent().filter(|d| !d.as_os_str().is_empty()) else { return };
+    let mut v: serde_json::Value = std::fs::read(store).ok().and_then(|b| serde_json::from_slice(&b).ok()).filter(serde_json::Value::is_object).unwrap_or_else(|| serde_json::json!({}));
+    v[purpose.key()] = serde_json::json!(dir.to_string_lossy());
+    if let Some(parent) = store.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Err(e) = std::fs::write(store, serde_json::to_vec_pretty(&v).unwrap_or_default()) {
+        log::warn!("Could not remember the file dialog's folder: {e}");
+    }
+}
+
 /// Ask for a save location, then call `then` with the chosen path.
 /// Uses the native dialog when available, otherwise an in-app prompt.
 pub fn request_save_path(title: &'static str, default_name: String, ext: &'static str, window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
@@ -103,13 +159,14 @@ pub fn request_save_path(title: &'static str, default_name: String, ext: &'stati
         cx.spawn(async move |cx| {
             let picked = rfd::AsyncFileDialog::new()
                 .set_title(title)
-                .set_directory(documents_dir())
+                .set_directory(start_dir(DialogPurpose::Save))
                 .set_file_name(&name)
                 .add_filter(ext.to_uppercase(), &[ext])
                 .save_file()
                 .await
                 .map(|f| f.path().to_path_buf());
             if let Some(p) = picked {
+                remember_choice(DialogPurpose::Save, &p);
                 cx.update(|cx| then(p, cx));
             }
         })
@@ -118,11 +175,21 @@ pub fn request_save_path(title: &'static str, default_name: String, ext: &'stati
     }
     // Deferred: callers often ask from a dialog's OK handler, and closing that
     // dialog would otherwise close this prompt (it is a dialog too).
-    window.defer(cx, move |window, cx| in_app_save_prompt(title, "Save", documents_dir().join(&default_name), window, cx, then));
+    window.defer(cx, move |window, cx| {
+        in_app_save_prompt(title, "Save", start_dir(DialogPurpose::Save).join(&default_name), window, cx, move |p, cx| {
+            remember_choice(DialogPurpose::Save, &p);
+            then(p, cx)
+        })
+    });
 }
 
-/// Ask for a file to open, then call `then` with it.
+/// Ask for a file to open (an import, an upload), then call `then` with it.
 pub fn request_open_path(title: &'static str, filter_name: &'static str, exts: &'static [&'static str], window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
+    request_open_path_for(DialogPurpose::Open, title, filter_name, exts, window, cx, then)
+}
+
+/// [`request_open_path`] starting in `purpose`'s last folder.
+pub fn request_open_path_for(purpose: DialogPurpose, title: &'static str, filter_name: &'static str, exts: &'static [&'static str], window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
     if crate::ui_script::active() {
         crate::ui_script::await_pick(Box::new(move |paths, cx| {
             if let Some(p) = paths.into_iter().next() {
@@ -133,15 +200,21 @@ pub fn request_open_path(title: &'static str, filter_name: &'static str, exts: &
     }
     if native_dialogs_available() {
         cx.spawn(async move |cx| {
-            let picked = rfd::AsyncFileDialog::new().set_title(title).set_directory(documents_dir()).add_filter(filter_name, exts).pick_file().await.map(|f| f.path().to_path_buf());
+            let picked = rfd::AsyncFileDialog::new().set_title(title).set_directory(start_dir(purpose)).add_filter(filter_name, exts).pick_file().await.map(|f| f.path().to_path_buf());
             if let Some(p) = picked {
+                remember_choice(purpose, &p);
                 cx.update(|cx| then(p, cx));
             }
         })
         .detach();
         return;
     }
-    window.defer(cx, move |window, cx| in_app_save_prompt(title, "Open", documents_dir().join(""), window, cx, then));
+    window.defer(cx, move |window, cx| {
+        in_app_save_prompt(title, "Open", start_dir(purpose).join(""), window, cx, move |p, cx| {
+            remember_choice(purpose, &p);
+            then(p, cx)
+        })
+    });
 }
 
 /// Ask for one or more files (Onshape's import picker allows several), then
@@ -153,8 +226,9 @@ pub fn request_open_paths(title: &'static str, filter_name: &'static str, exts: 
     }
     if native_dialogs_available() {
         cx.spawn(async move |cx| {
-            let picked: Vec<PathBuf> = rfd::AsyncFileDialog::new().set_title(title).set_directory(documents_dir()).add_filter(filter_name, exts).pick_files().await.map(|v| v.iter().map(|f| f.path().to_path_buf()).collect()).unwrap_or_default();
-            if !picked.is_empty() {
+            let picked: Vec<PathBuf> = rfd::AsyncFileDialog::new().set_title(title).set_directory(start_dir(DialogPurpose::Open)).add_filter(filter_name, exts).pick_files().await.map(|v| v.iter().map(|f| f.path().to_path_buf()).collect()).unwrap_or_default();
+            if let Some(first) = picked.first() {
+                remember_choice(DialogPurpose::Open, first);
                 cx.update(|cx| then(picked, cx));
             }
         })
@@ -162,8 +236,11 @@ pub fn request_open_paths(title: &'static str, filter_name: &'static str, exts: 
         return;
     }
     window.defer(cx, move |window, cx| {
-        in_app_save_prompt(title, "Open", documents_dir().join(""), window, cx, move |p, cx| {
+        in_app_save_prompt(title, "Open", start_dir(DialogPurpose::Open).join(""), window, cx, move |p, cx| {
             let paths: Vec<PathBuf> = p.to_string_lossy().split(';').map(|s| PathBuf::from(s.trim())).filter(|p| !p.as_os_str().is_empty()).collect();
+            if let Some(first) = paths.first() {
+                remember_choice(DialogPurpose::Open, first);
+            }
             then(paths, cx)
         })
     });
@@ -226,7 +303,26 @@ fn in_app_save_prompt(title: &'static str, ok_label: &'static str, default: Path
 
 #[cfg(test)]
 mod tests {
-    use super::{PathStyle, display_path_in, os_path_in};
+    use super::{DialogPurpose, PathStyle, display_path_in, os_path_in, remember_choice_in, start_dir_in};
+
+    /// User 11-12: an export's dialog starts where the last export went (each purpose its own), and a folder deleted
+    /// since falls back to the documents folder.
+    #[test]
+    fn dialogs_start_in_the_last_folder_chosen() {
+        let root = std::env::temp_dir().join(format!("noshape-dialog-dirs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (store, docs, chosen) = (root.join("config/file_dialogs.json"), root.join("documents"), root.join("exports"));
+        std::fs::create_dir_all(&docs).unwrap();
+        std::fs::create_dir_all(&chosen).unwrap();
+        assert_eq!(start_dir_in(&store, DialogPurpose::Save, &docs), docs, "nothing chosen yet");
+        remember_choice_in(&store, DialogPurpose::Save, &chosen.join("Part Studio 1.step"));
+        assert_eq!(start_dir_in(&store, DialogPurpose::Save, &docs), chosen, "the next export starts there");
+        assert_eq!(start_dir_in(&store, DialogPurpose::Open, &docs), docs, "an import keeps its own folder");
+        assert_eq!(start_dir_in(&store, DialogPurpose::Document, &docs), docs);
+        std::fs::remove_dir_all(&chosen).unwrap();
+        assert_eq!(start_dir_in(&store, DialogPurpose::Save, &docs), docs, "a deleted folder falls back");
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     /// Windows shows the documents folder as Explorer does: the full path, backslashes, no "~" (user 11-07: "~/Documents\noshape").
     #[test]
