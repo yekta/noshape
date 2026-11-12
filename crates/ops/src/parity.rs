@@ -1218,7 +1218,9 @@ impl<'a> Translator<'a> {
 
     /// Live's Use of model geometry (a PROJECTED entity) as Use makes it, when ours lands where live's is; else
     /// drawn as the other entities.
-    fn use_projected(&mut self, oid: &str, id: &str, u: Use, problems: &mut Vec<String>) {
+    /// Returns how far ours lies from live's stored entity (our sketch's metres), for a circle or point; a Use that
+    /// doesn't land where live's is stored comes back to be drawn (`moved_uses`).
+    fn use_projected(&mut self, oid: &str, id: &str, u: Use, problems: &mut Vec<String>) -> Result<Option<[f64; 2]>, Use> {
         let map = self.sketch_map;
         let top = |t: &mut Self| t.ctx.doc(None).ok().and_then(|od| od.session.undo_tops().0);
         let mark = top(self);
@@ -1244,19 +1246,74 @@ impl<'a> Translator<'a> {
                 problems.push(format!("sketch entity {}: its Use not made construction ({e})", u.eid));
             }
             self.map_drawn(oid, &u.eid, &c, point, u.ends);
+            let stored = match u.point {
+                Some(p) => Some((p, "at")),
+                None => self.circles.get(&(oid.to_string(), u.eid.clone())).map(|(c, _)| (*c, "center")),
+            };
             self.used.insert((oid.to_string(), u.eid));
-            return;
+            let at = |key: &str| Some([c[key][0].as_f64()? * map.k, c[key][1].as_f64()? * map.k]);
+            let step = stored.and_then(|(q, key)| {
+                let (p, q) = (at(key)?, map.local(q));
+                Some([p[0] - q[0], p[1] - q[1]])
+            });
+            return Ok(step);
         }
         if made.is_some() && top(self) != mark {
             let _ = self.call("history_undo", json!({}));
         }
-        match self.call("sketch_draw", json!({ "sketch": id, "shapes": [u.shape] })) {
-            Ok(r) => {
-                if let Some(c) = r["created"].as_array().and_then(|l| l.iter().find(|c| (c["type"] == "point") == point)) {
-                    self.map_drawn(oid, &u.eid, c, point, u.ends);
+        Err(u)
+    }
+
+    /// Live's Uses that ours can't make where they're stored (no model geometry named, or ours lands elsewhere),
+    /// drawn where they're stored: where they were when drawn, before the model moved. When every Use of the sketch
+    /// that ours made moved by the same step (infento-subs' Multi angle joint, Sketch 4: its hole circle 0.5 mm from
+    /// where it's stored, the pocket's two arcs with it), they're drawn moved by it too.
+    fn moved_uses(&mut self, oid: &str, id: &str, model_frame: bool, unnamed: Vec<(String, Value, Option<[[f64; 2]; 2]>)>, moved: &[[f64; 2]], problems: &mut Vec<String>) {
+        if unnamed.is_empty() {
+            return;
+        }
+        let map = self.sketch_map;
+        let step = moved.first().copied().filter(|d| d[0].hypot(d[1]) > 1e-9 && moved.iter().all(|m| (m[0] - d[0]).hypot(m[1] - d[1]) < 1e-7)).unwrap_or([0.0, 0.0]);
+        // The step in the model (shapes' points are model mm with live's frame, else our sketch's mm) and in live's
+        // sketch (the stored ends).
+        let [_, ox, oy] = map.ours;
+        let model: [f64; 3] = std::array::from_fn(|i| step[0] * ox[i] + step[1] * oy[i]);
+        let live = match map.onshape {
+            Some([_, fx, fy]) => [(0..3).map(|i| model[i] * fx[i]).sum::<f64>(), (0..3).map(|i| model[i] * fy[i]).sum::<f64>()],
+            None => step,
+        };
+        let shift = |p: &Value| -> Value {
+            let Some(a) = p.as_array() else { return p.clone() };
+            let d: &[f64] = if model_frame { &model } else { &step };
+            json!(a.iter().enumerate().map(|(i, c)| {
+                let v = c.as_str().and_then(|t| t.trim_end_matches(" mm").parse::<f64>().ok());
+                match (v, d.get(i)) {
+                    (Some(v), Some(d)) => json!(format!("{} mm", v + d * 1000.0)),
+                    _ => c.clone(),
                 }
+            }).collect::<Vec<_>>())
+        };
+        let key = |eid: &str| (oid.to_string(), eid.to_string());
+        for (eid, mut shape, ends) in unnamed {
+            if let Some(pts) = shape["points"].as_array().map(|a| a.iter().map(shift).collect::<Vec<_>>()) {
+                shape["points"] = json!(pts);
             }
-            Err(e) => problems.push(format!("sketch entity {}: not drawn ({e})", u.eid)),
+            let ends = ends.map(|e| e.map(|p| [p[0] + live[0], p[1] + live[1]]));
+            if let Some((c, _)) = self.circles.get_mut(&key(&eid)) {
+                *c = [c[0] + live[0], c[1] + live[1]];
+            }
+            if let Some(poly) = self.curves.get_mut(&key(&eid)) {
+                poly.iter_mut().for_each(|p| *p = [p[0] + live[0], p[1] + live[1]]);
+            }
+            let point = shape["tool"] == "point";
+            match self.call("sketch_draw", json!({ "sketch": id, "shapes": [shape] })) {
+                Ok(r) => {
+                    if let Some(c) = r["created"].as_array().and_then(|l| l.iter().find(|c| (c["type"] == "point") == point && c.get("handle_of").is_none())) {
+                        self.map_drawn(oid, &eid, c, point, ends);
+                    }
+                }
+                Err(e) => problems.push(format!("sketch entity {eid}: not drawn ({e})")),
+            }
         }
     }
 
@@ -3673,6 +3730,7 @@ impl<'a> Translator<'a> {
             })
             .collect();
         let mut uses: Vec<Use> = Vec::new();
+        let mut unnamed_uses: Vec<(String, Value, Option<[[f64; 2]; 2]>)> = Vec::new();
         for e in f["entities"].as_array().into_iter().flatten() {
             // Where live's solve put it (`sketches` geomEntities): stored
             // geometry can lag its variables (cf-parameter-pattern).
@@ -3803,12 +3861,21 @@ impl<'a> Translator<'a> {
                     let point = (s["tool"] == "point").then(|| [e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0)]);
                     uses.push(Use { eid, reference: used.unwrap_or_default(), shape: s, ends: end_points, point });
                 }
+                // A Use whose model geometry isn't named: drawn after the Uses ours makes (`moved_uses`).
+                Some(s) if projected.contains_key(&eid) => unnamed_uses.push((eid, s, end_points)),
                 Some(s) => {
                     shapes.push(s);
                     local.push(eid);
                     ends.push(end_points);
                 }
                 None => problems.push(format!("sketch entity {eid}: {} not translated", if gt.is_empty() { e["btType"].as_str().unwrap_or("?") } else { gt })),
+            }
+        }
+        if uses.is_empty() {
+            for (eid, s, e) in unnamed_uses.drain(..) {
+                shapes.push(s);
+                local.push(eid);
+                ends.push(e);
             }
         }
         // Curves first, then the free points, so each reply lists ours in
@@ -3847,9 +3914,14 @@ impl<'a> Translator<'a> {
                 }
             }
         }
+        let mut moved: Vec<[f64; 2]> = Vec::new();
         for u in uses {
-            self.use_projected(&oid, &id, u, problems);
+            match self.use_projected(&oid, &id, u, problems) {
+                Ok(step) => moved.extend(step),
+                Err(u) => unnamed_uses.push((u.eid, u.shape, u.ends)),
+            }
         }
+        self.moved_uses(&oid, &id, frame.is_some(), unnamed_uses, &moved, problems);
         for t in &texts {
             if let Err(e) = self.sketch_text(&oid, &id, t, map) {
                 problems.push(format!("sketch text {}: {e}", t["entityId"].as_str().unwrap_or("?")));

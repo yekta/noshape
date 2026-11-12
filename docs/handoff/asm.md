@@ -21,6 +21,15 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
   `fold_solved` writes every child's solved position into `Instance::nested` (sub-instance frame, as dx's op): the
   moved child's entry is the op's. History text differs: app "Move : Sub <2>", op "Move : Sub <2> > Part 1 <1>".
 
+## infento-subs' 28 unresolved mates: studio 74d3d6 (asm, 11-12 00:55 UTC)
+- Every "Mate cannot resolve mate connectors" there has an end on studio 74d3d6 (Multi angle joint, Axle clamp,
+  U-block, Profile connector: no volume of ours fits live's) or f0eedd (Extrusions). 74d3d6 alone (vibe3
+  ~/agents/asm/ps-mj/inf-mj, with a source.json saying its live.jsonl is the UI fetch: its boxes are loose): 9/127,
+  first Extrude 4 (Up to next, NEW: the Knurled disc). Its Sketch 4 arcs are Uses whose model edge live's fetch
+  doesn't name: drawn where stored, 0.5 mm off (centre x 37.5; the pocket and the named Use, the r4 hole, at 37),
+  so the disc runs into the pocket wall and Up to next never closes. Blind 4.3 mm gives live's volume exactly.
+- Change in testing: such Uses are drawn after the named ones, moved by their common step (`moved_uses`).
+
 ## hand-drill Cylindrical 22 is studio geometry, not the axis-point rule (asm, 11-11 22:06 UTC; for dx)
 Studio f79298 (Gear Selector Ring Gear) built alone (vibe3 ~/agents/asm/ps-ring/hd-ring, its document
 ~/tmp/asm/pr/ring-copy.noshape): 9/30 features as live, first Chamfer 1; the Spur gear gives 83 faces (live 98).
