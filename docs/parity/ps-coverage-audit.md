@@ -76,4 +76,6 @@ After both batches, 61 of 75 tools have a re-edit.
 
 - Wrap, Decal, Derived, Form, Flex PCB / Finish flex PCB: they need an image, another document or a library.
 - Tag, Frame trim (with a second frame), Sheet metal loft, Constrained surface, Enclose, Query variable's edit.
-- Create Drawing of… and Export… from the graphics.
+- Create Drawing of… and Export… from the graphics: batch 3 (`face-rclick-create-drawing`, `face-rclick-export`,
+  `face-rclick-export-dxf`, psui 11-12).
+- Enclose (needs a start with a closed set of surfaces).

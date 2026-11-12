@@ -1,0 +1,33 @@
+{
+ "name": "face-rclick-create-drawing",
+ "about": "the block's top face right-clicked: Create Drawing of Part 1… opens its dialog (template, views); Esc cancels and no drawing is made",
+ "area": "psui",
+ "source": "psui coverage audit 2026-11-12, batch 3 (docs/parity/ps-coverage-audit.md \"Still left\")",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create Drawing of Part 1…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,33 @@
+{
+ "name": "face-rclick-export-dxf",
+ "about": "the block's top face right-clicked: Export as DXF/DWG… opens its dialog for the face; Esc cancels",
+ "area": "psui",
+ "source": "psui coverage audit 2026-11-12, batch 3 (docs/parity/ps-coverage-audit.md \"Still left\")",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export as DXF/DWG…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
