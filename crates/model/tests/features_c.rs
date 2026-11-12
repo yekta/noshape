@@ -4166,10 +4166,11 @@ fn a_round_over_a_tube_end_rolls_the_ball_over_the_rim_as_live() {
     }
 }
 
-/// A face a unify merges after a boolean goes by the names its parents from the same argument would have given it (an
-/// older version picked among them by their order, which the result's geometry can move): a reference made under one
-/// of them still finds it (hat15's SSD pad sketches, made in v0.4.43, lost their plane in v0.4.44). Not a tool's: the
-/// old naming never named it that, and finding it there drafted a part inside out (qa rust-zero-solid-f197).
+/// A face a unify merges after a boolean goes by the names its other parents would have given it (an older version
+/// picked among them by the result's order, which its geometry can move): a reference made under one of them still
+/// finds it (hat15's SSD pad sketches, made in v0.4.43, lost their plane in v0.4.44; fuzz slow1151's pattern direction
+/// on a copy's face). A boolean's own naming took the target's face first, so a tool's name there is no alias (qa
+/// rust-zero-solid-f197 drafted a part inside out on one).
 #[test]
 fn a_merged_face_is_found_by_another_parents_name() {
     let mut s = Studio::new();
@@ -4222,12 +4223,13 @@ fn a_merged_face_is_found_by_another_parents_name() {
     let r = s.ok();
     let plane = r.display.sketches.last().map(|k| k.frame.origin.z);
     assert!(plane.is_some_and(|z| near(z, mm(10.0), 1e-12)), "{plane:?}");
-    // The filler's own top: a tool's face, not a name the top ever went by.
+    // The filler's own top too: the unify's result could have put it first.
     let mut sk = noshape_sketch::Sketch::new();
     polyline(&mut sk, &[(12.0, 2.0), (18.0, 2.0), (18.0, 8.0), (12.0, 8.0)], true);
     s.sketch(filler_top, sk);
-    let (status, message) = s.last_status();
-    assert_eq!((status, message.as_str()), (FeatureStatus::Error, "Select a sketch plane."));
+    let r = s.ok();
+    let plane = r.display.sketches.last().map(|k| k.frame.origin.z);
+    assert!(plane.is_some_and(|z| near(z, mm(10.0), 1e-12)), "{plane:?}");
 }
 
 /// A feature whose result is a solid turned inside out (a negative volume) fails, the part never kept (qa

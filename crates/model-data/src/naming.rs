@@ -165,13 +165,15 @@ pub fn name_faces(input: &FaceNamingInput) -> Vec<Name> {
             }
         };
         if let Some(p) = face_parents.first() {
-            // The names the old naming could have given it: its other parents from the same argument (their order
-            // there decided it; a tool's face never came before the target's), not a tool's (qa rust-zero-solid-f197:
-            // a mirror copy's face named that way, which no older version resolved, then drafted the part inside out).
+            // The names the old naming could have given it. After a boolean's unify (`parent_rank`) it went by the
+            // result's order, so any of its other parents (fuzz slow1151's pattern direction: a copy's face, a tool's);
+            // otherwise by argument, so only its other parents from the same argument, never a tool's (qa
+            // rust-zero-solid-f197: a mirror copy's face named that way, which no older version resolved, then drafted
+            // the part inside out).
             if let Some(sink) = input.aliases {
-                let arg_of = |n: &Name| input.parent_rank.and_then(|r| r(n)).map(|(a, _)| a).or_else(|| parent_key.get(&Arc::as_ptr(n)).map(|k| k.0));
+                let arg_of = |n: &Name| parent_key.get(&Arc::as_ptr(n)).map(|k| k.0);
                 let pa = arg_of(p);
-                sink.borrow_mut().extend(face_parents[1..].iter().filter(|q| arg_of(q) == pa).map(|q| (named(q), j)));
+                sink.borrow_mut().extend(face_parents[1..].iter().filter(|q| input.parent_rank.is_some() || arg_of(q) == pa).map(|q| (named(q), j)));
             }
             out[j] = Some(named(p));
             continue;
