@@ -1459,7 +1459,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   library, setting another replaces it). The default tolerance tables (model-data fits/tables.rs: the hole and dimension tolerance pickers) should list, next to Onshape's own library, a "My default tolerances" entry holding
   that folder's `.noshape` documents (its subfolders as folders, as the documents page shows them), each document's
   tolerance tables, picked like a document from Other documents (inserted at its latest version). No folder set: no entry.
-- [ ] P2 BAD-FACE-DISPLAY-60S (core 2026-11-08, found while fixing c2-hunting-knife's Loft 3; owner to route: the
+- [x] (psui 11-12: bounded by the mesher's cell cap per B-spline face (a73a253f5, 11-08). Repro re-run on vibe5 with the old sampling: the same bad Loft 3 (a sheet, 40 edges vs live 38, area 7915 vs 7769 mm²); feature list with the display 1131 ms, was 60855; the display 514 ms and 1.06 M triangles for 4 bodies, against 76 ms and 25k triangles for 3 without the bad face) P2 BAD-FACE-DISPLAY-60S (core 2026-11-08, found while fixing c2-hunting-knife's Loft 3; owner to route: the
   display / meshing path) **feature_list's display took 60.6 s** where the document's features regenerate in 473 ms.
   Cause upstream (fixed in eb200af6): a guided surface loft sampled its composite guide off the curve, so the fitted
   face wiggled (a 72 mm side along a 55 mm guide) and was sewn into the blade sheet. The lone face meshes in ~4 s

@@ -10,6 +10,11 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**2026-11-12 09:52 UTC:** line LOD at 0.5 px landed (d731becd). BAD-FACE-DISPLAY-60S closed: already bounded by the mesher's
+cell cap (a73a253f5); with core's old loft sampling the knife's display is 514 ms / 1.06 M triangles (76 ms / 25k
+without the bad face), the feature list 1.1 s (was 60.9 s). ps-* misses on the newest suite (1112-0757): only the six
+live-side ones.
+
 **Builds: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh …`** (vibe4 for clippy). Model suite gate: `NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 cargo test -q -p noshape-ops --release --test all parity::parity_models -- --ignored --nocapture`, compared per document with
 qa's run (`/root/qa-scratch/recut/models-f324e41f.log`: 77/87, 826/947, custom features 103/107).
