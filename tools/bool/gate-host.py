@@ -23,9 +23,10 @@ REPLAY = ("bool-corpus corpus2 corpus3 corpus4 corpus5 corpus6 direct-corpus sh-
           "kall k10-25 k10-25-12 k25-15 k25-25 k25-71-12 cf-spur-gear gears gpf").split()
 VS_OCCT = {"parity56"}
 # Corpora whose cases can take many GB each (Shell's slab fuses, knurls, gears: the memory budget is 16 GB a
-# process, as whyall.sh's): their own shards, in a pool of two. Eight such at once were killed for memory on vibe4.
+# process, as whyall.sh's; 8.3 GB the most seen in one shard): their own shards, in a pool of four. Eight such at
+# once were killed for memory on vibe4.
 HEAVY = {"shfall", "kall", "k10-25", "k10-25-12", "k25-15", "k25-25", "k25-71-12", "cf-spur-gear", "gears", "gpf"}
-HEAVY_AT_ONCE = 2
+HEAVY_AT_ONCE = 4
 SPEED = ["k25-15", "k25-25", "cf-spur-gear"]
 CASE = re.compile(r"^([0-9a-f]{16})")
 
