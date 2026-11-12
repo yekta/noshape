@@ -15,6 +15,14 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**2026-11-12 23:37 UTC (lead: 3D picking after the sketch reach fix):** outside sketch mode a click already acts on the
+hovered entity (the viewport's Click uses `pick_at` at the click, as the hover; the Part Studio applies the same Alt
+pick-through, field filter and midpoint target; the assembly maps both through `self.pick`). Our reach, measured
+(offscreen `our_3d_pick_reach_for_edges_and_vertices`, GPU T2 `a_click_beside_an_edge_selects_what_is_lit`): an edge
+9 px over the background but 5 px over its own face (the face wins from 6 px), a vertex 11 px and over the edge it ends,
+at DPR 1 and 2. Live asked to measure its 3D reach (REQUESTS 23:25): edges, vertices, mate connectors, sketch curves,
+plane borders, overlaps, click = hover; then set PICK_EXTRA_CSS_PX / the reach to theirs.
+
 **2026-11-12 22:50 UTC (live's batch-1 takes, vibe6):** 40/49 → 46/49 of my recorded audit scenarios. Fixed: a stale
 selection readout after a dialog's OK (menus.rs clears `measure_readout`), Boolean's empty Tools blamed (`tools`), a
 side panel live read unloaded not compared (run.py), Split with one side kept drops / keeps a part it doesn't cut by

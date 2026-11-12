@@ -602,6 +602,70 @@ fn a_point_picks_round_its_drawn_centre_at_any_pixel_ratio() {
     }
 }
 
+/// Our 3D pick reach outside sketch mode, as the viewport picks (the nearest id within PICK_RADIUS 5 CSS px of the
+/// pointer, vertices before edges before faces), measured on the pick buffer at a pixel ratio of 1 and 2: a part
+/// edge (drawn 1 px, picked PICK_EXTRA_CSS_PX wider) lights from 9 px off it; a vertex (a 6 px sprite) from 11 px,
+/// and beats the edge it ends. (In the app an edge reaches only 5 px over its own face: the GPU test
+/// `a_click_beside_an_edge_selects_what_is_lit`.) Live's are being measured (REQUESTS 11-12 23:25); these move with them.
+#[test]
+fn our_3d_pick_reach_for_edges_and_vertices() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (300u32, 200u32);
+    let (lo, hi) = ([-0.02f32, -0.01, -0.005], [0.02f32, 0.01, 0.005]);
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Top);
+    cam.fit_sphere(glam::DVec3::ZERO, 0.05, w as f64 / h as f64);
+    // The top face's front edge (y = lo, z = hi) as the builder draws a part edge, and its left end's vertex.
+    let mut edge = LineData::default();
+    edge.push_polyline(&[[lo[0], lo[1], hi[2]], [hi[0], lo[1], hi[2]]], [0, 0, 0, 255], 50, 1.0, LineSegment::CORE);
+    let vertex = PointData { points: vec![PointSprite { position: [lo[0], lo[1], hi[2]], color: [255; 4], pick_id: 60, size: 6.0, style: 0, _pad: 0 }] };
+    let scene = Scene {
+        instances: vec![
+            Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh(lo, hi, 1)))).with_color([0.6, 0.7, 0.8, 1.0]),
+            Instance::new(Drawable::Lines(r.upload_lines(&edge))).with_color([0.0, 0.0, 0.0, 1.0]).layer(10),
+            Instance::new(Drawable::Points(r.upload_points(&vertex))).per_primitive_color().layer(11),
+        ],
+        ..Default::default()
+    };
+    // Priorities as `PickMap::priority_fn` gives them (×2): vertex 6, edge 4, face 0.
+    let prio = |id: u32| match id {
+        60 => 6,
+        50 => 4,
+        0 => -1,
+        _ => 0,
+    };
+    for dpr in [1.0f32, 2.0] {
+        let (dw, dh) = ((w as f32 * dpr) as u32, (h as f32 * dpr) as u32);
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: dw, height: dh, device_pixel_ratio: dpr, style: &Style::default(), pick: true }).unwrap();
+        let pick = f.pick.unwrap();
+        let size = glam::DVec2::new(dw as f64, dh as f64);
+        let screen = |p: [f32; 3]| cam.project(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64), size, 0.05).unwrap();
+        let radius = (5.0 * dpr) as i32;
+        let at = |q: glam::DVec2| pick.pick(q.x.round() as i32, q.y.round() as i32, radius, prio);
+        // CSS px off the edge's middle, straight across it (outward over the background, inward over the top face).
+        let mid = screen([0.0, lo[1], hi[2]]);
+        let inward = (screen([0.0, 0.0, hi[2]]) - mid).normalize();
+        let reach = |dir: glam::DVec2, id: u32| (0..40).take_while(|k| at(mid + dir * (*k as f64 * dpr as f64)) == Some(id)).count() as i32 - 1;
+        let (out, inn) = (reach(-inward, 50), reach(inward, 50));
+        assert!((8..=10).contains(&out) && (8..=10).contains(&inn), "dpr {dpr}: an edge lights from {out} px off it over the background, {inn} over its face");
+        // The vertex, along the diagonal away from the part; and it beats the edge where both are in reach.
+        let corner = screen([lo[0], lo[1], hi[2]]);
+        let away = (corner - screen([0.0, 0.0, hi[2]])).normalize();
+        let v = (0..40).take_while(|k| at(corner + away * (*k as f64 * dpr as f64)) == Some(60)).count() as i32 - 1;
+        assert!((10..=13).contains(&v), "dpr {dpr}: a vertex lights from {v} px off it");
+        let along = (screen([hi[0], lo[1], hi[2]]) - corner).normalize();
+        assert_eq!(at(corner + along * (8.0 * dpr as f64)), Some(60), "dpr {dpr}: on its edge 8 px from the vertex, the vertex wins");
+        eprintln!("dpr {dpr}: edge {out} px out / {inn} px in, vertex {v} px");
+    }
+}
+
 /// Overlapping datum planes pick the nearest (live ui-parity: Top where it lies in front of Front; ours took the
 /// plane drawn last), a part behind the planes still wins over them, and its faces and edges pick as before.
 #[test]
