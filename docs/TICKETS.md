@@ -424,7 +424,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   B-splines), the commit qa's 17:00 list (15:22) bisected from fuzz document slow1151's lost pattern direction and left to the
   lead as "a fuzz document": it was this class. core is fixing it; **the 05:00 candidate must contain the fix, and hat15 must
   regenerate as on v0.4.43** (with hat8 and the dock, below).
-- **qa 04:26, the hotfix candidate = main 6d8b17381 (core's hat15 fix; no watcher green has it yet: qa's noshape-cli built from it
+- **qa 04:25, the hotfix candidate = main 6d8b17381 (core's hat15 fix; no watcher green has it yet: qa's noshape-cli built from it
   on vibe4; CI dispatched by the lead): hat15 FIXED, but two ticket documents regress: hold the cut until they are explained.**
   - hat15 (vibe3 ~/lead-private, v0.4.43's CLI in ~/lead-private/cli/0.4.43): all 142 features the same status as v0.4.43 (the
     SSD pad sketches, their extrudes and the pocket fillet Ok again). Parts: 5 of 6 equal; the Fan Riser 45,094.52 -> 45,100.24 mm³
