@@ -2907,8 +2907,10 @@ static bool apart_across_slab(const TopoDS_Face& fa, const TopoDS_Face& fb, Exac
   bb.Get(b[0], b[1], b[2], b[3], b[4], b[5]);
   const double tol = BRep_Tool::MaxTolerance(fa, TopAbs_EDGE) + BRep_Tool::MaxTolerance(fb, TopAbs_EDGE) + Precision::Confusion();
   const double overlap = std::min(a[axis + 3], b[axis + 3]) - std::max(a[axis], b[axis]);
-  // (Apart by more than their tolerances: nothing.)
-  if (overlap < -tol)
+  // (Apart: nothing. OCCT's section is of the faces' own surfaces, which their exact extents keep apart: the hunting
+  // knife's blade faces and their mirror images, 38 um apart with 21 um tolerances each, 150 ms of OCCT's marching a
+  // pair for no curve.)
+  if (overlap < -tol || overlap < -Precision::Confusion())
     return true;
   // (A face flat in the slab: the other's edges on it are sections.)
   if (overlap > tol || a[axis + 3] - a[axis] <= 2 * tol || b[axis + 3] - b[axis] <= 2 * tol)
