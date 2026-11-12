@@ -26,6 +26,19 @@ scratch /root/bool-scratch.
   5.894733 -> 5.894734 mm): needs a quiet A/B and its own gate.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **Completion (11-12 23:03 UTC, main 909e48460, all 98 suite documents recorded on vibe5, each distinct Boolean once a
+  document; /root/bool2-scratch/tally.py, replay-docs.sh):** 928 Booleans, 656 ours (70.7 %), 44 more on our other
+  shortcuts (on_face, through_holes), 228 OCCT; without cf-fill-pattern's 140 empty probes 656 / 788 (83.2 %). 48 of
+  the 72 documents with Booleans all ours. 70 of 72 documents' Booleans faster ours than OCCT's (45.9 s against 81.1 s;
+  not: cf-setback-fillet, cf-parameter-pattern's single on_face). With bool2-cov landed: +16 (rings 2, setback 5,
+  sheet metal 8, knife 1) and the 140 probes (8139e7607, gating): 812 / 928 (87.5 %); setback and fill-pattern all ours.
+- **Landing (11-12 23:35 UTC):** f57af894 (sheets of shells; plane / round sections) in the land queue; 8139e7607
+  (cf-fill-pattern's probes: a common of edges alone, lines and circles not running together, is empty) gating.
+  Real documents, main vs branch alternating on vibe5: c2-rings-loft 9.8-15.6 s -> 4.0-4.3 s (live 1.6), same 22/32;
+  cf-setback-fillet ~1.0 s both (live 1.09); c2-hunting-knife the same (1.8-2.0 s both).
+- **Next:** the knife's 343b971e (514 ms): the two chamfer tools meet end to end (caps coincident at x -50 mm), their
+  B-spline faces nearly tangent to the blade's; with near-on edges taken (X_NEARON) one section edge there has six
+  pieces of faces 4, 21 and 25 (non-manifold). A classification problem; parked for the probes.
 - **On now (lead 11-12 14:00 UTC):** Boolean coverage by real-document time: the documents whose OCCT Booleans cost
   the most seconds over live's time for the whole document, biggest first. Candidates: c2-impeller-loft (8 of 13 on
   OCCT), c2-sm-corner-break (23), c2-sm-louver (20), cf-sheet-metal-model-plus (7), cf-setback-fillet (5/5),
@@ -77,7 +90,7 @@ scratch /root/bool-scratch.
     CHECK: "the knurls not run". The timing rounds (ours alone, small) still run. Memory waits are a share of the host
     (30 %), never longer than 10 minutes.
   - **The kall nightly stays off** (kall needs 49.5 GB; vibe3 has 31). The hourly `--main` cron runs against vibe5.
-- **To core / blend (11-12 22:45 UTC): c2-impeller-loft's 9-hole cut and 9-seat fuse (Remove Bohrung Flansch /
+- **To core / blend (11-12 22:40 UTC): c2-impeller-loft's 9-hole cut and 9-seat fuse (Remove Bohrung Flansch /
   Extrude Bohrungssitz Flansch, 0.27 + 1.0 s on OCCT) get a flange body with 9 vertices of 1.1-1.8 mm tolerance (one
   0.4 mm off the plane z = -4 mm). The tools are plain blind extrudes; the Booleans before (Boolean 3's) see nothing over
   0.1 mm. So one of features 35-38 makes them: Fillet 4, Move face 2, Delete face 2, Fillet Ansaugflansch zum Gehaeuse.
