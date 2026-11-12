@@ -398,6 +398,14 @@ def compare(base_r, new_r, base_s, new_s, spd):
         info.append(f"replay: {len(n)} distinct cases; taken {sum(r[3] in TAKEN for r in base_r)} -> {sum(r[3] in TAKEN for r in new_r)} "
                     f"(+{len(gained)} -{len(lost)}), differing {sum(r[3] in BAD for r in base_r)} -> {sum(r[3] in BAD for r in new_r)}, "
                     f"fixed {len(fixed)}, decline reasons changed {reasons}")
+        # (Our time on the cases both take, both runs in one pool at once: a hint; the timing rounds decide.)
+        tb = {k: float(r[5]) for k, r in b.items() if r[3] in TAKEN and r[5]}
+        tn = {k: float(r[5]) for k, r in n.items() if r[3] in TAKEN and r[5]}
+        for what, pick in [("all", lambda c: True), ("knurls", lambda c: c in SOLO), ("gears", lambda c: c in {"cf-spur-gear", "gears", "gpf"})]:
+            ks = [k for k in tb if k in tn and any(pick(c) for c in n[k][2].split(","))]
+            if ks:
+                sb_, sn_ = sum(tb[k] for k in ks), sum(tn[k] for k in ks)
+                info.append(f"  ours on the {len(ks)} cases both take ({what}): main {sb_ / 1e3:.1f} s, branch {sn_ / 1e3:.1f} s ({sn_ / max(sb_, 1e-9):.2f}x; same pool, a hint)")
         if fixed:
             info.append("  fixed: " + ", ".join(fixed[:20]))
         if gained:
