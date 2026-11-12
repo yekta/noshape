@@ -14,6 +14,17 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
   OCCT), c2-sm-corner-break (23), c2-sm-louver (20), cf-sheet-metal-model-plus (7), cf-setback-fillet (5/5),
   cf-o-ring-generator (4). bool: you're on the sections-ahead speed group. I take declines (cases OCCT runs) and stay
   off our own time where we already take a case. If a decline I take is one you have WIP on, say so here.
+- **c2-fan-blade-sweep's Sweep 1 (lead's priority 11-12 15:30; gate PASS 17:02, landing):** OCCT's section of the
+  bolt's shaft cylinder (a whole one, its seam an edge) with each thread flank stopped at the last crossing of the
+  seam, a turn short of the shaft's end. For flank 1 it left a curve of no length there; for flank 2 nothing. So both
+  Booleans lost the overlap: OCCT's common came out empty and its fuse two solids. Ours declined "a non-manifold
+  result". Now, when such a section has a curve ending on the seam inside the face that nothing continues, it is asked
+  again of the free-form face and the cylinder made long enough to hold it (`sections_past_seam`, rust_boolean.cpp);
+  the Boolean cuts the curves to the faces. Ours: fuse one solid 2,156.49 mm3 (live 2,156.42), overlap 26.20 mm3
+  (live 26.27). The document goes 42 -> 44 of 53, Sweep 1 244 ms (live 58).
+  - T1 bool_patterns::a_thread_sunk_into_a_shaft_fuses_as_live (the two STEP solids from core's repro).
+  - **To core:** the next difference is feature 44, Mirror 3 (PART, NEW): its copy of the Bolt, Part 11, has
+    25/60/38 faces/edges/vertices, live 16/33/20, while the Bolt itself matches live at features 42 and 43.
 - **Coverage by document (11-12 14:40 UTC; model suite recorded per document on vibe4, main 54ffc204, 6 documents at a
   time; each distinct Boolean counted once).** OCCT seconds / ours / our regeneration / live:
   - c2-impeller-loft: 8.4 s on OCCT (10 Booleans), 1.0 s ours, regen 25.9 s, live 2.8 s.
@@ -24,7 +35,7 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
     cf-sheet-metal-model-plus 0.22 s (7), c2-sm-louver 0.13 s (20), cf-o-ring-generator 0.03 s (4).
   - Across all 98 documents: 14.9 s on OCCT (230 Booleans), 51.3 s ours (652).
 - **The impeller, case by case (exact recording, vibe4 ~/tmp/bool2/impy):**
-  - **Fixed (branch bool2-imp1, gating):** the flange fuse 1556cc26 declined "an invalid result". The Shell's offset wall
+  - **Fixed (landed 8c5d60fa1 as dc215328's parent):** the flange fuse 1556cc26 declined "an invalid result". The Shell's offset wall
     carries two edges inside it, apart from each other; in one wire they were BRepCheck's NotConnected. Now one wire per
     connected run. That late decline had also put the part studio's later fuses of the feature on OCCT (op_boolean's
     DeclineMemo: e9caded0, dc8a265f, 136cf961, 7de2dcc1, ~1.4 s); they're ours now, identical. T1
