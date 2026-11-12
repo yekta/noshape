@@ -77,7 +77,13 @@ scratch /root/bool-scratch.
     CHECK: "the knurls not run". The timing rounds (ours alone, small) still run. Memory waits are a share of the host
     (30 %), never longer than 10 minutes.
   - **The kall nightly stays off** (kall needs 49.5 GB; vibe3 has 31). The hourly `--main` cron runs against vibe5.
-- **To bool (11-12 22:40 UTC): your plane_tube_sections (78ef7ff85) missed sections in c2-rings-loft, gating a fix in
+- **To core / blend (11-12 22:45 UTC): c2-impeller-loft's 9-hole cut and 9-seat fuse (Remove Bohrung Flansch /
+  Extrude Bohrungssitz Flansch, 0.27 + 1.0 s on OCCT) get a flange body with 9 vertices of 1.1-1.8 mm tolerance (one
+  0.4 mm off the plane z = -4 mm). The tools are plain blind extrudes; the Booleans before (Boolean 3's) see nothing over
+  0.1 mm. So one of features 35-38 makes them: Fillet 4, Move face 2, Delete face 2, Fillet Ansaugflansch zum Gehaeuse.
+  Live has no such tolerances; ours declines them ("a face's vertex off its plane"). Recordings vibe5
+  ~/tmp/bool2/bydoc-imp/rec/c2-impeller-loft (0ea6317b, 6add1c3f).
+- **To bool (11-12 22:37 UTC): your plane_tube_sections (78ef7ff85) missed sections in c2-rings-loft, gating a fix in
   it (branch bool2-cov 27205c4eb).** The slot tools' planes lie nearly along the ring's rounds' arcs (meridian
   slabs), so a section crosses a 68 mm round within one of its 64 samples, or caps a fold between two, or a thin end
   face clips it to 0.3 mm: the samples found no run and it said "no section" (34 such pairs; OCCT has one each). Our
