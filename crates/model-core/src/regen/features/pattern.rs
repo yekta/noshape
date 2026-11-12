@@ -1283,6 +1283,8 @@ fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance], merg
         }
     }
     let (mut convex, mut concave) = (false, false);
+    // The part's other faces with their boxes, once (for copies landing on another face).
+    let faces_with_boxes: std::cell::OnceCell<Vec<(k::BoundingBox, Shape)>> = std::cell::OnceCell::new();
     for (e, fs) in ef.iter().enumerate() {
         let [a, b] = fs[..] else { continue };
         let (s, o) = match (sel.contains(&a), sel.contains(&b)) {
@@ -1306,11 +1308,22 @@ fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance], merg
                 return true;
             }
         }
-        // The edge, moved by the instances, still on the other face's surface.
+        // The edge, moved by the instances, still on the other face's surface, or on another face of the part (a hole
+        // in a side wall mirrored onto the opposite wall: asm-tvc-mount's Mirror 4).
         let (Ok(edge), Ok(other)) = (body.shape.sub_shape(ShapeType::Edge, e), body.shape.sub_shape(ShapeType::Face, o as usize)) else { continue };
         let Ok(info) = edge.edge_info() else { continue };
         let Ok(mid) = edge.point_at((info.first_param + info.last_param) * 0.5) else { continue };
-        if probes.iter().any(|m| !on_surface(&other, m.transform_point3(mid), tol)) {
+        let on_part = |p: DVec3| {
+            let others = faces_with_boxes.get_or_init(|| {
+                (0..body.faces.len()).filter(|i| !sel.contains(&(*i as u32))).filter_map(|i| body.shape.sub_shape(ShapeType::Face, i).ok()).filter_map(|f| Some((f.bounding_box(false).ok()?, f))).collect()
+            });
+            let near = |b: &k::BoundingBox| (b.min - DVec3::splat(tol)).cmple(p).all() && p.cmple(b.max + DVec3::splat(tol)).all();
+            others.iter().any(|(b, f)| near(b) && k::make_vertex(p).and_then(|v| k::distance(f, &v)).is_ok_and(|d| d.distance < tol))
+        };
+        if probes.iter().any(|m| {
+            let p = m.transform_point3(mid);
+            !on_surface(&other, p, tol) && !on_part(p)
+        }) {
             return true;
         }
     }

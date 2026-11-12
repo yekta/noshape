@@ -3167,6 +3167,29 @@ fn feature_mirror_of_a_boss_copies_the_boss() {
     assert_eq!(b.count(noshape_kernel::ShapeType::Face), 16);
 }
 
+/// asm-tvc-mount's Mirror 4 (live OK): a pocket in the block's right wall, mirrored as a feature across its middle,
+/// lands in the left wall: its rim on another face of the part, not on the face it was cut into (ours refused it,
+/// "Could not create all instances as entered."). 40 × 20 × 10 less two Ø6 × 5 pockets, 10 faces.
+#[test]
+fn feature_mirror_of_a_side_wall_pocket_lands_on_the_opposite_wall() {
+    let mut t = T::new();
+    t.block(40.0, 20.0, 10.0);
+    let wall = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("offset", e("40 mm"))]);
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(0.01, 0.005), 0.003);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(wall)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    let pocket = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("REMOVE")), ("oppositeDirection", ParamValue::Bool(true)), ("defaultScope", ParamValue::Bool(true))]);
+    let mid = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("offset", e("20 mm"))]);
+    let m = t.add("mirror", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(pocket)])), ("mirrorPlane", q(vec![Reference::FeaturePlane(mid)]))]);
+    let r = t.ok(m);
+    let b = &r.context.bodies[0].shape;
+    let want = 8000.0 - 2.0 * std::f64::consts::PI * 9.0 * 5.0;
+    assert!((volume(&r) - want).abs() < 1e-6, "{} mm³, {} faces", volume(&r), b.count(noshape_kernel::ShapeType::Face));
+    assert_eq!(b.count(noshape_kernel::ShapeType::Face), 10);
+}
+
 /// MIRROR-FEATURE-UP-TO (clamp-hms, live OK): a boss of two squares raised
 /// 5 mm, the second square then raised to 10 mm by another Extrude (their
 /// sides merge), both mirrored as features (Reapply off) across Right + 30:

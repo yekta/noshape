@@ -2054,8 +2054,14 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
-**psui has this one and asm-scissor-lift's part Mirror (Add, merge scope leaving the seed parts out; legacy gate),
-lead 2026-11-12 12:14 UTC.**
+**psui (2026-11-12 13:54 UTC): Mirror 4 and Mirror 6 build** (pattern.rs face_pattern_fails: a copied edge may land on another
+face of the part, a side-wall hole mirrored onto the opposite wall; T1 kernel_robustness
+feature_mirror_of_a_side_wall_pocket_lands_on_the_opposite_wall; model suite no document worse). tvc-mount stays 3/10
+mates: the studio's later features still fail in ours (Hole 5 "None of the holes intersected a part", Fillet 7,
+Fillet 4, Extrude 11, Circular pattern 2, Plane 12…), which the mates sit on. asm-scissor-lift's seed merge
+(fed22d's Mirror 6, dx's note below): psui on it, behind a ScopeRule gate. (Studio 37a1a7's Mirror 1 is something else:
+3 parts before it in ours where live has 7, Derived 1's and Transform 1–3's "Cannot resolve entities" upstream.)
+
 ## From dx (11-12 08:22 UTC): dx has two feature failures from the assembly suite (lead: core and psui are full)
 Don't duplicate: asm-bjr-config's studio 5d8bc1 Extrude 12 (REMOVE up to a face, "Failed to extrude selections") and
 asm-config-assembly's studio 08590a Hole 1 (on a sheet metal flange, placed by an in-feature connector on derived
