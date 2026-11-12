@@ -23,6 +23,9 @@
 #include <BRepTools_WireExplorer.hxx>
 #include <BRepLib.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepAdaptor_Surface.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
+#include <Bnd_Box.hxx>
 #include <BRepTopAdaptor_FClass2d.hxx>
 #include <GeomAPI.hxx>
 #include <Geom_OffsetCurve.hxx>
@@ -3312,6 +3315,86 @@ static IntTools_Curve refined_section(const IntTools_Curve& ic, const TopoDS_Fac
   return IntTools_Curve(nc, na, nb, tol, ic.TangentialTolerance());
 }
 
+// A whole cylinder's face (going round, its seam an edge of it) against a free-form face: OCCT's section of the two
+// left out its last part, from the last crossing of the seam to the cylinder's rim (c2-fan-blade-sweep's thread on
+// the bolt's shaft: its flanks' helices one turn short, so the thread fell outside the bolt, live's overlap lost).
+// Where a curve ends on that seam inside the face, with no other curve going on from there: the section again, of
+// the free-form face and the cylinder made long enough to hold it; the Boolean cuts its curves to the faces.
+static std::optional<std::vector<IntTools_Curve>> sections_past_seam(const TopoDS_Face& fa, const TopoDS_Face& fb, const std::vector<IntTools_Curve>& lines)
+{
+  for (const bool cyl_first : {true, false})
+  {
+    const TopoDS_Face& fc = cyl_first ? fa : fb;
+    const TopoDS_Face& ff = cyl_first ? fb : fa;
+    const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(fc));
+    if (cs.IsNull() || BRepAdaptor_Surface(ff, false).GetType() != GeomAbs_BSplineSurface)
+      continue;
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    BRepTools::UVBounds(fc, u0, u1, v0, v1);
+    if (std::abs(u1 - u0 - 2 * M_PI) > 1e-9)
+      continue;
+    const gp_Cylinder cy  = cs->Cylinder();
+    const double      tol = 1e-6;
+    // (A curve's end on the seam, inside the face's length, that no other curve's end meets.)
+    std::vector<gp_Pnt> ends;
+    for (const IntTools_Curve& ic : lines)
+      // (A curve of no length (OCCT's where the missing part starts) ends nowhere.)
+      if (!ic.Curve().IsNull() && ic.Curve()->Value(ic.Curve()->FirstParameter()).Distance(ic.Curve()->Value(ic.Curve()->LastParameter())) > tol)
+        for (const double t : {ic.Curve()->FirstParameter(), ic.Curve()->LastParameter()})
+          ends.push_back(ic.Curve()->Value(t));
+    bool dangling = false;
+    for (size_t k = 0; k < ends.size() && !dangling; ++k)
+    {
+      double u = 0, v = 0;
+      ElSLib::Parameters(cy, ends[k], u, v);
+      const double r = cy.Radius();
+      const bool on_seam = std::min(std::abs(u - u0), std::abs(2 * M_PI - std::abs(u - u0))) * r <= tol || std::abs(u - u1) * r <= tol;
+      if (!on_seam || v <= v0 + tol || v >= v1 - tol)
+        continue;
+      int meets = 0;
+      for (size_t j = 0; j < ends.size(); ++j)
+        meets += j != k && ends[j].Distance(ends[k]) <= tol;
+      dangling = meets == 0;
+    }
+    if (!dangling)
+      return std::nullopt;
+    // (Long enough: the free-form face's extent along the axis, and the face's own.)
+    Bnd_Box box;
+    BRepBndLib::Add(ff, box);
+    if (box.IsVoid())
+      return std::nullopt;
+    double xmin, ymin, zmin, xmax, ymax, zmax;
+    box.Get(xmin, ymin, zmin, xmax, ymax, zmax);
+    double lo = v0, hi = v1;
+    for (const double x : {xmin, xmax})
+      for (const double y : {ymin, ymax})
+        for (const double z : {zmin, zmax})
+        {
+          double u = 0, v = 0;
+          ElSLib::Parameters(cy, gp_Pnt(x, y, z), u, v);
+          lo = std::min(lo, v);
+          hi = std::max(hi, v);
+        }
+    const double margin = 0.1 * (hi - lo) + 1e-6;
+    BRepBuilderAPI_MakeFace mk(cs, u0, u1, lo - margin, hi + margin, Precision::Confusion());
+    if (!mk.IsDone())
+      return std::nullopt;
+    IntTools_FaceFace again;
+    again.SetParameters(true, true, true, 1e-7);
+    if (cyl_first)
+      again.Perform(mk.Face(), ff);
+    else
+      again.Perform(ff, mk.Face());
+    if (!again.IsDone() || again.Lines().IsEmpty())
+      return std::nullopt;
+    std::vector<IntTools_Curve> out;
+    for (const IntTools_Curve& ic : again.Lines())
+      out.push_back(refined_section(ic, cyl_first ? mk.Face() : ff, cyl_first ? ff : mk.Face()));
+    return out;
+  }
+  return std::nullopt;
+}
+
 static void occt_ahead(rust::Slice<const uint32_t> pairs)
 {
   if (t_free == nullptr || t_free->srcs == nullptr)
@@ -3357,6 +3440,8 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
         return;
       for (const IntTools_Curve& ic : ff.Lines())
         jobs[k].lines.push_back(refined_section(ic, jobs[k].fa, jobs[k].fb));
+      if (std::optional<std::vector<IntTools_Curve>> past = sections_past_seam(jobs[k].fa, jobs[k].fb, jobs[k].lines))
+        jobs[k].lines = std::move(*past);
       jobs[k].done = true;
     }
     catch (const Standard_Failure&)
@@ -3471,6 +3556,15 @@ static rust::String occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_ar
       return rust::String("OCCT's section failed");
     for (const IntTools_Curve& ic : ff.Lines())
       lines.push_back(refined_section(ic, fa, fb));
+    try
+    {
+      if (std::optional<std::vector<IntTools_Curve>> past = sections_past_seam(fa, fb, lines))
+        lines = std::move(*past);
+    }
+    catch (const Standard_Failure&)
+    {
+      return rust::String("OCCT's section failed");
+    }
     t_free->ahead.emplace(swap ? std::array<uint32_t, 4>{b_arg, b_face, a_arg, a_face} : std::array<uint32_t, 4>{a_arg, a_face, b_arg, b_face}, lines);
   }
   for (const IntTools_Curve& ic : lines)

@@ -2029,6 +2029,27 @@ fn a_face_with_two_edges_inside_it_apart_fused_as_occt() {
         v
     };
     assert_eq!(records(&r), records(&o));
+/// c2-fan-blade-sweep's Sweep 1: a helical thread whose base runs 0.1 mm inside the bolt's 3 mm shaft. OCCT's section
+/// of the shaft's cylinder with each flank stopped at its last crossing of the seam, a turn short of the shaft's end,
+/// so OCCT's common came out empty and its fuse two solids. Asked again of a cylinder long enough to hold the flank, the
+/// sections reach the end: noshape's Boolean fuses them as live (one Bolt, 2,156.42 mm3, overlap 26.27 mm3).
+#[test]
+fn a_thread_sunk_into_a_shaft_fuses_as_live() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let read = |n: &str| k::read_step(&dir.join(n), k::LengthUnit::Meter).expect("the STEP").remove(0).shape;
+    let (bolt, thread) = (read("fan-blade-bolt.step"), read("fan-blade-thread.step"));
+    let mm3 = |s: &k::Shape| s.volume().unwrap() * 1e9;
+    k::set_rust_boolean_only(true);
+    let fuse = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&bolt), std::slice::from_ref(&thread), &k::BooleanOptions::default());
+    let common = k::boolean(k::BooleanOp::Common, std::slice::from_ref(&bolt), std::slice::from_ref(&thread), &k::BooleanOptions::default());
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let (fuse, common) = (fuse.unwrap_or_else(|e| panic!("declined: {why} ({e})")), common.unwrap_or_else(|e| panic!("declined: {why} ({e})")));
+    assert!(fuse.shape.is_valid());
+    assert_eq!(fuse.shape.count(k::ShapeType::Solid), 1);
+    assert!((mm3(&fuse.shape) - 2156.42).abs() < 0.1, "fuse {} mm3, live 2156.42", mm3(&fuse.shape));
+    assert!((mm3(&common.shape) - 26.27).abs() < 0.1, "overlap {} mm3, live 26.27", mm3(&common.shape));
 }
 
 /// cf-surface-pattern's Surface Pattern 3 (recorded: a part cut by 85 stamp bodies): near a target's vertex of 4.9 um
