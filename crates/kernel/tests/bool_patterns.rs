@@ -2029,6 +2029,8 @@ fn a_face_with_two_edges_inside_it_apart_fused_as_occt() {
         v
     };
     assert_eq!(records(&r), records(&o));
+}
+
 /// c2-fan-blade-sweep's Sweep 1: a helical thread whose base runs 0.1 mm inside the bolt's 3 mm shaft. OCCT's section
 /// of the shaft's cylinder with each flank stopped at its last crossing of the seam, a turn short of the shaft's end,
 /// so OCCT's common came out empty and its fuse two solids. Asked again of a cylinder long enough to hold the flank, the
