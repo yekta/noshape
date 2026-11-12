@@ -28,6 +28,7 @@
 #include <Bnd_Box.hxx>
 #include <BRepTopAdaptor_FClass2d.hxx>
 #include <GeomAPI.hxx>
+#include <GeomProjLib.hxx>
 #include <Geom_OffsetCurve.hxx>
 #include <GProp_GProps.hxx>
 #include <BRepGProp.hxx>
@@ -2588,6 +2589,294 @@ bool interpolated(const std::function<bool(double, gp_Pnt&, gp_Pnt2d&, gp_Pnt2d&
   return false;
 }
 
+// A plane against a B-spline face with one span of degree 2 across it (a variable round's arcs: c2-tpd-fillet-variable's
+// Fillet 1, 62 plane / round pairs at 12 ms of OCCT's marching each): along the face the plane meets each arc where a
+// quadratic is nought, so the section is exact point by point, each branch of roots across the face's range
+// interpolated; an arc lying in the plane (the round's end on the face it starts from) and a side lying in it (the
+// round tangent to the face it runs on) are the face's own iso curves. All within both faces' parameter boxes, as
+// OCCT's. False where the face isn't one, lies in the plane, or two roots meet inside the range (OCCT's then).
+bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+{
+  const occ::handle<Geom_Plane> pa = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fa)), pb = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fb));
+  if (pa.IsNull() == pb.IsNull())
+    return false;
+  const bool         p_first = !pa.IsNull();
+  const TopoDS_Face& f       = p_first ? fb : fa;
+  occ::handle<Geom_Surface> base = BRep_Tool::Surface(f);
+  while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(base))
+    base = t->BasisSurface();
+  const occ::handle<Geom_BSplineSurface> S = occ::down_cast<Geom_BSplineSurface>(base);
+  if (S.IsNull())
+    return false;
+  // (Which way the one quadratic span goes: across v, or across u.)
+  const bool across_v = S->VDegree() == 2 && S->NbVKnots() == 2;
+  if (!across_v && !(S->UDegree() == 2 && S->NbUKnots() == 2))
+    return false;
+  const gp_Pln P = (p_first ? pa : pb)->Pln();
+  const gp_Vec n(P.Axis().Direction());
+  const double d = n.Dot(gp_Vec(P.Location().XYZ()));
+  // The plane's distance times the weight at each pole, a row of three across: along the face, B-spline functions.
+  const int                    na = across_v ? S->NbUPoles() : S->NbVPoles();
+  NCollection_Array1<gp_Pnt>   rows(1, na);
+  double                       scale = 0;
+  for (int i = 1; i <= na; ++i)
+  {
+    double c[3];
+    for (int j = 1; j <= 3; ++j)
+    {
+      const int    iu = across_v ? i : j, iv = across_v ? j : i;
+      const double w  = S->Weight(iu, iv);
+      c[j - 1]        = w * (n.Dot(gp_Vec(S->Pole(iu, iv).XYZ())) - d);
+      scale           = std::max(scale, std::abs(c[j - 1]));
+    }
+    rows(i) = gp_Pnt(c[0], c[1], c[2]);
+  }
+  if (scale < 1e-12)
+    return false;
+  NCollection_Array1<double> knots(1, across_v ? S->NbUKnots() : S->NbVKnots());
+  NCollection_Array1<int>    mults(1, knots.Length());
+  if (across_v)
+  {
+    S->UKnots(knots);
+    S->UMultiplicities(mults);
+  }
+  else
+  {
+    S->VKnots(knots);
+    S->VMultiplicities(mults);
+  }
+  const int                         deg = across_v ? S->UDegree() : S->VDegree();
+  const occ::handle<Geom_BSplineCurve> A = new Geom_BSplineCurve(rows, knots, mults, deg, across_v ? S->IsUPeriodic() : S->IsVPeriodic());
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  const double s0 = across_v ? u0 : v0, s1 = across_v ? u1 : v1;
+  const double k0 = across_v ? S->VKnot(1) : S->UKnot(1), k1 = across_v ? S->VKnot(2) : S->UKnot(2);
+  const double ta = ((across_v ? v0 : u0) - k0) / (k1 - k0), tb = ((across_v ? v1 : u1) - k0) / (k1 - k0);
+  // (A side of the face in the plane all along (a round tangent to the face it runs on): the root there everywhere,
+  // that side a section of its own (below); the quadratic's other root alone.)
+  bool side0 = true, side1 = true;
+  for (int i = 1; i <= na; ++i)
+  {
+    side0 = side0 && std::abs(rows(i).X()) <= 1e-9 * scale;
+    side1 = side1 && std::abs(rows(i).Z()) <= 1e-9 * scale;
+  }
+  if (side0 && side1)
+    return false;
+  // The quadratic's real roots at `s` (one where it is linear).
+  auto roots = [&](double s) {
+    const gp_Pnt        c = A->Value(s);
+    const double        p = c.X() - 2 * c.Y() + c.Z(), q = 2 * (c.Y() - c.X()), r = c.X();
+    std::vector<double> t;
+    if (side0 || side1)
+    {
+      // (a (1-t)^2 + 2b t(1-t) + c t^2 with a = 0: t (2b (1-t) + c t); with c = 0: (1-t)(a (1-t) + 2b t).)
+      const double den = side0 ? 2 * c.Y() - c.Z() : c.X() - 2 * c.Y();
+      // (Not the side again: a double root there where the face is tangent to the plane along it.)
+      if (std::abs(den) > 1e-12 * scale)
+        if (const double o = side0 ? 2 * c.Y() / den : c.X() / den; std::abs(o - (side0 ? 0.0 : 1.0)) > 1e-9)
+          t.push_back(o);
+      return t;
+    }
+    if (std::abs(p) <= 1e-12 * scale)
+    {
+      if (std::abs(q) > 1e-12 * scale)
+        t.push_back(-r / q);
+      return t;
+    }
+    const double disc = q * q - 4 * p * r;
+    if (disc < 0)
+      return t;
+    // (The root away from cancellation, then the other from their product.)
+    const double big = -0.5 * (q + (q < 0 ? -1 : 1) * std::sqrt(disc));
+    t.push_back(big / p);
+    if (std::abs(big) > 1e-300)
+      t.push_back(r / big);
+    return t;
+  };
+  const double slack = 1e-9 * (tb - ta);
+  // (Within the plane face's parameter box too, as OCCT's sections are.)
+  double pu0 = 0, pu1 = 0, pv0 = 0, pv1 = 0;
+  BRepTools::UVBounds(p_first ? fa : fb, pu0, pu1, pv0, pv1);
+  const double pe = 1e-9 * std::max(pu1 - pu0, pv1 - pv0);
+  auto point = [&](double sx, double t) {
+    const double w = k0 + (k1 - k0) * t;
+    return across_v ? S->Value(sx, w) : S->Value(w, sx);
+  };
+  auto on_plane = [&](const gp_Pnt& x) {
+    double pu = 0, pv = 0;
+    ElSLib::Parameters(P, x, pu, pv);
+    return pu >= pu0 - pe && pu <= pu1 + pe && pv >= pv0 - pe && pv <= pv1 + pe;
+  };
+  auto in_range = [&](double s) {
+    int n = 0;
+    for (const double t : roots(s))
+      n += t >= ta - slack && t <= tb + slack && on_plane(point(s, std::clamp(t, ta, tb)));
+    return n;
+  };
+  // Where an arc lies in the plane (a round's end on the face it starts from, at a knot or the face's bound): that arc,
+  // the section there; the samples step around it.
+  auto flat_at = [&](double sx) {
+    const gp_Pnt c = A->Value(sx);
+    return std::max({std::abs(c.X()), std::abs(c.Y()), std::abs(c.Z())}) <= 1e-9 * scale;
+  };
+  std::vector<double> flats;
+  for (int i = 1; i <= knots.Length(); ++i)
+    if (knots(i) >= s0 - 1e-12 && knots(i) <= s1 + 1e-12 && flat_at(knots(i)))
+      flats.push_back(std::clamp(knots(i), s0, s1));
+  for (const double sx : {s0, s1})
+    if (flat_at(sx) && std::find_if(flats.begin(), flats.end(), [&](double f) { return std::abs(f - sx) <= 1e-12; }) == flats.end())
+      flats.push_back(sx);
+  auto near_flat = [&](double sx) { return std::any_of(flats.begin(), flats.end(), [&](double f) { return std::abs(sx - f) <= 1e-9 * (s1 - s0); }); };
+  // (Never two roots in the range: no branch folds back or crosses another inside the face (OCCT's then).)
+  const int m = std::max(64, 16 * (knots.Length() - 1));
+  for (int i = 0; i <= m; ++i)
+    if (const double sx = s0 + (s1 - s0) * i / m; !near_flat(sx) && in_range(sx) > 1)
+      return false;
+  // The runs with one root in the range, their ends bisected where it crosses ta or tb.
+  auto edge = [&](double a, double b) {
+    const bool ia = in_range(a) == 1;
+    for (int it = 0; it < 80 && b - a > 1e-14 * (1 + std::abs(s0) + std::abs(s1)); ++it)
+    {
+      const double mid = 0.5 * (a + b);
+      ((in_range(mid) == 1) == ia ? a : b) = mid;
+    }
+    return ia ? a : b;
+  };
+  std::vector<std::pair<double, double>> runs;
+  double start = s0;
+  bool   in    = in_range(s0) == 1;
+  for (int i = 1; i <= m; ++i)
+  {
+    const double s = s0 + (s1 - s0) * i / m, prev = s0 + (s1 - s0) * (i - 1) / m;
+    if ((in_range(s) == 1) == in)
+      continue;
+    const double at = edge(prev, s);
+    if (in)
+      runs.emplace_back(start, at);
+    start = at;
+    in    = !in;
+  }
+  if (in)
+    runs.emplace_back(start, s1);
+  std::vector<IntTools_Curve> found;
+  // An iso curve of the face lying in the plane (`along_s`: at the across parameter `fixed`; else at `s` = `fixed`),
+  // from `a` to `b` of its own parameter: the face's own curve there, exact, its curve on the plane projected.
+  auto iso = [&](bool along_s, double fixed, double a, double b) {
+    const bool                    by_u = along_s == across_v;
+    const occ::handle<Geom_Curve> c3   = new Geom_TrimmedCurve(by_u ? S->VIso(fixed) : S->UIso(fixed), a, b);
+    const occ::handle<Geom2d_Curve> on_s = by_u ? occ::handle<Geom2d_Curve>(new Geom2d_Line(gp_Pnt2d(0, fixed), gp_Dir2d(1, 0))) : occ::handle<Geom2d_Curve>(new Geom2d_Line(gp_Pnt2d(fixed, 0), gp_Dir2d(0, 1)));
+    const occ::handle<Geom2d_Curve> on_p = GeomProjLib::Curve2d(c3, a, b, p_first ? pa : pb);
+    if (on_p.IsNull())
+      return false;
+    found.emplace_back(c3, p_first ? on_p : on_s, p_first ? on_s : on_p, Precision::Confusion());
+    return true;
+  };
+  // That side, where the face has it, within the plane face's box.
+  for (const int side : {0, 1})
+  {
+    if (!(side == 0 ? side0 : side1) || std::abs((side == 0 ? ta : tb) - side) > slack)
+      continue;
+    auto inside = [&](double sx) { return on_plane(point(sx, side)); };
+    auto cut = [&](double a, double b) {
+      const bool ia = inside(a);
+      for (int it = 0; it < 80 && b - a > 1e-14 * (1 + std::abs(s0) + std::abs(s1)); ++it)
+      {
+        const double mid = 0.5 * (a + b);
+        (inside(mid) == ia ? a : b) = mid;
+      }
+      return ia ? a : b;
+    };
+    std::vector<std::pair<double, double>> along;
+    double start = s0;
+    bool   in    = inside(s0);
+    for (int i = 1; i <= m; ++i)
+    {
+      const double sx = s0 + (s1 - s0) * i / m, prev = s0 + (s1 - s0) * (i - 1) / m;
+      if (inside(sx) == in)
+        continue;
+      const double at_cut = cut(prev, sx);
+      if (in)
+        along.emplace_back(start, at_cut);
+      start = at_cut;
+      in    = !in;
+    }
+    if (in)
+      along.emplace_back(start, s1);
+    for (const auto& [a, b] : along)
+    {
+      if (b - a <= 1e-9 * (s1 - s0))
+        continue;
+      if (!iso(true, k0 + (k1 - k0) * side, a, b))
+        return false;
+    }
+  }
+  for (const double sx : flats)
+  {
+    // (Its runs within the plane face's box.)
+    auto inside = [&](double t) { return on_plane(point(sx, t)); };
+    auto cut = [&](double a, double b) {
+      const bool ia = inside(a);
+      for (int it = 0; it < 80 && b - a > 1e-14; ++it)
+      {
+        const double mid = 0.5 * (a + b);
+        (inside(mid) == ia ? a : b) = mid;
+      }
+      return ia ? a : b;
+    };
+    double start = ta;
+    bool   in    = inside(ta);
+    std::vector<std::pair<double, double>> arcs;
+    for (int i = 1; i <= 64; ++i)
+    {
+      const double t = ta + (tb - ta) * i / 64, prev = ta + (tb - ta) * (i - 1) / 64;
+      if (inside(t) == in)
+        continue;
+      const double at_cut = cut(prev, t);
+      if (in)
+        arcs.emplace_back(start, at_cut);
+      start = at_cut;
+      in    = !in;
+    }
+    if (in)
+      arcs.emplace_back(start, tb);
+    for (const auto& [a, b] : arcs)
+      if (b - a > 1e-9 * (tb - ta) && !iso(false, sx, k0 + (k1 - k0) * a, k0 + (k1 - k0) * b))
+        return false;
+  }
+  for (const auto& [a, b] : runs)
+  {
+    if (b - a <= 1e-9 * (s1 - s0))
+      continue;
+    // (The root in the range, or nearest it at the run's ends.)
+    auto at = [&](double s, gp_Pnt& x, gp_Pnt2d& g, gp_Pnt2d& c) {
+      double best = 0, gap = RealLast();
+      for (const double t : roots(s))
+      {
+        const double off = t < ta ? ta - t : t > tb ? t - tb : 0.0;
+        if (off < gap)
+          gap = off, best = t;
+      }
+      if (gap > 1e-6 * (tb - ta))
+        return false;
+      const double w  = k0 + (k1 - k0) * std::clamp(best, ta, tb);
+      const double su = across_v ? s : w, sv = across_v ? w : s;
+      x               = S->Value(su, sv);
+      double pu = 0, pv = 0;
+      ElSLib::Parameters(P, x, pu, pv);
+      const gp_Pnt2d on_s(su, sv), on_p(pu, pv);
+      g = p_first ? on_p : on_s;
+      c = p_first ? on_s : on_p;
+      return true;
+    };
+    IntTools_Curve ic;
+    if (!interpolated(at, a, b, 8, ic))
+      return false;
+    found.push_back(ic);
+  }
+  out.insert(out.end(), found.begin(), found.end());
+  return true;
+}
+
 // Where a surface generated along a cone's axis (an extrusion along it, a cylinder beside it) meets the cone: each
 // generator at the height where the cone's radius is its distance from the axis (`gen`: the parameter -> the
 // generator's point at height 0 of its own surface, its direction, its parameters there; `on_gen`: its curve on the
@@ -3110,6 +3399,8 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
   if (off)
     return false;
   if (coaxial_sections(fa, fb, out))
+    return true;
+  if (plane_tube_sections(fa, fb, out))
     return true;
   const std::optional<Extruded> xa = extruded(fa), xb = extruded(fb);
   // A cone and a surface generated along its axis: that surface lifted onto it.

@@ -2150,3 +2150,23 @@ fn an_arc_ending_on_a_seam_fused_as_occt() {
     let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
     assert!((v - w).abs() <= 1e-7 * o.shape.area().unwrap(), "volume {v} against OCCT's {w}");
 }
+
+/// A box cut by four variable rounds (c2-tpd-fillet-variable's Fillet 1, recorded): each round's arcs against the box's
+/// planes, its ends lying in them and its sides tangent to them, sections noshape's own and exact (OCCT marched 62 such
+/// pairs at 12 ms each): the cut as OCCT's, its counts, its volume to its area times 1e-7.
+#[test]
+fn variable_rounds_against_a_boxs_planes_cut_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "f735e4f9be568ce0").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    let counts = (r.shape.count(k::ShapeType::Face), r.shape.count(k::ShapeType::Edge), r.shape.count(k::ShapeType::Vertex));
+    assert_eq!(counts, (c.summary.faces, c.summary.edges, c.summary.vertices));
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
+}
