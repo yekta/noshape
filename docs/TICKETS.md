@@ -1586,7 +1586,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Windows) and `cx.reveal_path` (start_window.rs 3816) can't take one. The click also gives no visible feedback (AGENTS.md: a
   click always does). Strip the verbatim prefix before revealing (and showing: check Details › Location too). Check:
   `gh workflow run qa-os.yml -R yekta/noshape -f ref=<branch>` (or `-f tag=`). (qa 2026-11-08 07:37)
-- [ ] P3 UIS-RCLICK-WINDOWS (studios / psui: the UI script) **the UI script's `rclick` on a documents page row opens no menu on
+- [x] (studios d70cf1bcf: the runner's window is 1028 px wide on windows-latest, so a documents row's centre lay under the Details panel; the driver presses the visible part of a control whose centre its list clips. qa-os.yml 43136917946: the UI script's rclick opens the row menu and Show in Explorer selects the document; footer.py's real right-click workaround can go) P3 UIS-RCLICK-WINDOWS (studios / psui: the UI script) **the UI script's `rclick` on a documents page row opens no menu on
   Windows** (macOS and Linux open it; a real right-click on Windows does): qa-os.yml's show-in / details steps fail with "menu:…
   is not shown", so .github/qa/footer.py right-clicks with mouse_event on Windows instead. (qa 2026-11-08 07:37)
 - [x] P1 SAVED-SKETCH-PLANE-LOST (blend; core's 6941806b7 / a38465541 are in the same green) **since green 4fee814c a saved
