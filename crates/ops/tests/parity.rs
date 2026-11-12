@@ -50,6 +50,114 @@ struct ModelResult {
     unfetched: Vec<String>,
 }
 
+/// A live mass-property reading the suite allows past, written next to its evidence (PARITY-SUITES.md): from
+/// `from_feature` on, `part` may lie `volume_above` mm³ above live's volume, `area_below` mm² below its area and `centroid` mm
+/// from its centroid. Topology is still compared.
+struct LiveReading {
+    doc: &'static str,
+    from_feature: &'static str,
+    part: &'static str,
+    volume_above: f64,
+    area_below: f64,
+    centroid: f64,
+}
+const LIVE_VOLUME_ALLOWANCES: &[LiveReading] = &[
+    // live 2484: evVolume HIGH reads 45,272.919 mm³ as massproperties does, its own tessellation of the part converges to
+    // about 45,277.97 mm³ / 32,144.50 mm² (ours 45,277.36 / 32,144.49; its evArea reads 32,145.58): evVolume and evArea
+    // mis-integrate the 3 mm offset face JKG, which stays in Part 1, and the centroid moves with them (5-7 µm).
+    LiveReading { doc: "c2-impeller-loft", from_feature: "Shell Gehäuse", part: "Part 1", volume_above: 5.05, area_below: 1.2, centroid: 0.01 },
+];
+
+/// Imported parts live's STEP importer refits, written next to their evidence (PARITY-SUITES.md): in `docs`, a part whose
+/// name starts with `prefix` is held within `volume` m³, `area` m² and `centroid` m of live's readings in every feature (the
+/// parts stay as imported), its edges' kinds not compared; its counts still are.
+struct LiveRefit {
+    docs: &'static [&'static str],
+    prefix: &'static str,
+    volume: f64,
+    area: f64,
+    centroid: f64,
+}
+const LIVE_IMPORT_REFITS: &[LiveRefit] = &[
+    // core.md 11-11 / lead 11-12: live's importer refits the file: it scales the stud groove's torus by 0.995 (its face
+    // 4.277452 mm², exact 4.158573) and reads 24 near-straight B-spline serration edges as circles; ours imports the file
+    // exactly (M3-18: 131.1503 mm³ / 203.1205 mm², live 131.1277 / 203.2332; M3-8: 60.4651 / 108.8728, live 60.4419 /
+    // 108.9854; the same counts): the same differences on both stud lengths.
+    LiveRefit { docs: &["c2-gamma-imported", "c2-wire-clip-imported"], prefix: "PEM FH4-M3-", volume: 0.03e-9, area: 0.15e-6, centroid: 3e-6 },
+];
+
+/// Live's parts after a feature, `reached` the names of the features up to it: its bands widened where
+/// [`LIVE_VOLUME_ALLOWANCES`] names a feature reached, and the importer's refit parts ([`LIVE_IMPORT_REFITS`]) held to their
+/// tolerances.
+fn allow_live_readings(doc: &str, reached: &[&str], mut parts: Vec<PartState>) -> Vec<PartState> {
+    for r in LIVE_IMPORT_REFITS {
+        if !r.docs.contains(&doc) {
+            continue;
+        }
+        let (dv, da, centroid) = (r.volume, r.area, r.centroid);
+        for p in parts.iter_mut().filter(|p| p.name.starts_with(r.prefix)) {
+            if let Some(v) = p.volume {
+                p.volume_band = Some([v - dv, v + dv]);
+                p.volume_high = None;
+            }
+            if let Some(a) = p.area {
+                p.area_band = Some([a - da, a + da]);
+            }
+            if let Some(c) = p.centroid {
+                p.centroid_band = Some([c.map(|x| x - centroid), c.map(|x| x + centroid)]);
+            }
+            p.edge_types = None;
+        }
+    }
+    for r in LIVE_VOLUME_ALLOWANCES {
+        if r.doc != doc || !reached.contains(&r.from_feature) {
+            continue;
+        }
+        let (mm3, mm2, mm) = (r.volume_above, r.area_below, r.centroid);
+        for p in parts.iter_mut().filter(|p| p.name == r.part) {
+            if let Some(v) = p.volume {
+                let [lo, hi] = p.volume_band.unwrap_or([v, v]);
+                p.volume_band = Some([lo.min(v), hi.max(v + mm3 * 1e-9)]);
+            }
+            if let Some(a) = p.area {
+                let [lo, hi] = p.area_band.unwrap_or([a, a]);
+                p.area_band = Some([lo.min(a - mm2 * 1e-6), hi.max(a)]);
+            }
+            if let Some(c) = p.centroid {
+                p.centroid_band = Some([c.map(|x| x - mm * 1e-3), c.map(|x| x + mm * 1e-3)]);
+            }
+        }
+    }
+    parts
+}
+
+#[test]
+fn live_volume_allowances_widen_from_their_feature_on_upward() {
+    let live = |v: f64| PartState { name: "Part 1".into(), faces: 40, edges: 90, vertices: 52, volume: Some(v * 1e-9), ..Default::default() };
+    let ours = |v: f64, faces: u64| vec![PartState { faces, ..live(v) }];
+    let at = |feature: &str| allow_live_readings("c2-impeller-loft", &["Loft Gehäuse", feature], vec![live(45272.919231)]);
+    assert!(differences(&at("Shell Gehäuse"), &ours(45277.36, 40)).is_empty(), "within live's tessellation (2484)");
+    assert!(!differences(&at("Shell Gehäuse"), &ours(45278.5, 40)).is_empty(), "past it");
+    assert!(!differences(&at("Shell Gehäuse"), &ours(45270.0, 40)).is_empty(), "below live's reading");
+    assert!(!differences(&at("Shell Gehäuse"), &ours(45277.36, 41)).is_empty(), "topology still compared");
+    assert!(!differences(&at("Loft Gehäuse"), &ours(45277.36, 40)).is_empty(), "not before the named feature");
+    assert!(differences(&allow_live_readings("c2-impeller-loft", &["Shell Gehäuse", "Extrude Flansch"], vec![live(45272.919231)]), &ours(45277.36, 40)).is_empty(), "and on after it");
+}
+
+#[test]
+fn live_import_refits_hold_the_studs_counts() {
+    let stud = |v: f64, a: f64, faces: u64| PartState { name: "PEM FH4-M3-18_7".into(), faces, edges: 223, vertices: 145, volume: Some(v * 1e-9), area: Some(a * 1e-6), centroid: Some([0.121667, 0.098672, 0.013186]), ..Default::default() };
+    let live = |doc: &str| allow_live_readings(doc, &["Import 1"], vec![stud(131.127719, 203.233226, 81)]);
+    let ours = |faces: u64| vec![PartState { centroid: Some([0.1216666, 0.098672, 0.013186]), ..stud(131.150338, 203.12054, faces) }];
+    assert!(differences(&live("c2-wire-clip-imported"), &ours(81)).is_empty(), "the refit's readings allowed");
+    assert!(!differences(&live("c2-wire-clip-imported"), &ours(82)).is_empty(), "counts still compared");
+    assert!(!differences(&live("c2-lofted-basic"), &ours(81)).is_empty(), "only the two documents");
+    let short = |v: f64, a: f64| PartState { name: "PEM FH4-M3-8_9".into(), ..stud(v, a, 81) };
+    let held = allow_live_readings("c2-gamma-imported", &["Import 1"], vec![short(60.441887, 108.985446)]);
+    assert!(differences(&held, &[short(60.465097, 108.872761)]).is_empty(), "the shorter stud's refit too");
+    assert!(!differences(&held, &[short(60.6, 108.872761)]).is_empty(), "past the refit's own difference");
+}
+
 /// Rebuilds `features` and compares with `live` (live.jsonl lines) after each feature.
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
@@ -73,8 +181,10 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     res.untranslated.extend(t.notes.iter().map(|n| format!("document: {n}")));
     res.custom.extend(t.custom_failures.iter().cloned());
     res.std_pins.extend(t.std_pins.iter().filter(|(_, pin, served)| pin != served).map(|(n, pin, served)| format!("{n} pins std {pin}, served {served}")));
+    let mut reached: Vec<String> = Vec::new();
     for k in 0..t.len() {
         let step = t.step(k);
+        reached.push(step.name.clone());
         for p in &step.problems {
             res.untranslated.push(format!("{} ({}): {p}", step.name, step.feature_type));
         }
@@ -112,7 +222,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         }
         diff.extend(step.frame.clone());
         match our_parts(&mut t) {
-            Ok(parts) => diff.extend(differences(&live_parts(line), &parts)),
+            Ok(parts) => diff.extend(differences(&allow_live_readings(name, &reached.iter().map(String::as_str).collect::<Vec<_>>(), live_parts(line)), &parts)),
             Err(e) => diff.push(format!("parts: {e}")),
         }
         // An input we couldn't place (live's geometry missing or a query

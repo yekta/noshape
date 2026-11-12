@@ -40,6 +40,21 @@ exact section for a Curvature fillet of magnitude 0.5 (behaviours.md G11 (a): po
 unit setback: × R × depth gives 0.8131 and 2.4393 to four digits, and live's face boxes show the full setbacks. So
 ours is the exact area; live's reading of it is 0.22 % short.
 
+**c2-impeller-loft's Shell Gehäuse: live's volume reading (qa, lead 11-12).** After Shell Gehäuse (feature 11) live reads
+Part 1's volume as 45,272.919 mm³, at evVolume's HIGH accuracy and in massproperties alike; ours is 45,277.36. Live's own
+tessellation of the same part converges to about 45,277.97 mm³ and 32,144.50 mm² (REQUESTS 2484; ours 32,144.49 mm²), so
+evVolume mis-integrates the 3 mm offset face JKG; its evArea (32,145.58 mm²) is off the same way, and the centroid moves with
+them (5-7 µm). From that feature on (JKG stays in Part 1), Part 1 may lie up to 5.05 mm³ above live's volume, 1.2 mm² below its area and 10 µm from its
+centroid (`LIVE_VOLUME_ALLOWANCES`, crates/ops/tests/parity.rs); its topology and everything else is compared as usual.
+
+**c2-gamma-imported / c2-wire-clip-imported: live's STEP importer refits the PEM FH4-M3 studs (qa, lead 11-12, core's
+reason in core.md 11-11).** Live scales each stud's groove torus by 0.995 (its face 4.277452 mm², the exact 4.158573) and reads
+24 near-straight B-spline serration edges as circles; ours imports the file exactly: 131.1503 mm³ / 203.1205 mm² against live's
+131.1277 / 203.2332 (the M3-8 studs: 60.4651 / 108.8728 against 60.4419 / 108.9854), the same counts. In those two documents a
+part named "PEM FH4-M3-…" is held within 0.03 mm³ of live's volume, 0.15 mm² of its area and 3 µm of its centroid (the refit's own
+differences, the same on both stud lengths), its edges' kinds not compared, in every feature (the studs stay as imported); its
+counts and every other part are compared as usual (`LIVE_IMPORT_REFITS`, crates/ops/tests/parity.rs).
+
 ## 2. Interaction suite: the same steps in live and in noshape
 
 **Scenarios (qa, live).** `tests/ui-parity/<name>.json`: short scripts of what a user does: keys, typed text, clicks
