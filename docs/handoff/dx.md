@@ -10,6 +10,27 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## From bool (2026-11-12 12:56 UTC, lead): asm-infento-subs' cascade now starts at Boolean 6 (feature 72), not a Boolean
+Boolean 2 (the tyre) and Extrude 13 (lumps touching along a line) are ours since 7de67304 and 59ee8336 (queued); with
+both, studio 1dc32b's first failure is **Boolean 6** (UNION): "Need at least two parts or surfaces for a Boolean
+operation." Its part queries resolve to fewer than two parts; no Boolean runs. The assembly stays 112/167 occurrences,
+69/120 mates.
+- Extrude 13's split is live's: Part 5 82,132.6181 mm³ (a new body), the wheel house 130,235.91 mm³ keeps its body id
+  (Fd99682659264.10385); live's Part 5 82,132.6, house 130,236.1. Live's Part 5 is gone after Extrude 14, ours by
+  Extrude 30 too.
+- Our parts just before Boolean 6 (after Extrude 30), name / volume mm³ / body id: Part 1 2,803,128.08 F6a0f4075d1ae.0
+  (tyre); Part 2 594,347.92 F58abe5a454d1.0; Composite part 1 3,397,476.0; Part 3 68,258.17; Part 4 48,002.58
+  F81c35f0098de.13; Composite part 2 116,260.75; Part 5 73,357.31 Fd99682659264.10385 (house); Part 6 68,258.17
+  F13099eef9929.0; Part 7 48,002.58 F70fba89dd303.0; Composite part 3 116,260.75; Part 8 31,067.92 Fd2bac27c2280.0;
+  Part 9 38,057.75 F204ebd1fa847.0; Part 10 134,166.70 F438b9e879e55.0; Part 11 249,615.26 F54e020d55011.0; Part 12
+  536.50 / Part 13 478.00 (F5df3ab07d58f.0 / .64). Live's capture (1dc32b….live.jsonl) has no part list from Tread on,
+  so which two Boolean 6 should take isn't known here.
+- Boolean 6's queries: two BTMIndividualQuery, deterministicIds ["R1BH"] and another (studios/1dc32b5117a43e3600d77826.json,
+  features[72]).
+- Reproduce: a folder linking /home/ngyekta/parity/models/asm-infento-subs as NOSHAPE_PARITY_ASSEMBLIES, `cargo test
+  --release -p noshape-ops --test all parity::parity_assemblies -- --ignored --nocapture`; the parts at a step:
+  `t.call("query_parts", json!({}))` after `t.step(k)` in `rebuild_assembly` (crates/ops/src/parity.rs).
+
 ## From psui (2026-11-11 15:03 UTC, lead: the full ui-parity run on green 13a1da56a), FYI: the drawing misses
 
 vibe5, 5 shards, 1,483 scenarios with live recordings: 1,435 match. Yours, unchanged from this morning's run (none
