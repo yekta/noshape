@@ -19,6 +19,7 @@
 // from it.
 
 #include "internal.hpp"
+#include <atomic>
 #include <chrono>
 #include <ShapeFix_Shape.hxx>
 #include <ShapeConstruct_ProjectCurveOnSurface.hxx>
@@ -1325,13 +1326,41 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
 
 // ------------------------------------------------------------------ slabs
 
-// Outward normal of `f` at the projection of `p`.
+// Bumped by each Shell: normal_at's projectors of the one before dropped.
+std::atomic<unsigned> projectors_gen{0};
+
+// Outward normal of `f` at the projection of `p` (a thread's projector of a surface made once in a Shell: its search
+// grid, as GeomAPI_ProjectPointOnSurf's constructor builds it each time).
 gp_Dir normal_at(const TopoDS_Face& f, const gp_Pnt& p)
 {
-  GeomAPI_ProjectPointOnSurf pr(p, BRep_Tool::Surface(f));
-  double                     u = 0, v = 0;
-  if (pr.NbPoints() > 0)
-    pr.LowerDistanceParameters(u, v);
+  using Projector = std::pair<occ::handle<Geom_Surface>, std::unique_ptr<GeomAPI_ProjectPointOnSurf>>;
+  thread_local std::vector<Projector> projectors;
+  thread_local unsigned               gen = 0;
+  if (gen != projectors_gen.load(std::memory_order_relaxed))
+  {
+    projectors.clear();
+    gen = projectors_gen.load(std::memory_order_relaxed);
+  }
+  const occ::handle<Geom_Surface> S  = BRep_Tool::Surface(f);
+  GeomAPI_ProjectPointOnSurf*     pr = nullptr;
+  for (const Projector& q : projectors)
+    if (q.first == S)
+      pr = q.second.get();
+  if (pr == nullptr)
+  {
+    if (projectors.size() >= 64)
+      projectors.erase(projectors.begin());
+    double u0, u1, v0, v1;
+    S->Bounds(u0, u1, v0, v1);
+    auto made = std::make_unique<GeomAPI_ProjectPointOnSurf>();
+    made->Init(S, u0, u1, v0, v1, Precision::Confusion());
+    pr = made.get();
+    projectors.emplace_back(S, std::move(made));
+  }
+  pr->Perform(p);
+  double u = 0, v = 0;
+  if (pr->NbPoints() > 0)
+    pr->LowerDistanceParameters(u, v);
   BRepAdaptor_Surface s(f);
   BRepLProp_SLProps   lp(s, u, v, 1, 1e-9);
   gp_Dir              n = lp.IsNormalDefined() ? lp.Normal() : gp_Dir(0, 0, 1);
@@ -9113,6 +9142,7 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
                                 uint8_t method)
 {
   require_non_null(solid.shape, "solid");
+  ++projectors_gen;
   if (std::getenv("NOSHAPE_DUMP_OPS"))
   {
     std::ostringstream p;
