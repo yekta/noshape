@@ -10,6 +10,12 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**2026-11-12 10:47 UTC:** Part Studio UI coverage audit (docs/parity/ps-coverage-audit.md, scripts /root/psui-scratch/cov/:
+scan.py, menus.py, depth.py, gen.py; run-new.sh on vibe5 runs scenarios without live recordings). 50 scenarios in
+92def5c5, on REQUESTS 10:47 for live in two batches (+ asked for `camera` / `measure` state keys). Ours: 48/50 clean;
+edge-rclick-select-loop and section-view-edit wait on live. Next: fix what live's recordings show; batch 2 = the 44
+tools still only opened and closed.
+
 **2026-11-12 09:52 UTC:** line LOD at 0.5 px landed (d731becd). BAD-FACE-DISPLAY-60S closed: already bounded by the mesher's
 cell cap (a73a253f5); with core's old loft sampling the knife's display is 514 ms / 1.06 M triangles (76 ms / 25k
 without the bad face), the feature list 1.1 s (was 60.9 s). ps-* misses on the newest suite (1112-0757): only the six
