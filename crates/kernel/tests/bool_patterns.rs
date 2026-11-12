@@ -1287,17 +1287,26 @@ fn walls_usd_leaves_apart_are_merged_after_it() {
 }
 
 /// c2-sm-louver's Linear pattern 3 fuse (bool's trace, 11-06), its result (tests/data/unify): 1382 faces, invalid (ten
-/// overlapping copies of the panel from an upstream sheet-metal difference). Our unify took 124-156 s on it: the
-/// cylinder-patch merge checked the whole shape for each of ~300 pairs (an invalid input never passes), and its three
-/// reordered tries did it again. Now ~1.2 s; the bound is generous (any machine), the old cost far past it.
+/// overlapping copies of the panel from an upstream sheet-metal difference). Unify merges as USD does (1173 faces).
 #[test]
+fn an_invalid_fuse_result_unifies_as_usd() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/louver-fuse-invalid.brep");
+    let ours = k::read_brep(&path).expect("the fuse's result");
+    let u = k::unify_same_domain(&ours).expect("unified").shape;
+    assert_eq!((ours.count(k::ShapeType::Face), u.count(k::ShapeType::Face)), (1382, 1173), "USD's merges as before");
+}
+
+/// The same unify timed: it took 124-156 s (the cylinder-patch merge checked the whole shape for each of ~300 pairs, an
+/// invalid input never passing, and its three reordered tries did it again); ~1.2 s now on a quiet vibe5. A wall-clock
+/// bound, so T2 (a loaded host took past 30 s, main red 11-12 16:58).
+#[test]
+#[ignore = "T2: timing"]
 fn an_invalid_fuse_result_unifies_in_bounded_time() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/louver-fuse-invalid.brep");
     let ours = k::read_brep(&path).expect("the fuse's result");
     let t = std::time::Instant::now();
-    let u = k::unify_same_domain(&ours).expect("unified").shape;
+    k::unify_same_domain(&ours).expect("unified");
     let secs = t.elapsed().as_secs_f64();
-    assert_eq!((ours.count(k::ShapeType::Face), u.count(k::ShapeType::Face)), (1382, 1173), "USD's merges as before");
     assert!(secs < 30.0, "unify took {secs:.1} s");
 }
 
