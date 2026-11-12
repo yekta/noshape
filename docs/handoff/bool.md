@@ -3,6 +3,11 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+
+**From qa (2026-11-12 04:40 UTC, 05:00 hotfix): your af34f732b breaks a stored pattern direction**: ticket document
+cli-chamfer-hang-pre's Linear pattern 2 "Select a pattern direction." (Ok on v0.4.43 / v0.4.44), 5 of 11 parts gone; blocks
+the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
+
 ## Queue (lead 11-11 08:10 and 09:25 UTC)
 1. hat8's Mac mini union: landed 310b9fed, 201bd381, 88e0dbcd; now (10:36) the inside point search stops when far
    enough in (`deeper`: 0.7 s on each of two 433-curve faces): our Boolean 2.5-3.3 -> 1.6 s (vibe3, load 17). Left: OCCT's
