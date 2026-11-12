@@ -6746,15 +6746,20 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     }
                     Some((c, inf.clone(), connector_z.get(&key).copied()))
                 })();
-                // An axis point's Z runs along its cylinder's axis, whose sense is the kernel's own (Parasolid's
-                // and OCCT's differ: rack-pinion's full round fillet, isaac-ball's bosses): flipped where live's
-                // frame has it the other way.
+                // An axis point's Z runs along its cylinder's axis, an edge's midpoint along its curve, in the
+                // kernel's own sense (Parasolid's and OCCT's differ: rack-pinion's full round fillet,
+                // robotic-arm's base edge midpoint): flipped where live's frame has it the other way. (A face's
+                // point has its outward normal: no such choice.)
                 ends.push(end.map(|(mut c, inf, live_z)| {
-                    if inf.ends_with("AXIS_POINT")
+                    // (A circle's centre not yet: scissor-lift's Revolute 12 / 13 then hold, but pull a link of its
+                    // subassembly 6 mm along their axis; nor a part inside a subassembly.)
+                    let on_edge = inf == "MID_POINT" && c["entity"].as_str().is_some_and(|e| e.starts_with("edge:")) && c["instance"].as_str().is_some_and(|i| !i.contains(" > "));
+                    if (inf.ends_with("AXIS_POINT") || on_edge)
                         && let Some(z) = live_z
                         && placer.connector_z_local(&l.tab, &c).is_some_and(|ours| ours.dot(glam::DVec3::from(z)) < -0.999)
                     {
                         c["flip"] = json!(true);
+                        trace(&format!("{name}: {inf} on {} flipped to live's Z", c["instance"]));
                     }
                     c
                 }));
