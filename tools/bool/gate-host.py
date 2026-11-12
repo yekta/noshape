@@ -3,7 +3,7 @@
 knurl / gear timing, each case once, in parallel within the host's cores; results cached by what they were built from.
 
   gate-host.py fp                                    the host's part of the cache keys (corpora, OCCT, models)
-  gate-host.py run --out DIR --role NAME:KEY:KBIN:OBIN ... [--speed BASE_KBIN NEW_KBIN] --cmp BASE_ROLE NEW_ROLE
+  gate-host.py run --out DIR --role NAME:RKEY:SKEY:OKEY:KBIN:OBIN ... [--speed BASE_KBIN NEW_KBIN] --cmp BASE_ROLE NEW_ROLE
 
 A role's replay (kernel binary KBIN) and suite (ops binary OBIN, '-' for none) run only when the cache has no result
 for its key: ~/agents/bool-gate/cache/<RKEY>-replay.tsv, <SKEY>-suite.tsv. OCCT's results, which only change with
@@ -29,7 +29,9 @@ VS_OCCT = {"parity56"}
 HEAVY = {"shfall", "cf-spur-gear", "gears", "gpf"}
 SOLO = {"kall", "k10-25", "k10-25-12", "k25-15", "k25-25", "k25-71-12"}
 HEAVY_AT_ONCE = 2
-CASE = re.compile(r"^([0-9a-f]{16})")
+# (A case is named by its file: a recorded one by its 16-digit hash, a hand-made one (kall's k25x2) any way.)
+NAME = r"[\w.-]+"
+CASE = re.compile(rf"^({NAME})( \(|: failed)")
 
 
 def sha(*parts):
@@ -149,15 +151,15 @@ def parse_replay(log):
     lines = read_lines(log)
     differ = False
     for l in lines:
-        m = re.match(r"^([0-9a-f]{16}) declined: (.*)$", l)
+        m = re.match(rf"^({NAME}) declined: (.*)$", l)
         if m:
             got[m[1]] = ("declined", m[2], "")
             continue
-        m = re.match(r"^([0-9a-f]{16}) (Fuse|Cut|Common) faces \d+ tools \d+: ([\d.]+) ms", l)
+        m = re.match(rf"^({NAME}) (Fuse|Cut|Common) faces \d+ tools \d+: ([\d.]+) ms", l)
         if m:
             got.setdefault(m[1], ("same", "", m[3]))
             continue
-        m = re.match(r"^  (equivalent|as live, OCCT differs): ([0-9a-f]{16})", l)
+        m = re.match(rf"^  (equivalent|as live, OCCT differs): ({NAME})", l)
         if m:
             got[m[2]] = ("equivalent" if m[1] == "equivalent" else "as-live", l.split(": ", 2)[-1][:300], got.get(m[2], ("", "", ""))[2])
             continue
@@ -167,7 +169,7 @@ def parse_replay(log):
         if differ:
             m = CASE.match(l)
             if m:
-                rest = l[16:]
+                rest = l[len(m[1]):]
                 got[m[1]] = ("failed" if rest.startswith(": failed") else "differ", rest.lstrip(": ")[:400], "")
             elif not l.startswith("    "):
                 differ = False
@@ -332,7 +334,7 @@ def speed(base_kbin, new_kbin, out, threads, rounds=3):
                     "NOSHAPE_BOOL_CORPUS": d, "NOSHAPE_BREP_OURS_ONLY": "1", "NOSHAPE_BOOLEAN_MEMORY_MB": "16000"},
                     "cmd": [kbin, "brep_replay::brep_corpus_replay", "--exact", "--ignored", "--nocapture", "--test-threads=1"]}, out, threads)
                 for l in read_lines(t["log"]) + read_lines(t["log"] + ".err"):
-                    m = re.match(r"^([0-9a-f]{16}) (Fuse|Cut|Common) (?:faces \d+ )?tools \d+: ([\d.]+) ms", l)
+                    m = re.match(rf"^({NAME}) (Fuse|Cut|Common) (?:faces \d+ )?tools \d+: ([\d.]+) ms", l)
                     if m:
                         k = (c, m[1], role)
                         best[k] = min(best.get(k, 1e18), float(m[3]))
@@ -349,9 +351,9 @@ def speed(base_kbin, new_kbin, out, threads, rounds=3):
 TAKEN = {"same", "equivalent", "as-live"}
 
 
-def rounded(text):
-    """A difference's words with its numbers to 9 digits (a volume's last digits move run to run)."""
-    return re.sub(r"-?\d+\.\d+(?:e-?\d+)?", lambda m: f"{float(m[0]):.9g}", text)
+def rounded(text, digits=9):
+    """A difference's words with its numbers to `digits` digits (a volume's last digits move run to run)."""
+    return re.sub(r"-?\d+\.\d+(?:e-?\d+)?", lambda m: f"{float(m[0]):.{digits}g}", text)
 BAD = {"differ", "failed", "noresult"}
 
 
@@ -427,7 +429,8 @@ def compare(base_r, new_r, base_s, new_s, spd):
             if tb_[2] and tn_[2]:
                 tb += float(tb_[2])
                 tn += float(tn_[2])
-            if tb_[1] == tn_[1]:
+            # (A document's measures to 7 digits: an area's 1e-8 moves with the Booleans' paths, c2-rings-loft's.)
+            if rounded(tb_[1], 7) == rounded(tn_[1], 7):
                 continue
             fb, fn = frac(tb_[1]), frac(tn_[1])
             line = f"{d}: main '{tb_[1][:200]}' -> '{tn_[1][:200]}'"
