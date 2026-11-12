@@ -1,19 +1,19 @@
 {
  "scenario": "doc-tab-manager-row-menu",
- "recorded": "2026-11-08T04:53:45.706Z",
+ "recorded": "2026-11-12T20:30:31.755Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
  },
  "live": {
-  "document": "f94043ce7204762e17884f30",
-  "workspace": "176f68d829a9a9926d9e352e",
-  "element": "4919279d36d5d20c6527e2ed",
+  "document": "f3f005ec13e61da2bb7e6359",
+  "workspace": "23b9f0241670c8edca5f0dd5",
+  "element": "126eedcc39abc96cd308c7ba",
   "start": "doc-tabs",
-  "startElement": "4919279d36d5d20c6527e2ed",
-  "runner": "live2 "
+  "startElement": "126eedcc39abc96cd308c7ba",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -62,6 +62,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -167,6 +194,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -211,7 +265,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 99433
+   "t": 59975
   },
   {
    "step": 2,
@@ -223,8 +277,8 @@
    },
    "ok": true,
    "at": [
-    144,
-    230
+    194,
+    212
    ],
    "state": {
     "focus": {
@@ -245,7 +299,8 @@
       "Duplicate",
       "Copy to clipboard",
       "Select as document thumbnail",
-      "Move to document…"
+      "Move to document…",
+      "Export…"
      ],
      "highlighted": null,
      "disabled": []
@@ -289,6 +344,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -333,7 +415,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 106118
+   "t": 62734
   },
   {
    "step": 3,
@@ -344,8 +426,8 @@
    "ok": true,
    "pointer": {
     "at": [
-     144,
-     229
+     194,
+     211
     ],
     "hover": [],
     "element": "div#context-menu-layer"
@@ -397,6 +479,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -441,7 +550,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 109617
+   "t": 66537
   }
  ]
 }
