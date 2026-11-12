@@ -46,12 +46,34 @@ Scripts: /root/psui-scratch/cov/ (scan.py, menus.py, depth.py).
 
 After batch 1, 29 of 75 tools have a re-edit; 44 are still only opened and closed.
 
-## Left for batch 2
+## Batch 2 (41 scenarios, psui 11-12)
 
-- **Full cycles for the other 44 tools:** surfaces (Boundary, Fill, Move boundary, Ruled, Mutual trim, Constrained),
-  curves (Fit spline, Projected, Bridging, Composite, Intersection, Trim, Isocline, Offset, Isoparametric, Edit,
-  Routing), Frame / Frame trim / Gusset / End cap / Cut list / Tag, the rest of sheet metal (Tab, Bend, Jog, Form,
-  Sheet metal loft, Make joint, Corner, Bend relief, Finish), Hole (from a sketch point), Rib, Wrap, Decal, Derived,
-  Replace face, Face blend, Body draft, Enclose, Query variable, Mate connector.
-- **The analysis submenu's eight tools; Create Drawing of… and Export… from the graphics.**
-- **New state keys, both recorders:** `camera` and `measure`, so view and Measure scenarios compare what they show.
+New starts: `pin`, `hole-sketch`, `surfaces`, `curves`, `frame-l`, `sm-box` and `bracket` (tests/ui-parity/starts.json;
+each `about` gives the coordinates the picks use).
+
+- **Full cycles:**
+  - surfaces: Boundary surface, Fill, Move boundary, Ruled surface, Mutual trim, Replace face;
+  - Face blend, Body draft;
+  - curves: Intersection, 3D fit spline, Composite, Bridging, Trim, Edit, Projected, Routing, Offset, Isocline,
+    Isoparametric;
+  - Hole from a sketch point; Rib;
+  - sheet metal: Tab, Bend, Jog, Corner, Bend relief, Make joint, Finish sheet metal model;
+  - frames: End cap, Gusset, Cut list.
+- **Edits:** `frame-edit-reedit`; `mate-connector-new-edit-cancel`.
+- **Analysis tools** (Show analysis tools ›): Deviation, Connection, Dihedral, Interference, Zebra, Reflection, Draft,
+  Flatten surfaces.
+
+All 41 run on ours without a failed step. Features that end in error on ours, to check against live:
+- curves: Bridging, Trim (Sketch 2's line isn't taken as a curve to adjust), Edit, Routing, Offset, Isocline,
+  Isoparametric;
+- Rib (with Parts filled);
+- sheet metal: Bend, Jog, Corner, Make joint;
+- Replace face.
+
+After both batches, 61 of 75 tools have a re-edit.
+
+## Still left
+
+- Wrap, Decal, Derived, Form, Flex PCB / Finish flex PCB: they need an image, another document or a library.
+- Tag, Frame trim (with a second frame), Sheet metal loft, Constrained surface, Enclose, Query variable's edit.
+- Create Drawing of… and Export… from the graphics.
