@@ -123,7 +123,11 @@ impl DrawingEditor {
         let scale = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
         let width = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false).default_value(sheet_len(w, inches)));
         let height = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false).default_value(sheet_len(h, inches)));
-        scale.update(cx, |st, cx| st.focus(window, cx));
+        // Opened, the scale is all selected: typed text replaces it (live2 drw-sheet-properties-scale: "1:2").
+        scale.update(cx, |st, cx| {
+            st.focus(window, cx);
+            st.select_all(window, cx);
+        });
         let lens = [&width, &height].map(|f| std::rc::Rc::new(std::cell::RefCell::new(f.read(cx).value().to_string())));
         let commit = |field: &Entity<InputState>, last: std::rc::Rc<std::cell::RefCell<String>>, window: &mut Window, cx: &mut Context<Self>| {
             cx.subscribe_in(field, window, move |_, st, ev: &InputEvent, window, cx| {

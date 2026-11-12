@@ -7,7 +7,7 @@
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::{Input, InputState, Textarea, TextareaState};
+use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -548,6 +548,15 @@ impl DrawingEditor {
             _ => v.label.clone().unwrap_or_default(),
         };
         let input = |text: String, window: &mut Window, cx: &mut Context<Self>| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
+        let scale_input = input(scale_text, window, cx);
+        // Enter in Scale keeps the dialog but the view's selection frame goes (live2 drw-view-properties-scale-typed).
+        cx.subscribe_in(&scale_input, window, |this, _, ev: &InputEvent, _, cx| {
+            if matches!(ev, InputEvent::PressEnter { .. }) {
+                this.selection.clear();
+                this.redraw(cx);
+            }
+        })
+        .detach();
         self.view_props = Some(ViewProps {
             view: id,
             orientation: match &v.kind {
@@ -557,7 +566,7 @@ impl DrawingEditor {
             named: v.named_view.clone(),
             scale: v.scale,
             sheet_scale: v.sheet_scale,
-            scale_input: input(scale_text, window, cx),
+            scale_input,
             rotation: input(format!("{}", (deg * 1000.0).round() / 1000.0), window, cx),
             rot_reverse: false,
             unaligned: v.unaligned,
@@ -1178,12 +1187,14 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-view-props")
-                // Esc with a field focused closes it too (live).
+                // Esc with a field focused closes it too, the view no longer selected (live2
+                // drw-view-properties-esc-cancels-name).
                 .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
                     if e.keystroke.key == "escape" {
                         cx.stop_propagation();
                         this.view_props = None;
-                        cx.notify();
+                        this.selection.clear();
+                        this.redraw(cx);
                     }
                 }))
                 .absolute()

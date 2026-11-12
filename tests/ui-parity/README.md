@@ -197,10 +197,14 @@ Studio ("Part Studio 1 Drawing 1"; start `frame-drawing`, a Frame and its cut li
 Its state adds `"drawing"` (`null` outside a drawing tab):
 ```json
  "drawing": { "tab": "Part 1 Drawing 1", "sheet": "Sheet1", "sheets": ["Sheet1"], "tool": "Dimension",
-              "views": [{"name": "Front", "kind": "projected", "parent": "Top", "scale": "1:1"}],
-              "annotations": [{"kind": "dimension", "text": "1.575"}, {"kind": "note", "text": "CHECK SIZE"}],
+              "views": [{"name": "Front", "kind": "projected", "position": [81, 81], "parent": "Top", "scale": "1:1"}],
+              "annotations": [{"kind": "dimension", "text": "1.575", "position": [81, 98.2]}, {"kind": "note", "text": "CHECK SIZE", "position": [60, 40]}],
               "selection": [{"kind": "VIEW", "owner": "Front"}] }
 ```
+- `position` (live2 11-12, from the drawing's own data): sheet mm from the sheet's lower-left corner, 0.1 mm; a view's
+  is the centre of its frame (the geometry and a 2 mm margin), a dimension's the centre of its text, another
+  annotation's the centre of its box; `null` for lines, centerlines and centermarks. Equal within 2 mm, compared
+  where both sides have one (older recordings have none).
 - `tool`: the active drawing tool's tooltip name without its shortcut ("Diameter dimension", "2 point linear
   dimension"), `null` when none. `views`: sorted by name (a section "Section", a detail "Detail"); `kind` one of
   `base`, `projected`, `isometric`, `section`, `detail`, `auxiliary`, `broken-out`; `parent` the view it was projected
@@ -333,8 +337,8 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   from Main's head after the versions, its own `features` in it, the run back on Main (start `doc-branches`). A drawing
   with `"first": true` is made before the versions and workspaces; `"drawing_notes": [{"text", "position": [x, y]}]`
   (sheet mm) adds notes to it, in a workspace's entry on that workspace, at the start's top level on Main after the
-  workspaces (start `merge-drawing`: the drawing edited on both sides; targets the merge row's ⓘ by its tooltip's first
-  line `{"button": "Part 1 Drawing 1 is out of date in Main and B1"}` and `{"button": "Open in B1"}`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
+  workspaces (start `merge-drawing`: the drawing edited on both sides; targets the merge row's ⓘ by its tooltip
+  `{"button": "For this tab type, edits from separate branches cannot be merged."}`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
   (the workspace "Main", a version, a history entry), `{"button": "Show changes:Main"}` a row's Show changes…, the
   panel header's buttons by tooltip (`"Create version…"`, `"Compare history entries"`, `"Close"`), the left rail's
   (`"Versions and history"`, `"Create version…"`).

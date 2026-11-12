@@ -148,7 +148,7 @@ impl DrawingEditor {
     }
 
     /// The sheet's annotations: id, kind and the text drawn for it.
-    fn ui_annotations(&self) -> Vec<(u64, &'static str, String)> {
+    pub(crate) fn ui_annotations(&self) -> Vec<(u64, &'static str, String)> {
         // What is placed (not a tool's preview: the note on the pointer).
         let Some(sheet) = self.drawing.sheets.get(self.sheet) else { return Vec::new() };
         let text = |id: u64| -> String {
@@ -208,9 +208,28 @@ impl DrawingEditor {
                     "ordinate" => t.split_whitespace().map(dimension_value).collect::<Vec<_>>().join(" "),
                     _ => t,
                 };
+                // An open palette's previewed values: read as committed (live's recorder, see `PaletteDlg::committed`).
+                let t = self.palette.as_ref().and_then(|p| p.committed.iter().find(|(id, _)| *id == a.id)).map_or(t, |(_, c)| c.clone());
                 (a.id, k, t)
             })
             .collect()
+    }
+
+    /// Where live's recorder places an annotation (live2 16:46, sheet mm in tenths): a dimension at its text's centre,
+    /// anything else at the centre of its box; none for lines, centerlines and centermarks, which have no box.
+    fn ui_position(&self, kind: &str, of: impl Fn(&PickTarget) -> bool) -> Option<[i64; 2]> {
+        if matches!(kind, "line" | "centerline" | "centermark") {
+            return None;
+        }
+        let b = self.built.as_ref()?;
+        let mine = |pick: u32| b.picks.get(pick as usize).is_some_and(&of);
+        let mut points: Vec<[f64; 2]> = b.geometry.texts.iter().filter(|t| mine(t.pick)).flat_map(noshape_model::drawing::font::text_box).collect();
+        if kind != "dimension" || points.is_empty() {
+            points.extend(b.geometry.lines.iter().filter(|l| mine(l.pick)).flat_map(|l| l.points.iter().copied()));
+        }
+        let first = *points.first()?;
+        let (lo, hi) = points.iter().fold((first, first), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
+        Some(tenths([(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0]))
     }
 
     /// The drawing's part of the state the ui-parity runner records (README "### Drawings").
@@ -226,14 +245,22 @@ impl DrawingEditor {
             .map(|v| {
                 // (An aligned section's too: live names its parent, drw-aligned-section-edit.)
                 let parent = sheet.parent_of(v.id).map(|p| self.ui_view_name(p));
-                let scale = self.placement(v.id).map(|p| noshape_model::drawing::sheet::format_scale(p.scale));
-                json!({ "name": self.ui_view_name(v.id), "kind": self.ui_view_kind(v.id), "parent": parent, "scale": scale, "brokenOut": v.broken_out.len() })
+                let pl = self.placement(v.id);
+                let scale = pl.map(|p| noshape_model::drawing::sheet::format_scale(p.scale));
+                // Live2 16:46: the centre of the view's frame, sheet mm (the frame's margin is even all round).
+                let position = pl.map(|p| tenths([(p.min[0] + p.max[0]) / 2.0, (p.min[1] + p.max[1]) / 2.0])).map(mm);
+                json!({ "name": self.ui_view_name(v.id), "kind": self.ui_view_kind(v.id), "position": position, "parent": parent, "scale": scale, "brokenOut": v.broken_out.len() })
             })
             .collect();
         views.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
         // Live's recorder lists no datum target (live2 drw-datum-target), nor a foreshortened dimension (live2
         // drw-dimension-foreshorten: its export drops it).
-        let mut annotations: Vec<(&str, String)> = self.ui_annotations().into_iter().filter(|(_, k, _)| !matches!(*k, "datumtarget" | "foreshortened")).map(|(_, k, t)| (k, t)).collect();
+        let mut annotations: Vec<(&str, String, Option<[i64; 2]>)> = self
+            .ui_annotations()
+            .into_iter()
+            .filter(|(_, k, _)| !matches!(*k, "datumtarget" | "foreshortened"))
+            .map(|(id, k, t)| (k, t, self.ui_position(k, |p| matches!(p, PickTarget::Annotation(x) if *x == id))))
+            .collect();
         // A view's label is a note in live's export ("SECTION A - A", 2063); a table its drawn texts.
         if let Some(b) = &self.built {
             // (A hole table isn't in live's exports, nor its recorder's state: live 2134.)
@@ -246,20 +273,20 @@ impl DrawingEditor {
             // drw-cut-list-table-properties.)
             for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. } | TableKind::Custom { .. } | TableKind::CutList { .. }) && Some(t.id) != editing) {
                 let parts: Vec<&str> = b.geometry.texts.iter().filter(|x| matches!(b.picks.get(x.pick as usize), Some(PickTarget::Table(id)) if *id == t.id)).map(|x| x.text.as_str()).collect();
-                annotations.push(("table", parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ")));
+                annotations.push(("table", parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" "), self.ui_position("table", |p| matches!(p, PickTarget::Table(id) if *id == t.id))));
             }
             for v in &sheet.views {
                 let parts: Vec<&str> = b.geometry.texts.iter().filter(|t| matches!(b.picks.get(t.pick as usize), Some(PickTarget::ViewLabel(x)) if *x == v.id)).map(|t| t.text.as_str()).collect();
                 let text = parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ");
                 if !text.is_empty() {
-                    annotations.push(("note", text));
+                    annotations.push(("note", text, self.ui_position("note", |p| matches!(p, PickTarget::ViewLabel(x) if *x == v.id))));
                 }
             }
         }
         // An inspection item is an annotation of its own in live, read as its number (live2 2226), hidden or not.
-        annotations.extend(sheet.annotations.iter().filter_map(|a| a.inspection).map(|n| ("inspectionsymbol", n.to_string())));
+        annotations.extend(sheet.annotations.iter().filter_map(|a| a.inspection).map(|n| ("inspectionsymbol", n.to_string(), None)));
         let open: &[noshape_sketch::EntityId] = if matches!(self.tool, Tool::Sketch { tool: SkTool::Point, .. }) { &self.tool_points } else { &[] };
-        annotations.extend(sheet_sketch_items(&sheet.sketch, open).into_iter().map(|k| (k, String::new())));
+        annotations.extend(sheet_sketch_items(&sheet.sketch, open).into_iter().map(|k| (k, String::new(), None)));
         annotations.sort();
         // What is drawn in selection colours (README "### Drawings"; live 2068): selected views; the Projected
         // tool's parent drawn picked after Insert view placed it. Live's reader (2402) says VIEW for a view drawn
@@ -411,7 +438,7 @@ impl DrawingEditor {
             }),
             "views": views,
             // (Live's recorder reads no text for a centermark, a centerline or a surface finish symbol: null, live 2146.)
-            "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol" | "virtualsharp" | "line" | "circle" | "arc" | "spline" | "splinepoint" | "sketchpoint" | "hatch")).then_some(t) })).collect::<Vec<_>>(),
+            "annotations": annotations.into_iter().map(|(k, t, p)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol" | "virtualsharp" | "line" | "circle" | "arc" | "spline" | "splinepoint" | "sketchpoint" | "hatch")).then_some(t), "position": p.map(mm) })).collect::<Vec<_>>(),
             "selection": selection,
         })
     }
@@ -591,4 +618,14 @@ fn sheet_sketch_items(sk: &noshape_model::drawing::sheet_sketch::SheetSketch, op
 fn dimension_value(shown: &str) -> String {
     let v = shown.trim_start_matches(['Ø', '⌀', 'R', 'S']);
     if v.starts_with('.') { format!("0{v}") } else { v.to_string() }
+}
+
+/// A sheet point in tenths of a millimetre (live's recorder rounds to 0.1 mm), comparable and sortable.
+fn tenths(p: [f64; 2]) -> [i64; 2] {
+    [(p[0] * 10.0).round() as i64, (p[1] * 10.0).round() as i64]
+}
+
+/// [`tenths`] back to millimetres for the state.
+fn mm(p: [i64; 2]) -> [f64; 2] {
+    [p[0] as f64 / 10.0, p[1] as f64 / 10.0]
 }

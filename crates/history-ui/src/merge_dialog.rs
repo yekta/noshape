@@ -501,34 +501,11 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                         .text_color(pal.text)
                         .child(crate::assets::icon(r.icon, 18., cx))
                         .child(div().min_w_0().truncate().child(crate::ui::user_text(r.name.clone())))
-                        // Live mg-903: ⓘ "<tab> is out of date in <target> and <source>" over "For this tab
-                        // type, edits from separate branches cannot be merged.", and "Open in <source>".
+                        // Live (live2 11-12, ver-merge-drawing-info): an ⓘ whose tooltip says only "For this tab type,
+                        // edits from separate branches cannot be merged."
                         .when(r.unmergeable_type, |d| {
-                            let (doc, side) = (doc.clone(), plan.source_side);
-                            let stale = format!("{} is out of date in {} and {}", r.name, plan.target, plan.source);
-                            let open_in = format!("Open in {}", plan.source);
-                            d.child(crate::ui_script::mark(div().id(SharedString::from(format!("merge-info-{i}"))), { let s = stale.clone(); move || format!("button:{s}") }).flex_none().tooltip(crate::ui::user_tooltip(format!("{stale}\n{}", crate::i18n::tr("For this tab type, edits from separate branches cannot be merged.")))).child(crate::ui::glyph("info", 14., rgb(0x4d8ccf))))
-                                .child(
-                                    crate::ui_script::mark(div().id(SharedString::from(format!("merge-open-{i}"))), { let o = open_in.clone(); move || format!("button:{o}") })
-                                        .flex_none()
-                                        .cursor_pointer()
-                                        .tooltip(crate::ui::tooltip(open_in))
-                                        .child(crate::assets::icon("open-external", 14., cx))
-                                        .on_click(move |_, window, cx| {
-                                            window.close_dialog(cx);
-                                            let r = doc.update(cx, |d, cx| -> anyhow::Result<()> {
-                                                match side {
-                                                    Side::Workspace(b) => d.session.switch_branch(b)?,
-                                                    Side::Entry(mv) => d.session.view_microversion(Some(mv))?,
-                                                }
-                                                d.reloaded(cx);
-                                                Ok(())
-                                            });
-                                            if let Err(e) = r {
-                                                doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
-                                            }
-                                        }),
-                                )
+                            const WHY: &str = "For this tab type, edits from separate branches cannot be merged.";
+                            d.child(crate::ui_script::mark(div().id(SharedString::from(format!("merge-info-{i}"))), || format!("button:{WHY}")).flex_none().tooltip(crate::ui::tooltip(crate::i18n::tr(WHY))).child(crate::ui::glyph("info", 14., rgb(0x4d8ccf))))
                         }),
                 )
                 .child(change_cell(r.ours, kept(true)))

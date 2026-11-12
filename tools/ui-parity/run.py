@@ -119,6 +119,15 @@ def forget_old_query_states(live):
     return live
 
 
+def same_position(path, k, a, b):
+    """A drawing view's or annotation's sheet position (live2 11-12, sheet mm): equal within 2 mm, compared where both
+    sides have one."""
+    if k != "position" or not path.startswith(".drawing"):
+        return False
+    pa, pb = a[k], b[k]
+    return pa is None or pb is None or (len(pa) == len(pb) and all(abs(x - y) <= 2.0 for x, y in zip(pa, pb)))
+
+
 def first_difference(a, b, path=""):
     """The first key path where `a` (live) and `b` (ours) differ, with both values. Keys only one side records
     (a side's debugging aids) are not compared; the selection compares its count only until both record kind and owner."""
@@ -136,6 +145,8 @@ def first_difference(a, b, path=""):
                 continue
             # A flip button has no label of its own (live records its icon's name).
             if k == "label" and a.get("kind") == "toggle":
+                continue
+            if same_position(path, k, a, b):
                 continue
             d = first_difference(a[k], b[k], f"{path}.{k}")
             if d:
@@ -161,6 +172,8 @@ def all_differences(a, b, path=""):
                 continue
             if k == "label" and a.get("kind") == "toggle":
                 continue
+            if same_position(path, k, a, b):
+                continue
             out += all_differences(a[k], b[k], f"{path}.{k}")
         return out
     if isinstance(a, list) and isinstance(b, list):
@@ -176,7 +189,8 @@ INPUT_BUTTONS = {"Apply", "Cancel", "Save", "OK"}
 
 # Tooltips live draws as an element's native `title` (the OS's tooltip, which its recorder can't read): ours' is read as
 # none while live's is (dom/panel-versions-history.txt: a history row's tip="Open version V1").
-NATIVE_TITLE_TOOLTIPS = re.compile(r"^Open (version|workspace) ")
+# The merge dialog's ⓘ too (live2 ver-merge-drawing-info: hovered, read as none).
+NATIVE_TITLE_TOOLTIPS = re.compile(r"^(Open (version|workspace) |For this tab type, edits from separate branches cannot be merged\.$)")
 CLOUD_ONLY = {"View support tickets", "App Store dev portal", "Sign out", "Add comment", "Copy link", "Share…", "Transfer ownership…", "Applications", "Create CAM Studio", "Create PCB Studio",
               "Create Render Studio", "Create tutorial…", "Explore Onshape", "What's new", "Forums", "Report a bug",
               "Import from", "Create task…"}
@@ -766,6 +780,12 @@ def compare(live, ours, whole_document=True):
             dr = side.get("drawing")
             if isinstance(dr, dict) and isinstance(dr.get("selection"), list):
                 dr["selection"] = sorted(dr["selection"], key=lambda s: json.dumps(s, sort_keys=True))
+        # Annotations alike in kind and text are listed in the drawing's order on live's side (its views' labels: Front,
+        # Right, Top, Isometric), by position on ours: both sorted by kind, text and position.
+        for side in (a, b):
+            dr = side.get("drawing")
+            if isinstance(dr, dict) and isinstance(dr.get("annotations"), list):
+                dr["annotations"] = sorted(dr["annotations"], key=lambda x: (str(x.get("kind")), str(x.get("text")), [round(v) for v in (x.get("position") or [])]))
         # Live's recorder can't read a table's cells (its text is null there).
         anns = [((side.get("drawing") or {}).get("annotations") or []) for side in (a, b)]
         if any(x.get("kind") == "table" and x.get("text") is None for x in anns[0]):

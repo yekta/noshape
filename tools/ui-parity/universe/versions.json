@@ -2697,11 +2697,25 @@
   {
    "id": "mg-tab-info",
    "category": "merge",
-   "name": "ⓘ out of date / Open in <ws>",
-   "where": "drawing row icons: tooltip \"… edits from separate branches cannot be merged.\", open in the other workspace",
+   "name": "ⓘ For this tab type, edits from separate branches cannot be merged.",
+   "where": "merge dialog: a drawing row edited on both sides (live2 11-12: no out-of-date line, no Open in)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5055"
+   "source": "behaviours.md:5055",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Merge into current workspace…"
+      }
+     },
+     {
+      "on": {
+       "button": "For this tab type, edits from separate branches cannot be merged."
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "mg-unchanged-toggle",

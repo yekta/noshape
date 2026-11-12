@@ -163,6 +163,10 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
         call(ctx, "history_switch_branch", json!({ "branch": "Main" }))?;
     }
     add_drawing_notes(ctx, start, &start["drawing_notes"])?;
+    // A drawing made first: the run opens on the Part Studio, as live's runner opens a whole document.
+    if start["drawing"]["first"].as_bool().unwrap_or(false) {
+        call(ctx, "tab_activate", json!({ "tab": "Part Studio 1" }))?;
+    }
     if !start["drawing"]["first"].as_bool().unwrap_or(false) {
         build_drawing(ctx, start, &asm_tab)?;
     }

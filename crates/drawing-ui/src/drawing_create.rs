@@ -124,9 +124,6 @@ pub struct CreateDrawingDialog {
     custom: bool,
     ct: CustomTemplate,
     suggested: bool,
-    /// The source has MBD data: the options say Suggested views keeps only
-    /// the views it needs (live dialog text).
-    pub mbd: bool,
     pub focus: FocusHandle,
     /// Template list scrolling (the preselected template is scrolled into view).
     list_scroll: ScrollHandle,
@@ -182,7 +179,6 @@ impl CreateDrawingDialog {
             ct: CustomTemplate::new(metric),
             // Onshape preselects "No views" (the first view follows the cursor).
             suggested: false,
-            mbd: false,
             focus: cx.focus_handle(),
             list_scroll: {
                 // Item 0 is the header row.
@@ -576,7 +572,7 @@ impl Render for CreateDrawingDialog {
         let suggested = self.suggested && has_source;
         // Live's recorder: the header's text (its name box's label) and the name field (recordings from 11-08 on).
         let name = self.name.read(cx).value().to_string();
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Create Drawing: New drawing name", "fields": [{ "label": "New drawing name", "kind": "input", "value": name }], "buttons": ["OK", "Cancel"] }));
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Create Drawing: New drawing name", "fields": [{ "label": null, "kind": "input", "value": name }], "buttons": ["OK", "Cancel"] }));
         let body = if custom { self.render_custom(cx) } else { self.render_existing(cx) };
         // Modal backdrop with the dialog centered.
         div()
@@ -629,7 +625,8 @@ impl Render for CreateDrawingDialog {
                             .child(option("cd-suggested", "Suggested views", suggested, has_source, "drawing-suggested-views", cx, true))
                             .child(option("cd-noviews", "No views", !suggested, true, "drawing-no-views", cx, false)),
                     )
-                    .when(self.mbd, |d| d.child(div().px(px(15.)).pb_2().text_size(px(12.)).text_color(pal.text_muted).child("Suggested views provide only necessary views when MBD data is present.")))
+                    // Under Suggested views, with or without MBD data (live2 drw-create-suggested-views).
+                    .when(suggested, |d| d.child(crate::ui_script::mark_message(div().px(px(15.)).pb_2().text_size(px(12.)).text_color(pal.text_muted), || "Suggested views provide only necessary views when MBD data is present.".into()).child("Suggested views provide only necessary views when MBD data is present.")))
                     .child(
                         h_flex()
                             .h(px(56.))

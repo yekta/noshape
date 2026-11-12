@@ -1,6 +1,6 @@
 {
  "name": "ver-merge-drawing-info",
- "about": "Merge from B1 with Part 1 Drawing 1 edited on both sides: its row's ⓘ tooltip (out of date in Main and B1; edits from separate branches cannot be merged)",
+ "about": "Merge from B1 with Part 1 Drawing 1 edited on both sides: its row's ⓘ tooltip (For this tab type, edits from separate branches cannot be merged.)",
  "area": "studios",
  "source": "studios 11-12 (gap audit: the merge dialog's drawing row)",
  "start": "merge-drawing",
@@ -26,7 +26,7 @@
   {
    "do": "hover",
    "on": {
-    "button": "Part 1 Drawing 1 is out of date in Main and B1"
+    "button": "For this tab type, edits from separate branches cannot be merged."
    }
   }
  ]

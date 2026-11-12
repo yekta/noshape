@@ -129,7 +129,16 @@ impl DrawingEditor {
                 body = body.child(check("ex-offsheet", "Exclude off-sheet content", s.exclude_off_sheet, |s, v| s.exclude_off_sheet = v));
             }
             let (st2, file2, custom2, ed2) = (st.clone(), file.clone(), custom.clone(), ed.clone());
-            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Export Drawing", "fields": shown.take(), "buttons": ["Export", "Cancel"] }));
+            // Custom sheets: live's recorder lists the Sheets select and its range box first (live2
+            // drw-export-dxf-custom-sheets-empty).
+            let mut fields = shown.take();
+            if matches!(f, DrawingFormat::Dwg | DrawingFormat::Dxf) && s.sheets == 2
+                && let Some(i) = fields.iter().position(|x| x["label"] == "Sheets")
+            {
+                let sheets = fields.remove(i);
+                fields.splice(0..0, [sheets, serde_json::json!({ "label": "Sheets", "kind": "input", "value": custom.read(cx).value().to_string() })]);
+            }
+            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Export Drawing", "fields": fields, "buttons": ["Export", "Cancel"] }));
             crate::os_ui::modal_help(dialog, "Export Drawing", 600.)
                 .child(body)
                 .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export").disabled(range_empty))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))

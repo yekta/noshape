@@ -125,7 +125,9 @@ fn opens_on_tab() -> Option<String> {
     if let Some(tab) = scenario["steps"].get(0).and_then(|s| s["on"]["doc_tab"].as_str()).filter(|_| !whole) {
         return Some(tab.to_string());
     }
-    if let Some(d) = start.get("drawing") {
+    // A drawing made before the start's workspaces (`"first": true`, start merge-drawing): a whole document, opening on
+    // its first tab as live's runner does.
+    if let Some(d) = start.get("drawing").filter(|d| d["first"] != true) {
         // (A drawing of the start's assembly is named after its tab.)
         // (`"part": null`: of the whole Part Studio.)
         let of = if d["assembly"] == true {

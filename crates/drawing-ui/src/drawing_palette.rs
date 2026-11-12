@@ -61,6 +61,9 @@ impl PaletteDlg {
 /// The open palette.
 pub struct PaletteDlg {
     pub id: u64,
+    /// The annotations' texts as committed when it opened: what live's recorder reads while it is open (its drawing
+    /// data changes on close, live2 drw-dimension-dblclick-precision; ui-parity runs only).
+    pub committed: Vec<(u64, String)>,
     /// A hole callout (else a dimension).
     pub hole: bool,
     pub above: Entity<InputState>,
@@ -230,7 +233,8 @@ impl DrawingEditor {
         let tol = tol_name(&a);
         let diam = (a.format.precision, a.format.tolerance.clone());
         let multi = !others.is_empty();
-        self.palette = Some(PaletteDlg { id, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, at: None, orig: a.clone(), base: a.clone(), cur: a, hole_sel: HoleValue::Diameter, diam, others, varies, _subs: subs });
+        let committed = if crate::ui_script::active() { self.ui_annotations().into_iter().map(|(id, _, t)| (id, t)).collect() } else { Vec::new() };
+        self.palette = Some(PaletteDlg { id, committed, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, at: None, orig: a.clone(), base: a.clone(), cur: a, hole_sel: HoleValue::Diameter, diam, others, varies, _subs: subs });
         // Several: what the palette shows as opened is the base the edits are
         // measured from.
         if multi {
@@ -388,9 +392,12 @@ impl DrawingEditor {
             Some(u) if u.symbol().is_empty() => "(ft-in)".to_string(),
             Some(u) => format!("({})", u.symbol()),
         };
-        // Live's recorder reads the dimension palette's one text, its unit (live2 drw-dimension-edit: "(in)").
-        if !hole {
-            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": unit_label, "text": [unit_label] }));
+        // Live's recorder reads the dimension palette's one text, its unit (live2 drw-dimension-edit: "(in)"), then an
+        // open drop-down's rows (live2 drw-dimension-dblclick-precision: "(in)", "0", "0.1", …).
+        if !hole && crate::ui_script::active() {
+            let rows: Vec<serde_json::Value> = crate::os_menu::ui_state(cx).and_then(|l| l["rows"].as_array().cloned()).unwrap_or_default();
+            let text: Vec<serde_json::Value> = std::iter::once(serde_json::json!(unit_label)).chain(rows).collect();
+            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": unit_label, "text": text }));
         }
         // A focused box: live's 1 px rgba(82,168,236,.8) border with an 8 px
         // rgba(82,168,236,.6) glow (dom/drawing-dimension-edit-dialog.txt).
@@ -545,7 +552,12 @@ impl DrawingEditor {
                 // Live: the content and an 8 x 4 black caret.
                 .child(h_flex().gap(px(3.)).child(content).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb(0x000000))))
                 .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
-                    m = m.min_width(widest(&items));
+                    // Esc closes the list and the palette together (live2 drw-dimension-palette-esc-twice).
+                    let shut = ed.clone();
+                    m = m.min_width(widest(&items)).on_first_escape(move |window, cx| {
+                        shut.update(cx, |t, cx| t.close_palette(false, cx));
+                        window.dispatch_action(Box::new(crate::os_menu::MenuDismiss), cx);
+                    });
                     for (l, on, f) in &items {
                         let (e, f) = (ed.clone(), f.clone());
                         m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_palette(|d| f(d), cx))));

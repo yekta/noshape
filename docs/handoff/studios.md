@@ -28,6 +28,24 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-12 19:24 UTC: live2's 35 drawing takes (06b0ba9b); `position`; file dialogs (P1)
+- P1 (user, landed e06b09c8): file dialogs start in the folder last chosen per purpose (save / open / document),
+  `file_dialogs.json` in the config folder; a deleted folder falls back to the documents folder.
+- `position` in the drawing state (live2 16:46): views' frame centres, a dimension's text centre, other annotations'
+  box centres, sheet mm; run.py compares it within 2 mm where both sides have one and sorts annotations by kind, text,
+  position on both sides (live lists equal ones in the drawing's order).
+- From the takes: Escape / Enter in View properties leave the view unselected; Sheet properties opens with Scale all
+  selected; the palette's open drop-down rows are part of its text, Esc closes the list and the palette, an open
+  palette's values read as committed (live's recorder reads the drawing data); Create Drawing's "Suggested views
+  provide only necessary views…" shows under Suggested views (not only with MBD); its name field has no label; Export's
+  Custom sheets lists the Sheets select and its box first; the merge dialog's drawing ⓘ says only "For this tab type,
+  edits from separate branches cannot be merged." (no Open in, lead 11-12); merge-drawing opens on Part Studio 1.
+- Open: a paste (keys or menu) puts the pasted items' box with its lower-left corner at the point (live: view
+  +21.8/+8.8, datum +13.5/+10.5 from the click; ours centres them): needs the pasted items' drawn box. Dragging a view
+  leaves nothing selected in live (ours selects it). Positions: a section label 3.4 mm lower in ours, a leadered note
+  14 mm off, a table 7.9 mm off (x). Asked live2 (REQUESTS 19:04): drw-view-move-to-sheet-ok re-record (its Sheet pick
+  failed), palette click-away, the dimension text after a sheet scale change.
+
 ### 2026-11-12 17:52 UTC: live's 37 takes of the gap scenarios (7e6701f4), fixed
 - Run against the takes before they landed (`git show 7e6701f4:…`, copied into vibe3's tests/ui-parity/live/ after
   every rb.sh, whose --delete drops them): 13/37 at first.
