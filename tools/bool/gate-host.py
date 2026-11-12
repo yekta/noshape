@@ -276,6 +276,9 @@ def run_task(t, out, threads):
             time.sleep(0.5)
         p.returncode = 0
     shutil.rmtree(tmp, ignore_errors=True)
+    # (A binary without the test (the wrong one): no results, said so.)
+    if rc == 0 and any(l.startswith("running 0 tests") for l in read_lines(log)):
+        rc = "no such test in its binary"
     t["rc"], t["secs"], t["log"] = rc, time.time() - t0, log
     return t
 
@@ -499,7 +502,7 @@ def main():
         done = [f.result() for f in futures]
     # (A shard killed without its results (for memory, beside the others): again, alone.)
     for t in done:
-        if t["rc"] not in (0, 101):
+        if isinstance(t["rc"], int) and t["rc"] not in (0, 101):
             print(f"gate-host: {t['role']} {t['kind']}-{t['id']} ended {t['rc']} without its results: again alone", flush=True)
             run_task(t, a.out, a.threads)
     results = [(key, "replay", collect_replay(ts, cases, "")) for key, (ts, cases) in replays.items()]

@@ -100,7 +100,8 @@ build() { # <worktree> <with ops 0/1> <out file>
   [ "$2" = 1 ] && cmd="$cmd && cargo test --release -p noshape-ops --test all --no-run"
   (cd "$1" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "$cmd" > "$3" 2>&1)
 }
-exe() { grep -E 'Executable tests/all.rs' "$1" | sed -n "s|.*(\(.*/$2\)).*|\1|p" | tail -1; }
+# (The build's test binaries in its order: the kernel's first, the ops' second.)
+exe() { grep -E 'Executable tests/all.rs' "$1" | sed -n 's|.*(\(.*\)).*|\1|p' | sed -n "$2p"; }
 need_bs=0; need_ns=0
 if [ $suite = 1 ]; then
   cached "$bkey_s" suite || need_bs=1
@@ -113,11 +114,10 @@ wait $pb; rb=$?; wait $pn; rn=$?
 cat "$scratch/gate-build-base.log" "$scratch/gate-build-new.log" >> "$log"
 [ $rn = 0 ] || { say "the branch doesn't build (tail of $scratch/gate-build-new.log):"; tail -20 "$scratch/gate-build-new.log" >&2; echo "VERDICT FAIL: the branch doesn't build"; exit 1; }
 [ $rb = 0 ] || { say "main doesn't build: $scratch/gate-build-base.log"; echo "VERDICT FAIL: main ${base:0:9} doesn't build here"; exit 1; }
-bk=$(exe "$scratch/gate-build-base.log" 'all-[0-9a-f]*'); nk=$(exe "$scratch/gate-build-new.log" 'all-[0-9a-f]*')
-# (cargo prints the kernel's binary first, the ops' second.)
+bk=$(exe "$scratch/gate-build-base.log" 1); nk=$(exe "$scratch/gate-build-new.log" 1)
 bo=-; no=-
-[ $need_bs = 1 ] && bo=$(grep -E 'Executable tests/all.rs' "$scratch/gate-build-base.log" | sed -n 's|.*(\(.*\)).*|\1|p' | grep -v "$bk" | tail -1)
-[ $need_ns = 1 ] && no=$(grep -E 'Executable tests/all.rs' "$scratch/gate-build-new.log" | sed -n 's|.*(\(.*\)).*|\1|p' | grep -v "$nk" | tail -1)
+[ $need_bs = 1 ] && bo=$(exe "$scratch/gate-build-base.log" 2)
+[ $need_ns = 1 ] && no=$(exe "$scratch/gate-build-new.log" 2)
 [ -n "$bk" ] && [ -n "$nk" ] || { echo "VERDICT FAIL: no test binary in the build output ($scratch/gate-build-*.log)"; exit 1; }
 say "built in $(( $(date +%s) - t0 )) s; running"
 
