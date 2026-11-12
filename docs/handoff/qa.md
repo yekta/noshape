@@ -51,6 +51,14 @@ Gehäuse), as do its later features; the knife's Chamfer 1 builds since blend's 
 cf-surface-pattern's Surface Pattern 3 is 12× live while Pattern 4 is under live; blend's fast-finish (4dc4f0964) and dx's
 mesh fix (fcd0b283f) came after this green: the 11-12 02:00 window re-measures.
 
+**11-12 19:58 (lead): vibe4 removed.** Everything of qa's runs on vibe5 now, vibe3 kept light for the watcher: qa-suites.sh's
+assembly / exchange stage (`QA_SUITES_HOST`, default vibe5, after the speed stage when on the same host), the interaction stage
+(`QA_UI_HOST` vibe5), bin/compat-check.sh (rewritten for vibe5: the private user documents hat15 / hat15b / hat8 / dock in vibe5
+~/lead-private (700, files 600), the 47 ticket documents in ~/qa/tickets, release CLIs in ~/qa-rel/<version>/noshape-cli, the
+candidate app at the one fixed path ~/qa-speed/bin/noshape); compat-loop.sh now takes the release's version (0.4.45). Until
+522b51a6 lands: `NOSHAPE_LAND_QUEUE_HOST=vibe5 NOSHAPE_LAND_HOSTS="vibe5 vibe3" tools/tiers/land.sh` (land-footer.sh does).
+Builds: the qa-bisect worktree on vibe5 (≤3 worktrees per host: qa-suite, qa-speed, qa-bisect; qa-t2's target removed).
+
 **11-12 08:58: standing jobs (detached):** bin/compat-loop.sh v0445 runs bin/compat-check.sh on every new watcher green against the
 last release (user documents hat8 / hat15 / dock, hat15 also against v0.4.43, the 47 ticket documents, qa's authored documents
 from qa-scratch/compat-docs/v0443 copied to vibe4 each run: vibe4's ~/tmp is pruned); a changed feature status writes
