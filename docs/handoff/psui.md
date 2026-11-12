@@ -10,6 +10,13 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**2026-11-12 11:55 UTC:** batch 2 (41 scenarios, 8 new starts incl. plate-bend) landed 10411936; on REQUESTS 11:22 + 11:55.
+Erroring features on ours: Rib fixed (std ribEditLogic + opDraft REFERENCE_ENTITY, 0c1f17bf); Replace face, Isocline,
+Bridging, Bend, Jog were scenario mistakes (fixed); Trim curve and Isoparametric fail on live too (std's own rules);
+Corner / Make joint wait on live's recordings; tickets OFFSET-CURVE-CURVED-FACE, REPLACE-FACE-SHEET-SMALL-MSG (live asked),
+EDIT-CURVE-ELEVATE-LINE (FS host). Ops repro harness: a scratch #[ignore] test in crates/ops/tests/prefs.rs (not
+committed) building a start and calling feature_add; run with `--test prefs` (the file has its own target).
+
 **2026-11-12 10:47 UTC:** Part Studio UI coverage audit (docs/parity/ps-coverage-audit.md, scripts /root/psui-scratch/cov/:
 scan.py, menus.py, depth.py, gen.py; run-new.sh on vibe5 runs scenarios without live recordings). 50 scenarios in
 92def5c5, on REQUESTS 10:47 for live in two batches (+ asked for `camera` / `measure` state keys). Ours: 48/50 clean;
