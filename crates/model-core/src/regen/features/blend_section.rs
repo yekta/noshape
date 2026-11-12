@@ -2219,7 +2219,7 @@ pub fn cliff_end_round(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) -> 
                     let n = n.normalize();
                     // (A foot inside the face's parameters, the offset along its normal.)
                     let along = (p - s1).cross(n).length() <= scale * 1e-9;
-                    if along && (!check || wall.contains_point(s1, scale * 1e-7).unwrap_or(false)) {
+                    if along && (!check || wall.contains_uv(uv.x, uv.y, scale * 1e-7).unwrap_or(false)) {
                         hint.set(Some(uv));
                         return Ok((s1, n));
                     }
@@ -2391,48 +2391,67 @@ pub fn cliff_end_round(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) -> 
     let part_names = body.shape_names();
     let trio = Shape::compound(&[wall.clone(), faces[tube_i].clone(), faces[cap_i].clone()]);
     let trio_names = crate::regen::eval::names_for(&trio, vec![part_names.faces[wall_i].clone(), part_names.faces[tube_i].clone(), part_names.faces[cap_i].clone()]);
-    let split = k::imprint(&trio, &[wall_curves[0].clone(), wall_curves[1].clone(), tube_curve])?;
-    let split_names = ev.name_result(&[&trio_names], &split.history, &split.shape, &BTreeMap::new(), None);
+    let curves = [wall_curves[0].clone(), wall_curves[1].clone(), tube_curve];
     let on_edge = |f: &Shape| {
         f.edges().iter().any(|x| {
             let Ok(i) = x.edge_info() else { return false };
             x.point_at(0.5 * (i.first_param + i.last_param)).is_ok_and(|q| k::make_vertex(q).and_then(|v| k::distance(&v, &edge)).is_ok_and(|d| d.distance < scale * 1e-7))
         })
     };
-    let (mut kept, mut kept_names) = (Vec::new(), Vec::new());
-    for (f, n) in split.shape.faces().into_iter().zip(split_names) {
-        if !on_edge(&f) {
-            kept.push(f);
-            kept_names.push(n);
-        }
-    }
-    for (i, f) in faces.iter().enumerate() {
-        if i != wall_i && i != tube_i && i != cap_i {
-            kept.push(f.clone());
-            kept_names.push(part_names.faces[i].clone());
-        }
-    }
-    if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
-        eprintln!("cliff end: angles {:.2}..{:.2} deg; JWO {:.3} mm2, JWK {:.3} mm2; split {} faces, kept {} of the part's {}", a0.to_degrees(), a1.to_degrees(), jwo.area()? * 1e6, jwk.area()? * 1e6, split.shape.faces().len(), kept.len(), faces.len());
-    }
-    let kept_shape = Shape::compound(&kept);
-    let kept_names = crate::regen::eval::names_for(&kept_shape, kept_names);
     let blend = Arc::new(TopoName::face(ev.feature, Role::Blend(body.edges[e].clone())));
     let blends = Shape::compound(&[jwo, jwk]);
     let blend_names = crate::regen::eval::names_for(&blends, vec![blend.clone(), blend]);
-    let sewn = k::sew(&[kept_shape, blends], scale * 1e-6, true)?;
-    let sewn_names = ev.name_result(&[&kept_names, &blend_names], &sewn.history, &sewn.shape, &BTreeMap::new(), None);
-    let un = k::unify_same_domain(&sewn.shape)?;
-    if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
-        eprintln!("cliff end: sewn valid {} faces {} volume {:?} (was {:?}); unified valid {} faces {}", sewn.shape.is_valid(), sewn.shape.faces().len(), sewn.shape.volume().map(|v| v * 1e9), shape.volume().map(|v| v * 1e9), un.shape.is_valid(), un.shape.faces().len());
+    // Split in 2D along the curves on their faces (the general split took ~270 ms of 9 edge-face intersections), else
+    // where that doesn't sew, by the general split.
+    for general in [false, true] {
+        let split = match general {
+            false => match k::split_on(&trio, &curves, scale * 1e-6) {
+                Ok(s) => s,
+                Err(_) => continue,
+            },
+            true => k::imprint(&trio, &curves)?,
+        };
+        let split_names = ev.name_result(&[&trio_names], &split.history, &split.shape, &BTreeMap::new(), None);
+        let (mut kept, mut kept_names) = (Vec::new(), Vec::new());
+        for (f, n) in split.shape.faces().into_iter().zip(split_names) {
+            if !on_edge(&f) {
+                kept.push(f);
+                kept_names.push(n);
+            }
+        }
+        for (i, f) in faces.iter().enumerate() {
+            if i != wall_i && i != tube_i && i != cap_i {
+                kept.push(f.clone());
+                kept_names.push(part_names.faces[i].clone());
+            }
+        }
+        if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+            eprintln!("cliff end: angles {:.2}..{:.2} deg; split {} faces (general {general}), kept {} of the part's {}", a0.to_degrees(), a1.to_degrees(), split.shape.faces().len(), kept.len(), faces.len());
+        }
+        let kept_shape = Shape::compound(&kept);
+        let kept_names = crate::regen::eval::names_for(&kept_shape, kept_names);
+        let sewn = match k::sew(&[kept_shape, blends.clone()], scale * 1e-6, true) {
+            Ok(s) => s,
+            Err(_) if !general => continue,
+            Err(e) => return Err(e.into()),
+        };
+        let sewn_names = ev.name_result(&[&kept_names, &blend_names], &sewn.history, &sewn.shape, &BTreeMap::new(), None);
+        let un = k::unify_same_domain(&sewn.shape)?;
+        if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+            eprintln!("cliff end: sewn valid {} faces {} volume {:?} (was {:?}); unified valid {} faces {}", sewn.shape.is_valid(), sewn.shape.faces().len(), sewn.shape.volume().map(|v| v * 1e9), shape.volume().map(|v| v * 1e9), un.shape.is_valid(), un.shape.faces().len());
+        }
+        if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+            if !general {
+                continue;
+            }
+            return Err(fail("the round over the rim is not one valid solid"));
+        }
+        let named = NamedShape::new(sewn.shape, sewn_names);
+        let names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
+        ev.replace_body(bi, un.shape, names);
+        return Ok(true);
     }
-    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
-        return Err(fail("the round over the rim is not one valid solid"));
-    }
-    let named = NamedShape::new(sewn.shape, sewn_names);
-    let names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
-    ev.replace_body(bi, un.shape, names);
-    Ok(true)
+    Err(fail("the round over the rim didn't sew"))
 }
 
 /// Rounds of boss rims (closed edges where a plane meets a cylinder square to it, the material inside) whose wall is

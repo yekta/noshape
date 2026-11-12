@@ -412,6 +412,13 @@ pub fn imprint(shape: &Shape, curves: &[Shape]) -> Result<OpResult> {
     split(std::slice::from_ref(shape), curves, &BooleanOptions::default())
 }
 
+/// `shape`'s faces split along `edges`, each lying on one of its faces within `tol` and ending on that face's boundary:
+/// in 2D, [`imprint`] without checking every curve against every face.
+pub fn split_on(shape: &Shape, edges: &[Shape], tol: f64) -> Result<OpResult> {
+    let l = vec_to_list(edges);
+    Ok(OpResult::from_ffi(ck(ffi::op_split_on(shape.raw(), &l, tol))?))
+}
+
 /// [`imprint`] of a split a feature makes on purpose (a thread's Split face, the Split feature, opSplitFace, Wrap,
 /// Offset curve, Isocline): the edges along `curves` are marked kept, so later unifies leave their faces apart, as
 /// Parasolid does (c2-fan-blade-sweep's thread band).

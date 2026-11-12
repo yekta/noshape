@@ -312,6 +312,12 @@ impl Shape {
         ck(ffi::face_contains_point(self.raw(), p3(p), tol))
     }
 
+    /// Whether the face's parameters (`u`, `v`) are inside it or on its boundary (within `tol`): [`Shape::contains_point`]
+    /// for a point whose parameters are known, without projecting it (~1 ms on a dense B-spline).
+    pub fn contains_uv(&self, u: f64, v: f64, tol: f64) -> Result<bool> {
+        ck(ffi::face_contains_uv(self.raw(), u, v, tol))
+    }
+
     /// Closest point on the (bounded) face to `p`, with its (u, v) parameters.
     pub fn project_point(&self, p: DVec3) -> Result<FaceProjection> {
         let r = ck(ffi::face_project_point(self.raw(), p3(p)))?;

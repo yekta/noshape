@@ -733,6 +733,13 @@ static bool big_bspline_nearest(const TopoDS_Face& f, const gp_Pnt& P, ProjPoint
 // On an elementary surface: within `tol` of the surface, the foot inside the face or on its boundary (no distance to
 // the boundary for a point off it: the projection's edge search took ~0.5 ms a call, a sheet metal Flange's thousands
 // of "on this face?" probes 0.7 s). Free-form faces by the projection below.
+bool face_contains_uv(const OcShape& fs, double u, double v, double tol)
+{
+  const TopoDS_Face&             f = as_face(fs.shape, "shape");
+  const BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), std::max(tol, BRep_Tool::Tolerance(f)));
+  return fc.State() == TopAbs_IN || fc.State() == TopAbs_ON;
+}
+
 bool face_contains_point(const OcShape& fs, P3 p, double tol)
 {
   const TopoDS_Face&        f    = as_face(fs.shape, "shape");

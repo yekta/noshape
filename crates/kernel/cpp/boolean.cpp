@@ -89,6 +89,7 @@
 #include <gp_Lin.hxx>
 #include <ElSLib.hxx>
 #include <GeomProjLib.hxx>
+#include <BRepFeat_SplitShape.hxx>
 #include <Geom_TrimmedCurve.hxx>
 #include <BRepTools_History.hxx>
 #include <BRepTools_Modification.hxx>
@@ -8649,6 +8650,116 @@ bool split_by_plane_ours(const TopoDS_Shape& a, const TopoDS_Shape& tool, TopoDS
   return true;
 }
 } // namespace
+
+// `shape`'s faces split along `edges`, each lying on one of them within `tol` (its curve on that face projected) and
+// ending on its boundary: in 2D, no curve checked against another face (a blend's touch curves on its walls:
+// c2-impeller-loft's Fillet 1, its general split ~270 ms of 9 edge-face intersections).
+OpOut op_split_on(const OcShape& shape, const OcShapeList& edges, double tol)
+{
+  require_non_null(shape.shape, "shape");
+  if (edges.items.empty())
+    fail_invalid("split needs at least one edge");
+  const KernelTimer   timer("split.on");
+  ShapeIMap           faces;
+  TopExp::MapShapes(shape.shape, TopAbs_FACE, faces);
+  BRepFeat_SplitShape        sp(shape.shape);
+  BRep_Builder               b;
+  std::vector<TopoDS_Vertex> ends;
+  for (const TopoDS_Shape& x : edges.items)
+  {
+    const TopoDS_Edge e = TopoDS::Edge(x);
+    double            f, l;
+    const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, f, l);
+    if (c3.IsNull())
+      fail_invalid("an edge without a curve");
+    // The face it lies on: its middle on it.
+    const TopoDS_Vertex mid = BRepBuilderAPI_MakeVertex(c3->Value(0.5 * (f + l)));
+    int                 on  = 0;
+    double              best = tol;
+    for (int j = 1; j <= faces.Extent(); ++j)
+    {
+      BRepExtrema_DistShapeShape d(mid, faces(j));
+      if (d.IsDone() && d.Value() <= best)
+      {
+        best = d.Value();
+        on   = j;
+      }
+    }
+    if (on == 0)
+      fail_op("an edge on none of the faces");
+    const TopoDS_Face               face = TopoDS::Face(faces(on));
+    double                          reached = 0;
+    const occ::handle<Geom2d_Curve> c2 = GeomProjLib::Curve2d(c3, f, l, BRep_Tool::Surface(face), reached);
+    if (c2.IsNull())
+      fail_op("an edge with no curve on its face");
+    // A vertex at `p`: the one already there (two lofts' touch curves meeting mid-face chain into one cut).
+    auto vertex_at = [&](const gp_Pnt& p, double vtol) {
+      for (const TopoDS_Vertex& w : ends)
+        if (BRep_Tool::Pnt(w).Distance(p) <= tol)
+          return w;
+      TopoDS_Vertex v;
+      b.MakeVertex(v, p, std::max(vtol, tol));
+      ends.push_back(v);
+      return v;
+    };
+    // Where its curve on a periodic face crosses the face's seam: cut there, the piece past it a period over.
+    std::vector<double>             cuts{f, l};
+    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(face);
+    double                          u0, u1, v0, v1;
+    BRepTools::UVBounds(face, u0, u1, v0, v1);
+    if (surf->IsUPeriodic())
+    {
+      const double per = surf->UPeriod();
+      auto         out = [&](double t) { return c2->Value(t).X() < u0 - 1e-9 * per || c2->Value(t).X() > u1 + 1e-9 * per; };
+      constexpr int N = 64;
+      for (int k = 0; k < N; ++k)
+      {
+        double ta = f + (l - f) * k / N, tb = f + (l - f) * (k + 1) / N;
+        if (out(ta) == out(tb))
+          continue;
+        const bool oa = out(ta);
+        for (int it = 0; it < 60; ++it)
+        {
+          const double tm = 0.5 * (ta + tb);
+          (out(tm) == oa ? ta : tb) = tm;
+        }
+        cuts.push_back(0.5 * (ta + tb));
+      }
+    }
+    std::sort(cuts.begin(), cuts.end());
+    const double etol = std::max({BRep_Tool::Tolerance(e), reached, tol * 0.1});
+    for (size_t k = 0; k + 1 < cuts.size(); ++k)
+    {
+      const double t0 = cuts[k], t1 = cuts[k + 1];
+      if (t1 - t0 <= 1e-12 * (l - f))
+        continue;
+      occ::handle<Geom2d_Curve> pc = c2;
+      if (surf->IsUPeriodic())
+      {
+        const double per = surf->UPeriod(), um = c2->Value(0.5 * (t0 + t1)).X();
+        const double sh  = um < u0 ? per * std::ceil((u0 - um) / per) : um > u1 ? -per * std::ceil((um - u1) / per) : 0.0;
+        if (sh != 0)
+          pc = occ::down_cast<Geom2d_Curve>(c2->Translated(gp_Vec2d(sh, 0)));
+      }
+      TopoDS_Edge piece;
+      b.MakeEdge(piece, c3, etol);
+      const TopoDS_Vertex a  = vertex_at(c3->Value(t0), etol), z = vertex_at(c3->Value(t1), etol);
+      b.Add(piece, a.Oriented(TopAbs_FORWARD));
+      b.Add(piece, z.Oriented(TopAbs_REVERSED));
+      b.Range(piece, t0, t1);
+      b.UpdateEdge(piece, pc, face, etol);
+      b.Range(piece, face, t0, t1);
+      b.UpdateVertex(a, t0, piece, etol);
+      b.UpdateVertex(z, t1, piece, etol);
+      sp.Add(piece, face);
+    }
+  }
+  sp.Build();
+  if (!sp.IsDone())
+    fail_op("split along edges failed");
+  HHist hist = new BRepTools_History(to_list({shape.shape}), sp);
+  return make_result({shape.shape}, sp.Shape(), hist.get());
+}
 
 OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts)
 {

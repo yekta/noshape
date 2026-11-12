@@ -518,6 +518,7 @@ pub(crate) mod ffi {
         fn face_project_point(face: &OcShape, p: P3) -> Result<ProjPoint>;
         /// Whether `p` lies on the bounded face within `tol`.
         fn face_contains_point(face: &OcShape, p: P3, tol: f64) -> Result<bool>;
+        fn face_contains_uv(face: &OcShape, u: f64, v: f64, tol: f64) -> Result<bool>;
         fn face_uv_bounds(face: &OcShape) -> Result<Vec<f64>>;
         fn face_frames_at_uvs(face: &OcShape, uvs: &[f64]) -> Result<Vec<f64>>;
         fn face_d2_at_uvs(face: &OcShape, uvs: &[f64]) -> Result<Vec<f64>>;
@@ -757,6 +758,7 @@ pub(crate) mod ffi {
             opts: &BoolOpts,
         ) -> Result<OpOut>;
         fn op_split(args: &OcShapeList, tools: &OcShapeList, opts: &BoolOpts) -> Result<OpOut>;
+        fn op_split_on(shape: &OcShape, edges: &OcShapeList, tol: f64) -> Result<OpOut>;
         /// Cancel flag of this thread's booleans (an `AtomicBool` address, 0 = none).
         fn set_thread_cancel(flag: usize);
         fn op_unify(s: &OcShape) -> Result<OpOut>;

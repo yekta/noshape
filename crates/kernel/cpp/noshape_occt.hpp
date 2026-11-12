@@ -842,6 +842,7 @@ P3    face_normal_at_uv(const OcShape& face, double u, double v);
 P3    face_point_at_uv(const OcShape& face, double u, double v);
 ProjPoint                face_project_point(const OcShape& face, P3 p);
 bool                     face_contains_point(const OcShape& face, P3 p, double tol);
+bool                     face_contains_uv(const OcShape& face, double u, double v, double tol);
 rust::Vec<double>        face_uv_bounds(const OcShape& face);
 rust::Vec<double>        face_frames_at_uvs(const OcShape& face, rust::Slice<const double> uvs);
 rust::Vec<double>        face_d2_at_uvs(const OcShape& face, rust::Slice<const double> uvs);
@@ -993,6 +994,7 @@ void                     set_occt_threads(int32_t n);
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts);
 OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts);
+OpOut op_split_on(const OcShape& shape, const OcShapeList& edges, double tol);
 // Cancel flag of this thread's booleans (address of a Rust AtomicBool, 0 = none).
 void set_thread_cancel(size_t flag);
 OpOut op_unify(const OcShape& s);
