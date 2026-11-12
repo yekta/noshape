@@ -16,6 +16,27 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
 **c2-rings-loft stops at feature 20, Extrude 5 (core's):** the engraving cut's edges are split at the revolved ring's
 seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs live 335/206); Parasolid has no seams.
 
+## 11-12 08:03 UTC: rings-loft speed landed; FACEBLEND-HOLD-RIM built directly (c2-variable-fillet-faceblend 7 -> 8 of 8)
+- Landed: blend-ringtips (7106535b), blend-ringspeed (11f138b5: a ring's rounds built directly, Fillet 1 ~423 -> ~97 ms;
+  the notch arcs' off-part check by a ray, Chamfer 1 ~244 -> ~183 ms; live 23 / 30). The rest of Chamfer 1 is noshape's
+  Boolean with the four lofted tools (~87 ms) and the wedges' splits (~55 ms): the exact chamfer build would be days.
+- **FACEBLEND-HOLD-RIM** (blend-holdrim, queued de3ee507; model suite 829 -> 830, 77 -> 78 documents, assemblies identical, g++-13): the held range in pieces, one per chain edge and hold
+  line edge (`held_pieces`, as live's 8 faces), each an open loft (24 sections a piece: the radius bends only at the
+  pieces' ends), all handed to `k::blend_direct`, which now: takes a lofted side that only approximates its part faces
+  as lying on them (`lies_on`: its samples over a face within 1e-4 x size, normals within 0.02 rad; the touch curve
+  cut only where it runs near that face), leaves out the planar ends where two tools meet and their blends' shared
+  section, runs a shallow run-out section on to the blend's boundary, treats a short tangent zone as a crossing (not an
+  overlap), drops a cut within snap of its face's boundary all along (a lofted hold line a few µm off the rim), checks
+  OCCT's IN against a tool with rays (OCCT put a family of points inside a lofted tool: its ray through an edge), and
+  sews / snaps twice as loose when a side is approximate. Result 20 faces, 136,948.64 mm³ (live 136,943.82). T1
+  `features_a::a_face_blend_held_by_a_pockets_rim_takes_the_whole_top` (a stadium plate with a concentric pocket:
+  Pappus volume, 14 faces). Face blend 1 ~366 ms (live 25): the 8 lofts ~205 ms, the direct build ~56 ms.
+- learning-center-michael's Fillet 2 (603 ms, live 46): 530 ms is OCCT's cut by its 6 tori and 6 mitre balls. Glued:
+  169 ms but wrong (40 faces, live 44); the tools fused into a ring first: 2.3 s and an error; through blend_direct
+  (patch /root/blend-scratch/patches/michael-direct-ball-wip.patch: balls exactly r so their outer faces lie on the
+  part, a tool off the part skipped): two mitre balls don't fit taken / added (one past the slot's end, one with the
+  part on both sides of its faces). Needs the balls' own handling in the direct build.
+
 ## 11-11 23:23 UTC: rings-loft's pattern tips done without crates/brep (17 -> 19 of 32)
 - Landed: blend-lcm, blend-filletspeed, the knife's sliver end (af254976; knife 15 -> 16 of 52).
 - **Circular pattern 2 as live 2513** (blend-ringtips, queued 1b11b8f6): a feature pattern of an Add and the chamfer or fillet of

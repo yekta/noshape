@@ -4499,7 +4499,7 @@ P1
   several faces, both sides on one sheet, sections other than a symmetric circular radius.
 - [x] P1 FACEBLEND-HOLD-TANGENT (blend, live 2233) Tangent / Inverse tangent hold lines (c2-variable-fillet-faceblend).
   Tangent hold lines inside the sides done as live 2233 (radius = min(entered, the hold line's), all 4 cases).
-- [ ] P2 FACEBLEND-HOLD-RIM (blend, parked by the lead 11-08: reopen if another document needs the same cut)
+- [x] P2 FACEBLEND-HOLD-RIM (blend, 11-12: built directly, one loft per hold line edge and wall; c2-variable-fillet-faceblend 8/8, handoff/blend.md 11-12)
   c2-variable-fillet-faceblend's Face blend 1: its hold lines are the top rim's edges with a pocket (a side's boundary
   with another face); the blend takes the whole rim and runs down past the pocket's floor (live 20 faces, 136,943.82
   mm³); ours errs "not supported yet" up front. Our sections and tool match live (removes 5,897 vs 5,898.7 mm³); placing
