@@ -100,6 +100,19 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
   bool_patterns::a_fillets_ball_and_ring_cut_as_occt.
 - Don't touch: bool's seam-end / touching work (bool-main2, bool-touch); Shell (by_quadrics).
 
+## From core (2026-11-12 15:23 UTC): c2-fan-blade-sweep's Sweep 1, a Boolean that misses a real overlap (11 features)
+Sweep 1 sweeps a thread profile (a trapezoid from radius 2.9 to 3.8 mm) along a helix round the Bolt's r 3.0 mm shaft and adds
+it to the Bolt: ours "Boolean resulted in no geometry change", the thread left as its own part (12 parts, live 11), live merges
+it (Bolt 12 -> 17 faces, 2049.316 -> 2156.420 mm³, so an overlap of 26.27 mm³). Both solids are valid and the sweep is where it
+should be (its inner helical face at radius 2.900000 mm over its whole face, 0.1 mm inside the shaft; its first turn inside the
+head). `noshape_kernel::common` gives no solid, with the Rust Boolean on or off (`last_boolean_path` occt; on: decline "a
+non-manifold result"); `fuse` gives 2 solids, 37 faces, the volumes' sum. Repro: vibe5:~/tmp/core/repro-fan/bolt.step and
+thread.step (exported at the feature, metres via LengthUnit::Meter), probe
+`NOSHAPE_PROBE_A=…/bolt.step NOSHAPE_PROBE_B=…/thread.step cargo test --release -p noshape-kernel --test all
+features::two_step_solids_boolean_probe -- --ignored --nocapture` (NOSHAPE_PROBE_AXIS=-73,13 prints the thread faces' radii).
+Expected: common about 26.3 mm³, fuse one solid of 2156.42 mm³ with 17 faces.
+
+
 ## Queue (lead 11-11 08:10 and 09:25 UTC)
 1. hat8's Mac mini union: landed 310b9fed, 201bd381, 88e0dbcd; now (10:36) the inside point search stops when far
    enough in (`deeper`: 0.7 s on each of two 433-curve faces): our Boolean 2.5-3.3 -> 1.6 s (vibe3, load 17). Left: OCCT's

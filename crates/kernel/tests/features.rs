@@ -1388,3 +1388,41 @@ fn faces_near_a_box_probe() {
         std::fs::write(&out, c.to_brep_bytes().unwrap()).unwrap();
     }
 }
+
+/// Probe: two solids from STEP files (NOSHAPE_PROBE_A, NOSHAPE_PROBE_B): validity and volume of each, then their common and
+/// their fuse (solids, faces, volume).
+#[test]
+#[ignore = "T2: probe"]
+fn two_step_solids_boolean_probe() {
+    let (Ok(a), Ok(b)) = (std::env::var("NOSHAPE_PROBE_A"), std::env::var("NOSHAPE_PROBE_B")) else { return };
+    let read = |p: &str| noshape_kernel::read_step(std::path::Path::new(p), noshape_kernel::LengthUnit::Meter).unwrap().remove(0).shape;
+    let (a, b) = (read(&a), read(&b));
+    for (n, s) in [("a", &a), ("b", &b)] {
+        println!("{n}: valid {} faces {} volume {:.6} mm³", s.is_valid(), s.faces().len(), s.volume().unwrap() * 1e9);
+    }
+    // Radii about the x axis through NOSHAPE_PROBE_AXIS (y, z mm) of each of b's faces' points.
+    if let Ok(ax) = std::env::var("NOSHAPE_PROBE_AXIS") {
+        let c: Vec<f64> = ax.split(',').map(|x| x.parse::<f64>().unwrap() * 1e-3).collect();
+        for (i, f) in b.faces().iter().enumerate() {
+            let [u0, u1, v0, v1] = f.uv_bounds().unwrap();
+            let r: Vec<f64> = (0..=40).flat_map(|i| (0..=40).map(move |j| (u0 + (u1 - u0) * i as f64 / 40.0, v0 + (v1 - v0) * j as f64 / 40.0))).filter_map(|(u, v)| f.point_at_uv(u, v).ok()).map(|p| (p.y - c[0]).hypot(p.z - c[1]) * 1e3).collect();
+            println!("b face {i}: {} points, radius {:.6} .. {:.6} mm", r.len(), r.iter().cloned().fold(f64::MAX, f64::min), r.iter().cloned().fold(0.0, f64::max));
+        }
+    }
+    for rust in [None, Some(false)] {
+        set_rust_boolean(rust);
+        match common(&a, &b) {
+            Ok(r) => println!("common ({:?}, path {}, decline {}): solids {} volume {:.6} mm³", rust, last_boolean_path(), last_rust_decline(), r.shape.count(ShapeType::Solid), r.shape.volume().unwrap_or(0.0) * 1e9),
+            Err(e) => println!("common ({rust:?}): {e}"),
+        }
+    }
+    set_rust_boolean(None);
+    match common(&a, &b) {
+        Ok(r) => println!("common: solids {} faces {} volume {:.6} mm³", r.shape.count(ShapeType::Solid), r.shape.faces().len(), r.shape.volume().unwrap_or(0.0) * 1e9),
+        Err(e) => println!("common: {e}"),
+    }
+    match fuse(&a, &b) {
+        Ok(r) => println!("fuse: solids {} faces {} volume {:.6} mm³ valid {}", r.shape.count(ShapeType::Solid), r.shape.faces().len(), r.shape.volume().unwrap_or(0.0) * 1e9, r.shape.is_valid()),
+        Err(e) => println!("fuse: {e}"),
+    }
+}
