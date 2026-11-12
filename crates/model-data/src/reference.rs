@@ -198,9 +198,13 @@ pub enum Inference {
     /// The centre, as saved before v0.4.45: a circular edge's Z its circle's own axis (kept so saved mates solve as
     /// they did; "center_axis").
     Center,
-    /// The centre ("center"): a circular edge's Z out of the material as live's (1708: out through the planar face it
-    /// bounds; a cone rim's against the cone), elsewhere as [`Inference::Center`].
+    /// The centre as v0.4.45 saved it ("center_cone"): a circular edge's Z out through the planar face it bounds, a
+    /// rim between curved faces against its cone (kept so those mates solve as they did), elsewhere as
+    /// [`Inference::Center`].
     CenterOutward,
+    /// The centre ("center"): a circular edge's Z as live's (1708, 2519): out through the planar face it bounds, else
+    /// along the rim circle's own normal as the feature that made it runs it; elsewhere as [`Inference::Center`].
+    CenterRim,
     Midpoint,
     Vertex,
     TopAxis,

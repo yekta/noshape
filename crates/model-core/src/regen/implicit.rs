@@ -53,7 +53,11 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
                 // Arcs and circles: the center, except an arc's midpoint
                 // (Onshape offers center, midpoint and ends on an arc).
                 k::Curve::Circle { center, axis, .. } if !matches!(inference, Inference::Midpoint | Inference::Vertex) => {
-                    let outward = (inference == Inference::CenterOutward).then(|| rim_normal(ev, bi, ei, info.start, axis.normalize())).flatten();
+                    let outward = match inference {
+                        Inference::CenterRim => rim_z(ev, bi, ei, info.start),
+                        Inference::CenterOutward => rim_normal(ev, bi, ei, info.start, axis.normalize()),
+                        _ => None,
+                    };
                     Some(mk(center, outward.unwrap_or(axis)))
                 }
                 _ => {
@@ -95,7 +99,7 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
     }
 }
 
-/// Live 1708: a circular edge's CENTER connector points along the circle's axis: out through the planar face it
+/// v0.4.45's rule (`Inference::CenterOutward`, kept for what it saved): out through the planar face it
 /// bounds (that face's outward normal: +z on top rims, −z on bottom rims, pins and holes alike); on a rim between a
 /// cone and a cylinder against the cone's outward normal (asm-robotic-arm: an M3 screw's head-to-shank rim points to
 /// the head, its countersunk hole's rim to the bore). None for other rims (the circle's own axis then).
@@ -108,4 +112,35 @@ fn rim_normal(ev: &EvalCtx, bi: usize, ei: usize, at: DVec3, axis: DVec3) -> Opt
     }
     let cone = faces.iter().find(|f| matches!(f.face_surface(), Ok(k::Surface::Cone { .. })))?;
     along(cone).map(|d| axis * -d.signum())
+}
+
+/// Live 1708 / 2519: a circular edge's CENTER connector points out through the planar face it bounds (that face's
+/// outward normal); between two curved faces along the rim circle's own normal, as the feature that made it runs it:
+/// a revolve's rims (two side faces of one feature) against its axis, ours along it; others as ours (a chamfer's or a
+/// boolean's countersink rims +z on a +z hole).
+fn rim_z(ev: &EvalCtx, bi: usize, ei: usize, at: DVec3) -> Option<DVec3> {
+    let body = &ev.ctx.bodies[bi];
+    let shape = &body.shape;
+    let indices = shape.edge_faces().ok()?.get(ei).cloned().unwrap_or_default();
+    let faces: Vec<(usize, k::Shape)> = indices.iter().filter_map(|&fi| Some((fi as usize, shape.sub_shape(ShapeType::Face, fi as usize).ok()?))).collect();
+    if let Some((_, f)) = faces.iter().find(|(_, f)| f.is_planar()) {
+        return f.normal_at_point(at).ok();
+    }
+    let k::Curve::Circle { axis, .. } = shape.sub_shape(ShapeType::Edge, ei).ok()?.edge_info().ok()?.curve else { return None };
+    // (A face's own name through the splits later features made and a custom feature's wrapping of its operations'
+    // faces, `Generated`: robotic-arm's screws are a custom feature's opRevolve.)
+    let side_of = |fi: usize| {
+        use crate::reference::{Role, TopoName};
+        let mut n = body.faces.get(fi)?.as_ref();
+        loop {
+            match n {
+                TopoName::Split { parent, .. } => n = parent,
+                TopoName::Face { role: Role::Generated(inner), .. } => n = inner,
+                TopoName::Face { feature, role: Role::Side(_) } => return Some(*feature),
+                _ => return None,
+            }
+        }
+    };
+    let swept = faces.len() == 2 && side_of(faces[0].0).is_some() && side_of(faces[0].0) == side_of(faces[1].0);
+    Some(if swept { -axis.normalize() } else { axis.normalize() })
 }

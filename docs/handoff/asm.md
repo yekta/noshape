@@ -35,13 +35,14 @@ Studio f79298 (Gear Selector Ring Gear) built alone (vibe3 ~/agents/asm/ps-ring/
   mate of a conflicting Fastened/Revolute loop (behaviours "request 1798" a2, a3, f79), so they are likely its
   collateral (and Planar 11's chamfer); recheck once the ring gear is live's.
 
-## From dx (11-12 02:33 UTC): circular-edge centre connectors as live: dx's (lead), don't redo it
-Assembly implicit connectors on a circular edge took the circle's own axis; live points them out of the material
-(1708: out through the planar face the rim bounds; a cone/cylinder rim against the cone: asm-robotic-arm's screw and
-countersunk hole). Gated in the data, so saved assemblies solve exactly as before: `Inference::Center` (serde "Center",
-id "center_axis") keeps the circle's axis; new connectors are `Inference::CenterOutward` (id "center": the mate dialog's
-candidates, standard content, the API and the translator make it), resolved by `implicit.rs` `rim_normal`. Test
-`circle_centre_connectors_point_out_and_saved_ones_keep_their_axis`; oracle_asm's 7 live comparisons pass with it.
+## From dx (11-12 09:59 UTC): circular-edge centre connectors as live 2519: dx's, don't redo it
+New connectors on a circular edge (`Inference::CenterRim`, id "center") follow live 1708 / 2519 (`implicit.rs`
+`rim_z`): a plane among the rim's two faces gives its outward normal; two curved faces give the rim circle's own
+normal as the feature that made it runs it: ours along a revolve's axis, live against it, so a rim between two side
+faces of one feature (a revolve; through a custom feature's `Generated` wrapping too) takes the reversed axis.
+Saved connectors keep their meaning: `Center` ("center_axis", before v0.4.45) the circle's axis, `CenterOutward`
+("center_cone", v0.4.45's cone rule). Tests `revolved_rims_between_curved_faces_point_against_the_revolve_axis`,
+`circle_centre_connectors_point_out_and_saved_ones_keep_their_axis`; robotic-arm mates 5 -> 22/29.
 
 ## From dx (11-11 21:44 UTC): asm-hand-drill-pinslot's 30 "Mate overdefines the assembly" (live OK), FYI
 29 of them have the Gearbox Housing (studio e0abe1, which builds without a feature error) at one end, 12 a 4mm

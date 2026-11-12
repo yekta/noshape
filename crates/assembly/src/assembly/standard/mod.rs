@@ -181,7 +181,7 @@ pub fn hole_connectors(ctx: &Arc<crate::regen::context::Context>, body: Option<&
     let mut out: Vec<(super::eval::InferencePoint, f64)> = Vec::new();
     for (ei, fi, d) in holes {
         let (Some(en), Some(fname)) = (b.edges.get(ei), b.faces.get(fi as usize)) else { continue };
-        let reference = Reference::Implicit { on: Box::new(Reference::Edge((**en).clone())), inference: Inference::CenterOutward };
+        let reference = Reference::Implicit { on: Box::new(Reference::Edge((**en).clone())), inference: Inference::CenterRim };
         let align = Reference::Face((**fname).clone());
         if let Some(frame) = super::eval::resolve_connector_aligned(ctx, body, &reference, Some(&align), units) {
             out.push((super::eval::InferencePoint { reference, align: Some(align), frame }, d));

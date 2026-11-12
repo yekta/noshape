@@ -1297,9 +1297,9 @@ fn plate_with_holes() -> PartStudio {
 /// circular top edge replicates once per other matching hole (through the
 /// hole's face), on that hole's top edge; never onto the seed's own hole
 /// (its other end) nor twice into one hole.
-/// A circular edge's centre connector: a new one (`CenterOutward`, "center") points out of the material as live's
-/// (1708: top rims +z, bottom rims −z, the plate's hole and the pin alike); one saved before (`Center`) keeps its
-/// circle's own axis, so a saved assembly's mates solve as they did.
+/// A circular edge's centre connector: a new one (`CenterRim`, "center") points out of the material as live's (1708:
+/// top rims +z, bottom rims −z, the plate's hole and the pin alike); one saved before v0.4.45 (`Center`) keeps its
+/// circle's own axis and one v0.4.45 saved (`CenterOutward`) its rule, so saved assemblies' mates solve as they did.
 #[test]
 fn circle_centre_connectors_point_out_and_saved_ones_keep_their_axis() {
     let f = doc_with(vec![plate_with_hole(), pin_studio()]);
@@ -1325,14 +1325,17 @@ fn circle_centre_connectors_point_out_and_saved_ones_keep_their_axis() {
                 super::eval::resolve_connector_in(&r.context, Some(&body), &c, &units).expect("a connector").z()
             };
             let out = if centre.z > mid { DVec3::Z } else { DVec3::NEG_Z };
-            assert!((z(Inference::CenterOutward) - out).length() < 1e-9, "new: {:?} at z {}", z(Inference::CenterOutward), centre.z);
+            assert!((z(Inference::CenterRim) - out).length() < 1e-9, "new: {:?} at z {}", z(Inference::CenterRim), centre.z);
+            assert!((z(Inference::CenterOutward) - out).length() < 1e-9, "v0.4.45's: {:?} at z {}", z(Inference::CenterOutward), centre.z);
             // (On an extruded rim the edge's own sense already points out; they part on others, a countersink's.)
             assert!((z(Inference::Center) - out).length() < 1e-9 && axis.z.abs() > 0.999, "saved: {:?}", z(Inference::Center));
         }
     }
-    // A document saved before reads its connectors as `Center`, a new one writes `CenterOutward`.
+    // A document saved before reads its connectors as `Center`, one v0.4.45 saved as `CenterOutward`; a new one
+    // writes `CenterRim`.
     assert_eq!(serde_json::from_str::<Inference>("\"Center\"").unwrap(), Inference::Center);
-    assert_eq!(serde_json::to_string(&Inference::CenterOutward).unwrap(), "\"CenterOutward\"");
+    assert_eq!(serde_json::from_str::<Inference>("\"CenterOutward\"").unwrap(), Inference::CenterOutward);
+    assert_eq!(serde_json::to_string(&Inference::CenterRim).unwrap(), "\"CenterRim\"");
 }
 
 #[test]
@@ -3671,6 +3674,35 @@ fn revolved_studio(profile: impl FnOnce(&mut noshape_sketch::Sketch)) -> PartStu
     f.params.set("axis", ParamValue::Query(vec![Reference::SketchEntity { sketch: sid, entity: axis.0 }]));
     ps.features.push(f);
     ps
+}
+
+/// Live 2519 (c): the profile (0,0)→(5,0)→(5,2)→(3,4)→(3,20)→(0,20) mm on Front revolved about +Z: its plane rims
+/// point out of their planes (z 0 −z, z 20 +z); its rims between curved faces (z 2 cylinder/cone, z 4 cone/cylinder)
+/// along the revolve's circles' own normal, −z.
+#[test]
+fn revolved_rims_between_curved_faces_point_against_the_revolve_axis() {
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    let studio = revolved_studio(|sk| {
+        let p = [mm(0.0, 0.0), mm(5.0, 0.0), mm(5.0, 2.0), mm(3.0, 4.0), mm(3.0, 20.0), mm(0.0, 20.0)];
+        let ids: Vec<_> = p.iter().map(|q| sk.add_point(*q)).collect();
+        for i in 0..6 {
+            sk.add_line_between(ids[i], ids[(i + 1) % 6]).unwrap();
+        }
+    });
+    let f = doc_with(vec![studio]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let b = &r.context.bodies[0];
+    let units = UnitPrefs::default();
+    let mut seen = Vec::new();
+    for (i, n) in b.edges.iter().enumerate() {
+        let Ok(noshape_kernel::Curve::Circle { center, .. }) = b.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).and_then(|e| e.edge_info()).map(|i| i.curve) else { continue };
+        let c = Reference::Implicit { on: Box::new(Reference::Edge((**n).clone())), inference: Inference::CenterRim };
+        let z = super::eval::resolve_connector_in(&r.context, Some(&body), &c, &units).expect("a connector").z();
+        seen.push(((center.z * 1e3).round() as i64, z.z.round() as i64));
+    }
+    seen.sort();
+    assert_eq!(seen, [(0, -1), (2, -1), (4, -1), (20, 1)], "(rim z mm, Z's z)");
 }
 
 #[test]
