@@ -468,6 +468,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     (a tool's click acts on the hovered entity) and 7707424a7 (the snap square): psui's.
   - qa's harness: two parallel userdocs runs deleted each other's copies (ud-*) and read "no document is open"; each run now
     has its own folder (bin/userdocs.py).
+- **qa 21:53, v0.4.46 checked (published 21:21, run 43294740369, cut e06b09c83): no blocker; the same as the candidate.** 11 assets,
+  the Linux ones match SHA256SUMS; qa-os on Windows and macOS green (43309955873).
+  - User documents, released CLI against v0.4.45's (vibe5, fresh mode-700 copies): hat15 142, hat15b 143, hat8 139, the dock
+    499 features, every feature and every part the same. hat15 against v0.4.43: every feature Ok, only the accepted Fan Riser
+    (+5.72 mm³).
+  - Ticket documents and qa's authored documents against v0.4.45: no feature worse; slow1151 (-pre, -before-extrude) fixed
+    (8 parts, as v0.4.43); the same eight edge-count-only differences as on the candidate. CLI smoke, volume sweep and ticket
+    volumes (vibe3) as v0.4.45. GUI rows pixel-identical to v0.4.45 (11 / 11). Agent session: 19 tool calls, 0 failed.
+  - The 149 sketch scenarios on the released app (vibe7, 3 shards, e06b09c83's scenario files): 147/149, the same two as
+    the candidate, 2 / 2 again alone: sketch-constraint-refusals (step 59 `.selection.count` live 0 / ours 1) and
+    sketch-offset-key (step 10 `.focus.kind` live "other" / ours "none"), psui's.
 
 ## Release blockers for the 2026-11-12 05:00 release (qa list started 23:10 on 11-11; the latest release is v0.4.44)
 - **P0, the user's hat15 (Mac-mini-hat 15, private: vibe3 ~/lead-private/hat15.noshape, copies in ~/tmp/qa, mode 700): in v0.4.44

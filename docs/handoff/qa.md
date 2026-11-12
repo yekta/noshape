@@ -70,7 +70,8 @@ from qa-scratch/compat-docs/v0443 copied to vibe4 each run: vibe4's ~/tmp is pru
 qa-scratch/compat/ALERT-<sha> (tell the lead and the committing agent at once). Change its release tag at each release (stop:
 touch compat/stop-loop, restart with the new tag). bin/vibe5-window.sh is armed for 02:00 (hat A/B, speed). bin/land-footer.sh
 lands qa-footer's qa-os change when studios' 02da93d9 reaches main. v0.4.45 (hotfix) checked: no blocker; WIN-SHOW-IN-EXPLORER
-verified. Open: core's P1 slow1151 (214116a5d's alias narrowing).
+verified. v0.4.46 checked 21:53: no blocker (TICKETS, the off-slot list); the compatibility loop now runs against 0.4.46
+(vibe5 ~/qa-rel/0.4.46). Open: core's P1 slow1151 (214116a5d's alias narrowing).
 
 **11-12 02:46: the 02:00 window:** the user's Mac mini hat on green 3c8c7c1c against the 02:00 (11-11) baseline: "Mac mini hat" 16.4
 -> 3.0 s wall (regen 14.9 -> 2.8 s; the union 8.2 -> 0.63 s, the STEP reference 1.5 -> 0.07, the chamfers 2.2 -> 0.29 / 1.1 -> 0.04),
