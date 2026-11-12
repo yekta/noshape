@@ -9,7 +9,7 @@ A role's replay (kernel binary KBIN) and suite (ops binary OBIN, '-' for none) r
 for its key: ~/agents/bool-gate/cache/<RKEY>-replay.tsv, <SKEY>-suite.tsv. OCCT's results, which only change with
 what OCCT's path is built from (OKEY), are kept by case in ~/agents/bool-gate/occt/<OKEY> (NOSHAPE_BREP_OCCT_CACHE). Run on the host (gate.sh does it through rb.sh).
 """
-import argparse, hashlib, json, os, re, shutil, subprocess, sys, time
+import argparse, hashlib, json, os, re, shutil, subprocess, sys, threading, time
 from concurrent.futures import ThreadPoolExecutor
 
 HOME = os.path.expanduser("~")
@@ -22,6 +22,10 @@ FORMAT = "1"
 REPLAY = ("bool-corpus corpus2 corpus3 corpus4 corpus5 corpus6 direct-corpus sh-new2 parity56 valve2 snap sp-cut shfall "
           "kall k10-25 k10-25-12 k25-15 k25-25 k25-71-12 cf-spur-gear gears gpf").split()
 VS_OCCT = {"parity56"}
+# Corpora whose cases can take many GB each (Shell's slab fuses, knurls, gears: the memory budget is 16 GB a
+# process, as whyall.sh's): their own shards, two at a time. Eight such at once were killed for memory on vibe4.
+HEAVY = {"shfall", "kall", "k10-25", "k10-25-12", "k25-15", "k25-25", "k25-71-12", "cf-spur-gear", "gears", "gpf"}
+HEAVY_AT_ONCE = threading.BoundedSemaphore(2)
 SPEED = ["k25-15", "k25-25", "cf-spur-gear"]
 CASE = re.compile(r"^([0-9a-f]{16})")
 
@@ -93,22 +97,23 @@ def corpus_cases():
 
 def replay_tasks(role, out, kbin, jobs, okey):
     """Shards (directories of links to the cases' files) balanced by the recorded times, longest first. A shard
-    holds one case of a name and one kind (parity56's against OCCT run here, or not)."""
+    holds one case of a name and one kind (parity56's against OCCT run here, or not; heavy or not)."""
     cases = corpus_cases()
     pools = {}
     for x in sorted(cases.values(), key=lambda x: (x["name"], x["key"])):
+        heavy = any(c in HEAVY for c in x["corpora"])
         variant = 0
-        while (x["vs_occt"], variant, x["name"]) in pools.setdefault("_seen", set()):
+        while (x["vs_occt"], heavy, variant, x["name"]) in pools.setdefault("_seen", set()):
             variant += 1
-        pools["_seen"].add((x["vs_occt"], variant, x["name"]))
-        pools.setdefault((x["vs_occt"], variant), []).append(x)
+        pools["_seen"].add((x["vs_occt"], heavy, variant, x["name"]))
+        pools.setdefault((x["vs_occt"], heavy, variant), []).append(x)
     pools.pop("_seen")
     total = sum(x["ms"] + 30 for x in cases.values())
     tasks = []
-    for (vs, variant), xs in sorted(pools.items()):
+    for (vs, heavy, variant), xs in sorted(pools.items()):
         weight = sum(x["ms"] + 30 for x in xs)
         # (By time, and by count: cases recorded with our Boolean on (parity56's) say little of the replay's time.)
-        k = max(1, round(4 * jobs * weight / total), -(-len(xs) // 40))
+        k = max(1, round(4 * jobs * weight / total), -(-len(xs) // (25 if heavy else 40)))
         bins = [[0.0, []] for _ in range(k)]
         for x in sorted(xs, key=lambda x: -x["ms"]):
             b = min(bins, key=lambda b: b[0])
@@ -117,7 +122,7 @@ def replay_tasks(role, out, kbin, jobs, okey):
         for i, (w, members) in enumerate(bins):
             if not members:
                 continue
-            sd = os.path.join(out, role, "shards", f"{'v' if vs else 'r'}{variant}-{i}")
+            sd = os.path.join(out, role, "shards", f"{'v' if vs else 'h' if heavy else 'r'}{variant}-{i}")
             os.makedirs(sd, exist_ok=True)
             for x in members:
                 for f in x["files"]:
@@ -130,7 +135,7 @@ def replay_tasks(role, out, kbin, jobs, okey):
             env = {"NOSHAPE_BOOL_CORPUS": sd, "NOSHAPE_BREP_WHY": "", "NOSHAPE_BOOLEAN_MEMORY_MB": "16000", "NOSHAPE_BREP_OCCT_CACHE": occt}
             if vs:
                 env["NOSHAPE_BREP_VS_OCCT"] = "1"
-            tasks.append({"role": role, "kind": "replay", "id": os.path.basename(sd), "weight": w, "env": env,
+            tasks.append({"role": role, "kind": "replay", "id": os.path.basename(sd), "weight": w, "env": env, "heavy": heavy,
                           "cmd": [kbin, "brep_replay::brep_corpus_replay", "--exact", "--ignored", "--nocapture", "--test-threads=1"],
                           "cases": {x["name"]: x["key"] for x in members}})
     return tasks, cases
@@ -228,18 +233,47 @@ def parse_suite(log, docs):
 
 # ---- running -------------------------------------------------------------------------------------------------------
 
+def available_gb():
+    for l in read_lines("/proc/meminfo"):
+        if l.startswith("MemAvailable:"):
+            return int(l.split()[1]) / 1e6
+    return 1e9
+
+
 def run_task(t, out, threads):
+    """Runs one shard: a heavy one only two at a time, each only once the host has memory free for it (a heavy one
+    16 GB, its budget; another 4 GB); its peak memory and exit kept with it."""
     log = os.path.join(out, t["role"], "logs", f"{t['kind']}-{t['id']}.log")
     tmp = os.path.join(out, t["role"], "tmp", f"{t['kind']}-{t['id']}")
     os.makedirs(os.path.dirname(log), exist_ok=True)
     os.makedirs(tmp, exist_ok=True)
     env = dict(os.environ, RAYON_NUM_THREADS=str(threads), TMPDIR=tmp, **t["env"])
-    t0 = time.time()
-    with open(log, "w") as o, open(log + ".err", "w") as e:
-        try:
-            rc = subprocess.run(t["cmd"], stdout=o, stderr=e, env=env, timeout=5400).returncode
-        except subprocess.TimeoutExpired:
-            rc = "timeout"
+    heavy = t.get("heavy", False)
+    if heavy:
+        HEAVY_AT_ONCE.acquire()
+    try:
+        while available_gb() < (16 if heavy else 4):
+            time.sleep(5)
+        t0 = time.time()
+        with open(log, "w") as o, open(log + ".err", "w") as e:
+            p = subprocess.Popen(t["cmd"], stdout=o, stderr=e, env=env)
+            deadline = t0 + 5400
+            while True:
+                pid, status, usage = os.wait4(p.pid, os.WNOHANG)
+                if pid:
+                    rc = os.waitstatus_to_exitcode(status)
+                    t["peak_gb"] = usage.ru_maxrss / 1e6
+                    break
+                if time.time() > deadline:
+                    p.kill()
+                    rc = "timeout"
+                    os.wait4(p.pid, 0)
+                    break
+                time.sleep(0.5)
+            p.returncode = 0
+    finally:
+        if heavy:
+            HEAVY_AT_ONCE.release()
     shutil.rmtree(tmp, ignore_errors=True)
     t["rc"], t["secs"], t["log"] = rc, time.time() - t0, log
     return t
@@ -262,7 +296,8 @@ def collect_replay(tasks, cases, role):
     for t in tasks:
         got = parse_replay(t["log"]) | parse_replay(t["log"] + ".err")
         for name, key in t["cases"].items():
-            st, detail, ms = got.get(name, ("noresult", f"no line for it (exit {t['rc']}, {t['log']})", ""))
+            why = "killed (memory?)" if t["rc"] == -9 else f"exit {t['rc']}"
+            st, detail, ms = got.get(name, ("noresult", f"no line for it ({why}, {t['log']})", ""))
             rows.append((key, name, ",".join(cases[key]["corpora"]), st, detail, ms))
     return sorted(rows)
 
@@ -458,7 +493,8 @@ def main():
             shutil.copy(f"{a.out}/{key}-{kind}.tsv", f"{CACHE}/{key}-{kind}.tsv")
     if done:
         slow = sorted(done, key=lambda t: -t["secs"])[:3]
-        print(f"gate-host: shards done in {time.time() - t0:.0f} s (longest: {', '.join(f'{t['kind']}-{t['id']} {t['secs']:.0f} s' for t in slow)})", flush=True)
+        print(f"gate-host: shards done in {time.time() - t0:.0f} s (longest: {', '.join(f'{t['kind']}-{t['id']} {t['secs']:.0f} s' for t in slow)}; "
+              f"most memory: {', '.join(f'{t['kind']}-{t['id']} {t.get('peak_gb', 0):.1f} GB' for t in sorted(done, key=lambda t: -t.get('peak_gb', 0))[:3])})", flush=True)
     spd = speed(a.speed[0], a.speed[1], a.out, a.speed_threads) if a.speed else None
     if a.cmp:
         def get(role, kind):
