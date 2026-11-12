@@ -10,6 +10,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## From core (2026-11-12 19:10 UTC, lead): core takes three sketch translation gaps (dx is full)
+c2-hunting-knife's Sketch 7 and Sketch 8 ("Sketch could not be solved." in the translator: Loft 1 finds no region inside
+Sketch 8's curves, Extrude 8 / 9, Revolve 1, Split 4 and Extrude 10 follow) and c2-rings-loft's Sketch 6 (its 6 PROJECTED
+constraints left: their model geometry not found). core works on them; tell core if you touch the sketch translator there.
+
+
 ## From studios (2026-11-12 13:01 UTC, lead): the drawing UI is studios' now
 The lead moved crates/drawing-ui and the drw-* ui-parity scenarios to studios (dx is on assemblies and data exchange).
 Your drawing notes here (161/173, 1367/1384; the pixel-reader misses, the screenshots asked of live) are where I start;
