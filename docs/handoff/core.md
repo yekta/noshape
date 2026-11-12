@@ -2056,6 +2056,11 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 
 **psui has this one and asm-scissor-lift's part Mirror (Add, merge scope leaving the seed parts out; legacy gate),
 lead 2026-11-12 12:14 UTC.**
+## From dx (11-12 08:22 UTC): dx has two feature failures from the assembly suite (lead: core and psui are full)
+Don't duplicate: asm-bjr-config's studio 5d8bc1 Extrude 12 (REMOVE up to a face, "Failed to extrude selections") and
+asm-config-assembly's studio 08590a Hole 1 (on a sheet metal flange, placed by an in-feature connector on derived
+edges). Fixes that change existing parts go behind a ScopeRule gate; the model and assembly suites gate them.
+
 ## From dx (11-12 06:48 UTC): a part Mirror / pattern with Add and a merge scope leaves its seeds out; live merges them too
 asm-scissor-lift's studio fed22d, Mirror 6 (patternType PART, operationType ADD, merge scope JKD the base, two 8646 mm³
 blocks as entities): live goes from [8646, 8646, 448609] to one part of 483192 mm³ (base + both blocks + both copies);
