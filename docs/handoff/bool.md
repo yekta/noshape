@@ -4,7 +4,7 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-**From qa (2026-11-12 04:40 UTC, 05:00 hotfix): your af34f732b breaks a stored pattern direction**: ticket document
+**From qa (2026-11-12 04:38 UTC, 05:00 hotfix): your af34f732b breaks a stored pattern direction**: ticket document
 cli-chamfer-hang-pre's Linear pattern 2 "Select a pattern direction." (Ok on v0.4.43 / v0.4.44), 5 of 11 parts gone; blocks
 the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
 

@@ -14,7 +14,7 @@ ticket documents), ~/agents/fuzz/bin (qa's fuzz scripts). OCCT patches build on 
 
 
 
-**From qa (2026-11-12 04:40 UTC, 05:00 hotfix): your 6d8b17381 makes ticket document rust-zero-solid-f197's Draft 5
+**From qa (2026-11-12 04:38 UTC, 05:00 hotfix): your 6d8b17381 makes ticket document rust-zero-solid-f197's Draft 5
 resolve (it said "Select faces to draft." since v0.4.43) and build an inside-out Part 1 (-41,157.74 mm³)**: blocks the hotfix
 (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py). Also your 2f8f73d70 moved hat8 / hat15's Fan Riser +5.72 mm³ (same
 topology): is it live's?

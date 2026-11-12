@@ -440,7 +440,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     unify, references still resolve) and slow1151-pre (fixed: = v0.4.43).
   - Model suite (vibe5): 77/87, 827/947; against v0.4.44 only c2-hunting-knife 15 -> 16 (better); gear documents at baseline.
     Volume sweep and cf corpus = 44ff040aa.
-- **qa 04:40: the three causes found (each commit built and run on vibe4 / vibe3):**
+- **qa 04:38: the three causes found (each commit built and run on vibe4 / vibe3):**
   - **BLOCKER, bool af34f732b** (a cut's lumps touching along an edge as two solids): ticket document cli-chamfer-hang-pre's
     Linear pattern 2 "Select a pattern direction." (Ok on v0.4.43, v0.4.44 and 686c50acf; its stored direction no longer
     resolves): 5 of its 11 parts gone; also Fillet 7 / Shell 1 / Shell 4 messages change. hat15's class: a reference saved
