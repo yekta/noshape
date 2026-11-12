@@ -345,8 +345,11 @@ fn timing_on() -> bool {
 struct StepClock {
     t0: Instant,
     dispatch: f32,
-    frame: std::sync::Arc<std::sync::Mutex<Option<(f32, [f32; 3])>>>,
+    frame: FrameTimes,
 }
+
+/// A timed action's first frame: its end (ms from the action) and its layout, prepaint and paint (ms).
+type FrameTimes = std::sync::Arc<std::sync::Mutex<Option<(f32, [f32; 3])>>>;
 
 thread_local! {
     static CLOCK: std::cell::RefCell<Option<StepClock>> = const { std::cell::RefCell::new(None) };

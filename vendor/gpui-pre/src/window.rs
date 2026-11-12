@@ -5864,10 +5864,24 @@ impl Window {
         // NOSHAPE PATCH (agent studios): a key that switches to keyboard modality redraws after it is dispatched.
         // Refreshing first made `dispatch_key_event` draw a whole frame before handling the first key after a click
         // (only hover and focus-visible styling follow the modality, not the dispatch tree), then another for its
-        // result.
+        // result. A typed character with no text input registered yet still draws first: a field focused in the last
+        // frame registers for input in the next one (the character would be lost).
+        let types_text = match &event {
+            PlatformInput::KeyDown(k) => k.keystroke.key_char.is_some(),
+            _ => false,
+        };
+        let has_text_input = types_text && {
+            let handler = self.platform_window.take_input_handler();
+            let some = handler.is_some();
+            if let Some(handler) = handler {
+                self.platform_window.set_input_handler(handler);
+            }
+            some
+        };
         let is_key = matches!(event, PlatformInput::KeyDown(_) | PlatformInput::KeyUp(_));
+        let refresh_after = is_key && (!types_text || has_text_input);
         let modality_changed = self.last_input_modality != old_modality;
-        if modality_changed && !is_key {
+        if modality_changed && !refresh_after {
             self.refresh();
         }
 
@@ -5995,7 +6009,7 @@ impl Window {
             self.dispatch_mouse_event(any_mouse_event, cx);
         } else if let Some(any_key_event) = event.keyboard_event() {
             self.dispatch_key_event(any_key_event, cx);
-            if modality_changed {
+            if modality_changed && refresh_after {
                 self.refresh();
             }
         } else if let Some(touch_event) = event.touch_event() {
