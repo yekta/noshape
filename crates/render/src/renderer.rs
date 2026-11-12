@@ -4317,9 +4317,11 @@ mod tests {
     }
 
     #[test]
-    fn line_lod_level_keeps_the_error_under_a_quarter_pixel() {
+    fn line_lod_level_keeps_the_error_under_half_a_pixel() {
         assert_eq!(line_lod_level(f32::INFINITY), 1);
-        assert_eq!(line_lod_level(5000.0), 1);
+        assert_eq!(line_lod_level(10000.0), 1);
+        assert_eq!(line_lod_level(5000.0), 2);
+        assert_eq!(line_lod_level(2000.0), 3);
         assert_eq!(line_lod_level(3000.0), 2);
         assert_eq!(line_lod_level(900.0), 3);
         assert_eq!(line_lod_level(240.0), 4);

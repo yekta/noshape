@@ -751,8 +751,10 @@ pub fn lod_box_mesh() -> MeshData {
 /// plate's Ø8 holes, ~16 px each at fit while the plate is ~1100 px)
 /// still drops its sub-pixel segments.
 pub const LINE_LOD_TOLERANCES: [f32; 6] = [0.0, 6.25e-5, 2.5e-4, 1e-3, 4e-3, 1.6e-2];
-/// The screen error (CSS px) a simplified edge level may have.
-pub const LINE_LOD_MAX_ERROR_PX: f32 = 0.25;
+/// The screen error (CSS px) a simplified edge level may have. Half a pixel (was a quarter, 11-12): pixel diffs of
+/// big-plate and NIST through a zoom sweep differ only in anti-aliasing (no faceting on their small holes), and NIST's
+/// 2x orbit draws 2-4 % less GPU time a frame on the macOS runners (perf.yml 43187490193).
+pub const LINE_LOD_MAX_ERROR_PX: f32 = 0.5;
 
 /// The coarsest line level (1-based, [`LINE_LOD_TOLERANCES`]) for a body
 /// whose bounding-box diagonal is `diagonal_px` CSS px on screen.
