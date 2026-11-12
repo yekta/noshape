@@ -3041,7 +3041,9 @@ double eval(const Surf& s, const gp_XYZ& x)
   {
     // The distance from the foot point on the face's surface along its natural normal, less the offset's.
     const gp_Pnt   P(x);
-    const gp_Pnt2d uv = s.has_hint ? s.sas->NextValueOfUV(s.hint, P, 1e-12, 1e-9) : s.sas->ValueOfUV(P, 1e-12);
+    // (No maxpreci: x lies a wall off the surface, so a foot is never within one; with it every call also
+    // projected onto iso curves, c2-rings-loft's Shell 1 25 % of its time.)
+    const gp_Pnt2d uv = s.has_hint ? s.sas->NextValueOfUV(s.hint, P, 1e-12) : s.sas->ValueOfUV(P, 1e-12);
     s.hint            = uv;
     s.has_hint        = true;
     gp_Pnt S;
@@ -3076,7 +3078,7 @@ double eval_grad(const Surf& s, const gp_XYZ& x, gp_XYZ& g)
   if (s.general)
   {
     const gp_Pnt   P(x);
-    const gp_Pnt2d uv = s.has_hint ? s.sas->NextValueOfUV(s.hint, P, 1e-12, 1e-9) : s.sas->ValueOfUV(P, 1e-12);
+    const gp_Pnt2d uv = s.has_hint ? s.sas->NextValueOfUV(s.hint, P, 1e-12) : s.sas->ValueOfUV(P, 1e-12);
     s.hint            = uv;
     s.has_hint        = true;
     gp_Pnt S;
