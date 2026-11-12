@@ -3,6 +3,7 @@
 knurl / gear timing, each case once, in parallel within the host's cores; results cached by what they were built from.
 
   gate-host.py fp                                    the host's part of the cache keys (corpora, OCCT, models)
+  gate-host.py cmpfiles BEFORE AFTER                 two replays' results compared (kall-nightly.sh)
   gate-host.py run --out DIR --role NAME:RKEY:SKEY:OKEY:KBIN:OBIN ... [--speed BASE_KBIN NEW_KBIN] --cmp BASE_ROLE NEW_ROLE
 
 A role's replay (kernel binary KBIN) and suite (ops binary OBIN, '-' for none) run only when the cache has no result
@@ -18,9 +19,10 @@ MODELS = f"{HOME}/parity/models"
 CACHE = f"{HOME}/agents/bool-gate/cache"
 # Bumped when what a result file holds or how a log is read changes: older cached results are not reused.
 FORMAT = "1"
-# The gate's corpora: bool's whyall set, shfall, the knurls and gears (kg.sh). parity56 against OCCT run here.
+# The gate's corpora: bool's whyall set, shfall, the knurls and gears (kg.sh). parity56 against OCCT run here. kall
+# (knurls of 45-50 GB a process) is the nightly run's (kall-nightly.sh, lead 11-12), not each change's.
 REPLAY = ("bool-corpus corpus2 corpus3 corpus4 corpus5 corpus6 direct-corpus sh-new2 parity56 valve2 snap sp-cut shfall "
-          "kall k10-25 k10-25-12 k25-15 k25-25 k25-71-12 cf-spur-gear gears gpf").split()
+          "k10-25 k10-25-12 k25-15 k25-25 k25-71-12 cf-spur-gear gears gpf").split()
 VS_OCCT = {"parity56"}
 # Corpora whose cases take many GB (the memory budget is 16 GB a process, as whyall.sh's): Shell's slab fuses and the
 # gears in a pool of two; the knurls, whose OCCT cuts reached 35-40 GB a process, one at a time, each with 36 GB free
@@ -478,10 +480,21 @@ def main():
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--threads", type=int, default=2)
     ap.add_argument("--speed-threads", type=int, default=8)
+    ap.add_argument("--corpora", help="these corpora only (comma-separated), not the gate's")
+    ap.add_argument("files", nargs="*")
     a = ap.parse_args()
     a.out = os.path.abspath(a.out) if a.out else a.out
+    if a.corpora:
+        REPLAY[:] = a.corpora.split(",")
     if a.cmd == "fp":
         print(json.dumps(fingerprints()))
+        return
+    # (cmpfiles BEFORE AFTER: two replays' results compared, as main's and a branch's: the nightly run's.)
+    if a.cmd == "cmpfiles":
+        verdict, why, info = compare(read_tsv(a.files[0]), read_tsv(a.files[1]), None, None, None)
+        for l in info:
+            print(l)
+        print(f"VERDICT {verdict}" + (f": {'; '.join(why)}" if why else ""))
         return
     os.makedirs(CACHE, exist_ok=True)
     t0 = time.time()

@@ -12,13 +12,17 @@
 # lands they are main's). FAIL: a case that differs from OCCT or fails where main's doesn't, a crash, a document
 # matching fewer features. CHECK: a case main takes declined, a document's outcome changed, a timing case >5 % slower.
 # The full output: /root/<caller>-scratch/gate-<sha>.log. One gate at a time per host (a lock); builds through rb.sh.
+# gate.sh --nightly-kall: kall's knurls (45-50 GB a process, not in the per-change gate) replayed on main alone, one
+# case at a time, against the night before: bool2's cron at 04:30 UTC (lead 11-12). Its verdict line goes to
+# /tmp/lead/kall-status and /root/<caller>-scratch/kall-nightly.log, a FAIL also to /root/bool-scratch/KALL-FAIL.
 set -uo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(git -C "$here" rev-parse --show-toplevel)
 caller=$(basename "$repo")
 [ $# -ge 1 ] || { sed -n '2,13p' "$0"; exit 2; }
 target=$1; shift
-jobs=8; threads=2; suite=1; spd=1; host=vibe4
+jobs=8; threads=2; suite=1; spd=1; host=vibe4; nightly=0
+[ "$target" = --nightly-kall ] && { nightly=1; target=origin/main; suite=0; spd=0; }
 while [ $# -gt 0 ]; do
   case $1 in
     --jobs) jobs=$2; shift;; --threads) threads=$2; shift;; --host) host=$2; shift;;
@@ -84,6 +88,24 @@ cached() { ssh -o BatchMode=yes "$host" "test -s ~/agents/bool-gate/cache/$1-$2.
 lock=/root/projects/noshape-wt/.bool-gate-$host.lock
 exec 9> "$lock"
 flock -n 9 || { say "waiting for another gate on $host"; flock 9; }
+
+# The nightly kall run: main's kernel tests built in main's worktree, kall replayed alone, compared with the night before.
+if [ $nightly = 1 ]; then
+  wt_base=/root/projects/noshape-wt/bool-gate-base
+  [ -d "$wt_base" ] || git -C "$repo" worktree add -q --detach "$wt_base" origin/main >> "$log" 2>&1
+  git -C "$wt_base" checkout -q -f --detach "$base" && git -C "$wt_base" clean -fdq
+  build() { (cd "$1" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cargo test --release -p noshape-kernel --test all --no-run" > "$2" 2>&1); }
+  build "$wt_base" "$scratch/gate-build-base.log" || { echo "VERDICT FAIL: main ${base:0:9} doesn't build" | tee -a "$scratch/kall-nightly.log"; exit 1; }
+  bk=$(grep -E 'Executable tests/all.rs' "$scratch/gate-build-base.log" | sed -n 's|.*(\(.*\)).*|\1|p' | head -1)
+  ssh -o BatchMode=yes "$host" "mkdir -p ~/agents/bool-gate/bin ~/agents/bool-gate/runs ~/agents/bool-gate/nightly" && scp -q "$here/gate-host.py" "$host:agents/bool-gate/bin/gate-host.py"
+  night=$(date -u +%m%d); corp=${NOSHAPE_NIGHTLY_CORPORA:-kall}  # (another corpus: to try the run)
+  out="agents/bool-gate/runs/kall-$night"
+  (cd "$wt_base" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && python3 agents/bool-gate/bin/gate-host.py run --out $out --jobs 1 --threads 8 --corpora $corp --role main:kall-$night-${base:0:9}:-:$bkey_o:$bk:- && cp $out/kall-$night-${base:0:9}-replay.tsv agents/bool-gate/nightly/kall-$night.tsv && prev=\$(ls agents/bool-gate/nightly/kall-*.tsv | grep -v kall-$night.tsv | tail -1) && if [ -n \"\$prev\" ]; then python3 agents/bool-gate/bin/gate-host.py cmpfiles \$prev agents/bool-gate/nightly/kall-$night.tsv; else echo \"VERDICT PASS: the first night, nothing to compare: \$(cut -f4 agents/bool-gate/nightly/kall-$night.tsv | sort | uniq -c | tr -s ' ' | paste -sd, -)\"; fi") >> "$log" 2>&1
+  v=$(grep '^VERDICT' "$log" | tail -1); [ -n "$v" ] || v="VERDICT FAIL: the nightly kall run gave no verdict ($log)"
+  line="$(date -u +%m-%d) kall on main ${base:0:9}: $v"
+  echo "$line" | tee -a "$scratch/kall-nightly.log"; mkdir -p /tmp/lead; echo "$line" > /tmp/lead/kall-status
+  case $v in "VERDICT PASS"*) exit 0;; "VERDICT CHECK"*) exit 3;; *) echo "$line" >> /root/bool-scratch/KALL-FAIL; exit 1;; esac
+fi
 
 # The two worktrees (warm target dirs on the host): main's shared, the branch's per caller.
 wt_base=/root/projects/noshape-wt/bool-gate-base
