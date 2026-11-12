@@ -33,6 +33,10 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
   OUT; one assembly per process. asm-base worktree (/root/projects/noshape-wt/asm-base) builds main for baselines.
 - Dropped: taking the other end of a top / bottom axis point whose Z is reversed (no effect: clamp-pattern's
   10.4 mm ends have live's Z, their faces' extent differs).
+- infento-subs (main: 66 mates not as live): the diagnostic's wrong ends are Peddle crank (studio 1dc32b: no part of
+  ours with its volume; its Boolean 2 / Extrude 13 non-manifold, core/bool) under Planar 13/14/15/28/29 (90°), and
+  Bearing block 40x40 hexa's edge RaEu centre (74d3d6) 14 mm / 74° off under Fastened 4/7/23; the rest is their
+  overdefined cluster. 74d3d6's next difference after Extrude 4: the Knurled disc's faces (ours 7/13/8, live 4/4/0).
 - Next: the remaining mate losses by assembly (main 81f2a19e): hand-drill 45 (ring gear's Extrude 7/8, dx), clamp-
   pattern 20 (one overdefined cluster: a face extent), isaac-ball 29, infento-subs 69, robotic-arm 7.
 
