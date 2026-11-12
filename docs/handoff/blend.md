@@ -13,6 +13,9 @@ Worktree /root/projects/noshape-wt/blend (and blend2 for a second build), builds
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+**c2-rings-loft stops at feature 20, Extrude 5 (core's):** the engraving cut's edges are split at the revolved ring's
+seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs live 335/206); Parasolid has no seams.
+
 ## 11-11 23:23 UTC: rings-loft's pattern tips done without crates/brep (17 -> 19 of 32)
 - Landed: blend-lcm, blend-filletspeed, the knife's sliver end (af254976; knife 15 -> 16 of 52).
 - **Circular pattern 2 as live 2513** (blend-ringtips, queued 1b11b8f6): a feature pattern of an Add and the chamfer or fillet of
