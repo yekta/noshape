@@ -2203,7 +2203,8 @@ fn variable_rounds_against_a_boxs_planes_cut_as_occt() {
 /// Fuses of sheets that are shells (parity documents' and the corpus's, recorded): OCCT's result keeps each input
 /// shell's pieces in shells, a shell per connected group (BOPAlgo_BOP::BuildShape); ours builds them so ("a sheet
 /// of shells" before): the same counts, shells and faces turned as OCCT's. cf-setback-fillet's corner patch takes the
-/// fillet's arcs, its own edges' curves on it 40 um off them: their tolerances raised to cover it, as OCCT's.
+/// fillet's arcs, its own edges' curves on it 40 um off them: an invalid result's tolerances corrected as OCCT's
+/// builder ends (CorrectTolerances), then valid.
 #[test]
 fn sheets_of_shells_fused_into_shells_as_occt() {
     let _ = k::set_working_scale(1000.0);
@@ -2235,4 +2236,13 @@ fn sheets_of_shells_fused_into_shells_as_occt() {
         assert_eq!(counts(&r.shape), counts(&o.shape), "{name}: shells, faces, edges, vertices");
         assert_eq!(shells(&r.shape), shells(&o.shape), "{name}: shells' faces and those reversed");
     }
+}
+
+/// c2-rings-loft's slots cut across its ring's 1 mm wall and its rounds (3 of them, recorded): their planes
+/// lie nearly along the rounds' arcs, so a section crosses a round within one of the exact plane / round sections'
+/// samples, or caps a fold between two (it found none, and ours declined "a non-manifold result": the 51-slot cut 5 s
+/// on OCCT). Such a pair is OCCT's section now; the cut ours, as OCCT's.
+#[test]
+fn slots_across_a_rings_rounds_cut_as_occt() {
+    valid_as_occt("d3b24561b7688e74", 1e-8);
 }

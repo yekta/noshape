@@ -2829,8 +2829,18 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
     if (flat_at(sx) && std::find_if(flats.begin(), flats.end(), [&](double f) { return std::abs(f - sx) <= 1e-12; }) == flats.end())
       flats.push_back(sx);
   auto near_flat = [&](double sx) { return std::any_of(flats.begin(), flats.end(), [&](double f) { return std::abs(sx - f) <= 1e-9 * (s1 - s0); }); };
+  // (Samples close enough for the plane face too: four across its width, its area over its box's diagonal (a slot's
+  // end face, 0.3 mm wide, turned in its plane, across a ring's 68 mm round), up to 4096; else OCCT's.)
+  double along = 0;
+  for (int i = 1; i <= 64; ++i)
+    along += point(s0 + (s1 - s0) * (i - 1) / 64, 0.5 * (ta + tb)).Distance(point(s0 + (s1 - s0) * i / 64, 0.5 * (ta + tb)));
+  GProp_GProps area;
+  BRepGProp::SurfaceProperties(p_first ? fa : fb, area);
+  const double narrow = std::min({pu1 - pu0, pv1 - pv0, area.Mass() / std::hypot(pu1 - pu0, pv1 - pv0)});
+  if (!(narrow > 0) || 4 * along / narrow > 4096)
+    return false;
+  const int m = std::max({64, 16 * (knots.Length() - 1), static_cast<int>(std::ceil(4 * along / narrow))});
   // (Never two roots in the range: no branch folds back or crosses another inside the face (OCCT's then).)
-  const int m = std::max(64, 16 * (knots.Length() - 1));
   for (int i = 0; i <= m; ++i)
     if (const double sx = s0 + (s1 - s0) * i / m; !near_flat(sx) && in_range(sx) > 1)
       return false;
@@ -2860,6 +2870,64 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
   }
   if (in)
     runs.emplace_back(start, s1);
+  // (A run shorter than the samples' step (a plane nearly along the arcs crosses the face within one: c2-rings-loft's
+  // slots across its ring's 68 mm round, 35 um of it): where the plane crosses a side of the face inside the plane
+  // face's box a run ends, and a step whose roots in the range are as many at both ends crosses no side; else OCCT's.)
+  auto g = [&](double side, double sx) {
+    const gp_Pnt c = A->Value(sx);
+    return (1 - side) * (1 - side) * c.X() + 2 * side * (1 - side) * c.Y() + side * side * c.Z();
+  };
+  auto in_t = [&](double sx) {
+    int n = 0;
+    for (const double t : roots(sx))
+      n += t >= ta - slack && t <= tb + slack;
+    return n;
+  };
+  // (Nor a fold between two samples (the plane all but touching the arcs: its section a cap about where two roots
+  // meet, their branch steep there) where the two roots at the sample that has them span part of the range.)
+  for (int i = 1; i <= m && !side0 && !side1; ++i)
+  {
+    const double a = s0 + (s1 - s0) * (i - 1) / m, b = s0 + (s1 - s0) * i / m;
+    if (near_flat(a) || near_flat(b))
+      continue;
+    const std::vector<double> ra = roots(a), rb = roots(b);
+    if ((ra.size() == 2) == (rb.size() == 2))
+      continue;
+    const std::vector<double>& r = ra.size() == 2 ? ra : rb;
+    if (std::max(r[0], r[1]) >= ta - slack && std::min(r[0], r[1]) <= tb + slack)
+      return false;
+  }
+  for (int i = 1; i <= m; ++i)
+  {
+    const double a = s0 + (s1 - s0) * (i - 1) / m, b = s0 + (s1 - s0) * i / m;
+    if (near_flat(a) || near_flat(b))
+      continue;
+    int crossed = 0;
+    for (const double side : {ta, tb})
+      crossed += !((side == ta && side0) || (side == tb && side1)) && (g(side, a) < 0) != (g(side, b) < 0);
+    if (crossed > 0 && in_t(a) == in_t(b))
+      return false;
+  }
+  for (const double side : {ta, tb})
+  {
+    if ((side == ta && side0) || (side == tb && side1))
+      continue;
+    for (int i = 1; i <= m; ++i)
+    {
+      double a = s0 + (s1 - s0) * (i - 1) / m, b = s0 + (s1 - s0) * i / m;
+      const double ga = g(side, a), gb = g(side, b);
+      if ((ga < 0) == (gb < 0) || near_flat(a) || near_flat(b))
+        continue;
+      for (int it = 0; it < 80 && b - a > 1e-14 * (1 + std::abs(s0) + std::abs(s1)); ++it)
+      {
+        const double mid = 0.5 * (a + b);
+        ((g(side, mid) < 0) == (ga < 0) ? a : b) = mid;
+      }
+      const double at = 0.5 * (a + b);
+      if (on_plane(point(at, side)) && std::none_of(runs.begin(), runs.end(), [&](const auto& r) { return std::abs(r.first - at) <= 1e-9 * (s1 - s0) || std::abs(r.second - at) <= 1e-9 * (s1 - s0); }))
+        return false;
+    }
+  }
   std::vector<IntTools_Curve> found;
   // An iso curve of the face lying in the plane (`along_s`: at the across parameter `fixed`; else at `s` = `fixed`),
   // from `a` to `b` of its own parameter: the face's own curve there, exact, its curve on the plane projected.
