@@ -693,7 +693,17 @@ impl<'a> Translator<'a> {
         for sub in f["subFeatures"].as_array().into_iter().flatten().filter(|s| s["featureType"] == "mateConnector" || s["featureType"] == "cPoint") {
             let mut problems = Vec::new();
             match self.feature_params(k, sub, &mut problems) {
-                Ok((_, params)) => {
+                Ok((_, mut params)) => {
+                    // An origin on a sketch's circle reached through what later features made of it (asm-config-assembly's
+                    // Hole 1: the sheet metal model's edges derived from Sketch 1's circle, no ids to match): ours of
+                    // that sketch entity, whose centre is the same.
+                    if sub["featureType"] == "mateConnector"
+                        && params.get("originQuery").is_none_or(|v| v.as_array().is_none_or(Vec::is_empty))
+                        && let Some(e) = sub["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "originQuery").and_then(|p| p["queries"].as_array()?.first()?["queryString"].as_str().map(str::to_string)).and_then(|t| self.sketch_entity_named(&t))
+                    {
+                        params.insert("originQuery".into(), json!([e]));
+                        problems.retain(|p| !p.starts_with("originQuery"));
+                    }
                     if let Some(oid) = sub["featureId"].as_str() {
                         if sub["featureType"] == "cPoint" {
                             self.sub_points.insert(oid.to_string(), params);
@@ -2828,6 +2838,17 @@ impl<'a> Translator<'a> {
         Some(best.map(|(_, id)| id).ok_or_else(|| format!("blended edge of sketch {sk}: no rounded corner of ours there")))
     }
 
+    /// The first sketch entity of ours a packed query names anywhere in it (`<sketch>.wireOp` … `sketchEntityId`),
+    /// whatever was made of it after.
+    fn sketch_entity_named(&self, text: &str) -> Option<String> {
+        let packed = text.split("qCompressed(1.0,\"").nth(1)?.split('"').next()?;
+        let tree = noshape_model::custom::host::packed::unpack(packed).ok()?;
+        let mut strings = Vec::new();
+        packed_strings(&tree, &mut strings);
+        let sketches: Vec<&str> = strings.iter().filter_map(|s| s.strip_suffix(".wireOp")).collect();
+        strings.windows(2).filter(|w| w[0] == "sketchEntityId").find_map(|w| sketches.iter().find_map(|sk| self.sketch_entities.get(&(sk.to_string(), w[1].clone())).cloned()))
+    }
+
     /// A sketch curve or point named by its Onshape id (packed
     /// `SKETCH_ENTITY` query of a sketch's own wire, not of a feature made
     /// from it).
@@ -3489,6 +3510,20 @@ impl<'a> Translator<'a> {
             let close: Vec<&Value> = found.iter().filter(|e| rel(e) <= 5e-2).collect();
             let theirs: Vec<&Value> = close.iter().copied().filter(on_part).collect();
             if let Some(e) = if theirs.is_empty() { close } else { theirs }.into_iter().min_by(|x, y| rel(x).total_cmp(&rel(y))) {
+                return id(e);
+            }
+        }
+        // A planar face none of ours matches in area: ours on its plane before the nearest (an Extrude up to it takes
+        // the plane: asm-bjr-config's Extrude 12, live's 585 mm² face at z −1.85 our pieces there split otherwise,
+        // the nearest of ours on the faces it starts from).
+        if kind == "faces"
+            && r.geometry.as_deref() == Some("plane")
+            && let Some(n) = r.normal
+        {
+            let on_plane = |e: &&Value| f3(&e["centroid"]).is_some_and(|c| (0..3).map(|i| (c[i] * k - p[i]) * n[i]).sum::<f64>().abs() <= 1e-7);
+            a["limit"] = json!(64);
+            let more = self.call("query_entities", a).ok()?;
+            if let Some(e) = more[kind].as_array().into_iter().flatten().filter(on_plane).min_by(|x, y| off(x).total_cmp(&off(y))) {
                 return id(e);
             }
         }
