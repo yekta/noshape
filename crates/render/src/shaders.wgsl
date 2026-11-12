@@ -1124,6 +1124,17 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
     // A lit spline handle tip (style 64): a 14 px disc hovered, 15 px selected (live 2221), whatever its size at rest.
     if ((st & (HOVER | SELECTED)) != 0u && (p.style & 64u) != 0u) { size = select(14.0, 15.0, (st & SELECTED) != 0u) + g.viewport.w; }
     let half = size * g.viewport.z * 0.5;
+    // A sketch point's disc stands off its plane toward the eye by twice its radius: drawn flat at the point's depth,
+    // the half of an 11 px hover disc over a tilted plane's far side was hidden by the plane (the user's "offset" disc).
+    if ((p.style & 128u) != 0u && (p.style & 2u) == 0u) {
+        let toward = select(-g.camera_fwd.xyz, normalize(g.camera_pos.xyz - w), g.camera_pos.w > 0.5);
+        let right = normalize(cross(g.camera_fwd.xyz, g.camera_up.xyz));
+        let step = 1e-3;
+        let cr = g.view_proj * vec4(w + right * step, 1.0);
+        let px_per_unit = length((cr.xy / cr.w - c.xy / c.w) * g.viewport.xy * 0.5) / step;
+        let lifted = g.view_proj * vec4(w + toward * 2.0 * (half + 0.75) / max(px_per_unit, 1e-6), 1.0);
+        c.z = lifted.z / lifted.w * c.w;
+    }
     c = vec4(c.xy + uv * (half + 0.75) / (g.viewport.xy * 0.5) * c.w, c.z, c.w);
     // Onshape's offsets: points 9 units, faces 27.
     if ((p.style & 2u) != 0u) { c.z = c.w; } else { c = in_front_of_faces(c, 18.0); }

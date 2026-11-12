@@ -1172,6 +1172,15 @@ fn an_open_under_defined_sketch_has_the_rows_badge(cx: &mut TestAppContext) {
         v.display.feature_state(id).map(|s| (s.status, s.underdefined))
     });
     assert_eq!(under(cx), Some((noshape_model::display::FeatureStatus::Ok, true)), "the open sketch's state");
+    // Its line's end dragged (the user's flow): still under defined, open and once closed.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    draw(cx, window);
+    drag(cx, window, &view, (640., 360.), (660., 330.), 6);
+    assert_eq!(under(cx), Some((noshape_model::display::FeatureStatus::Ok, true)), "after a drag");
+    let id = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).edit.is_none() && view.read(cx).display.feature_state(id).is_some_and(|s| s.status != noshape_model::display::FeatureStatus::RolledBack));
+    assert_eq!(cx.update(|cx| view.read(cx).display.feature_state(id).map(|s| s.underdefined)), Some(true), "closed");
 }
 
 /// Parity sketch.md 7.3: the Dimension tool's pick and placement clicks open

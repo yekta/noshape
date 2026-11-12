@@ -1072,6 +1072,8 @@ impl PartStudioView {
         // outline in hover orange (`with_highlights`; live "psui (2026-10-27, P2) PART-HOVER-RED look").
         match &self.hover {
             Some(r @ Reference::Body(_)) => vec![r.clone()],
+            // Mid-draw the open sketch's entity under the pointer isn't recoloured (live: the snap shows instead).
+            Some(Reference::SketchEntity { sketch, .. }) if self.sketch.as_ref().is_some_and(|ed| ed.feature == *sketch && ed.mid_draw()) => Vec::new(),
             // A sketch curve under a region field pre-highlights its region.
             Some(r @ Reference::SketchEntity { .. }) => {
                 let filter = self.edit.as_ref().and_then(|e| e.dialog.read(cx).active_filter()).map(|(_, f, _)| f);

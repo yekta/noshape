@@ -2488,6 +2488,47 @@ fn a_sketch_point_is_drawn_as_lives_in_each_state() {
     }
 }
 
+/// User 11-12 (hat15b): a hovered sketch point on a plane seen at a slant drew half its disc (the far half hidden by
+/// the plane under it, which read as an orange disc beside the point). Lit on a face tilted 60° from the view, the
+/// disc is whole: the hover colour 4.5 px above and below the point as at its sides.
+#[test]
+fn a_hovered_sketch_point_on_a_slanted_face_draws_its_whole_disc() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let n = 64u32;
+    let mut cam = Camera::default();
+    cam.fit_sphere(glam::DVec3::ZERO, 0.01, 1.0);
+    // The face through the point, its normal 60° off the view direction (about the camera's right).
+    let (fwd, up) = (cam.forward(), cam.up());
+    let right = fwd.cross(up).normalize();
+    let normal = -fwd * 0.5 + up * (3f64.sqrt() / 2.0);
+    let along = normal.cross(right).normalize();
+    let corner = |a: f64, b: f64| { let q = right * a + along * b; [q.x as f32, q.y as f32, q.z as f32] };
+    let e = 0.02;
+    let face = MeshData { positions: vec![corner(-e, -e), corner(e, -e), corner(e, e), corner(-e, e)], normals: vec![[normal.x as f32, normal.y as f32, normal.z as f32]; 4], pick_ids: vec![2; 4], indices: vec![0, 1, 2, 0, 2, 3] };
+    let point = PointSprite { position: [0.0; 3], color: UNDER_DEFINED, pick_id: 1, size: 6.7, style: PointSprite::SKETCH_POINT, _pad: 0 };
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&face))).with_color([0.9, 0.9, 0.9, 1.0]).unlit());
+    scene.instances.push(Instance::new(Drawable::Points(r.upload_points(&PointData { points: vec![point] }))).per_primitive_color());
+    scene.set_state(1, state::HOVER);
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: n, height: n, device_pixel_ratio: 1.0, style: &Style { msaa: 1, ..Style::default() }, pick: false }).unwrap();
+    let at = |dx: i32, dy: i32| {
+        let (x, y) = ((n / 2) as i32 + dx, (n / 2) as i32 + dy);
+        let i = ((y as u32 * n + x as u32) * 4) as usize;
+        [f.bgra[i + 2], f.bgra[i + 1], f.bgra[i]]
+    };
+    // (Pixel centres 4.5 px from the point either way: it sits on a pixel corner.)
+    for (dx, dy) in [(4, 0), (-5, 0), (0, 4), (0, -5)] {
+        assert!(rgb_near(at(dx, dy), [255, 198, 133], 8), "the disc at ({dx}, {dy}): {:?}", at(dx, dy));
+    }
+}
+
 /// DEPTH24-BLANK: on a device without float depth with stencil (24-bit depth + stencil) the box still draws. The
 /// format is chosen once a process, so the render runs in a child of this test binary under `NOSHAPE_DEPTH24`.
 #[test]

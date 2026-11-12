@@ -18,8 +18,11 @@ the 6 px / 10 px `near` re-check only when it can't tell); a drawing tool re-inf
 curve 7.5 px, a point 8.5 px (`inference::POINT_REACH`), a midpoint 6 px, a dragged point's drop the same on screen;
 in sketch mode sketch points / curves win the pick over model vertices / edges (`PickMap::priority_fn_sketching`). Tests: sketch_ui_tests `a_line_ends_on_the_hovered_point_at_scale_1/2`, `a_dragged_point_lands_on_a_line_within_7_px` (T1),
 `the_dimension_tool_takes_the_hovered_line_at_scale_2` (T2, a real GPU pick), `an_open_under_defined_sketch_has_the_rows_badge`.
-Next (live's look): the snap target's yellow-orange square outline (points, midpoints; none on a line), no hover
-recolour of the target mid-draw, the hover disc 10–11 px translucent centred on the point. Open: the P1 "hover not orange" on hat8 (debug patch /root/psui-scratch/hover/hoverdbg.patch: logs highlighted_hover;
+Then (live's look, landing after): the snap target's yellow-orange square (`SNAP_SQUARE_*`; points, midpoints, a
+dragged point's drop; none on a line), nothing recoloured under the pointer mid-draw (`SketchEditor::mid_draw`), a
+sketch point's sprite lifted toward the eye by twice its radius (the user's "offset" hover disc was half hidden by
+the slanted plane under it), and the under-defined badge kept through a regeneration's least-change placement
+(`solve_with` keeps the current analysis; it was dropped, so hat15b's row had no badge). Open: the P1 "hover not orange" on hat8 (debug patch /root/psui-scratch/hover/hoverdbg.patch: logs highlighted_hover;
 suspect more than one highlighted reference -> no single_hover), the open sketch's row badge on hat15b against live's
 capture.
 

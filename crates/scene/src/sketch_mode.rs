@@ -401,6 +401,9 @@ pub struct GlyphInfo {
 /// vertical. Live draws its inferences 15 px wide (woolsthorpe INFERENCE_POINT_SIZE_PX / INFERENCE_LINE_WIDTH_PX) and
 /// picks the pointer's pixel (INFERENCE_PICK_RADIUS_PX 0).
 const INFERENCE_PX: f64 = 7.5;
+/// The square round a snapped point: its 1 px sides 8 px from the point (live qsnap/za-p2p-d8: 17 px outside), #FFC92A.
+const SNAP_SQUARE_HALF_PX: f64 = 8.0;
+const SNAP_SQUARE_COLOR: [u8; 4] = [0xff, 0xc9, 0x2a, 0xff];
 
 /// Glyph ids of "Use" links (Onshape's use glyph on projected geometry):
 /// not solver constraints but the entity's link in `SketchData::external_refs`.
@@ -1486,6 +1489,12 @@ impl SketchEditor {
             best = Some(Inference { kind: InferenceKind::Midpoint, position: s, entity: None, reference: Some((self.clicks[0].pos + self.clicks[1].pos) * 0.5), constraints: Vec::new(), distance: (s - p).length(), priority: 1 });
         }
         best
+    }
+
+    /// A drawing tool has placed its first click (or chains on): live recolours nothing under the pointer then, the
+    /// snap shows by its square and glyph.
+    pub fn mid_draw(&self) -> bool {
+        self.tool.draws() && (!self.clicks.is_empty() || self.chain_end.is_some())
     }
 
     /// The snap again once the GPU hover the last move asked for arrives (a model edge or vertex it lit snaps too).
@@ -5746,12 +5755,19 @@ impl SketchEditor {
         // A point inference marks its point; a direction inference of the
         // line being drawn shows on the line itself (its dash and end dot),
         // an alignment by its guide alone (live part-studio/1032).
-        let alignment = |k: InferenceKind| matches!(k, InferenceKind::AlignHorizontal | InferenceKind::AlignVertical | InferenceKind::AlignBoth);
-        if let Some(inf) = self.inference.as_ref().filter(|i| !(self.tool == Tool::Line && is_direction(i.kind)) && !alignment(i.kind)) {
-            points.points.push(PointSprite { position: w(inf.position), color: guide_color, pick_id: 0, size: 8.0, style: on_top, _pad: 0 });
+        // Live (behaviours "sketch snapping and hover", 11-12): a point or midpoint snapped to gets a yellow-orange 1 px
+        // square round it, 17 px across (the point keeps its colour); an end snapped onto a curve only its glyph.
+        let mut snap_square = |q: DVec2| {
+            let c = self.plane_to_screen(q);
+            let pts3: Vec<[f32; 3]> = [(-1., -1.), (1., -1.), (1., 1.), (-1., 1.), (-1., -1.)].iter().map(|(x, y)| w(self.screen_to_plane(c + DVec2::new(*x, *y) * SNAP_SQUARE_HALF_PX))).collect();
+            lines.push_polyline(&pts3, SNAP_SQUARE_COLOR, 0, 1.0, on_top);
+        };
+        let point_like = |k: InferenceKind| matches!(k, InferenceKind::Endpoint | InferenceKind::Center | InferenceKind::Midpoint | InferenceKind::Quadrant);
+        if let Some(inf) = self.inference.as_ref().filter(|i| point_like(i.kind)) {
+            snap_square(inf.position);
         }
-        if let Some((_, q, _)) = self.drag_snap {
-            points.points.push(PointSprite { position: w(q), color: guide_color, pick_id: 0, size: 10.0, style: on_top, _pad: 0 });
+        if let Some((_, q, Drop::Merge | Drop::Midpoint)) = self.drag_snap {
+            snap_square(q);
         }
         // Profile inspector issues: red markers, the focused one larger with its curves.
         let issue_red = [0xbd, 0x30, 0x39, 255];
@@ -9009,6 +9025,21 @@ mod tests {
         assert_eq!(d.texts.len(), 1, "edited in place");
         assert_eq!(d.texts[0].text, "Changed");
         assert!(ed.editing_text.is_none());
+    }
+
+    /// Live (behaviours "sketch snapping and hover", 11-12): a line's end snapped to a point or a midpoint shows a
+    /// yellow-orange square round it; snapped onto a line, no square (its glyph only).
+    #[test]
+    fn a_snapped_point_or_midpoint_gets_the_square_and_a_curve_none() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        d.sketch.add_line(v(0.0, 0.0), v(200.0 * PX, 0.0));
+        let squares = |ed: &SketchEditor, d: &SketchData| ed.overlay(d, &noshape_units::UnitPrefs::default()).0.segments.iter().filter(|s| s.color == SNAP_SQUARE_COLOR).count();
+        click(&mut ed, &mut d, v(60.0 * PX, 80.0 * PX));
+        for (at, kind, square) in [(v(203.0 * PX, 4.0 * PX), InferenceKind::Endpoint, true), (v(103.0 * PX, 3.0 * PX), InferenceKind::Midpoint, true), (v(150.0 * PX, 3.0 * PX), InferenceKind::OnCurve, false)] {
+            ed.pointer_move(&mut d, at, false, false);
+            assert_eq!(ed.inference.as_ref().map(|i| i.kind), Some(kind), "at {at:?}");
+            assert_eq!(squares(&ed, &d) == 4, square, "{kind:?}: {} square sides", squares(&ed, &d));
+        }
     }
 
     #[test]

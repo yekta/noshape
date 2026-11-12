@@ -1312,6 +1312,10 @@ impl Sketch {
 
     pub fn solve_with(&mut self, opts: &SolveOptions) -> SolveReport {
         let snapshot = self.clone();
+        // The DOF analysis is the constraints', not where a least-change placement moves things: a solve without
+        // `analyze` keeps reporting the one current when it started (a regeneration's placement touched the sketch,
+        // and the open sketch's row lost its under-defined badge, user 11-12).
+        let analysis = if !opts.analyze && self.analysis_current() { self.cache.analysis.clone() } else { None };
         // Live's least change first (constructive.rs); kept only when the
         // solve then finds every constraint held where it put things.
         let unheld = if opts.constructive && opts.light.is_empty() && opts.still.is_empty() { self.unheld_constraints(1e-9) } else { HashSet::new() };
@@ -1332,6 +1336,15 @@ impl Sketch {
         } else {
             self.solve_inner(opts)
         };
+        let mut rep = rep;
+        if let Some((_, a)) = analysis
+            && rep.dof.is_none()
+        {
+            rep.dof = Some(a.dof);
+            rep.entity_states = a.states.clone();
+            rep.redundant = a.redundant.clone();
+            self.cache.analysis = Some((self.cache.revision, a));
+        }
         // Live (qa4 round 5 v3 s6, CON-HV-COLLAPSE): constraints that
         // collapse a line to a point (Vertical on a Horizontal line) don't
         // solve: the line stays, its constraints are the conflicting ones
@@ -1611,5 +1624,33 @@ impl Sketch {
             }
         }
         out
+    }
+}
+
+#[cfg(test)]
+mod analysis_tests {
+    use crate::{ConstraintKind, Geometry, SolveOptions, Sketch};
+    use glam::DVec2;
+
+    /// User 11-12 (hat15b): a regeneration solves without the DOF analysis while the sketch's is current, and its
+    /// least-change placement moved geometry the regeneration had updated (a constraint no longer held): the report had
+    /// no DOF, so the open sketch's row lost its under-defined badge. The analysis is the constraints', kept.
+    #[test]
+    fn a_placement_without_analysis_keeps_reporting_the_current_one() {
+        let mut sk = Sketch::new();
+        let line = sk.add_line(DVec2::ZERO, DVec2::new(0.02, 0.0));
+        sk.add_constraint(ConstraintKind::Length { curve: line, value: 0.02 }).unwrap();
+        let dof = sk.solve().dof;
+        assert!(dof.is_some_and(|d| d > 0), "a free line with a length: {dof:?}");
+        // Its end moved as a regeneration moves used geometry: without a new revision.
+        let (_, end) = sk.entity(line).and_then(|e| e.endpoints()).unwrap();
+        if let Some(Geometry::Point { pos }) = sk.entity_mut_silent(end).map(|e| &mut e.geometry) {
+            *pos = DVec2::new(0.03, 0.0);
+        }
+        assert!(sk.analysis_current());
+        let rep = sk.solve_with(&SolveOptions { analyze: false, constructive: true, ..Default::default() });
+        assert!(rep.is_solved());
+        assert_eq!(rep.dof, dof, "the analysis after the placement");
+        assert!(sk.analysis_current());
     }
 }
