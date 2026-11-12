@@ -449,6 +449,26 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the off-slot release of 2026-11-12 (the user's sketch problems; qa list 19:33, candidate main e06b09c83, qa's app built from it on vibe4; the latest release is v0.4.45)
+- **qa 19:33: no blocker in the documents; two sketch interaction regressions for the lead's call.**
+  - User documents against v0.4.45: hat15 (142 features), hat15b (143), hat8 (139), the dock (499): every feature and every
+    part the same.
+  - Backward compatibility: qa's authored documents = v0.4.45; slow1151 (-pre, -before-extrude) fixed (Linear pattern 2 Ok
+    again, 8 parts, = v0.4.43: core 8cde65436). The 47 ticket documents: no feature's status or message changes; eight
+    differ only in edge / vertex counts with the same volumes and faces (cli-draft-hang 23 -> 21 edges on its 11 small parts,
+    cli-draft-hang2, cli-draft-segv, cli-fillet2-segv, cli-shell-gpf, cli-shell-hang-pre, crash957-after-del-sk4,
+    rust-zero-solid-f197 93 -> 92): curve pieces shown as one edge (core 79a968ef6, by its subject; not bisected), no
+    reference lost.
+  - Model suite (vibe5): 79/87, 847/947 (better); the gear documents at baseline. Volume sweep and cf corpus unchanged. GUI
+    rows pixel-identical to v0.4.45 (11 / 11).
+  - Sketch: the GUI fuzz has no sketch actions (picking / snapping not exercised there). The ui-parity sketch scenarios on the
+    candidate (vibe5, 6 shards): 147/149, 1535/1560 states; two match on the 15:57 run (52121e8b) and differ now, 2 / 2 alone,
+    their scenario files unchanged: **sketch-constraint-refusals** step 59 `.selection.count` live 0 / ours 1, and
+    **sketch-offset-key** step 10 `.focus.kind` live "other" / ours "none". The sketch UI commits between are psui's 0e29b5d3d
+    (a tool's click acts on the hovered entity) and 7707424a7 (the snap square): psui's.
+  - qa's harness: two parallel userdocs runs deleted each other's copies (ud-*) and read "no document is open"; each run now
+    has its own folder (bin/userdocs.py).
+
 ## Release blockers for the 2026-11-12 05:00 release (qa list started 23:10 on 11-11; the latest release is v0.4.44)
 - **P0, the user's hat15 (Mac-mini-hat 15, private: vibe3 ~/lead-private/hat15.noshape, copies in ~/tmp/qa, mode 700): in v0.4.44
   a face reference saved by v0.4.43 no longer resolves.** Regenerated on fresh copies with each release's CLI (qa userdocs.py):

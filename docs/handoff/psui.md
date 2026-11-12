@@ -5,6 +5,11 @@ Scratch: /root/psui-scratch (check2.sh = clippy + covering tests + T0, detached;
 document with noshape-cli; ink.py measures plane-name ink boxes). Live: my own tab is the old ui tab
 (`UI=1 node r.mjs …` in /root/live-pw, target id in /root/ui-scratch/live/.ui-tab); captures in onshape-research/live/psui/.
 Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079` (planes then sit on live's pixels).
+
+**From qa (2026-11-12 19:33 UTC, the off-slot sketch release): two sketch scenarios regress on e06b09c83** (matched on the
+15:57 run, scenario files unchanged; 2 / 2 alone on vibe5): sketch-constraint-refusals step 59 `.selection.count` live 0 / ours 1;
+sketch-offset-key step 10 `.focus.kind` live "other" / ours "none". Your 0e29b5d3d / 7707424a7 are the sketch UI changes between.
+
 **Builds and tests run on vibe4 since 11-01 (user; docs/TESTS.md):** `tools/tiers/rb.sh cargo test -p <crate>`; for GUI
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
