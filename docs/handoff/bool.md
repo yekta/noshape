@@ -43,6 +43,14 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
     (~/agents/bool-gate/suite-times.json).
   - Once warm (the OCCT cache for main's key filled, main's results cached), a crates/brep branch replays only its own
     side, without OCCT.
+- **Warm gate (11-12 12:44, vibe4, a crates/brep-only change, main 54ffc2047 cached): 40 min, PASS.**
+  - Build of the kernel and ops tests: 12.6 min. Crate tests: 11 min, now beside the replay, so about 29 min.
+  - The branch's replay and suite: 11.5 min. The suite's floor is c2-impeller-loft, about 11 min alone.
+  - Timing: 4.5 min.
+  - Main cold too (the first gate after main's kernel moves): 61 min.
+  - `gate.sh --main` (hourly, bool2's session cron) works out main's side ahead of the next gate.
+  - Timing under vibe4's load: main's own rounds 11-85 % apart. Slower beyond that spread is CHECK, so smaller
+    regressions show only as a hint.
 - **Host:** vibe4 sits at load 25-100 from the land queue's slots, psui, blend and dx suites and bool's replays, so
   16 gate threads get a fraction of 16 cores. Proposal to the lead: a gate lane on vibe4 (rb.sh pins other jobs to cores
   0-9, gates to 10-15), or gates on vibe5 at night.
