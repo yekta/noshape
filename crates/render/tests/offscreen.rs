@@ -569,6 +569,39 @@ fn a_line_in_an_edge_on_plane_picks_over_the_plane() {
     assert_eq!(at(-0.01), 1, "below the line the plane's edge picks the plane");
 }
 
+/// A point picks around its drawn centre, PICK_EXTRA_CSS_PX wider in CSS px, at a pixel ratio of 1 and 2 alike (the
+/// user's Retina: the margin was multiplied by the ratio twice, so a 6 px sketch point picked 11 px round itself, a
+/// neighbouring point won the hover and the click, and a snap shown on hover didn't commit).
+#[test]
+fn a_point_picks_round_its_drawn_centre_at_any_pixel_ratio() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (200u32, 150u32);
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Top);
+    cam.fit_sphere(glam::DVec3::ZERO, 0.03, w as f64 / h as f64);
+    let p = [0.004f32, 0.003, 0.0];
+    let points = PointData { points: vec![PointSprite { position: p, color: [0, 0, 255, 255], pick_id: 7, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 }] };
+    let scene = Scene { instances: vec![Instance::new(Drawable::Points(r.upload_points(&points))).per_primitive_color().layer(20)], ..Default::default() };
+    for dpr in [1.0f32, 2.0] {
+        let (dw, dh) = ((w as f32 * dpr) as u32, (h as f32 * dpr) as u32);
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: dw, height: dh, device_pixel_ratio: dpr, style: &Style::default(), pick: true }).unwrap();
+        let pick = f.pick.unwrap();
+        let c = cam.project(glam::DVec3::new(p[0] as f64, p[1] as f64, 0.0), glam::DVec2::new(dw as f64, dh as f64), 0.03).unwrap();
+        // CSS px to the right of the drawn centre.
+        let at = |css: f64| pick.id_at((c.x + css * dpr as f64) as i32, c.y as i32).unwrap_or(0);
+        assert_eq!(at(0.0), 7, "dpr {dpr}: the drawn centre");
+        assert_eq!(at(6.0), 7, "dpr {dpr}: within its radius and the pick margin (3 + {PICK_EXTRA_CSS_PX} / 2 px)");
+        assert_eq!(at(9.0), 0, "dpr {dpr}: past them");
+    }
+}
+
 /// Overlapping datum planes pick the nearest (live ui-parity: Top where it lies in front of Front; ours took the
 /// plane drawn last), a part behind the planes still wins over them, and its faces and edges pick as before.
 #[test]

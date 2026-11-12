@@ -70,6 +70,11 @@ const POINT_DEPTH_BIAS: wgpu::DepthBiasState = wgpu::DepthBiasState { constant: 
 /// on a part face): a small pull toward the camera on top of the faces' push.
 const PICK_PRIORITY_DEPTH_BIAS: wgpu::DepthBiasState = wgpu::DepthBiasState { constant: 4, slope_scale: 0.0, clamp: 0.0 };
 
+/// How much wider lines and points are in the pick pass, in CSS px (`g.viewport.w`: the shaders multiply it by the
+/// device pixel ratio). It was given ×dpr too, so on a Retina display a sketch point picked 16 px around itself: a
+/// neighbouring point took the hover and the click, and a snap shown on hover was dropped by the click's 10 px check.
+pub const PICK_EXTRA_CSS_PX: f32 = 8.0;
+
 /// Upper bound of color frames one target may have in flight (rendering or
 /// being read back); see [`Renderer::frames_in_flight`].
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
@@ -3456,7 +3461,8 @@ impl Renderer {
                 self.rebuild_bind_groups();
             }
             let mut globals = make_globals(&last.scene, &last.camera, width, height, last.device_pixel_ratio, &last.style);
-            globals.viewport[3] = 8.0 * last.device_pixel_ratio;
+            // Lines and points pick PICK_EXTRA_CSS_PX wider (the shaders scale it by the pixel ratio themselves).
+            globals.viewport[3] = PICK_EXTRA_CSS_PX;
             self.queue.write_buffer(&self.globals_pick, 0, bytemuck::bytes_of(&globals));
             let mut lists = std::mem::take(&mut self.lists);
             lists.mesh_error_px = last.style.detail.mesh_error_px;
@@ -3586,7 +3592,7 @@ impl Renderer {
         // Line and point widths stay in device pixels of the full frame.
         let dpr = last.device_pixel_ratio * sw as f32 / width.max(1) as f32;
         let mut globals = make_globals(&last.scene, &last.camera, sw, sh, dpr, &last.style);
-        globals.viewport[3] = 8.0 * dpr;
+        globals.viewport[3] = PICK_EXTRA_CSS_PX;
         self.queue.write_buffer(&self.globals_sample, 0, bytemuck::bytes_of(&globals));
         let view_proj = Mat4::from_cols_array_2d(&globals.view_proj);
         let mut lists = DrawLists { mesh_error_px: last.style.detail.mesh_error_px, ..Default::default() };
