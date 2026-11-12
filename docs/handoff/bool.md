@@ -60,20 +60,25 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
   - **Recordings:** vibe4 ~/tmp/bool2/ (impy: impeller, hk: hunting knife, rings: rings-loft, all exact, from
     NOSHAPE_RECORD_BOOLEANS + NOSHAPE_RECORD_EXACT on one document); bydoc: all 98 documents (text BREP).
     /root/bool2-scratch/bool-by-doc.py makes the per-document table.
-- **On: c2-rings-loft's 1b9ae499** (Circular pattern 1's 8-tool fuse, 1.49 s on OCCT, the feature 1,390 ms against
-  live's 767).
-  - It declines "a shared shape OCCT may keep or remake": the target and a pattern copy share a vertex where tori and
-    planes meet. As bool found (shared3 notes below), OCCT keeps or remakes such a vertex as its rounding falls.
-  - Switched to keep, or to remake, the plain path then declines "pattern instances overlapping". That's the
-    checked-glue pattern fuse, which goes on to rust_fuse_trimmed in the app. Measuring the whole document both ways
-    now.
-  - The question for the gate: OCCT's arbitrary keep / remake shows only in that vertex's history and tolerance, so
-    the replay's `equivalent` should take it. bool: shout if you'd rather keep the decline.
-- **Then the knife's 343b971e (1.5 s):** the chamfer tool's B-spline edges lie within 0.5 um of the blade's faces
-  (on_tol 0.2 um). Taking them as on (OCCT does) gets to "a non-manifold result"; WIP
-  /root/bool2-scratch/knife-nearon-wip.patch. After it: c2-extension-spring 84884726 (0.53 s, "a short section from a
-  corner"), c2-fan-blade-sweep 07831a00 (0.51 s, non-manifold), cf-setback-fillet's five sheet fuses ("a sheet of
-  shells").
+- **c2-rings-loft's 1b9ae499 (gating, branch bool2-rings, gate run 12 from 19:23 UTC):** Circular pattern 1's
+  8-ring fuse with checked glue. The rings reach into the ring and overlap one another too, so the touching-only path
+  declines "pattern instances overlapping" and our trimmed fuse's final fuse declines as well. OCCT's own fuse_trimmed
+  fails there (volumes don't add up) and OCCT runs the plain fuse. Ours now does the same: rust_fuse_trimmed failing
+  -> rust_boolean plain (boolean.cpp, the checked branch). Taken, equivalent to OCCT (0 records apart, volume
+  1.8e-9 off the recorded one), 222 ms against OCCT's 472. The shared-vertex rule ("a shared shape OCCT may keep or
+  remake") is unchanged: the plain fuse doesn't trip it here. T1
+  bool_patterns::pattern_copies_overlapping_one_another_fused_as_occt. On PASS: land.sh from bool2 (branch bool2-rings).
+- **The knife's 343b971e (1.5 s, not done):** the chamfer tool's B-spline edges lie within 0.5 um of the blade's faces
+  (on_tol 0.2 um, grey band 0.8 um); OCCT takes them as on. Taking them so (X_NEARON in
+  /root/bool2-scratch/knife-nearon-wip.patch: all 7 samples within the grey band -> on) gets to "a non-manifold
+  result". Ours keeps the target's B-spline side face 4 but drops its extruded neighbour face 3, so their shared edge
+  19 is used once. OCCT keeps the extrusion (its f8, bounded by e40 / e41). There the tool's and the target's B-spline
+  faces run 0.03 mm apart and nearly tangent: a classification problem. Recording vibe4 ~/tmp/bool2/hk.
+- **c2-extension-spring's 84884726 (0.23-0.53 s):** "a short section from a corner" is bool's deliberate decline.
+  OCCT's builder takes a 10-100 tol stub from a corner to a branch point into the vertex; ours doesn't model that.
+  Recording vibe4 ~/tmp/bool2/es.
+- **After those:** c2-fan-blade-sweep 07831a00 (0.51 s, non-manifold), cf-setback-fillet's five sheet fuses ("a sheet
+  of shells"), the sheet-metal documents' "coplanar sheets" (many, under 15 ms each).
 - **Done before:** (1) a fast gate, `tools/bool/gate.sh <branch>` (below); (2) spheres and tori in our Boolean:
   learning-center-michael's ring cut (lcm 41701bb2) and Fillet 2's ball / torus cut (f71e381d, vibe4
   ~/agents/bool-corpora/mf2), which `fillet_by_tools` (features.cpp) sends straight to OCCT (`others`). cf-surface-pattern's
