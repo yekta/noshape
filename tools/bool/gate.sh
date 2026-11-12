@@ -19,7 +19,13 @@
 # case at a time, against the night before: bool2's cron at 04:30 UTC (lead 11-12). Its verdict line goes to
 # /tmp/lead/kall-status and /root/<caller>-scratch/kall-nightly.log, a FAIL also to /root/bool-scratch/KALL-FAIL.
 set -uo pipefail
-here=$(cd "$(dirname "$0")" && pwd)
+# (Run from a copy: bash reads a script as it goes, and an edit to the checkout mid-gate broke one run.)
+if [ -z "${GATE_HERE:-}" ]; then
+  GATE_HERE=$(cd "$(dirname "$0")" && pwd); export GATE_HERE
+  copy=$(mktemp /tmp/bool-gate-XXXXXX.sh); cp "$0" "$copy"; exec bash "$copy" "$@"
+fi
+rm -f "$0"
+here=$GATE_HERE
 repo=$(git -C "$here" rev-parse --show-toplevel)
 caller=$(basename "$repo")
 [ $# -ge 1 ] || { sed -n '2,13p' "$0"; exit 2; }
