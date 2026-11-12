@@ -417,6 +417,11 @@ mod tests {
         let b1 = names(&mut ctx);
         assert_eq!(b1.last().map(String::as_str), Some("Extrude 3"), "B1: {b1:?}");
         assert_eq!(b1[..b1.len() - 2], main[..], "B1 from Main's head: {b1:?}");
+        // Its hole goes through Part 1, as live's builder makes it (the direction given: std's edit logic flips a Remove on
+        // a plane away from the part behind it, ver-switch-workspace-edit's Extrude 3 then cut nothing and had no
+        // appearance item).
+        let volume = call(&mut ctx, "query_mass_properties", json!({ "parts": ["Part 1"] })).unwrap()["volume"].as_f64().unwrap();
+        assert!((volume - (12000.0 - std::f64::consts::PI * 9.0 * 10.0)).abs() < 1.0, "B1's Part 1 with its Ø6 hole: {volume} mm³");
         let _ = std::fs::remove_dir_all(dir);
     }
 
