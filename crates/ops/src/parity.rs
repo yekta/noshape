@@ -3940,7 +3940,16 @@ impl<'a> Translator<'a> {
         self.dimensions(k, &oid, &id, f, problems);
         let after = self.call("sketch_get", json!({ "sketch": id }))?;
         let moved = sketch_moved(&before, &after);
-        if moved > 1e-7 {
+        // Kept when it gives more of live's regions (its sketch bodies file) than the stored geometry did: that was
+        // stale (rack-pinion's Sketch 6: a 0 cm distance to the rack's end, stored 1 mm short of it).
+        let live_regions = self.live_region_areas(&oid);
+        let regions_as_live = |g: &Value| {
+            let k = per_unit(&g["units"]);
+            let ours: Vec<f64> = g["regions"].as_array().into_iter().flatten().filter_map(|r| r["area"].as_f64()).map(|a| a * k * k).collect();
+            live_regions.iter().filter(|l| ours.iter().any(|a| (a - **l).abs() <= 1e-4 * l.max(1e-9))).count()
+        };
+        let keep = !live_regions.is_empty() && regions_as_live(&after) > regions_as_live(&before);
+        if moved > 1e-7 && !keep {
             // Undone back to the edit before them (deleting them would leave
             // the points moved; some calls make no edit, so not by count).
             let mut undone = 0;
@@ -3954,6 +3963,14 @@ impl<'a> Translator<'a> {
         let st = self.call("feature_list", json!({}))?;
         let row = st["features"].as_array().into_iter().flatten().find(|x| x["id"] == id).cloned().unwrap_or_default();
         Ok((id, row["status"].as_str().unwrap_or("Ok").to_string(), row["message"].as_str().map(str::to_string)))
+    }
+
+    /// The areas of live's regions of sketch `oid` (its sketch bodies file), m².
+    fn live_region_areas(&self, oid: &str) -> Vec<f64> {
+        let mut out: Vec<f64> = self.refs.values().filter(|r| r.sketch_file && r.kind == "SKETCH_REGION" && r.sketch_of.as_deref() == Some(oid)).filter_map(|r| r.measure).collect();
+        out.sort_by(f64::total_cmp);
+        out.dedup();
+        out
     }
 
     /// A text entity as the Text tool makes it: its first baseline's start,
@@ -5797,6 +5814,48 @@ fn row_major(m: glam::DMat4) -> Vec<f64> {
     vec![c[0], c[4], c[8], c[12], c[1], c[5], c[9], c[13], c[2], c[6], c[10], c[14], c[3], c[7], c[11], c[15]]
 }
 
+/// A root mate whose status isn't live's: how far each of our two connectors lies from live's `mateConnectorCS` (its
+/// `matedCS` carries the mate's offset and flip, live 2423), in its part's own coordinates and live's order, and the
+/// two as ours solved them.
+fn mate_ends_off(ctx: &mut Ctx, live_root: &Value, name: &str) -> Option<String> {
+    use glam::DVec3;
+    use noshape_model::assembly::MateConnectorRef;
+    use noshape_model::assembly::eval::matrix_frame;
+    let live = values(&live_root["features"]).into_iter().find(|f| f["featureData"]["name"] == name)?;
+    let v3 = |v: &Value| f3(v).map(DVec3::from);
+    let ends: Vec<(DVec3, DVec3)> = live["featureData"]["matedEntities"].as_array()?.iter().filter_map(|e| Some((v3(&e["mateConnectorCS"]["origin"])?, v3(&e["mateConnectorCS"]["zAxis"])?))).collect();
+    let od = ctx.doc(None).ok()?;
+    let tab = od.doc().tabs.iter().find(|t| t.name == "Assembly 1")?.id;
+    let asm = match &od.doc().tab(tab)?.content {
+        noshape_model::document::TabContent::Assembly(a) => (**a).clone(),
+        _ => return None,
+    };
+    let m = asm.mates.iter().find(|m| m.name == name)?.clone();
+    let units = od.doc().settings.units;
+    let r = od.evaluate_assembly(&asm, &Default::default());
+    let local = |c: &MateConnectorRef| -> Option<(DVec3, DVec3)> {
+        let path: Vec<_> = std::iter::once(c.instance).chain(c.path.iter().copied()).collect();
+        let o = r.occurrences.iter().find(|o| o.path == path)?;
+        let f = matrix_frame(&o.transform).inverse().mul(&r.connector_world(c, &units)?);
+        Some((f.origin, f.z()))
+    };
+    // (Off along live's Z, then within its plane.)
+    let off = |o: Option<(DVec3, DVec3)>, l: Option<&(DVec3, DVec3)>| match (o, l) {
+        (Some(o), Some(l)) => {
+            let d = o.0 - l.0;
+            let along = d.dot(l.1.normalize_or_zero());
+            format!("{:.3} / {:.3} mm {:.0}°", along * 1e3, (d - l.1.normalize_or_zero() * along).length() * 1e3, o.1.angle_between(l.1).to_degrees())
+        }
+        _ => "-".to_string(),
+    };
+    // Ours as solved: the angle between the two ends' Z axes, the mate's Z alignment (live's primaryAxisAlignment
+    // false: aligned) and its state.
+    let world = |c: &MateConnectorRef| r.connector_world(c, &units);
+    let angle = world(&m.a).zip(world(&m.b)).map_or("-".to_string(), |(a, b)| format!("{:.1}°, b {:.3} mm along a's Z", a.z().angle_between(b.z()).to_degrees(), (b.origin - a.origin).dot(a.z()) * 1e3));
+    let state = r.mates.iter().find(|s| s.id == m.id).and_then(|s| s.message.clone()).unwrap_or_else(|| "ok".into());
+    Some(format!("ends from live's (along Z / in plane): a {}, b {}; ours solved: Z axes {angle} apart, {}, {state}", off(local(&m.a), ends.first()), off(local(&m.b), ends.get(1)), if m.flip_primary { "aligned" } else { "flipped" }) + &m.offset_z.as_ref().map(|z| format!(", offset z {}", z.text)).unwrap_or_default())
+}
+
 fn values(v: &Value) -> Vec<&Value> {
     v.as_array().into_iter().flatten().collect()
 }
@@ -6672,7 +6731,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         if ok == live_ok {
             res.mates_matching += 1;
         } else {
-            res.differences.push(format!("{name}: {}, live {}", if ok { "OK".to_string() } else { format!("error ({})", m["message"].as_str().unwrap_or("")) }, states[id.as_str()]["featureStatus"].as_str().unwrap_or("?")));
+            let ends = mate_ends_off(&mut *placer.ctx, root, name).map(|e| format!("; {e}")).unwrap_or_default();
+            res.differences.push(format!("{name}: {}, live {}{ends}", if ok { "OK".to_string() } else { format!("error ({})", m["message"].as_str().unwrap_or("")) }, states[id.as_str()]["featureStatus"].as_str().unwrap_or("?")));
         }
     }
     // Inside the subassemblies (not scored, their mates' placements are the occurrences'): ours that fail where
