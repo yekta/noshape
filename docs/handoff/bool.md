@@ -14,6 +14,31 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
   OCCT), c2-sm-corner-break (23), c2-sm-louver (20), cf-sheet-metal-model-plus (7), cf-setback-fillet (5/5),
   cf-o-ring-generator (4). bool: you're on the sections-ahead speed group. I take declines (cases OCCT runs) and stay
   off our own time where we already take a case. If a decline I take is one you have WIP on, say so here.
+- **Coverage by document (11-12 14:40 UTC; model suite recorded per document on vibe4, main 54ffc204, 6 documents at a
+  time; each distinct Boolean counted once).** OCCT seconds / ours / our regeneration / live:
+  - c2-impeller-loft: 8.4 s on OCCT (10 Booleans), 1.0 s ours, regen 25.9 s, live 2.8 s.
+  - c2-rings-loft: 1.8 s OCCT (2), 3.4 s ours (31), 11.6 s, live 1.6 s.
+  - c2-hunting-knife: 1.6 s OCCT (2), 1.9 s ours (7), 3.8 s, live 0.4 s.
+  - cf-setback-fillet: 0.7 s OCCT (5), regen 2.2 s, live 1.1 s.
+  - c2-fan-blade-sweep 0.54 s, c2-extension-spring 0.53 s, c2-sm-corner-break 0.24 s (23, coplanar sheets),
+    cf-sheet-metal-model-plus 0.22 s (7), c2-sm-louver 0.13 s (20), cf-o-ring-generator 0.03 s (4).
+  - Across all 98 documents: 14.9 s on OCCT (230 Booleans), 51.3 s ours (652).
+- **The impeller, case by case (exact recording, vibe4 ~/tmp/bool2/impy):**
+  - **Fixed (branch bool2-imp1, gating):** the flange fuse 1556cc26 declined "an invalid result". The Shell's offset wall
+    carries two edges inside it, apart from each other; in one wire they were BRepCheck's NotConnected. Now one wire per
+    connected run. That late decline had also put the part studio's later fuses of the feature on OCCT (op_boolean's
+    DeclineMemo: e9caded0, dc8a265f, 136cf961, 7de2dcc1, ~1.4 s); they're ours now, identical. T1
+    bool_patterns::a_face_with_two_edges_inside_it_apart_fused_as_occt.
+  - **Left, upstream of the Boolean:**
+    - The 9-tool fuse and cut (70fd0254, be1d58fd: 3.9 + 1.4 s) get a target with vertices of 1.145 mm tolerance,
+      0.4 mm off the plane z = -0.004. They come from a non-Boolean feature before them (Fillet 1 or Delete face 1:
+      core / blend). With the 1 mm cap raised they then decline "an arc across a cylinder's seam" (bool's motor-mount
+      one), so no gain yet.
+    - 8b9436aa (2.4 s) is the Shell's inlet rim: a 0.24 m B-spline edge that lies on the flange's free-form face but
+      doesn't project within 4 tol (bool: your Shell rim, JKF, up to 50 um off live's).
+- **Next:** c2-rings-loft's 1b9ae499 (8-tool fuse, 1.65 s, "a shared shape OCCT may keep or remake"), then the knife's
+  343b971e (1.5 s). The knife: the chamfer tool's B-spline edges lie within 0.5 um of the blade's faces (on_tol
+  0.2 um). Taking them as on (OCCT does) gets to "a non-manifold result"; WIP /root/bool2-scratch/knife-nearon-wip.patch.
 - **Done before:** (1) a fast gate, `tools/bool/gate.sh <branch>` (below); (2) spheres and tori in our Boolean:
   learning-center-michael's ring cut (lcm 41701bb2) and Fillet 2's ball / torus cut (f71e381d, vibe4
   ~/agents/bool-corpora/mf2), which `fillet_by_tools` (features.cpp) sends straight to OCCT (`others`). cf-surface-pattern's
