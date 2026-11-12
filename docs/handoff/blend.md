@@ -70,6 +70,28 @@ arcs (B-splines 57.7 mm²), the 2.04 mm lines and the corners (tori 8.1, cylinde
 cliff / roll-over), and the 4.000 mm wall is consumed. core can't take this one quickly; it's yours when the knife allows,
 unless the lead says otherwise.
 
+## 11-12 23:06 UTC: the knife's Fillet 3 as live (branch blend-knifetip a9e4c9369, pairs queued on vibe7)
+- **Rolling balls** (`blend_section::rolling_ball_blend`, detail.rs `fillet`): when OCCT's fillet leaves one edge's round
+  in several faces (`split_blends`: c2-hunting-knife's tip pinched at its apex, its corners split where the round runs
+  past the chain's open end), the chain is rebuilt of exact balls, one tool per edge (`ball_tools`): each section's
+  ball solved on the true faces (`Support`: planes and cylinders run on past a free end; other faces as they are), its
+  sides on the faces to the edge's point (lines on planes, arcs on curved faces) so the direct build takes them as
+  strips; lines between planes one section extruded (live's cylinders); lofts with a section per 0.05 rad of turn;
+  where two edges meet one shared ball, the one touching the edge between the faces that change (live's circle KjpB:
+  19-44 um off the vertex's plane, which moved 0.015-0.034 mm2 between faces); past a free end the ball rolls on until
+  off the part. Built by `k::blend_direct` only (a boolean by these tools fails or leaves slivers: declined, OCCT's kept).
+- Contacts between a plane and a cylinder are ellipses (`plane_cylinder_contacts`; kernel `canonical_edges` rebuilds
+  the B-spline edges on them): live's 12 ellipses on the knife.
+- c2-hunting-knife 20 -> 24 of 52; Fillet 3's faces vs live: tips 7.829009 (7.829014), corners 1.003963 / 1.004665
+  (1.004015 / 1.004703), coves 10.855977 (10.855988), straight rounds equal to 6 decimals; live's corner grids (out2.json)
+  within 0.06 um inside the faces. Fillet 3 ~620 ms (live 11; OCCT's attempt ~110-170 of it, the tools built in
+  parallel).
+- **The knife's next difference (feature 24, the first with live volumes), not blend's:** volume 9301.30 mm3 vs live
+  9306.25, 3 lines that are live's B-splines; the centroid shift puts the missing volume at x ~ -84 (the handle), and
+  the handle's loft face (live JZa 2443.957 mm2, ours 2443.869) is ~2 um inside live's: Loft 3 / Bridging curve 1.
+- **Chamfer 2 (mine, next):** live's two rim chamfers of the x = 30 hole differ (JiG 19.444938, JiC 18.856481 mm2;
+  ours 19.160723 each): an Offset and angle chamfer's offset face seems to follow each edge's direction, ours follows
+  face order. Live capture requested (REQUESTS.md 22:57).
 
 ## 11-12 20:28 UTC: impeller Fillet 1 speed, rings-loft Chamfer 3, the knife's Fillet 3 (michael parked)
 - blend-impspeed (queued 3c52dc84): the tube-end round splits its faces in 2D (`k::split_on`, BRepFeat_SplitShape: each
