@@ -146,7 +146,7 @@ mod tests {
     fn a_reference_to_an_obsoleted_release_is_obsolete() {
         let tab = noshape_model::document::TabId(3);
         let item = |rev: &str| ReleaseItem { tab, part: None, name: "Assembly 1".into(), kind: ItemKind::Assembly, part_number: "ASM-1".into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None };
-        let pkg = |kind, version: Option<&str>, items| Package { id: 0, kind, name: "r".into(), notes: String::new(), created: 0, version: version.map(String::from), items, re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None };
+        let pkg = |kind, version: Option<&str>, items| Package { id: 0, kind, name: "r".into(), notes: String::new(), created: 0, version: version.map(String::from), items, re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None, decided_by: None, comments: Vec::new() };
         let mut log = ReleaseLog::default();
         log.record(pkg(PackageKind::Release, Some("v1"), vec![item("A")]));
         let t = tab.to_string();

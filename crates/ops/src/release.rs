@@ -269,15 +269,35 @@ pub fn submit(session: &mut Session, pkg: Package) -> anyhow::Result<Package> {
 /// Approve a Pending candidate: released at the version made when it was submitted.
 pub fn approve(session: &mut Session, name: &str) -> anyhow::Result<Package> {
     let mut log = release_log(session);
-    let Some(pkg) = log.take_pending(name) else { anyhow::bail!("no pending release candidate `{name}`") };
+    let Some(mut pkg) = log.take_pending(name) else { anyhow::bail!("no pending release candidate `{name}`") };
+    pkg.decided_by = Some(noshape_store::local_user_name());
     save_log(session, &log)?;
     record_released(session, pkg)
+}
+
+/// Discard a Pending or Rejected candidate (its creator's "Discard Release candidate"): it stays, Discarded.
+pub fn discard(session: &mut Session, name: &str) -> anyhow::Result<()> {
+    let mut log = release_log(session);
+    if !log.discard(name) {
+        anyhow::bail!("no pending or rejected release candidate `{name}`");
+    }
+    save_log(session, &log)
+}
+
+/// A comment on a draft, candidate or release (the dialog's Comments; local, no notifications).
+pub fn comment(session: &mut Session, name: &str, text: &str) -> anyhow::Result<()> {
+    let mut log = release_log(session);
+    let created = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+    if !log.comment(name, noshape_model::release::Comment { author: noshape_store::local_user_name(), created, text: text.to_string() }) {
+        anyhow::bail!("no release, draft or candidate `{name}`");
+    }
+    save_log(session, &log)
 }
 
 /// Reject a Pending candidate: it stays, Rejected; its items are released by another candidate.
 pub fn reject(session: &mut Session, name: &str) -> anyhow::Result<()> {
     let mut log = release_log(session);
-    if !log.reject(name) {
+    if !log.reject(name, &noshape_store::local_user_name()) {
         anyhow::bail!("no pending release candidate `{name}`");
     }
     save_log(session, &log)

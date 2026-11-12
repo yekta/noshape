@@ -1274,7 +1274,7 @@ mod tests {
         use crate::release::{ItemKind, Package, PackageKind, ReleaseItem, ReleaseLog};
         let tab = crate::document::TabId(7);
         let item = |rev: &str| ReleaseItem { tab, part: None, name: "Drawing 1".into(), kind: ItemKind::Drawing, part_number: "DRW-1".into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None };
-        let pkg = |id: u64, kind: PackageKind, rev: &str, notes: &str, day: i64| Package { id, kind, name: format!("R{id}"), notes: notes.into(), created: day * 86_400_000, version: None, items: vec![item(rev)], re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None };
+        let pkg = |id: u64, kind: PackageKind, rev: &str, notes: &str, day: i64| Package { id, kind, name: format!("R{id}"), notes: notes.into(), created: day * 86_400_000, version: None, items: vec![item(rev)], re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None, decided_by: None, comments: Vec::new() };
         let mut log = ReleaseLog::default();
         log.packages.push(pkg(1, PackageKind::Release, "A", "Initial release", 20744));
         log.packages.push(pkg(2, PackageKind::Release, "B", "Hole moved", 20745));

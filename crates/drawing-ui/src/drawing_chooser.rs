@@ -1234,7 +1234,7 @@ mod released_tests {
     }
 
     fn package(id: u64, kind: PackageKind, version: Option<&str>, items: Vec<ReleaseItem>) -> Package {
-        Package { id, kind, name: format!("R{id}"), notes: String::new(), created: 0, version: version.map(String::from), items, re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None }
+        Package { id, kind, name: format!("R{id}"), notes: String::new(), created: 0, version: version.map(String::from), items, re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None, decided_by: None, comments: Vec::new() }
     }
 
     /// View released items: parts and assemblies, newest release first;

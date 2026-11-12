@@ -7047,6 +7047,7 @@ fn release_submit_approve_and_reject() {
     assert!(try_call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0100" })).is_err(), "not released while pending");
     let a = call(&mut ctx, "release_approve", json!({ "name": "R1" }));
     assert_eq!(a["state"], "Released", "{a}");
+    assert_eq!(a["approved_by"], me.as_str(), "Approved by …: {a}");
     assert_eq!(a["version"], r["version"], "released at the version made at Submit: {a}");
     let rh = call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0100" }));
     assert_eq!(rh["revisions"][0]["revision"], "A", "{rh}");
@@ -7056,8 +7057,16 @@ fn release_submit_approve_and_reject() {
     assert_eq!(call(&mut ctx, "release_reject", json!({ "name": "R2" }))["state"], "Rejected");
     let list = call(&mut ctx, "release_drafts", json!({}));
     assert_eq!(list["candidates"][0]["state"], "Rejected", "{list}");
+    assert_eq!(list["candidates"][0]["decided_by"], me.as_str(), "Rejected by …: {list}");
     let e = try_call(&mut ctx, "release_approve", json!({ "name": "R2" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("name"));
+    // Comments, then Discard: it stays, Discarded.
+    call(&mut ctx, "release_comment", json!({ "name": "R2", "text": "Wrong hole size." }));
+    call(&mut ctx, "release_discard", json!({ "name": "R2" }));
+    let list = call(&mut ctx, "release_drafts", json!({}));
+    assert_eq!(list["candidates"][0]["state"], "Discarded", "{list}");
+    assert_eq!(list["candidates"][0]["comments"][0]["text"], "Wrong hole size.", "{list}");
+    assert_eq!(try_call(&mut ctx, "release_discard", json!({ "name": "R2" })).unwrap_err().param.as_deref(), Some("name"));
     // Without approvers, Release releases at once.
     let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R3" }));
     assert_eq!(r["state"], "Released", "{r}");

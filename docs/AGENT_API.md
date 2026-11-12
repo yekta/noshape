@@ -336,7 +336,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_edit_joint`](#sheetmetal_edit_joint), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
-- **release**: [`release_create`](#release_create), [`release_approve`](#release_approve), [`release_reject`](#release_reject), [`release_drafts`](#release_drafts), [`release_draft_delete`](#release_draft_delete), [`release_revision_history`](#release_revision_history)
+- **release**: [`release_create`](#release_create), [`release_approve`](#release_approve), [`release_reject`](#release_reject), [`release_discard`](#release_discard), [`release_comment`](#release_comment), [`release_drafts`](#release_drafts), [`release_draft_delete`](#release_draft_delete), [`release_revision_history`](#release_revision_history)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image), [`render_print`](#render_print), [`render_file_page`](#render_file_page)
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
@@ -6927,6 +6927,41 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `name` | string | required | The candidate's release name. |
+
+#### release_discard
+
+Discard a Pending or Rejected release candidate (edits the document (one undoable history entry); deletes or overwrites).
+
+Discard Release candidate: "The Release candidate will be discarded and all items will be returned to their initial states." It stays in Release drafts, Discarded; its part numbers are no longer pending.
+
+Examples:
+
+```json
+{"name": "Release 3"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `name` | string | required | The candidate's release name. |
+
+#### release_comment
+
+Comment on a release draft, candidate or release (edits the document (one undoable history entry)).
+
+The Release dialog's Comments: `text` added by the local user (kept with the document; no notifications).
+
+Examples:
+
+```json
+{"name": "Release 3", "text": "Checked against the drawing."}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `name` | string | required | The draft's, candidate's or release's name. |
+| `text` | string | required | The comment. |
 
 #### release_drafts
 

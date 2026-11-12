@@ -892,6 +892,10 @@ pub struct ReleaseDialog {
     people_menu: Option<bool>,
     /// A submitted candidate under review: its state (Pending: Approve / Reject).
     candidate: Option<noshape_model::release::CandidateState>,
+    /// Comments (the dialog's Comments view: "Back to Release properties" returns), and the new comment's field.
+    comments: Vec<noshape_model::release::Comment>,
+    comments_view: bool,
+    comment_input: Entity<TextareaState>,
     /// Item search and the type filter (help: "Searching and filtering the
     /// object list"): empty = every type.
     search: Entity<InputState>,
@@ -962,6 +966,7 @@ impl ReleaseDialog {
             .collect();
         let name = cx.new(|cx| InputState::new(window, cx).default_value(name));
         let notes = cx.new(|cx| TextareaState::new(window, cx).rows(3).default_value(notes));
+        let comment_input = cx.new(|cx| TextareaState::new(window, cx).rows(3));
         subs.push(cx.subscribe(&notes, |this: &mut Self, st, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change) {
                 this.record_typing(st.entity_id(), cx);
@@ -980,7 +985,7 @@ impl ReleaseDialog {
                 cx.notify();
             }
         }));
-        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, conditions, _subs: subs }
+        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, comments: Vec::new(), comments_view: false, comment_input, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, conditions, _subs: subs }
     }
 
     /// A new part number suggests its next revision (unless one was typed).
@@ -1268,6 +1273,8 @@ impl ReleaseDialog {
             approvers: self.approvers.clone(),
             observers: self.observers.clone(),
             state: None,
+            decided_by: None,
+            comments: self.comments.clone(),
         }
     }
 
@@ -1309,6 +1316,78 @@ impl ReleaseDialog {
             return false;
         }
         true
+    }
+
+    /// Discard Release candidate (its creator): Discarded, its items back to their states before it.
+    fn discard(&mut self, cx: &mut Context<Self>) {
+        let name = self.name.read(cx).value().trim().to_string();
+        let r = self.doc.update(cx, |doc, cx| {
+            let r = noshape_ops::release::discard(&mut doc.session, &name);
+            doc.reloaded(cx);
+            r
+        });
+        match r {
+            Ok(()) => self.candidate = Some(noshape_model::release::CandidateState::Discarded),
+            Err(e) => self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}")))),
+        }
+        cx.notify();
+    }
+
+    /// Add the typed comment: kept with the candidate (saved with a draft, or at once for a saved one).
+    fn add_comment(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let text = self.comment_input.read(cx).value().trim().to_string();
+        if text.is_empty() {
+            return;
+        }
+        let created = chrono::Utc::now().timestamp_millis();
+        self.comments.push(noshape_model::release::Comment { author: noshape_store::local_user_name(), created, text: text.clone() });
+        self.comment_input.update(cx, |s, cx| s.set_value("", window, cx));
+        let name = self.name.read(cx).value().trim().to_string();
+        let saved = self.package.is_some() || self.applied;
+        if saved && !name.is_empty() {
+            let r = self.doc.update(cx, |doc, _| noshape_ops::release::comment(&mut doc.session, &name, &text));
+            if let Err(e) = r {
+                self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+            }
+        }
+        cx.notify();
+    }
+
+    /// The Comments view: each comment (author, time, text), a field and its button, and "Back to Release properties".
+    fn render_comments(&self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let rows = self.comments.iter().map(|c| {
+            v_flex()
+                .py(px(6.))
+                .border_b_1()
+                .border_color(gpui_kit::rgb(GRID))
+                .child(h_flex().gap_2().text_size(px(13.)).child(div().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(c.author.clone())).child(div().text_color(pal.text_muted).child(crate::start_library::format_onshape_time(c.created))))
+                .child(div().text_size(px(14.)).text_color(pal.text).child(c.text.clone()))
+        });
+        v_flex()
+            .h(px(380.))
+            .px(px(12.))
+            .py(px(10.))
+            .gap(px(8.))
+            .child(
+                div()
+                    .id("rel-comments-back")
+                    .map(|d| crate::ui_script::mark(d, || "button:Back to Release properties".into()))
+                    .cursor_pointer()
+                    .text_size(px(13.))
+                    .text_color(gpui_kit::rgb(0x094174))
+                    .hover(|d| d.underline())
+                    .child("Back to Release properties")
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.comments_view = false;
+                        cx.notify();
+                    })),
+            )
+            .child(div().text_size(px(16.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Comments"))
+            .child(v_flex().id("rel-comments").flex_1().overflow_y_scroll().children(rows))
+            .child(div().map(|d| crate::ui_script::mark(d, || "field:Comment".into())).child(Textarea::new(&self.comment_input)))
+            .child(h_flex().justify_end().child(os::primary_button("rel-comment-add", "Comment").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.add_comment(window, cx)))))
+            .into_any_element()
     }
 
     /// The approver's Approve (released at the candidate's version) or Reject (kept, Rejected).
@@ -2015,18 +2094,8 @@ impl Render for ReleaseDialog {
                                         }
                                     })))
                                     .child(item("rel-draft-delete", "Delete draft").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                                        let name = draft.clone();
-                                        let r = this.doc.update(cx, |doc, cx| {
-                                            let mut log = release_log(doc);
-                                            log.delete_draft(&name);
-                                            let r = save_log(doc, &log);
-                                            cx.notify();
-                                            r
-                                        });
-                                        if let Err(e) = r {
-                                            this.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
-                                        }
-                                        close(window, cx);
+                                        this.draft_menu = false;
+                                        confirm_delete_draft(this.doc.clone(), draft.clone(), window, cx);
                                     }))),
                             )
                         }),
@@ -2055,11 +2124,19 @@ impl Render for ReleaseDialog {
                         }))
                     });
             }
-            // A Pending candidate's approver (the local user): Approve or Reject (Onshape's standard workflow).
+            // A Rejected candidate: its creator can discard it.
+            Mode::Review if self.candidate == Some(noshape_model::release::CandidateState::Rejected) => {
+                let view = cx.entity();
+                footer = footer.child(os::secondary_button("rel-discard", "Discard", cx).on_click(move |_, window, cx| confirm_discard(view.clone(), window, cx)));
+            }
+            // A Pending candidate's approver (the local user): Approve or Reject (Onshape's standard workflow); its
+            // creator can discard it.
             Mode::Review if self.candidate == Some(noshape_model::release::CandidateState::Pending) => {
                 let me = noshape_store::local_user_name();
                 let approver = self.approvers.contains(&me);
+                let view = cx.entity();
                 footer = footer
+                    .child(os::secondary_button("rel-discard", "Discard", cx).on_click(move |_, window, cx| confirm_discard(view.clone(), window, cx)))
                     .child(button("rel-reject", "Reject", 0xbd3039, approver).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         if this.decide(false, cx) {
                             close(window, cx);
@@ -2093,6 +2170,13 @@ impl Render for ReleaseDialog {
             Mode::Review => {}
         }
         footer = footer.child(os::cancel_button("rel-close", "Close", cx).on_click(move |_, window, cx| close(window, cx)));
+        let decision = match (self.candidate, self.package.as_ref().and_then(|p| p.decided_by.clone())) {
+            (Some(noshape_model::release::CandidateState::Rejected), Some(by)) => Some(format!("Rejected by {by}")),
+            (Some(noshape_model::release::CandidateState::Discarded), _) => Some("Discarded".to_string()),
+            (Some(noshape_model::release::CandidateState::Pending), _) => Some("Pending".to_string()),
+            (None, Some(by)) if self.mode == Mode::Review => Some(format!("Approved by {by}")),
+            _ => None,
+        };
         let title = match self.mode {
             Mode::Release if self.applied => format!("Review Release: {}", self.name.read(cx).value()),
             Mode::Release => "Create Release candidate".into(),
@@ -2134,15 +2218,66 @@ impl Render for ReleaseDialog {
                     .child(div().text_size(px(20.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).whitespace_nowrap().child(title))
                     // Help: Refresh "to make sure you have the latest iteration of the objects".
                     .when(self.mode == Mode::Release, |d| d.child(boxed("rel-refresh".into(), "refresh", "Refresh", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.refresh(window, cx)))))
+                    // "Approved by …" / "Rejected by …" (Onshape's strings), or the candidate's state.
+                    .children(decision.map(|t| div().text_size(px(13.)).text_color(pal.text_muted).whitespace_nowrap().child(t)))
                     .child(div().flex_1())
                     .children(attention_label)
                     .children(attention_filter)
+                    .child(os::secondary_button("rel-comments-open", "Comments", cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.comments_view = !this.comments_view;
+                        cx.notify();
+                    })))
                     .child(overflow),
             )
-            .child(v_flex().border_t_1().border_b_1().border_color(gpui_kit::rgb(GRID)).child(header).children(filter_row).child(list))
-            .child(form)
+            .when(!self.comments_view, |d| d.child(v_flex().border_t_1().border_b_1().border_color(gpui_kit::rgb(GRID)).child(header).children(filter_row).child(list)).child(form))
+            .when(self.comments_view, |d| d.child(div().border_t_1().border_color(gpui_kit::rgb(GRID)).child(self.render_comments(cx))))
             .child(h_flex().h(px(56.)).px(px(12.)).gap(px(8.)).border_t_1().border_color(gpui_kit::rgb(os::MODAL_DIVIDER)).child(left).child(div().flex_1().child(footer)))
     }
+}
+
+/// "Discard Release candidate" (Onshape's strings): Discard | Cancel.
+fn confirm_discard(view: Entity<ReleaseDialog>, window: &mut Window, cx: &mut App) {
+    window.open_dialog(cx, move |dialog, _, cx| {
+        let view = view.clone();
+        os::modal(dialog, "Discard Release candidate", 600.)
+            .child(os::modal_body().child(div().text_size(px(14.)).text_color(p().text).child("The Release candidate will be discarded and all items will be returned to their initial states.")))
+            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Discard"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .on_ok(move |_, _, cx| {
+                view.update(cx, |t, cx| t.discard(cx));
+                true
+            })
+    });
+}
+
+/// "Delete release candidate draft?" (Onshape's strings): "This will permanently delete **name** and cannot be undone."
+/// Delete | Cancel; Delete also closes the draft's dialog.
+fn confirm_delete_draft(doc: Entity<DocModel>, name: String, window: &mut Window, cx: &mut App) {
+    window.open_dialog(cx, move |dialog, _, cx| {
+        let (doc, n) = (doc.clone(), name.clone());
+        let text = format!("This will permanently delete {name} and cannot be undone.");
+        let bold = 27..27 + name.len();
+        os::modal(dialog, "Delete release candidate draft?", 600.)
+            .child(os::modal_body().child(div().text_size(px(14.)).text_color(p().text).child(StyledText::new(text).with_highlights([(bold, FontWeight::BOLD.into())]))))
+            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Delete"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .on_ok(move |_, window, cx| {
+                let r = doc.update(cx, |doc, cx| {
+                    let mut log = release_log(doc);
+                    log.delete_draft(&n);
+                    let r = save_log(doc, &log);
+                    cx.notify();
+                    r
+                });
+                if let Err(e) = r {
+                    doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+                }
+                // The draft's own dialog goes too (the confirmation closes itself).
+                let w = window.window_handle();
+                cx.defer(move |cx| {
+                    let _ = w.update(cx, |_, window, cx| window.close_dialog(cx));
+                });
+                true
+            })
+    });
 }
 
 /// The release dialogs' modal: no title bar (the dialog draws its own
@@ -2169,6 +2304,9 @@ pub fn open_review(doc: Entity<DocModel>, package: &Package, window: &mut Window
     let package = package.clone();
     let view = cx.new(|cx| {
         let mut d = ReleaseDialog::new(doc, Mode::Review, package.items.clone(), package.name.clone(), package.notes.clone(), window, cx);
+        d.comments = package.comments.clone();
+        d.approvers = package.approvers.clone();
+        d.observers = package.observers.clone();
         d.package = Some(package);
         d
     });
@@ -2190,6 +2328,7 @@ pub fn open_draft(doc: Entity<DocModel>, draft: &Package, window: &mut Window, c
         d.draft = Some(name);
         d.approvers = draft.approvers.clone();
         d.observers = draft.observers.clone();
+        d.comments = draft.comments.clone();
         d
     });
     window.open_dialog(cx, move |dialog, _, cx| release_dialog_modal(dialog, &view, cx));
@@ -2204,6 +2343,7 @@ pub fn open_candidate(doc: Entity<DocModel>, candidate: &Package, window: &mut W
         d.approvers = candidate.approvers.clone();
         d.observers = candidate.observers.clone();
         d.candidate = candidate.state;
+        d.comments = candidate.comments.clone();
         d
     });
     window.open_dialog(cx, move |dialog, _, cx| release_dialog_modal(dialog, &view, cx));

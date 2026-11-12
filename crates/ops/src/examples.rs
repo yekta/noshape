@@ -172,6 +172,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("release_drafts", &[r##"{}"##]),
     ("release_approve", &[r##"{"name": "Release 3"}"##]),
     ("release_reject", &[r##"{"name": "Release 3"}"##]),
+    ("release_discard", &[r##"{"name": "Release 3"}"##]),
+    ("release_comment", &[r##"{"name": "Release 3", "text": "Checked against the drawing."}"##]),
     ("release_draft_delete", &[r##"{"name": "Release 2"}"##]),
     ("material_list", &[r##"{"search": "steel"}"##]),
     ("material_library_update", &[r##"{"tab": "Material Library 1", "path": "/tmp/materials.csv"}"##, r##"{"tab": "Material Library 1", "csv": "Category,Name,Density [kg/m^3]\nMetals,Brass C360,8500\n"}"##]),
