@@ -5,6 +5,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## core, 2026-11-12
+- [ ] P3 STEP-ANALYTIC-REFIT (core; 2026-11-12 15:12 UTC) **Live's STEP import refits geometry; ours keeps the file's** (not
+  imitated, lead 11-12; recorded in case circle recognition ever matters for mates). c2-wire-clip-imported and c2-gamma-imported's
+  PEM FH4-M3-18 / -8 studs: (1) the shank groove's TOROIDAL_SURFACE (major 1.5 mm, minor 0.15 mm, bounded by the r 1.5 mm
+  shank's circles) comes out in live with major 1.4925 mm (x 0.995): face 4.2775 mm², ours 4.1586 as the file; the groove
+  7.5 µm deeper, the part 0.0226 mm³ smaller; its two edges with the shank no longer circles (live "other"). (2) 24 serration
+  edges (0.408 mm), cubic 4-pole B_SPLINE_CURVE_WITH_KNOTS in the file and a plane x cone in geometry (no circle), are CIRCLE in
+  live; ours keep the B-splines (79 circle / 24 other edges, live 101 / 2).
+
+
 ## psui, 2026-11-12 (Part Studio coverage audit, batch 2's erroring features)
 - [ ] P3 OFFSET-CURVE-CURVED-FACE (psui; 2026-11-12 11:50 UTC) **Offset curve on an edge whose first neighbour isn't planar fails**:
   "Offset curve currently supports planar faces only" (`curves.rs` offset_curve; ui-parity offset-curve-new-edit-reedit, the

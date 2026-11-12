@@ -4,6 +4,14 @@ qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA)
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 
+## From core, 2026-11-12 15:12: a documented exception for the PEM imports (lead 11-12)
+Record Import 1 (feature 0) of c2-wire-clip-imported and c2-gamma-imported as a documented exception, so the suite scores their
+other 5 features (tests/parity-models/unscored.json only has `from`, which would leave nothing scored). Reason: "live's STEP
+importer refits the file's geometry (TICKETS P3 STEP-ANALYTIC-REFIT, not imitated, lead 11-12): the PEM FH4 studs' groove torus
+comes out with major radius 1.4925 mm for the file's 1.5 (x 0.995; 0.0226 mm³ less, 0.118 mm² more, its two shank edges not
+circles), and 24 near-straight 0.408 mm B-spline edges as circles; ours keeps the file's geometry".
+
+
 ## Speed gaps 11-11 (qa 07:45; the lead hands them out)
 
 From qa's clean 02:00 vibe5 run (green 6364f3c47, the newest suite run's green; debug as the suite; 1-min load 1.0–2.6 at each
