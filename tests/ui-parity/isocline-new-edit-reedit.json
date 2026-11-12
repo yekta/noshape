@@ -1,6 +1,6 @@
 {
  "name": "isocline-new-edit-reedit",
- "about": "Isocline on the pin's side along Top, then 10°; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
+ "about": "Isocline on the pin's side along the Right plane, then 10°; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
  "area": "psui",
  "source": "psui coverage audit batch 2, 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
  "start": "pin",
@@ -35,7 +35,7 @@
   {
    "do": "click",
    "on": {
-    "plane": "Top"
+    "plane": "Right"
    }
   },
   {

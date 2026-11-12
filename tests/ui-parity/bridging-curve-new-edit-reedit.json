@@ -1,6 +1,6 @@
 {
  "name": "bridging-curve-new-edit-reedit",
- "about": "Bridging curve from the box's front top left corner to its front bottom right one; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
+ "about": "Bridging curve from the box's front top edge (near its left end) to its right bottom edge (near its back end); ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
  "area": "psui",
  "source": "psui coverage audit batch 2, 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
  "start": "curves",
@@ -19,8 +19,8 @@
   {
    "do": "click",
    "on": {
-    "vertex": [
-     0,
+    "edge": [
+     5,
      0,
      10
     ]
@@ -35,9 +35,9 @@
   {
    "do": "click",
    "on": {
-    "vertex": [
+    "edge": [
      40,
-     0,
+     25,
      0
     ]
    }

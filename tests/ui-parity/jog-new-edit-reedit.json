@@ -1,9 +1,9 @@
 {
  "name": "jog-new-edit-reedit",
- "about": "Jog the plate along Sketch 3's line, then 8 mm; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
+ "about": "Jog the plate along Sketch 2's line, then 8 mm; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
  "area": "psui",
  "source": "psui coverage audit batch 2, 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
- "start": "sm-box",
+ "start": "plate-bend",
  "steps": [
   {
    "do": "click",
@@ -37,7 +37,7 @@
    "on": {
     "face": [
      20,
-     35,
+     20,
      2
     ]
    }

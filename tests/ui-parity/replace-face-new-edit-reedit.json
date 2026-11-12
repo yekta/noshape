@@ -1,6 +1,6 @@
 {
  "name": "replace-face-new-edit-reedit",
- "about": "Replace the box's top face with Surface 1, then offset 1 mm; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
+ "about": "Replace the box's front face (y -10) with Surface 2 (y 0), then offset 1 mm; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
  "area": "psui",
  "source": "psui coverage audit batch 2, 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
  "start": "surfaces",
@@ -20,8 +20,8 @@
    "on": {
     "face": [
      40,
-     0,
-     5
+     -10,
+     2.5
     ]
    }
   },
@@ -36,8 +36,8 @@
    "on": {
     "face": [
      10,
-     -10,
-     10
+     0,
+     15
     ]
    }
   },

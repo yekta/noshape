@@ -559,6 +559,40 @@ fn rib_in_l_bracket() {
     assert!(near(v - v0, 0.05 * 0.05 * 0.5 * 0.005, 2e-3), "rib volume {}", v - v0);
 }
 
+/// std ribEditLogic: once a profile is picked, the direction that reaches a part is chosen and Parts filled with it.
+/// Drawn from the base to the wall, the default direction points away from the L's corner.
+#[test]
+fn a_new_ribs_direction_and_parts_come_from_stds_editing_logic() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [(0.0, 0.0), (0.1, 0.0), (0.1, 0.01), (0.01, 0.01), (0.01, 0.1), (0.0, 0.1)];
+    let ids: Vec<_> = pts.iter().map(|p| sk.add_point(DVec2::new(p.0, p.1))).collect();
+    for i in 0..ids.len() {
+        sk.add_line_between(ids[i], ids[(i + 1) % ids.len()]).unwrap();
+    }
+    let s = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let r = t.regions(s)[0].clone();
+    let x = t.extrude(r, "50 mm", "NEW");
+    t.set(x, "symmetric", b(true));
+    let v0 = total_volume(&t.ok().context);
+    let mut rs = noshape_sketch::Sketch::new();
+    let l = rs.add_line(DVec2::new(0.06, 0.01), DVec2::new(0.01, 0.06));
+    let rsk = t.sketch(Reference::Plane(DatumPlane::Front), rs);
+    let rib = t.add("rib", &[("profiles", q(vec![Reference::SketchEntity { sketch: rsk, entity: l.0 }])), ("thickness", e("5 mm"))]);
+    let at = t.ps.features.iter().position(|f| f.id == rib).unwrap();
+    let ctx = t.reg.regenerate(&t.ps, &ConfigValues::default(), &t.units, &RegenOptions { upto: Some(at), ..Default::default() }).context;
+    let f = t.ps.features[at].clone();
+    let changed = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), "rib", f.id, &f.name, &t.units, &ParamValues::default(), &f.params, &["profiles".to_string()], true).expect("std's editing logic ran");
+    let mut params = f.params.clone();
+    for (k, v) in changed.0 {
+        params.set(&k, v);
+    }
+    assert_eq!((params.bool("oppositeDirection"), params.query("parts").len()), (false, 1), "{params:?}");
+    t.ps.feature_mut(rib).unwrap().params = params;
+    let v = total_volume(&t.ok().context);
+    assert!(near(v - v0, 0.05 * 0.05 * 0.5 * 0.005, 2e-3), "rib volume {}", v - v0);
+}
+
 #[test]
 fn primitives() {
     let mut t = T::new();

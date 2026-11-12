@@ -5,6 +5,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## psui, 2026-11-12 (Part Studio coverage audit, batch 2's erroring features)
+- [ ] P3 OFFSET-CURVE-CURVED-FACE (psui; 2026-11-12 11:50 UTC) **Offset curve on an edge whose first neighbour isn't planar fails**:
+  "Offset curve currently supports planar faces only" (`curves.rs` offset_curve; ui-parity offset-curve-new-edit-reedit, the
+  pin's top circle: our first adjacent face is the cylinder). Asked live (REQUESTS 2026-11-12 11:50) which face Onshape offsets onto
+  by default and with Flip. A cylinder or cone is developable: a geodesic offset is a flat offset in its development.
+- [ ] P3 REPLACE-FACE-SHEET-SMALL-MSG (psui; 2026-11-12 11:50 UTC) a Replace face template that doesn't cover the face fails with
+  "Could not replace faces as requested." (`direct.rs` replace_face maps every error to it); std's REPLACE_FACE_SHEET_SMALL
+  reads "Surface to replace with needs to extend size of faces." Which one live shows: asked (REQUESTS 2026-11-12 11:50).
+- [ ] P3 EDIT-CURVE-ELEVATE-LINE (FeatureScript host; psui 2026-11-12 11:50 UTC) **Edit curve with Elevate on a sketch line: "Error
+  regenerating."** (start `curves`, Sketch 3's line, `elevate` true, target degree 3): a runtime error inside std
+  editCurve.fs elevateDegree in our interpreter (std's wrapper turns it into REGEN_ERROR). Ops repro: feature_add
+  editCurve {"wire": [the line], "elevate": true}.
+
+
 ## studios, 2026-11-12
 - [ ] P2 IGES-SUBFIGURE-ONE-PART (dx; studios 2026-11-12 00:11 UTC) **an IGES subfigure of several solids imports as one
   part.** Live's own export of Assembly 1 = Part 1 + Sub(Part 2, Part 3) as IGES (crates/kernel/tests/data/iges/asm2.igs:

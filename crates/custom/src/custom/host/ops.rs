@@ -1926,6 +1926,29 @@ fn op_draft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // std passes `pullVec` (extrude's draft flips it for the second side).
     let pull = vec3_of(def.get("pullVec")).or_else(|| vec3_of(def.get("pullDirection")));
     let (refillet, tangent) = (def_bool(&def, "reFillet", false), def_bool(&def, "tangentPropagation", false));
+    // DraftType.REFERENCE_ENTITY (std Rib's draft): each face hinged on its reference edges.
+    if def_enum(&def, "draftType").as_deref() == Some("REFERENCE_ENTITY") {
+        let mut options = Vec::new();
+        for o in def.get("referenceEntityDraftOptions").as_array().map(|v| v.to_vec()).unwrap_or_default() {
+            options.push((evaluate_refs(i, &cx, o.get("face"))?, evaluate_refs(i, &cx, o.get("references"))?));
+        }
+        run_op(i, &cx, &id, "DRAFT_FAILED", |ev| {
+            let Some(dir) = pull.map(|p| p.normalize_or_zero()).filter(|p| *p != DVec3::ZERO) else { return Err(super::code_error("DRAFT_FAILED")) };
+            if angle.abs() < 1e-12 {
+                return Ok(());
+            }
+            for (faces, refs) in &options {
+                let Some(edge) = ev.resolve_edges(refs).first().and_then(|&(b, e)| ev.ctx.bodies[b].shape.edges().get(e).cloned()) else { continue };
+                let info = edge.edge_info()?;
+                let hinge = edge.point_at(0.5 * (info.first_param + info.last_param))?;
+                let plane = k::Plane { origin: hinge, x_dir: dir.any_orthonormal_vector(), normal: dir };
+                let groups = by_body(ev.resolve_faces(faces));
+                crate::regen::features::detail_a::draft_faces(ev, groups, dir, &plane, angle, refillet, tangent)?;
+            }
+            Ok(())
+        })?;
+        return Ok(Value::Undefined);
+    }
     run_op(i, &cx, &id, "DRAFT_FAILED", |ev| {
         if neutral.is_empty() {
             return Err(super::code_error_faulty("DRAFT_SELECT_NEUTRAL", &["neutralPlane"]));

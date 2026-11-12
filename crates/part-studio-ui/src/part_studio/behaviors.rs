@@ -4248,14 +4248,6 @@ impl PartStudioView {
                     decal_sized = Some(ready.then_some((id, image)));
                 }
             }
-            // Live L22: a new Rib's Parts holds the studio's parts.
-            // std ribEditLogic: no profile yet, no parts (live ui-parity rib-dialog: Parts empty on opening).
-            "rib" if !user_set.contains("parts") && params.query("parts").is_empty() && !params.query("profiles").is_empty() => {
-                let solids: Vec<Reference> = ctx.map(|c| c.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect()).unwrap_or_default();
-                if !solids.is_empty() {
-                    changes.push(("parts", ParamValue::Query(solids)));
-                }
-            }
             // connectorEditLogic (live L37): the owner is the origin entity's
             // part, else the only part; attached to a picked face, else to
             // the owner. Only once an origin is picked: a new connector opens
