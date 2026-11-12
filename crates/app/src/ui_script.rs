@@ -251,7 +251,7 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
                 Some("right") => point(b.right() - px(3.), b.center().y),
                 // The code editor where live's runner clicks Ace's scroller: at most 400 px in and 300 px down.
                 _ if name.starts_with("editor:") => point(b.left() + (b.size.width / 2.).min(px(400.)), b.top() + (b.size.height / 2.).min(px(300.))),
-                _ => b.center(),
+                _ => visible_center(b, noshape_app_core::ui_script::clip_of(&name)),
             });
         }
         // A list row by the start of its text, as live's runner falls back to ("Assembly" for "Assembly 2 <1>"), when only
@@ -307,6 +307,19 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
     }
     let asm = assembly.as_ref().ok_or("not in a Part Studio, an Assembly or a Drawing")?;
     asm.read(cx).ui_target_point(t, cx).map(whole)
+}
+
+/// Where to press a control: its centre, or the middle of its visible part across when its centre is outside the clip
+/// of its scrolling containers (a documents row wider than the list in a narrow window: the Windows runner's 1028 px,
+/// whose rows' centres lay under the Details panel, UIS-RCLICK-WINDOWS).
+fn visible_center(b: Bounds<Pixels>, clip: Option<Bounds<Pixels>>) -> Point<Pixels> {
+    let c = b.center();
+    let Some(clip) = clip else { return c };
+    let (left, right) = (b.left().max(clip.left()), b.right().min(clip.right()));
+    if (clip.left()..clip.right()).contains(&c.x) || left >= right {
+        return c;
+    }
+    point((left + right) / 2., c.y)
 }
 
 /// Presses at `at`, where the pointer already is (a pointer that doesn't move sends no second move: a repeated
