@@ -28,6 +28,30 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-12 08:49 UTC: release management: approvals (lead: full workflow, local approvers), associated drawings, live's strings
+- Live 2522 ("release strings (client code)", "studios: the Release candidate dialog's item messages…") gives the
+  dialog's texts; used verbatim: the rows' blue INFO messages ("Item has not changed since its last revision.",
+  "Item's geometry has not changed since its last revision, but its properties have changed[ and company policy
+  requires a new revision].") with the row's Revert for both unless the policy holds; the header's "Revert unchanged
+  items to last revision"; Include associated drawings' tooltip and bubbles ("No associated drawings found.",
+  "Drawings were unable to be added from workspaces: …").
+- Associated drawings: a drawing made from another workspace's state (its `sources_at` not an ancestor of the head)
+  is left out (the bubble; ops `drawings_left_out`). The outdated-drawing warning is a server message whose text
+  neither the client nor help has: not shown (the "Drawing has a pending update" condition still holds).
+- Approvals: Approvers / Observers fields (the local user only, Preferences' name); with approvers the button is
+  Submit: the candidate's version is made then and it waits, Pending (ReleaseLog::candidates; items' state Pending;
+  the revision table's pending row). Release drafts lists candidates with their state; opening a Pending one gives
+  its approver Approve (released at the Submit version) / Reject (kept, Rejected). Ops: release_create
+  `approvers` / `observers`, release_approve, release_reject, release_drafts `candidates`.
+- Company settings applied: Require an approver (Release disabled; op error), Do not allow creator as approver (the
+  local user can't be chosen: with Require an approver too, nothing can be released; op error), Require a note,
+  Require a new revision when properties changed (the blue message, no row Revert), Prevent if a part number is in
+  another pending candidate. Not applicable locally: Require approval from all approvers (one possible approver),
+  Restrict approvers (no users), Prevent if an item has a pending task (tasks are cloud), approval delegation, admin
+  overrides, sharing with approvers.
+- Not done: "Discard Release candidate" (live's string: "The Release candidate will be discarded and all items will be
+  returned to their initial states."), "Approved by / Rejected by <name>" lines, Comments.
+
 ### 2026-11-12 07:33 UTC: release management against Onshape's help (lead 11-12; behaviours "lead (2026-11-11 02:15 UTC)")
 Audited field by field (release-ui, ops release, drawing revision table). Present: entry points (Parts list, tab
 menus, Versions and history, assembly menus, part Properties), titles Create Release candidate / Review Release, Refresh,

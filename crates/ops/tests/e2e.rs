@@ -7026,6 +7026,73 @@ fn release_drafts_revert_and_generate() {
     assert!(e.as_ref().is_none_or(|e| e.param.as_deref() == Some("generate_part_numbers")), "{e:?}");
 }
 
+/// The approval workflow (Onshape help "Typical Release Workflow"; the local user is the only person offered): with an
+/// approver, Submit makes the candidate's version and leaves it Pending; Approve releases it at that version; Reject
+/// keeps it, Rejected.
+#[test]
+fn release_submit_approve_and_reject() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "release-approve.noshape");
+    let me = noshape_store::local_user_name();
+    let e = try_call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1", "part_numbers": { "Part 1": "PRT-0100" }, "approvers": ["Somebody Else"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("approvers[0]"), "{e:?}");
+    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1", "part_numbers": { "Part 1": "PRT-0100" }, "approvers": [me], "observers": [me] }));
+    assert_eq!(r["state"], "Pending", "{r}");
+    // The candidate's version is made when it is submitted.
+    let h = call(&mut ctx, "history_list", json!({ "limit": 3 }));
+    assert!(h["versions"].as_array().unwrap().iter().any(|v| v["name"] == "R1"), "{h}");
+    let list = call(&mut ctx, "release_drafts", json!({}));
+    assert_eq!(list["candidates"][0]["state"], "Pending", "{list}");
+    assert_eq!(list["candidates"][0]["approvers"][0], me.as_str(), "{list}");
+    assert!(try_call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0100" })).is_err(), "not released while pending");
+    let a = call(&mut ctx, "release_approve", json!({ "name": "R1" }));
+    assert_eq!(a["state"], "Released", "{a}");
+    assert_eq!(a["version"], r["version"], "released at the version made at Submit: {a}");
+    let rh = call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0100" }));
+    assert_eq!(rh["revisions"][0]["revision"], "A", "{rh}");
+    // A second candidate, rejected: it stays, Rejected, and can't be approved.
+    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R2", "approvers": [me] }));
+    assert_eq!(r["state"], "Pending", "{r}");
+    assert_eq!(call(&mut ctx, "release_reject", json!({ "name": "R2" }))["state"], "Rejected");
+    let list = call(&mut ctx, "release_drafts", json!({}));
+    assert_eq!(list["candidates"][0]["state"], "Rejected", "{list}");
+    let e = try_call(&mut ctx, "release_approve", json!({ "name": "R2" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("name"));
+    // Without approvers, Release releases at once.
+    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R3" }));
+    assert_eq!(r["state"], "Released", "{r}");
+}
+
+/// Include associated drawings leaves out a drawing made from another workspace's state (Onshape help "Typical Release
+/// Workflow": "drawings referencing a version from another workspace are left out").
+#[test]
+fn release_leaves_out_a_drawing_made_from_another_workspace() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "release-assoc.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let drawing = d["drawing"].as_str().unwrap().to_string();
+    let kinds = |r: &Value| r["items"].as_array().unwrap().iter().map(|i| i["type"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "D1", "draft": true, "include_drawings": true }));
+    assert!(kinds(&r).iter().any(|k| k == "Drawing"), "the drawing is associated: {r}");
+    // A state made on another workspace (B1), then the drawing in Main marked as made from it.
+    let main = call(&mut ctx, "document_info", json!({}))["branch"].as_str().unwrap().to_string();
+    call(&mut ctx, "history_create_branch", json!({ "name": "B1" }));
+    call(&mut ctx, "variable_create", json!({ "name": "w", "value": "3 mm" }));
+    let b1_head = ctx.doc(None).unwrap().session.head().unwrap().to_string();
+    call(&mut ctx, "history_switch_branch", json!({ "branch": main }));
+    {
+        let od = ctx.doc(None).unwrap();
+        let id = noshape_ops::doc::find_tab(od.doc(), &drawing).unwrap();
+        if let Some(noshape_model::TabContent::Drawing(dr)) = od.session.doc.tab_mut(id).map(|t| &mut t.content) {
+            dr.sources_at = Some(b1_head);
+        }
+        od.session.commit_all("test: drawing made on B1").unwrap();
+    }
+    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "D2", "draft": true, "include_drawings": true }));
+    assert!(!kinds(&r).iter().any(|k| k == "Drawing"), "made from B1's state, left out: {r}");
+    assert_eq!(r["drawings_left_out"].as_array().map(Vec::len), Some(1), "{r}");
+}
+
 /// qa DWG-DIM-TWO-EDGES: Line to line on two parallel view edges clicked at
 /// their middles (where snap points and other targets sit on top) dimensions
 /// the distance between them.

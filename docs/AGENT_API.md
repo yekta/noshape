@@ -336,7 +336,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_edit_joint`](#sheetmetal_edit_joint), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
-- **release**: [`release_create`](#release_create), [`release_drafts`](#release_drafts), [`release_draft_delete`](#release_draft_delete), [`release_revision_history`](#release_revision_history)
+- **release**: [`release_create`](#release_create), [`release_approve`](#release_approve), [`release_reject`](#release_reject), [`release_drafts`](#release_drafts), [`release_draft_delete`](#release_draft_delete), [`release_revision_history`](#release_revision_history)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image), [`render_print`](#render_print), [`render_file_page`](#render_file_page)
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
@@ -6890,13 +6890,49 @@ Examples:
 | `notes` | string |  | Release notes (the version's description). |
 | `part_numbers` | object |  | {item name or part id: part number}. |
 | `revisions` | object |  | {item name or part id: revision}. |
-| `include_drawings` | boolean |  | Include associated drawings. |
+| `include_drawings` | boolean |  | Include associated drawings (those made from another workspace's state are left out and listed as `drawings_left_out`). |
+| `approvers` | array of string |  | Approvers: Submit instead of Release. The candidate's version is made now and it waits, Pending, for release_approve or release_reject. The only person offered is the local user (Preferences' name; no user directory in a local app). |
+| `observers` | array of string |  | Observers (the local user). |
+
+#### release_approve
+
+Approve a Pending release candidate (edits the document (one undoable history entry)).
+
+A submitted candidate's approver › Approve (from Release drafts): it is released at the version made when it was submitted; its items' states become Released.
+
+Examples:
+
+```json
+{"name": "Release 3"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `name` | string | required | The candidate's release name. |
+
+#### release_reject
+
+Reject a Pending release candidate (edits the document (one undoable history entry)).
+
+A submitted candidate's approver › Reject: the candidate stays, Rejected; its items stay as they were (release them with another candidate).
+
+Examples:
+
+```json
+{"name": "Release 3"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `name` | string | required | The candidate's release name. |
 
 #### release_drafts
 
 The saved Release candidate drafts.
 
-Release drafts (the document's panel): each saved candidate's name, notes, time and items. Reopen one with release_create `from_draft`, delete it with release_draft_delete.
+Release drafts (the document's panel): each saved candidate's name, notes, time and items, then the submitted candidates with their state (Pending, Rejected), approvers and observers. Reopen a draft with release_create `from_draft`, delete it with release_draft_delete; approve or reject a Pending one with release_approve / release_reject.
 
 Examples:
 

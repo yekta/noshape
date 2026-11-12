@@ -59,7 +59,7 @@
   {
    "do": "click",
    "on": {
-    "button": "Revert unchanged items to their last revision"
+    "button": "Revert unchanged items to last revision"
    }
   }
  ]

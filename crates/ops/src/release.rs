@@ -191,20 +191,33 @@ pub fn tab_items(session: &Session, provider: &dyn DerivedProvider, tab: TabId) 
 
 /// Drawings of the document showing any of `items` (Include associated
 /// drawings): a drawing whose base views show the item's part, Part Studio
-/// or Assembly.
+/// or Assembly. A drawing made from another workspace's state is left out (help: "drawings referencing a version
+/// from another workspace").
 pub fn associated_drawings(session: &Session, provider: &dyn DerivedProvider, items: &[ReleaseItem]) -> Vec<ReleaseItem> {
+    associated_drawings_split(session, provider, items).0
+}
+
+/// [`associated_drawings`] and the names of the drawings left out (made from another workspace's state: the dialog's
+/// bubble "Drawings were unable to be added from workspaces: …").
+pub fn associated_drawings_split(session: &Session, provider: &dyn DerivedProvider, items: &[ReleaseItem]) -> (Vec<ReleaseItem>, Vec<String>) {
     let mut out = Vec::new();
+    let mut left_out = Vec::new();
+    let head = session.head().ok();
     for t in session.doc.ordered_tabs() {
         let TabContent::Drawing(d) = &t.content else { continue };
+        let made_from: Option<noshape_store::MicroversionId> = d.sources_at.as_ref().and_then(|m| m.parse().ok());
+        let elsewhere = matches!((made_from, head), (Some(mv), Some(head)) if !session.store.is_ancestor(mv, head).unwrap_or(true));
         let shows = d.sheets.iter().flat_map(|s| s.views.iter()).any(|v| match &v.kind {
             noshape_model::drawing::ViewKind::Base { source, part, .. } => items.iter().any(|it| it.tab == *source && (part.is_none() || it.part.is_none() || it.part == *part)),
             _ => false,
         });
-        if shows {
+        if shows && elsewhere {
+            left_out.push(t.name.clone());
+        } else if shows {
             out.extend(tab_items(session, provider, t.id).into_iter().filter(|i| i.kind == ItemKind::Drawing));
         }
     }
-    out
+    (out, left_out)
 }
 
 /// Items linked from versions of other documents: their releases go into
@@ -237,7 +250,53 @@ pub fn release_description(pkg: &Package) -> String {
 /// Part Studio) and the tab items, and is recorded at a new version named
 /// after it; an obsoletion marks the version of the release it obsoletes.
 /// Returns the package as recorded (its version set).
-pub fn commit(session: &mut Session, mut pkg: Package) -> anyhow::Result<Package> {
+pub fn commit(session: &mut Session, pkg: Package) -> anyhow::Result<Package> {
+    let pkg = make_version(session, pkg)?;
+    record_released(session, pkg)
+}
+
+/// Submit a candidate to its approvers (Onshape help: "When a candidate is created, Onshape makes a version, and every
+/// object in it is from that version"): its part numbers written and its version made as a release's, then kept as
+/// Pending until its approver approves or rejects it.
+pub fn submit(session: &mut Session, pkg: Package) -> anyhow::Result<Package> {
+    let pkg = make_version(session, pkg)?;
+    let mut log = release_log(session);
+    log.submit(pkg.clone());
+    save_log(session, &log)?;
+    Ok(log.candidate(&pkg.name).cloned().unwrap_or(pkg))
+}
+
+/// Approve a Pending candidate: released at the version made when it was submitted.
+pub fn approve(session: &mut Session, name: &str) -> anyhow::Result<Package> {
+    let mut log = release_log(session);
+    let Some(pkg) = log.take_pending(name) else { anyhow::bail!("no pending release candidate `{name}`") };
+    save_log(session, &log)?;
+    record_released(session, pkg)
+}
+
+/// Reject a Pending candidate: it stays, Rejected; its items are released by another candidate.
+pub fn reject(session: &mut Session, name: &str) -> anyhow::Result<()> {
+    let mut log = release_log(session);
+    if !log.reject(name) {
+        anyhow::bail!("no pending release candidate `{name}`");
+    }
+    save_log(session, &log)
+}
+
+/// Record a package whose version is made (a release, or an approved candidate).
+fn record_released(session: &mut Session, pkg: Package) -> anyhow::Result<Package> {
+    if pkg.kind == PackageKind::Release {
+        mark_linked_versions(&pkg)?;
+    }
+    let mut log = release_log(session);
+    log.record(pkg.clone());
+    save_log(session, &log)?;
+    Ok(pkg)
+}
+
+/// A package's part numbers written onto its items and its version made (an obsoletion: the version of the release it
+/// obsoletes).
+fn make_version(session: &mut Session, mut pkg: Package) -> anyhow::Result<Package> {
     let kind = pkg.kind;
     if kind == PackageKind::Release {
         // Items linked from versions keep theirs (versions don't change).
@@ -287,11 +346,5 @@ pub fn commit(session: &mut Session, mut pkg: Package) -> anyhow::Result<Package
         Some(v) => v,
         None => session.create_version(&pkg.name, &pkg.notes)?.to_string(),
     });
-    if kind == PackageKind::Release {
-        mark_linked_versions(&pkg)?;
-    }
-    let mut log = release_log(session);
-    log.record(pkg.clone());
-    save_log(session, &log)?;
     Ok(pkg)
 }

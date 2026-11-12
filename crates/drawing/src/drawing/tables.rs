@@ -143,7 +143,7 @@ pub fn revision_rows(log: &crate::release::ReleaseLog, tab: crate::document::Tab
     for p in &log.packages {
         for it in p.items.iter().filter(|it| it.kind == ItemKind::Drawing && it.tab == tab) {
             match p.kind {
-                PackageKind::Release => out.push(RevisionRow { revision: it.revision.clone(), description: p.notes.clone(), date: date(p.created), approved: String::new(), pending: false, obsolete: false, part_number: it.part_number.clone(), name: it.name.clone() }),
+                PackageKind::Release => out.push(RevisionRow { revision: it.revision.clone(), description: p.notes.clone(), date: date(p.created), approved: p.approvers.join(", "), pending: false, obsolete: false, part_number: it.part_number.clone(), name: it.name.clone() }),
                 PackageKind::Obsoletion => {
                     if let Some(r) = out.iter_mut().rev().find(|r| r.revision == it.revision) {
                         r.obsolete = true;
@@ -152,7 +152,9 @@ pub fn revision_rows(log: &crate::release::ReleaseLog, tab: crate::document::Tab
             }
         }
     }
-    for p in log.drafts.iter().filter(|p| p.kind == PackageKind::Release) {
+    // Pending until released: saved drafts and submitted candidates (a rejected one isn't a revision).
+    let pending = log.candidates.iter().filter(|p| p.state == Some(crate::release::CandidateState::Pending));
+    for p in log.drafts.iter().filter(|p| p.kind == PackageKind::Release).chain(pending) {
         for it in p.items.iter().filter(|it| it.kind == ItemKind::Drawing && it.tab == tab) {
             out.push(RevisionRow { revision: it.revision.clone(), description: p.notes.clone(), date: String::new(), approved: String::new(), pending: true, obsolete: false, part_number: it.part_number.clone(), name: it.name.clone() });
         }
@@ -1272,7 +1274,7 @@ mod tests {
         use crate::release::{ItemKind, Package, PackageKind, ReleaseItem, ReleaseLog};
         let tab = crate::document::TabId(7);
         let item = |rev: &str| ReleaseItem { tab, part: None, name: "Drawing 1".into(), kind: ItemKind::Drawing, part_number: "DRW-1".into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None };
-        let pkg = |id: u64, kind: PackageKind, rev: &str, notes: &str, day: i64| Package { id, kind, name: format!("R{id}"), notes: notes.into(), created: day * 86_400_000, version: None, items: vec![item(rev)], re_releasable: false };
+        let pkg = |id: u64, kind: PackageKind, rev: &str, notes: &str, day: i64| Package { id, kind, name: format!("R{id}"), notes: notes.into(), created: day * 86_400_000, version: None, items: vec![item(rev)], re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None };
         let mut log = ReleaseLog::default();
         log.packages.push(pkg(1, PackageKind::Release, "A", "Initial release", 20744));
         log.packages.push(pkg(2, PackageKind::Release, "B", "Hole moved", 20745));

@@ -202,6 +202,31 @@ pub struct Package {
     /// Obsoletion: the revisions may be released again.
     #[serde(default)]
     pub re_releasable: bool,
+    /// The candidate's approvers and observers (Onshape's Approvers / Observers fields; here the local user).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approvers: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub observers: Vec<String>,
+    /// A submitted candidate's state (Pending until its approver approves or rejects it); None for drafts and
+    /// released packages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state: Option<CandidateState>,
+}
+
+/// A submitted release candidate's state (Onshape help: Pending / Rejected / Released).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CandidateState {
+    Pending,
+    Rejected,
+}
+
+impl CandidateState {
+    pub fn label(self) -> &'static str {
+        match self {
+            CandidateState::Pending => "Pending",
+            CandidateState::Rejected => "Rejected",
+        }
+    }
 }
 
 /// A revision's place in a part number's history.
@@ -235,6 +260,8 @@ pub struct TypedRevision {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ItemState {
     InProgress,
+    /// In a submitted candidate waiting for its approver.
+    Pending,
     Released,
     Obsolete,
 }
@@ -243,6 +270,7 @@ impl ItemState {
     pub fn label(self) -> &'static str {
         match self {
             ItemState::InProgress => "In progress",
+            ItemState::Pending => "Pending",
             ItemState::Released => "Released",
             ItemState::Obsolete => "Obsolete",
         }
@@ -255,6 +283,10 @@ pub struct ReleaseLog {
     pub packages: Vec<Package>,
     #[serde(default)]
     pub drafts: Vec<Package>,
+    /// Submitted candidates waiting for their approvers (Pending) or rejected; each at the version made when it was
+    /// submitted.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub candidates: Vec<Package>,
     #[serde(default)]
     next_id: u64,
     /// The revision scheme of the Release management settings (not stored
@@ -354,6 +386,9 @@ impl ReleaseLog {
     /// State of a part number (in a workspace: In progress unless the
     /// latest revision is obsolete).
     pub fn state(&self, part_number: &str) -> ItemState {
+        if !part_number.is_empty() && self.pending_part_numbers("").iter().any(|p| p == part_number) {
+            return ItemState::Pending;
+        }
         match self.revisions(part_number).last() {
             Some(e) if e.obsoleted_by.is_some() => ItemState::Obsolete,
             Some(_) => ItemState::Released,
@@ -401,11 +436,51 @@ impl ReleaseLog {
     /// Record a release (or obsoletion) package; returns its id. The caller
     /// checks [`Self::validate`] first.
     pub fn record(&mut self, mut package: Package) -> u64 {
-        self.next_id = self.next_id.max(self.packages.iter().chain(&self.drafts).map(|p| p.id).max().unwrap_or(0)) + 1;
+        self.next_id = self.next_id.max(self.packages.iter().chain(&self.drafts).chain(&self.candidates).map(|p| p.id).max().unwrap_or(0)) + 1;
         package.id = self.next_id;
         self.drafts.retain(|d| d.name != package.name || d.kind != package.kind);
+        self.candidates.retain(|c| c.name != package.name);
         self.packages.push(package);
         self.next_id
+    }
+
+    /// Submit a candidate to its approvers: kept as Pending (its draft of that name goes).
+    pub fn submit(&mut self, mut candidate: Package) {
+        self.next_id = self.next_id.max(self.packages.iter().chain(&self.drafts).chain(&self.candidates).map(|p| p.id).max().unwrap_or(0)) + 1;
+        candidate.id = self.next_id;
+        candidate.state = Some(CandidateState::Pending);
+        self.drafts.retain(|d| d.name != candidate.name);
+        self.candidates.retain(|c| c.name != candidate.name);
+        self.candidates.push(candidate);
+    }
+
+    /// A submitted candidate by name.
+    pub fn candidate(&self, name: &str) -> Option<&Package> {
+        self.candidates.iter().find(|c| c.name == name)
+    }
+
+    /// Approve a Pending candidate: it leaves the candidates; the caller records it as released.
+    pub fn take_pending(&mut self, name: &str) -> Option<Package> {
+        let i = self.candidates.iter().position(|c| c.name == name && c.state == Some(CandidateState::Pending))?;
+        let mut c = self.candidates.remove(i);
+        c.state = None;
+        Some(c)
+    }
+
+    /// Reject a Pending candidate (it stays, Rejected). False when there is none of that name.
+    pub fn reject(&mut self, name: &str) -> bool {
+        match self.candidates.iter_mut().find(|c| c.name == name && c.state == Some(CandidateState::Pending)) {
+            Some(c) => {
+                c.state = Some(CandidateState::Rejected);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Part numbers in Pending candidates (a candidate's own `except` aside).
+    pub fn pending_part_numbers(&self, except: &str) -> Vec<String> {
+        self.candidates.iter().filter(|c| c.state == Some(CandidateState::Pending) && c.name != except).flat_map(|c| c.items.iter().map(|i| i.part_number.clone())).filter(|p| !p.is_empty()).collect()
     }
 
     /// Delete a saved draft (Review Release › Save draft ▴ › Delete draft).
@@ -473,7 +548,7 @@ impl ReleaseLog {
         if items.is_empty() {
             return false;
         }
-        self.record(Package { id: 0, kind: PackageKind::Obsoletion, name: format!("Reset part number type {part_number}"), notes: String::new(), created, version: None, items, re_releasable: true });
+        self.record(Package { id: 0, kind: PackageKind::Obsoletion, name: format!("Reset part number type {part_number}"), notes: String::new(), created, version: None, items, re_releasable: true, approvers: Vec::new(), observers: Vec::new(), state: None });
         true
     }
 
@@ -601,7 +676,7 @@ mod tests {
         assert_eq!(c.next(Some("X2")), "");
         let mut log = ReleaseLog { scheme: n, ..Default::default() };
         assert_eq!(log.next_revision("PN"), "01");
-        log.record(Package { id: 0, kind: PackageKind::Release, name: "R".into(), notes: String::new(), created: 0, version: None, items: vec![item("PN", "01")], re_releasable: false });
+        log.record(Package { id: 0, kind: PackageKind::Release, name: "R".into(), notes: String::new(), created: 0, version: None, items: vec![item("PN", "01")], re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None });
         assert_eq!(log.next_revision("PN"), "02");
         assert!(log.validate(&[item("PN", "01")])[0].iter().any(|i| matches!(i, Issue::RevisionTooLow { .. })));
         assert!(log.validate(&[item("PN", "A")])[0].contains(&Issue::InvalidRevision));
@@ -612,7 +687,7 @@ mod tests {
     }
 
     fn package(kind: PackageKind, name: &str, items: Vec<ReleaseItem>) -> Package {
-        Package { id: 0, kind, name: name.into(), notes: String::new(), created: 0, version: Some(format!("v-{name}")), items, re_releasable: false }
+        Package { id: 0, kind, name: name.into(), notes: String::new(), created: 0, version: Some(format!("v-{name}")), items, re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None }
     }
 
     #[test]
@@ -689,7 +764,7 @@ mod tests {
     #[test]
     fn reset_part_number_type_obsoletes_that_type_only() {
         let item = |kind, rev: &str| ReleaseItem { tab: TabId(1), part: None, name: "x".into(), kind, part_number: "PRT-002".into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None };
-        let pkg = |name: &str, items| Package { id: 0, kind: PackageKind::Release, name: name.into(), notes: String::new(), created: 1, version: None, items, re_releasable: false };
+        let pkg = |name: &str, items| Package { id: 0, kind: PackageKind::Release, name: name.into(), notes: String::new(), created: 1, version: None, items, re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None };
         let mut log = ReleaseLog::default();
         log.record(pkg("rel-1.0.2", vec![item(ItemKind::Part, "A")]));
         log.record(pkg("rel-A", vec![item(ItemKind::Part, "B")]));

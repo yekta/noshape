@@ -4,10 +4,9 @@
 //! and on Refresh, since they regenerate Part Studios and evaluate
 //! Assemblies.
 //!
-//! "A part number is included in another pending Release candidate" and "An
-//! item has a pending task" never hold here: releases are made at once on
-//! this computer (no Submit / approval, so no pending candidates) and there
-//! are no tasks.
+//! "A part number is included in another pending Release candidate" holds for
+//! a part number in a submitted candidate still Pending; "An item has a pending
+//! task" never holds here (tasks are a cloud feature).
 
 use crate::session::Session;
 use noshape_model::display::FeatureStatus;
@@ -22,11 +21,13 @@ const ROLLED_BACK: usize = 1;
 const ASSEMBLY_ERRORS: usize = 2;
 const PENDING_REFERENCES: usize = 3;
 const DRAWING_UPDATE: usize = 4;
+const PENDING_CANDIDATE: usize = 5;
 const OBSOLETE_REFERENCES: usize = 7;
 
 /// The conditions that hold for each item.
 pub fn condition_issues(session: &Session, items: &[ReleaseItem]) -> Vec<Vec<Issue>> {
     let on = crate::release_settings::release_settings().conditions;
+    let pending = if on[PENDING_CANDIDATE] { crate::release::release_log(session).pending_part_numbers("") } else { Vec::new() };
     let mut studio_errors: HashMap<(TabId, noshape_model::configuration::ConfigValues), bool> = HashMap::new();
     items
         .iter()
@@ -36,6 +37,9 @@ pub fn condition_issues(session: &Session, items: &[ReleaseItem]) -> Vec<Vec<Iss
                 return v;
             }
             let prevented = |v: &mut Vec<Issue>, text: &str| v.push(Issue::Prevented(text.into()));
+            if !it.part_number.is_empty() && pending.contains(&it.part_number) {
+                prevented(&mut v, "The part number is included in another pending Release candidate.");
+            }
             match session.doc.tab(it.tab).map(|t| &t.content) {
                 Some(TabContent::PartStudio(ps)) => {
                     if on[FEATURE_ERRORS] {
@@ -142,7 +146,7 @@ mod tests {
     fn a_reference_to_an_obsoleted_release_is_obsolete() {
         let tab = noshape_model::document::TabId(3);
         let item = |rev: &str| ReleaseItem { tab, part: None, name: "Assembly 1".into(), kind: ItemKind::Assembly, part_number: "ASM-1".into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None };
-        let pkg = |kind, version: Option<&str>, items| Package { id: 0, kind, name: "r".into(), notes: String::new(), created: 0, version: version.map(String::from), items, re_releasable: false };
+        let pkg = |kind, version: Option<&str>, items| Package { id: 0, kind, name: "r".into(), notes: String::new(), created: 0, version: version.map(String::from), items, re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None };
         let mut log = ReleaseLog::default();
         log.record(pkg(PackageKind::Release, Some("v1"), vec![item("A")]));
         let t = tab.to_string();

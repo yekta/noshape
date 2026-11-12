@@ -100,9 +100,10 @@ pub fn tab_items(doc: &DocModel, tab: TabId) -> Vec<ReleaseItem> {
     noshape_ops::release::tab_items(&doc.session, &*doc.derived_provider(), tab)
 }
 
-/// Drawings of the document showing any of `items` (Include associated drawings).
-fn associated_drawings(doc: &DocModel, items: &[ReleaseItem]) -> Vec<ReleaseItem> {
-    noshape_ops::release::associated_drawings(&doc.session, &*doc.derived_provider(), items)
+/// Drawings of the document showing any of `items` (Include associated drawings), and those left out (made from
+/// another workspace's state).
+fn associated_drawings(doc: &DocModel, items: &[ReleaseItem]) -> (Vec<ReleaseItem>, Vec<String>) {
+    noshape_ops::release::associated_drawings_split(&doc.session, &*doc.derived_provider(), items)
 }
 
 /// "Add Items to Release" (help add-item-to-release-01.png): the current
@@ -884,6 +885,13 @@ pub struct ReleaseDialog {
     draft: Option<String>,
     /// The Save draft ▴ menu is open.
     draft_menu: bool,
+    /// Approvers and Observers (the local user is the only person offered: no user directory in a local app).
+    approvers: Vec<String>,
+    observers: Vec<String>,
+    /// Which of the two lists' dropdown is open (true: Approvers).
+    people_menu: Option<bool>,
+    /// A submitted candidate under review: its state (Pending: Approve / Reject).
+    candidate: Option<noshape_model::release::CandidateState>,
     /// Item search and the type filter (help: "Searching and filtering the
     /// object list"): empty = every type.
     search: Entity<InputState>,
@@ -972,7 +980,7 @@ impl ReleaseDialog {
                 cx.notify();
             }
         }));
-        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, conditions, _subs: subs }
+        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, conditions, _subs: subs }
     }
 
     /// A new part number suggests its next revision (unless one was typed).
@@ -1257,6 +1265,9 @@ impl ReleaseDialog {
             version: None,
             items: self.items(cx),
             re_releasable: self.re_releasable,
+            approvers: self.approvers.clone(),
+            observers: self.observers.clone(),
+            state: None,
         }
     }
 
@@ -1279,6 +1290,117 @@ impl ReleaseDialog {
         self.applied = true;
         cx.notify();
         true
+    }
+
+    /// Submit to the approvers: the candidate's version is made now and it waits, Pending (noshape_ops::release::submit).
+    fn submit(&mut self, cx: &mut Context<Self>) -> bool {
+        let pkg = self.package(PackageKind::Release, cx);
+        if pkg.name.is_empty() || self.approvers.is_empty() || self.issues(cx).iter().any(|v| !v.is_empty()) {
+            cx.notify();
+            return false;
+        }
+        let r = self.doc.update(cx, |doc, cx| -> anyhow::Result<()> {
+            let r = noshape_ops::release::submit(&mut doc.session, pkg);
+            doc.reloaded(cx);
+            r.map(|_| ())
+        });
+        if let Err(e) = r {
+            self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+            return false;
+        }
+        true
+    }
+
+    /// The approver's Approve (released at the candidate's version) or Reject (kept, Rejected).
+    fn decide(&mut self, approve: bool, cx: &mut Context<Self>) -> bool {
+        let name = self.name.read(cx).value().trim().to_string();
+        let r = self.doc.update(cx, |doc, cx| -> anyhow::Result<()> {
+            let r = if approve { noshape_ops::release::approve(&mut doc.session, &name).map(|_| ()) } else { noshape_ops::release::reject(&mut doc.session, &name) };
+            doc.reloaded(cx);
+            r
+        });
+        if let Err(e) = r {
+            self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+            return false;
+        }
+        true
+    }
+
+    /// Approvers or Observers (`approvers`): the chosen people with their ×, and a dropdown that offers the local
+    /// user (greyed as an approver when Company settings don't allow the creator as approver).
+    fn people_field(&self, approvers: bool, read_only: bool, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let (label, list) = if approvers { ("Approvers", &self.approvers) } else { ("Observers", &self.observers) };
+        let me = noshape_store::local_user_name();
+        let barred = approvers && release_settings().no_creator_approver;
+        let chips = list.iter().map(|n| {
+            let n2 = n.clone();
+            h_flex()
+                .gap(px(4.))
+                .px(px(6.))
+                .h(px(22.))
+                .rounded(px(11.))
+                .bg(gpui_kit::rgb(0xe6eef7))
+                .text_size(px(13.))
+                .child(n.clone())
+                .when(!read_only, |d| {
+                    d.child(div().id(SharedString::from(format!("rel-person-x-{label}-{n}"))).cursor_pointer().text_color(pal.text_muted).child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        let list = if approvers { &mut this.approvers } else { &mut this.observers };
+                        list.retain(|x| *x != n2);
+                        cx.notify();
+                    })))
+                })
+                .into_any_element()
+        });
+        let open = self.people_menu == Some(approvers);
+        let menu = open.then(|| {
+            let taken = list.contains(&me);
+            let row = div()
+                .id(SharedString::from(format!("rel-person-{label}")))
+                .map(|d| crate::ui_script::mark(d, || format!("list_row:{}", noshape_store::local_user_name())))
+                .px(px(8.))
+                .py(px(6.))
+                .text_size(px(13.))
+                .child(me.clone())
+                .when(taken || barred, |d| d.text_color(pal.text_muted))
+                .when(barred, |d| d.tooltip(crate::ui::tooltip("Company settings don't allow the creator as an approver")))
+                .when(!taken && !barred, |d| {
+                    let me = me.clone();
+                    d.cursor_pointer().hover(|d| d.bg(pal.row_hover)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        let list = if approvers { &mut this.approvers } else { &mut this.observers };
+                        if !list.contains(&me) {
+                            list.push(me.clone());
+                        }
+                        this.people_menu = None;
+                        cx.notify();
+                    }))
+                });
+            deferred(anchored().child(v_flex().mt(px(32.)).w(px(380.)).bg(pal.panel).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(3.)).shadow_md().child(row))).with_priority(2)
+        });
+        v_flex()
+            .gap(px(4.))
+            .child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(label))
+            .child(
+                h_flex()
+                    .id(SharedString::from(format!("rel-people-{label}")))
+                    .map(|d| crate::ui_script::mark(d, move || format!("field:{label}")))
+                    .flex_wrap()
+                    .gap(px(4.))
+                    .min_h(px(30.))
+                    .px(px(4.))
+                    .border_1()
+                    .rounded(px(3.))
+                    .border_color(gpui_kit::rgb(0xcccccc))
+                    .children(chips)
+                    .when(!read_only, |d| {
+                        d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            this.people_menu = if this.people_menu == Some(approvers) { None } else { Some(approvers) };
+                            cx.notify();
+                        }))
+                    })
+                    .children(menu),
+            )
+            .into_any_element()
     }
 
     /// Release (or Obsolete): record the package at a new version.
@@ -1310,6 +1432,8 @@ const COL_REVISION: f32 = 140.;
 const COL_STATE: f32 = 140.;
 const COL_PART_NUMBER: f32 = 150.;
 const GRID: u32 = 0xdddddd;
+/// An item's INFO message (Bootstrap's alert-info text).
+const INFO_BLUE: u32 = 0x31708f;
 
 impl Render for ReleaseDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1386,8 +1510,17 @@ impl Render for ReleaseDialog {
                         cx.notify();
                     })))
                     .when(self.mode == Mode::Release, |d| {
-                        d.child(small("rel-assoc-drawings", "release-drawings", "Include associated drawings from current workspace", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                            let extra = associated_drawings(this.doc.read(cx), &this.items(cx));
+                        d.child(small("rel-assoc-drawings", "release-drawings", "Include associated drawings", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                            let (extra, left_out) = associated_drawings(this.doc.read(cx), &this.items(cx));
+                            // The client's bubbles (Onshape's strings).
+                            let bubble = if !left_out.is_empty() {
+                                Some(format!("Drawings were unable to be added from workspaces: {}", left_out.join(", ")))
+                            } else {
+                                extra.is_empty().then(|| "No associated drawings found.".to_string())
+                            };
+                            if let Some(msg) = bubble {
+                                this.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(msg)));
+                            }
                             this.add_items(extra, window, cx);
                         })))
                         .child(small("rel-add-items", "plus", "Add to Release…", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
@@ -1407,7 +1540,7 @@ impl Render for ReleaseDialog {
             .child(head(COL_STATE).justify_between().child("State").when(self.mode == Mode::Release, |d| {
                 // Help: the button on the State header reverts every unchanged item.
                 d.child(
-                    boxed("rel-revert-all".into(), "undo", "Revert unchanged items to their last revision", cx)
+                    boxed("rel-revert-all".into(), "undo", "Revert unchanged items to last revision", cx)
                         .when(!unchanged, |d| d.opacity(0.4).cursor_default())
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let ids: Vec<usize> = this.rows.iter().enumerate().filter(|(_, r)| r.since == Some(SinceRelease::Unchanged) && !r.item.reverted).map(|(i, _)| i).collect();
@@ -1541,6 +1674,8 @@ impl Render for ReleaseDialog {
         });
         let query = self.search.read(cx).value().trim().to_lowercase();
         let mut rows_el: Vec<AnyElement> = Vec::new();
+        // Company settings › Release management › "Require a new revision when an item's properties have changed".
+        let policy_new_revision = release_settings().require_new_revision;
         for (i, row) in self.rows.iter().enumerate() {
             let row_issues = issues.get(i).cloned().unwrap_or_default();
             if self.problems_only && row_issues.is_empty() {
@@ -1558,8 +1693,8 @@ impl Render for ReleaseDialog {
                 Mode::Release if row.item.reverted => "Released",
                 Mode::Release => "In progress",
             };
-            // Help: the State column's Revert when only the item's metadata changed; the header's Revert takes every
-            // unchanged item.
+            // The row's Revert (help revert-04 / revert-04-01): an unchanged item, or one whose properties alone changed,
+            // unless company policy then requires a new revision (revert-03: none).
             let since = row.since.filter(|_| self.mode == Mode::Release);
             let reverted = row.item.reverted;
             let missing = row_issues.contains(&Issue::MissingPartNumber);
@@ -1649,7 +1784,7 @@ impl Render for ReleaseDialog {
                         }),
                 )
                 .child(div().w(px(COL_REVISION)).flex_none().flex().justify_end().px(px(10.)).child(div().w(px(64.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Revision:{n}")) }).child(field(&row.revision, row_issues.iter().any(|x| matches!(x, Issue::InvalidRevision | Issue::RevisionTooLow { .. })), editing && !row.item.not_revision_managed, reverted))))
-                .child(h_flex().w(px(COL_STATE)).flex_none().px(px(10.)).gap(px(6.)).child(state).when(matches!(since, Some(SinceRelease::MetadataChanged)) || (reverted && since.is_some()), |d| {
+                .child(h_flex().w(px(COL_STATE)).flex_none().px(px(10.)).gap(px(6.)).child(state).when(since.is_some_and(|s| !(s == SinceRelease::MetadataChanged && policy_new_revision)), |d| {
                     d.child(
                         boxed(SharedString::from(format!("rel-revert-{i}")), "undo", if reverted { "Use the workspace item" } else { "Revert to last revision" }, cx)
                             .when(reverted, |d| d.bg(gpui_kit::rgb(0xeaeaea)))
@@ -1721,14 +1856,16 @@ impl Render for ReleaseDialog {
                 v_flex()
                     .child(main)
                     .children(row_issues.iter().filter(|x| **x != Issue::MissingPartNumber).map(|x| note(x.message().into(), red.into())))
+                    // The server's INFO messages (alert-info), as Onshape's help screenshots show them.
                     .children(since.filter(|_| !reverted).map(|s| {
                         note(
                             match s {
-                                SinceRelease::Unchanged => "Item has not changed since its latest revision.",
-                                SinceRelease::MetadataChanged => "Only the item's properties have changed since its latest revision.",
+                                SinceRelease::Unchanged => "Item has not changed since its last revision.".to_string(),
+                                SinceRelease::MetadataChanged if policy_new_revision => "Item's geometry has not changed since its last revision, but its properties have changed and company policy requires a new revision.".to_string(),
+                                SinceRelease::MetadataChanged => "Item's geometry has not changed since its last revision, but its properties have changed.".to_string(),
                             }
                             .into(),
-                            pal.text_muted.into(),
+                            gpui_kit::rgb(INFO_BLUE).into(),
                         )
                     }))
                     .into_any_element(),
@@ -1797,8 +1934,11 @@ impl Render for ReleaseDialog {
                             cx.notify();
                         }))))
                     }),
-            );
-        let blocked = attention > 0 || name_empty || (self.mode == Mode::Release && notes_required && notes_empty);
+            )
+            .when(self.mode != Mode::Obsolete, |d| d.child(v_flex().w(px(380.)).ml(px(24.)).gap(px(4.)).child(self.people_field(true, read_only, cx)).child(div().pt(px(6.)).child(self.people_field(false, read_only, cx)))));
+        // Company settings › Release management › "Require an approver in the Release dialog".
+        let approver_missing = self.mode == Mode::Release && settings.require_approver && self.approvers.is_empty();
+        let blocked = attention > 0 || name_empty || (self.mode == Mode::Release && notes_required && notes_empty) || approver_missing;
         let status = (blocked && !read_only).then(|| div().text_size(px(12.)).text_color(pal.text_muted).child("A field required by one or more actions is empty ⓘ"));
         let button = |id: &'static str, text: &'static str, bg: u32, enabled: bool| {
             div()
@@ -1900,8 +2040,33 @@ impl Render for ReleaseDialog {
                     .child(button("rel-apply", "Apply", 0x1651b0, !name_empty).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.save_draft(cx);
                     })))
-                    .child(button("rel-release", "Release", 0x2b9d3a, !blocked).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                        if this.commit(cx) {
+                    // Help: Submit when approvers are listed (the candidate waits for them), else Release.
+                    .child(if self.approvers.is_empty() {
+                        button("rel-release", "Release", 0x2b9d3a, !blocked).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            if this.commit(cx) {
+                                close(window, cx);
+                            }
+                        }))
+                    } else {
+                        button("rel-submit", "Submit", 0x2b9d3a, !blocked).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            if this.submit(cx) {
+                                close(window, cx);
+                            }
+                        }))
+                    });
+            }
+            // A Pending candidate's approver (the local user): Approve or Reject (Onshape's standard workflow).
+            Mode::Review if self.candidate == Some(noshape_model::release::CandidateState::Pending) => {
+                let me = noshape_store::local_user_name();
+                let approver = self.approvers.contains(&me);
+                footer = footer
+                    .child(button("rel-reject", "Reject", 0xbd3039, approver).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        if this.decide(false, cx) {
+                            close(window, cx);
+                        }
+                    })))
+                    .child(button("rel-approve", "Approve", 0x2b9d3a, approver).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        if this.decide(true, cx) {
                             close(window, cx);
                         }
                     })));
@@ -2023,6 +2188,22 @@ pub fn open_draft(doc: Entity<DocModel>, draft: &Package, window: &mut Window, c
         d.package = Some(draft.clone());
         d.applied = true;
         d.draft = Some(name);
+        d.approvers = draft.approvers.clone();
+        d.observers = draft.observers.clone();
+        d
+    });
+    window.open_dialog(cx, move |dialog, _, cx| release_dialog_modal(dialog, &view, cx));
+}
+
+/// A submitted candidate from the Release drafts panel: Review Release, read-only; its approver (the local user) can
+/// Approve or Reject it while it is Pending.
+pub fn open_candidate(doc: Entity<DocModel>, candidate: &Package, window: &mut Window, cx: &mut App) {
+    let view = cx.new(|cx| {
+        let mut d = ReleaseDialog::new(doc, Mode::Review, candidate.items.clone(), candidate.name.clone(), candidate.notes.clone(), window, cx);
+        d.package = Some(candidate.clone());
+        d.approvers = candidate.approvers.clone();
+        d.observers = candidate.observers.clone();
+        d.candidate = candidate.state;
         d
     });
     window.open_dialog(cx, move |dialog, _, cx| release_dialog_modal(dialog, &view, cx));
@@ -2048,10 +2229,12 @@ impl Render for ReleaseDraftsPanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let log = release_log(self.doc.read(cx));
-        let user = std::env::var("USER").or_else(|_| std::env::var("USERNAME")).unwrap_or_default();
-        let rows = log.drafts.iter().rev().enumerate().map(|(i, d)| {
+        let user = noshape_store::local_user_name();
+        // Saved drafts, then the submitted candidates with their state (Pending, Rejected).
+        let rows = log.drafts.iter().rev().chain(log.candidates.iter().rev()).enumerate().map(|(i, d)| {
             let selected = self.selected.as_deref() == Some(d.name.as_str());
             let (name, pkg, doc) = (d.name.clone(), d.clone(), self.doc.clone());
+            let state = d.state;
             let icon = match d.items.first().map(|i| i.kind) {
                 Some(ItemKind::Assembly) => "assembly",
                 Some(ItemKind::Drawing) => "drawing",
@@ -2072,12 +2255,17 @@ impl Render for ReleaseDraftsPanel {
                         .text_size(px(14.))
                         .text_color(pal.text)
                         .child(crate::ui::user_text(d.name.clone()))
-                        .child(h_flex().gap_1().text_size(px(13.)).child("by").child(div().font_weight(FontWeight::SEMIBOLD).child(user.clone())).child(div().text_color(pal.text_muted).child(crate::start_library::format_onshape_time(d.created)))),
+                        .child(h_flex().gap_1().text_size(px(13.)).child("by").child(div().font_weight(FontWeight::SEMIBOLD).child(user.clone())).child(div().text_color(pal.text_muted).child(crate::start_library::format_onshape_time(d.created))))
+                        .children(state.map(|s| div().text_size(px(13.)).font_weight(FontWeight::SEMIBOLD).text_color(if s == noshape_model::release::CandidateState::Rejected { gpui_kit::rgb(0xbd3039) } else { gpui_kit::rgb(0x1651b0) }).child(s.label()))),
                 )
                 .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                     this.selected = Some(name.clone());
                     if ev.click_count() >= 2 {
-                        open_draft(doc.clone(), &pkg, window, cx);
+                        if state.is_some() {
+                            open_candidate(doc.clone(), &pkg, window, cx);
+                        } else {
+                            open_draft(doc.clone(), &pkg, window, cx);
+                        }
                     }
                     cx.notify();
                 }))

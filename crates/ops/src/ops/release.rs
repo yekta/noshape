@@ -30,7 +30,9 @@ pub fn ops() -> Vec<Op> {
                 opt("notes", s(), "Release notes (the version's description)."),
                 opt("part_numbers", json!({ "type": "object" }), "{item name or part id: part number}."),
                 opt("revisions", json!({ "type": "object" }), "{item name or part id: revision}."),
-                opt("include_drawings", json!({ "type": "boolean" }), "Include associated drawings."),
+                opt("include_drawings", json!({ "type": "boolean" }), "Include associated drawings (those made from another workspace's state are left out and listed as `drawings_left_out`)."),
+                opt("approvers", strings(), "Approvers: Submit instead of Release. The candidate's version is made now and it waits, Pending, for release_approve or release_reject. The only person offered is the local user (Preferences' name; no user directory in a local app)."),
+                opt("observers", strings(), "Observers (the local user)."),
             ],
             mutates: true,
             destructive: false,
@@ -38,9 +40,29 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "release",
+            verb: "approve",
+            summary: "Approve a Pending release candidate",
+            description: "A submitted candidate's approver › Approve (from Release drafts): it is released at the version made when it was submitted; its items' states become Released.",
+            fields: vec![doc_field(), req("name", s(), "The candidate's release name.")],
+            mutates: true,
+            destructive: false,
+            run: approve,
+        },
+        Op {
+            group: "release",
+            verb: "reject",
+            summary: "Reject a Pending release candidate",
+            description: "A submitted candidate's approver › Reject: the candidate stays, Rejected; its items stay as they were (release them with another candidate).",
+            fields: vec![doc_field(), req("name", s(), "The candidate's release name.")],
+            mutates: true,
+            destructive: false,
+            run: reject,
+        },
+        Op {
+            group: "release",
             verb: "drafts",
             summary: "The saved Release candidate drafts",
-            description: "Release drafts (the document's panel): each saved candidate's name, notes, time and items. Reopen one with release_create `from_draft`, delete it with release_draft_delete.",
+            description: "Release drafts (the document's panel): each saved candidate's name, notes, time and items, then the submitted candidates with their state (Pending, Rejected), approvers and observers. Reopen a draft with release_create `from_draft`, delete it with release_draft_delete; approve or reject a Pending one with release_approve / release_reject.",
             fields: vec![doc_field()],
             mutates: false,
             destructive: false,
@@ -145,8 +167,11 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         items = keep;
     }
+    let mut left_out = Vec::new();
     if a.bool_or("include_drawings", false)? {
-        let extra: Vec<_> = rel::associated_drawings(&od.session, &*provider, &items).into_iter().filter(|d| !items.iter().any(|i| i.same_object(d))).collect();
+        let (found, skipped) = rel::associated_drawings_split(&od.session, &*provider, &items);
+        left_out = skipped;
+        let extra: Vec<_> = found.into_iter().filter(|d| !items.iter().any(|i| i.same_object(d))).collect();
         items.extend(extra);
     }
     let pick = |field: &str, items: &mut Vec<noshape_model::release::ReleaseItem>, set: &dyn Fn(&mut noshape_model::release::ReleaseItem, String)| -> Result<(), OpError> {
@@ -194,18 +219,40 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let created = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
     // Save draft: kept by its name, no checks but the name (the dialog's).
     if a.bool_or("draft", false)? {
-        let pkg = Package { id: 0, kind: PackageKind::Release, name: name.clone(), notes, created, version: None, items, re_releasable: false };
+        let pkg = Package { id: 0, kind: PackageKind::Release, name: name.clone(), notes, created, version: None, items, re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None };
         let mut log = rel::release_log(&od.session);
         log.save_draft(pkg.clone());
         if let Some(old) = draft.as_ref().filter(|d| d.name != name) {
             log.delete_draft(&old.name);
         }
         rel::save_log(&mut od.session, &log).map_err(|e| OpError::new("release", format!("{e:#}")))?;
-        return Ok(json!({ "draft": name, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>() }).into());
+        return Ok(json!({ "draft": name, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>(), "drawings_left_out": left_out }).into());
     }
     // Company settings › Release management › "Require a note in the Release dialog".
-    if crate::release_settings::release_settings().require_note && notes.trim().is_empty() {
+    let settings = crate::release_settings::release_settings();
+    if settings.require_note && notes.trim().is_empty() {
         return Err(OpError::param("notes", "Required field must not be empty."));
+    }
+    let people = |field: &str| -> Result<Vec<String>, OpError> {
+        let me = noshape_store::local_user_name();
+        let mut out: Vec<String> = Vec::new();
+        for (i, v) in a.opt_array(field)?.into_iter().flatten().enumerate() {
+            let n = v.as_str().unwrap_or_default().trim().to_string();
+            if n != me {
+                return Err(OpError::param(&format!("{field}[{i}]"), &format!("only the local user can be chosen: `{me}`")));
+            }
+            if !out.contains(&n) {
+                out.push(n);
+            }
+        }
+        Ok(out)
+    };
+    let (approvers, observers) = (people("approvers")?, people("observers")?);
+    if settings.no_creator_approver && !approvers.is_empty() {
+        return Err(OpError::param("approvers", "Company settings don't allow the creator as an approver"));
+    }
+    if settings.require_approver && approvers.is_empty() {
+        return Err(OpError::param("approvers", "Company settings require an approver"));
     }
     // The dialog's checks.
     let mut issues = log.validate(&items);
@@ -216,16 +263,37 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if !problems.is_empty() {
         return Err(OpError::invalid(format!("the release candidate needs attention: {}", problems.join(" | "))));
     }
-    let pkg = Package { id: 0, kind: PackageKind::Release, name, notes, created, version: None, items, re_releasable: false };
-    let pkg = rel::commit(&mut od.session, pkg).map_err(|e| OpError::new("release", format!("{e:#}")))?;
-    Ok(json!({ "release": pkg.name, "version": pkg.version, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>() }).into())
+    let submitting = !approvers.is_empty();
+    let pkg = Package { id: 0, kind: PackageKind::Release, name, notes, created, version: None, items, re_releasable: false, approvers, observers, state: None };
+    // With approvers: Submit (Pending at its version); else Release at once.
+    let pkg = if submitting { rel::submit(&mut od.session, pkg) } else { rel::commit(&mut od.session, pkg) }.map_err(|e| OpError::new("release", format!("{e:#}")))?;
+    let state = pkg.state.map_or("Released", |s| s.label());
+    Ok(json!({ "release": pkg.name, "state": state, "version": pkg.version, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>(), "drawings_left_out": left_out }).into())
+}
+
+fn approve(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let name = a.str("name")?;
+    if rel::release_log(&od.session).candidate(name).is_none_or(|c| c.state != Some(noshape_model::release::CandidateState::Pending)) {
+        return Err(OpError::param("name", &format!("no pending release candidate `{name}`")));
+    }
+    let pkg = rel::approve(&mut od.session, name).map_err(|e| OpError::new("release", format!("{e:#}")))?;
+    Ok(json!({ "release": pkg.name, "state": "Released", "version": pkg.version, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>() }).into())
+}
+
+fn reject(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let name = a.str("name")?;
+    rel::reject(&mut od.session, name).map_err(|_| OpError::param("name", &format!("no pending release candidate `{name}`")))?;
+    Ok(json!({ "release": name, "state": "Rejected" }).into())
 }
 
 fn drafts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let log = rel::release_log(&od.session);
     let drafts: Vec<Value> = log.drafts.iter().map(|d| json!({ "name": d.name, "notes": d.notes, "created": d.created, "items": d.items.iter().map(item_json).collect::<Vec<_>>() })).collect();
-    Ok(json!({ "drafts": drafts }).into())
+    let candidates: Vec<Value> = log.candidates.iter().map(|c| json!({ "name": c.name, "state": c.state.map_or("Pending", |s| s.label()), "approvers": c.approvers, "observers": c.observers, "notes": c.notes, "created": c.created, "items": c.items.iter().map(item_json).collect::<Vec<_>>() })).collect();
+    Ok(json!({ "drafts": drafts, "candidates": candidates }).into())
 }
 
 fn draft_delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

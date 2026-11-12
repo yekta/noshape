@@ -170,6 +170,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("release_create", &[r##"{"tab": "Part Studio 1", "name": "Release 1", "part_numbers": {"Part 1": "PRT-0001"}}"##, r##"{"tab": "Assembly 1", "name": "R2", "notes": "first build", "include_drawings": true}"##, r##"{"tab": "Part Studio 1", "tabs": ["Drawing 1"], "name": "Release 2", "generate_part_numbers": true, "draft": true}"##, r##"{"from_draft": "Release 2"}"##]),
     ("release_revision_history", &[r##"{"part_number": "PRT-0001"}"##, r##"{}"##]),
     ("release_drafts", &[r##"{}"##]),
+    ("release_approve", &[r##"{"name": "Release 3"}"##]),
+    ("release_reject", &[r##"{"name": "Release 3"}"##]),
     ("release_draft_delete", &[r##"{"name": "Release 2"}"##]),
     ("material_list", &[r##"{"search": "steel"}"##]),
     ("material_library_update", &[r##"{"tab": "Material Library 1", "path": "/tmp/materials.csv"}"##, r##"{"tab": "Material Library 1", "csv": "Category,Name,Density [kg/m^3]\nMetals,Brass C360,8500\n"}"##]),
