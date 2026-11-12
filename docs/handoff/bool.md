@@ -28,9 +28,19 @@ the hotfix (TICKETS 05:00 list; vibe3 ~/qa/tickets, bin/featstat.py).
     built from, plus the corpora, OCCT's libraries and the models. A branch's results are cached too: once it lands,
     they serve as main's.
   - Host side: tools/bool/gate-host.py. Full log: /root/<caller>-scratch/gate-<sha>.log. One gate per host at a time.
-- **Measured (vibe4, load 25-100):** the old serial gate is about 2.5 h (corpora + parity56 13 min x2 (branch and main),
-  kg + kt about 35 min x2, the model suite 30 min x2). The first sharded run without the OCCT cache spent 25+ min on
-  k25-25's single case (OCCT's 80 s cut at 2 threads under load). The cache removes that from every gate after the first.
+- **Measured (vibe4, load 25-100):** the old serial gate is about 2.5 h: corpora + parity56 13 min x2 (branch and
+  main), kg + kt about 35 min x2, the model suite 30 min x2.
+  - First sharded runs, OCCT cache cold, both sides at once: the light shards (about 170) take 10 min.
+  - The knurl shards are OCCT's cuts: k25-25's single case 918 s, kall shards 1,100-1,600 s. One process reached
+    35-40 GB, past the 16 GB budget, and vibe4's earlyoom SIGTERMed it. So the knurls run one at a time with 36 GB free,
+    and a killed shard reruns alone.
+  - The sharded model suite takes 601 s (serial 30 min). Per-document times are kept for balancing next time
+    (~/agents/bool-gate/suite-times.json).
+  - Once warm (the OCCT cache for main's key filled, main's results cached), a crates/brep branch replays only its own
+    side, without OCCT.
+- **Host:** vibe4 sits at load 25-100 from the land queue's slots, psui, blend and dx suites and bool's replays, so
+  16 gate threads get a fraction of 16 cores. Proposal to the lead: a gate lane on vibe4 (rb.sh pins other jobs to cores
+  0-9, gates to 10-15), or gates on vibe5 at night.
 - **lcm (branch bool2-fixes, gating):** OCCT's section of a round and a ring, both tangent to the top plane at a corner, crosses
   the round's straight edge at about 50 degrees 23 um before the corner, runs 8 um out and hooks back into the corner.
   OCCT's own pcurve on the round has the same hook. OCCT puts no vertex there: the edge only touches the ring. Ours now
