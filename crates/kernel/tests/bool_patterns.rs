@@ -2084,6 +2084,35 @@ fn a_thread_sunk_into_a_shaft_fuses_as_live() {
     assert!((mm3(&common.shape) - 26.27).abs() < 0.1, "overlap {} mm3, live 26.27", mm3(&common.shape));
 }
 
+/// c2-rings-loft's Circular pattern 1 (recorded): 8 ring copies fused onto the ring with checked glue. They reach into
+/// it and overlap one another too, so trimmed by it they still don't just touch: OCCT's fuse_trimmed fails there and
+/// OCCT runs the plain fuse. So does noshape's Boolean now (it went to OCCT): OCCT's counts, volume and history.
+#[test]
+fn pattern_copies_overlapping_one_another_fused_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "1b9ae499ee4c1570").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).unwrap();
+    k::set_rust_boolean(None);
+    let counts = |s: &k::Shape| [k::ShapeType::Solid, k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), counts(&o.shape));
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-7 * o.shape.area().unwrap(), "volume {v} against OCCT's {w}");
+    let records = |x: &k::OpResult| {
+        let mut v: Vec<String> = x.history.records.iter().map(|h| format!("{} {:?}{} {:?} {:?}", h.arg, h.input_kind, h.input_index, h.relation, h.output_kind)).collect();
+        v.sort();
+        v
+    };
+    assert_eq!(records(&r), records(&o));
+}
+
 /// cf-surface-pattern's Surface Pattern 3 (recorded: a part cut by 85 stamp bodies): near a target's vertex of 4.9 um
 /// a tool's face has two sections between the same two vertices, 2-6 um apart (with the target's face and with another
 /// tool's): one edge within both curves' errors and the vertices' tolerance, as OCCT's existing pave block (left as two,

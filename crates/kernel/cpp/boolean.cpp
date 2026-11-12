@@ -8021,6 +8021,11 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
         {
           const KernelTimer trim("boolean.rust.trimmed");
           done = rust_fuse_trimmed(a, t, opts, out, h);
+          // (Instances overlapping one another too, so the trimmed ones don't just touch: OCCT's fuse_trimmed fails
+          // there (their volumes don't add up) and OCCT runs the plain fuse; so does ours (c2-rings-loft's
+          // Circular pattern 1: 8 rings, 222 ms against OCCT's 472).)
+          if (!done)
+            done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false);
         }
         if (!done)
           rust_decline(nullptr);
