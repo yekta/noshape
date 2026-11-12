@@ -167,16 +167,26 @@ pub fn read_iges_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShap
     if t.instances.is_empty() && !t.parts.names.is_empty() {
         return step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, true)).collect();
     }
-    // Shared shapes placed (a subfigure placed twice, studios' asm2-twice.igs): each placement a part of its own.
+    // Shared shapes placed (a subfigure placed twice, studios' asm2-twice.igs): each placement of each solid a part of
+    // its own, a subfigure's solids named in its definition's order.
     if !t.instances.is_empty() {
         let parts = step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?;
+        let tree = std::fs::read(path).ok().and_then(|text| iges_subfigures(&String::from_utf8_lossy(&text)));
         let mut placed = Vec::new();
         for i in pvz_instances_of(&t.instances) {
             let Some(p) = parts.get(i.part) else { continue };
             let mut m = i.transform;
             m.w_axis = (m.w_axis.truncate() * (1000.0 / unit.mm_per_unit())).extend(1.0);
             let shape = p.shape.transformed(&crate::Transform::Matrix(m))?;
-            placed.push(merged_faces(ImportedShape { shape, name: p.name.clone(), color: p.color, opacity: p.opacity, face_colors: p.face_colors.clone() }, true)?);
+            let solids = shape.solids();
+            let names = tree.as_ref().and_then(|t| t.members_matching(p.name.as_deref(), solids.len())).filter(|_| solids.len() > 1);
+            let Some(names) = names else {
+                placed.push(merged_faces(ImportedShape { shape, name: p.name.clone(), color: p.color, opacity: p.opacity, face_colors: p.face_colors.clone() }, true)?);
+                continue;
+            };
+            for (shape, name) in solids.into_iter().zip(names) {
+                placed.push(merged_faces(ImportedShape { shape, name: Some(name), color: p.color, opacity: p.opacity, face_colors: Vec::new() }, true)?);
+            }
         }
         if !placed.is_empty() {
             return Ok(placed);
@@ -309,6 +319,13 @@ enum IgesChild {
 struct IgesTree {
     subs: Vec<String>,
     children: Vec<(Option<usize>, IgesChild)>,
+}
+
+impl IgesTree {
+    /// The solid names of the subfigure whose definition holds `count` solids, the first named `first`.
+    fn members_matching(&self, first: Option<&str>, count: usize) -> Option<Vec<String>> {
+        (0..self.subs.len()).map(|k| self.children.iter().filter(|(o, _)| *o == Some(k)).filter_map(|(_, c)| if let IgesChild::Solid(n) = c { Some(n.clone()) } else { None }).collect::<Vec<_>>()).find(|m| m.len() == count && m.first().map(String::as_str) == first)
+    }
 }
 
 fn iges_subfigures(text: &str) -> Option<IgesTree> {
