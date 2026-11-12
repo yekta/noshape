@@ -5861,7 +5861,13 @@ impl Window {
             PlatformInput::Touch(_) => InputModality::Touch,
             _ => self.last_input_modality,
         };
-        if self.last_input_modality != old_modality {
+        // NOSHAPE PATCH (agent studios): a key that switches to keyboard modality redraws after it is dispatched.
+        // Refreshing first made `dispatch_key_event` draw a whole frame before handling the first key after a click
+        // (only hover and focus-visible styling follow the modality, not the dispatch tree), then another for its
+        // result.
+        let is_key = matches!(event, PlatformInput::KeyDown(_) | PlatformInput::KeyUp(_));
+        let modality_changed = self.last_input_modality != old_modality;
+        if modality_changed && !is_key {
             self.refresh();
         }
 
@@ -5989,6 +5995,9 @@ impl Window {
             self.dispatch_mouse_event(any_mouse_event, cx);
         } else if let Some(any_key_event) = event.keyboard_event() {
             self.dispatch_key_event(any_key_event, cx);
+            if modality_changed {
+                self.refresh();
+            }
         } else if let Some(touch_event) = event.touch_event() {
             self.dispatch_touch_event(touch_event, cx);
         }
