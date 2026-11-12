@@ -1,0 +1,51 @@
+{
+ "name": "docs-import-modal-options",
+ "about": "Create › Import files… › a STEP assembly: the Import to Onshape modal's cards and Join adjacent surfaces, Cancel",
+ "area": "studios",
+ "source": "studios 11-12 (documents coverage: pick_files)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Import files…"
+   }
+  },
+  {
+   "do": "pick_files",
+   "files": [
+    "uip-asm.step"
+   ]
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Split into multiple documents"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Join adjacent surfaces"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Import to a single document"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

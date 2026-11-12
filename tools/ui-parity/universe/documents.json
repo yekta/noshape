@@ -490,7 +490,39 @@
    "where": "documents page › Create › Import files… › pick a CAD file",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:31"
+   "source": "behaviours.md:31",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Import files…"
+      }
+     },
+     {
+      "do": "pick_files"
+     },
+     {
+      "on": {
+       "button": "Import to a single document"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "menu": "Import files…"
+      }
+     },
+     {
+      "do": "pick_files"
+     },
+     {
+      "on": {
+       "button": "modal-ok"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-import-to-onshape-split-into-multiple-documents",
@@ -499,7 +531,24 @@
    "where": "documents page › Create › Import files… › pick an assembly",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:31"
+   "source": "behaviours.md:31",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Import files…"
+      }
+     },
+     {
+      "do": "pick_files"
+     },
+     {
+      "on": {
+       "button": "Split into multiple documents"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-import-to-onshape-combine-to-a-single-part-studio",
@@ -584,7 +633,19 @@
    "where": "Import to Onshape modal (checkbox)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:31"
+   "source": "behaviours.md:31",
+   "via": [
+    [
+     {
+      "do": "pick_files"
+     },
+     {
+      "on": {
+       "checkbox": "Join adjacent surfaces"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-import-to-onshape-import-cancel",
@@ -4929,7 +4990,117 @@
    "where": "document tab bar › + › Import…",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:30199"
+   "source": "behaviours.md:30199",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Import…"
+      }
+     },
+     {
+      "do": "pick_files",
+      "files": [
+       "dx-image.png"
+      ]
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Import…"
+      }
+     },
+     {
+      "do": "pick_files",
+      "files": [
+       "uip-page.pdf"
+      ]
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Import…"
+      }
+     },
+     {
+      "do": "pick_files",
+      "files": [
+       "uip-notes.txt"
+      ]
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Import…"
+      }
+     },
+     {
+      "do": "pick_files",
+      "files": [
+       "uip-table.csv"
+      ]
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Import…"
+      }
+     },
+     {
+      "do": "pick_files",
+      "files": [
+       "uip-data.json"
+      ]
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Import…"
+      }
+     },
+     {
+      "do": "pick_files",
+      "files": [
+       "dx-plate.dxf"
+      ]
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-import-of-cad-import-to-onshape-import-to-this-document-combine-to-a-sin",
@@ -4938,7 +5109,27 @@
    "where": "document tab bar › + › Import…",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1722"
+   "source": "behaviours.md:1722",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Import…"
+      }
+     },
+     {
+      "do": "pick_files",
+      "files": [
+       "uip-asm.step"
+      ]
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-imported-image-tab-viewer-actual-size-top-left",

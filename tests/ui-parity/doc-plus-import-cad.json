@@ -1,0 +1,37 @@
+{
+ "name": "doc-plus-import-cad",
+ "about": "+ › Import… › a STEP assembly: Import to Onshape (Import to this document), Import: the new tabs after the active one and the toast",
+ "area": "studios",
+ "source": "studios 11-12 (documents coverage: pick_files)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Import…"
+   }
+  },
+  {
+   "do": "pick_files",
+   "files": [
+    "uip-asm.step"
+   ]
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait",
+   "ms": 8000
+  }
+ ]
+}

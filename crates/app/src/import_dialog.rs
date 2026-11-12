@@ -292,6 +292,13 @@ fn wrapped_lines(text: &str, bold: usize, breaks: &[usize]) -> Vec<(String, Stri
 
 /// Translate the files and add their tabs (shared with the agent API:
 /// `noshape_ops::import`).
+/// A CAD file tab's Update… (live 2430): the new file imported at once with the dialog's defaults (Import to this
+/// document, appearances), its tabs right after the active tab, the same toast; no modal.
+pub fn reimport(doc: &Entity<DocModel>, path: PathBuf, cx: &mut App) {
+    let after = doc.read(cx).session.active_tab;
+    let _ = import(doc, &[path], Choice { appearances: true, ..Default::default() }, after, false, cx);
+}
+
 fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<TabId>, keep_files: bool, cx: &mut App) -> Option<TabId> {
     use noshape_ops::import as imp;
     let units = doc.read(cx).session.doc.settings.units;

@@ -414,14 +414,29 @@ pub fn update(doc: &Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut 
     crate::file_dialogs::request_open_path("Update file", "All files", &["*"], window, cx, move |path, cx| {
         let Ok(bytes) = std::fs::read(&path) else { return };
         let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+        let file = FileTab::new(&name, &bytes, noshape_model::file_tab::now());
+        let cad = file.kind() == noshape_model::file_tab::FileKind::Cad;
         doc.update(cx, |d, cx| {
             d.edit_document(&format!("Update {name}"), cx, |d| {
                 if let Some(t) = d.tab_mut(tab) {
-                    t.content = TabContent::File(FileTab::new(&name, &bytes, noshape_model::file_tab::now()));
+                    t.content = TabContent::File(file);
                 }
             })
         });
+        // A CAD file is imported again at once, with the Import dialog's defaults (live 2430).
+        if cad && let Some(reimport) = REIMPORT.get() {
+            reimport(&doc, path, cx);
+        }
     });
+}
+
+/// The app's import of a CAD file into the document with the Import dialog's defaults, its tabs after the active one
+/// (`set_reimport`).
+static REIMPORT: std::sync::OnceLock<fn(&Entity<DocModel>, std::path::PathBuf, &mut App)> = std::sync::OnceLock::new();
+
+/// Set at startup by the app (its import lives above this crate).
+pub fn set_reimport(f: fn(&Entity<DocModel>, std::path::PathBuf, &mut App)) {
+    let _ = REIMPORT.set(f);
 }
 
 /// "Uploaded 10:20 pm Oct 18 2026" (local time).

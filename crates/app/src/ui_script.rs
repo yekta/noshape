@@ -309,6 +309,12 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
     asm.read(cx).ui_target_point(t, cx).map(whole)
 }
 
+/// A `pick_files` step's files, in tests/ui-parity/files/ beside the scenarios.
+fn picked_files(step: &Value) -> Vec<PathBuf> {
+    let dir = scenario_path().with_file_name("files");
+    step["files"].as_array().into_iter().flatten().filter_map(Value::as_str).map(|f| dir.join(f)).collect()
+}
+
 /// Where to press a control: its centre, or the middle of its visible part across when its centre is outside the clip
 /// of its scrolling containers (a documents row wider than the list in a narrow window: the Windows runner's 1028 px,
 /// whose rows' centres lay under the Details panel, UIS-RCLICK-WINDOWS).
@@ -687,6 +693,14 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     let _ = cx.update(|window, cx| window.dispatch_event(ev, cx));
                     Ok(())
                 }
+                // The file dialog the step before opened, answered with tests/ui-parity/files/ (live's runner's).
+                "pick_files" => {
+                    let paths = picked_files(&step);
+                    match cx.update(|_, cx| noshape_app_core::ui_script::answer_pick(paths, cx)) {
+                        Ok(true) => Ok(()),
+                        _ => Err("no file dialog is open".to_string()),
+                    }
+                }
                 "wait" => {
                     match step["until"].as_str() {
                         Some("ms") => sleep(cx, step["ms"].as_u64().unwrap_or(500)).await,
@@ -954,6 +968,13 @@ pub fn start_page(cx: &mut App) {
                     }
                     None => Err(format!("unknown key {}", step["key"])),
                 },
+                "pick_files" => {
+                    let paths = picked_files(&step);
+                    match cx.update(|cx| noshape_app_core::ui_script::answer_pick(paths, cx)) {
+                        true => Ok(()),
+                        false => Err("no file dialog is open".to_string()),
+                    }
+                }
                 "wait" => {
                     sleep(cx, step["ms"].as_u64().unwrap_or(500)).await;
                     Ok(())

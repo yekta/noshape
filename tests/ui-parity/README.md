@@ -102,6 +102,9 @@ as the app's own config files, written into the run's config directory before it
 - A `key` step with `"hold": true` leaves its modifiers down (Ctrl+Space's quick tab switcher) until
   `{"do": "release"}` lets them go (psui, 11-09).
 - `{"do": "drag", "from": TARGET, "to": TARGET}`.
+- `{"do": "pick_files", "files": ["uip-asm.step"]}`: answers the file dialog the step before opened with files of
+  `files/` (no dialog shows on either side: live's runner intercepts the browser's, ours the app's while a scenario
+  runs); the step fails with "no file dialog is open" when none waits.
 - `{"do": "wait", "until": "regenerated" | "dialog" | "ms", "ms": 500}`. Each side also waits, after every step,
   until its regeneration is idle (at most 30 s), so timing never decides a result.
 

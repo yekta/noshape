@@ -127,6 +127,7 @@ fn apply_theme(cx: &mut App) {
     // Ace's gutter markers (live document/fs-gutter-*): the notice icons, 13 px
     // in the 16 px cell 2 px into the gutter, with Ace's tooltip.
     cx.set_global(gpui_kit::base::input::GutterMarkerRenderer(std::rc::Rc::new(feature_studio::gutter_marker)));
+    noshape_app_core::file_tab_view::set_reimport(import_dialog::reimport);
     apply_kit_theme(cx);
 }
 

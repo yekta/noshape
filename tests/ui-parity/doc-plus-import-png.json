@@ -1,0 +1,31 @@
+{
+ "name": "doc-plus-import-png",
+ "about": "+ › Import… › a PNG: a file tab, no options modal",
+ "area": "studios",
+ "source": "studios 11-12 (documents coverage: pick_files)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Import…"
+   }
+  },
+  {
+   "do": "pick_files",
+   "files": [
+    "dx-image.png"
+   ]
+  },
+  {
+   "do": "wait",
+   "ms": 3000
+  }
+ ]
+}

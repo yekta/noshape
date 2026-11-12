@@ -1,0 +1,43 @@
+{
+ "name": "docs-import-split",
+ "about": "Create › Import files… › a STEP assembly, Split into multiple documents: a folder named after the file with Sub's document and the top one",
+ "area": "studios",
+ "source": "studios 11-12 (documents coverage: pick_files)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Import files…"
+   }
+  },
+  {
+   "do": "pick_files",
+   "files": [
+    "uip-asm.step"
+   ]
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Split into multiple documents"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait",
+   "ms": 8000
+  }
+ ]
+}

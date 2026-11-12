@@ -1,0 +1,31 @@
+{
+ "name": "doc-file-tab-update",
+ "about": "A STEP file tab's Update… › the same file: re-imported at once, no Import modal (live 2430)",
+ "area": "studios",
+ "source": "studios 11-12 (documents coverage: pick_files)",
+ "start": "doc-cad-file",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "uip-asm.step"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Update…"
+   }
+  },
+  {
+   "do": "pick_files",
+   "files": [
+    "uip-asm.step"
+   ]
+  },
+  {
+   "do": "wait",
+   "ms": 8000
+  }
+ ]
+}

@@ -115,6 +115,14 @@ pub fn request_save_path(title: &'static str, default_name: String, ext: &'stati
 
 /// Ask for a file to open, then call `then` with it.
 pub fn request_open_path(title: &'static str, filter_name: &'static str, exts: &'static [&'static str], window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
+    if crate::ui_script::active() {
+        crate::ui_script::await_pick(Box::new(move |paths, cx| {
+            if let Some(p) = paths.into_iter().next() {
+                then(p, cx)
+            }
+        }));
+        return;
+    }
     if native_dialogs_available() {
         cx.spawn(async move |cx| {
             let picked = rfd::AsyncFileDialog::new().set_title(title).set_directory(documents_dir()).add_filter(filter_name, exts).pick_file().await.map(|f| f.path().to_path_buf());
@@ -131,6 +139,10 @@ pub fn request_open_path(title: &'static str, filter_name: &'static str, exts: &
 /// Ask for one or more files (Onshape's import picker allows several), then
 /// call `then` with them. The in-app prompt takes paths separated by `;`.
 pub fn request_open_paths(title: &'static str, filter_name: &'static str, exts: &'static [&'static str], window: &mut Window, cx: &mut App, then: impl FnOnce(Vec<PathBuf>, &mut App) + 'static) {
+    if crate::ui_script::active() {
+        crate::ui_script::await_pick(Box::new(then));
+        return;
+    }
     if native_dialogs_available() {
         cx.spawn(async move |cx| {
             let picked: Vec<PathBuf> = rfd::AsyncFileDialog::new().set_title(title).set_directory(documents_dir()).add_filter(filter_name, exts).pick_files().await.map(|v| v.iter().map(|f| f.path().to_path_buf()).collect()).unwrap_or_default();

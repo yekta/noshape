@@ -59,6 +59,26 @@ pub fn register_page(window: WindowId, state: impl Fn(&mut Window, &mut App) -> 
     }
 }
 
+/// A file dialog's answer, waiting for the scenario's `pick_files` step.
+type PendingPick = Box<dyn FnOnce(Vec<std::path::PathBuf>, &mut App)>;
+
+thread_local! {
+    static PICK: std::cell::RefCell<Option<PendingPick>> = const { std::cell::RefCell::new(None) };
+}
+
+/// While a scenario runs, a file dialog shows nothing and waits for its `pick_files` step (live's runner intercepts the
+/// browser's dialog the same way).
+pub fn await_pick(then: PendingPick) {
+    PICK.with(|p| *p.borrow_mut() = Some(then));
+}
+
+/// Answer the waiting file dialog with `paths`; false when none waits.
+pub fn answer_pick(paths: Vec<std::path::PathBuf>, cx: &mut App) -> bool {
+    let Some(then) = PICK.with(|p| p.borrow_mut().take()) else { return false };
+    then(paths, cx);
+    true
+}
+
 /// The state of window `window`, read by its registered reader.
 pub fn page_state(window: &mut Window, cx: &mut App) -> Option<serde_json::Value> {
     let f = PAGES.with(|p| p.borrow().get(&window.window_handle().window_id()).cloned())?;
