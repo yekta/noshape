@@ -2054,6 +2054,9 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+**psui has this one and asm-scissor-lift's part Mirror (Add, merge scope leaving the seed parts out; legacy gate),
+lead 2026-11-12 12:14 UTC.**
+
 ## From dx (11-12 05:00 UTC): asm-tvc-mount's Mirror 4 (a feature mirror of a custom fastener hole) fails, live removes 89 mm³
 Studio 7bc9d8 of asm-tvc-mount: Mirror 4 is patternType FEATURE over a custom feature ("#featureName", a fastener
 hole: "Fastener fit will not be applied…"), mirrorPlane a face (JEC). Ours: "Could not create all instances as entered.
