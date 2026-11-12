@@ -3940,23 +3940,43 @@ fn a_sketch_on_the_flat_is_drawn_in_the_flat_view(cx: &mut TestAppContext) {
     assert!(near(w(line.0), (10.0, 10.0)) && near(w(line.1), (40.0, 30.0)), "{:?} {:?}", w(line.0), w(line.1));
 }
 
-/// A default plane right-clicked in the graphics (ui-parity plane-graphics-rclick-menu, live): its feature list row's
-/// menu. It is built while the view is being updated: reading the view for its selection there crashed the app
-/// (vibe6 11-12). Selected, it adds Clear selection (live PLANE-MENU-SELECTED).
+/// Every kind of plane right-clicked in the graphics, unselected and selected: Top, Front and Right (the feature list
+/// row's menu, ui-parity plane-graphics-rclick-menu) and a Plane feature's. The menu is built while the view is being
+/// updated: the default planes' read the view for their selection there and crashed the app (v0.4.46, 2347771e).
+/// Selected, a default plane's adds Clear selection (live PLANE-MENU-SELECTED).
 #[gpui::test]
-fn a_default_planes_graphics_menu_opens_without_reading_the_view(cx: &mut TestAppContext) {
+fn every_kind_of_plane_right_clicked_in_the_graphics_opens_its_menu(cx: &mut TestAppContext) {
     let (window, view) = part_studio(cx, "plane-graphics-menu");
-    let menu = |cx: &mut TestAppContext| {
-        cx.update_window(window, |_, w, cx| {
-            view.update(cx, |v, cx| v.open_context_menu(Some(noshape_scene::builder::PickTarget { reference: Reference::Plane(DatumPlane::Top), kind: noshape_scene::builder::PickKind::Plane, anchor: None }), gpui_kit::point(px(600.), px(400.)), w, cx))
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let tab = v.tab;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "Add plane", cx, |ps| {
+                    let mut f = ps.new_feature("cPlane", &noshape_units::UnitPrefs::default()).expect("Plane");
+                    f.params.set("entities", noshape_model::ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+                    f.params.set("offset", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("10 mm")));
+                    ps.features.push(f);
+                })
+            });
         })
-        .unwrap();
+    });
+    wait_until(cx, window, |cx| view.read(cx).display.planes.len() == 4);
+    let feature_plane = cx.update(|cx| view.read(cx).display.planes.iter().map(|p| p.reference.clone()).find(|r| matches!(r, Reference::FeaturePlane(_)))).expect("Plane 1");
+    let menu = |cx: &mut TestAppContext, r: &Reference| {
+        let t = noshape_scene::builder::PickTarget { reference: r.clone(), kind: noshape_scene::builder::PickKind::Plane, anchor: None };
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_context_menu(Some(t), gpui_kit::point(px(600.), px(400.)), w, cx))).unwrap();
         draw(cx, window);
         cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default())
     };
-    let rows = menu(cx);
-    assert!(rows.iter().any(|l| l == "New sketch…") && rows.iter().any(|l| l == "Offset plane…") && !rows.iter().any(|l| l == "Clear selection"), "{rows:?}");
-    cx.update_window(window, |_, _, cx| view.update(cx, |v, _| v.selection = vec![Reference::Plane(DatumPlane::Top)])).unwrap();
-    let rows = menu(cx);
-    assert!(rows.iter().any(|l| l == "Clear selection"), "selected: {rows:?}");
+    let planes = [Reference::Plane(DatumPlane::Top), Reference::Plane(DatumPlane::Front), Reference::Plane(DatumPlane::Right), feature_plane];
+    for r in &planes {
+        for selected in [false, true] {
+            cx.update_window(window, |_, _, cx| view.update(cx, |v, _| v.selection = if selected { vec![r.clone()] } else { Vec::new() })).unwrap();
+            let rows = menu(cx, r);
+            assert!(rows.iter().any(|l| l == "New sketch…") && rows.iter().any(|l| l == "Offset plane…"), "{r:?} selected {selected}: {rows:?}");
+            if matches!(r, Reference::Plane(_)) {
+                assert_eq!(rows.iter().any(|l| l == "Clear selection"), selected, "{r:?} selected {selected}: {rows:?}");
+            }
+        }
+    }
 }
