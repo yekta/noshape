@@ -24,7 +24,8 @@ REPLAY = ("bool-corpus corpus2 corpus3 corpus4 corpus5 corpus6 direct-corpus sh-
 VS_OCCT = {"parity56"}
 # Corpora whose cases take many GB (the memory budget is 16 GB a process, as whyall.sh's): Shell's slab fuses and the
 # gears in a pool of two; the knurls, whose OCCT cuts reached 35-40 GB a process, one at a time, each with 36 GB free
-# (vibe4's earlyoom ends the largest process when memory runs low: eight heavy shards at once lost their results).
+# (vibe4's earlyoom ends the largest process when memory runs low: eight heavy shards at once lost their results);
+# a case a shard (kall's 324c79d1 alone took 49.5 GB).
 # A shard ended without its results runs again alone after the rest.
 HEAVY = {"shfall", "cf-spur-gear", "gears", "gpf"}
 SOLO = {"kall", "k10-25", "k10-25-12", "k25-15", "k25-25", "k25-71-12"}
@@ -117,7 +118,7 @@ def replay_tasks(role, out, kbin, jobs, okey):
     for (vs, heavy, variant), xs in sorted(pools.items()):
         weight = sum(x["ms"] + 30 for x in xs)
         # (By time, and by count: cases recorded with our Boolean on (parity56's) say little of the replay's time.)
-        k = max(1, round(4 * jobs * weight / total), -(-len(xs) // (5 if heavy == "solo" else 25 if heavy else 40)))
+        k = max(1, round(4 * jobs * weight / total), -(-len(xs) // (1 if heavy == "solo" else 25 if heavy else 40)))
         bins = [[0.0, []] for _ in range(k)]
         for x in sorted(xs, key=lambda x: -x["ms"]):
             b = min(bins, key=lambda b: b[0])
@@ -365,7 +366,7 @@ def compare(base_r, new_r, base_s, new_s, spd):
         b = {r[0]: r for r in base_r}
         n = {r[0]: r for r in new_r}
         per = {}
-        new_bad, lost, gained, fixed, reasons, unknown = [], [], [], [], 0, []
+        new_bad, lost, gained, fixed, reasons, unknown, unrunnable = [], [], [], [], 0, [], []
         for key in sorted(set(b) | set(n)):
             rb, rn = b.get(key), n.get(key)
             if rn is None or rb is None:
@@ -379,7 +380,9 @@ def compare(base_r, new_r, base_s, new_s, spd):
                 p[2] += sn in TAKEN
                 p[3] += sb in BAD
                 p[4] += sn in BAD
-            if sb == "noresult":
+            if sb == sn == "noresult" and all(re.search(r"\(killed|\(exit -(9|15),", x) for x in (rb[4], rn[4])):
+                unrunnable.append(f"{rn[2].split(',')[0]} {rn[1]}")
+            elif sb == "noresult":
                 unknown.append(f"{rn[2].split(',')[0]} {rn[1]}: {rb[4]}")
             elif sn in BAD and not (sb == sn and rounded(rb[4]) == rounded(rn[4])):
                 new_bad.append(f"{rn[2].split(',')[0]} {rn[1]}: {sn}: {rn[4]} (main: {sb} {rb[4]})".strip())
@@ -391,6 +394,10 @@ def compare(base_r, new_r, base_s, new_s, spd):
                 fixed.append(f"{rn[1]} ({sn})")
             elif sb == sn == "declined" and rb[4] != rn[4]:
                 reasons += 1
+        # (Cases neither run could finish for memory (kall's knurls: 45-50 GB a process, ended by the host's earlyoom;
+        # bool's kg.sh got nothing for kall either): said, not failed.)
+        if unrunnable:
+            check.append(f"{len(unrunnable)} cases too big for this host on both sides: {' '.join(unrunnable[:8])}")
         if unknown:
             fail.append(f"{len(unknown)} cases without main's result (its replay crashed or timed out there: run again)")
             info += ["  no main result: " + x for x in unknown[:10]]
