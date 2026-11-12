@@ -1297,6 +1297,44 @@ fn plate_with_holes() -> PartStudio {
 /// circular top edge replicates once per other matching hole (through the
 /// hole's face), on that hole's top edge; never onto the seed's own hole
 /// (its other end) nor twice into one hole.
+/// A circular edge's centre connector: a new one (`CenterOutward`, "center") points out of the material as live's
+/// (1708: top rims +z, bottom rims −z, the plate's hole and the pin alike); one saved before (`Center`) keeps its
+/// circle's own axis, so a saved assembly's mates solve as they did.
+#[test]
+fn circle_centre_connectors_point_out_and_saved_ones_keep_their_axis() {
+    let f = doc_with(vec![plate_with_hole(), pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let units = UnitPrefs::default();
+    for studio in &f.studios {
+        let (body, r) = body_of(&mut ev, &f.doc, *studio);
+        let b = &r.context.bodies[0];
+        let rims: Vec<(Reference, DVec3, DVec3)> = b
+            .edges
+            .iter()
+            .enumerate()
+            .filter_map(|(i, n)| match b.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).ok()?.edge_info().ok()?.curve {
+                noshape_kernel::Curve::Circle { center, axis, .. } => Some((Reference::Edge((**n).clone()), center, axis.normalize())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(rims.len(), 2, "two rims");
+        let mid = (rims[0].1.z + rims[1].1.z) * 0.5;
+        for (edge, centre, axis) in &rims {
+            let z = |inference| {
+                let c = Reference::Implicit { on: Box::new(edge.clone()), inference };
+                super::eval::resolve_connector_in(&r.context, Some(&body), &c, &units).expect("a connector").z()
+            };
+            let out = if centre.z > mid { DVec3::Z } else { DVec3::NEG_Z };
+            assert!((z(Inference::CenterOutward) - out).length() < 1e-9, "new: {:?} at z {}", z(Inference::CenterOutward), centre.z);
+            // (On an extruded rim the edge's own sense already points out; they part on others, a countersink's.)
+            assert!((z(Inference::Center) - out).length() < 1e-9 && axis.z.abs() > 0.999, "saved: {:?}", z(Inference::Center));
+        }
+    }
+    // A document saved before reads its connectors as `Center`, a new one writes `CenterOutward`.
+    assert_eq!(serde_json::from_str::<Inference>("\"Center\"").unwrap(), Inference::Center);
+    assert_eq!(serde_json::to_string(&Inference::CenterOutward).unwrap(), "\"CenterOutward\"");
+}
+
 #[test]
 fn replicate_from_a_hole_edge_matches_holes_once() {
     let f = doc_with(vec![plate_with_holes(), pin_studio()]);

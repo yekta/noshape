@@ -1697,7 +1697,7 @@ pub fn resolve_connector_aligned(ctx: &Arc<Context>, body: Option<&BodyId>, refe
     let vars = BTreeMap::new();
     let ev = EvalCtx::new(FeatureId(0), "", &params, units, c, &vars);
     let special = match reference {
-        Reference::Implicit { on, inference: Inference::Center } if matches!(**on, Reference::Face(_)) => {
+        Reference::Implicit { on, inference: Inference::Center | Inference::CenterOutward } if matches!(**on, Reference::Face(_)) => {
             let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(&**on)).first()?;
             match ev.face_shape(bi, fi).ok()?.face_surface().ok()? {
                 noshape_kernel::Surface::Cone { axis, apex, .. } => Some(connector_frame(apex, axis)),
@@ -1792,7 +1792,7 @@ fn unaligned(ev: &EvalCtx, reference: &Reference, frame: Frame) -> Option<Frame>
             let d = direction.normalize();
             return Some(connector_frame(frame.origin, if edge.orientation() == noshape_kernel::Orientation::Reversed { -d } else { d }));
         }
-        (Inference::Center, noshape_kernel::Curve::Circle { .. }) => {}
+        (Inference::Center | Inference::CenterOutward, noshape_kernel::Curve::Circle { .. }) => {}
         _ => return None,
     }
     let faces = shape.edge_faces().ok()?.get(ei)?.clone();
@@ -1878,7 +1878,7 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                     }
                     let edge_ref = Reference::Edge((**en).clone());
                     if matches!(info.curve, noshape_kernel::Curve::Circle { .. }) {
-                        refs.push((implicit(&edge_ref, Inference::Center), Some(on.clone())));
+                        refs.push((implicit(&edge_ref, Inference::CenterOutward), Some(on.clone())));
                     }
                     if !info.closed {
                         refs.push((implicit(&edge_ref, Inference::Midpoint), Some(on.clone())));
@@ -1908,7 +1908,7 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                         refs.push((implicit(on, inf), None));
                     }
                 }
-                Some(noshape_kernel::Surface::Sphere { .. }) => refs.push((implicit(on, Inference::Center), None)),
+                Some(noshape_kernel::Surface::Sphere { .. }) => refs.push((implicit(on, Inference::CenterOutward), None)),
                 // A fillet ring round a hole (torus) or a revolved face: the
                 // centers of its circular edges, Z along the axis. Its
                 // centroid lies off the surface, so a normal there would put
@@ -1927,7 +1927,7 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                                 && circle
                                 && let Some(en) = b.edges.get(ei)
                             {
-                                refs.push((implicit(&Reference::Edge((**en).clone()), Inference::Center), None));
+                                refs.push((implicit(&Reference::Edge((**en).clone()), Inference::CenterOutward), None));
                             }
                         }
                     }
@@ -1961,7 +1961,7 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                         }
                         let edge_ref = Reference::Edge((**en).clone());
                         if matches!(info.curve, noshape_kernel::Curve::Circle { .. }) {
-                            refs.push((implicit(&edge_ref, Inference::Center), Some(on.clone())));
+                            refs.push((implicit(&edge_ref, Inference::CenterOutward), Some(on.clone())));
                         }
                         if !info.closed {
                             open_edges.insert(ei as u32);
@@ -1988,7 +1988,7 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                 let Ok(info) = e.edge_info() else { continue };
                 let circle = matches!(info.curve, noshape_kernel::Curve::Circle { .. });
                 if circle {
-                    refs.push((implicit(on, Inference::Center), None));
+                    refs.push((implicit(on, Inference::CenterOutward), None));
                 }
                 if info.closed && !circle {
                     refs.push((implicit(on, Inference::Midpoint), None));
@@ -2011,7 +2011,7 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
             }
             if !done {
                 // Sketch curves and edges outside the restricted body.
-                refs.push((implicit(on, Inference::Center), None));
+                refs.push((implicit(on, Inference::CenterOutward), None));
                 refs.push((implicit(on, Inference::Midpoint), None));
             }
         }

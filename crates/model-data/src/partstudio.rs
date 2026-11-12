@@ -63,7 +63,7 @@ impl ConnectorOrigin {
         let kind = match (inference, align.is_some()) {
             (I::Vertex, _) => "POINT",
             (I::Midpoint, _) => "MID_POINT",
-            (I::Center, _) => "CENTER",
+            (I::Center | I::CenterOutward, _) => "CENTER",
             (I::Centroid, true) => "LOOP_CENTER",
             (I::Centroid, false) => "CENTROID",
             (I::TopAxis, _) => "TOP_AXIS_POINT",

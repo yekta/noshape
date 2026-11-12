@@ -195,7 +195,12 @@ pub enum DatumPlane {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Inference {
     Centroid,
+    /// The centre, as saved before v0.4.45: a circular edge's Z its circle's own axis (kept so saved mates solve as
+    /// they did; "center_axis").
     Center,
+    /// The centre ("center"): a circular edge's Z out of the material as live's (1708: out through the planar face it
+    /// bounds; a cone rim's against the cone), elsewhere as [`Inference::Center`].
+    CenterOutward,
     Midpoint,
     Vertex,
     TopAxis,

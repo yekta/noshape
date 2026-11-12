@@ -52,7 +52,10 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
             match info.curve {
                 // Arcs and circles: the center, except an arc's midpoint
                 // (Onshape offers center, midpoint and ends on an arc).
-                k::Curve::Circle { center, axis, .. } if !matches!(inference, Inference::Midpoint | Inference::Vertex) => Some(mk(center, axis)),
+                k::Curve::Circle { center, axis, .. } if !matches!(inference, Inference::Midpoint | Inference::Vertex) => {
+                    let outward = (inference == Inference::CenterOutward).then(|| rim_normal(ev, bi, ei, info.start, axis.normalize())).flatten();
+                    Some(mk(center, outward.unwrap_or(axis)))
+                }
                 _ => {
                     let mid = e.point_at((info.first_param + info.last_param) * 0.5).ok()?;
                     let p = if matches!(inference, Inference::Vertex) { info.start } else { mid };
@@ -90,4 +93,19 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
             None
         }
     }
+}
+
+/// Live 1708: a circular edge's CENTER connector points along the circle's axis: out through the planar face it
+/// bounds (that face's outward normal: +z on top rims, −z on bottom rims, pins and holes alike); on a rim between a
+/// cone and a cylinder against the cone's outward normal (asm-robotic-arm: an M3 screw's head-to-shank rim points to
+/// the head, its countersunk hole's rim to the bore). None for other rims (the circle's own axis then).
+fn rim_normal(ev: &EvalCtx, bi: usize, ei: usize, at: DVec3, axis: DVec3) -> Option<DVec3> {
+    let shape = &ev.ctx.bodies[bi].shape;
+    let faces: Vec<k::Shape> = shape.edge_faces().ok()?.get(ei).cloned().unwrap_or_default().iter().filter_map(|&fi| shape.sub_shape(ShapeType::Face, fi as usize).ok()).collect();
+    let along = |f: &k::Shape| f.normal_at_point(at).ok().map(|n| n.dot(axis)).filter(|d| d.abs() > 1e-6);
+    if let Some(d) = faces.iter().filter(|f| f.is_planar()).find_map(along) {
+        return Some(axis * d.signum());
+    }
+    let cone = faces.iter().find(|f| matches!(f.face_surface(), Ok(k::Surface::Cone { .. })))?;
+    along(cone).map(|d| axis * -d.signum())
 }

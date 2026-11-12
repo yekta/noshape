@@ -72,7 +72,8 @@ fn parse_dotted(s: &str) -> Option<(FeatureId, u32)> {
 fn inference_name(i: Inference) -> &'static str {
     match i {
         Inference::Centroid => "centroid",
-        Inference::Center => "center",
+        Inference::Center => "center_axis",
+        Inference::CenterOutward => "center",
         Inference::Midpoint => "midpoint",
         Inference::Vertex => "vertex",
         Inference::TopAxis => "top_axis",
@@ -82,7 +83,7 @@ fn inference_name(i: Inference) -> &'static str {
     }
 }
 
-pub const INFERENCES: [Inference; 8] = [Inference::Centroid, Inference::Center, Inference::Midpoint, Inference::Vertex, Inference::TopAxis, Inference::MidAxis, Inference::BottomAxis, Inference::Origin];
+pub const INFERENCES: [Inference; 9] = [Inference::Centroid, Inference::CenterOutward, Inference::Center, Inference::Midpoint, Inference::Vertex, Inference::TopAxis, Inference::MidAxis, Inference::BottomAxis, Inference::Origin];
 
 /// The id of a reference.
 pub fn to_id(r: &Reference) -> String {

@@ -189,7 +189,7 @@ fn cases(parts: &Parts) -> Vec<(&'static str, Assembly)> {
     let r1 = pose(0.0, (-50.0, 60.0, 40.0));
     let pin_edges = |r: Placement, t: MateType, set: &dyn Fn(&mut Mate)| {
         let mut asm = two(parts, PLATE, PIN, r);
-        let mut m = mate(10, t, conn(2, edge(parts, PIN, 200.0, 5.0, 0.0), Inference::Center), conn(1, edge(parts, PLATE, 130.0, 25.0, 10.0), Inference::Center));
+        let mut m = mate(10, t, conn(2, edge(parts, PIN, 200.0, 5.0, 0.0), Inference::CenterOutward), conn(1, edge(parts, PLATE, 130.0, 25.0, 10.0), Inference::CenterOutward));
         set(&mut m);
         asm.mates.push(m);
         asm
@@ -449,7 +449,7 @@ fn onshape_inference(i: Inference) -> &'static str {
         Inference::Centroid => "CENTROID",
         Inference::Vertex => "POINT",
         Inference::Midpoint => "MID_POINT",
-        Inference::Center => "CENTER",
+        Inference::Center | Inference::CenterOutward => "CENTER",
         Inference::MidAxis => "MID_AXIS_POINT",
         Inference::TopAxis => "TOP_AXIS_POINT",
         Inference::BottomAxis => "BOTTOM_AXIS_POINT",
@@ -711,7 +711,7 @@ fn asm_probes(parts: &Parts) -> Vec<(&'static str, Assembly)> {
     // b1–b5: a plate's hole on A's front face by a Slider, turned from its start.
     for (name, deg, t) in [("b1", 0.0, (88.0, 66.0, 49.0)), ("b2", 90.0, (88.0, 66.0, 49.0)), ("b3", 180.0, (88.0, 66.0, 49.0)), ("b4", 302.0, (88.0, 66.0, 49.0)), ("b5", 302.0, (0.0, 0.0, 0.0))] {
         let mut a = two(parts, BLOCK, PLATE, pose(deg, t));
-        a.mates.push(mate(10, MateType::Slider, conn(2, edge(parts, PLATE, 130.0, 25.0, 0.0), Inference::Center), conn(1, face(parts, BLOCK, 20.0, 0.0, 5.0), Inference::Centroid)));
+        a.mates.push(mate(10, MateType::Slider, conn(2, edge(parts, PLATE, 130.0, 25.0, 0.0), Inference::CenterOutward), conn(1, face(parts, BLOCK, 20.0, 0.0, 5.0), Inference::Centroid)));
         out.push((name, named(a)));
     }
     out
@@ -807,7 +807,7 @@ fn spec_assembly(parts: &Parts, spec: &serde_json::Value) -> Assembly {
         asm.instances.push(instance(parts, k as u64 + 1, &names[k], kinds[k], at, i["fixed"].as_bool().unwrap()));
     }
     let types = [MateType::Fastened, MateType::Revolute, MateType::Slider, MateType::Cylindrical, MateType::Planar, MateType::Ball, MateType::Parallel];
-    let infer = |s: &str| [Inference::Centroid, Inference::Vertex, Inference::Midpoint, Inference::Center, Inference::MidAxis, Inference::TopAxis, Inference::BottomAxis, Inference::Origin].into_iter().find(|i| onshape_inference(*i) == s).unwrap();
+    let infer = |s: &str| [Inference::Centroid, Inference::Vertex, Inference::Midpoint, Inference::CenterOutward, Inference::MidAxis, Inference::TopAxis, Inference::BottomAxis, Inference::Origin].into_iter().find(|i| onshape_inference(*i) == s).unwrap();
     for m in spec["mates"].as_array().unwrap() {
         let t = types.into_iter().find(|t| t.name() == m["type"].as_str().unwrap()).unwrap();
         let side = |c: &serde_json::Value| {

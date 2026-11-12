@@ -30,6 +30,13 @@ new); most are the selection after a step (`.drawing.selection.length` live 1 / 
 - drw-view-align-vertically: step 1 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (4/6 states)
 - drw-view-replicate-annotations: step 8 differs at .drawing.selection[0].kind: live "EDGE" / ours "VIEW" (8/10 states)
 
+## 11-12 03:53 UTC: circular-edge centre connectors point out of the material as live (gated); assembly suite 1484, mates 286
+- New connectors on a circular edge (`Inference::CenterOutward`, id "center") point as live 1708: out through the
+  planar face the rim bounds, a cone/cylinder rim against the cone (robotic-arm's countersunk screws and holes). Saved
+  ones stay `Center` ("center_axis": the circle's own axis), so saved assemblies solve as before. robotic-arm mates
+  1 -> 5/29, scissor-lift 204/242; none worse (vibe5, all 24). oracle_asm's 7 live comparisons pass with it.
+- Per-mate check script: /root/dx-scratch/ra/cmp.py + rel.py (our connector vs live's matedCS, flip-aware).
+
 ## 11-12 01:56 UTC: a sketch on a face has its holes' insides as regions; IGES subfigures one part per solid
 - Imprint: a hole's inside, closed by the face's edges alone, is a sketch face too (live: asm-robotic-arm's Sketch 3,
   JPC inside JPG; T1 sketch_assoc a_sketch_on_a_face_with_a_hole_has_the_holes_inside_too). Model suite 826 -> 827/947
