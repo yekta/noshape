@@ -1,0 +1,1110 @@
+{
+ "scenario": "drw-export-dxf-custom-sheets-empty",
+ "recorded": "2026-11-12T17:55:26.073Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+ },
+ "live": {
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "6d5b4285b66228ec3481ebf9",
+  "start": "block-drawing",
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "other",
+   "tag": "iframe"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": {
+   "tab": "Part 1 Drawing 1",
+   "sheet": "Sheet1",
+   "sheets": [
+    "Sheet1"
+   ],
+   "tool": null,
+   "views": [
+    {
+     "name": "Front",
+     "kind": "base",
+     "position": [
+      81,
+      81
+     ],
+     "parent": null,
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Isometric",
+     "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Right",
+     "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Top",
+     "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    }
+   ],
+   "annotations": [],
+   "selection": []
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "doc_tab": "Part 1 Drawing 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    775,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Delete",
+      "Open in new browser tab",
+      "Rename",
+      "Properties…",
+      "Duplicate",
+      "Copy to clipboard",
+      "Change to version…",
+      "Select as document thumbnail",
+      "Move to document…",
+      "Export…",
+      "Release…"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 228958
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Export…"
+    }
+   },
+   "ok": true,
+   "at": [
+    806,
+    926
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export Drawing",
+     "fields": [
+      {
+       "label": "File name View export rules",
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "PDF"
+      },
+      {
+       "label": "Version",
+       "kind": "select",
+       "value": "1.5"
+      },
+      {
+       "label": "Overridden dimensions",
+       "kind": "select",
+       "value": "Show underlines"
+      },
+      {
+       "label": "Text",
+       "kind": "select",
+       "value": "Normal"
+      },
+      {
+       "label": "Color",
+       "kind": "select",
+       "value": "Color"
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Download"
+      },
+      {
+       "label": "Hide inspection items",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PDF DWG DXF DWT SVG PNG JPEG TIFF Inspection list Drawing definition list Version 1.4 1.5 1.6 1.7 Overridden dimensions Show underlines Hide underlines Text Normal Selectable Color Color Black and white Grayscale Options Download Download and store file in a new tab Store file in a new tab Hide inspection items"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 256770
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export Drawing",
+     "fields": [
+      {
+       "label": "File name View export rules",
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "PDF"
+      },
+      {
+       "label": "Version",
+       "kind": "select",
+       "value": "1.5"
+      },
+      {
+       "label": "Overridden dimensions",
+       "kind": "select",
+       "value": "Show underlines"
+      },
+      {
+       "label": "Text",
+       "kind": "select",
+       "value": "Normal"
+      },
+      {
+       "label": "Color",
+       "kind": "select",
+       "value": "Color"
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Download"
+      },
+      {
+       "label": "Hide inspection items",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PDF DWG DXF DWT SVG PNG JPEG TIFF Inspection list Drawing definition list Version 1.4 1.5 1.6 1.7 Overridden dimensions Show underlines Hide underlines Text Normal Selectable Color Color Black and white Grayscale Options Download Download and store file in a new tab Store file in a new tab Hide inspection items"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 296482
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "PDF",
+     "pick": "DXF"
+    }
+   },
+   "ok": true,
+   "at": [
+    950,
+    202
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export Drawing",
+     "fields": [
+      {
+       "label": "File name View export rules",
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "DXF"
+      },
+      {
+       "label": "Version",
+       "kind": "select",
+       "value": "Release 14"
+      },
+      {
+       "label": "Sheets",
+       "kind": "select",
+       "value": "All sheets"
+      },
+      {
+       "label": "Overridden dimensions",
+       "kind": "select",
+       "value": "Show underlines"
+      },
+      {
+       "label": "Text",
+       "kind": "select",
+       "value": "Export as text"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Use drawing units"
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Download"
+      },
+      {
+       "label": "Export splines as polylines",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Set z-height to zero and normals to positive",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Hide inspection items",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Exclude off-sheet content",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PDF DWG DXF DWT SVG PNG JPEG TIFF Inspection list Drawing definition list In the exported file, dimensions added to a view with a scale different from the active sheet may be out of scale. Version Release 11-12 Release 13 Release 14 2000 2004 2007 2010 2013 2018 Model space only Sheets All sheets Current sheet Custom sheets Overridden dimensions Show underlines Hide underlines Text Export as text Explode into polylines (notes) Explode all into polylines Units U"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 312536
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "All sheets",
+     "pick": "Custom sheets"
+    }
+   },
+   "ok": true,
+   "at": [
+    943,
+    440
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export Drawing",
+     "fields": [
+      {
+       "label": "Sheets",
+       "kind": "select",
+       "value": "Custom sheets"
+      },
+      {
+       "label": "Sheets",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "File name View export rules",
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "DXF"
+      },
+      {
+       "label": "Version",
+       "kind": "select",
+       "value": "Release 14"
+      },
+      {
+       "label": "Overridden dimensions",
+       "kind": "select",
+       "value": "Show underlines"
+      },
+      {
+       "label": "Text",
+       "kind": "select",
+       "value": "Export as text"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Use drawing units"
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Download"
+      },
+      {
+       "label": "Export splines as polylines",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Set z-height to zero and normals to positive",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Hide inspection items",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Exclude off-sheet content",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PDF DWG DXF DWT SVG PNG JPEG TIFF Inspection list Drawing definition list In the exported file, dimensions added to a view with a scale different from the active sheet may be out of scale. Version Release 11-12 Release 13 Release 14 2000 2004 2007 2010 2013 2018 Model space only Sheets All sheets Current sheet Custom sheets Sheet range cannot be empty Overridden dimensions Show underlines Hide underlines Text Export as text Explode into polylines (notes) Explod"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 327292
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export Drawing",
+     "fields": [
+      {
+       "label": "Sheets",
+       "kind": "select",
+       "value": "Custom sheets"
+      },
+      {
+       "label": "Sheets",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "File name View export rules",
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "DXF"
+      },
+      {
+       "label": "Version",
+       "kind": "select",
+       "value": "Release 14"
+      },
+      {
+       "label": "Overridden dimensions",
+       "kind": "select",
+       "value": "Show underlines"
+      },
+      {
+       "label": "Text",
+       "kind": "select",
+       "value": "Export as text"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Use drawing units"
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Download"
+      },
+      {
+       "label": "Export splines as polylines",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Set z-height to zero and normals to positive",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Hide inspection items",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Exclude off-sheet content",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PDF DWG DXF DWT SVG PNG JPEG TIFF Inspection list Drawing definition list In the exported file, dimensions added to a view with a scale different from the active sheet may be out of scale. Version Release 11-12 Release 13 Release 14 2000 2004 2007 2010 2013 2018 Model space only Sheets All sheets Current sheet Custom sheets Sheet range cannot be empty Overridden dimensions Show underlines Hide underlines Text Export as text Explode into polylines (notes) Explod"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 351409
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "cancel"
+    }
+   },
+   "ok": true,
+   "at": [
+    1212,
+    897
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 377222
+  }
+ ]
+}
