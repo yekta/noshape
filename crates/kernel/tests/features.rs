@@ -1362,3 +1362,29 @@ fn sheet_edges_along_a_line_probe() {
         show("edges unified", &unify_edges(&s).unwrap().shape);
     }
 }
+
+/// Probe: from unify dumps (NOSHAPE_PROBE_DIR) with NOSHAPE_PROBE_FACES faces, the faces with a vertex within 0.2 mm of
+/// the box NOSHAPE_PROBE_BOX (x0,y0,z0,x1,y1,z1 mm) written as a compound to NOSHAPE_PROBE_OUT, with their shown counts.
+#[test]
+#[ignore = "T2: probe"]
+fn faces_near_a_box_probe() {
+    let (Ok(dir), Ok(n), Ok(bx), Ok(out)) = (std::env::var("NOSHAPE_PROBE_DIR"), std::env::var("NOSHAPE_PROBE_FACES"), std::env::var("NOSHAPE_PROBE_BOX"), std::env::var("NOSHAPE_PROBE_OUT")) else { return };
+    let n: usize = n.parse().unwrap();
+    let b: Vec<f64> = bx.split(',').map(|x| x.parse::<f64>().unwrap() * 1e-3).collect();
+    let inside = |p: DVec3| p.x > b[0] && p.x < b[3] && p.y > b[1] && p.y < b[4] && p.z > b[2] && p.z < b[5];
+    for e in std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()) {
+        let Ok(s) = read_brep(&e.path()) else { continue };
+        if s.faces().len() < n || s.faces().len() > n + 40 {
+            continue;
+        }
+        let Ok(s) = unify_same_domain(&s).map(|r| r.shape) else { continue };
+        if s.faces().len() != n {
+            continue;
+        }
+        let picked: Vec<Shape> = s.faces().into_iter().filter(|f| f.vertices().iter().any(|v| v.vertex_point().is_ok_and(inside))).collect();
+        let c = Shape::compound(&picked);
+        let t = c.shown_topology().unwrap();
+        println!("{}: {} faces picked, edges {} shown {} vertices shown {}", e.path().display(), picked.len(), c.edges().len(), t.edge_count(), t.vertices.iter().filter(|v| **v).count());
+        std::fs::write(&out, c.to_brep_bytes().unwrap()).unwrap();
+    }
+}

@@ -497,3 +497,22 @@ fn an_inside_out_solid_is_told() {
     assert!(!c.has_inside_out_solid());
     assert!(c.reversed().unwrap().has_inside_out_solid());
 }
+
+/// c2-rings-loft's ring after Extrude 5, the engraving's faces only (the ring's seam taken off them by the unify): the
+/// engraving's edges left in pieces where the seam was, B-splines and ellipses, are one edge each, no vertex there
+/// (live 335 edges and 206 vertices on the ring, 7 more of each on ours).
+#[test]
+fn an_engravings_edges_split_where_a_seam_was_show_whole() {
+    let s = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/topology/rings-loft-engraving.brep")).unwrap();
+    let t = s.shown_topology().unwrap();
+    assert_eq!((t.edge_count(), t.vertices.iter().filter(|v| **v).count()), (83, 54));
+}
+
+/// c2-impeller-loft's Loft Gehäuse: its end's sketch circle split into three arcs, one curve, between the loft's side and
+/// the end's plane with no seam: three edges and their vertices, as live (4/10/8).
+#[test]
+fn a_sketch_circles_arcs_between_two_faces_stay_apart() {
+    let s = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/topology/impeller-loft-housing.brep")).unwrap();
+    let t = s.shown_topology().unwrap();
+    assert_eq!((s.faces().len(), t.edge_count(), t.vertex_count()), (4, 10, 8));
+}

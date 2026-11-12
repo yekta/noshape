@@ -1055,11 +1055,18 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       TopExp::Vertices(TopoDS::Edge(em(two[0])), a0, a1);
       TopExp::Vertices(TopoDS::Edge(em(two[1])), b0, b1);
       const bool loop = (a0.IsSame(b0) && a1.IsSame(b1)) || (a0.IsSame(b1) && a1.IsSame(b0));
-      if (seams == 0 && !loop)
-        continue;
       const std::vector<uint32_t> fa = faces_of(two[0]), fb = faces_of(two[1]);
       if (fa.size() != 2 || fa != fb)
         continue;
+      // No seam through it: only B-spline or ellipse pieces the curve tests below find one curve, a seam a unify took
+      // away with them left apart (c2-rings-loft's Extrude 5: 7 edges more than live), never a sketch's arcs or lines of
+      // one curve, which live keeps apart (c2-impeller-loft's Loft Gehäuse: 3 arcs round its end, 10 edges).
+      if (seams == 0 && !loop)
+      {
+        const GeomAbs_CurveType ta = BRepAdaptor_Curve(TopoDS::Edge(em(two[0]))).GetType(), tb = BRepAdaptor_Curve(TopoDS::Edge(em(two[1]))).GetType();
+        if (ta != tb || (ta != GeomAbs_BSplineCurve && ta != GeomAbs_Ellipse))
+          continue;
+      }
       // Going on from each other: their directions away from the vertex opposite.
       const TopoDS_Vertex& v = TopoDS::Vertex(vm(i));
       auto away = [&](int j) {
@@ -1092,6 +1099,21 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
             const gp_Circ p = xa.Circle(), q = xb.Circle();
             const double  tol = 1e-9 * std::max(1.0, p.Radius());
             one = p.Location().Distance(q.Location()) <= tol && std::abs(p.Radius() - q.Radius()) <= tol && p.Axis().Direction().IsParallel(q.Axis().Direction(), 1e-9);
+          }
+          // Pieces of one ellipse or line OCCT made apart either side of the seam (c2-rings-loft's Extrude 5: an engraving
+          // cut into its ring's cylinder and cone across their seam, 7 edges more than live).
+          if (!one && xa.GetType() == GeomAbs_Ellipse && xb.GetType() == GeomAbs_Ellipse)
+          {
+            const gp_Elips p = xa.Ellipse(), q = xb.Ellipse();
+            const double   tol = 1e-9 * std::max(1.0, p.MajorRadius());
+            one = p.Location().Distance(q.Location()) <= tol && std::abs(p.MajorRadius() - q.MajorRadius()) <= tol &&
+                  std::abs(p.MinorRadius() - q.MinorRadius()) <= tol && p.Axis().Direction().IsParallel(q.Axis().Direction(), 1e-9) &&
+                  p.XAxis().Direction().IsParallel(q.XAxis().Direction(), 1e-9);
+          }
+          if (!one && xa.GetType() == GeomAbs_Line && xb.GetType() == GeomAbs_Line)
+          {
+            const gp_Lin p = xa.Line(), q = xb.Line();
+            one = p.Direction().IsParallel(q.Direction(), 1e-9) && p.Distance(q.Location()) <= 1e-9 * std::max(1.0, gp_Vec(p.Location().XYZ()).Magnitude());
           }
           // A section OCCT approximates on each side of the seam (two B-splines, one curve in live: Parasolid's
           // periodic faces have no seam; c2-rings-loft's slots through its rounds): their curvatures agree there, unlike
