@@ -3908,6 +3908,9 @@ impl PartStudioView {
                     .into_any_element(),
                 move || format!("feature:{label}"),
             ));
+            if let Some(last) = dg_rows.pop() {
+                dg_rows.push(test_named(last, move || format!("feature:{label}")));
+            }
         }
         let dg_count = dg_rows.len();
         // The cached display standing in: "Regenerating…" above everything (cached_open.rs).
@@ -4092,7 +4095,7 @@ impl PartStudioView {
                         continue;
                     }
                     gap = false;
-                    rows.push(crate::ui_script::wrap(self.part_row_cached(b, cx), || format!("part:{}", b.name)));
+                    rows.push(crate::ui_script::wrap(test_named(self.part_row_cached(b, cx), || format!("part:{}", b.name)), || format!("part:{}", b.name)));
                 }
                 (title, key, rows, bodies.iter().map(|b| b.id.clone()).collect())
             })
@@ -4431,7 +4434,7 @@ impl PartStudioView {
             return div().into_any_element();
         };
         let (rolled_back, editing) = (i >= self.row_ctx.rollback, self.row_ctx.editing_id == Some(id));
-        let row = self.render_feature_row(i, &f, rolled_back, editing, slot, cx);
+        let row = test_named(self.render_feature_row(i, &f, rolled_back, editing, slot, cx), || format!("feature:{}", f.name));
         if !crate::ui_script::active() {
             return row;
         }
@@ -4522,9 +4525,6 @@ impl PartStudioView {
         let r_hover = r.clone();
         let view = cx.entity();
         let part_name = b.name.clone();
-        // The name's painted bounds: a double-click renames only on its text.
-        let name_at: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
-        let (name_at2, name_text) = (name_at.clone(), b.name.clone());
         let several_parts = self.display.bodies.len() > 1;
         // Live 1714: a composite part's, a surface's or a curve's row has no
         // Copy <name> and no Hide other / all parts; a curve's no Export….
@@ -4580,10 +4580,6 @@ impl PartStudioView {
                 None => div()
                     .id(SharedString::from(format!("part-name-{}", b.id)))
                     .relative()
-                    .child({
-                        let at = name_at.clone();
-                        canvas(move |bounds, _, _| at.set(bounds), |_, _, _, _| {}).absolute().inset_0()
-                    })
                     // With the properties shown the name is as wide as its text and the pills follow it (live
                     // "psui (2026-10-28, P1) part-studio 7.7").
                     .when(!show_props, |d| d.flex_1())
@@ -4637,17 +4633,24 @@ impl PartStudioView {
                     this.refresh_scene(false, cx);
                 }
             }))
-            // Live: double-clicking the name renames the part; beside it the second click is a click (it
-            // deselects: ui-parity parts-row-dblclick).
+            // Live (ui-parity parts-row-dblclick, feel/featurelist.json): a double-click is two clicks, no rename (only the
+            // menu's Rename renames). Shift takes the range from the last part clicked; with a feature last clicked it
+            // does nothing.
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
-                let b = name_at2.get();
-                let on_name = f32::from(ev.position().x - b.origin.x) <= crate::ui::text_width(window, &name_text, crate::ui::ROW_TEXT) + 2.0;
-                if ev.click_count() >= 2 && on_name {
-                    this.start_part_rename(id1.clone(), window, cx);
-                } else if ev.modifiers().shift && this.edit.is_none() && this.ui.part_anchor.is_some() {
+                // The list has the keyboard, as after a feature row's click (live parts-row-dblclick-rename-escape:
+                // Y then hides the part under the pointer).
+                if this.edit.is_none() {
+                    window.focus(&this.ui.list_focus, cx);
+                }
+                let shift = ev.modifiers().shift && this.edit.is_none();
+                if shift && this.ui.part_anchor.is_none() && this.ui.anchor.is_some() {
+                    return;
+                }
+                if shift && this.ui.part_anchor.is_some() {
                     this.select_part_range(&id1, cx);
                 } else {
                     this.ui.part_anchor = Some(id1.clone());
+                    this.ui.anchor = None;
                     this.pick_body(id1.clone(), cx);
                     // Live (ui-parity boolean-subtract): a part picked from the list into a dialog gives the keyboard
                     // back to its active selection field (a list row takes no focus, unlike the graphics).
@@ -4656,12 +4659,26 @@ impl PartStudioView {
                     }
                 }
             }))
-            .os_context_menu(move |menu, _, _| {
+            .os_context_menu(move |menu, _, cx| {
                 let b = id2.clone();
                 let item = |label: &str, f: ViewAction| {
                     let v = view.clone();
                     crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
                 };
+                // Live (qa4 r4 s5, feel/featurelist.json): several parts selected (the right-clicked one counts) get the
+                // parts menu; a part with features or other things selected gets its own menu without Copy <part>.
+                let (parts, others) = {
+                    let this = view.read(cx);
+                    let mut parts: Vec<BodyId> = this.selection.iter().filter_map(|r| if let Reference::Body(x) = r { Some(x.clone()) } else { None }).collect();
+                    if !parts.contains(&b) {
+                        parts.push(b.clone());
+                    }
+                    (parts, !this.selected_features.is_empty() || this.selection.iter().any(|r| !matches!(r, Reference::Body(_))))
+                };
+                if parts.len() > 1 {
+                    let left_out = view.read(cx).display.bodies.len() > parts.len();
+                    return several_parts_menu(menu, &view, parts, left_out);
+                }
                 // Commands apply to every selected part when the row is selected.
                 let targets = move |this: &PartStudioView, b: &BodyId| -> Vec<BodyId> {
                     let sel: Vec<BodyId> = this.selection.iter().filter_map(|r| match r {
@@ -4695,7 +4712,7 @@ impl PartStudioView {
                         }
                     })))
                     // Copy Part N (live: right after Copy here…).
-                    .when(solid_part, |m| m.item(item(&format!("Copy {part_name}"), Box::new({
+                    .when(solid_part && !others, |m| m.item(item(&format!("Copy {part_name}"), Box::new({
                         let b = b.clone();
                         move |this, _, cx| this.copy_part(b.clone(), cx)
                     })).icon_name("menu-copy")))
@@ -5050,6 +5067,7 @@ impl PartStudioView {
             let this = view.read(cx);
             targets.iter().copied().partition(|f| this.display.sketches.iter().any(|s| s.feature == *f))
         };
+        let clicked_selected = view.read(cx).selected_features.contains(&clicked);
         let (sketches_shown, planes, sketch_swatch) = {
             let this = view.read(cx);
             (
@@ -5081,12 +5099,16 @@ impl PartStudioView {
             m = m.item(item("Add selection to folder…", Box::new(move |this, window, cx| this.open_folder_prompt(t.clone(), window, cx)))).separator();
         }
         if !sketches.is_empty() && others.is_empty() {
-            // Sketches alone: Hide (or Show) them.
+            // Sketches alone: Hide them, or Show them and Show all sketches (live feel/featurelist.json "two_sketches").
             let refs: Vec<Reference> = sketches.iter().map(|f| Reference::Feature(*f)).collect();
             m = m.item(item(if sketches_shown { "Hide" } else { "Show" }, Box::new(move |this, _, cx| this.set_visibility(&refs, sketches_shown, cx))));
-        } else if let Some(&keep) = sketches.first().filter(|_| sketches_shown) {
-            // A shown sketch with other features: Hide other / all sketches (a hidden one has none, live
-            // ui-parity feature-row-rclick-other-selected).
+            if !sketches_shown {
+                m = m.item(item("Show all sketches", Box::new(|this, _, cx| this.show_all_sketches(cx))));
+            }
+        } else if let Some(&keep) = sketches.first().filter(|_| sketches_shown || clicked_selected) {
+            // Sketches with other features: Hide other / all sketches; for hidden sketches only when the right-clicked
+            // row is selected itself (live feel/featurelist.json "sketch_and_feature"; not on an unselected row:
+            // ui-parity feature-row-rclick-other-selected, feature-row-mod-click-toggle).
             m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(Some(keep), cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
         }
         if !sketches.is_empty() || planes {
@@ -5447,6 +5469,7 @@ impl PartStudioView {
         let focused = self.ui.list_focus.is_focused(window) && self.ui.rollback_keyboard.as_ref() == Some(&self.selected_features);
         div()
             .id(SharedString::from(format!("rollback-{index}")))
+            .debug_selector(|| "rollback".into())
             .h(px(crate::ui::ROW_H))
             // Live (menus/rmb-ps-rollback-bar): x 45-234, `#c8d9e2` on hover,
             // tooltip "Rollback bar".
@@ -5796,13 +5819,36 @@ impl PartStudioView {
                 this.click_feature(id, ev.modifiers().shift, cx);
                 window.focus(&this.ui.list_focus, cx);
             }))
-            .drag_over::<RollbackDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
-            .on_drop(cx.listener(move |this, _: &RollbackDrag, _, cx| this.set_rollback(Some(i), cx)))
-            // Live (F33): a blue pill with the feature's name, "2 items" for several.
+            // Live (feel/featurelist.json): the bar drops before a row from its top half, after it from its bottom half.
+            .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<RollbackDrag>, _, cx| {
+                if !e.bounds.contains(&e.event.position) {
+                    return;
+                }
+                let slot = Some((i, e.event.position.y >= e.bounds.center().y));
+                if this.ui.feature_drop.get() != slot {
+                    this.ui.feature_drop.set(slot);
+                    cx.notify();
+                }
+            }))
+            .drag_over::<RollbackDrag>({
+                let drop = self.ui.feature_drop.clone();
+                move |s, _, _, _| {
+                    let s = s.border_color(p().accent);
+                    if drop.get() == Some((i, true)) { s.border_b_2() } else { s.border_t_2() }
+                }
+            })
+            .on_drop(cx.listener(move |this, _: &RollbackDrag, _, cx| {
+                let after = this.ui.feature_drop.take().is_some_and(|(r, a)| r == i && a);
+                this.set_rollback(Some(i + after as usize), cx)
+            }))
+            // Live (F33): a blue pill with the feature's name, "2 items" for several (the selection and the pressed row).
             .on_drag(
                 FeatureDrag {
                     id,
-                    name: if selected && self.selected_features.len() > 1 { format!("{} items", self.selected_features.len()).into() } else { name.clone().into() },
+                    name: match self.selected_features.len() + usize::from(!selected) {
+                        n if n > 1 => format!("{n} items").into(),
+                        _ => name.clone().into(),
+                    },
                 },
                 |d, grab, _, cx| cx.new(|_| FeatureDragPill(grab, d.name.clone())),
             )
@@ -5929,6 +5975,31 @@ impl PartStudioView {
                 let t = targets(this);
                 this.open_folder_prompt(t, window, cx);
             }));
+            // Live (feel/featurelist.json "feature_and_plane_on_feature"): with a default plane selected too, the
+            // planes' items, Clear selection and the feature's appearance; no Delete.
+            let planes: Vec<Reference> = view.read(cx).selection.iter().filter(|r| matches!(r, Reference::Plane(_))).cloned().collect();
+            if !planes.is_empty() {
+                let (p1, p2, p3) = (planes.clone(), planes.clone(), planes);
+                let m = menu
+                    .item(item("Size to Part Studio", Box::new(move |this, _, cx| {
+                        for r in &p1 {
+                            this.size_plane_to_studio(r.clone(), cx);
+                        }
+                    })))
+                    .separator()
+                    .item(item("Hide other planes", Box::new(move |this, _, cx| this.hide_planes(p2.first(), cx))))
+                    .item(item("Hide all planes", Box::new(|this, _, cx| this.hide_planes(None, cx))))
+                    .item(item("Section view…", Box::new(move |this, w, cx| this.section_through_all(&p3, w, cx))).icon_name("menu-section-view"))
+                    .separator()
+                    .item(item("Clear selection", Box::new(|this, _, cx| {
+                        this.selection.clear();
+                        this.selected_features.clear();
+                        this.refresh_scene(false, cx);
+                        cx.notify();
+                    })))
+                    .separator();
+                return appearance(m);
+            }
             if multi {
                 return Self::selection_feature_menu(&view, id, targets(view.read(cx)), None, menu, window, cx);
             }
@@ -5998,10 +6069,7 @@ impl PartStudioView {
                 // sketches when there are other sketches, shown or not (one sketch alone: Show only).
                 let others_hidden = is_sketch && hidden && view.read(cx).display.sketches.iter().any(|s| s.feature != id);
                 if others_hidden {
-                    m = m.item(item("Show all sketches", Box::new(|this, _, cx| {
-                        let all: Vec<Reference> = this.display.sketches.iter().filter(|s| s.hidden).map(|s| Reference::Feature(s.feature)).collect();
-                        this.set_visibility(&all, false, cx);
-                    })));
+                    m = m.item(item("Show all sketches", Box::new(|this, _, cx| this.show_all_sketches(cx))));
                 }
             }
             if is_sketch {
@@ -7662,4 +7730,76 @@ pub(super) fn default_geometry_menu(menu: crate::os_menu::OsMenu, view: &Entity<
         })
     }));
     m
+}
+
+/// A list row named for tests (`VisualTestContext::debug_bounds`, the feel matrices); the app's own layout is
+/// untouched.
+fn test_named(el: AnyElement, name: impl FnOnce() -> String) -> AnyElement {
+    #[cfg(test)]
+    {
+        div().debug_selector(name).child(el).into_any_element()
+    }
+    #[cfg(not(test))]
+    {
+        let _ = name;
+        el
+    }
+}
+
+/// The Parts list menu for several selected parts (live qa4 r4 s5 (2) / (3), menus/rmb-ps-partslist-{2,3}-parts.png):
+/// counts in the labels, Boolean and Copy N items; Hide other / all parts only while some part is left out.
+fn several_parts_menu(menu: crate::os_menu::OsMenu, view: &Entity<PartStudioView>, parts: Vec<BodyId>, others_left: bool) -> crate::os_menu::OsMenu {
+    let n = parts.len();
+    let item = |label: String, f: ViewAction| {
+        let v = view.clone();
+        crate::os_menu::OsMenuItem::new(label).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
+    };
+    let refs: Vec<Reference> = parts.iter().cloned().map(Reference::Body).collect();
+    let all = |f: fn(&mut PartStudioView, Vec<BodyId>, &mut Window, &mut Context<PartStudioView>)| {
+        let parts = parts.clone();
+        Box::new(move |this: &mut PartStudioView, w: &mut Window, cx: &mut Context<PartStudioView>| f(this, parts.clone(), w, cx)) as ViewAction
+    };
+    let selecting = |f: fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)| {
+        let refs = refs.clone();
+        Box::new(move |this: &mut PartStudioView, w: &mut Window, cx: &mut Context<PartStudioView>| {
+            this.selection = refs.clone();
+            this.hover = None;
+            f(this, w, cx)
+        }) as ViewAction
+    };
+    let first = parts[0].clone();
+    menu.item(item("Properties…".into(), Box::new(move |this, w, cx| this.open_part_meta(first.clone(), w, cx))))
+        .item(item(format!("Assign material for {n} parts…"), all(|this, t, w, cx| this.open_material_panel(t, w, cx))))
+        .item(item(format!("Edit appearance for {n} parts…"), all(|this, t, w, cx| {
+            this.selection = t.iter().cloned().map(Reference::Body).collect();
+            this.edit_appearance(appearance::EditTarget::Parts(t), w, cx)
+        })))
+        .item(item(format!("Check interference for {n} parts…"), selecting(|this, w, cx| this.toggle_analysis_tool(analysis_tools::ToolKind::Interference, w, cx))))
+        .separator()
+        .item(item("Boolean".into(), selecting(|this, w, cx| this.start_feature("booleanBodies", w, cx))))
+        .separator()
+        .item(item(format!("Copy {n} items"), all(|this, t, _, cx| this.copy_parts(&t, cx))).icon_name("menu-copy"))
+        .separator()
+        .item(item("Hide".into(), all(|this, t, _, cx| this.set_visibility(&t.into_iter().map(Reference::Body).collect::<Vec<_>>(), true, cx))).icon_name("eye-off"))
+        .when(others_left, |m| {
+            m.item(item(crate::i18n::template("Hide other __label__", &[("label", "parts")]), all(|this, keep, _, cx| {
+                let others: Vec<Reference> = this.display.bodies.iter().filter(|d| !keep.contains(&d.id)).map(|d| Reference::Body(d.id.clone())).collect();
+                this.set_visibility(&others, true, cx);
+            })))
+            .item(item(crate::i18n::template("Hide all __label__", &[("label", "parts")]), Box::new(|this, _, cx| {
+                let all: Vec<Reference> = this.display.bodies.iter().map(|d| Reference::Body(d.id.clone())).collect();
+                this.set_visibility(&all, true, cx);
+            })))
+        })
+        .item(item("Isolate…".into(), selecting(|this, w, cx| this.isolate(behaviors::IsolateMode::Isolate, w, cx))))
+        .item(item("Make transparent…".into(), selecting(|this, w, cx| this.isolate(behaviors::IsolateMode::Transparent, w, cx))))
+        .separator()
+        .item(item("Export…".into(), all(|this, t, w, cx| this.open_export_dialog(t, w, cx))))
+        .item(item("Release…".into(), all(|this, t, w, cx| {
+            let names: Vec<String> = t.iter().map(|id| this.display.body(id).map(|d| d.name.clone()).unwrap_or_default()).collect();
+            let items = crate::part_studio_hooks::release_part_items(this.doc.read(cx), this.tab, &t, &names, &this.config_values);
+            crate::part_studio_hooks::open_release_candidate(this.doc.clone(), items, w, cx);
+        })))
+        .separator()
+        .item(item("Delete".into(), selecting(|this, w, cx| this.start_feature("deleteBodies", w, cx))).icon_name("menu-delete"))
 }

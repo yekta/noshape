@@ -1408,12 +1408,10 @@ impl PartStudioView {
             .map(|d| d.id.clone())
             .collect();
         let selected: Vec<BodyId> = self.selection.iter().filter_map(|r| if let Reference::Body(x) = r { Some(x.clone()) } else { None }).collect();
-        for x in interaction::list_click(&order, &selected, self.ui.part_anchor.as_ref(), b, true) {
-            let r = Reference::Body(x);
-            if !self.selection.contains(&r) {
-                self.selection.push(r);
-            }
-        }
+        let picked = list_shift_click(&order, &selected, self.ui.part_anchor.as_ref(), b);
+        self.selection.retain(|r| !matches!(r, Reference::Body(_)));
+        self.selection.extend(picked.into_iter().map(Reference::Body));
+        self.ui.part_anchor = Some(b.clone());
         self.refresh_scene(false, cx);
         cx.notify();
     }
@@ -1692,6 +1690,12 @@ impl PartStudioView {
         self.set_visibility(&planes, any_shown, cx);
     }
 
+    /// Sketch menus' "Show all sketches": every hidden sketch shown.
+    pub(super) fn show_all_sketches(&mut self, cx: &mut Context<Self>) {
+        let all: Vec<Reference> = self.display.sketches.iter().filter(|s| s.hidden).map(|s| Reference::Feature(s.feature)).collect();
+        self.set_visibility(&all, false, cx);
+    }
+
     /// Sketch menus "Hide other sketches" (keep one) / "Hide all sketches".
     pub(super) fn hide_sketches(&mut self, keep: Option<FeatureId>, cx: &mut Context<Self>) {
         let sketches: Vec<Reference> = self.display.sketches.iter().filter(|s| !s.hidden && Some(s.feature) != keep).map(|s| Reference::Feature(s.feature)).collect();
@@ -1734,6 +1738,12 @@ impl PartStudioView {
     /// silently (live: no toast); an Assembly's Ctrl+V inserts it.
     pub(super) fn copy_part(&mut self, b: BodyId, cx: &mut Context<Self>) {
         let v = serde_json::json!({ "noshape_part": { "tab": self.tab.to_string(), "body": b } });
+        cx.write_to_clipboard(ClipboardItem::new_string(v.to_string()));
+    }
+
+    /// "Copy N items" on several parts: the clipboard holds them all (`body`: the first, what a paste reads today).
+    pub(super) fn copy_parts(&mut self, bodies: &[BodyId], cx: &mut Context<Self>) {
+        let v = serde_json::json!({ "noshape_part": { "tab": self.tab.to_string(), "body": bodies.first(), "bodies": bodies } });
         cx.write_to_clipboard(ClipboardItem::new_string(v.to_string()));
     }
 
@@ -3759,10 +3769,24 @@ impl PartStudioView {
             return;
         }
         let order: Vec<FeatureId> = self.studio(cx).map(|s| s.features.iter().map(|f| f.id).collect()).unwrap_or_default();
-        self.selected_features = interaction::list_click(&order, &self.selected_features, self.ui.anchor.as_ref(), &id, shift);
+        let from_top = shift && (self.ui.anchor.is_none() || (self.selected_features.is_empty() && self.selection.is_empty()));
+        self.selected_features = if !shift {
+            interaction::list_click(&order, &self.selected_features, None, &id, false)
+        } else if from_top {
+            // Live: Shift with nothing selected takes the list from its top: the default geometry, then the features.
+            for r in [Reference::Origin, Reference::Plane(noshape_model::reference::DatumPlane::Top), Reference::Plane(noshape_model::reference::DatumPlane::Front), Reference::Plane(noshape_model::reference::DatumPlane::Right)] {
+                if !self.selection.contains(&r) {
+                    self.selection.push(r);
+                }
+            }
+            list_shift_click(&order, &self.selected_features, order.first(), &id)
+        } else {
+            list_shift_click(&order, &self.selected_features, self.ui.anchor.as_ref(), &id)
+        };
         self.ui.selected_folder = None;
         self.ui.fresh_folder = None;
         self.ui.anchor = Some(id);
+        self.ui.part_anchor = None;
         self.refresh_scene(false, cx);
         cx.notify();
     }
@@ -3773,7 +3797,7 @@ impl PartStudioView {
     /// order check as a drop between rows.
     pub(super) fn drop_into_folder(&mut self, dragged: FeatureId, folder: u32, cx: &mut Context<Self>) {
         let Some(studio) = self.studio(cx) else { return };
-        let moving: Vec<FeatureId> = if self.selected_features.contains(&dragged) { self.selected_features.clone() } else { vec![dragged] };
+        let moving = self.dragged_features(dragged, cx);
         let first = studio.folder_features(folder).into_iter().find(|f| !moving.contains(f));
         let empty_after = studio.folder(folder).and_then(|f| f.after);
         let (to, after) = match first {
@@ -3787,9 +3811,9 @@ impl PartStudioView {
         // Live (qa4 round 5 v3 s8, REORDER-INVALID): a move above a
         // dependency is done; the feature then fails on its missing selection.
         let order = to.and_then(|to| interaction::reordered_at(&studio.features, &moving, to, after)).unwrap_or(current);
-        let n = moving.len();
+        let desc = noshape_ops::studio::move_description(studio, &moving);
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, if n == 1 { "Reorder feature" } else { "Reorder features" }, cx, |ps| {
+            doc.edit_studio(self.tab, &desc, cx, |ps| {
                 interaction::apply_order(ps, &order);
                 for id in &moving {
                     if let Some(f) = ps.feature_mut(*id) {
@@ -3810,12 +3834,24 @@ impl PartStudioView {
     /// feature then fails on its missing selection.
     pub(super) fn drop_features(&mut self, dragged: FeatureId, to: usize, after: bool, cx: &mut Context<Self>) {
         let Some(studio) = self.studio(cx) else { return };
-        let moving: Vec<FeatureId> = if self.selected_features.contains(&dragged) { self.selected_features.clone() } else { vec![dragged] };
+        let moving = self.dragged_features(dragged, cx);
         let Some(order) = interaction::reordered_at(&studio.features, &moving, to, after) else { return };
-        let n = moving.len();
+        let desc = noshape_ops::studio::move_description(studio, &moving);
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, if n == 1 { "Reorder feature" } else { "Reorder features" }, cx, |ps| interaction::apply_order(ps, &order));
+            doc.edit_studio(self.tab, &desc, cx, |ps| interaction::apply_order(ps, &order));
         });
+        // Live: the moved rows are selected.
+        self.selected_features = moving;
+        self.ui.anchor = Some(dragged);
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
+    /// What a drag of `pressed` carries (live feel/featurelist.json): the selected features and the pressed row, in
+    /// list order (pressing doesn't clear the selection).
+    pub(super) fn dragged_features(&self, pressed: FeatureId, cx: &App) -> Vec<FeatureId> {
+        let Some(studio) = self.studio(cx) else { return vec![pressed] };
+        studio.features.iter().map(|f| f.id).filter(|f| *f == pressed || self.selected_features.contains(f)).collect()
     }
 
     /// "Show dependencies": parents above the arrow, children below.
@@ -4772,4 +4808,20 @@ pub struct FaceMass {
     pub area: f64,
     pub perimeter: f64,
     pub var: Option<noshape_model::regen::measure::FaceVariance>,
+}
+
+/// Live's Shift+click in the feature list and the Parts list (feel/featurelist.json): the rows from the anchor (the
+/// last row clicked) to `clicked` join the selection, or leave it when `clicked` is already selected. Without an
+/// anchor in `order`, only `clicked`.
+pub(super) fn list_shift_click<T: Clone + PartialEq>(order: &[T], selected: &[T], anchor: Option<&T>, clicked: &T) -> Vec<T> {
+    let (Some(i), Some(j)) = (anchor.and_then(|a| order.iter().position(|x| x == a)), order.iter().position(|x| x == clicked)) else {
+        return if selected.contains(clicked) { selected.to_vec() } else { selected.iter().cloned().chain([clicked.clone()]).collect() };
+    };
+    let range = &order[i.min(j)..=i.max(j)];
+    if selected.contains(clicked) {
+        return selected.iter().filter(|x| !range.contains(x)).cloned().collect();
+    }
+    let mut out = selected.to_vec();
+    out.extend(range.iter().filter(|x| !selected.contains(x)).cloned());
+    out
 }

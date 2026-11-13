@@ -839,8 +839,8 @@ fn reorder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let moving = features_arg(ps, a, "features")?;
     let to = a.opt_u64("to")?.unwrap_or(0) as usize;
     let order = interaction::reordered(&ps.features, &moving, to).ok_or_else(|| OpError::param("to", "nothing to move there"))?;
-    let desc = if moving.len() == 1 { "Reorder feature" } else { "Reorder features" };
-    edit_studio(od, tab, desc, |ps| {
+    let desc = crate::studio::move_description(ps, &moving);
+    edit_studio(od, tab, &desc, |ps| {
         interaction::apply_order(ps, &order);
         Ok(())
     })?;

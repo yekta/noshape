@@ -57,7 +57,8 @@ fn part_studio_from(cx: &mut TestAppContext, name: &str, start: Option<serde_jso
         let doc = cx.new(|_| DocModel::new(session));
         let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
         let mut view = None;
-        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+        // As every app window: its menus (a list row's right-click) draw in it.
+        let (w, _) = crate::os_menu::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
             let v = cx.new(|cx| PartStudioView::new(doc, tab, gpu, window, cx));
             view = Some(v.clone());
             cx.new(|_| Workspace(v))
@@ -3947,7 +3948,8 @@ fn a_sketch_on_the_flat_is_drawn_in_the_flat_view(cx: &mut TestAppContext) {
         let doc = cx.new(|_| DocModel::new(session));
         let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
         let mut view = None;
-        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+        // As every app window: its menus (a list row's right-click) draw in it.
+        let (w, _) = crate::os_menu::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
             let v = cx.new(|cx| PartStudioView::new(doc, tab, gpu, window, cx));
             view = Some(v.clone());
             cx.new(|_| Workspace(v))
@@ -4068,6 +4070,8 @@ fn every_kind_of_plane_right_clicked_in_the_graphics_opens_its_menu(cx: &mut Tes
 mod feel;
 #[path = "snap_matrix_tests.rs"]
 mod snaps;
+#[path = "list_feel_tests.rs"]
+mod list;
 
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.

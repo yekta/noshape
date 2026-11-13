@@ -14,6 +14,29 @@ sketch-offset-key step 10 `.focus.kind` live "other" / ours "none". Your 0e29b5d
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## Mac trial wall times (11-13, `NOSHAPE_RB_HOST=mac`; vibe6 only for ui-parity runs, which need Xvfb)
+Every rb.sh build and test since the Mac's 07:12 reboot ran on the Mac (its logs in ~/noshape-host/tmp/psui-*.log; the
+target folder's own mtime doesn't move when files inside it are rebuilt). Wall times, Mac vs earlier vibe numbers:
+- incremental `cargo test -p noshape-part-studio-ui --lib --no-run` after a part-studio-ui edit: 24 s (vibe5 31 s).
+- the feature list matrix alone (build + run): 1 m 10 s with gaps waiting out 30 s timeouts; 3.5 s run once matched.
+- the whole part-studio-ui suite (171 tests) after an edit: 42 s (vibe5: ~3 min incl. build).
+- app-core edit, then the tests of the 9 UI crates using it + clippy of 3 crates: 42 s + 30 s.
+- app build `cargo build -p noshape`: Mac 56 s (06:3x) vs vibe6 182 s; an incremental one for the scenarios on vibe6
+  (after part-studio-ui / app-core edits): 1 m 30 s, then 41 s with a 6-scenario run.
+- 71 feature-list ui-parity scenarios on vibe6, 3 shards: 2 m 44 s.
+
+**08:04 UTC: the feature list / Parts list matrix** (interaction-feel.md "Feature list and Parts list", part-studio-ui
+`list::the_feature_list_matrix_matches_live`) at 43 / 43, from 20 / 42: Shift deselect-range and from-the-top, one
+anchor across the lists, a part double-click no longer renames, the multi-part list menu, the feature + default plane
+menu, Show all / Hide other sketches, a drag carries the selection and leaves the moved rows selected, the rollback bar
+drops by row half, undo names "Move …", menu keys bound per App (os_menu: a `static Once` left every later UI test's
+menus deaf to Escape / arrows). The 71 list scenarios: 67 / 71; 3 of the 4 differences are on green too
+(feature-menu-suppress-unsuppress, parts-row-dblclick-rename-escape: our `y` hides the hovered part in the GPUI test
+but not in the runner's app run, to look at), feature-row-drag-above is the catalogue-vs-recording question in
+REQUESTS (08:04). Next: the measure matrix (live/feel/measure.json), then navigation, chrome (shortcut map diff,
+tooltips, dropdowns, panels, Select other) and look (glyphs, caps, colours).
+
+
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
 **2026-11-13 06:36 UTC:** landed 9a233601 (3D picking, snaps batch 1, Hole Units, scenarios). Local, not queued yet:
 the snaps matrix at 55 / 55 and the 3D pick matrix at 15 / 15 (render `the_3d_pick_matrix_matches_live`: a line picks

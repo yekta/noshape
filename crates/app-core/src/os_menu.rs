@@ -29,21 +29,27 @@ type Handler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 
 actions!(os_menu, [MenuUp, MenuDown, MenuLeft, MenuRight, MenuConfirm, MenuDismiss]);
 
+/// The menu keys are bound in this app (once per app, not per process: every UI test has its own).
+struct MenuKeysBound;
+
+impl Global for MenuKeysBound {}
+
 /// Menu keys, bound in the menu's own key context so they win over the
 /// window's bindings (Esc = Cancel, arrows = rotate the view).
 fn bind_keys(cx: &mut App) {
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| {
-        let ctx = Some("OsMenu");
-        cx.bind_keys([
-            KeyBinding::new("up", MenuUp, ctx),
-            KeyBinding::new("down", MenuDown, ctx),
-            KeyBinding::new("left", MenuLeft, ctx),
-            KeyBinding::new("right", MenuRight, ctx),
-            KeyBinding::new("enter", MenuConfirm, ctx),
-            KeyBinding::new("escape", MenuDismiss, ctx),
-        ]);
-    });
+    if cx.has_global::<MenuKeysBound>() {
+        return;
+    }
+    cx.set_global(MenuKeysBound);
+    let ctx = Some("OsMenu");
+    cx.bind_keys([
+        KeyBinding::new("up", MenuUp, ctx),
+        KeyBinding::new("down", MenuDown, ctx),
+        KeyBinding::new("left", MenuLeft, ctx),
+        KeyBinding::new("right", MenuRight, ctx),
+        KeyBinding::new("enter", MenuConfirm, ctx),
+        KeyBinding::new("escape", MenuDismiss, ctx),
+    ]);
 }
 
 /// Paint order of open menus: the kit's popup priority (gpui-base

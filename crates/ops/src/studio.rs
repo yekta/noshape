@@ -149,6 +149,14 @@ pub fn rename_description(name: &str) -> String {
     format!("Rename : {name}")
 }
 
+/// A feature list move's undo step (live feel/featurelist.json "undo_description"): "Move Extrude 3", "Move 2 features".
+pub fn move_description(ps: &PartStudio, moving: &[FeatureId]) -> String {
+    match moving {
+        [one] => format!("Move {}", ps.feature(*one).map(|f| f.name.as_str()).unwrap_or_default()),
+        _ => format!("Move {} features", moving.len()),
+    }
+}
+
 /// Rename a feature; an empty name gives it back its default name (live
 /// qa4 r5 s8 (5): "Fillet 2"), the lowest free "<type> N".
 pub fn rename_feature(ps: &mut PartStudio, id: FeatureId, name: &str) {
