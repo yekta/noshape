@@ -144,9 +144,7 @@ fn rows() -> Vec<Row> {
             let tip = hover_tooltip(cx, window, "dialog-title").ok_or("no tooltip")?;
             expect(tip.starts_with("Extrude 1 did not regenerate properly: "), true, &tip)
         } },
-        // Ours: Fillet 100 mm on the 40 × 30 × 10 block's top edge regenerates "Ok" into a body with no faces (20 mm
-        // fails as live: fillet-too-big); blend's fillet, reported 11-13.
-        Row { id: "error / a failed preview", live: "Fillet 100 mm on a block edge: no preview body, the title red, the field's entry 'Edge of Extrude 1' red; tooltip '… did not regenerate properly: Failed to fillet selections.'", gap: true, check: |cx| {
+        Row { id: "error / a failed preview", live: "Fillet 100 mm on a block edge: no preview body, the title red, the field's entry 'Edge of Extrude 1' red (the field not marked); tooltip '… did not regenerate properly: Failed to fillet selections.'", gap: false, check: |cx| {
             let json = serde_json::json!({ "units": "mm", "features": [
                 { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
                 { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
@@ -170,8 +168,13 @@ fn rows() -> Vec<Row> {
             let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
             let d = &state["dialog"];
             let query = d["fields"].as_array().and_then(|f| f.iter().find(|f| f["kind"] == "query")).cloned().ok_or("no selection field")?;
+            let entry_red = cx.update(|cx| {
+                let dlg = dialog.read(cx);
+                dlg.feature.params.query("entities").iter().all(|r| dlg.entry_failing(r))
+            });
             let tip = hover_tooltip(cx, window, "dialog-title").unwrap_or_default();
-            expect((d["titleState"].as_str(), query["state"].as_str(), tip.as_str()), (Some("error"), Some("error"), "Fillet 1 did not regenerate properly: Failed to fillet selections."), "(title, field, title's tooltip)")
+            // (Live's recorder reads the field itself "ok": fillet-too-big; the entry is what turns red.)
+            expect((d["titleState"].as_str(), query["state"].as_str(), entry_red, tip.as_str()), (Some("error"), Some("ok"), true, "Fillet 1 did not regenerate properly: Failed to fillet selections."), "(title, field, its entry red, title's tooltip)")
         } },
     ]
 }

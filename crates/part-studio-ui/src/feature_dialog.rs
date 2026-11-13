@@ -1436,6 +1436,14 @@ impl FeatureDialog {
 
     /// A picked reference whose creator is gone, but not one of this feature's in-feature mate connectors (not in the
     /// saved studio while it is new).
+    /// A field entry drawn as an error (live `ns-list-item-error`): its entity is gone, or the feature fails with an
+    /// error naming no field, which draws its inputs red (live feel/feedback.json "failedPreview": Fillet 100 mm's
+    /// "Edge of Extrude 1" entry red, the field itself not marked).
+    pub(crate) fn entry_failing(&self, r: &Reference) -> bool {
+        let failing = matches!(self.status, Some((FeatureStatus::Error, _))) && self.faulty.is_empty() && self.feature.type_id != "sketch";
+        failing || self.ref_missing(r)
+    }
+
     pub(crate) fn ref_missing(&self, r: &Reference) -> bool {
         let own = matches!(r, Reference::MateConnector { feature, .. } if self.feature.sub_features.iter().any(|s| s.id == *feature));
         !own && (self.missing)(r)
@@ -3084,7 +3092,7 @@ impl FeatureDialog {
                         let single = indices.len() == 1;
                         let label_for_drag = label.clone();
                         // Missing references (deleted/suppressed creators) show red.
-                        let missing = indices.iter().any(|i| self.ref_missing(&refs[*i]));
+                        let missing = indices.iter().any(|i| self.entry_failing(&refs[*i]));
                         // Made by a later feature: its name in light grey italic (live 1990 5.15, 90h-missing-chip).
                         let later = !missing && indices.iter().any(|i| (self.later)(&refs[*i]));
                         let p2 = path_s.clone();
