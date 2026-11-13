@@ -28,6 +28,23 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-13 03:52 UTC: studios' speed against live (live 2525 part 1, behaviours.md "speed: studios")
+Live: medians of 5, input event to DOM, software-GL Chrome (3D tab switches are upper bounds). Ours: 11-11's table
+(vibe3 under load; first painted frame / idle).
+
+| Operation | live | ours |
+|---|---|---|
+| Documents page reload to rows | 4.0 s | first read 480–570 ms (1000 documents), then 20–30 ms |
+| Row click to Details | 98 ms | one frame (not timed apart) |
+| Search + Enter to results | 161 ms | 21 ms (1000 documents) |
+| Tab switch: Part Studio → Part Studio / Assembly / Feature Studio / back | 2.4 / 2.2 / 2.7 / 1.6 s | 14–63 ms first frame, idle to 560 ms |
+| Versions and history open | 0.77 s | 22–114 ms first frame, idle 250–750 ms (2000 entries) |
+| Name header sort | (doesn't sort in live's Owned by me) | 29–47 ms |
+
+Every row is faster than live; the history panel's idle (its background reads) is the nearest, next to look at. Still
+to come from live: compare / open a version / workspace switch, and the 200-variable Variable Studio (live's REST is
+rate-limited until ~18:30 UTC).
+
 ### 2026-11-13 00:00 UTC: drawing speed (lead 11-12): the table, the wave spring's hidden lines, zoom off the UI thread
 Measured on vibe6 (8 cores, Xvfb, software GL, shared with psui), release app, NOSHAPE_PERF=1 (perf log
 "drawing: …" lines, now with ms since start), scripts in /root/studios-scratch/drwperf (copies in vibe6
