@@ -5,6 +5,16 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## Knife Loft 3, parked (11-13 21:5x UTC)
+- Live's exact faces at rollback 12 (q2620b): all 14 areas equal ours to < 0.005 mm², planes in place; the part 2.8 mm³
+  under (ours 4983.62, a mesh integration agrees; live 4986.43). The loft face is the source: normal deviations up to 6 µm
+  (q2620 7×7 grid vs ours, STEP-parsed), tangential up to 1.1 mm along guide 1: the guides pair differently.
+- Rule (hermite_coons) is live's exactly (rows 1-2 = guide rows + Greville-linear blend of the profiles' tangent poles,
+  1e-14). Guide 2 matches; guide 1's first piece (70.54 mm, y = -0.25, beside JTO) is a B-spline both ways (live 8 C1
+  cubic spans, ours one degree-5 span) lying within 1-2 µm of Sketch 1's interpolated spline, but its parameter is neither
+  the spline's nor arc length: Parasolid's parametrization of that section edge. To match: that edge's parameter
+  (where Split 3's plane meets the blade side), or ask live for the edge's evCurveDefinition at rollback 9-11.
+
 ## core state (11-13 20:27 UTC)
 - **Landed since 18:13:** 1cecae62 Move face near freeform faces by booleans first (impeller's two flange offsets ~0.6 s
   of invalid OCCT offset each); 80cd8de6 up-to extrude splits by the target's faces over the profile only (fan-blade
