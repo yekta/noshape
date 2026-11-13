@@ -15,7 +15,7 @@ at a time; CARGO_BUILD_JOBS=6 (gate.sh sets it). vibe7 has the corpora (~/agents
 dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording (~/tmp/bool/private/rec-dock, mode 700).
 
 **Worktree /root/projects/noshape-wt/bool-hat:**
-- branch bool-hat = main + 51e469c67 (gate CHECK, knurls only; queued 06:12 as 6958716c) "Shell's self-interference check drops its face-to-face mesh proximity rule"
+- branch bool-hat = main + 51e469c67 (gate CHECK, knurls only; in the land queue as 6958716c since 06:12) "Shell's self-interference check drops its face-to-face mesh proximity rule"
   (same content as 05921b9da). Its gate runs on vibe5 (started 04:58 after waiting on the lock; built 05:45; log
   /root/bool-hat-scratch/chain-05921b9da.out, gate-05921b9da.log). Expect CHECK (knurls out) with 0 differences: then
   land it from bool-hat (`git checkout crates/kernel/tests/all.rs` first, see below; land.sh with the env above).
@@ -26,35 +26,21 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
   (copies /root/bool-scratch/xprobe-1112.rs, sampler-1112.rs; re-apply with probe-allrs.patch).
 
 **Next, in order:**
-1. **The private dock (the user's own document; lead: first).** vibe5/vibe7 ~/tmp/bool/private (mode 700: dock.noshape,
-   hat8, hat15, rec-dock = its three biggest tabs' Booleans; nothing of it in the repo or the corpora). 44 distinct
-   cases, 18 ours (all as OCCT); 12 decline "an edge on another argument's free-form face", ~4.9 s of OCCT: a small arc
-   (r 0.4 mm, a half circle) on a torus face (periodic both ways, a whole turn in v) crossing its v seam; projected sees
-   v jump 0 -> 2π and fails. With bool-wip-seam the case 5e1d4d0a77371efc still declines: the last probe (XEOF=1
-   NOSHAPE_BREP_ONLY=5e1d4d0a77371efc NOSHAPE_BOOL_CORPUS=~/tmp/bool/private/rec-dock, kernel tests on vibe7) was to
-   show which. **Answer (06:05):** seam_crossings finds it (edge 15 on face 21, range π..2π, crossing 4.775) but late:
-   param_of seeded from the point before follows v past 0 into the face box's margin (to -0.06, uvbox -0.0628) and only
-   flips to 2π beyond it, so the bisection lands past the seam and part 1's last point flips (projected: "point 64
-   jumps -0.037 -> 6.22"). Fix: (a) in seam_crossings, bisect on the unwrapped v (param_of's v shifted by a turn to the
-   side it came from) against the face's own seam value (uv_span's lo / hi, 0 = 2π), not on param_of's flip; (b) in
-   projected, a part ending on the seam unwraps its last point by a turn (as k == 0 does at the start). **Done on
-   bool-wip-seam (pushed, 06:04):** the crossing is now at 3π/2 (v = 0), the parts project, and all 12 cases get one
-   step further, to "a piece's point on another solid's face" (ray_state: a piece's point within the tolerance of the
-   other argument's face). The arc's torus face and the other argument's seem to coincide (a rib's round end fused
-   onto a body with the same torus): next, look at which piece and face (XEOF prints are in the branch), likely the
-   same-surface (coincident faces) handling for tori. **06:15:** in 5e1d4d0a the piece is on face 10 (arg 0, free-form)
-   and its point lies on face 21 (arg 1, the torus) within the tolerance at (0, 10.517, 62.883) mm; same_surface(10, 21)
-   and lies_on both ways are false; the boxes nearly match (x ±23.5, y 9.9-12.1 / 9.9-11.7, z 34-63 mm). So either two
-   tori that differ a little (major / minor radius, centre) or tangent along a circle with the piece's sample point
-   near it. Uncommitted XON prints in bool-hat (branch bool-wip-seam) print both surfaces' torus parameters: run
-   XEOF=1 NOSHAPE_BREP_ONLY=5e1d4d0a77371efc NOSHAPE_BOOL_CORPUS=~/tmp/bool/private/rec-dock (kernel tests, vibe7). If
-   tangent: tangent_side (planes only today, the Rotieren rule) or the piece's point taken off the tangent line; if
-   the same torus: same_surface's samples. Then: replay the
-   whole rec-dock (0 differences), the gate, a T1 test that doesn't use the private data (a synthetic: a box with a
-   torus-ended rib, an arc over the torus's seam).
-   Next declines there: a 1355-face cut "a point near two vertices" (1.24 s), "a new edge on a free-form face" (589 ms),
-   "a non-manifold result" (582 ms), 5 x "a face's vertex off its plane". hat8: its biggest Boolean is ours, 1.44 s (794
-   Rust, 565 build): speed.
+1. **The private dock (the user's own document; lead: first). Gating 06:26 on vibe7: branch bool-seam (pushed,
+   387b4f060)**, one commit on main: an edge across the seam of a free-form face going a whole turn round is cut
+   there, each part its own curve on the face (`free::seam_crossings`, `edge_in_face`, Pending::InFace with a curve a
+   part, `projected` unwrapping a last point on the seam); tori and spheres measured on their whole surface for
+   coincident faces (`free::whole_surface_distance` in same_surface / lies_on: two parts of one torus, faces 10 and 21
+   of case 5e1d4d0a, identical tori, weren't seen as one). The dock's three biggest tabs: 29 of 44 Booleans ours (was
+   18), none differing from OCCT. T1 bool_patterns::parts_of_one_torus_fused_as_occt (a half ring and a quarter, also
+   turned a fifth of a turn; fails without the whole-surface distance). Gate log /root/bool-hat-scratch/chain-387b4f060.out
+   (vibe7's first gate: main built and cached there first). Clean (CHECK, knurls out) -> land bool-seam from bool-hat
+   (`git checkout crates/kernel/tests/all.rs` first). bool-wip-seam is the history of it (no longer needed).
+   Data: vibe5 / vibe7 ~/tmp/bool/private (mode 700: dock.noshape, hat8, hat15, rec-dock = the 44 cases; nothing of it
+   in the repo or the corpora).
+   Next declines there: 5 x "a face's vertex off its plane", 4 x "a new edge on a free-form face" (one of the 12 seam
+   cases now), 2 x "a non-manifold result" (582 ms), "a point near two vertices" (a 1355-face cut, 1.24 s). hat8: its
+   biggest Boolean is ours, 1.44 s (794 Rust, 565 build): speed.
 2. **cf-surface-pattern's Surface Pattern 3 (+4.3 s):** our 85-tool cut 1.6-3.6 s (case sp-1113/7ecd5a8b6e7c4f6b,
    vibe5 ~/agents/bool-corpora/sp-1113). Profile (xprobe::probe_case_sample, release, LTO off): C2::at 29 %,
    intervals_on 25 %, ray_state 22 %, chords 15 %; the length table landed (3770108f). Ideas: fewer samples per C2,
