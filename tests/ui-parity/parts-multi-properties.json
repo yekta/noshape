@@ -1,0 +1,49 @@
+{
+ "name": "parts-multi-properties",
+ "about": "overlap: Part 1 + Part 2 in the Parts list, right-click, Properties… (2 selected: Name shows Multiple values), Description \"D\", Save: both parts get Description D, nothing else changes",
+ "area": "psui",
+ "source": "psui 2962 (2026-11-13): the multi-part Properties dialog",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Properties…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Description"
+   }
+  },
+  {
+   "do": "type",
+   "text": "D"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Save"
+   }
+  }
+ ]
+}

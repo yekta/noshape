@@ -221,7 +221,9 @@ Its state adds `"drawing"` (`null` outside a drawing tab):
   so neither side records one).
 - A drawing's dialogs and panels are the top-level `dialog`, in live's recorder's forms (live 2063): a modal (Create
   Drawing, Export Drawing) is `{"kind": "modal", "title", "fields": [{"label", "kind": "input" | "select" |
-  "checkbox", "value"}], "buttons"}`, its label the label row's text ("File name View export rules"); a drawing panel
+  "checkbox", "value"}], "buttons"}`, its label the label row's text ("File name View export rules"); from live's
+  recorder 2026-11-13.1 a field also carries `"placeholder"` (shown only while it is empty: "Multiple values"),
+  `"disabled": true` and `"indeterminate": true` when they hold, and the modal `"disabledButtons"` (live 2962); a drawing panel
   (Insert view, Note, Section view) is `{"kind": "drawing-panel", "title", "text": [...]}`, every text it shows in
   reading order (a list's options too, at most 30).
 - `selection` is what is drawn in selection colours: `VIEW` for a framed view (selected or hovered), `EDGE` for a view
