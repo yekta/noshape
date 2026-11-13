@@ -1,0 +1,834 @@
+{
+ "scenario": "asm-menu-pin-reference",
+ "recorded": "2026-11-13T04:11:08.616Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+ },
+ "live": {
+  "document": "6235afdcb4fc67d720369a70",
+  "workspace": "8802eff5ec59b723d52e31f7",
+  "element": "ced9f1eb34481f9bea06d8d2",
+  "start": "doc-linked",
+  "startElement": "ced9f1eb34481f9bea06d8d2",
+  "runner": "live2 .nstate-uip-3.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "doc_tab": "Assembly 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    381,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 62.753,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.037509,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 30690
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "instance": "Part 1 <1>"
+    }
+   },
+   "ok": true,
+   "at": [
+    90,
+    209
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Properties…",
+      "Instance properties…",
+      "Hide",
+      "Hide other instances",
+      "Hide all instances",
+      "Show center of mass",
+      "Isolate…",
+      "Make transparent…",
+      "Suppress",
+      "Dynamic suppression",
+      "Fix",
+      "Use best available tessellation",
+      "Edit in context",
+      "Add mate connector to instance origin…",
+      "Replace instances…",
+      "Copy Part 1 <1>",
+      "Move to new subassembly",
+      "Update linked document…",
+      "Open linked document",
+      "Pin reference",
+      "Export…",
+      "Release…",
+      "Add comment",
+      "Zoom to selection",
+      "Create Drawing of Part 1…",
+      "Add selection to folder…",
+      "Create empty subassembly",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance  fake-hover context-menu-active"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 62.753,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.037509,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 34452
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Pin reference"
+    }
+   },
+   "ok": true,
+   "at": [
+    225,
+    673
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 62.753,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.037509,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 38144
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "instance": "Part 1 <1>"
+    }
+   },
+   "ok": true,
+   "at": [
+    90,
+    209
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Properties…",
+      "Instance properties…",
+      "Hide",
+      "Hide other instances",
+      "Hide all instances",
+      "Show center of mass",
+      "Isolate…",
+      "Make transparent…",
+      "Suppress",
+      "Dynamic suppression",
+      "Fix",
+      "Use best available tessellation",
+      "Add mate connector to instance origin…",
+      "Replace instances…",
+      "Copy Part 1 <1>",
+      "Move to new subassembly",
+      "Update linked document…",
+      "Open linked document",
+      "Unpin reference",
+      "Export…",
+      "Release…",
+      "Add comment",
+      "Zoom to selection",
+      "Create Drawing of Part 1…",
+      "Add selection to folder…",
+      "Create empty subassembly",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance  fake-hover context-menu-active"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 62.753,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.037509,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 41134
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     90,
+     209
+    ],
+    "hover": [
+     {
+      "_serializedByteLength": 0,
+      "path": [
+       "MPUoaioSO7DYwk2nJ"
+      ]
+     }
+    ],
+    "element": "div#context-menu-layer"
+   },
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 62.753,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.037509,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 45055
+  }
+ ]
+}
