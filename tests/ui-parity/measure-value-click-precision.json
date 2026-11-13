@@ -1,0 +1,46 @@
+{
+ "name": "measure-value-click-precision",
+ "about": "Measure: two vertices give 'Min dist: 50.990 mm'; clicking the value shows 5 decimals and selects its text, clicking again goes back to 3",
+ "area": "psui",
+ "source": "live feel 2026-11-13 (live/feel/chrome.json, measure.json): rows with no scenario",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     40,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     0,
+     30,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "measure_value": "Min dist"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "measure_value": "Min dist"
+   }
+  }
+ ]
+}

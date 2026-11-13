@@ -1,0 +1,34 @@
+{
+ "name": "select-other-row-click",
+ "about": "Select other: hover the block's top face, `, then click the first 'Face of Extrude 1' row: that face is selected and the dialog closes",
+ "area": "psui",
+ "source": "live feel 2026-11-13 (live/feel/chrome.json, measure.json): rows with no scenario",
+ "start": "block",
+ "steps": [
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "`"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "select_other_row": "Face of Extrude 1"
+   }
+  }
+ ]
+}
