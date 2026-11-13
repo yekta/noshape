@@ -1,5 +1,25 @@
 # Core modelling (agent "core")
 
+## core state (11-13 15:45 UTC)
+**Landed:** 47c19496 rounded-box round remover (kernel `rounds.rs`, before OCCT's Defeaturing in `delete_faces`: kept faces
+beside cylinder / sphere / torus rounds rebuilt from their neighbours' planes and sewn; declines prisms (C++
+delete_prism_rounds), non-planar neighbours, corners far from the rounds): Part Draft dumps 44-235 ms -> 3-9 ms, same faces /
+volume; cf-part-draft Part Draft 2 438 -> 226 ms (live 39; rest: draft + re-fillet). 8424513e sweep self-intersection test
+walks the path's edges in order (cf-snap-hook Sweep 1 183 -> 85 ms; rest is bool's Boolean 76 ms). Snap Hook 1/2 (272/308,
+live 81/83) are opBoolean 160-430 ms: bool's.
+**Isaac Fillet 2 (branch core-isaac, /root/projects/noshape-wt/core):** reworked: the shown-topology joins dropped (they broke
+references in hand-drill / keyboard / robotic-arm / infento), the convexity-stopped chain only through
+`stopped_concave_arc_round` (else main's chain: scissor-lift fed22d Fillet 2), the round's revolve seam moved off it (T1
+passes). Mac pair 863 = 863, no document changed; asm pair (6 assemblies) on vibe5 running; g++-13 kernel build queued.
+isaac studio: Fillet 2 18/43/27 vs live 18/42/26: OCCT left two straight tangent edges B-splines; `straighten_edges` replaces
+them but a cylinder face then fails BRepCheck (diagnosing, NOSHAPE_STRDBG prints in io.cpp, not to land).
+**Bisect (vibe6, unit core-bisect2-flange9b):** Flange 9 52-53 ms while the louver matched 10-11/36 (11-07), 814-1223 ms once
+30-31/36 (11-08 01:07 on): the time came with Flange 9 building as live, narrowing between 8c87fb60f and d765a589f.
+**Hosts (lead 11-13):** model-suite pairs and crate tests on the Mac (NOSHAPE_RB_HOST=mac, models ~/noshape-host/parity/models,
+isaac studio ~/agents/core-keep/ibm on Mac and vibe5); assembly suites / OCCT-exact on x86. Wall times: Mac release build
+280-290 s cold, full model suite 751-759 s with both pair sides at once (vibe5 under load ~40: build 20-40 min, suite ~35 min).
+Scripts: /root/core-scratch/bin/suite.sh (host-aware), asmsel.sh (vibe5 ~/tmp/core/asmsel: the six assemblies).
+
 ## core state (11-13 12:25 UTC)
 **Landed today:** 4cc0dc86 (a new Remove extrude picked fast keeps Remove's flip: std_edit_logic's dropped run passed its
 old values on; psui's start hole-sketch cut nothing; UI tests `a_remove_extrude_*` in sketch_ui_tests.rs) and 82a6adad
