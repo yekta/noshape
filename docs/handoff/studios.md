@@ -28,6 +28,11 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-13 07:43 UTC: drw-* 192/206 (1645/1669 states)
+On ebd03749 (vibe6, 3 shards): +8 since 04:45 (palette, insert image / DXF focus, move to sheet, sheet scale text, the
+click after Ctrl+C). The 14 left are the known ones (04:45 entry), none a regression. live's chrome-shortcuts.json
+(07:33) checked against ours for drawing (52 rows), Feature Studio (6) and all-tab keys: all match.
+
 ### 2026-11-13 07:03 UTC: tab drags from live2's feel/documents.json; where things stand
 - 3f9c63fd (to land after doc-tm-* / doc-folder-* pass): tab bar drag from 6 px, auto-scroll from 45 px of an end
   with live's speed ramp, the gap following the tabs scrolling under a still pointer (a synthetic mouse move each tick);
