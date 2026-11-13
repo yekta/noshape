@@ -5933,7 +5933,14 @@ impl PartStudioView {
                         _ => name.clone().into(),
                     },
                 },
-                |d, grab, _, cx| cx.new(|_| FeatureDragPill(grab, d.name.clone())),
+                {
+                    let xs = self.ui.feature_drop_x.clone();
+                    move |d, grab, window, cx| {
+                        let x = f32::from(window.mouse_position().x);
+                        xs.set(Some((x, x)));
+                        cx.new(|_| FeatureDragPill(grab, d.name.clone()))
+                    }
+                },
             )
             // Live (F33): the half of the hovered row the cursor is in picks
             // the slot, whichever way the drag goes: the upper half lands
@@ -5943,7 +5950,10 @@ impl PartStudioView {
                 if !e.bounds.contains(&e.event.position) {
                     return;
                 }
+                let x = f32::from(e.event.position.x);
                 let slot = Some((i, e.event.position.y >= e.bounds.center().y));
+                let x0 = this.ui.feature_drop_x.get().filter(|_| this.ui.feature_drop.get() == slot).map_or(x, |(x0, _)| x0);
+                this.ui.feature_drop_x.set(Some((x0, x)));
                 if this.ui.feature_drop.get() != slot {
                     this.ui.feature_drop.set(slot);
                     cx.notify();
@@ -6272,7 +6282,7 @@ impl PartStudioView {
             return None;
         }
         // Moved dialogs keep their place (Onshape lets you drag them).
-        let (left, top) = self.ui.dialog_pos.map(|p| (p.x, p.y)).unwrap_or((px(0.), px(3.)));
+        let (left, top) = { let p = behaviors::feature_dialog_pos(); (p.x, p.y) };
         // Onshape: at the viewport's left edge, 3 px under the toolbar.
         let size = self.ui.dialog_size.clone();
         let d = div()
@@ -7016,6 +7026,14 @@ impl Render for PartStudioView {
             // copy nothing and Ctrl+V pastes no features (live 11-03, psui's probe: Onshape handles neither key there
             // and has no feature paste; ui-parity feature-row-copy-paste).
             .on_action(cx.listener(|this, _: &Copy, _, cx| {
+                // A measured value just clicked (its text selected): the text.
+                if let Some((sel, text)) = this.ui.measure_text.take()
+                    && sel == this.selection
+                {
+                    cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(text.clone()));
+                    this.ui.measure_text = Some((sel, text));
+                    return;
+                }
                 if this.sketch.is_none()
                     && let Some(b) = behaviors::part_to_copy(&this.selection, |r| this.body_of(r))
                 {
@@ -7361,7 +7379,7 @@ impl Render for PartStudioView {
                             .bg(pal.app_bg)
                             // Resizing the dialog by its right edge (width only, min 220).
                             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::feature_dialog::DialogResize>, _, cx| {
-                                let origin = this.ui.dialog_pos.unwrap_or(point(px(0.), px(3.)));
+                                let origin = behaviors::feature_dialog_pos();
                                 let p = e.event.position - e.bounds.origin - origin;
                                 let width = p.x.max(px(220.)).round();
                                 let changed = this.ui.dialog_width != Some(width);
@@ -7386,9 +7404,10 @@ impl Render for PartStudioView {
                             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::feature_dialog::DialogMove>, _, cx| {
                                 let grab = *e.drag(cx).0.lock();
                                 let p = e.event.position - e.bounds.origin - grab;
-                                this.ui.dialog_pos = Some(behaviors::place_feature_dialog(point(p.x, p.y), this.ui.dialog_size.get(), e.bounds.size));
+                                behaviors::set_feature_dialog_pos(behaviors::place_feature_dialog(point(p.x, p.y), this.ui.dialog_size.get(), e.bounds.size));
                                 cx.notify();
                             }))
+                            .on_drop(cx.listener(|_, _: &crate::feature_dialog::DialogMove, _, cx| behaviors::save_feature_dialog_pos(cx)))
                             .child(self.viewport.clone())
                             // Under the dialogs and the list toggle, as live.
                             .when(!self.ui.list_collapsed, |d| d.child(crate::ui::left_splitter()))

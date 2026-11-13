@@ -131,6 +131,43 @@ pub struct SelectOther {
     pub scroll: ScrollHandle,
 }
 
+thread_local! {
+    /// Where feature dialogs open, for every tab and session (live feel/chrome.json "dialogs": one stored layout for
+    /// all feature dialogs, `panelLayoutManager.<userId>.feature-dialog`); none: the graphics area's top left.
+    static FEATURE_DIALOG_POS: std::cell::Cell<Option<(f32, f32)>> = std::cell::Cell::new(
+        std::fs::read_to_string(feature_dialog_pos_path()).ok().and_then(|t| serde_json::from_str::<(f32, f32)>(&t).ok()).filter(|(x, y)| x.is_finite() && y.is_finite()),
+    );
+}
+
+fn feature_dialog_pos_path() -> std::path::PathBuf {
+    crate::paths::config_dir().join("feature_dialog_place.json")
+}
+
+/// Where feature dialogs open (its top left in the graphics area).
+pub(crate) fn feature_dialog_pos() -> Point<Pixels> {
+    FEATURE_DIALOG_POS.with(|c| c.get()).map_or(point(px(0.), px(3.)), |(x, y)| point(px(x), px(y)))
+}
+
+/// A feature dialog moved to `p` (kept for every tab; [`save_feature_dialog_pos`] stores it).
+pub(crate) fn set_feature_dialog_pos(p: Point<Pixels>) {
+    FEATURE_DIALOG_POS.with(|c| c.set(Some((f32::from(p.x), f32::from(p.y)))));
+}
+
+/// Back to the default place (tests: the place is per thread, the config file isn't written).
+#[cfg(test)]
+pub(crate) fn reset_feature_dialog_pos() {
+    FEATURE_DIALOG_POS.with(|c| c.set(None));
+}
+
+/// Stores the feature dialogs' place for later sessions (off the UI thread), once a move ends.
+pub(crate) fn save_feature_dialog_pos(cx: &App) {
+    let Some(p) = FEATURE_DIALOG_POS.with(|c| c.get()) else { return };
+    cx.background_spawn(async move {
+        let _ = std::fs::write(feature_dialog_pos_path(), serde_json::to_string(&p).unwrap_or_default());
+    })
+    .detach();
+}
+
 /// Onshape's Select other constants (woolsthorpe: SELECTION_DIALOG_OFFSET_X /
 /// _Y, SELECT_OTHER_CLICK_ZONE_RADIUS_PX, _PICK_RADIUS_PX, _MAXIMUM_ELEMENTS)
 /// and the dialog's size (dom/select-other-popup.txt: 220 × 149).
@@ -448,6 +485,9 @@ pub struct UiState {
     /// Summary bar values clicked to 5 decimals (live measure.json "value_click": a click toggles 3 / 5), for the
     /// selection they were clicked on.
     pub measure_precise: (Vec<Reference>, std::collections::BTreeSet<String>),
+    /// The summary value last clicked (its text selected, live measure.json "value_click"), for the selection it
+    /// measured: Ctrl+C copies it.
+    pub measure_text: Option<(Vec<Reference>, String)>,
     /// An in-feature mate connector's own editor beside the feature's dialog (live 1851), while open.
     pub sub_dialog: Option<(Entity<crate::feature_dialog::FeatureDialog>, Subscription)>,
     /// The no-material notice is due (shown ≈ 1 s after measuring; the ui-parity driver waits for it).
@@ -467,8 +507,6 @@ pub struct UiState {
     /// The Measure panel's Length / Angle unit selects (None = workspace units).
     pub measure_length_unit: Option<noshape_units::LengthUnit>,
     pub measure_angle_unit: Option<noshape_units::AngleUnit>,
-    /// Feature dialog position after the user moved it.
-    pub dialog_pos: Option<Point<Pixels>>,
     /// The feature dialog's size as last drawn (dragging keeps it inside the graphics area).
     pub dialog_size: std::rc::Rc<std::cell::Cell<Size<Pixels>>>,
     /// Feature dialog width after the user resized it.
@@ -539,6 +577,9 @@ pub struct UiState {
     /// A feature drag's drop slot: the hovered row and whether the cursor is
     /// in its lower half (lands after it; live F33).
     pub feature_drop: std::rc::Rc<std::cell::Cell<Option<(usize, bool)>>>,
+    /// A feature drag's pointer x when it came onto its drop slot and now (live: every 19 px sideways steps the drop a
+    /// folder level).
+    pub feature_drop_x: std::rc::Rc<std::cell::Cell<Option<(f32, f32)>>>,
     /// Where a drag over a folder row drops (the folder, and 0 above it, 1 inside, 2 below it).
     pub folder_drop: std::rc::Rc<std::cell::Cell<Option<(u32, u8)>>>,
     /// The open Hole dialog's parameters last time (its linked depths).
@@ -547,10 +588,10 @@ pub struct UiState {
     /// Stops [`Self::preview_tool_task`]'s regeneration.
     pub preview_tool_cancel: noshape_model::regen::RegenCancel,
     /// Measure graphics uploaded for a selection.
-    pub measure_lines: Option<(Vec<Reference>, Option<String>, Option<noshape_render::Instance>)>,
-    /// The Measure panel's distance row under the pointer (its label): live
-    /// draws that one measurement's dashed line, nothing otherwise.
-    pub measure_hover: Option<String>,
+    pub measure_lines: Option<(Vec<Reference>, Option<MeasureHover>, Option<noshape_render::Instance>)>,
+    /// The distance under the pointer, in the summary bar or the Measure panel: live draws that one measurement's
+    /// dashed line (its X / Y / Z legs for a component row), nothing otherwise.
+    pub measure_hover: Option<MeasureHover>,
     /// Sheet metal table and flat view: the chosen context (else the first
     /// model by name) and the collapsed tables.
     pub sm_context: Option<noshape_model::reference::FeatureId>,
@@ -851,6 +892,7 @@ impl UiState {
             mass_state: None,
             measure_readout: Vec::new(),
             measure_precise: Default::default(),
+            measure_text: None,
             sub_dialog: None,
             material_notice_pending: false,
             mass_job: None,
@@ -860,7 +902,6 @@ impl UiState {
             measure_type: None,
             measure_length_unit: None,
             measure_angle_unit: None,
-            dialog_pos: None,
             dialog_size: Default::default(),
             dialog_width: None,
             toolbar: super::toolbar_prefs::ToolbarPrefs::load(),
@@ -890,6 +931,7 @@ impl UiState {
             preview_tool_adds: false,
             preview_tone: false,
             feature_drop: Default::default(),
+            feature_drop_x: Default::default(),
             folder_drop: Default::default(),
             hole_prev: None,
             preview_tool_task: None,
@@ -3444,16 +3486,12 @@ impl PartStudioView {
         inst
     }
 
-    /// Measure graphics (Onshape): a dotted line between the closest points
-    /// of the measured entities, with its X (red), Y (green) and Z (blue)
-    /// components.
+    /// Measure graphics (Onshape): the hovered distance as a dashed line between its closest points, or its X (red),
+    /// Y (green) and Z (blue) legs.
     pub(super) fn measure_overlay(&mut self) -> Vec<noshape_render::Instance> {
-        use noshape_render::{Drawable, Instance, LineData, LineSegment};
-        // Live (behaviours "ui (10-23 a)"): no measure lines from the
-        // selection alone; hovering a distance row of the open Measure panel
-        // draws that distance as one black dashed line.
-        let hover = self.ui.measure_hover.clone().filter(|_| self.ui.measure_pinned);
-        if self.edit.is_some() || self.show_mass || self.selection.len() < 2 || hover.is_none() {
+        use noshape_render::{Drawable, Instance};
+        let hover = self.measure_hover_shown();
+        if hover.is_none() {
             return Vec::new();
         }
         let sel = self.selection.clone();
@@ -3464,23 +3502,54 @@ impl PartStudioView {
         {
             return inst.iter().cloned().collect();
         }
-        // The panel's measurement (`selection_measurement`, off the UI thread): no line until it arrives, which
-        // refreshes the scene.
-        let Some(results) = self.measure_cache.as_ref().filter(|c| c.selection == sel).and_then(|c| c.results.clone()) else { return Vec::new() };
-        let mut l = LineData::default();
-        for (label, m) in results {
-            if Some(&label) == hover.as_ref()
-                && let noshape_model::regen::measure::Measurement::Distance { a, b, .. } = m
-            {
-                let f = |v: glam::DVec3| -> [f32; 3] { v.as_vec3().into() };
-                l.segments.push(LineSegment { a: f(a), b: f(b), color: [20, 20, 20, 255], pick_id: 0, width: 2.0, style: LineSegment::DASHED | LineSegment::ON_TOP });
-            }
-        }
+        let l = self.measure_hover_lines();
         // Out of the scene bounds (qa4 R1): a distance to a default plane can
         // end far out on it.
         let inst = (!l.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().no_bounds().layer(21));
-        self.ui.measure_lines = Some((self.selection.clone(), hover, inst.clone()));
+        self.ui.measure_lines = Some((sel, hover, inst.clone()));
         inst.into_iter().collect()
+    }
+
+    /// The measure hover that draws: the summary bar's while the panel is closed, the panel's rows while it is open
+    /// (a hover the closing panel never ended doesn't stay); none from the selection alone (live "ui (10-23 a)").
+    fn measure_hover_shown(&self) -> Option<MeasureHover> {
+        if self.edit.is_some() || self.show_mass || self.selection.len() < 2 {
+            return None;
+        }
+        self.ui.measure_hover.clone().filter(|h| h.bar != self.ui.measure_pinned)
+    }
+
+    /// The hovered measurement's lines (live feel/measure.json "display_3d"): a black-and-white dashed line between
+    /// the closest points; for a component row, the legs from one point to the other dashed in the axis colours,
+    /// zero-length ones left out.
+    pub(super) fn measure_hover_lines(&self) -> noshape_render::LineData {
+        use noshape_render::{LineData, LineSegment};
+        let mut l = LineData::default();
+        let Some(hover) = self.measure_hover_shown() else { return l };
+        // The measurement (`selection_measurement`, off the UI thread): no line until it arrives, which refreshes
+        // the scene.
+        let Some(results) = self.measure_cache.as_ref().filter(|c| c.selection == self.selection).and_then(|c| c.results.clone()) else { return l };
+        let f = |v: glam::DVec3| -> [f32; 3] { v.as_vec3().into() };
+        let dashed = |a: glam::DVec3, b: glam::DVec3, color: [u8; 4]| LineSegment { a: f(a), b: f(b), color, pick_id: 0, width: 2.0, style: LineSegment::DASHED | LineSegment::ON_TOP };
+        for (label, m) in results {
+            let noshape_model::regen::measure::Measurement::Distance { a, b, .. } = m else { continue };
+            if label != hover.label {
+                continue;
+            }
+            if !hover.legs {
+                l.segments.push(dashed(a, b, [20, 20, 20, 255]));
+                continue;
+            }
+            let mut at = a;
+            for (axis, color) in [(glam::DVec3::X, [0xbd, 0x30, 0x39, 255]), (glam::DVec3::Y, [0x00, 0x94, 0x00, 255]), (glam::DVec3::Z, [0x16, 0x51, 0xb0, 255])] {
+                let step = axis * (b - a).dot(axis);
+                if step.length() > 1e-9 {
+                    l.segments.push(dashed(at, at + step, color));
+                    at += step;
+                }
+            }
+        }
+        l
     }
 
     /// Direction of a straight part edge.
@@ -3921,9 +3990,19 @@ impl PartStudioView {
         let Some(studio) = self.studio(cx) else { return };
         let moving = self.dragged_features(dragged, cx);
         let Some(order) = interaction::reordered_at(&studio.features, &moving, to, after) else { return };
+        let steps = self.ui.feature_drop_x.take().map_or(0, |(x0, x)| (x / LIST_LEVEL_PX).floor() as i32 - (x0 / LIST_LEVEL_PX).floor() as i32);
+        let folder = drop_folder(studio, &moving, to, after, steps);
         let desc = noshape_ops::studio::move_description(studio, &moving);
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, &desc, cx, |ps| interaction::apply_order(ps, &order));
+            doc.edit_studio(self.tab, &desc, cx, |ps| {
+                // Their folder first: the order keeps each folder's features together.
+                for id in &moving {
+                    if let Some(f) = ps.feature_mut(*id) {
+                        f.folder = folder;
+                    }
+                }
+                interaction::apply_order(ps, &order);
+            });
         });
     }
 
@@ -4909,4 +4988,48 @@ pub(super) fn list_shift_click<T: Clone + PartialEq>(order: &[T], selected: &[T]
     let mut out = selected.to_vec();
     out.extend(range.iter().filter(|x| !selected.contains(x)).cloned());
     out
+}
+
+/// A measurement under the pointer: its label, its X / Y / Z legs (a component row) rather than its line, and whether
+/// the summary bar's value (else a Measure panel row).
+#[derive(Clone, Debug, PartialEq)]
+pub struct MeasureHover {
+    pub label: String,
+    pub legs: bool,
+    pub bar: bool,
+}
+
+/// Sideways pointer movement per folder level of a feature drag's drop (live feel/featurelist.json: Math.floor(clientX
+/// / 19)).
+pub(super) const LIST_LEVEL_PX: f32 = 19.0;
+
+/// The folder a drop between two feature rows lands in (live feel/featurelist.json "folders"): the row's own folder
+/// from its top half, the folder of the row above from its bottom half; `steps` sideways levels (negative: left) move
+/// it out toward the folders the two rows share or into the deeper side's (a last child's bottom half 19 px left:
+/// after the folder; the top half below a folder 19 px right: into it, after its last child).
+pub(super) fn drop_folder(ps: &noshape_model::partstudio::PartStudio, moving: &[FeatureId], to: usize, after: bool, steps: i32) -> Option<u32> {
+    let chain = |f: &noshape_model::partstudio::Feature| {
+        let mut c = Vec::new();
+        let mut at = f.folder;
+        while let Some(id) = at {
+            c.push(id);
+            at = ps.folder(id).and_then(|fd| fd.parent);
+        }
+        c.reverse();
+        c
+    };
+    let rest: Vec<&noshape_model::partstudio::Feature> = ps.features.iter().filter(|f| !moving.contains(&f.id)).collect();
+    let row = ps.features.get(to)?;
+    let at = rest.iter().position(|f| f.id == row.id);
+    let (above, below) = match (at, after) {
+        (Some(i), true) => (rest.get(i).map(|f| chain(f)), rest.get(i + 1).map(|f| chain(f))),
+        (Some(i), false) => (i.checked_sub(1).and_then(|k| rest.get(k)).map(|f| chain(f)), rest.get(i).map(|f| chain(f))),
+        (None, _) => (None, Some(chain(row))),
+    };
+    let (above, below) = (above.unwrap_or_default(), below.unwrap_or_default());
+    let shared = above.iter().zip(&below).take_while(|(a, b)| a == b).count();
+    let (near, far) = if after { (&above, &below) } else { (&below, &above) };
+    let level = (near.len() as i32 + steps).clamp(shared as i32, near.len().max(far.len()) as i32) as usize;
+    let side = if level <= near.len() { near } else { far };
+    level.checked_sub(1).and_then(|l| side.get(l)).copied()
 }

@@ -182,7 +182,7 @@ impl Render for MenuAwareTip {
         if shown {
             crate::ui_script::note_tooltip(&self.1);
         }
-        div().when(shown, |d| d.child(self.0.clone()))
+        div().when(shown, |d| d.child(div().child(self.0.clone()).with_animation("tooltip-fade", Animation::new(TOOLTIP_FADE_IN), |c, t| c.opacity(t))))
     }
 }
 
@@ -425,6 +425,9 @@ const SIDE_TIP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_mil
 pub const TOOLTIP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_millis(2000);
 pub const ROW_TIP_DELAY: std::time::Duration = std::time::Duration::from_millis(160);
 const ROW_TIP_FADE: std::time::Duration = std::time::Duration::from_millis(230);
+/// Tooltips fade in (live feel/chrome.json "tooltips": fully shown 470-545 ms after the pointer arrives, the 400 ms
+/// delay and ~150 ms of Bootstrap's fade).
+pub const TOOLTIP_FADE_IN: std::time::Duration = std::time::Duration::from_millis(150);
 
 impl Render for PlacedTooltip {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -534,7 +537,7 @@ fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool) ->
         .on_any_mouse_down(move |_, _, _| p3.set(true))
         .tooltip(move |_, cx| {
             let (text, anchor, pressed) = (text.clone(), anchor.get(), pressed.clone());
-            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None, user, fade: None }).into()
+            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None, user, fade: Some(TOOLTIP_FADE_IN) }).into()
         })
 }
 
@@ -571,7 +574,7 @@ pub fn with_side_tooltip_expanded(row: Stateful<Div>, text: impl Into<SharedStri
                     });
                 })
                 .detach();
-                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: Some((extra, false)), user: false, fade: None }
+                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: Some((extra, false)), user: false, fade: Some(TOOLTIP_FADE_IN) }
             })
             .into()
         })

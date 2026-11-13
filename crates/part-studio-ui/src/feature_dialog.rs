@@ -4246,6 +4246,7 @@ impl Render for FeatureDialog {
         let ref_panel = self.render_reference_panel(window, cx);
         v_flex()
             .id("feature-dialog")
+            .debug_selector(|| "feature-dialog".into())
             .map(|d| crate::ui_script::mark(d, || "dialog".into()))
             // Clicks on the dialog never reach the graphics area beneath.
             .occlude()

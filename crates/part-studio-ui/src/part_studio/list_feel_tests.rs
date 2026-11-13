@@ -552,6 +552,60 @@ fn rows() -> Vec<Row> {
                 "top third, then bottom third",
             )
         } },
+        Row { id: "folders / an expanded folder's halves", live: "top half: before the folder; bottom half: inside it, as its first child", gap: false, check: |l, cx| {
+            folder_of_last_part(l, cx);
+            cx.update(|cx| l.view.update(cx, |v, cx| {
+                let id = v.studio(cx).and_then(|s| s.folders.first().map(|f| f.id));
+                if let Some(id) = id {
+                    v.set_folder_collapsed(id, false, cx);
+                }
+            }));
+            draw(cx, l.window);
+            let h = f32::from(l.bounds(cx, "folder:New folder").ok_or("no folder row")?.size.height);
+            let (from, to) = (l.at(cx, "feature:Extrude 1"), l.at_y(cx, "folder:New folder", h * 0.25));
+            l.drag(cx, from, to, true);
+            let top = (l.order(cx), l.folders(cx));
+            let (from, to) = (l.at(cx, "feature:Extrude 2"), l.at_y(cx, "folder:New folder", h * 0.75));
+            l.drag(cx, from, to, true);
+            expect(
+                (top, (l.order(cx), l.folders(cx))),
+                (
+                    (names(&["Sketch 1", "Sketch 2", "Extrude 2", "Plane 1", "Extrude 1", "Sketch 3", "Extrude 3"]), vec![("New folder".to_string(), names(&["Sketch 3", "Extrude 3"]), false)]),
+                    (names(&["Sketch 1", "Sketch 2", "Plane 1", "Extrude 1", "Extrude 2", "Sketch 3", "Extrude 3"]), vec![("New folder".to_string(), names(&["Extrude 2", "Sketch 3", "Extrude 3"]), false)]),
+                ),
+                "top half, then bottom half",
+            )
+        } },
+        Row { id: "folders / a drop between its children", live: "inside the folder (the insertion line 10 px in at depth 1)", gap: false, check: |l, cx| {
+            expanded_folder_of_last_part(l, cx);
+            let (from, to) = (l.at(cx, "feature:Extrude 1"), l.at_y(cx, "feature:Extrude 3", 6.));
+            l.drag(cx, from, to, true);
+            expect(l.folders(cx), vec![("New folder".to_string(), names(&["Sketch 3", "Extrude 1", "Extrude 3"]), false)], "folders")
+        } },
+        Row { id: "folders / sideways, 19 px a level", live: "on the last child's bottom half: inside; 19 px left: after the folder, outside it", gap: false, check: |l, cx| {
+            expanded_folder_of_last_part(l, cx);
+            let h = f32::from(l.bounds(cx, "feature:Extrude 3").ok_or("no row")?.size.height);
+            let (from, to) = (l.at(cx, "feature:Extrude 1"), l.at_y(cx, "feature:Extrude 3", h * 0.75));
+            l.drag(cx, from, to, true);
+            let inside = l.folders(cx);
+            // Onto the last child's bottom half, then 20 px left within it.
+            let (from, to) = (l.at(cx, "feature:Extrude 2"), l.at_y(cx, "feature:Extrude 1", h * 0.75));
+            l.drag(cx, from, to, false);
+            for k in 1..=10 {
+                l.event(cx, MouseMoveEvent { position: to - point(px(2. * k as f32), px(0.)), pressed_button: Some(MouseButton::Left), modifiers: NONE });
+                draw(cx, l.window);
+            }
+            l.release(cx, to - point(px(20.), px(0.)));
+            expect(
+                (inside, l.folders(cx), l.order(cx)),
+                (
+                    vec![("New folder".to_string(), names(&["Sketch 3", "Extrude 3", "Extrude 1"]), false)],
+                    vec![("New folder".to_string(), names(&["Sketch 3", "Extrude 3", "Extrude 1"]), false)],
+                    names(&["Sketch 1", "Sketch 2", "Plane 1", "Sketch 3", "Extrude 3", "Extrude 1", "Extrude 2"]),
+                ),
+                "folders after the first drop; folders and order after the second",
+            )
+        } },
         Row { id: "Parts list / click toggles, Shift range, Ctrl adds", live: "plain click toggles; Shift+click the range from the anchor; Ctrl+click adds like a plain click, no menu", gap: false, check: |l, cx| {
             l.click(cx, "part:Part 1", NONE);
             l.click(cx, "part:Part 3", SHIFT);
@@ -587,6 +641,17 @@ fn folder_of_last_part(l: &List, cx: &mut TestAppContext) {
             cx.notify();
         })
     });
+    draw(cx, l.window);
+}
+
+fn expanded_folder_of_last_part(l: &List, cx: &mut TestAppContext) {
+    folder_of_last_part(l, cx);
+    cx.update(|cx| l.view.update(cx, |v, cx| {
+        let id = v.studio(cx).and_then(|s| s.folders.first().map(|f| f.id));
+        if let Some(id) = id {
+            v.set_folder_collapsed(id, false, cx);
+        }
+    }));
     draw(cx, l.window);
 }
 

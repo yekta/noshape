@@ -153,6 +153,42 @@ fn rows() -> Vec<Row> {
             }
             expect(gone, vec![true, true], "gone after a click, after the wheel")
         } },
+        Row { id: "tooltip / fades in", live: "~150 ms (fully shown 470-545 ms after the pointer arrives: the 400 ms delay and the fade)", gap: false, check: |_, _| {
+            near(crate::ui::TOOLTIP_FADE_IN.as_millis() as f32, 150., "ms")
+        } },
+        Row { id: "tooltip / a drag's start closes it", live: "closes on drag start", gap: false, check: |c, cx| {
+            c.hover_first(cx);
+            let _ = c.wait(cx, 450);
+            let at = point(px(60.), px(35.));
+            let mut vcx = gpui_kit::VisualTestContext::from_window(c.tips, cx);
+            vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: NONE, click_count: 1, first_mouse: false });
+            vcx.simulate_event(MouseMoveEvent { position: at + point(px(12.), px(0.)), pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: NONE });
+            crate::ui_script::clear_tooltip();
+            let gone = c.wait(cx, 30).is_none();
+            gpui_kit::VisualTestContext::from_window(c.tips, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: NONE, click_count: 1 });
+            expect(gone, true, "gone once the drag starts")
+        } },
+        Row { id: "feature dialog / one place for every tab", live: "where it was left: every feature dialog shares one stored layout (per user, not per tab)", gap: false, check: |_, cx| {
+            let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+            let open = |cx: &mut TestAppContext, name: &str| {
+                let (window, view) = part_studio_from(cx, name, Some(starts["block"].clone()));
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+                draw(cx, window);
+                window
+            };
+            let origin = |cx: &mut TestAppContext, window: AnyWindowHandle| {
+                draw(cx, window);
+                gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("feature-dialog").map(|b| (f32::from(b.origin.x), f32::from(b.origin.y)))
+            };
+            let a = open(cx, "chrome-dlg-a");
+            let before = origin(cx, a).ok_or("no dialog")?;
+            behaviors::set_feature_dialog_pos(point(px(120.), px(40.)));
+            let moved = origin(cx, a).ok_or("no dialog")?;
+            let b = open(cx, "chrome-dlg-b");
+            let other = origin(cx, b).ok_or("no dialog in the second tab")?;
+            behaviors::reset_feature_dialog_pos();
+            expect(((moved.0 - before.0).round(), (moved.1 - before.1).round(), other == moved), (120., 37., true), "moved by, the other tab's dialog at the same place")
+        } },
         Row { id: "tooltip / longer help after 2 s", live: "data-expand-delay 2000 ms after it shows (measured 2.25-2.5 s from arrival)", gap: false, check: |_, _| {
             near(crate::ui::TOOLTIP_EXPAND_DELAY.as_millis() as f32, 2000., "ms")
         } },

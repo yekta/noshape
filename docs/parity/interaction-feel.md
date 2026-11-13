@@ -181,7 +181,7 @@ device pixel ratio of 1 and 2: part-studio-ui `list::the_feature_list_matrix_mat
 canvas click is the viewport's empty pick). Like the snaps matrix it prints matched / total and fails when a row's
 status moves. `LIST_ROW=<part of an id>` runs some rows.
 
-**Matched: 54 / 54** (11-13 08:20 UTC; 20 / 42 at the first run). ui-parity: the 78 list and tooltip scenarios 75 / 78 before the last fixes, the 3 left on green too or fixed since (feature-row-drag-above).
+**Matched: 57 / 57** (11-13 15:51 UTC; 20 / 42 at the first run; 3 folder rows added 15:51: 1 / 3 matched, 2 fixed). ui-parity: the 78 list and tooltip scenarios 75 / 78 before the last fixes, the 3 left on green too or fixed since (feature-row-drag-above).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -211,8 +211,11 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Hover: the geometry | lit 100 ms after the pointer arrives, cleared 100 ms after it leaves; a sweep lights only where it rests | the same (`LIST_HOVER_DEBOUNCE`; was at once) | = (fixed) |
 | Folders: New folder | nothing selected: an empty folder above the rollback bar; features and a part: the features; only default geometry: nothing; Escape: none | the same (default geometry alone opened the popover) | = (fixed) |
 | Folders: dropping on a collapsed folder | top third before it, middle inside at its end, bottom third after it | the same (every drop went inside, first) | = (fixed) |
+| Folders: dropping on an expanded folder | top half before it, bottom half inside as its first child | the same | = |
+| Folders: a drop between its children | inside the folder | the moved feature kept its own folder and the folder lost the children before it; now the folder at the drop (`behaviors::drop_folder`) | = (fixed) |
+| Folders: sideways | every 19 px sideways in the slot steps a level: a last child's bottom half 19 px left drops after the folder, outside | no levels; now 19 px a level from where the pointer came onto the slot (`LIST_LEVEL_PX`) | = (fixed) |
 | Multi-part Properties… | one "2 selected" dialog, both parts listed, Name "Multiple values", shared fields editable (live 08:18) | the first part's Properties | ≠ (not a row yet) |
-| Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); an expanded folder's halves and sideways steps, nesting; an empty new folder's caret (live2's new-folder-empty, queued); the insertion line's look | – | – |
+| Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); 4 levels of nesting at most; an empty new folder's caret (live2's new-folder-empty, queued); the insertion line's look | – | – |
 
 ## Measure (matrix)
 
@@ -222,7 +225,7 @@ live2's measure.json (11-13 06:50–06:56) on live's own document, rebuilt (Part
 gives, at a device pixel ratio of 1 and 2. part-studio-ui `measure::the_measure_matrix_matches_live` (T1, no GPU,
 entities found with `query_entities` by a point on them); `MEASURE_ROW=<part of an id>` runs some rows.
 
-**Matched: 18 / 18** (11-13 08:31 UTC; 15 / 17 at the first run). ui-parity: the 12 measure scenarios 12 / 12.
+**Matched: 23 / 23** (11-13 15:51 UTC; 15 / 17 at the first run; 5 rows added 15:51: 2 / 5 matched, 3 fixed). ui-parity: the 12 measure scenarios 12 / 12.
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -234,7 +237,12 @@ entities found with `query_entities` by a point on them); `MEASURE_ROW=<part of 
 | Three vertices, a part, a feature | nothing | the same | = |
 | The details panel open (`[`) | the summary bar empty; `[` again closes it | the same | = |
 | A value clicked | 5 decimals ("20.00000"); again: 3 | the same (was nothing; `ui.measure_precise`, per selection) | = (fixed) |
-| Not yet in the matrix | a click near an edge's middle takes its midpoint (3D pick); a value's or a panel row's hover draws the dashed line (and the X/Y/Z legs); no preview while hovering a second entity; the panel's contents (220 × 345, Measure type, units, the (x) Add variable rows); the click also selects the value's text for Ctrl+C | – | – |
+| A value clicked: Ctrl+C | its text selected: Ctrl+C copies "20.00000" | nothing copied; now the number shown (`ui.measure_text`) | = (fixed) |
+| A value hovered | its 5 decimals' tooltip and its measurement's dashed line | the tooltip only (the line only from the open panel's rows); now both (`MeasureHover`, the hover on a wrapper: on the value its redraw kept the tooltip shut) | = (fixed) |
+| The panel's rows hovered | a distance row: the dashed line; an X / Y / Z row: the legs dashed in X red, Y green, Z blue, zero ones left out | the line only; now the legs too (`measure_hover_lines`) | = (fixed) |
+| The panel's size | 220 × 345 with a distance and its X / Y / Z rows | 220 × 347 (6 px above the footer); now 4 px, 345 | = (fixed) |
+| A second entity hovered | no preview: the first one's readout | the same | = |
+| Not yet in the matrix | a click near an edge's middle takes its midpoint (the 9 px window and the dwell: `midpoint_target_tests`) | – | – |
 
 ## Navigation (matrix)
 
@@ -280,7 +288,7 @@ debugging rows, left out. Ours binds besides live's map, in those scopes: the de
 Close window, Quit (secondary-n / o / w / q) and the dialog Tab / Enter / Shift+Enter keys live's client handles
 outside its map (its "client side entries").
 
-**Chrome: 18 / 18** (11-13 14:01 UTC, was 17 / 17 at 13:33 UTC; 7 / 11 at the first run, then 5 rows added: 1 / 5 matched).
+**Chrome: 21 / 21** (11-13 15:51 UTC, 18 / 18 at 14:01; 14:01 UTC, was 17 / 17 at 13:33 UTC; 7 / 11 at the first run, then 5 rows added: 1 / 5 matched).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -292,13 +300,16 @@ outside its map (its "client side entries").
 | Feature dialog drag | clamped inside the graphics area; within ~10 px of the top / right / bottom it snaps (3 / 0 / 2 px); the left doesn't | could leave the area by all but 80 × 40 px, no snap; now live's (`behaviors::place_feature_dialog`) | = (fixed) |
 | Select other place | pointer + (100, 51) | the same | = |
 | A tooltip on a click or the wheel | closes | the same | = |
+| A tooltip on a drag's start | closes | the same | = |
+| Tooltip fade-in | ~150 ms | none on toolbar tooltips (only list rows' 230 ms); now 150 ms (`ui::TOOLTIP_FADE_IN`); its fade-out isn't drawn (gpui drops a tooltip at once) | = (fixed) |
+| Feature dialog place, kept | every feature dialog, in every tab and session, opens where the last one was left | per tab, lost on closing; now one place (`behaviors::feature_dialog_pos`, config feature_dialog_place.json, written when a move ends) | = (fixed) |
 | A submenu (▸ row) | opens on hover with no delay (one 10 ms poll); closes ~30 ms after the pointer moves to another row | opens in the frame the row is hovered, closes in the next | = |
 | Select other size | 220 px, 24 px rows in a 90 px list; nothing found: 83 px tall | the same, but the empty dialog kept the 92 px list (149 px); now one row (`SELECT_OTHER_EMPTY_H`) | = (fixed) |
 | Context menu place | pointer + (0, 2) in the graphics; + (10, 12) on a feature-list row | (0, 2) everywhere; now (10, 12) on feature and folder rows (`os_menu::MENU_AT_ROW`) | = (fixed) |
 | Context menu flip | at the right edge its right side 1 px left of the pointer; at the bottom its bottom 4 px below it | flipped round where it opened (pointer + (0, 2)); now round the pointer (vendored gpui `anchored().flip_point`) | = (fixed) |
 | Feature list width | remembered per tab, the default 205 elsewhere | one width for every tab; now per tab (`ui::left_panel_w(tab)`, config left_panel_widths.json) | = (fixed) |
 | Toolbar dropdowns | on click only, under the toolbar at the tool group's left edge, staying open | under the caret (31 px right of the group's left); now at the group's left (vendored gpui-component `PopupMenu::shift_x`); 4 px under the buttons as live | = (fixed; checked on a runner screenshot and by a row click, no T1 test) |
-| Not yet in the matrix | tooltip fade-in / fade-out, closing on a drag's start; feature dialogs sharing one stored layout | – | – |
+| Not yet in the matrix | the tooltip's ~100 ms fade-out | – | – |
 
 ## Look
 

@@ -1167,19 +1167,31 @@ impl PartStudioView {
                     match full {
                         Some((x, d)) => {
                             let (l1, l2, l3) = (label.clone(), label.clone(), label.clone());
+                            let hover = super::behaviors::MeasureHover { label: label.clone(), legs: false, bar: true };
+                            // The number each way: a click also selects the one it shows, for Ctrl+C (live "value_click").
+                            let numbers = (text.split_once(' ').map(|(n, _)| n.to_string()).unwrap_or_else(|| text.clone()), noshape_units::to_fixed(x / units.si_factor(d), 5));
                             let v = div()
                                 .id(SharedString::from(format!("readout-{label}")))
                                 .debug_selector(move || format!("measure_value:{l1}"))
                                 .child(value(five(&label, text, full)))
-                                .tooltip(crate::ui::tooltip(noshape_units::to_fixed(x / units.si_factor(d), 5)))
+                                .tooltip(crate::ui::tooltip(numbers.1.clone()))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     let set = &mut this.ui.measure_precise.1;
-                                    if !set.remove(&l3) {
+                                    let precise = !set.remove(&l3);
+                                    if precise {
                                         set.insert(l3.clone());
                                     }
+                                    let shown = if precise { numbers.1.clone() } else { numbers.0.clone() };
+                                    this.ui.measure_text = Some((this.selection.clone(), shown));
                                     cx.notify();
                                 }));
-                            item.child(crate::ui_script::mark(v, move || format!("measure_value:{l2}")))
+                            // Its measurement's dashed line while hovered (live feel/measure.json "value_hover"), from a
+                            // wrapper: on the value itself the listener's redraw kept its tooltip from opening.
+                            let v = div()
+                                .id(SharedString::from(format!("readout-hover-{label}")))
+                                .on_hover(cx.listener(move |this, h: &bool, _, cx| this.set_measure_hover(hover.clone(), *h, cx)))
+                                .child(crate::ui_script::mark(v, move || format!("measure_value:{l2}")));
+                            item.child(v)
                         }
                         None => item.child(value(text)),
                     }
@@ -1297,6 +1309,15 @@ impl PartStudioView {
             );
         }
         out
+    }
+
+    /// The pointer came onto (`on`) or left a measurement's value or row.
+    fn set_measure_hover(&mut self, hover: super::behaviors::MeasureHover, on: bool, cx: &mut Context<Self>) {
+        let next = if on { Some(hover) } else if self.ui.measure_hover.as_ref() == Some(&hover) { None } else { self.ui.measure_hover.clone() };
+        if next != self.ui.measure_hover {
+            self.ui.measure_hover = next;
+            self.refresh_scene(false, cx);
+        }
     }
 
     pub(super) fn render_measure_panel(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
@@ -1891,6 +1912,7 @@ impl PartStudioView {
         vec![
             v_flex()
                 .id("measure-panel")
+                .debug_selector(|| "measure-panel".into())
                 .occlude()
                 // Live (part-studio/82, at 1×): 220 px, flush with the
                 // viewport's bottom-right corner, over the panel strip and
@@ -1958,22 +1980,15 @@ impl PartStudioView {
                         }
                         None => row.child(div().child(format!("{k}:"))).child(value),
                     };
-                    // A distance row (not its X/Y/Z sub-rows) shows its dashed
-                    // line while hovered (live ui 10-23 a).
-                    let distance = axis.is_none() && var.is_some_and(|v| v.0 == "DISTANCE");
+                    // A distance row shows its dashed line while hovered (live ui 10-23 a), its X / Y / Z rows the
+                    // legs (live feel/measure.json "hover_component_row").
+                    let distance = var.is_some_and(|v| v.0 == "DISTANCE");
                     let hover_view = view_rows.clone();
-                    let label = k.to_string();
-                    let row = row.id(SharedString::from(format!("measure-row-{n}"))).when(distance, |d| {
+                    let hover = super::behaviors::MeasureHover { label: if axis.is_some() { parent.clone() } else { k.to_string() }, legs: axis.is_some(), bar: false };
+                    let row = row.id(SharedString::from(format!("measure-row-{n}"))).debug_selector(move || format!("measure-row-{n}")).when(distance, |d| {
                         d.on_hover(move |h: &bool, _, cx| {
-                            let label = label.clone();
-                            let h = *h;
-                            hover_view.update(cx, |this, cx| {
-                                let next = if h { Some(label) } else if this.ui.measure_hover.as_ref() == Some(&label) { None } else { this.ui.measure_hover.clone() };
-                                if next != this.ui.measure_hover {
-                                    this.ui.measure_hover = next;
-                                    this.refresh_scene(false, cx);
-                                }
-                            });
+                            let (hover, h) = (hover.clone(), *h);
+                            hover_view.update(cx, |this, cx| this.set_measure_hover(hover, h, cx));
                         })
                     });
                     // Live (behaviours.md: each row has an (x) "create variable"
@@ -1988,9 +2003,9 @@ impl PartStudioView {
                             .on_click(move |_, window, cx| view.update(cx, |this, cx| this.create_variable_from_measure(var, axis, window, cx)))
                     }))
                 }))
-                // Live: 24 px from the last row's text to a 1 px `#d7d7d7` line
-                // over a 21 px `#eee` band with the ?.
-                .child(div().h(px(6.)))
+                // Live (feel/measure/meas-panel.png): 4 px below the last row a 1 px `#d7d7d7` line over a 21 px
+                // `#eee` band with the ?; 220 × 345 with a distance and its X / Y / Z rows.
+                .child(div().h(px(4.)))
                 .child(h_flex().h(px(22.)).px(px(4.)).justify_end().border_t_1().border_color(pal.border).bg(gpui_kit::rgb(0xeeeeee)).child(help()))
                 .into_any_element(),
         ]

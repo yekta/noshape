@@ -40,6 +40,8 @@ const FRONT: E = E::At("faces", [20., 0., 5.]);
 const TOP: E = E::At("faces", [30., 25., 10.]);
 const BOTTOM: E = E::At("faces", [5., 5., 0.]);
 const P2_TOP: E = E::At("faces", [70., 10., 15.]);
+/// Part 2's top front left corner: from V40, live's 25 mm (X 20, Y 0, Z 15).
+const V60_TOP: E = E::At("vertices", [60., 0., 15.]);
 
 struct Bench {
     window: AnyWindowHandle,
@@ -107,6 +109,43 @@ impl Bench {
         Ok(cx.update(|cx| self.view.read(cx).ui.measure_readout.iter().map(|r| format!("{}: {} {}", r["name"].as_str().unwrap_or(""), r["value"].as_str().unwrap_or(""), r["units"].as_str().unwrap_or("")).trim().to_string()).collect()))
     }
 
+/// The pointer onto element `sel` (`None`: off into empty graphics), then 500 ms of the clock.
+    fn point_at(&self, cx: &mut TestAppContext, sel: Option<&str>) -> Result<(), String> {
+        draw(cx, self.window);
+        let at = match sel {
+            Some(sel) => gpui_kit::VisualTestContext::from_window(self.window, cx).debug_bounds(Box::leak(sel.to_string().into_boxed_str())).ok_or(format!("no {sel}"))?.center(),
+            None => point(px(600.), px(300.)),
+        };
+        gpui_kit::VisualTestContext::from_window(self.window, cx).simulate_event(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
+        for _ in 0..50 {
+            cx.executor().advance_clock(std::time::Duration::from_millis(10));
+            draw(cx, self.window);
+        }
+        Ok(())
+    }
+
+    /// The hovered measurement's lines, each named by its colour.
+    fn lines(&self, cx: &mut TestAppContext) -> Vec<String> {
+        cx.update(|cx| {
+            self.view.read(cx).measure_hover_lines().segments.iter().map(|s| match s.color {
+                [20, 20, 20, _] => "dashed black",
+                [0xbd, 0x30, 0x39, _] => "X red",
+                [0x00, 0x94, 0x00, _] => "Y green",
+                [0x16, 0x51, 0xb0, _] => "Z blue",
+                _ => "other",
+            }.to_string()).collect()
+        })
+    }
+
+    fn panel(&self, cx: &mut TestAppContext, open: bool) {
+        if cx.update(|cx| self.view.read(cx).ui.measure_pinned) != open {
+            let focus = cx.update(|cx| self.view.read(cx).focus.clone());
+            cx.update_window(self.window, |_, w, cx| w.focus(&focus, cx)).unwrap();
+            gpui_kit::VisualTestContext::from_window(self.window, cx).simulate_keystrokes("[");
+            draw(cx, self.window);
+        }
+    }
+
     fn click_value(&self, cx: &mut TestAppContext, name: &str) -> Result<(), String> {
         let b = gpui_kit::VisualTestContext::from_window(self.window, cx).debug_bounds(Box::leak(format!("measure_value:{name}").into_boxed_str())).ok_or(format!("no value {name}"))?;
         let mut v = gpui_kit::VisualTestContext::from_window(self.window, cx);
@@ -168,6 +207,61 @@ fn rows() -> Vec<Row> {
             let five = b.readout(cx, &[V40, V60], &[])?;
             b.click_value(cx, "Min dist")?;
             Ok(five.into_iter().chain(b.readout(cx, &[V40, V60], &[])?).collect())
+        } },
+        Row { id: "a value clicked: its text selected, Ctrl+C copies it", live: &["20.00000"], gap: false, check: |b, cx| {
+            b.readout(cx, &[V40, V60], &[])?;
+            b.click_value(cx, "Min dist")?;
+            let focus = cx.update(|cx| b.view.read(cx).focus.clone());
+            cx.update_window(b.window, |_, w, cx| w.focus(&focus, cx)).unwrap();
+            gpui_kit::VisualTestContext::from_window(b.window, cx).simulate_keystrokes("secondary-c");
+            let copied = cx.update(|cx| cx.read_from_clipboard().and_then(|c| c.text()));
+            // Back to 3 decimals for the next rows.
+            b.click_value(cx, "Min dist")?;
+            Ok(copied.into_iter().collect())
+        } },
+        Row { id: "a value hovered: its 5 decimals' tooltip and its dashed line", live: &["Min dist: 20.000 mm", "20.00000", "dashed black", "left: no line"], gap: false, check: |b, cx| {
+            b.panel(cx, false);
+            let mut out = b.readout(cx, &[V40, V60], &[])?;
+            // From empty space (an earlier row's click left the pointer on this value).
+            b.point_at(cx, None)?;
+            crate::ui_script::clear_tooltip();
+            b.point_at(cx, Some("measure_value:Min dist"))?;
+            out.push(crate::ui_script::shown_tooltip().unwrap_or_default());
+            out.extend(b.lines(cx));
+            b.point_at(cx, None)?;
+            out.push(if b.lines(cx).is_empty() { "left: no line".into() } else { "left: a line".into() });
+            Ok(out)
+        } },
+        Row { id: "the panel's rows hovered: the line, then the X / Y / Z legs", live: &["dashed black", "X red", "Z blue"], gap: false, check: |b, cx| {
+            b.readout(cx, &[V40, V60_TOP], &[])?;
+            b.panel(cx, true);
+            b.point_at(cx, Some("measure-row-0"))?;
+            let mut out = b.lines(cx);
+            b.point_at(cx, Some("measure-row-1"))?;
+            out.extend(b.lines(cx));
+            b.point_at(cx, None)?;
+            b.panel(cx, false);
+            Ok(out)
+        } },
+        Row { id: "the details panel: 220 × 345 for a distance and its components", live: &["220 x 345"], gap: false, check: |b, cx| {
+            b.readout(cx, &[V40, V60_TOP], &[])?;
+            b.panel(cx, true);
+            draw(cx, b.window);
+            let size = gpui_kit::VisualTestContext::from_window(b.window, cx).debug_bounds("measure-panel").map(|r| r.size);
+            b.panel(cx, false);
+            let size = size.ok_or("no panel")?;
+            Ok(vec![format!("{} x {}", f32::from(size.width).round(), f32::from(size.height).round())])
+        } },
+        Row { id: "a second entity hovered: no preview", live: &["Point:", "svg-icon-XYZ-Icons-AlongX: 40.000 mm", "svg-icon-XYZ-Icons-AlongY: 0.000 mm", "svg-icon-XYZ-Icons-AlongZ: 0.000 mm"], gap: false, check: |b, cx| {
+            let other = b.reference(cx, V60)?;
+            b.readout(cx, &[V40], &[])?;
+            cx.update(|cx| b.view.update(cx, |v, cx| {
+                v.hover = Some(other.clone());
+                v.refresh_scene(false, cx);
+            }));
+            let out = b.readout(cx, &[V40], &[]);
+            cx.update(|cx| b.view.update(cx, |v, _| v.hover = None));
+            out
         } },
     ]
 }

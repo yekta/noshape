@@ -100,6 +100,13 @@ navigation 20 / 20 (a rotate from empty space about the view centre).
 trim / Text / eye scenarios in 2 shards: 45 / 51; alone 3 of the misses match (load: sm-hem-edge, sm-flange-two-edges
 read before their preview, mutual-trim-new-edit-reedit), drw-sheet-properties / -rename are dx's, analysis-flatten's
 click sits on a tie between two edge midpoints (moved to x 10, re-record asked REQUESTS 15:06).
+**15:51 (lead: measure, feature list, chrome leftovers; then Extend once live answers):** measure 23 / 23 (fixed: a
+summary value's hover draws its dashed line, an X / Y / Z row's hover the axis legs, a value click selects its number
+for Ctrl+C, the panel 345 px), feature list 57 / 57 (fixed: a drop between a folder's children went in without a folder
+and split it; drops take the folder at their spot, 19 px sideways a level: `behaviors::drop_folder`), chrome 21 / 21
+(fixed: tooltips fade in 150 ms; one feature dialog place for every tab and session, config feature_dialog_place.json).
+vibe6: the 62 folder, drag and measure scenarios 62 / 62. Open: 4-level nesting (no capture of what live says), the tooltip's fade-out (gpui drops it at once). Extend: live
+hasn't answered REQUESTS 14:07 yet.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's
