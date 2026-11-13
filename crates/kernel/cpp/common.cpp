@@ -139,9 +139,11 @@ void set_working_scale(double k)
 void fail_unsupported(const std::string& msg) { throw std::runtime_error("unsupported: " + msg); }
 void fail_io(const std::string& msg) { throw std::runtime_error("io: " + msg); }
 
-std::mutex& mesh_mutex()
+// Exclusive to write triangulations onto the model's shapes (BRepMesh, exports, the mesh cache), shared to read them
+// while nothing re-meshes (the HLR's polygonal pass).
+std::shared_mutex& mesh_mutex()
 {
-  static std::mutex m;
+  static std::shared_mutex m;
   return m;
 }
 

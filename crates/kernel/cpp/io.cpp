@@ -591,7 +591,7 @@ void write_brep_file(const OcShape& s, rust::Str path)
 {
   require_non_null(s.shape, "shape");
   const LockedSection locked_section_171;
-  std::lock_guard<std::mutex> lock(mesh_mutex());
+  std::lock_guard<std::shared_mutex> lock(mesh_mutex());
   if (!BRepTools::Write(s.shape, path_str(path).c_str(), false, false,
                         TopTools_FormatVersion_CURRENT))
     fail_io("could not write BREP file " + path_str(path));
@@ -612,7 +612,7 @@ rust::Vec<uint8_t> brep_to_bytes(const OcShape& s)
   std::ostringstream os;
   {
     const LockedSection locked_section_191;
-    std::lock_guard<std::mutex> lock(mesh_mutex());
+    std::lock_guard<std::shared_mutex> lock(mesh_mutex());
     BRepTools::Write(s.shape, os, false, false, TopTools_FormatVersion_CURRENT);
   }
   const std::string  str = os.str();
@@ -641,7 +641,7 @@ rust::Vec<uint8_t> bin_to_bytes(const OcShape& s, bool with_triangles)
   std::ostringstream os(std::ios::out | std::ios::binary);
   {
     const LockedSection locked_section_219;
-    std::lock_guard<std::mutex> lock(mesh_mutex());
+    std::lock_guard<std::shared_mutex> lock(mesh_mutex());
     BinTools::Write(s.shape, os, with_triangles, false, BinTools_FormatVersion_CURRENT);
   }
   const std::string  str = os.str();

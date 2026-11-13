@@ -1202,7 +1202,7 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     // behind 104 s of summed waits).
     std::optional<LockedSection>   locked_section_721;
     locked_section_721.emplace();
-    std::unique_lock<std::mutex> lock(mesh_mutex());
+    std::unique_lock<std::shared_mutex> lock(mesh_mutex());
     IMeshTools_Parameters prm;
     prm.Deflection               = lin;
     prm.Angle                    = ang;
@@ -1810,7 +1810,7 @@ void mesh_fill(const OcMesh& m, rust::Slice<float> positions, rust::Slice<float>
   if (m.cleaned)
     return; // mesh_prepare did
   const LockedSection locked_section_1121;
-  std::lock_guard<std::mutex> lock(mesh_mutex());
+  std::lock_guard<std::shared_mutex> lock(mesh_mutex());
   BRepTools::Clean(m.shape);
 }
 

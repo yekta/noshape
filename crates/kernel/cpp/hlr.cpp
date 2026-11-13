@@ -576,14 +576,20 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
   // Polygonal HLR on the triangulation.
   {
     const LockedSection locked_section_328;
-    std::lock_guard<std::mutex> lock(mesh_mutex());
+    std::lock_guard<std::shared_mutex> lock(mesh_mutex());
     BRepMesh_IncrementalMesh    mesher(s.shape, defl, false, 0.25, true);
     (void)mesher;
   }
+  // Load and Update read the faces' triangulations: shared, so a parallel view re-meshing the same shape at
+  // another scale can't replace them mid-read; Hide uses the algorithm's own copies after.
   occ::handle<HLRBRep_PolyAlgo> pa = new HLRBRep_PolyAlgo();
-  pa->Load(s.shape);
-  pa->Projector(proj);
-  pa->Update();
+  {
+    const LockedSection                  locked_section_poly;
+    std::shared_lock<std::shared_mutex> read(mesh_mutex());
+    pa->Load(s.shape);
+    pa->Projector(proj);
+    pa->Update();
+  }
   const gp_Trsf& T = pa->Projector().Transformation();
 
   struct Seg
