@@ -107,6 +107,44 @@ fn rows() -> Vec<Row> {
             let open = cx.update(|cx| view.read(cx).context_menu.is_some());
             expect((open, tool(cx, &view)), (true, Some(Tool::Select)), "after one Esc: menu open, tool")
         } },
+        Row { id: "trim / a click removes the piece between the crossings", live: "H -100..0 crossed at -70 and -40: the middle piece goes", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-trim", Tool::Line);
+            for (a, b) in [((300., 300.), (600., 300.)), ((400., 200.), (400., 400.)), ((500., 200.), (500., 400.))] {
+                click(cx, window, &view, a);
+                click(cx, window, &view, b);
+                keys(cx, window, &["escape"]);
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+            }
+            let before = lines(cx, &view);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Trim, w, cx))).unwrap();
+            click(cx, window, &view, (450., 300.));
+            // The crossed line keeps its two outer pieces: 3 lines -> 4.
+            expect((before, lines(cx, &view)), (3, 4), "lines before, after the trim")
+        } },
+        Row { id: "fillet / a click on a corner previews, nothing committed", live: "a preview arc 'R5' with an arrow; nothing committed yet; Esc cancels", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-fillet-click", Tool::Line);
+            for at in [(400., 300.), (500., 300.), (500., 400.)] {
+                click(cx, window, &view, at);
+            }
+            keys(cx, window, &["escape"]);
+            keys(cx, window, &["shift-f"]);
+            click(cx, window, &view, (500., 300.));
+            let arcs = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch_data(cx).map_or(0, |d| d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Arc).count()));
+            let after_click = arcs(cx);
+            keys(cx, window, &["escape"]);
+            expect((after_click, arcs(cx)), (0, 0), "arcs after the click, after Esc")
+        } },
+        Row { id: "fillet / a drag from the corner creates it", live: "pressing on the corner and dragging: on release the fillet is created (an arc, two tangents, a radius) and its radius box opens", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-fillet-drag", Tool::Line);
+            for at in [(400., 300.), (500., 300.), (500., 400.)] {
+                click(cx, window, &view, at);
+            }
+            keys(cx, window, &["escape"]);
+            keys(cx, window, &["shift-f"]);
+            drag(cx, window, &view, (500., 300.), (480., 320.), 6);
+            let arcs = cx.update(|cx| view.read(cx).sketch_data(cx).map_or(0, |d| d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Arc).count()));
+            expect(arcs, 1, "arcs after the drag")
+        } },
         Row { id: "fillet / Shift+F", live: "the sketch fillet's key", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-fillet", Tool::Select);
             keys(cx, window, &["shift-f"]);

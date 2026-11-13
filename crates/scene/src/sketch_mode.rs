@@ -641,6 +641,9 @@ pub struct SketchEditor {
     pending_corner: Option<(SketchData, noshape_sketch::EditResult)>,
     /// The corner point of the pending fillet (clicked on its vertex).
     pending_corner_pid: Option<EntityId>,
+    /// Where the press that made the pending fillet / chamfer was: dragged from there and released, it is made
+    /// (live feel/sketchtools.json "sketchFillet": the radius box opens).
+    corner_pressed: Option<DVec2>,
     /// A corner whose fillet at the current radius is invalid: previewed red
     /// (live), its arrow drags the radius to one that fits.
     invalid_corner: Option<EntityId>,
@@ -1252,6 +1255,7 @@ impl SketchEditor {
             fillet_session: None,
             pending_corner: None,
             pending_corner_pid: None,
+            corner_pressed: None,
             invalid_corner: None,
             pending_slot: None,
             chamfer_distance: 0.005,
@@ -2353,6 +2357,7 @@ impl SketchEditor {
         match made {
             Ok(res) => {
                 self.pending_corner = Some((preview, res));
+                self.corner_pressed = Some(p);
                 self.pending_corner_pid = target.1.is_none().then_some(target.0);
                 // Live (ui-parity sketch-fillet-corner): the clicked corner
                 // stays selected until the fillet is confirmed.
@@ -4051,6 +4056,15 @@ impl SketchEditor {
     }
 
     fn tool_up_inner(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
+        // A fillet / chamfer press dragged from its corner and released makes it (a click only previews).
+        if let Some(start) = self.corner_pressed.take()
+            && self.drag.is_none()
+            && self.pending_corner.is_some()
+            && (p - start).length() > self.world_per_px * 4.0
+        {
+            self.press = None;
+            return self.commit_corner(data);
+        }
         // Press-drag-release with a drawing tool: the release is the next click.
         if self.tool.draws()
             && self.drag.is_none()

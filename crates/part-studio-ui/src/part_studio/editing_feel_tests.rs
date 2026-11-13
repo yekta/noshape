@@ -88,6 +88,36 @@ fn rows() -> Vec<Row> {
             wait_until(cx, window, |cx| !view.read(cx).ui_busy());
             expect((made, undone, feature_names(cx, &view).len()), (1, 0, 1), "features: made, undone, redone")
         } },
+        Row { id: "copy / sketch entities paste under the pointer", live: "Ctrl+V puts the copy's centre under the pointer at once, selected; one Ctrl+Z removes it", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "ed-paste", Tool::Line);
+            click(cx, window, &view, (400., 300.));
+            click(cx, window, &view, (500., 300.));
+            keys(cx, window, &["escape"]);
+            let line = cx.update(|cx| view.read(cx).sketch_data(cx).and_then(|d| d.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).map(|e| e.id)));
+            cx.update(|cx| view.update(cx, |v, _| v.sketch.as_mut().unwrap().selection = line.into_iter().collect()));
+            keys(cx, window, &["secondary-c"]);
+            let at = glam::DVec2::new(650., 420.);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
+            }))
+            .unwrap();
+            keys(cx, window, &["secondary-v"]);
+            let (n, mid, selected) = cx.update(|cx| {
+                let v = view.read(cx);
+                let d = v.sketch_data(cx).unwrap();
+                let ed = v.sketch.as_ref().unwrap();
+                let newest = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).max_by_key(|e| e.id.0);
+                let mid = newest.and_then(|e| e.endpoints()).and_then(|(a, b)| {
+                    let (pa, pb) = (d.sketch.point(a)?, d.sketch.point(b)?);
+                    v.viewport.read(cx).project(ed.frame.to_world((pa + pb) * 0.5))
+                });
+                (d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line && !e.construction).count(), mid, newest.is_some_and(|e| ed.selection.contains(&e.id)))
+            });
+            keys(cx, window, &["secondary-z"]);
+            let off = mid.map_or(f64::MAX, |m| m.distance(at));
+            expect((n, off < 2.0, selected, lines(cx, &view)), (2, true, true, 1), "lines after paste, centre under the pointer, selected, lines after undo")
+        } },
         Row { id: "copy / a feature's Ctrl+C, Ctrl+V does nothing", live: "no new feature, no dialog, no toast", gap: false, check: |cx| {
             let (window, view) = block(cx, "ed-copy");
             select_feature(cx, &view, "Extrude 1");

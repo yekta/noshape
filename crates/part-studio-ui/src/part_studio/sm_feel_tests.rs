@@ -153,6 +153,12 @@ fn rows() -> Vec<Row> {
             s.frames(cx);
             expect(manip, false, "a manipulator")
         } },
+        Row { id: "flat view / starts from Top", live: "it starts looking straight down (Top), the view cube 'Top'", gap: false, check: |s, cx| {
+            let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).viewport.clone())).ok_or("no flat view")?;
+            let rot = cx.update(|cx| flat.read(cx).camera.rotation);
+            let top = noshape_render::Camera::rotation_for(noshape_render::StandardView::Top);
+            expect(rot.angle_between(top).to_degrees() < 0.01, true, "the flat camera on Top")
+        } },
         Row { id: "flat view / its own camera", live: "the wheel over the flat view zooms it alone; the main view doesn't move", gap: false, check: |s, cx| {
             let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).viewport.clone())).ok_or("no flat view")?;
             let main = cx.update(|cx| s.view.read(cx).viewport.clone());

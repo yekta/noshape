@@ -263,7 +263,7 @@ Alt+right drags, view keys, animations, double middle click, acted out with real
 | Easing | smootherstep t³(6t² − 15t + 10) | the same | = |
 | A new animation while one runs | ignored until it ends | replaced the running one; now ignored | = (fixed) |
 | Double middle click | two middle releases within 500 ms fit (150 ms did, 600 ms didn't) | the OS's double click count; now live's own 500 ms timer | = (fixed) |
-| Not yet in the matrix | inertia (a flick keeps turning, ×0.77 per 16.67 ms; none held still 50 ms; none below 20 fps); a press on empty space rotates about the view centre; Alt+right on a tilted view animates upright first; the view cube (150 px, 15 px margins, face / edge / corner 500 ms, arrows 15° in 250 ms, curved arrows roll, hover fill) and its menu | – | – |
+| Not yet in the matrix | inertia (a flick keeps turning, ×0.77 per 16.67 ms; none held still 50 ms; none below 20 fps: it reads real time and the frame rate, so not a T1 row; navigation `inertia_decays_like_onshape` checks the decay); a press on empty space rotates about the view centre; Alt+right on a tilted view animates upright first; the view cube (150 px, 15 px margins, face / edge / corner 500 ms, arrows 15° in 250 ms, curved arrows roll, hover fill) and its menu | – | – |
 
 ## Chrome (matrix)
 
@@ -279,7 +279,7 @@ debugging rows, left out. Ours binds besides live's map, in those scopes: the de
 Close window, Quit (secondary-n / o / w / q) and the dialog Tab / Enter / Shift+Enter keys live's client handles
 outside its map (its "client side entries").
 
-**Chrome: 16 / 16** (11-13 12:16 UTC; 7 / 11 at the first run, then 5 rows added: 1 / 5 matched).
+**Chrome: 17 / 17** (11-13 13:33 UTC; 7 / 11 at the first run, then 5 rows added: 1 / 5 matched).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -290,12 +290,13 @@ outside its map (its "client side entries").
 | Feature dialog place | graphics area's top left, 3 px down | the same | = |
 | Feature dialog drag | clamped inside the graphics area; within ~10 px of the top / right / bottom it snaps (3 / 0 / 2 px); the left doesn't | could leave the area by all but 80 × 40 px, no snap; now live's (`behaviors::place_feature_dialog`) | = (fixed) |
 | Select other place | pointer + (100, 51) | the same | = |
+| A tooltip on a click or the wheel | closes | the same | = |
 | Select other size | 220 px, 24 px rows in a 90 px list; nothing found: 83 px tall | the same, but the empty dialog kept the 92 px list (149 px); now one row (`SELECT_OTHER_EMPTY_H`) | = (fixed) |
 | Context menu place | pointer + (0, 2) in the graphics; + (10, 12) on a feature-list row | (0, 2) everywhere; now (10, 12) on feature and folder rows (`os_menu::MENU_AT_ROW`) | = (fixed) |
 | Context menu flip | at the right edge its right side 1 px left of the pointer; at the bottom its bottom 4 px below it | flipped round where it opened (pointer + (0, 2)); now round the pointer (vendored gpui `anchored().flip_point`) | = (fixed) |
 | Feature list width | remembered per tab, the default 205 elsewhere | one width for every tab; now per tab (`ui::left_panel_w(tab)`, config left_panel_widths.json) | = (fixed) |
 | Toolbar dropdowns | on click only, under the toolbar at the tool group's left edge, staying open | under the caret (31 px right of the group's left); now at the group's left (vendored gpui-component `PopupMenu::shift_x`); 4 px under the buttons as live | = (fixed; checked on a runner screenshot and by a row click, no T1 test) |
-| Not yet in the matrix | tooltip fade-in / fade-out; tooltips closing on click, wheel, drag; submenus opening on hover with no delay; feature dialogs sharing one stored layout | – | – |
+| Not yet in the matrix | tooltip fade-in / fade-out, closing on a drag's start; submenus opening on hover with no delay; feature dialogs sharing one stored layout | – | – |
 
 ## Look
 
@@ -337,7 +338,7 @@ live2's sheetmetal.json (11-13 08:10–08:37, a 60 × 40 sheet metal model with 
 `sm::the_sheet_metal_matrix_matches_live` (T1, no GPU) on the sm-box start, the Sheet metal table and flat view
 panel open, a fresh document per row; cells carry `sm-cell-<table>-<row>-<column>` debug selectors.
 
-**Matched: 9 / 9** (11-13 12:28 UTC; 5 / 7 at the first run). ui-parity: the 11 sm-* scenarios 10 / 11
+**Matched: 10 / 10** (11-13 13:33 UTC; 5 / 7 at the first run). ui-parity: the 11 sm-* scenarios 10 / 11
 (sm-form-tool: live's Form dialog opens on "Circle emboss", ours "Select Part Studio…"; the same on green).
 
 | Row | Live | Ours | Status |
@@ -351,7 +352,8 @@ panel open, a fresh document per row; cells carry `sm-cell-<table>-<row>-<column
 | A row hovered | lights its bend in the 3D and flat views | the same | = |
 | Flange | no length arrow, a preview wall | the same | = |
 | The flat view | its own camera: the wheel zooms it alone | the same | = |
-| Not yet in the matrix | the panel's open time (0.9–1.4 s live on a software GPU), the flat view starting from Top and re-fitting, its bend lines (rgb(47,47,47), dashed centre), a flat bend hovered / clicked lighting both views and selecting its row, the Make joint / Corner / Bend relief picks, Tab filling its fields from the sketch | – | – |
+| The flat view's start | looking straight down (Top) | the same | = |
+| Not yet in the matrix | the panel's open time (0.9–1.4 s live on a software GPU), the flat view re-fitting, its bend lines (rgb(47,47,47), dashed centre), a flat bend hovered / clicked lighting both views and selecting its row, the Make joint / Corner / Bend relief picks, Tab filling its fields from the sketch | – | – |
 
 ## Sketch tools (matrix)
 
@@ -359,7 +361,7 @@ live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-st
 `sketchtools::the_sketch_tools_matrix_matches_live` (T1, no GPU); Search tools' ranking through
 `noshape_ops::tool_search::studio_rank` over the toolbar's feature types.
 
-**Matched: 10 / 10** (11-13 12:33 UTC; nothing to fix).
+**Matched: 13 / 13** (11-13 13:33 UTC; 10 / 10 at the first run, then 3 rows added: 2 / 3 matched).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -373,14 +375,17 @@ live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-st
 | The menu mid-chain | Escape line, Confirm Sketch 1, …; the tool stays | the same | = |
 | Esc with that menu open | sketch/405–408: the first Esc exits the tool, the menu stays, a second closes it (live2's note reads otherwise: asked, REQUESTS 12:33) | the same as sketch/405–408 | = |
 | Shift+F | the sketch fillet | the same | = |
-| Not yet in the matrix | Search tools' panel (Recently used, the info box, Highlight tool in toolbar), the pattern labels (3x / 1x, spacing, inline boxes), Text's two-click rectangle and dialog (font list, "Default text" selected, n/250 characters: ours has them), Insert image's tabs and aspect-kept rectangle, trim hover / drag-trim, extend hover, the sketch fillet's preview and drag | – | – |
+| Trim, a click | removes the piece between the crossings | the same | = |
+| Sketch fillet, a click on a corner | a preview, nothing made; Esc cancels | the same | = |
+| Sketch fillet, a drag from the corner | made on release (arc, tangents, radius; its radius box opens) | only previewed (a second click made it); now made on release (`SketchEditor::corner_pressed`) | = (fixed) |
+| Not yet in the matrix | Search tools' panel (Recently used, the info box, Highlight tool in toolbar), the pattern labels (3x / 1x, spacing, inline boxes), Text's two-click rectangle and dialog (font list, "Default text" selected, n/250 characters: ours has them), Insert image's tabs and aspect-kept rectangle, trim hover / drag-trim, extend hover | – | – |
 
 ## Editing (matrix)
 
 live2's editing.json (11-13 09:27). part-studio-ui `editing::the_editing_matrix_matches_live` (T1, no GPU; outside a
 dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it there).
 
-**Matched: 7 / 7** (11-13 12:38 UTC; nothing to fix).
+**Matched: 8 / 8** (11-13 13:33 UTC; nothing to fix).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -391,7 +396,8 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 | Delete a sketch another feature uses | no warning; the extrude turns red, Parts (0) | the same | = |
 | Delete a part | "Delete part 1" (behaviours 1.12: its dialog opens pre-filled) | the same | = |
 | Y / Shift+Y with nothing selected or under the pointer | nothing (Shift+Y isn't "show all") | the same | = |
-| Not yet in the matrix | the toolbar's Undo tooltip (always "Undo (cmd+z/ctrl+z)": ours the same), undo in a feature dialog (an existing test), sketch copy / paste (at the pointer, selected, with a 2D triad, constraints kept), the assembly rows (asm's), eye icons | – | – |
+| Sketch Ctrl+C, Ctrl+V | the copy's centre under the pointer at once, selected; one undo removes it | the same | = |
+| Not yet in the matrix | the toolbar's Undo tooltip (always "Undo (cmd+z/ctrl+z)": ours the same), undo in a feature dialog (an existing test), the paste's 2D triad and kept constraints, the assembly rows (asm's), eye icons | – | – |
 
 ## Dialogs (matrix)
 

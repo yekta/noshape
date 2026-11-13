@@ -77,6 +77,10 @@ impl Chrome {
     }
 }
 
+fn expect<T: PartialEq + std::fmt::Debug>(got: T, want: T, what: &str) -> Result<(), String> {
+    if got == want { Ok(()) } else { Err(format!("{what}: ours {got:?}, live {want:?}")) }
+}
+
 fn near(got: f32, want: f32, what: &str) -> Result<(), String> {
     if (got - want).abs() < 0.5 { Ok(()) } else { Err(format!("{what}: ours {got}, live {want}")) }
 }
@@ -130,6 +134,24 @@ fn rows() -> Vec<Row> {
                 return Err(format!("100 ms after coming back: {early:?}"));
             }
             Ok(())
+        } },
+        Row { id: "tooltip / a click or the wheel closes it", live: "closes on click (buttons, links, inputs, dropdowns), double-click, wheel, drag start", gap: false, check: |c, cx| {
+            let mut gone = Vec::new();
+            for wheel in [false, true] {
+                c.hover_first(cx);
+                let _ = c.wait(cx, 450);
+                let at = point(px(60.), px(35.));
+                let mut vcx = gpui_kit::VisualTestContext::from_window(c.tips, cx);
+                if wheel {
+                    vcx.simulate_event(gpui_kit::ScrollWheelEvent { position: at, delta: gpui_kit::ScrollDelta::Lines(point(0., 1.)), modifiers: NONE, ..Default::default() });
+                } else {
+                    vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: NONE, click_count: 1, first_mouse: false });
+                    vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: NONE, click_count: 1 });
+                }
+                crate::ui_script::clear_tooltip();
+                gone.push(c.wait(cx, 30).is_none());
+            }
+            expect(gone, vec![true, true], "gone after a click, after the wheel")
         } },
         Row { id: "tooltip / longer help after 2 s", live: "data-expand-delay 2000 ms after it shows (measured 2.25-2.5 s from arrival)", gap: false, check: |_, _| {
             near(crate::ui::TOOLTIP_EXPAND_DELAY.as_millis() as f32, 2000., "ms")
