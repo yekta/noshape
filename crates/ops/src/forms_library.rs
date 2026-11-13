@@ -1,6 +1,7 @@
-//! The user's sheet metal forms library (live 2497: a folder's Set library ▸ My sheet metal forms): every Part Studio
-//! of every document in the folder and its subfolders, at its latest version, checked as a form and listed in the
-//! Form picker's Libraries tab as "‹user› sheet metal forms".
+//! The user's sheet metal forms library (live 2497: a folder's Set library ▸ My sheet metal forms) and frame profiles
+//! library (live 2530: ▸ My frame profiles library): every Part Studio of every document in the folder and its
+//! subfolders, at its latest version, listed in the Form / Frame picker's Libraries tab as "‹user› sheet metal forms"
+//! / "‹user› frame profiles". Forms are checked as forms; frame profiles aren't checked (an untagged one is kept).
 
 use noshape_model::configuration::{ConfigInputKind, Configuration, VariableKind};
 use noshape_model::document::TabContent;
@@ -37,6 +38,9 @@ pub struct LibraryForm {
     pub name: String,
     /// Its configuration inputs (the picker's fields under Form).
     pub configuration: Configuration,
+    /// A frame profile's sketch: the one a Frame Tag names, else the Part Studio's first sketch.
+    #[serde(default)]
+    pub sketch: Option<noshape_model::FeatureId>,
 }
 
 impl LibraryDocument {
@@ -44,41 +48,79 @@ impl LibraryDocument {
     pub fn value(&self, tab: &str) -> String {
         crate::derived::ExternalRef { path: self.path.clone(), microversion: self.microversion, tab: tab.to_string() }.key()
     }
+
+    /// A frame profile's value: its sketch in that Part Studio (the Frame's `profileSketch`).
+    pub fn profile_value(&self, form: &LibraryForm) -> Option<String> {
+        Some(format!("{}#F{:x}", self.value(&form.tab), form.sketch?.0))
+    }
 }
 
 impl FormsLibrary {
-    /// The document and form a Form's `formPartStudio` (its Part Studio, at any version) is from.
+    /// The document and form a Form's `formPartStudio` or a Frame's `profileSketch` (its Part Studio, at any
+    /// version) is from.
     pub fn find(&self, value: &str) -> Option<(&LibraryDocument, &LibraryForm)> {
-        let r = crate::derived::ExternalRef::parse(value.split('\t').next().unwrap_or(value))?;
+        let base = value.split('\t').next().unwrap_or(value);
+        // (A frame profile's value ends in its sketch, "#F‹id›".)
+        let base = base.rsplit_once("#F").filter(|(_, f)| !f.is_empty() && f.chars().all(|c| c.is_ascii_hexdigit())).map_or(base, |(k, _)| k);
+        let r = crate::derived::ExternalRef::parse(base)?;
         let tab = r.tab.split('#').next().unwrap_or(&r.tab);
         let doc = self.documents.iter().find(|d| d.path == r.path)?;
         Some((doc, doc.forms.iter().find(|f| f.tab == tab)?))
     }
 }
 
-fn path() -> PathBuf {
-    noshape_scene::config_dir().join("sheet-metal-forms-library.json")
+/// Which of the user's Part Studio libraries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Forms,
+    Frames,
 }
 
-/// The library's name in the picker (live: "‹the user's full name› sheet metal forms").
-pub fn title() -> String {
-    format!("{} sheet metal forms", noshape_store::local_user_name())
+impl Kind {
+    /// Its key among the Set library ▸ libraries.
+    pub fn key(self) -> &'static str {
+        match self {
+            Kind::Forms => "sheet_metal_forms",
+            Kind::Frames => "frame_profiles",
+        }
+    }
+
+    fn file(self) -> &'static str {
+        match self {
+            Kind::Forms => "sheet-metal-forms-library.json",
+            Kind::Frames => "frame-profiles-library.json",
+        }
+    }
+}
+
+fn path(kind: Kind) -> PathBuf {
+    noshape_scene::config_dir().join(kind.file())
+}
+
+/// The library's name in the picker (live: "‹the user's full name› sheet metal forms" / "… frame profiles").
+pub fn title(kind: Kind) -> String {
+    let what = match kind {
+        Kind::Forms => "sheet metal forms",
+        Kind::Frames => "frame profiles",
+    };
+    format!("{} {what}", noshape_store::local_user_name())
 }
 
 /// The library, if a folder is set as it.
-pub fn load() -> Option<FormsLibrary> {
-    let folder = crate::prefs::LibraryFolders::load().0.get("sheet_metal_forms").cloned()?;
-    last().filter(|lib| lib.folder == folder)
+pub fn load(kind: Kind) -> Option<FormsLibrary> {
+    let folder = crate::prefs::LibraryFolders::load().0.get(kind.key()).cloned()?;
+    last(kind).filter(|lib| lib.folder == folder)
 }
 
-/// The library last built, set or since unset (a Form picked from an unset one shows "Library not available").
-pub fn last() -> Option<FormsLibrary> {
-    serde_json::from_slice(&std::fs::read(path()).ok()?).ok()
+/// The library last built, set or since unset (a pick from an unset one shows "Library not available").
+pub fn last(kind: Kind) -> Option<FormsLibrary> {
+    serde_json::from_slice(&std::fs::read(path(kind)).ok()?).ok()
 }
 
-/// Builds the library from `folder` (Set library and Update my library): every document's Part Studios at its latest
-/// version must be forms, or nothing changes and the problems come back in live's words, one per problem.
-pub fn build(folder: &Path) -> Result<FormsLibrary, Vec<String>> {
+/// Builds the library from `folder` (Set library and Update my library). Forms: every document's Part Studios at
+/// its latest version must be forms, or nothing changes and the problems come back in live's words, one per problem.
+/// Frame profiles: every Part Studio, unchecked (live 2530).
+pub fn build(kind: Kind, folder: &Path) -> Result<FormsLibrary, Vec<String>> {
     let mut docs = Vec::new();
     collect(folder, &mut Vec::new(), &mut docs);
     if docs.is_empty() {
@@ -98,6 +140,12 @@ pub fn build(folder: &Path) -> Result<FormsLibrary, Vec<String>> {
         let mut forms = Vec::new();
         for tab in &doc.tabs {
             let TabContent::PartStudio(ps) = &tab.content else { continue };
+            if kind == Kind::Frames {
+                let tagged = ps.features.iter().filter(|f| !f.suppressed && f.type_id == "tag" && f.params.is("tagPurpose", "FRAME")).find_map(|f| f.params.query("sketch").first()?.depends_on());
+                let sketch = tagged.or_else(|| ps.features.iter().find(|f| !f.suppressed && f.type_id == "sketch").map(|f| f.id));
+                forms.push(LibraryForm { tab: tab.id.to_string(), name: tab.name.clone(), configuration: ps.configuration.clone(), sketch });
+                continue;
+            }
             let fail = |why: &str| format!("Element \"{}\" in document \"{}\" at its latest version \"{version}\" failed validation: \"{why}\". Fix and create a new version.", tab.name, info.name);
             let thickness = ps.configuration.inputs.iter().any(|i| i.id == "thickness" && matches!(i.kind, ConfigInputKind::Variable { kind: VariableKind::Length, .. }));
             if !thickness {
@@ -107,14 +155,14 @@ pub fn build(folder: &Path) -> Result<FormsLibrary, Vec<String>> {
             if !tagged {
                 problems.push(fail("The Part Studio should have at least one solid body marked as positive or negative"));
             }
-            forms.push(LibraryForm { tab: tab.id.to_string(), name: tab.name.clone(), configuration: ps.configuration.clone() });
+            forms.push(LibraryForm { tab: tab.id.to_string(), name: tab.name.clone(), configuration: ps.configuration.clone(), sketch: None });
         }
         documents.push(LibraryDocument { folders, name: info.name, path, version, microversion, forms });
     }
     if !problems.is_empty() {
         return Err(problems);
     }
-    let version = load().filter(|l| l.folder == folder).map_or(1, |l| l.version + 1);
+    let version = load(kind).filter(|l| l.folder == folder).map_or(1, |l| l.version + 1);
     Ok(FormsLibrary { folder: folder.to_path_buf(), version, documents })
 }
 
@@ -165,8 +213,8 @@ impl FormsLibrary {
 }
 
 /// Saves a built library as the user's.
-pub fn save(lib: &FormsLibrary) -> std::io::Result<()> {
-    std::fs::write(path(), serde_json::to_vec_pretty(lib).unwrap_or_default())
+pub fn save(kind: Kind, lib: &FormsLibrary) -> std::io::Result<()> {
+    std::fs::write(path(kind), serde_json::to_vec_pretty(lib).unwrap_or_default())
 }
 
 /// The `.noshape` documents under `dir`, with the folders between, by name.

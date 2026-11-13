@@ -75,6 +75,7 @@ fn graphics_preferences_toolbar_and_shortcuts_read_set_and_kept() {
     export_defaults(&mut ctx, &dir);
     libraries(&mut ctx, &dir);
     forms_library(&mut ctx, &dir);
+    frames_library(&mut ctx, &dir);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -225,3 +226,50 @@ fn custom_properties(ctx: &mut Ctx, dir: &std::path::Path) {
     let g = call(ctx, "drawing_get", json!({ "drawing": name })).unwrap();
     assert!(g["annotations"].as_array().unwrap().iter().any(|a| a["text"] == "FINISH B2"), "{}", g["annotations"]);
 }
+
+/// A frame profile document: Part Studio 1's sketch "Profile", a 25.4 mm square round the origin, marked by a Frame
+/// Tag when `tagged`, versioned "V1" (live 2530's "uip frame A" / "uip frame plain").
+fn frame_document(path: &std::path::Path, tagged: bool) {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() })).unwrap();
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" })).unwrap()["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-12.7, -12.7], [12.7, 12.7]] })).unwrap();
+    if tagged {
+        call(&mut ctx, "feature_add", json!({ "type": "tag", "params": { "tagPurpose": "FRAME", "sketch": [format!("sketch:{sk}")] } })).unwrap();
+    }
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" })).unwrap();
+}
+
+/// My frame profiles library (live 2530): an untagged Part Studio doesn't stop it; every Part Studio is a profile
+/// (its tagged sketch, else its first), the subfolder's too; a Frame built with one sweeps that square; unset, there's
+/// none.
+fn frames_library(ctx: &mut Ctx, dir: &std::path::Path) {
+    let frames = dir.join("uip frames");
+    std::fs::create_dir_all(frames.join("uip frames sub")).unwrap();
+    frame_document(&frames.join("uip frame A.noshape"), true);
+    frame_document(&frames.join("uip frame plain.noshape"), false);
+    frame_document(&frames.join("uip frames sub").join("uip frame B.noshape"), true);
+    let l = call(ctx, "documents_set_library", json!({ "library": "frame_profiles", "folder": frames.to_str().unwrap() })).unwrap();
+    assert_eq!(l["frames_library"]["name"], format!("{} frame profiles", noshape_store::local_user_name()), "{l}");
+    let lib = call(ctx, "documents_frames_library", json!({})).unwrap()["frames_library"].clone();
+    let docs = lib["documents"].as_array().unwrap();
+    let shape: Vec<(Value, Value)> = docs.iter().map(|d| (d["folders"].clone(), d["name"].clone())).collect();
+    assert_eq!(shape, vec![(json!([]), json!("uip frame A")), (json!([]), json!("uip frame plain")), (json!(["uip frames sub"]), json!("uip frame B"))], "{lib}");
+    assert!(docs.iter().all(|d| d["forms"][0]["value"].as_str().is_some_and(|v| v.starts_with("ext:") && v.contains("#F"))), "each Part Studio's profile sketch: {lib}");
+    // A Frame along a 200 mm line with the library's first profile: the 25.4 mm square swept.
+    let mut user = Ctx::new();
+    call(&mut user, "document_create", json!({ "path": dir.join("uses frames.noshape").to_str().unwrap() })).unwrap();
+    let sk = call(&mut user, "sketch_create", json!({ "plane": "plane:front" })).unwrap()["sketch"].as_str().unwrap().to_string();
+    let r = call(&mut user, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [[0, 0], [200, 0]] })).unwrap();
+    let line = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "line").unwrap()["id"].clone();
+    for d in docs {
+        let f = call(&mut user, "feature_add", json!({ "type": "frame", "params": { "profileSketch": d["forms"][0]["value"], "selections": [line.clone()] } })).unwrap();
+        assert_eq!(f["feature_status"]["status"], "Ok", "{}: {f}", d["name"]);
+        let v = call(&mut user, "query_parts", json!({})).unwrap()["parts"].as_array().unwrap().last().unwrap()["volume"].as_f64().unwrap();
+        assert!((v - 25.4 * 25.4 * 200.0).abs() < 1.0, "{}: volume {v}", d["name"]);
+        call(&mut user, "feature_delete", json!({ "features": [f["feature"].clone()] })).unwrap();
+    }
+    call(ctx, "documents_set_library", json!({ "library": "frame_profiles", "clear": true })).unwrap();
+    assert_eq!(call(ctx, "documents_frames_library", json!({})).unwrap()["frames_library"], Value::Null);
+}
+

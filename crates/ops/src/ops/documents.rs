@@ -147,12 +147,12 @@ pub fn ops() -> Vec<Op> {
             group: "documents",
             verb: "set_library",
             summary: "Set a folder as one of your libraries (Documents › a folder's Set library ▸)",
-            description: "The folder becomes the user's library of that kind: My frame profiles library, My sheet metal forms, My default tolerances, My images or My standard content (one folder each; setting another replaces it). `clear` unsets the kind (the set folder's Unset my library). Every library needs a document in the folder or its subfolders (\"Folder \"…\" is empty.\"); My images a versioned image in each document; My sheet metal forms checks every Part Studio of every document at its latest version (a length configuration variable \"thickness\", a solid marked positive or negative by a Form Tag): one that fails stops the whole library, with live's \"Failed to update the library\" problems. `update` builds the set one again from the documents' latest versions (‹Type› library ▸ Update my library); `up_to_date` says nothing changed since (\"Your … library is already up to date.\"). The reply lists every library set (and the forms library built, as documents_forms_library lists it).",
+            description: "The folder becomes the user's library of that kind: My frame profiles library, My sheet metal forms, My default tolerances, My images or My standard content (one folder each; setting another replaces it). `clear` unsets the kind (the set folder's Unset my library). Every library needs a document in the folder or its subfolders (\"Folder \"…\" is empty.\"); My images a versioned image in each document; My sheet metal forms checks every Part Studio of every document at its latest version (a length configuration variable \"thickness\", a solid marked positive or negative by a Form Tag): one that fails stops the whole library, with live's \"Failed to update the library\" problems; My frame profiles library lists every Part Studio, unchecked. `update` builds the set one again from the documents' latest versions (‹Type› library ▸ Update my library); `up_to_date` says nothing changed since (\"Your … library is already up to date.\"). The reply lists every library set (and the forms or frame profiles library built, as documents_forms_library / documents_frames_library list it).",
             fields: vec![
                 req("library", json!({ "type": "string", "enum": crate::prefs::LIBRARIES.iter().map(|(k, _)| *k).collect::<Vec<_>>() }), "Which library (its key; the menu's row also works)."),
                 opt("folder", s(), "The folder's path (required unless `clear` or `update`)."),
                 opt("clear", json!({ "type": "boolean" }), "Unset that library."),
-                opt("update", json!({ "type": "boolean" }), "My sheet metal forms: build the set library again from its documents' latest versions."),
+                opt("update", json!({ "type": "boolean" }), "Build the set library again from its documents' latest versions."),
             ],
             mutates: true,
             destructive: false,
@@ -167,6 +167,16 @@ pub fn ops() -> Vec<Op> {
             mutates: false,
             destructive: false,
             run: forms_library,
+        },
+        Op {
+            group: "documents",
+            verb: "frames_library",
+            summary: "List your frame profiles library (the Frame's Sketch profile › Libraries › ‹you› frame profiles)",
+            description: "The Part Studios of the folder set as My frame profiles library, as it was built (documents_set_library; none is checked: an untagged one is listed too): its name (\"‹your name› frame profiles\"), version, and each document (the folders above it, its version) with its Part Studios as `forms`. A profile's `value` is the Frame feature's profileSketch: the sketch a Frame Tag names in that Part Studio (else its first sketch), at the library's version. `frames_library` is null when none is set.",
+            fields: vec![],
+            mutates: false,
+            destructive: false,
+            run: frames_library,
         },
         Op {
             group: "documents",
@@ -457,17 +467,20 @@ fn set_library(_ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             return Err(OpError::invalid(format!("{} isn't a folder", folder.display())).with_param("folder"));
         }
         let failed = |p: Vec<String>| OpError::invalid(format!("Failed to update the library\n\n{}", p.join("\n\n")));
-        // My sheet metal forms: every Part Studio must be a form, or the library isn't made (live 2497); the others
-        // need a document (images a versioned image, live 2508).
-        if key == "sheet_metal_forms" {
-            let mut lib = crate::forms_library::build(&folder).map_err(failed)?;
-            let before = crate::forms_library::load().filter(|l| l.folder == folder);
+        // My sheet metal forms: every Part Studio must be a form, or the library isn't made (live 2497); My frame
+        // profiles library: every Part Studio, unchecked (live 2530); the others need a document (images a versioned
+        // image, live 2508).
+        use crate::forms_library::Kind;
+        let kind = [Kind::Forms, Kind::Frames].into_iter().find(|k| k.key() == key);
+        if let Some(kind) = kind {
+            let mut lib = crate::forms_library::build(kind, &folder).map_err(failed)?;
+            let before = crate::forms_library::load(kind).filter(|l| l.folder == folder);
             if let Some(b) = before.filter(|b| b.same_as(&lib)) {
                 up_to_date = true;
                 lib = b;
             }
-            crate::forms_library::save(&lib).map_err(|e| OpError::new("io", format!("saving the library: {e}")))?;
-            forms = Some(lib);
+            crate::forms_library::save(kind, &lib).map_err(|e| OpError::new("io", format!("saving the library: {e}")))?;
+            forms = Some((kind, lib));
         } else {
             crate::forms_library::check_folder(key, &folder).map_err(failed)?;
         }
@@ -475,16 +488,16 @@ fn set_library(_ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     libs.save().map_err(|e| OpError::new("io", format!("saving the libraries: {e}")))?;
     let mut out = json!({ "libraries": libs.0, "up_to_date": up_to_date });
-    if let Some(lib) = forms {
-        out["forms_library"] = forms_library_json(&lib);
+    if let Some((kind, lib)) = forms {
+        out[if kind == crate::forms_library::Kind::Forms { "forms_library" } else { "frames_library" }] = forms_library_json(kind, &lib);
     }
     Ok(out.into())
 }
 
-/// The forms library as documents_forms_library lists it.
-fn forms_library_json(lib: &crate::forms_library::FormsLibrary) -> serde_json::Value {
+/// The forms / frame profiles library as documents_forms_library / documents_frames_library list it.
+fn forms_library_json(kind: crate::forms_library::Kind, lib: &crate::forms_library::FormsLibrary) -> serde_json::Value {
     json!({
-        "name": crate::forms_library::title(),
+        "name": crate::forms_library::title(kind),
         "folder": lib.folder,
         "version": format!("V{}", lib.version),
         "documents": lib.documents.iter().map(|d| json!({
@@ -492,12 +505,19 @@ fn forms_library_json(lib: &crate::forms_library::FormsLibrary) -> serde_json::V
             "name": d.name,
             "path": d.path,
             "version": d.version,
-            "forms": d.forms.iter().map(|f| json!({ "name": f.name, "value": d.value(&f.tab) })).collect::<Vec<_>>(),
+            "forms": d.forms.iter().map(|f| json!({ "name": f.name, "value": if kind == crate::forms_library::Kind::Frames { d.profile_value(f) } else { Some(d.value(&f.tab)) } })).collect::<Vec<_>>(),
         })).collect::<Vec<_>>(),
     })
 }
 
 fn forms_library(_ctx: &mut Ctx, _a: &Args) -> Result<OpOutput, OpError> {
-    let Some(lib) = crate::forms_library::load() else { return Ok(json!({ "forms_library": null }).into()) };
-    Ok(json!({ "forms_library": forms_library_json(&lib) }).into())
+    use crate::forms_library::Kind;
+    let Some(lib) = crate::forms_library::load(Kind::Forms) else { return Ok(json!({ "forms_library": null }).into()) };
+    Ok(json!({ "forms_library": forms_library_json(Kind::Forms, &lib) }).into())
+}
+
+fn frames_library(_ctx: &mut Ctx, _a: &Args) -> Result<OpOutput, OpError> {
+    use crate::forms_library::Kind;
+    let Some(lib) = crate::forms_library::load(Kind::Frames) else { return Ok(json!({ "frames_library": null }).into()) };
+    Ok(json!({ "frames_library": forms_library_json(Kind::Frames, &lib) }).into())
 }

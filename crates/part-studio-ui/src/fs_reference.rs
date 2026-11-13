@@ -60,8 +60,14 @@ fn value_name(sources: &[RefSource], value: &str) -> Option<String> {
         return Some(profile);
     }
     // A sketch of another Part Studio (Frame › Select sketch › Current document) reads as its studio (live 2294: "A").
+    // Another document's (a user frame library's profile, live 2530: "Part Studio 1") as that Part Studio too.
     if let Some((tab, _, _)) = noshape_model::features::frames::studio_sketch(value) {
-        return sources.iter().find(|s| s.tab == tab).map(|s| s.name.clone());
+        if let Some(s) = sources.iter().find(|s| s.tab == tab) {
+            return Some(s.name.clone());
+        }
+        let r = ext_key(tab)?;
+        let doc = crate::derived::external_snapshot(&r.path, r.microversion).ok()?;
+        return doc.tabs.iter().find(|t| t.id.to_string() == r.tab).map(|t| t.name.clone());
     }
     // A profile named by its kind and dimensions (documents from before the library: "SHS 40x40x3").
     if !value.contains('\t') && noshape_model::regen::features::frames_profiles::parse(value).is_ok() {

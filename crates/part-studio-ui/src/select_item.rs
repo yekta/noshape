@@ -178,6 +178,12 @@ pub struct SelectItemPanel {
     /// Frame's library search box, and its previews by `profileSketch` value (with their size).
     frame_search: Option<(Entity<InputState>, Subscription)>,
     frame_previews: HashMap<(String, u32), Arc<gpui_kit::Image>>,
+    /// The user's frame profiles library (live 2530: Library ▾ "‹name› frame profiles" first), whether it is the one
+    /// shown (`Some(true)`; `None` "Library not available": the value's library was unset), and the Type / Profile
+    /// picked under it (`f:‹folder›` or `p:‹value›`, then `p:‹value›`).
+    frames_lib: Option<noshape_ops::forms_library::FormsLibrary>,
+    frame_user: Option<bool>,
+    frame_user_path: Vec<String>,
     /// The user's sheet metal forms library (live 2497: Library ▾ "‹name› sheet metal forms"), the library picked
     /// (`Some(true)` the user's; `None` "Library not available": the value's library was unset), the folders and
     /// document picked under it (`f:` / `d:` and the name), and the selects: Library ▾, then one per level.
@@ -192,6 +198,52 @@ pub struct SelectItemPanel {
     /// The search's list closed by a pick, until the text changes (live 2512: the text stays).
     form_search_closed: bool,
     _subs: Vec<Subscription>,
+}
+
+/// A level's items (id, label).
+type LevelItems = Vec<(String, String)>;
+
+/// The user frame library's Type and Profile levels ([`SelectItemPanel::user_frame_levels`]): each level's items and
+/// pick.
+#[derive(Default)]
+struct UserFrameLevels {
+    types: LevelItems,
+    ty: Option<String>,
+    profiles: Option<(LevelItems, Option<String>)>,
+}
+
+/// The user frame library's levels as picked (`path`), a level not picked yet at its first item (live 2530): Type's
+/// items (its subfolders and its own documents' Part Studios, by name) and pick, Profile's under a folder (that
+/// folder's Part Studios), and the profile they come to.
+fn user_frame_levels(lib: &noshape_ops::forms_library::FormsLibrary, path: &[String]) -> (UserFrameLevels, Option<String>) {
+    let mut out = UserFrameLevels::default();
+    let profile = |d: &noshape_ops::forms_library::LibraryDocument, f: &noshape_ops::forms_library::LibraryForm| d.profile_value(f).map(|v| (format!("p:{v}"), f.name.clone()));
+    for d in &lib.documents {
+        match d.folders.first() {
+            Some(f) if !out.types.iter().any(|(i, _)| *i == format!("f:{f}")) => out.types.push((format!("f:{f}"), f.clone())),
+            Some(_) => {}
+            None => out.types.extend(d.forms.iter().filter_map(|f| profile(d, f))),
+        }
+    }
+    out.types.sort_by(|a, b| a.1.cmp(&b.1));
+    out.ty = path.first().filter(|p| out.types.iter().any(|(i, _)| i == *p)).or(out.types.first().map(|(i, _)| i)).cloned();
+    let Some(ty) = out.ty.clone() else { return (out, None) };
+    if let Some(folder) = ty.strip_prefix("f:") {
+        let items: Vec<(String, String)> = lib.documents.iter().filter(|d| d.folders.first().map(String::as_str) == Some(folder)).flat_map(|d| d.forms.iter().filter_map(move |f| profile(d, f))).collect();
+        let picked = path.get(1).filter(|p| items.iter().any(|(i, _)| i == *p)).or(items.first().map(|(i, _)| i)).cloned();
+        let value = picked.as_ref().and_then(|p| p.strip_prefix("p:")).map(String::from);
+        out.profiles = Some((items, picked));
+        return (out, value);
+    }
+    let value = ty.strip_prefix("p:").map(String::from);
+    (out, value)
+}
+
+/// The levels a Frame's `profileSketch` from the user frame library shows at (its folder, then itself), if it is one.
+fn user_frame_path(lib: &noshape_ops::forms_library::FormsLibrary, value: &str) -> Option<Vec<String>> {
+    let (doc, form) = lib.find(value)?;
+    let v = doc.profile_value(form)?;
+    Some(doc.folders.first().map(|f| format!("f:{f}")).into_iter().chain([format!("p:{v}")]).collect())
 }
 
 /// The stored value's base (`key[#part]`) and configuration (after a tab:
@@ -284,11 +336,17 @@ fn texts(mode: PanelMode) -> (&'static str, &'static str, &'static str) {
 impl SelectItemPanel {
     pub fn new(setup: PanelSetup, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let PanelSetup { mode, sources, doc_name, doc_path, except, gpu, value, libraries, frame_profiles } = setup;
-        let forms_lib = (libraries && !frame_profiles).then(noshape_ops::forms_library::load).flatten();
+        use noshape_ops::forms_library::{self as user_lib, Kind};
+        let forms_lib = (libraries && !frame_profiles).then(|| user_lib::load(Kind::Forms)).flatten();
         let base = split_value(&value).0;
         let from_user = forms_lib.as_ref().and_then(|l| l.find(base)).map(|(d, _)| d.folders.iter().map(|f| format!("f:{f}")).chain([format!("d:{}", d.name)]).collect::<Vec<_>>());
-        let unavailable = libraries && !frame_profiles && from_user.is_none() && noshape_ops::forms_library::last().is_some_and(|l| l.find(base).is_some());
-        let in_libraries = libraries && (value.is_empty() || value.starts_with(noshape_model::sheetmetal::forms::PREFIX) || value.starts_with(frame_library::PREFIX) || from_user.is_some() || unavailable);
+        let unavailable = libraries && !frame_profiles && from_user.is_none() && user_lib::last(Kind::Forms).is_some_and(|l| l.find(base).is_some());
+        let frames_lib = (libraries && frame_profiles).then(|| user_lib::load(Kind::Frames)).flatten();
+        let frame_from_user = frames_lib.as_ref().and_then(|l| user_frame_path(l, base));
+        let frame_unavailable = libraries && frame_profiles && frame_from_user.is_none() && user_lib::last(Kind::Frames).is_some_and(|l| l.find(base).is_some());
+        let frame_user = if frame_from_user.is_some() { Some(true) } else if frame_unavailable { None } else { Some(false) };
+        let in_libraries = libraries
+            && (value.is_empty() || value.starts_with(noshape_model::sheetmetal::forms::PREFIX) || value.starts_with(frame_library::PREFIX) || from_user.is_some() || unavailable || frame_from_user.is_some() || frame_unavailable);
         let lib_user = if from_user.is_some() { Some(true) } else if unavailable { None } else { Some(false) };
         let search = cx.new(|cx| InputState::new(window, cx));
         let url = cx.new(|cx| InputState::new(window, cx));
@@ -357,6 +415,9 @@ impl SelectItemPanel {
             frame_selects: HashMap::new(),
             frame_search: None,
             frame_previews: HashMap::new(),
+            frames_lib,
+            frame_user,
+            frame_user_path: frame_from_user.unwrap_or_default(),
             forms_lib,
             lib_user,
             lib_path: from_user.unwrap_or_default(),
@@ -788,6 +849,11 @@ impl SelectItemPanel {
 
     /// A labelled select of Frame's library (Library, Type, Profile: live D134's rows, 32 px apart).
     fn frame_select(&mut self, key: &'static str, label: &'static str, items: Vec<String>, current: &str, cx: &mut Context<Self>) -> AnyElement {
+        self.frame_select_items(key, label, items.into_iter().map(|i| (i.clone(), i)).collect(), current, cx)
+    }
+
+    /// [`Self::frame_select`] with items' ids apart from their labels (the user library's Part Studios share names).
+    fn frame_select_items(&mut self, key: &'static str, label: &'static str, items: Vec<(String, String)>, current: &str, cx: &mut Context<Self>) -> AnyElement {
         let select = match self.frame_selects.get(key) {
             Some((s, _)) => s.clone(),
             None => {
@@ -800,7 +866,7 @@ impl SelectItemPanel {
                 s
             }
         };
-        let items: Vec<(SharedString, SharedString)> = items.into_iter().map(|i| (SharedString::from(i.clone()), SharedString::from(i))).collect();
+        let items: Vec<(SharedString, SharedString)> = items.into_iter().map(|(i, l)| (SharedString::from(i), SharedString::from(l))).collect();
         select.update(cx, |s, _| s.set_items(items, current.to_string()));
         h_flex()
             .h(px(32.))
@@ -814,6 +880,32 @@ impl SelectItemPanel {
     /// A level of Frame's library changed: the levels below take their defaults and the field shows the new profile at
     /// once, before Select (live D134).
     fn pick_frame_level(&mut self, level: &'static str, id: &str, cx: &mut Context<Self>) {
+        // Library ▾: the user's library applies its first profile at once (live 2530); Onshape's, its own pick.
+        if level == "library" {
+            let user = self.frames_lib.as_ref().is_some_and(|l| id == noshape_ops::forms_library::title(noshape_ops::forms_library::Kind::Frames) && !l.documents.is_empty());
+            self.frame_user = Some(user);
+            self.frame_user_path.clear();
+            if user {
+                if let Some(v) = self.user_frame_levels().1 {
+                    self.pick(v, cx);
+                }
+            } else {
+                let (standard, profile) = self.frame_choice();
+                let size = frame_library::sizes(&standard, &profile).1;
+                self.pick(frame_library::value(&standard, &profile, size, false), cx);
+            }
+            return;
+        }
+        if matches!(level, "utype" | "uprofile") {
+            let depth = usize::from(level == "uprofile");
+            self.frame_user_path.truncate(depth);
+            self.frame_user_path.push(id.to_string());
+            if let Some(v) = self.user_frame_levels().1 {
+                self.pick(v, cx);
+            }
+            cx.notify();
+            return;
+        }
         let (standard, profile) = match level {
             "type" => (id.to_string(), frame_library::profiles(id).first().map(|p| p.to_string()).unwrap_or_default()),
             "profile" => (self.frame_choice().0, id.to_string()),
@@ -830,6 +922,145 @@ impl SelectItemPanel {
         self.frame_pick = Some((standard.clone(), profile.clone()));
         let size = frame_library::sizes(&standard, &profile).1;
         self.pick(frame_library::value(&standard, &profile, size, false), cx);
+    }
+
+    /// The user frame library's levels as picked ([`user_frame_levels`]).
+    fn user_frame_levels(&self) -> (UserFrameLevels, Option<String>) {
+        match &self.frames_lib {
+            Some(lib) => user_frame_levels(lib, &self.frame_user_path),
+            None => (UserFrameLevels::default(), None),
+        }
+    }
+
+    /// Frame's Libraries tab on the user's frame profiles library (live 2530): Library, Type (its subfolders and its
+    /// own Part Studios), Profile under a folder; no size inputs; the search over profile and folder names; Select.
+    /// "Library not available" (the value's library was unset): Library ▾ and Select alone.
+    fn render_user_frames(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        use noshape_ops::forms_library::{Kind, title};
+        let pal = p();
+        let search = match &self.frame_search {
+            Some((s, _)) => s.clone(),
+            None => {
+                let s = cx.new(|cx| InputState::new(window, cx));
+                let sub = cx.subscribe(&s, |_: &mut Self, _, ev: &InputEvent, cx| {
+                    if matches!(ev, InputEvent::Change) {
+                        cx.notify();
+                    }
+                });
+                self.frame_search = Some((s.clone(), sub));
+                s
+            }
+        };
+        let query = search.read(cx).value().trim().to_lowercase();
+        let search_box = h_flex().h(px(38.)).flex_none().px(px(6.)).pt(px(4.)).child(
+            div()
+                .flex_1()
+                .relative()
+                .h(px(30.))
+                .rounded(px(3.))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xcccccc))
+                .child(crate::ui::input_with_placeholder(&search, "Search by name, folder, or configuration", cx).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)).pl(px(5.))),
+        );
+        let user = title(Kind::Frames);
+        let mut libraries = Vec::new();
+        if self.frames_lib.is_some() {
+            libraries.push(user.clone());
+        }
+        libraries.push(frame_library::LIBRARY.to_string());
+        let current = if self.frame_user == Some(true) { user.clone() } else { String::new() };
+        let library = self.frame_select("library", "Library", libraries, &current, cx);
+        if self.frame_user.is_none()
+            && let Some((s, _)) = self.frame_selects.get("library")
+        {
+            s.update(cx, |s, _| s.set_missing(Some("Library not available".into())));
+        }
+        let mut col = v_flex().id("sel-frame-library").flex_1().min_h_0().overflow_y_scroll().pt(px(2.)).child(library);
+        if self.frame_user == Some(true) {
+            let (levels, _) = self.user_frame_levels();
+            col = col.child(self.frame_select_items("utype", "Type", levels.types.clone(), levels.ty.as_deref().unwrap_or_default(), cx));
+            if let Some((items, picked)) = levels.profiles {
+                col = col.child(self.frame_select_items("uprofile", "Profile", items, picked.as_deref().unwrap_or_default(), cx));
+            }
+        }
+        // The search: profile names and folder names (not documents'), each row the name and its folders (the
+        // library's folder first: "uip frames - uip frames sub").
+        let hits: Vec<(String, String, Vec<String>)> = match (&self.frames_lib, query.is_empty()) {
+            (Some(lib), false) => {
+                let root = lib.folder.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                lib.documents
+                    .iter()
+                    .flat_map(|d| d.forms.iter().map(move |f| (d, f)))
+                    .filter(|(d, f)| f.name.to_lowercase().contains(&query) || d.folders.iter().chain([&root]).any(|n| n.to_lowercase().contains(&query)))
+                    .filter_map(|(d, f)| {
+                        let path = std::iter::once(root.clone()).chain(d.folders.iter().cloned()).collect::<Vec<_>>().join(" - ");
+                        let mut levels: Vec<String> = d.folders.first().map(|f| format!("f:{f}")).into_iter().collect();
+                        levels.push(format!("p:{}", d.profile_value(f)?));
+                        Some((f.name.clone(), path, levels))
+                    })
+                    .collect()
+            }
+            _ => Vec::new(),
+        };
+        let results = (!hits.is_empty()).then(|| {
+            let mut list = v_flex().id("sel-frame-results").occlude().absolute().top(px(38.)).left(px(6.)).right(px(6.)).max_h(px(330.)).overflow_y_scroll().bg(pal.panel).border_1().border_color(gpui_kit::rgb(0xcccccc)).shadow_md();
+            for (i, (name, path, levels)) in hits.into_iter().enumerate() {
+                list = list.child(
+                    v_flex()
+                        .id(("sel-frame-hit", i))
+                        .h(px(55.))
+                        .flex_none()
+                        .justify_center()
+                        .px(px(10.))
+                        .cursor_pointer()
+                        .when(i == 0, |d| d.bg(gpui_kit::rgb(0xdef1fb)))
+                        .hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)))
+                        .child(div().text_size(px(14.)).child(name))
+                        .child(div().truncate().italic().text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(path))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            this.frame_user_path = levels.clone();
+                            if let Some((st, _)) = &this.frame_search {
+                                st.update(cx, |s, cx| s.set_value("", window, cx));
+                            }
+                            if let Some(v) = this.user_frame_levels().1 {
+                                this.pick(v, cx);
+                            }
+                            cx.notify();
+                        })),
+                );
+            }
+            list
+        });
+        let available = self.frame_user == Some(true);
+        let select_button = div()
+            .id("sel-frame-select")
+            .h(px(30.))
+            .px(px(16.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(px(3.))
+            .border_1()
+            .border_color(gpui_kit::rgb(0x959595))
+            .text_size(px(14.67))
+            .text_color(pal.text)
+            .when(!available, |d| d.opacity(0.25))
+            .when(available, |d| d.cursor_pointer().hover(|d| d.bg(pal.panel_hover)))
+            .child("Select")
+            .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
+                if available {
+                    cx.emit(SelectItemEvent::Close);
+                }
+            }));
+        v_flex()
+            .flex_1()
+            .min_h_0()
+            .relative()
+            .child(search_box)
+            .child(col)
+            .child(h_flex().flex_none().justify_center().p(px(8.)).border_t_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(select_button))
+            .children(results)
+            .into_any_element()
     }
 
     /// A search result (or Enter on the first): the levels jump to it, the field shows it (live D134).
@@ -875,6 +1106,9 @@ impl SelectItemPanel {
     /// Generate preview, and Select, which takes them and closes the panel.
     fn render_frame_library(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         use noshape_model::configuration::{ConfigInput, ListOption};
+        if self.frame_user != Some(false) {
+            return self.render_user_frames(window, cx);
+        }
         let pal = p();
         let (standard, profile) = self.frame_choice();
         let search = match &self.frame_search {
@@ -906,7 +1140,12 @@ impl SelectItemPanel {
                 .border_color(gpui_kit::rgb(0xcccccc))
                 .child(crate::ui::input_with_placeholder(&search, "Search by name, folder, or configuration", cx).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)).pl(px(5.))),
         );
-        let library = self.frame_select("library", "Library", vec![frame_library::LIBRARY.to_string()], frame_library::LIBRARY, cx);
+        let mut libraries = Vec::new();
+        if self.frames_lib.is_some() {
+            libraries.push(noshape_ops::forms_library::title(noshape_ops::forms_library::Kind::Frames));
+        }
+        libraries.push(frame_library::LIBRARY.to_string());
+        let library = self.frame_select("library", "Library", libraries, frame_library::LIBRARY, cx);
         let types = frame_library::standards().into_iter().map(String::from).collect();
         let type_row = self.frame_select("type", frame_library::standard_label(&standard), types, &standard, cx);
         // A standard with a Type level (AISC › "AISC profiles", 8020's series) shows it between; Profile lists that
@@ -1230,7 +1469,7 @@ impl SelectItemPanel {
     fn render_forms_levels(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let mut items: Vec<(SharedString, SharedString)> = Vec::new();
         if self.forms_lib.is_some() {
-            items.push(("user".into(), noshape_ops::forms_library::title().into()));
+            items.push(("user".into(), noshape_ops::forms_library::title(noshape_ops::forms_library::Kind::Forms).into()));
         }
         items.push(("onshape".into(), "Onshape sheet metal forms".into()));
         let current = match self.lib_user {
@@ -2199,5 +2438,33 @@ mod picked_tests {
         assert!(!picked_studio_exists("Part Studio 1", &sources));
         assert!(!picked_studio_exists("", &sources));
         assert!(picked_studio_exists("ext:x|t|/p.noshape", &sources));
+    }
+
+    /// Live 2530: the user frame library's Type mixes its subfolder with its own documents' Part Studios (by tab name,
+    /// "Part Studio 1" twice), the first picked at once; under the subfolder, Profile lists its Part Studio; a value
+    /// from the library shows at its levels.
+    #[::core::prelude::v1::test]
+    fn the_user_frame_library_levels_as_live() {
+        use noshape_ops::forms_library::{FormsLibrary, LibraryDocument, LibraryForm};
+        let doc = |name: &str, folders: &[&str], sketch: u64| LibraryDocument {
+            folders: folders.iter().map(|f| f.to_string()).collect(),
+            name: name.into(),
+            path: format!("/lib/{name}.noshape").into(),
+            version: "V1".into(),
+            microversion: noshape_store::MicroversionId::generate(),
+            forms: vec![LibraryForm { tab: format!("t{sketch}"), name: "Part Studio 1".into(), configuration: Default::default(), sketch: Some(noshape_model::FeatureId(sketch)) }],
+        };
+        let lib = FormsLibrary { folder: "/lib".into(), version: 1, documents: vec![doc("uip frame A", &[], 1), doc("uip frame plain", &[], 2), doc("uip frame B", &["uip frames sub"], 3)] };
+        let (levels, value) = user_frame_levels(&lib, &[]);
+        let labels: Vec<&str> = levels.types.iter().map(|(_, l)| l.as_str()).collect();
+        assert_eq!(labels, ["Part Studio 1", "Part Studio 1", "uip frames sub"]);
+        assert!(levels.profiles.is_none(), "no Profile level for a Part Studio");
+        let first = value.expect("the first profile at once");
+        assert_eq!(lib.find(&first).map(|(d, _)| d.name.as_str()), Some("uip frame A"));
+        let (levels, value) = user_frame_levels(&lib, &["f:uip frames sub".into()]);
+        let (items, _) = levels.profiles.expect("Profile under the subfolder");
+        assert_eq!(items.iter().map(|(_, l)| l.as_str()).collect::<Vec<_>>(), ["Part Studio 1"]);
+        assert_eq!(value.as_deref().and_then(|v| lib.find(v)).map(|(d, _)| d.name.as_str()), Some("uip frame B"));
+        assert_eq!(user_frame_path(&lib, value.as_deref().unwrap()), Some(vec!["f:uip frames sub".to_string(), format!("p:{}", value.unwrap())]));
     }
 }
