@@ -3099,6 +3099,21 @@ impl<'a> Translator<'a> {
                 }
                 return Some(self.common_edge(&faces[0], &faces[1]));
             }
+            // A vertex where three named faces meet (c2-hunting-knife's Fillet 7: a variable fillet's vertex, Extrude
+            // 5's end cap, its swept face off an arc and Extrude 7's side).
+            if matches!(get("queryType"), Some(Packed::Str(t)) if t == "INTERSECT")
+                && let Some(Packed::Array(sides)) = get("derivedFrom")
+                && sides.len() == 3
+            {
+                let mut faces = Vec::new();
+                for side in sides {
+                    match self.extrude_name_from_tree(side)? {
+                        Ok(f) => faces.push(f),
+                        Err(e) => return Some(Err(format!("INTERSECT: {e}"))),
+                    }
+                }
+                return Some(self.common_vertex(&faces));
+            }
             // A pattern instance's copy of a named entity (`COPY` of `….opPattern`, `instanceName` "k":
             // asm-infento-subs' Fillet 2 on Circular pattern 2's copy of a cap edge): ours of the same pattern.
             if matches!(get("queryType"), Some(Packed::Str(t)) if t == "COPY")
@@ -3353,6 +3368,23 @@ impl<'a> Translator<'a> {
             [(_, id)] => Ok(id.clone()),
             [] => Err(format!("COPY: no {kind} of pattern {pattern}'s instance {index} copies {seed}")),
             more => Err(format!("COPY: {} {plural} of pattern {pattern}'s instance {index} could copy {seed}", more.len())),
+        }
+    }
+
+    fn common_vertex(&mut self, faces: &[String]) -> Result<String, String> {
+        let mut common: Option<Vec<String>> = None;
+        for f in faces {
+            let r = self.call("query_entities", json!({ "kind": "vertices", "of": [f], "limit": 10000 }))?;
+            let ids: Vec<String> = r["vertices"].as_array().into_iter().flatten().filter_map(|v| v["id"].as_str().map(str::to_string)).collect();
+            common = Some(match common {
+                None => ids,
+                Some(c) => c.into_iter().filter(|v| ids.contains(v)).collect(),
+            });
+        }
+        match common.unwrap_or_default().as_slice() {
+            [one] => Ok(one.clone()),
+            [] => Err("INTERSECT: its three faces have no common vertex of ours".into()),
+            more => Err(format!("INTERSECT: its three faces share {} vertices of ours", more.len())),
         }
     }
 

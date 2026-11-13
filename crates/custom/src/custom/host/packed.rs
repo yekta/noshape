@@ -136,6 +136,10 @@ impl Decoder<'_> {
                 let i = self.hex()?;
                 return self.values.get(i).cloned().ok_or_else(|| format!("unknown value {i:x}"));
             }
+            // A boolean takes no place in the value table (live: c2-hunting-knife's Fillet 7 vertex refers to the
+            // values after an `isStart` F one place lower).
+            b'F' => return Ok(Packed::Bool(false)),
+            b'T' => return Ok(Packed::Bool(true)),
             _ => {
                 self.pos -= 1;
                 self.untracked()?
@@ -256,6 +260,10 @@ impl Encoder {
     }
 
     fn value(&mut self, p: &Packed) {
+        if let Packed::Bool(b) = p {
+            self.out.push(if *b { 'T' } else { 'F' });
+            return;
+        }
         if let Some(i) = self.values.iter().position(|v| v == p) {
             self.out.push_str(&format!("R{i:x}"));
             return;
@@ -483,6 +491,26 @@ mod tests {
         assert!(m.contains(&(s("isStart"), Packed::Bool(false))));
         assert!(m.contains(&(s("operationId"), id("FyUE18XOUbMicpL_0.opExtrude"))));
         assert!(m.contains(&(s("queryType"), s("CAP_EDGE"))));
+    }
+
+    /// A boolean takes no place in the value table: live's vertex where three faces meet (c2-hunting-knife's
+    /// Fillet 7), its references after Extrude 5's `isStart` F (`R21` its Id, `R27` "SWEPT_FACE").
+    #[test]
+    fn a_boolean_takes_no_value_slot() {
+        let live = "%B5$QueryM5Sb$derivedFromA3C0M6S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA6C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FTSK3zAsWFr8Ttg_1wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdSc$yQ90XcHrLa8sC0M5R5R6R7R8R9RbRcRdReSc.6$CAcMxa4iF1ebbottomC0M5R5R6R7R8R9RbRcRdReS-14.3$topC0M5R5R6R7R8R9RbRcRdReSc$hUhYATumoK0gC0M5R5R6R7R8R9RbRcRdReSd.8$EOgr6iJbVfd40MirrorCSC0M5R5R6R7R8R9RbRcRdReSc$JjRdOC417BS1R5C7S4$FACER7R8S7$isStartFR9CcA1S11.9$FULRZq57eweaAuq_1opExtrudeRcS8$CAP_FACEC0M5R1A1M2R2R3R4A1R16R5R1eR7R8R9R21RcSa$SWEPT_FACEC0M5R1A1M2R2R3R4A1C0M5R5R6R7R8R9CcA1S11.-e$FGdoWZrba7wqcu0_2RcRdReSc$AbzZQ1EaKSFER5R1eR7R8R9CcA1S11.-21$FpINrTEhkzt0nZA_2RcR27R5C7S6$VERTEXR7R8R9CcA1S-28.7.9$booleanopBooleanRcS9$INTERSECT";
+        let p = unpack(live).unwrap();
+        let Packed::Tagged(_, m) = &p else { panic!() };
+        let Packed::Map(m) = m.as_ref() else { panic!() };
+        let Some((_, Packed::Array(sides))) = m.iter().find(|(k, _)| *k == s("derivedFrom")) else { panic!() };
+        let field = |side: &Packed, key: &str| {
+            let Packed::Tagged(_, m) = side else { panic!() };
+            let Packed::Map(m) = m.as_ref() else { panic!() };
+            m.iter().find(|(k, _)| *k == s(key)).map(|(_, v)| v.clone())
+        };
+        assert_eq!(field(&sides[1], "operationId"), Some(id("FULRZq57eweaAuq_1.opExtrude")));
+        assert_eq!(field(&sides[2], "queryType"), Some(s("SWEPT_FACE")));
+        assert_eq!(field(&sides[2], "operationId"), Some(id("FpINrTEhkzt0nZA_2.opExtrude")));
+        assert_eq!(pack_plain(&p), live);
     }
 
     /// Every string in a decoded value.
