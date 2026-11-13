@@ -213,7 +213,28 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   clamp-hms 1309375f (a fuse, 13 ms) has its seam line at u -0.078 on one side and 0.1215 on the other (r 31.75 mm,
   one turn apart), so the outline doesn't close; cf-lighten a28978f4 (a 4-tool cut, 40 ms) loses tool face 26 likewise.
   The gap fix doesn't help them. Cases: vibe5 ~/tmp/bool2/lost.
-- **The knife's 343b971e (11-13 05:33 UTC, gating 2a78dd7f, branch bool2-knife2):** a cut by two chamfer tools
+- **Gating 07:28 UTC on vibe5 (queued behind bool's fe8859ed4): branch bool2-knife2 e6de34123, three commits:**
+  - f7768ac9b the knife (below). Its first gate (2a78dd7f, vibe7) FAILED: 4 new differences, 47 cases declined, 6
+    crate tests, clamp-hms worse. Two bugs, fixed: the "section along an edge" test measured distance to the edge's
+    infinite line (seg_param), so sections running on straight past an edge's end were dropped; now within its range,
+    and for B-spline sections only (exact ones don't stray: two shfall slab fuses were taken and differed). And
+    "past the face's edge" counted points past it inside an edge (a circle on a torus leaving one face and coming back)
+    or with one point on; now only at its ends, three points or more on. All bool_patterns pass; the 4 cases as main.
+  - d7994c86a cf-setback-fillet's last two fuses: OCCT's section passes 0.5-4 um from the face's edge, which lies on
+    the other face's surface all along (OCCT: edge on face, no vertex), so not "a section touching a face's
+    boundary". An edge touching at one point (bool-corpus 890acd4d, 0.1 nm) still declines: OCCT puts a vertex there.
+    All 5 of its fuses ours, as OCCT's, 1.1-1.5x. T1 a_section_beside_an_edge_lying_on_the_other_face_fused_as_occt.
+  - e6de34123 sheet metal: a sheet cut by flat sheets on one of its planes, its other faces' planes past the tools'
+    reach: corner-break 1, louver 2, as OCCT's. T1 a_sheet_cut_by_a_sheet_on_one_of_its_faces_as_occt.
+- **Next (user 07:20): c2-rings-loft's ring wedges.** blend found OCCT's Boolean faster than ours there (Chamfer 1
+  534 -> ~380 ms, Fillet 1 223 -> ~128 ms, identical results; branch blend-speed on blend8): profile, make ours win.
+- **Suite declines left (07:00 UTC replay of all 98 documents, 47 cases):** impeller 3 upstream (blend / core); fan's
+  two cuts (05cd5358, fb562f41: helical strips on full-turn cylinders, bool's seam area; a circle cut at a seam now
+  goes round past its own start: /root/bool2-scratch/fan-wrap-gap.patch with the gap fix, then "a non-manifold
+  result" / "an arc across a cylinder's seam"); snap-hook 2 (bool's); 7 "an edge on another argument's free-form face"
+  (edges along a free-form face's v=0 edge 1-8 um off its surface: ambiguous); cf-box-dovetail-joint's 4 cuts (an
+  object face inside the tool kept whole: coincident-face classification); "a shared shape" 8.
+- **The knife's 343b971e (11-13 05:33 UTC, branch bool2-knife2):** a cut by two chamfer tools
   end to end along the blade, their B-spline faces all but tangent to the grind face 4. Tool 0's edge 52 lies on face 4
   within 0.2 um but runs on past the blade's tip (0.2 mm off the surface there); OCCT's sections of tool 0's faces
   with face 4 come in pieces with gaps (open ends, not taken). Now: an edge within the grey band all along is on the face
