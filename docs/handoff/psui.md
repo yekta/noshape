@@ -96,6 +96,10 @@ Extend's hover preview, ours takes the curve then the boundary: asked live REQUE
 editing 9 / 9 (eye icons), sheet metal 11 / 11 (fixed: a click inside a bend's zone in the flat view selects that
 bend's face in 3D, its line and its Bends row: `FlatViewEvent::BendZone`; only the centre line took a click before),
 navigation 20 / 20 (a rotate from empty space about the view centre).
+**15:04:** 055377f9 landed as 322ad565 (Windows CI fix); the batch queued as 87cad835. vibe6, 51 sheet metal / flat /
+trim / Text / eye scenarios in 2 shards: 45 / 51; alone 3 of the misses match (load: sm-hem-edge, sm-flange-two-edges
+read before their preview, mutual-trim-new-edit-reedit), drw-sheet-properties / -rename are dx's, analysis-flatten's
+click sits on a tie between two edge midpoints (moved to x 10, re-record asked REQUESTS 15:06).
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's
