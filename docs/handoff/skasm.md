@@ -25,6 +25,12 @@
   a boolean a value-table slot (live doesn't: every `R` after an `isStart` F was one off, packed.rs
   `a_boolean_takes_no_value_slot`), and an INTERSECT of three faces is now their common vertex (`common_vertex`).
   Its four vertices land as mirror pairs; the result is still asymmetric (centroid y 0.013): blend's variable fillet.
+- Knife Loft 1's profile (cd4045f46): live's Sketch 12 joints are 5.7e-6 rad (arc-spline) and 2.35e-4 (spline-line), ours
+  were up to 4.4e-4 (the 1 µm join pulled the spline end across its 0.38 mm first span). `smooth_use_splines` puts a Used
+  B-spline's end on the Used line / arc end it meets within 2e-3 rad and turns its next pole along it (a Tangent
+  constraint moved the ends off Loft 1's guides instead). Our loft then needs core's smooth-closed-profile loft
+  (core-loftsmooth 4f6a20fc5, gating); core checks Loft 1 / Extrude 10 against live once both are on main.
+- Suite pairs on the Mac for every land today: 80/87, 870/947, every document identical to the base.
 - Sheet metal speed. Profiling: macOS `sample` on the Mac (/root/skasm-scratch/bin/sample.sh, run there from
   ~/agents/skasm; sample_incl.py / sample_children.py / sample_parents.py read its call graph), plus NOSHAPE_SMPROF
   (core's /root/core-scratch/rmx/smprof.patch), NOSHAPE_KERNEL_PROFILE, NOSHAPE_FS_PROFILE.
@@ -34,8 +40,7 @@
   - What's left in corner-break (Mac samples of regeneration): update_sheet_metal_geometry 83 %, of it build_part
     ~58 % (the glued `fuse_all` of walls and bends through OCCT ~half, relief cuts ~third), flat_of ~1/3 (unfold,
     flat_from_pieces). model-plus (437 ms, live 917): Extrude 4 = std's performSheetMetalBoolean ~50 % (bool's Rust
-    Boolean) + the rebuild ~50 % (build_part's glued fuse). The glued fuse is the next lever (bool's Boolean; core
-    tried one combined cut: slower on corner-break).
+    Boolean) + the rebuild ~50 % (build_part's glued fuse). The glued fuse is the next lever: sent to bool (22:33) with the samples.
 - Mac runs: /root/skasm-scratch/bin/suite.sh (copy into the worktree as suite-tmp.sh, never commit it), e.g.
   `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh env DOC=c2-hunting-knife bash suite-tmp.sh`; knife on main there 24/52, 496 ms.
 
