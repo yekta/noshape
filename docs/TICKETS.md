@@ -467,7 +467,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     selection missing in v0.4.47; the chamfer now runs on the rest). P3 CHAMFER-SAYS-FILLET (blend): cli-draft-hang Chamfer 3
     now fails with "Failed to fillet selections." (was "Distance of chamfer on face too large."); a chamfer's message should
     name chamfer.
-- **qa 07:25, v0.4.48 checked (cut 6932701dc, published 07:07): no blocker.** Linux assets match SHA256SUMS. User documents,
+- **qa 07:14, v0.4.48 checked (cut 6932701dc, published 07:07): no blocker.** Linux assets match SHA256SUMS. User documents,
   released CLI against v0.4.47's (vibe5): hat15, hat15b, hat8, the dock, every feature and part the same. In the released Linux
   app on a mode-700 hat15 copy (vibe7 :481): the autocomplete ("fancontrol" both rows, values grey, first lit; ↓ Enter inserts
   #fan_control_board_wall_length and the box stays open, Enter commits 12; "fcb" in Depth, Tab inserts) and the model-edge snap
