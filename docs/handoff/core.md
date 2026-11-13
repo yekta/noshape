@@ -5,7 +5,7 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
-## core state (11-13 20:30 UTC)
+## core state (11-13 20:27 UTC)
 - **Landed since 18:13:** 1cecae62 Move face near freeform faces by booleans first (impeller's two flange offsets ~0.6 s
   of invalid OCCT offset each); 80cd8de6 up-to extrude splits by the target's faces over the profile only (fan-blade
   Extrude 8 119 -> ~65 ms); 598a81a4 loft profile of faces making one face, empty connections ignored (rings-loft 29 ->
