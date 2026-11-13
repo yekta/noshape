@@ -1,19 +1,19 @@
 {
  "scenario": "doc-plus-create-drawing",
- "recorded": "2026-11-13T04:33:27.927Z",
+ "recorded": "2026-11-13T17:22:59.050Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-13.1"
  },
  "live": {
-  "document": "7e67d98ff680b4305c965de6",
-  "workspace": "187540f7f382b00e6942282f",
-  "element": "fc95a6b817682ab042be94fb",
+  "document": "37445fd4a16106830013e725",
+  "workspace": "38d6c8b3e4617ef9c47b6953",
+  "element": "26a5ff66e907805819bf5479",
   "start": "doc-tabs",
-  "startElement": "fc95a6b817682ab042be94fb",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "26a5ff66e907805819bf5479",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -83,9 +83,9 @@
     -116.913,
     77.942
    ],
-   "width_mm": 460.686,
+   "width_mm": 419.494,
    "height_mm": 243.974,
-   "mmPerPixel": 0.275365,
+   "mmPerPixel": 0.250744,
    "orthographic": true
   },
   "measure": null,
@@ -145,7 +145,7 @@
    "ok": true,
    "at": [
     57,
-    977
+    1064
    ],
    "state": {
     "focus": {
@@ -234,9 +234,9 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null,
@@ -284,7 +284,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 58120
+   "t": 60158
   },
   {
    "step": 2,
@@ -297,7 +297,7 @@
    "ok": true,
    "at": [
     121,
-    861
+    948
    ],
    "state": {
     "focus": {
@@ -383,9 +383,9 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null,
@@ -433,7 +433,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 62334
+   "t": 63489
   }
  ]
 }
