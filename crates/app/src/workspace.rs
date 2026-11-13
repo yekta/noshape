@@ -1601,6 +1601,18 @@ impl Workspace {
             .on_drag_move::<TabDrag>(cx.listener(|this, e: &DragMoveEvent<TabDrag>, _, cx| {
                 if let Some(g) = &mut this.tab_gap {
                     g.x = e.event.position.x;
+                    let edge = px(TAB_AUTOSCROLL_EDGE);
+                    g.scroll = if g.x < e.bounds.left() + edge { -1 } else if g.x > e.bounds.right() - edge { 1 } else { 0 };
+                    if g.scroll != 0 && g.autoscroll.is_none() {
+                        g.autoscroll = Some(cx.spawn(async move |this, cx| {
+                            loop {
+                                cx.background_executor().timer(std::time::Duration::from_millis(16)).await;
+                                if !this.update(cx, |this, cx| this.autoscroll_tabs(cx)).unwrap_or(false) {
+                                    break;
+                                }
+                            }
+                        }));
+                    }
                     cx.notify();
                 }
             }))
@@ -2015,6 +2027,21 @@ impl Workspace {
                 .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| this.scroll_tabs(left, true, cx)))
         };
         Some(h_flex().flex_none().child(button(true, !at_first, cx)).child(button(false, !at_last, cx)).into_any_element())
+    }
+
+    /// A frame of a tab drag's scroll at an end of the strip; false once the drag is over.
+    fn autoscroll_tabs(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(g) = &self.tab_gap else { return false };
+        if g.scroll != 0 {
+            let (mut off, max) = (self.tab_scroll.offset(), self.tab_scroll.max_offset().x);
+            let x = (off.x - px(TAB_AUTOSCROLL_STEP * f32::from(g.scroll))).clamp(-max, px(0.));
+            if x != off.x {
+                off.x = x;
+                self.tab_scroll.set_offset(off);
+                cx.notify();
+            }
+        }
+        true
     }
 
     /// Scrolls the tab strip a page (about the visible width less one tab),
@@ -3194,7 +3221,14 @@ struct TabGap {
     name: String,
     /// The dragged tab's width: the gap it leaves.
     width: Pixels,
+    /// The strip scrolling under a drag held at one of its ends (-1 left, 1 right), and the timer doing it.
+    scroll: i8,
+    autoscroll: Option<Task<()>>,
 }
+
+/// A tab drag this close to an end of the strip scrolls it, this many px a frame (60 Hz).
+const TAB_AUTOSCROLL_EDGE: f32 = 30.;
+const TAB_AUTOSCROLL_STEP: f32 = 6.;
 
 /// The drag start of a tab or folder chip: records the drag on the
 /// workspace (the gap starts where the tab was).
@@ -3204,7 +3238,7 @@ fn start_tab_drag(ws: WeakEntity<Workspace>) -> impl Fn(&TabDrag, Point<Pixels>,
         let _ = ws.update(cx, |w, cx| {
             let order = w.doc.read(cx).session.doc.children(w.open_folder);
             let next = order.iter().position(|t| *t == d.id).and_then(|i| order.get(i + 1)).copied();
-            w.tab_gap = Some(TabGap { dragged: d.id, before: Some(next), x, grab: offset.x, icon: d.icon, name: d.name.clone(), width: d.width });
+            w.tab_gap = Some(TabGap { dragged: d.id, before: Some(next), x, grab: offset.x, icon: d.icon, name: d.name.clone(), width: d.width, scroll: 0, autoscroll: None });
             cx.notify();
         });
         cx.new(|_| d.clone())

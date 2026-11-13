@@ -73,6 +73,23 @@ struct Thumbs {
     busy: bool,
 }
 
+/// Tabs and folders dragged in the Tab manager: the Ctrl selection when the grabbed row is part of it, else the row.
+#[derive(Clone)]
+pub(crate) struct TmDrag {
+    pub(crate) ids: Vec<TabId>,
+    pub(crate) label: String,
+}
+
+impl Render for TmDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        div().px(px(10.)).h(px(30.)).flex().items_center().rounded(px(3.)).bg(rgb(0xffffff)).border_1().border_color(rgb(0xcccccc)).shadow_md().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(self.label.clone()))
+    }
+}
+
+/// The insertion line where dragged rows land (live's Sheets panel: 2 px rgb(27,95,170)).
+const TM_DROP_LINE: u32 = 0x1b5faa;
+
 pub struct TabManager {
     doc: Entity<DocModel>,
     /// The window's workspace: the tab menu's actions (create, duplicate, thumbnail…) are its.
@@ -86,6 +103,8 @@ pub struct TabManager {
     selected: Option<TabId>,
     /// Ctrl+click selection (tabs and folders).
     multi: Vec<TabId>,
+    /// While rows are dragged: the tab row under the pointer and whether they'd land after it.
+    pub(crate) drop_at: Option<(TabId, bool)>,
     collapsed: HashSet<TabId>,
     /// Folder being renamed in place.
     renaming: Option<(TabId, Entity<InputState>, Subscription)>,
@@ -151,7 +170,7 @@ impl TabManager {
         ];
         // Live 10-27 (TABS-PANEL-FOCUS): opening the panel leaves the focus
         // on the page; typing goes into Search tabs only once it is clicked.
-        Self { doc, workspace, thumbs: Thumbs::default(), evaluator: Default::default(), search, query: String::new(), kinds: HashSet::new(), selected: active, multi: Vec::new(), collapsed: HashSet::new(), renaming: None, sort: TabSort::TabOrder, sort_open: false, sort_focus: cx.focus_handle(), sort_anchor: Default::default(), show_search: true, show_filters: true, compact: false, show_preview: true, _subs: subs }
+        Self { doc, workspace, thumbs: Thumbs::default(), evaluator: Default::default(), search, query: String::new(), kinds: HashSet::new(), selected: active, multi: Vec::new(), drop_at: None, collapsed: HashSet::new(), renaming: None, sort: TabSort::TabOrder, sort_open: false, sort_focus: cx.focus_handle(), sort_anchor: Default::default(), show_search: true, show_filters: true, compact: false, show_preview: true, _subs: subs }
     }
 
     /// The workspace's active tab changed (keep it selected, like Onshape).
@@ -209,6 +228,55 @@ impl TabManager {
     /// Add selection to folder (a folder's Add selected to folder too): a new folder "New folder" (live
     /// doc-tm-add-selection-to-folder, doc-tm-folder-add-selected) in the first item's folder, holding `ids`, then its
     /// name field.
+    fn drag_of(&self, id: TabId, name: &str) -> TmDrag {
+        let ids = self.targets(id);
+        let label = if ids.len() > 1 { format!("{} items", ids.len()) } else { name.to_string() };
+        TmDrag { ids, label }
+    }
+
+    /// Dragged rows dropped on folder `folder`: moved into it (as the tab bar's drop on a folder).
+    pub(crate) fn drop_into_folder(&mut self, drag: &TmDrag, folder: TabId, cx: &mut Context<Self>) {
+        self.drop_at = None;
+        let ids: Vec<TabId> = drag.ids.iter().copied().filter(|i| *i != folder).collect();
+        self.doc.update(cx, |doc, cx| {
+            if ids.iter().any(|i| doc.session.doc.parent_of(*i) != Some(folder)) {
+                doc.edit_document("Move to folder", cx, |d| {
+                    for i in &ids {
+                        d.set_parent(*i, Some(folder));
+                    }
+                });
+            }
+        });
+        cx.notify();
+    }
+
+    /// Dragged rows dropped on tab row `target`: before or after it, in its folder (as the tab bar's reorder).
+    pub(crate) fn drop_by_row(&mut self, drag: &TmDrag, target: TabId, cx: &mut Context<Self>) {
+        let at = self.drop_at.take();
+        if !self.tree_mode() || drag.ids.contains(&target) {
+            cx.notify();
+            return;
+        }
+        let after = at.is_some_and(|(t, after)| t == target && after);
+        self.doc.update(cx, |doc, cx| {
+            let d = &doc.session.doc;
+            let parent = d.parent_of(target);
+            let siblings: Vec<TabId> = d.children(parent).into_iter().filter(|c| !drag.ids.contains(c)).collect();
+            let before = match after {
+                false => Some(target),
+                true => siblings.iter().position(|c| *c == target).and_then(|i| siblings.get(i + 1)).copied(),
+            };
+            doc.edit_document_not_undoable("Reorder tabs", cx, |d| {
+                for i in &drag.ids {
+                    if d.set_parent(*i, parent) {
+                        d.move_in_order(*i, before);
+                    }
+                }
+            });
+        });
+        cx.notify();
+    }
+
     fn add_to_new_folder(&mut self, ids: Vec<TabId>, window: &mut Window, cx: &mut Context<Self>) {
         let Some(first) = ids.first().copied() else { return };
         let mut made = None;
@@ -272,6 +340,9 @@ impl TabManager {
             .cursor_pointer()
             .when(picked, |d| d.bg(pal.accent_soft))
             .when(!picked, |d| d.hover(|d| d.bg(pal.panel_hover)))
+            .on_drag(self.drag_of(id, &name), |d, _, _, cx| cx.new(|_| d.clone()))
+            .drag_over::<TmDrag>(|st, _, _, _| st.bg(rgb(0xdef1fb)))
+            .on_drop(cx.listener(move |this, drag: &TmDrag, _, cx| this.drop_into_folder(drag, id, cx)))
             .child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 14., pal.text))
             .child(os::glyph(os::GLYPH_FOLDER, 24., pal.text))
             .child(match self.renaming.as_ref().filter(|r| r.0 == id) {
@@ -408,7 +479,11 @@ impl Render for TabManager {
             v
         };
         // Tree mode: folders and their tabs (indented); otherwise the matches.
-        let entries: Vec<(TabId, usize)> = if self.tree_mode() { self.tree(false, cx) } else { matches.iter().map(|t| (t.0, 0)).collect() };
+        let tree = self.tree_mode();
+        if !cx.has_active_drag() {
+            self.drop_at = None;
+        }
+        let entries: Vec<(TabId, usize)> = if tree { self.tree(false, cx) } else { matches.iter().map(|t| (t.0, 0)).collect() };
         let rows: Vec<AnyElement> = entries
             .into_iter()
             .filter_map(|(id, depth)| {
@@ -448,6 +523,24 @@ impl Render for TabManager {
                         )
                     })
                     .tooltip(crate::ui::tooltip(format!("Click to navigate to {name}")))
+                    .on_drag(self.drag_of(id, name), |d, _, _, cx| cx.new(|_| d.clone()))
+                    .when(tree && cx.has_active_drag(), |d| {
+                        d.on_drag_move::<TmDrag>(cx.listener(move |this, e: &DragMoveEvent<TmDrag>, _, cx| {
+                            if !e.bounds.contains(&e.event.position) {
+                                return;
+                            }
+                            let at = Some((id, e.event.position.y > e.bounds.center().y));
+                            if this.drop_at != at {
+                                this.drop_at = at;
+                                cx.notify();
+                            }
+                        }))
+                        .when_some(self.drop_at.filter(|(t, _)| *t == id), |d, (_, after)| {
+                            let line = div().absolute().left_0().right_0().h(px(2.)).bg(rgb(TM_DROP_LINE));
+                            d.child(if after { line.bottom_0() } else { line.top_0() })
+                        })
+                    })
+                    .on_drop(cx.listener(move |this, drag: &TmDrag, _, cx| this.drop_by_row(drag, id, cx)))
                     .on_click(cx.listener(move |this, e: &ClickEvent, _, cx| {
                         // Ctrl+click: select several (Onshape); a click opens the tab.
                         if e.modifiers().secondary() {

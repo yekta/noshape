@@ -57,6 +57,48 @@ P1 (lead 11-12). Live measures the 3D side (live/feel/3d.json, behaviours.md "fe
 | Point and line drags | ? | – | – | ? |
 | Click vs drag threshold | ? | 3 px (sketch drags) | – | ? |
 
+## Drawings (studios, from 2026-11-13)
+
+Live: behaviours.md (lines cited) and live2's feel/drawing.json (asked 11-13 00:40). Ours: px are screen px
+(`tol_mm(px)` = px / zoom), mm are sheet mm.
+
+| Item | Live | Ours (where) | Test | Status |
+|---|---|---|---|---|
+| View edge hover reach (Select) | lights within ~4 px, nothing at 11 (bm 26810, Dimension tool) | 5 px (`hover_at`, `BuiltSheet::hit`) | – | ? |
+| Dimension line / extension / arrow reach | ? | 5 px; annotations win ties by 2.5 px (`hit` bias) | – | ? |
+| Dimension / note text | ? | inside the text box (+0.15 × height pad) | – | ? |
+| View's empty inside | the view's frame lights (bm 23413, 36443) | the smallest view box within 1 mm (`view_under`) | – | ? |
+| Priority: edge vs annotation vs view | ? | annotation (−2.5 px) > edge > title block (+1.25 px) > view box | – | ? |
+| Snap reach (Dimension tool, Note leader) | 10–13 px, 12 fits best, constant in px (bm 4078) | 8 px (`snap_at_with`) | – | ≠ (live2 pinning it down) |
+| Snap marker | a filled 10 px disc rgb(216,165,102) for every kind (bm 19501, D21); older notes saw squares / triangles | square / triangle / diamond / circle by kind, 9 px, 2 px orange stroke (`overlay.rs`) | – | ≠ (asked which is current) |
+| Midpoints / quadrants | only after Shift+Q (D22) | the same | – | = |
+| Two points in reach | the nearer, one marker (bm 4092) | the nearer (`snap_near`) | – | = |
+| Placement inference (note / dimension text) | pink dotted line, red ✕, gone 4 px off (bm 26796) | 6 px, magenta dashed, red ✕ (`drawing_tools.rs` 1517) | – | ? |
+| Box select left → right | ? (Part Studio: window, blue) | window (#1651B0 box) | – | ? |
+| Box select right → left | ? (Part Studio: crossing, #FFC20E dashed) | crossing, Onshape's crossing box (`select_in_box`, `box_overlay`) | GPUI `a_box_right_to_left_takes_what_it_crosses` | ? (built 11-13) |
+| Click on an item | toggles it, no modifier (help, bm 34761) | toggles (`select_click`) | – | = |
+| Shift + click | adds views, notes, dimensions (bm 6004, 24332) | as a plain click | – | = |
+| Ctrl + click | ? | as a plain click | – | ? |
+| Click vs drag | ? (runs used a 0.5 s hold) | 3 px (`drawing_tools.rs` 1269) | – | ? |
+| Dragging a projected view | follows its parent's axis (bm 13993) | locked to the axis (`MoveViews`) | – | = |
+| Dragging a view near another's alignment | ? | – (building, lead 11-13) | – | ? |
+| Double-click | ? | the OS's (GPUI: Linux 400 ms, 5 px) | – | ? |
+
+## Documents page and tabs (studios, from 2026-11-13)
+
+| Item | Live | Ours (where) | Test | Status |
+|---|---|---|---|---|
+| Documents list: click / Ctrl / Shift | ? (asked: F1) | a click selects one row, Ctrl (Cmd) toggles, Shift selects from the anchor, folders and documents in page order (`click_rows`) | `rows_select_alone_with_ctrl_toggles_and_with_shift_ranges_from_the_anchor` | ? (built 11-13) |
+| Actions on N selected | "N selection(s)" wording (bm 35) | right-click menu Move to… / Send to trash, Delete key; "N selections will be sent to the trash." | – | ? |
+| Documents dragged onto a folder | ? (asked: F2) | rows, folder tiles and parent crumbs take a drop (#def1fb); the selection moves | – | ? (built 11-13) |
+| Row hover / selected | #def1fb / #b2ddf6 (bm 20) | the same | – | = |
+| Tab drag: ghost, gap | 100 px ghost, a tab-wide gap, no line (bm 6562) | the same | – | = |
+| Tab drag start | ? | GPUI's 2 px | – | ? |
+| Tab dropped on a folder | lights (`hovered-group`), needs a dwell (bm 6576, 13328) | lights #def1fb, drops at once | – | ? |
+| Tab bar auto-scroll while dragging | ? (asked: F5) | within 30 px of an end, 6 px a frame (`autoscroll_tabs`) | – | ? (built 11-13) |
+| Tab manager drag and drop | ? (asked: F6) | – | – | ? |
+| Ctrl / Shift + click a tab | opens it in a new window (rq 2403) | the same | – | = |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Per-entity colour~~ (psui 11-12: lines by their own geometry). Arcs and circles: ask live2 whether an arc whose
    ends slide along its circle stays black.

@@ -232,3 +232,67 @@ fn a_zoom_remakes_the_lines_off_the_ui_thread(cx: &mut TestAppContext) {
     let (after, remaking) = cx.update(|cx| editor.read(cx).lines_state());
     assert!(!remaking && after == zoom && zoom > before * 1.4, "the lines made for the new zoom: {before} -> {after} ({zoom})");
 }
+
+/// Lead 11-13 (interaction feel): a box dragged right to left selects what it crosses, left to right only what lies
+/// wholly inside it (Onshape's window / crossing boxes, behaviours "box selection: window vs crossing").
+#[gpui::test]
+fn a_box_right_to_left_takes_what_it_crosses(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "box-crossing");
+    for _ in 0..1500 {
+        if cx.update(|cx| editor.read(cx).real_sheet_in()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, window);
+    }
+    let pl = cx.update(|cx| editor.read(cx).built.as_ref().and_then(|b| b.placements.first().cloned())).expect("a view placed");
+    // From below-left of the view to its middle: half of it inside.
+    let corner = [pl.min[0] - 3.0, pl.min[1] - 3.0];
+    let middle = [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0];
+    let selected = |cx: &mut TestAppContext, from: [f64; 2], to: [f64; 2]| {
+        cx.update(|cx| editor.update(cx, |e, cx| {
+            e.select_in_box(from, to, false, cx);
+            e.selection.contains(&Sel::View(pl.id))
+        }))
+    };
+    assert!(!selected(cx, corner, middle), "left to right: the half-covered view isn't taken");
+    assert!(selected(cx, middle, corner), "right to left: it is");
+    let around = [pl.max[0] + 3.0, pl.max[1] + 3.0];
+    assert!(selected(cx, corner, around), "left to right around it: taken");
+}
+
+/// Lead 11-13 (interaction feel): a free view dragged within 6 px of another view's centre line is held on it, the
+/// placement inference's line shown; farther it moves freely.
+#[gpui::test]
+fn a_dragged_view_holds_on_another_views_centre_line(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "view-align");
+    for _ in 0..1500 {
+        if cx.update(|cx| editor.read(cx).real_sheet_in()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, window);
+    }
+    let (a, b, zoom, start) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pls = e.built.as_ref().expect("built").placements.clone();
+        let centre = |pl: &noshape_model::drawing::build::ViewPlacement| [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0];
+        let (pa, pb) = pls.iter().flat_map(|x| pls.iter().map(move |y| (x, y))).find(|(x, y)| (centre(x)[1] - centre(y)[1]).abs() > 20.0).expect("two views at different heights");
+        let start = e.current_sheet().view(pa.id).expect("view").position;
+        ((pa.id, centre(pa)), centre(pb), e.zoom, start)
+    });
+    let px_mm = 1.0 / zoom;
+    let off = |px: f64| [15.0, b[1] - a.1[1] + px * px_mm];
+    let moved = cx.update(|cx| editor.update(cx, |e, _| (e.align_view_drag(&[(a.0, start)], off(4.0)), e.infer_lines.len())));
+    assert!((moved.0[1] - (b[1] - a.1[1])).abs() < 1e-9 && moved.1 >= 1, "4 px off: held on the line, its guide shown: {moved:?}");
+    let free = cx.update(|cx| editor.update(cx, |e, _| {
+        e.infer_lines.clear();
+        e.align_view_drag(&[(a.0, start)], off(9.0))
+    }));
+    assert!((free[1] - off(9.0)[1]).abs() < 1e-9, "9 px off: free");
+}

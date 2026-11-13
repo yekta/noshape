@@ -36,6 +36,8 @@ mod start_links_tests;
 mod tooltip_rehover_tests;
 #[cfg(test)]
 mod notification_job_tests;
+#[cfg(test)]
+mod tab_manager_tests;
 mod cli_mode;
 mod live_server;
 mod doc_dialogs;

@@ -335,7 +335,13 @@ pub struct StartView {
     sort_shown: bool,
     search: Entity<InputState>,
     query: String,
+    /// The selected row (the last clicked); with Ctrl / Shift + click, `also` holds the others, valid while `selected`
+    /// is still `also_of` (anything else that selects a row drops them).
     selected: Option<PathBuf>,
+    also: Vec<PathBuf>,
+    also_of: Option<PathBuf>,
+    /// Shift + click's range start.
+    anchor: Option<PathBuf>,
     /// Onshape's document labels and whether the nav section is expanded.
     labels: lib::Labels,
     labels_open: bool,
@@ -554,6 +560,9 @@ impl StartView {
             search,
             query: String::new(),
             selected: None,
+            also: Vec::new(),
+            also_of: None,
+            anchor: None,
             labels: lib::Labels::load(),
             labels_open: false,
             label_search,
@@ -733,6 +742,146 @@ impl StartView {
         self.view = v;
         self.save_prefs();
         cx.notify();
+    }
+
+    /// The rows the page lists, in order: folders, then documents.
+    fn page_order(&self) -> Vec<PathBuf> {
+        self.folder_tiles().into_iter().map(|(f, _)| f).chain(self.visible().into_iter().map(|d| d.path)).collect()
+    }
+
+    fn is_selected(&self, p: &Path) -> bool {
+        self.selected.as_deref() == Some(p) || (self.also_of.is_some() && self.also_of == self.selected && self.also.iter().any(|q| q == p))
+    }
+
+    /// Every selected row, the last clicked first.
+    fn selection(&self) -> Vec<PathBuf> {
+        let mut v: Vec<PathBuf> = self.selected.iter().cloned().collect();
+        if self.also_of.is_some() && self.also_of == self.selected {
+            v.extend(self.also.iter().cloned());
+        }
+        v
+    }
+
+    /// A folder or document row clicked (`click_rows`).
+    fn click_row(&mut self, row: &Path, m: &Modifiers) {
+        let (sel, anchor) = click_rows(&self.selection(), self.anchor.as_deref(), &self.page_order(), row, m.shift, m.secondary());
+        self.selected = sel.first().cloned();
+        self.also = sel.into_iter().skip(1).collect();
+        self.also_of = self.selected.clone();
+        self.anchor = anchor;
+    }
+
+    /// A right-click on `row`: it alone selected unless it is part of a multiple selection, which the menu acts on.
+    fn context_select(&mut self, row: &Path) -> bool {
+        if self.selection().len() > 1 && self.is_selected(row) {
+            return true;
+        }
+        self.selected = Some(row.to_path_buf());
+        self.anchor = Some(row.to_path_buf());
+        false
+    }
+
+    /// The selected rows as the commands take them: (path, name, folder), the page's order.
+    fn selection_items(&self) -> Vec<(PathBuf, String, bool)> {
+        let sel = self.selection();
+        self.page_order()
+            .into_iter()
+            .filter(|p| sel.contains(p))
+            .map(|p| match self.docs.iter().find(|d| d.path == p) {
+                Some(d) => (p, d.name.clone(), false),
+                None => {
+                    let name = folder_label(&p);
+                    (p, name, true)
+                }
+            })
+            .collect()
+    }
+
+    /// The menu of a multiple selection: what applies to every row in it.
+    fn selection_menu(view: Entity<StartView>, menu: OsMenu) -> OsMenu {
+        let (v1, v2) = (view.clone(), view);
+        menu.list_no_icons()
+            .item(OsMenuItem::new("Move to…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.move_selected(window, cx))))
+            .item(OsMenuItem::new("Send to trash").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.trash_selected(window, cx))))
+    }
+
+    /// What a drag from `row` carries: the selection if the row is in a multiple one, else the row.
+    fn drag_items(&self, row: &Path, name: &str, folder: bool) -> DocsDrag {
+        if self.is_selected(row) && self.selection().len() > 1 {
+            return DocsDrag { items: self.selection_items() };
+        }
+        DocsDrag { items: vec![(row.to_path_buf(), name.to_string(), folder)] }
+    }
+
+    /// Dragged rows dropped on folder `dir`: moved into it (those already there, and a folder onto itself, stay).
+    fn drop_into_folder(&mut self, drag: &DocsDrag, dir: &Path, window: &mut Window, cx: &mut Context<Self>) {
+        let dir = canon(dir);
+        let items: Vec<_> = drag.items.iter().filter(|(p, _, _)| canon(p) != dir && p.parent().is_none_or(|f| canon(f) != dir)).cloned().collect();
+        if items.is_empty() {
+            return;
+        }
+        if let Some((_, name, _)) = items.iter().find(|(p, _, folder)| !folder && crate::doc_files::is_document_open(p, cx)) {
+            Self::notify(window, cx, AlertKind::Warning, format!("{name}: Close the document's window before moving it"));
+            return;
+        }
+        self.move_items(&items, &dir, window, cx);
+    }
+
+    /// Send to trash on the selected rows (none of them open).
+    fn trash_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let items = self.selection_items();
+        if let Some((_, name, _)) = items.iter().find(|(p, _, folder)| !folder && crate::doc_files::is_document_open(p, cx)) {
+            Self::notify(window, cx, AlertKind::Warning, format!("{name}: Close the document's window before moving it to the trash"));
+            return;
+        }
+        self.confirm_trash(items, window, cx);
+    }
+
+    /// Move to… on the selected rows: one folder picker, each moved into the folder chosen, the moved rows selected.
+    fn move_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let items = self.selection_items();
+        let Some((first, _, _)) = items.first().cloned() else { return };
+        if let Some((_, name, _)) = items.iter().find(|(p, _, folder)| !folder && crate::doc_files::is_document_open(p, cx)) {
+            Self::notify(window, cx, AlertKind::Warning, format!("{name}: Close the document's window before moving it"));
+            return;
+        }
+        let mut location = Location::new(first.parent().map(Path::to_path_buf).unwrap_or_else(crate::file_dialogs::documents_dir));
+        location.exclude = items.iter().find(|i| i.2).map(|i| i.0.clone());
+        let location = Rc::new(location);
+        let view = cx.entity();
+        window.open_dialog(cx, move |dialog, _, cx| {
+            let (loc, view, items) = (location.clone(), view.clone(), items.clone());
+            os::modal_doc_page(dialog, "Move documents and folders to", 460.)
+                .child(os::modal_body().child(os::field_label("Location")).child(location.render(cx)))
+                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+                .on_ok(move |_, window, cx| {
+                    let dir = loc.chosen.borrow().clone();
+                    view.update(cx, |this, cx| this.move_items(&items, &dir, window, cx));
+                    true
+                })
+        });
+    }
+
+    /// Moves `items` into `dir` (documents and folders; a folder can't go into itself), the moved rows selected after.
+    fn move_items(&mut self, items: &[(PathBuf, String, bool)], dir: &Path, window: &mut Window, cx: &mut Context<Self>) {
+        let mut moved = Vec::new();
+        for (path, name, folder) in items {
+            let res = if *folder { lib::move_folder(path, dir) } else { lib::move_doc(path, dir) };
+            match res {
+                Ok(dest) => {
+                    if *folder {
+                        self.folder_moved(&canon(path), &canon(&dest));
+                    }
+                    moved.push(canon(&dest));
+                }
+                Err(e) => Self::notify(window, cx, AlertKind::Warning, format!("{name}: {e:#}")),
+            }
+        }
+        self.labels = lib::Labels::load();
+        self.selected = moved.first().cloned();
+        self.also = moved.into_iter().skip(1).collect();
+        self.also_of = self.selected.clone();
+        self.force_rescan(cx);
     }
 
     fn selected_entry(&self) -> Option<DocEntry> {
@@ -1143,36 +1292,42 @@ impl StartView {
             Self::notify(window, cx, AlertKind::Warning, format!("{}: Close the document's window before moving it to the trash", d.name));
             return;
         }
-        self.confirm_trash(d.path, d.name, false, window, cx);
+        self.confirm_trash(vec![(d.path, d.name, false)], window, cx);
     }
 
     /// The bordered list of the items a trash dialog acts on (live
     /// documents/70): 1 px `#ccc`, one row per item with its icon.
-    fn selection_box(name: &str, folder: bool) -> Div {
+    fn selection_box(items: &[(PathBuf, String, bool)]) -> Div {
         let pal = p();
-        div().mt(px(14.)).ml(px(10.)).py(px(6.)).px(px(22.)).border_1().border_color(rgb(0xcccccc)).child(
+        div().mt(px(14.)).ml(px(10.)).py(px(6.)).px(px(22.)).border_1().border_color(rgb(0xcccccc)).children(items.iter().map(|(_, name, folder)| {
             h_flex()
                 .gap(px(8.))
                 .text_size(px(14.))
                 .text_color(pal.text)
-                .child(os::glyph(if folder { os::GLYPH_FOLDER } else { os::GLYPH_DOCUMENT }, 18., pal.text))
-                .child(crate::ui::user_text(name.to_string())),
-        )
+                .child(os::glyph(if *folder { os::GLYPH_FOLDER } else { os::GLYPH_DOCUMENT }, 18., pal.text))
+                .child(crate::ui::user_text(name.to_string()))
+        }))
     }
 
     /// Onshape's "Send to trash" confirmation (live documents/47): "1
     /// selection will be sent to the trash." (bold) + "Show details" (the
     /// item list), **Send to trash** / Cancel.
-    fn confirm_trash(&mut self, path: PathBuf, name: String, folder: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if folder && self.docs.iter().any(|d| d.path.starts_with(&path) && crate::doc_files::is_document_open(&d.path, cx)) {
-            Self::notify(window, cx, AlertKind::Warning, format!("{name}: Close the documents in this folder before moving it to the trash"));
-            return;
+    fn confirm_trash(&mut self, items: Vec<(PathBuf, String, bool)>, window: &mut Window, cx: &mut Context<Self>) {
+        for (path, name, folder) in &items {
+            if *folder && self.docs.iter().any(|d| d.path.starts_with(path) && crate::doc_files::is_document_open(&d.path, cx)) {
+                Self::notify(window, cx, AlertKind::Warning, format!("{name}: Close the documents in this folder before moving it to the trash"));
+                return;
+            }
         }
         let view = cx.entity();
         let shown = Rc::new(std::cell::Cell::new(false));
+        let count = match items.len() {
+            1 => "1 selection will be sent to the trash.".to_string(),
+            n => format!("{n} selections will be sent to the trash."),
+        };
         window.open_dialog(cx, move |dialog, _, cx| {
             let pal = p();
-            let (view, path, name) = (view.clone(), path.clone(), name.clone());
+            let (view, items, count) = (view.clone(), items.clone(), count.clone());
             let s2 = shown.clone();
             os::modal_doc_page(dialog, "Send to trash", 598.)
                 .child(
@@ -1181,7 +1336,7 @@ impl StartView {
                             h_flex()
                                 .gap(px(10.))
                                 .text_size(px(14.))
-                                .child(div().font_weight(FontWeight::BOLD).text_color(pal.text).child("1 selection will be sent to the trash."))
+                                .child(div().font_weight(FontWeight::BOLD).text_color(pal.text).child(count))
                                 .child(
                                     div()
                                         .id("trash-details")
@@ -1195,31 +1350,39 @@ impl StartView {
                                         }),
                                 ),
                         )
-                        .when(shown.get(), |d| d.child(Self::selection_box(&name, folder))),
+                        .when(shown.get(), |d| d.child(Self::selection_box(&items))),
                 )
                 .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Send to trash"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
-                    let (path, name) = (path.clone(), name.clone());
-                    view.update(cx, |this, cx| this.send_to_trash(path, name, folder, window, cx));
+                    let items = items.clone();
+                    view.update(cx, |this, cx| this.send_to_trash(items, window, cx));
                     true
                 })
         });
     }
 
-    fn send_to_trash(&mut self, path: PathBuf, name: String, folder: bool, window: &mut Window, cx: &mut Context<Self>) {
-        match lib::send_to_trash(&path, &name, folder) {
-            Ok(item) => {
-                self.trash = crate::start_trash::Trash::load();
-                if folder && matches!(&self.source, Source::Folder(f) if canon(f).starts_with(&item.original)) {
-                    self.source = Source::All;
-                    self.save_prefs();
+    fn send_to_trash(&mut self, items: Vec<(PathBuf, String, bool)>, window: &mut Window, cx: &mut Context<Self>) {
+        let mut sent = Vec::new();
+        for (path, name, folder) in &items {
+            match lib::send_to_trash(path, name, *folder) {
+                Ok(item) => {
+                    if *folder && matches!(&self.source, Source::Folder(f) if canon(f).starts_with(&item.original)) {
+                        self.source = Source::All;
+                        self.save_prefs();
+                    }
+                    sent.push((name.clone(), item.id));
                 }
-                self.selected = None;
-                Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name), text: " has been sent to the trash and will be automatically deleted after 30 days.".into(), restore: Some(item.id), brief: true });
-                self.force_rescan(cx);
+                Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Could not move to trash: {e:#}")),
             }
-            Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Could not move to trash: {e:#}")),
         }
+        self.trash = crate::start_trash::Trash::load();
+        self.selected = None;
+        match sent.as_slice() {
+            [] => {}
+            [(name, id)] => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name.clone()), text: " has been sent to the trash and will be automatically deleted after 30 days.".into(), restore: Some(id.clone()), brief: true }),
+            many => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(format!("{} items", many.len())), text: " have been sent to the trash and will be automatically deleted after 30 days.".into(), restore: None, brief: true }),
+        }
+        self.force_rescan(cx);
     }
 
     /// Trash row menu › Restore and the toast's Restore link.
@@ -1249,7 +1412,7 @@ impl StartView {
                 .child(
                     os::modal_body()
                         .child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("1 selection will be permanently deleted from your trash; you can't undo this action."))
-                        .child(Self::selection_box(&item.name, item.folder)),
+                        .child(Self::selection_box(&[(PathBuf::new(), item.name.clone(), item.folder)])),
                 )
                 .footer(os::modal_footer().child(os::modal_ok(os::danger_button("ok", "Delete forever", cx))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
@@ -1336,7 +1499,7 @@ impl StartView {
         menu.item(item("Move to…", &f, |t, f, w, cx| t.move_folder(f, w, cx)))
             .item(OsMenuItem::new("Send to trash").on_click(move |_, window, cx| {
                 let (f, name) = (f2.clone(), name.clone());
-                v.update(cx, |t, cx| t.confirm_trash(f, name, true, window, cx));
+                v.update(cx, |t, cx| t.confirm_trash(vec![(f, name, true)], window, cx));
             }))
             .submenu("Set library", window, cx, move |m, _, _| Self::library_menu(v3, f, m))
     }
@@ -2506,9 +2669,10 @@ impl StartView {
     }
 
     fn on_doc_click(&mut self, d: &DocEntry, ev: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
-        self.selected = Some(d.path.clone());
+        let m = ev.modifiers();
+        self.click_row(&d.path, &m);
         window.focus(&self.focus, cx);
-        if ev.click_count() >= 2 && !d.trashed {
+        if ev.click_count() >= 2 && !d.trashed && !m.shift && !m.secondary() {
             self.open_path(d.path.clone(), window, cx);
         }
         cx.notify();
@@ -2856,6 +3020,8 @@ impl StartView {
                             .text_color(rgb(0x666666))
                             .cursor_pointer()
                             .hover(|d| d.text_color(pal.accent))
+                            .drag_over::<DocsDrag>(|st, _, _, _| st.bg(rgb(0xdef1fb)))
+                            .on_drop(cx.listener(|this, drag: &DocsDrag, window, cx| this.drop_into_folder(drag, &crate::file_dialogs::documents_dir(), window, cx)))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_source(Source::All, cx)))
                     }),
             );
@@ -2867,10 +3033,13 @@ impl StartView {
                     let name = folder_label(&c);
                     crate::ui_script::mark(d, move || format!("crumb:{name}"))
                 }).child(folder_label(&c)).tooltip(crate::ui::user_tooltip(folder_label(&c))).when(i < last, |d| {
+                    let into = target.clone();
                     d.font_weight(FontWeight::NORMAL)
                         .text_color(rgb(0x666666))
                         .cursor_pointer()
                         .hover(|d| d.text_color(pal.accent))
+                        .drag_over::<DocsDrag>(|st, _, _, _| st.bg(rgb(0xdef1fb)))
+                        .on_drop(cx.listener(move |this, drag: &DocsDrag, window, cx| this.drop_into_folder(drag, &into, window, cx)))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_source(Source::Folder(target.clone()), cx)))
                 }),
             );
@@ -2944,7 +3113,7 @@ impl StartView {
         let mut tiles = div().flex().flex_wrap().gap(px(12.)).pl(px(18.)).pr(px(10.));
         for (i, (f, trash_id)) in tiles_list.into_iter().enumerate() {
             let view = cx.entity();
-            let selected = self.selected.as_ref() == Some(&f);
+            let selected = self.is_selected(&f);
             let name = trash_id.as_ref().and_then(|id| self.trash.get(id)).map(|t| t.name.clone()).unwrap_or_else(|| folder_label(&f));
             let (f1, f2) = (f.clone(), f.clone());
             tiles = tiles.child(
@@ -2964,19 +3133,29 @@ impl StartView {
                     .text_color(pal.text)
                     .child(os::glyph(self.folder_glyph(&f), 20., pal.text))
                     .child(self.inline_rename_field(&f, cx).unwrap_or_else(|| div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())).into_any_element()))
+                    .when(trash_id.is_none(), |t| {
+                        let target = f.clone();
+                        t.on_drag(self.drag_items(&f, &name, true), |d, _, _, cx| cx.new(|_| d.clone()))
+                            .drag_over::<DocsDrag>(|st, _, _, _| st.bg(rgb(0xdef1fb)))
+                            .on_drop(cx.listener(move |this, drag: &DocsDrag, window, cx| this.drop_into_folder(drag, &target, window, cx)))
+                    })
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
-                        this.selected = Some(f1.clone());
-                        if ev.click_count() >= 2 && !this.trash.items.iter().any(|t| t.stored() == f1) {
+                        let m = ev.modifiers();
+                        this.click_row(&f1, &m);
+                        if ev.click_count() >= 2 && !this.trash.items.iter().any(|t| t.stored() == f1) && !m.shift && !m.secondary() {
                             this.set_source(Source::Folder(f1.clone()), cx);
                         }
                         cx.notify();
                     }))
                     // Right-click selects too (the menu's handler stops propagation).
                     .os_context_menu(move |menu, window, cx| {
-                        view.update(cx, |this, cx| {
-                            this.selected = Some(f2.clone());
+                        if view.update(cx, |this, cx| {
+                            let many = this.context_select(&f2);
                             cx.notify();
-                        });
+                            many
+                        }) {
+                            return Self::selection_menu(view.clone(), menu);
+                        }
                         Self::folder_menu(view.clone(), f.clone(), name.clone(), trash_id.clone(), menu, window, cx)
                     }),
             );
@@ -3133,12 +3312,13 @@ impl StartView {
             .child(head("fh-modby", "Modified by", 200., false, false, sort, cx));
         let mut rows = v_flex().child(header);
         for (i, (f, trash_id)) in tiles.iter().enumerate() {
-            let selected = self.selected.as_ref() == Some(f);
+            let selected = self.is_selected(f);
             let name = trash_id.as_ref().and_then(|id| self.trash.get(id)).map(|t| t.name.clone()).unwrap_or_else(|| folder_label(f));
             let modified = std::fs::metadata(f).and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
             let (f1, f2, f3, v) = (f.clone(), f.clone(), f.clone(), cx.entity());
             let tid = trash_id.clone();
             let menu_name = name.clone();
+            let name_for_drag = name.clone();
             rows = rows.child(
                 h_flex()
                     .id(("folder-row", i))
@@ -3153,19 +3333,29 @@ impl StartView {
                     .child(h_flex().w(px(350.)).flex_none().pl(px(16.)).gap(px(10.)).child(os::glyph(self.folder_glyph(f), 20., pal.text)).child(div().min_w_0().truncate().child(crate::ui::user_text(name))))
                     .child(div().w(px(200.)).flex_none().pl(px(16.)).child(lib::format_onshape_time(modified)))
                     .child(div().w(px(200.)).flex_none().pl(px(16.)).child("me"))
+                    .when(trash_id.is_none(), |r| {
+                        let target = f.clone();
+                        r.on_drag(self.drag_items(f, &name_for_drag, true), |d, _, _, cx| cx.new(|_| d.clone()))
+                            .drag_over::<DocsDrag>(|st, _, _, _| st.bg(rgb(0xdef1fb)))
+                            .on_drop(cx.listener(move |this, drag: &DocsDrag, window, cx| this.drop_into_folder(drag, &target, window, cx)))
+                    })
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
-                        this.selected = Some(f1.clone());
-                        if ev.click_count() >= 2 && this.trash.item_of(&f1).is_none() {
+                        let m = ev.modifiers();
+                        this.click_row(&f1, &m);
+                        if ev.click_count() >= 2 && this.trash.item_of(&f1).is_none() && !m.shift && !m.secondary() {
                             this.set_source(Source::Folder(f1.clone()), cx);
                         }
                         cx.notify();
                     }))
                     // Right-click selects too (the menu's handler stops propagation).
                     .os_context_menu(move |menu, window, cx| {
-                        v.update(cx, |this, cx| {
-                            this.selected = Some(f2.clone());
+                        if v.update(cx, |this, cx| {
+                            let many = this.context_select(&f2);
                             cx.notify();
-                        });
+                            many
+                        }) {
+                            return Self::selection_menu(v.clone(), menu);
+                        }
                         Self::folder_menu(v.clone(), f3.clone(), menu_name.clone(), tid.clone(), menu, window, cx)
                     }),
             );
@@ -3630,7 +3820,7 @@ impl StartView {
         } else {
             let mut rows = Vec::new();
             for (k, d) in docs.iter().enumerate() {
-                let keep = (on_screen.0..on_screen.1).contains(&k) || self.selected.as_ref() == Some(&d.path) || self.renaming.as_ref().is_some_and(|r| r.0 == d.path);
+                let keep = (on_screen.0..on_screen.1).contains(&k) || self.is_selected(&d.path) || self.renaming.as_ref().is_some_and(|r| r.0 == d.path);
                 if !keep {
                     skipped += 1;
                     continue;
@@ -3640,7 +3830,9 @@ impl StartView {
                     skipped = 0;
                 }
                 rows.push({
-                let selected = self.selected.as_ref() == Some(&d.path);
+                let selected = self.is_selected(&d.path);
+                // The quick actions show on the one selected row only.
+                let alone = selected && self.selection().len() == 1;
                 let open = crate::doc_files::is_document_open(&d.path, cx);
                 let v2 = cx.entity();
                 let (d1, d2) = (d.clone(), d.clone());
@@ -3689,7 +3881,7 @@ impl StartView {
                     .children(search_cols.iter().map(|_| cell(200.).into_any_element()))
                     // Live documents/112: the selected row shows its quick actions at the
                     // right end (share is cloud-only): Send to trash, Labels.
-                    .when(selected && !d.trashed, |r| {
+                    .when(alone && !d.trashed, |r| {
                         let (d3, d4) = (d.clone(), d.clone());
                         let icon = |id: &'static str, glyph: &'static [u8], tip: &'static str| div().id(id).map(|d| crate::ui_script::mark(d, move || format!("row_icon:{tip}"))).size(px(20.)).flex_none().cursor_pointer().tooltip(crate::ui::tooltip(tip)).child(os::glyph(glyph, 20., pal.text));
                         r.child(div().flex_1()).child(
@@ -3709,11 +3901,18 @@ impl StartView {
                                 }))),
                         )
                     })
+                    .when(!d.trashed, |r| r.on_drag(self.drag_items(&d.path, &d.name, false), |d, _, _, cx| cx.new(|_| d.clone())))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
                     // Right-click selects the row too (live documents/25); the
                     // menu's own handler stops propagation, so select here.
                     .os_context_menu(move |menu, _, cx| {
-                        v2.update(cx, |this, cx| this.select(&p1, cx));
+                        if v2.update(cx, |this, cx| {
+                            let many = this.context_select(&p1);
+                            cx.notify();
+                            many
+                        }) {
+                            return Self::selection_menu(v2.clone(), menu);
+                        }
                         let in_recent = v2.read(cx).source == Source::Recent;
                         Self::doc_menu(v2.clone(), d2.clone(), in_recent, menu)
                     })
@@ -3931,12 +4130,14 @@ impl Render for StartView {
                 }
             }))
             .on_action(cx.listener(|this, _: &TrashSelected, window, cx| {
-                if let Some(d) = this.selected_entry() {
+                if this.selection().len() > 1 && this.source != Source::Trash {
+                    this.trash_selected(window, cx);
+                } else if let Some(d) = this.selected_entry() {
                     this.trash(d, window, cx);
                 } else if let Some(f) = this.selected.clone().filter(|f| this.folder_tiles().iter().any(|(t, _)| t == f)) {
                     match this.trash.item_of(&f).map(|i| i.id.clone()) {
                         Some(id) => this.confirm_delete_forever(id, window, cx),
-                        None => this.confirm_trash(f.clone(), folder_label(&f), true, window, cx),
+                        None => this.confirm_trash(vec![(f.clone(), folder_label(&f), true)], window, cx),
                     }
                 }
             }))
@@ -4018,6 +4219,36 @@ impl Render for StartView {
 
 /// A documents-page message: kind, an optional bold lead (a document
 /// name), the text, and the trash item its Restore link brings back.
+/// Documents and folders dragged on the documents page: the selection when the grabbed row is part of it, else that
+/// row; dropped on a folder (row, tile or breadcrumb) they move into it.
+#[derive(Clone)]
+struct DocsDrag {
+    items: Vec<(PathBuf, String, bool)>,
+}
+
+impl Render for DocsDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        let (label, folder) = match self.items.as_slice() {
+            [(_, name, folder)] => (name.clone(), *folder),
+            many => (format!("{} items", many.len()), false),
+        };
+        h_flex()
+            .gap(px(8.))
+            .px(px(10.))
+            .h(px(32.))
+            .rounded(px(3.))
+            .bg(rgb(0xffffff))
+            .border_1()
+            .border_color(rgb(0xcccccc))
+            .shadow_md()
+            .text_size(px(14.))
+            .text_color(pal.text)
+            .child(os::glyph(if folder { os::GLYPH_FOLDER } else { os::GLYPH_DOCUMENT }, 18., pal.text))
+            .child(crate::ui::user_text(label))
+    }
+}
+
 #[derive(Clone)]
 struct Toast {
     kind: os::BubbleKind,
@@ -4162,6 +4393,28 @@ fn library_texts(key: &str) -> (&'static str, &'static str, &'static str) {
         "images" => (" images", "Image library", "image"),
         _ => (" standard content", "Standard content library", "standard-content"),
     }
+}
+
+/// A row clicked on the documents page (folders and documents, `order` as on the page), `sel` selected before (the
+/// last clicked first): the selection after it, the clicked row first, and Shift's anchor. Alone it selects the row;
+/// Ctrl (Cmd on a Mac) toggles it; Shift selects from the anchor (the last row clicked without Shift) to it.
+fn click_rows(sel: &[PathBuf], anchor: Option<&Path>, order: &[PathBuf], row: &Path, shift: bool, toggle: bool) -> (Vec<PathBuf>, Option<PathBuf>) {
+    let at = |p: &Path| order.iter().position(|q| q == p);
+    if shift && let Some(a) = anchor && let (Some(i), Some(j)) = (at(a), at(row)) {
+        let range = &order[i.min(j)..=i.max(j)];
+        let mut out = vec![row.to_path_buf()];
+        out.extend(range.iter().filter(|q| q.as_path() != row).cloned());
+        return (out, Some(a.to_path_buf()));
+    }
+    if toggle {
+        if sel.iter().any(|q| q == row) {
+            return (sel.iter().filter(|q| q.as_path() != row).cloned().collect(), Some(row.to_path_buf()));
+        }
+        let mut out = vec![row.to_path_buf()];
+        out.extend(sel.iter().cloned());
+        return (out, Some(row.to_path_buf()));
+    }
+    (vec![row.to_path_buf()], Some(row.to_path_buf()))
 }
 
 fn folder_label(f: &Path) -> String {
@@ -4670,7 +4923,36 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
 
 #[cfg(test)]
 mod tests {
-    use super::{history_change_matches, lib};
+    use super::{click_rows, history_change_matches, lib};
+    use std::path::PathBuf;
+
+    /// Lead 11-13 (interaction feel): the documents page's rows multi-select as a list does: a click selects one row,
+    /// Ctrl toggles one, Shift selects from the anchor (the last click without Shift) to the row, folders and documents
+    /// alike in the page's order.
+    #[test]
+    fn rows_select_alone_with_ctrl_toggles_and_with_shift_ranges_from_the_anchor() {
+        let order: Vec<PathBuf> = ["f1", "f2", "a", "b", "c", "d", "e"].iter().map(PathBuf::from).collect();
+        let p = |s: &str| PathBuf::from(s);
+        let names = |v: &[PathBuf]| v.iter().map(|q| q.display().to_string()).collect::<Vec<_>>().join(" ");
+        let (sel, anchor) = click_rows(&[], None, &order, &p("b"), false, false);
+        assert_eq!((names(&sel), anchor.clone()), ("b".into(), Some(p("b"))));
+        // Shift: b..e, e first (the row clicked last), the anchor kept.
+        let (sel, anchor) = click_rows(&sel, anchor.as_deref(), &order, &p("e"), true, false);
+        assert_eq!((names(&sel), anchor.clone()), ("e b c d".into(), Some(p("b"))));
+        // Ctrl adds a folder, then takes c out; the anchor follows Ctrl's row.
+        let (sel, anchor) = click_rows(&sel, anchor.as_deref(), &order, &p("f1"), false, true);
+        assert_eq!(names(&sel), "f1 e b c d");
+        let (sel, anchor) = click_rows(&sel, anchor.as_deref(), &order, &p("c"), false, true);
+        assert_eq!((names(&sel), anchor.clone()), ("f1 e b d".into(), Some(p("c"))));
+        // Shift from the new anchor upward replaces the selection with the range.
+        let (sel, anchor) = click_rows(&sel, anchor.as_deref(), &order, &p("f2"), true, false);
+        assert_eq!((names(&sel), anchor.clone()), ("f2 a b c".into(), Some(p("c"))));
+        // A plain click: that row alone.
+        let (sel, _) = click_rows(&sel, anchor.as_deref(), &order, &p("d"), false, false);
+        assert_eq!(names(&sel), "d");
+        // Shift with no anchor (nothing clicked yet): the row alone.
+        assert_eq!(names(&click_rows(&[], None, &order, &p("c"), true, false).0), "c");
+    }
     use noshape_model::document::TabId;
     use noshape_ops::history_filter::HistoryFilter;
     use std::prelude::v1::test;

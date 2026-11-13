@@ -2629,7 +2629,7 @@ fn converted_ctrl_click() -> bool {
 
 /// How [`box_overlay`] draws a box.
 #[derive(Clone, Copy, PartialEq, Debug)]
-enum BoxStyle {
+pub enum BoxStyle {
     Window,
     Crossing,
     Zoom,
@@ -2643,7 +2643,7 @@ enum BoxStyle {
 /// `BOX_ZOOM_COLOR` rgba(144, 206, 241, 0.7), 10 on 10 off. Live, the line
 /// shows at 0.6 of its color over white (#7296cf, #ffda6e), the infill
 /// exactly at 0.2 (#d0dcef, #fff3cf).
-fn box_overlay(a: DVec2, b: DVec2, style: BoxStyle) -> Div {
+pub fn box_overlay(a: DVec2, b: DVec2, style: BoxStyle) -> Div {
     let (color, alpha, on, off) = match style {
         BoxStyle::Window => (noshape_scene::palette::pick(0x1651b0, 0x769fcc), 1.0, f32::INFINITY, 0.0),
         BoxStyle::Crossing => (0xffc20e, 1.0, 9.0, 8.0),

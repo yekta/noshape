@@ -1316,6 +1316,10 @@ impl DrawingEditor {
                     let t = dot(d, axis);
                     d = [axis[0] * t, axis[1] * t];
                 }
+                self.infer_lines.clear();
+                if constraint.is_none() && !e.modifiers.shift {
+                    d = self.align_view_drag(&orig, d);
+                }
                 let mut dr = self.drawing.clone();
                 if let Some(s) = dr.sheets.get_mut(self.sheet) {
                     for (id, p) in &orig {
@@ -1512,6 +1516,35 @@ impl DrawingEditor {
     /// placement too (live request 1662; EX17).
     fn placing_note(&self) -> bool {
         (matches!(self.tool, Tool::Note) && self.note_leader.is_none() && !matches!(self.panel, Some(Panel::Note { .. }))) || matches!(self.tool, Tool::PlaceImage { .. })
+    }
+
+    /// A free view dragged by `d`: its centre held on another view's centre line within 6 px, shown as the
+    /// placement inference's line (Shift: free); the offset it moves by.
+    pub(crate) fn align_view_drag(&mut self, orig: &[(ViewId, [f64; 2])], d: [f64; 2]) -> [f64; 2] {
+        let tol = self.tol_mm(6.0);
+        let centre = |pl: &noshape_model::drawing::build::ViewPlacement| [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0];
+        // The built sheet shows the drag's last preview: the view's centre at its original position.
+        let Some(&(id, start)) = orig.first() else { return d };
+        let (Some(pl), Some(shown)) = (self.placement(id), self.display().sheets.get(self.sheet).and_then(|s| s.view(id)).map(|v| v.position)) else { return d };
+        let c = centre(&pl);
+        let own = [c[0] - shown[0] + start[0], c[1] - shown[1] + start[1]];
+        let moved = [own[0] + d[0], own[1] + d[1]];
+        let others: Vec<[f64; 2]> = self.current_sheet().real_views().filter(|v| !orig.iter().any(|(o, _)| *o == v.id)).filter_map(|v| self.placement(v.id)).map(|pl| centre(&pl)).collect();
+        let best = |axis: usize| others.iter().filter(|c| (c[axis] - moved[axis]).abs() < tol).min_by(|a, b| (a[axis] - moved[axis]).abs().total_cmp(&(b[axis] - moved[axis]).abs())).copied();
+        let mut out = d;
+        let mut at = moved;
+        for axis in 0..2 {
+            if let Some(c) = best(axis) {
+                out[axis] += c[axis] - moved[axis];
+                at[axis] = c[axis];
+            }
+        }
+        for axis in 0..2 {
+            if let Some(c) = best(axis) {
+                self.infer_lines.push((c, at));
+            }
+        }
+        out
     }
 
     pub fn infer_placement(&mut self, skip: Option<u64>) {
