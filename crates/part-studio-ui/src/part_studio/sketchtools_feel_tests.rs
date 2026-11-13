@@ -184,8 +184,7 @@ fn rows() -> Vec<Row> {
             left.sort();
             expect((after_click, lines(cx, &view), left.len()), (4, 2, 2), "lines after the click, after the drag")
         } },
-        // Ours: Extend takes the curve, then the boundary; nothing drawn on hover. How a click acts is asked (REQUESTS 14:07).
-        Row { id: "extend / hover previews the extension", live: "hovering near a line's end lights the line orange and draws its extension in light blue up to the next entity", gap: true, check: |cx| {
+        Row { id: "extend / hover previews the extension", live: "hovering near a line's end lights the line orange and draws its extension in light blue up to the next entity (the clicks: the curve, then the boundary, behaviours 34469)", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-extend-hover", Tool::Line);
             for (a, b) in [((300., 300.), (400., 300.)), ((500., 240.), (500., 360.))] {
                 click(cx, window, &view, a);
@@ -198,18 +197,25 @@ fn rows() -> Vec<Row> {
             let ahead = cx.update(|cx| view.update(cx, |v, cx| {
                 let data = v.sketch_data(cx).unwrap();
                 let sk = &data.sketch;
-                // The short line (what the pick under the pointer gives) and the two x's past its end, to the vertical.
-                let short = sk.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).find(|e| sk.endpoints(e.id).and_then(|(a, b)| Some((sk.point(a)?.y - sk.point(b)?.y).abs() < 1e-9)).unwrap_or(false)).map(|e| e.id);
+                // (The sketch view is tilted: the lines by length.) The short line, what the pick under the pointer
+                // gives; its end by the pointer is the second one drawn.
+                let line = |e: &&noshape_sketch::Entity| e.kind() == noshape_sketch::EntityKind::Line;
+                let len = |id| sk.curve(id).map_or(0., |c| c.length());
+                let mut ids: Vec<_> = sk.entities().filter(line).map(|e| e.id).collect();
+                ids.sort_by(|a, b| len(*a).total_cmp(&len(*b)));
+                let (Some(&short), Some(&long)) = (ids.first(), ids.last()) else { return false };
+                let (Some(noshape_sketch::Curve2::Line { a, b }), Some(far)) = (sk.curve(short), sk.curve(long).map(|c| c.point(0.5))) else { return false };
                 let ed = v.sketch.as_mut().unwrap();
-                ed.hover = short;
-                let ends = short.and_then(|l| sk.endpoints(l)).and_then(|(a, b)| Some((sk.point(a)?, sk.point(b)?)));
-                let (Some((a, b)), Some(far)) = (ends, sk.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).filter(|e| Some(e.id) != short).find_map(|e| sk.endpoints(e.id).and_then(|(p, _)| sk.point(p)))) else { return false };
-                let (we, wf) = (ed.frame.to_world(if a.x > b.x { a } else { b }), ed.frame.to_world(far));
+                ed.hover = Some(short);
+                let (we, wa, wf) = (ed.frame.to_world(b), ed.frame.to_world(a), ed.frame.to_world(far));
                 let (lines, _) = ed.overlay(&data, &noshape_units::UnitPrefs::default());
-                // A segment lying past the line's end, toward the vertical line.
+                let dir = (we - wa).normalize();
+                // A segment on the line's extension past its end, toward the other line.
                 lines.segments.iter().any(|sg| {
                     let mid = (glam::DVec3::from(glam::Vec3::from(sg.a)) + glam::DVec3::from(glam::Vec3::from(sg.b))) * 0.5;
-                    (mid - we).dot(wf - we) > 0. && (mid - we).length() < (wf - we).length() && (mid.y - we.y).abs() < 1e-4 && (mid.z - we.z).abs() < 1e-4
+                    let along = (mid - we).dot(dir);
+                    let off = ((mid - we) - dir * along).length();
+                    along > 0. && along < (wf - we).length() * 1.5 && off < 1e-5
                 })
             }));
             expect(ahead, true, "an extension drawn past the line's end")

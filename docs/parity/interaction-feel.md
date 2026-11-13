@@ -491,7 +491,7 @@ live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-st
 `sketchtools::the_sketch_tools_matrix_matches_live` (T1, no GPU); Search tools' ranking through
 `noshape_ops::tool_search::studio_rank` over the toolbar's feature types.
 
-**Matched: 17 / 18** (11-13 14:14 UTC; 10 / 10 at the first run, then 8 rows added: 6 / 8 matched, 1 fixed).
+**Matched: 18 / 18** (11-13 19:30 UTC, 17 / 18 at 14:14 UTC; 10 / 10 at the first run, then 8 rows added: 6 / 8 matched, 1 fixed).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -508,7 +508,7 @@ live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-st
 | Trim, a click | removes the piece between the crossings | the same | = |
 | Trim, hover | the piece up to the nearest crossings lit tan, orange dots at its ends | the same | = |
 | Trim, a drag | every piece the trail crosses goes; one that nothing crosses any more goes whole (tr0) | the same | = |
-| Extend, hover | the line lit, its extension drawn light blue up to the next entity (one click extends?) | nothing drawn; Extend takes the curve, then the boundary. Asked live (REQUESTS 14:07) before changing the tool | ≠ |
+| Extend, hover | the line lit, its extension drawn light blue rgb(125, 164, 206) up to the next entity; the clicks: the curve, then the boundary (behaviours 34469) | nothing drawn; now the extension (`line_extension`); the two clicks were already live's | = (fixed) |
 | Text | two clicks (corners), then its dialog with "Default text" | the same | = |
 | Search tools in a sketch | the sketch tools (Offset o, Linear / Circular pattern, Mirror, Text, Insert image, Trim, Extend) | the same | = |
 | Sketch fillet, a click on a corner | a preview, nothing made; Esc cancels | the same | = |
