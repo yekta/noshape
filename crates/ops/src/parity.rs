@@ -621,7 +621,27 @@ impl<'a> Translator<'a> {
         {
             a.insert("tab".into(), json!(tab));
         }
-        registry::run(self.ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
+        // Our sketches as read stay until something can change one: reads and new features keep them, a sketch's own
+        // edits drop that one, anything else all.
+        let reads = tool.starts_with("query_") || matches!(tool, "sketch_get" | "sketch_dimension_options" | "feature_list" | "feature_schema" | "featurestudio_get" | "document_info" | "assembly_list" | "assembly_connectors" | "feature_add" | "sketch_create");
+        if !reads {
+            match args["sketch"].as_str().filter(|_| tool.starts_with("sketch_")) {
+                Some(sk) => {
+                    self.sketch_cache.remove(sk);
+                }
+                None => self.sketch_cache.clear(),
+            }
+        }
+        // (A sketch read whole: from there.)
+        let whole = tool == "sketch_get" && args.as_object().is_some_and(|a| a.keys().all(|k| k == "sketch" || k == "tab"));
+        if whole && let Some(g) = args["sketch"].as_str().and_then(|sk| self.sketch_cache.get(sk)) {
+            return if g.is_null() { Err("not a sketch".into()) } else { Ok(g.clone()) };
+        }
+        let out = registry::run(self.ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string());
+        if whole && let (Ok(g), Some(sk)) = (&out, args["sketch"].as_str()) {
+            self.sketch_cache.insert(sk.to_string(), g.clone());
+        }
+        out
     }
 
     /// Our feature for live's feature id.
@@ -694,7 +714,6 @@ impl<'a> Translator<'a> {
 
     /// Rebuilds feature `k` (after features 0 … k−1).
     pub fn step(&mut self, k: usize) -> Step {
-        self.sketch_cache.clear();
         let f = self.features[k].clone();
         let mut step = Step { index: k, name: f["name"].as_str().unwrap_or("").to_string(), feature_type: f["featureType"].as_str().unwrap_or("").to_string(), ..Default::default() };
         step.custom = f["namespace"].as_str().is_some_and(|n| !n.is_empty());
@@ -1964,7 +1983,8 @@ impl<'a> Translator<'a> {
         self.query_with(k, q, true)
     }
 
-    /// Our sketch `id`'s sketch_get (cached within a step); None for a feature that isn't a sketch.
+    /// Our sketch `id`'s sketch_get (cached until an edit can change it, [`Self::call`]: asm-infento-subs' studio
+    /// 1dc32b read every earlier sketch again each step, 0.3–2.3 s each); None for a feature that isn't a sketch.
     fn sketch_geometry(&mut self, id: &str) -> Option<Value> {
         if let Some(g) = self.sketch_cache.get(id) {
             return (!g.is_null()).then(|| g.clone());
