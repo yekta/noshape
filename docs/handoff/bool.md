@@ -34,6 +34,8 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    turned a fifth of a turn; fails without the whole-surface distance). Gate log /root/bool-hat-scratch/chain-387b4f060.out
    (vibe7's first gate: main built and cached there first). Clean (CHECK, knurls out) -> land bool-seam from bool-hat
    (`git checkout crates/kernel/tests/all.rs` first). bool-wip-seam is the history of it (no longer needed).
+   Binaries (not pruned): vibe5 ~/agents/bool-bin/{ops-all, kern-all, pm/models} (ops test binary for suite runs
+   with NOSHAPE_RECORD_BOOLEANS / NOSHAPE_DUMP_OPS; ~/tmp/bool is pruned after 12 h).
    Data: vibe5 / vibe7 ~/tmp/bool/private (mode 700: dock.noshape, hat8, hat15, rec-dock = the 44 cases; nothing of it
    in the repo or the corpora).
    **And on bool-seam's second commit:** a new edge
@@ -49,12 +51,12 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    (e4db7fcb, 1.24 s: a point at (1.21, 15.2, 0.405) mm 0.42-0.44 mm from two vertices of 0.38 mm tolerance, their
    group 0.8 mm across, past find_tol's 0.5 mm). hat8: its
    biggest Boolean is ours, 1.44 s (794 Rust, 565 build): speed.
-2. **cf-surface-pattern's Surface Pattern 3 (+4.3 s). Gating 07:46 on vibe5: branch bool-speed (pushed, 2d51dbefb,
-   one commit on main, log /root/bool-hat-scratch/chain-2d51dbefb.out):** curve2.rs: a 2D curve's sample points kept
+2. **cf-surface-pattern's Surface Pattern 3 (+4.3 s). Branch bool-speed (2d51dbefb): gate CHECK (knurls only, replay
+   and suite unchanged), in the land queue since 08:56 as 9e930815:** curve2.rs: a 2D curve's sample points kept
    in its SpanBoxes for every ray's crossings (inside_with's roots asked the same points each time), and roots'
    bisection stopped when the midpoint is one of its ends (the rest changed nothing): the 85-tool cut 2.51-2.72 ->
-   2.26-2.42 s (alternated, load 24); bit-identical by construction. Clean -> land bool-speed (it is checked out in
-   worktree bool-hat; `git checkout crates/kernel/tests/all.rs` first). Profile after it (release, LTO off,
+   2.26-2.42 s (alternated, load 24); bit-identical by construction. If 9e930815 fails in the queue, fix forward on
+   bool-speed (checked out in worktree bool-hat; `git checkout crates/kernel/tests/all.rs` first) and land.sh again. Profile after it (release, LTO off,
    xprobe::probe_case_sample): C2::Mapped's at (curve2.rs:132, a 3D NURBS mapped to the face's parameters) 17 %, most
    of it chords' sample points and bulges for intersections_with (~500 samples) and ray roots (~150). Next ideas:
    cheaper Mapped evaluation, fewer samples per span for chords, ray_state's inside tests.
@@ -63,12 +65,17 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    intervals_on 25 %, ray_state 22 %, chords 15 %; the length table landed (3770108f). Ideas: fewer samples per C2,
    ray_state's inside tests.
 3. **The rest of bool's rows:** valve-config's Booleans (Circular pattern 1 one-by-one 320 ms, Extrude 3 sections ahead
-   136 ms; 11-13 08:20: the case is vibe5 ~/agents/bool-corpora/valve-1113/d561e54532ca1330, a cut of 39 faces by 7
+   136 ms; 11-13 09:01: the case is vibe5 ~/agents/bool-corpora/valve-1113/d561e54532ca1330, a cut of 39 faces by 7
    2 m cutter cones meeting below the part, so boolean.cpp's tools_meet_outside sends it one tool at a time (7 x ~45 ms);
    all at once it is 436-672 ms, sections ahead the most. Tried, not kept: not pairing two tools' faces whose boxes meet
    only outside the objects' (the cut ends non-manifold: pieces far out at z -1997 mm kept, as piece states pass to
    neighbours across shared edges and the crossings that bound them were missing). Ideas: clip each cutter to the
-   part's box first (one cheap common each), or the same skip with those far pieces dropped before the states pass), corner-break's 34 Booleans (461 ms), learning-center's Fillet 2 Boolean (283 ms), the snap hooks' Booleans,
+   part's box first (one cheap common each), or the same skip with those far pieces dropped before the states pass),
+   learning-center-michael's Fillet 2 (09:05: its cut ef8ba7b09bd86189, 46 faces by 12 tori and balls, ours 130 ms in
+   the suite, 266-298 ms in the release probe; vibe5 ~/agents/bool-corpora/lcm-1113): sections ahead 56 % of our
+   Boolean, OCCT's IntTools_FaceFace 29 % and apart_across_slab's ExactBoxes::of 21 % (BRepBndLib::AddOptimal on the
+   torus faces: GeomBndLib_Torus::BoxOptimal's optimisation); a torus face's exact box from its own parameter range
+   (analytic) would take most of that 21 %. corner-break's 34 Booleans (461 ms), learning-center's Fillet 2 Boolean (283 ms), the snap hooks' Booleans,
    cf-part-draft's glued Boolean (223 ms), rings-loft Shell 1 (~580 ms on the probe, live 235), the knife's Mirror 1.
 4. Untried: eval_grad_near's NextValueOfUV without maxpreci (byte-identical, gain unclear under load).
 
