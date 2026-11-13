@@ -9,9 +9,24 @@
   live measures the overlap on the centre line (helpParameters -pi / pi); ours was d - r1 - r2 = -12.5: "Sketch could
   not be solved". The Minimum circle-circle distance now takes the side it is drawn on (`Hints::sign`, overlap
   r1 + r2 - d); T1 constraints_more::a_minimum_distance_between_overlapping_circles_is_their_overlap.
-- Next: Loft 1 "no region of ours inside Sketch 12's curves" (named 0.0 0.1 0.2 0.5 0.6 0.7 of an 8-curve Use loop),
-  then Sketch 7 (externals JTd / JIl have no live geometry), then model-plus Extrude 4 (528 ms on vibe5, live 339)
-  with core's NOSHAPE_SMPROF timers (/root/core-scratch/rmx/smprof.patch).
+- Knife translation (287fac05c), all past core's Loft 3 so the score stays 24/52 until the blade matches:
+  - Sketch 12 (Loft 1's profile, a Use of the guard's edges): its arcs were moved to live's solved geometry
+    (`solved_entity`) but its stored B-splines weren't, so they no longer met (0.34 mm). A `splineSegment` now takes
+    live's re-projected poles (live's knot list comes cut to the pole count: the stored knots kept when they begin the
+    same); Use ends live projects onto one vertex but stores up to 0.15 µm apart are joined (`join_use_ends`, 1 µm).
+    Loft 1 builds, and with it Extrude 8 / 9 and Revolve 1 (they had "No merge scope selected.").
+  - Fillet 5's CAP_EDGE of Extrude 5 on an arc: our edge "midpoint" is its centre of mass (off any arc) and Fillet 4
+    had trimmed it: a cap edge on an arc is now found by its circle (centre, radius, its ends within the arc) at the
+    cap's level. Fillet 5 builds: volume 1486.045 vs live 1486.040, its faces B-splines where live has 5 tori (blend).
+  - Left in the knife after Loft 3: Fillet 7 "Select vertices on fillet chain." (a variable fillet's vertexSettings:
+    blend), Extrude 10 "Failed to extrude selections" (Up to surface, both ways, to the blade's B-spline face RxBG:
+    core), Sketch 7's Distances to JTd / JIl (no live geometry; geometry left as live's).
+- Sheet metal speed (Mac, NOSHAPE_SMPROF + NOSHAPE_KERNEL_PROFILE + NOSHAPE_FS_PROFILE): model-plus 437 ms (live 917),
+  corner-break 956 ms (live 1972); vibe5 has them at x1.0-1.1. No duplicate build_part inside a regeneration (the 2x
+  repeats in the logs are the harness's second regeneration). model-plus Extrude 4 (205 ms): std's
+  performSheetMetalBoolean ~104 ms (createOutlineBooleanToolsForFaceNoChecks / trimTool, the Rust Boolean 64 ms over 22
+  calls) and updateSheetMetalGeometry ~98 ms (build_part 58 ms, its final fuse ~28 ms). Next lever to try: the walls'
+  fuse in build_part.
 - Mac runs: /root/skasm-scratch/bin/suite.sh (copy into the worktree as suite-tmp.sh, never commit it), e.g.
   `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh env DOC=c2-hunting-knife bash suite-tmp.sh`; knife on main there 24/52, 496 ms.
 
