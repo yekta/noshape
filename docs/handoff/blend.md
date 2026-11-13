@@ -87,7 +87,12 @@ seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs li
   checked blend's `valid_changed` passed a result with no new face, and an empty solid has none. Now `valid_changed` and
   `valid_shape` want a face, and `fillet` / `chamfer` (detail.rs) fail "Failed to fillet / chamfer selections." when a
   body they touched has no solid or no face. T1 `kernel_robustness::an_oversized_blend_fails_as_live_never_an_empty_body`.
-- Open (live REQUESTS 14:18): psui reports live fails R100 on the **vertical** edge too, where ours builds the ball's
+- **Settled by live 2986 (18:54 UTC):** the vertical edge builds at every radius to R100 in live, our volumes exactly (R30
+  10068.583 / 6 faces, R45 7786.122 / 5, R60 5281.409 / 5, R80 2437.211 / 5, R100 599.887 / 5): no change, psui told.
+  Top edge y = 0: live R9.9-R20 as ours (R20 8913.479 / 6), R100 error; x = 0: R15 10593.828, R20 9685.109 as ours.
+  Open: live's first failing radius on the top edges (ours builds the roll-over through R60, fails from R80); live
+  bisects R25-R80 in the UI (asked 19:00).
+- Was (live REQUESTS 14:18): psui reports live fails R100 on the **vertical** edge too, where ours builds the ball's
   roll-over (599.887 mm³, 5 faces: exactly block ∩ the ball's cylinder, the same shape as live's 10-29 R45 on 40 x 20,
   4267.940743, 5 faces, OK). Live's limit for a single edge's roll-over isn't recorded; the request asks R30-R100 here
   and the top edge's R10-R20 (ours: R20 on the 40 long top edge OK, 8913.479 mm³).
