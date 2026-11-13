@@ -1,19 +1,19 @@
 {
  "scenario": "doc-tab-menu-assembly",
- "recorded": "2026-11-13T04:55:36.777Z",
+ "recorded": "2026-11-09T00:10:49.323Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "a852bbdcf3fdb4105bfee92c",
-  "workspace": "95bf9cbb5056177c6dbafc5d",
-  "element": "18d365b4a1dd5f469e40ffa2",
+  "document": "c20a930507ee5905ad6b92f9",
+  "workspace": "c8d82b2c45889da9257da14e",
+  "element": "04660d1e739b9c09f59948dd",
   "start": "doc-tabs",
-  "startElement": "18d365b4a1dd5f469e40ffa2",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "04660d1e739b9c09f59948dd",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -62,33 +62,6 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
-  "camera": {
-   "direction": [
-    -0.433013,
-    0.75,
-    -0.5
-   ],
-   "up": [
-    -0.25,
-    0.433013,
-    0.866025
-   ],
-   "target_mm": [
-    0,
-    0,
-    0
-   ],
-   "eye_mm": [
-    67.5,
-    -116.913,
-    77.942
-   ],
-   "width_mm": 460.686,
-   "height_mm": 243.974,
-   "mmPerPixel": 0.275365,
-   "orthographic": true
-  },
-  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -189,33 +162,6 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
-    "camera": {
-     "direction": [
-      -0.433013,
-      0.75,
-      -0.5
-     ],
-     "up": [
-      -0.25,
-      0.433013,
-      0.866025
-     ],
-     "target_mm": [
-      0,
-      0,
-      0
-     ],
-     "eye_mm": [
-      67.5,
-      -116.913,
-      77.942
-     ],
-     "width_mm": 460.686,
-     "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
-     "orthographic": true
-    },
-    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -260,7 +206,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 60764
+   "t": 60324
   },
   {
    "step": 2,
@@ -294,6 +240,7 @@
       "Create Drawing of Assembly 1…",
       "Select as document thumbnail",
       "Move to document…",
+      "Export…",
       "Release…"
      ],
      "highlighted": null,
@@ -338,33 +285,6 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
-    "camera": {
-     "direction": [
-      -0.433013,
-      0.75,
-      -0.5
-     ],
-     "up": [
-      -0.25,
-      0.433013,
-      0.866025
-     ],
-     "target_mm": [
-      0,
-      0,
-      0
-     ],
-     "eye_mm": [
-      67.5,
-      -116.913,
-      77.942
-     ],
-     "width_mm": 460.686,
-     "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
-     "orthographic": true
-    },
-    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -409,7 +329,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 63588
+   "t": 62704
   },
   {
    "step": 3,
@@ -473,33 +393,6 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
-    "camera": {
-     "direction": [
-      -0.433013,
-      0.75,
-      -0.5
-     ],
-     "up": [
-      -0.25,
-      0.433013,
-      0.866025
-     ],
-     "target_mm": [
-      0,
-      0,
-      0
-     ],
-     "eye_mm": [
-      67.5,
-      -116.913,
-      77.942
-     ],
-     "width_mm": 460.686,
-     "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
-     "orthographic": true
-    },
-    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -544,7 +437,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 67403
+   "t": 66119
   }
  ]
 }
