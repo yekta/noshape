@@ -64,15 +64,31 @@ fn may_self_intersect(profile: &Shape, path: &Shape, tool: &Shape, scale: f64) -
     let gap = pts.iter().flat_map(|s| s.windows(2).map(|w| w[0].0.distance(w[1].0))).fold(0.0, f64::max);
     let edge_pts: Vec<Vec<DVec3>> = pts.into_iter().map(|s| s.into_iter().map(|(p, _)| p).collect()).collect();
     let pts: Vec<DVec3> = edge_pts.iter().flatten().copied().collect();
+    // The path's edges end to end, each sampled the way the path runs (in the edges' own order, samples of edges
+    // apart came next to each other: cf-snap-hook's Sweep 1 read a 117 mm step and checked a clear sweep, 77 ms).
+    let Some(chain) = path_in_order(path) else { return true };
     let mut path_pts: Vec<(DVec3, DVec3, f64)> = Vec::new();
     let mut arc = 0.0;
-    for e in path.edges() {
-        let Some(coarse) = samples(&e, 64) else { return true };
+    for (e, reversed) in &chain {
+        let Some(coarse) = samples(e, 64) else { return true };
         let n = ((turning(&coarse) / 0.05).ceil() as usize + 64).min(20_000);
-        let Some(s) = samples(&e, n) else { return true };
+        let Some(mut s) = samples(e, n) else { return true };
+        if *reversed {
+            s.reverse();
+            s.iter_mut().for_each(|x| x.1 = -x.1);
+        }
+        // A corner between edges (not tangent): a bend as tight as can be.
+        if let (Some(last), Some(first)) = (path_pts.last(), s.first())
+            && last.1.angle_between(first.1) > 1e-3
+        {
+            return true;
+        }
         for (k, (p, t)) in s.iter().enumerate() {
-            if k > 0 {
-                arc += p.distance(s[k - 1].0);
+            if k > 0 || !path_pts.is_empty() {
+                arc += p.distance(path_pts.last().map_or(*p, |l| l.0));
+            }
+            if k == 0 && !path_pts.is_empty() {
+                continue;
             }
             path_pts.push((*p, *t, arc));
         }
@@ -107,13 +123,20 @@ fn may_self_intersect(profile: &Shape, path: &Shape, tool: &Shape, scale: f64) -
     for (i, (p, _, _)) in path_pts.iter().enumerate() {
         grid.entry(key(*p)).or_default().push(i);
     }
+    // Along a closed path the way round is the shorter one (its start is its end).
+    let total = path_pts.last().map_or(0.0, |l| l.2);
+    let closed = path_pts.len() > 2 && path_pts[0].0.distance(path_pts[path_pts.len() - 1].0) <= step;
+    if closed && path_pts[0].1.angle_between(path_pts[path_pts.len() - 1].1) > 1e-3 {
+        return true;
+    }
+    let apart = |a: f64, b: f64| if closed { (a - b).abs().min(total - (a - b).abs()) } else { (a - b).abs() };
     for (p, _, s) in &path_pts {
         let (x, y, z) = key(*p);
         for dx in -1..=1 {
             for dy in -1..=1 {
                 for dz in -1..=1 {
                     let Some(cands) = grid.get(&(x + dx, y + dy, z + dz)) else { continue };
-                    if cands.iter().any(|&j| (path_pts[j].2 - s).abs() > 2.0 * near && path_pts[j].0.distance(*p) < near) {
+                    if cands.iter().any(|&j| apart(path_pts[j].2, *s) > 2.0 * near && path_pts[j].0.distance(*p) < near) {
                         return true;
                     }
                 }
@@ -121,6 +144,28 @@ fn may_self_intersect(profile: &Shape, path: &Shape, tool: &Shape, scale: f64) -
         }
     }
     false
+}
+
+/// A path's edges end to end from its start, each with whether it runs against its own direction; `None` where they
+/// don't make one chain.
+fn path_in_order(path: &Shape) -> Option<Vec<(Shape, bool)>> {
+    let mut left: Vec<(Shape, DVec3, DVec3)> = path.edges().into_iter().map(|e| e.endpoints().ok().map(|(a, b)| (e, a, b))).collect::<Option<_>>()?;
+    let scale = left.iter().map(|e| e.1.length().max(e.2.length())).fold(1.0, f64::max);
+    let near = |p: DVec3, q: DVec3| p.distance(q) <= 1e-7 * scale;
+    // An open path starts at an end no other edge reaches.
+    let lone = |p: DVec3| left.iter().filter(|e| near(e.1, p) || near(e.2, p)).count() == 1;
+    let first = left.iter().position(|e| lone(e.1)).map(|i| (i, false)).or_else(|| left.iter().position(|e| lone(e.2)).map(|i| (i, true))).unwrap_or((0, false));
+    let (e, a, b) = left.swap_remove(first.0);
+    let mut tail = if first.1 { a } else { b };
+    let mut chain = vec![(e, first.1)];
+    while !left.is_empty() {
+        let i = left.iter().position(|e| near(e.1, tail) || near(e.2, tail))?;
+        let (e, a, b) = left.swap_remove(i);
+        let reversed = !near(a, tail);
+        tail = if reversed { a } else { b };
+        chain.push((e, reversed));
+    }
+    Some(chain)
 }
 
 /// A planar profile swept along a helix, its frame following the helix's screw motion (checked on the swept `tool`:
@@ -1943,6 +1988,39 @@ mod tests {
 #[cfg(test)]
 mod sweep_tests {
     use super::*;
+
+    /// A closed path round a 40 × 20 mm rectangle with 5 mm corner rounds (lines and arcs, listed out of order), and a
+    /// circle profile at its start square to it.
+    fn rounded_loop(profile_r: f64) -> (Shape, Shape) {
+        let mm = |x: f64, y: f64| DVec3::new(x, y, 0.0) * 1e-3;
+        let d = 5.0 * (1.0 - std::f64::consts::FRAC_1_SQRT_2);
+        let lines = [(mm(5.0, 0.0), mm(35.0, 0.0)), (mm(40.0, 5.0), mm(40.0, 15.0)), (mm(35.0, 20.0), mm(5.0, 20.0)), (mm(0.0, 15.0), mm(0.0, 5.0))];
+        let arcs = [(mm(35.0, 0.0), mm(40.0 - d, d), mm(40.0, 5.0)), (mm(40.0, 15.0), mm(40.0 - d, 20.0 - d), mm(35.0, 20.0)), (mm(5.0, 20.0), mm(d, 20.0 - d), mm(0.0, 15.0)), (mm(0.0, 5.0), mm(d, d), mm(5.0, 0.0))];
+        let mut edges: Vec<Shape> = Vec::new();
+        for i in [2, 0, 3, 1] {
+            edges.push(k::make_arc_3pts(arcs[i].0, arcs[i].1, arcs[i].2).unwrap());
+            edges.push(k::make_line(lines[(i + 2) % 4].0, lines[(i + 2) % 4].1).unwrap());
+        }
+        let profile = k::make_wire(&[k::make_circle(mm(20.0, 0.0), DVec3::X, profile_r * 1e-3).unwrap()]).unwrap();
+        (profile, Shape::compound(&edges))
+    }
+
+    /// cf-snap-hook's Sweep 1: a closed path of lines and arcs whose edges come out of order; a profile well inside its
+    /// bends can't meet itself (the check of the swept solid, 77 ms, was run because samples of edges apart were taken
+    /// as neighbours).
+    #[test]
+    fn a_small_profile_round_a_closed_path_of_edges_out_of_order_is_clear() {
+        let (profile, path) = rounded_loop(2.0);
+        assert!(path_in_order(&path).is_some_and(|c| c.len() == 8));
+        assert!(!may_self_intersect(&profile, &path, &profile, 1.0));
+    }
+
+    /// The same path with a profile wider than its bends: still checked.
+    #[test]
+    fn a_profile_wider_than_the_paths_bends_is_still_checked() {
+        let (profile, path) = rounded_loop(6.0);
+        assert!(may_self_intersect(&profile, &path, &profile, 1.0));
+    }
 
     /// A V profile in a plane through a helix's axis (or tilted `tilt` from it about the radius), `h` high, swept
     /// along an 8-turn helix of radius 25.4 mm and pitch 15.875 mm (c2-helical-sweep's thread), the profile just below
