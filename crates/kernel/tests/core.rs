@@ -931,3 +931,20 @@ fn a_mirrored_copy_shows_its_originals_faces() {
     let m = transform(&part, &Transform::Mirror(Plane::from_normal(DVec3::new(30.0, 0.0, 0.0), DVec3::X)), false).unwrap().shape;
     assert_eq!(shown(&m), original, "raw faces {raw}, shown in the original {original}");
 }
+
+/// A guided loft between two smooth closed profiles (no corners on either: c2-hunting-knife's handle, Loft 1): one side
+/// face round the loop through the guides, as live, where ours refused ("Loft guides need a profile with corners yet").
+#[test]
+fn a_guided_loft_of_smooth_closed_profiles_has_one_side_face() {
+    let disc = |z: f64| {
+        let w = make_wire(&[make_circle(DVec3::new(0.0, 0.0, z), DVec3::Z, 10.0).unwrap()]).unwrap();
+        make_face_from_wire(&w, true).unwrap()
+    };
+    let guides = [make_line(DVec3::new(10.0, 0.0, 0.0), DVec3::new(10.0, 0.0, 30.0)).unwrap(), make_line(DVec3::new(-10.0, 0.0, 0.0), DVec3::new(-10.0, 0.0, 30.0)).unwrap()];
+    let s = loft_guided_curved(&disc(0.0), &disc(30.0), &guides, true).unwrap();
+    assert!(s.is_valid());
+    let shown = s.shown_topology().unwrap().faces_joined.iter().enumerate().filter(|(i, j)| *i == **j).count();
+    assert_eq!(shown, 3, "two caps and one side ({} raw faces)", s.faces().len());
+    let v = s.volume().unwrap();
+    assert!((v - PI * 100.0 * 30.0).abs() < 1.0, "{v} mm³");
+}

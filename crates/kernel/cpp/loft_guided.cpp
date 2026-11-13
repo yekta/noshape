@@ -441,6 +441,15 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
   for (size_t i = 0; i < n; ++i)
     if (pts[i].corner)
       seams.push_back(i);
+  // Both profiles smooth (a handle's cross-sections): one face round the loop, from the first guide (live: c2-hunting-
+  // knife's Loft 1, the handle's side one face).
+  if (seams.empty())
+    for (size_t i = 0; i < n && seams.empty(); ++i)
+      if (pts[i].guide >= 0)
+      {
+        pts[i].corner = true;
+        seams.push_back(i);
+      }
   if (seams.empty())
     fail_op("Loft guides need a profile with corners yet");
   // The faces between consecutive seams.
