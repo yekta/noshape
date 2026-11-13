@@ -17,6 +17,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-13 20:19 UTC: live's REST batch used: robotic-arm 32/32 and 40/40, isaac-ball 113/121 (data only)
+- Live writes its fetches to /root/parity/models here; vibe7's copy (the suites') didn't have them. Synced (rsync -a
+  --update, no deletes) asm-robotic-arm, -xdev-subs, -isaac-ball, -corexy. On main's binary: robotic-arm 27 -> 32/32
+  occurrences, 29/29 -> 40/40 mates (its other-document studios); isaac-ball 105 -> 113/121, 63/92 -> 91/99 mates (the
+  96 in-context sub-features); xdev-subs 241/266 (was /286); corexy 26/62.
+- Waiting on live 11-14 ~18:30: xdev's Transform 3 frame (2495 (2): Studio 62b37d cascades from it), corexy's 3
+  Derived sources (2632 (1)). robotic-arm's Derived 1 source (7690dd, another document) isn't fetched either.
+
 ## 11-13 19:47 UTC: corexy's Transform connectors from live's frames; hose as OFFSET_SURF waits on live; tvc parked
 - asm-corexy: live 2632 (2) read the Transforms' in-feature mate connectors (evMateConnector, world, mm). They are in
   the parity models as studios/<element>.connectors.json (written from live/dx/q2632/frames.json, beside each studio;
