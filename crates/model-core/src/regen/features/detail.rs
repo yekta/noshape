@@ -839,13 +839,19 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
     if groups.is_empty() {
         return crate::regen::eval::err_at(&["entities"], "Select edges or faces to chamfer.");
     }
+    let picked_faces = ev.resolve_faces(refs);
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
         let stops = !propagate && propagate_tangent(&body.shape, &edges).len() > edges.len();
         let edges = if propagate { propagate_tangent(&body.shape, &edges) } else { edges };
+        // A picked cylinder's seam (a solid's edge on one face) is no edge of Onshape's: Parasolid's faces have none.
+        let adjacency = body.shape.edge_faces()?;
+        let solid = body.shape.count(ShapeType::Solid) > 0;
+        let edges: Vec<usize> = edges.into_iter().filter(|&e| !(solid && adjacency.get(e).is_some_and(|f| f.len() < 2 || f[0] == f[1]))).collect();
         let shapes: Vec<k::Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
         let flipped: BTreeSet<usize> = overrides.iter().filter(|(b, _)| *b == bi).map(|&(_, e)| e).collect();
+        let picked: Vec<k::Shape> = picked_faces.iter().filter(|(b, _)| *b == bi).filter_map(|&(_, f)| body.shape.sub_shape(ShapeType::Face, f).ok()).collect();
         use super::blend_section::ChamferSides;
         let sides = match (ev.enum_("chamferMethod") == "APEX_RANGE", spec) {
             (true, k::ChamferSpec::Equal(d)) => Some(ChamferSides::Tangent(d, d)),
@@ -858,6 +864,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
             Some(sides) => two_offsets(ev, &body, &edges, sides, &flipped)?,
             None => None,
         };
+        let asked = spec;
         let (spec, reference) = match as_offsets {
             Some(offsets) => offsets,
             None if matches!(spec, k::ChamferSpec::Equal(_)) => (spec, Vec::new()),
@@ -894,6 +901,23 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
             && let Some(rims) = rims(&body.shape, &edges)
             && (rims_tilted(&rims) || rims_overflow(&rims, &body.shape, &[d], RimBlend::Chamfer))
             && ring_blend(ev, bi, &rims, &edges, &[d], RimBlend::Chamfer).is_ok()
+        {
+            continue;
+        }
+        // Whole rims tilted to their plane, an Offset chamfer of a distance and an angle (or two distances): each rim's
+        // chamfer at constant offsets from both faces sized at its own middle (live c2-hunting-knife's Chamfer 2: a hole
+        // through sides tilted 0.5°, its rims' chamfers 19.445 and 18.856 mm²), measured on a picked wall.
+        let offset = match asked {
+            k::ChamferSpec::DistanceAngle(d, a) => Some((d, super::blend_section::OffsetOther::Angle(a))),
+            k::ChamferSpec::TwoDistances(d, e) => Some((d, super::blend_section::OffsetOther::Distance(e))),
+            k::ChamferSpec::Equal(_) => None,
+        };
+        if let Some((d, other)) = offset.filter(|_| ev.enum_("chamferMethod") != "APEX_RANGE")
+            && let Some(rims) = rims(&body.shape, &edges)
+            && super::blend_section::rims_whole(&rims)
+            && rims_tilted(&rims)
+            && let Some(on_wall) = super::blend_section::rims_measure_on_wall(&rims, &picked, &distance_one_faces(ev, &body, &edges, &flipped, ev.bool("oppositeDirection"))?)
+            && ring_blend(ev, bi, &rims, &edges, &[d], RimBlend::Offset { on_wall, other }).is_ok()
         {
             continue;
         }

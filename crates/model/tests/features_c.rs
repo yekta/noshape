@@ -4149,6 +4149,50 @@ fn equal_chamfers_on_tilted_rims_roll_one_ball_as_live() {
     assert!((area - 52.66144).abs() < 0.05, "tilted top: {area} mm² (live 52.661)");
 }
 
+/// Live c2-hunting-knife's Chamfer 2 (Offset, 0.75 mm and 45° on the wall of a Ø5 hole through a blade whose sides are
+/// tilted 0.5° about Z, the wall picked): each rim's chamfer keeps constant offsets from the wall and the side, sized
+/// at the rim's middle as Parasolid's ellipse runs (halfway from its start, the major axis's end the hole's axis points
+/// to on the side); the two rims' middles fall on opposite sides of the hole, so their chamfers differ: live's JiC
+/// 18.856481 and JiG 19.444938 mm² (ours ~1 µm wider on the side: 18.869 / 19.458). Not the same on both rims, as a
+/// constant setback (OCCT's 19.161 each) would be.
+#[test]
+fn an_offset_chamfer_of_a_holes_two_tilted_rims_sizes_each_at_its_own_middle_as_live() {
+    use noshape_kernel::{Plane, cut, extrude, make_cylinder, make_face_from_wire, make_line, make_wire};
+    let k = 0.008727 / 0.999962;
+    let (top, bottom) = (|x: f64| 1.701397 - k * (x - 27.5), |x: f64| -1.657763 + k * (x - 32.5));
+    let corners = [(20.0, bottom(20.0)), (40.0, bottom(40.0)), (40.0, top(40.0)), (20.0, top(20.0))].map(|(x, y)| DVec3::new(mm(x), mm(y), mm(-8.0)));
+    let lines: Vec<_> = (0..4).map(|i| make_line(corners[i], corners[(i + 1) % 4]).unwrap()).collect();
+    let slab = extrude(&make_face_from_wire(&make_wire(&lines).unwrap(), true).unwrap(), DVec3::new(0.0, 0.0, mm(10.0))).unwrap().shape;
+    let axis = DVec3::new(mm(30.0), mm(-10.0), mm(-3.231827));
+    let hole = make_cylinder(&Plane::new(axis, DVec3::Y, DVec3::X), mm(2.5), mm(20.0), std::f64::consts::TAU).unwrap();
+    let part = cut(&slab, &hole).unwrap().shape;
+    let path = std::env::temp_dir().join(format!("noshape-knife-chamfer2-{}.brep", std::process::id()));
+    noshape_kernel::write_brep(&part, &path).unwrap();
+    let brep = std::fs::read_to_string(&path).unwrap();
+    let _ = std::fs::remove_file(&path);
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let wall = b.shape.faces().iter().position(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).unwrap();
+    let face = Reference::Face((*b.faces[wall]).clone());
+    s.add("chamfer", move |p| {
+        p.set("entities", ParamValue::Query(vec![face]));
+        p.set("chamferMethod", en("FACE_OFFSET"));
+        p.set("chamferType", en("OFFSET_ANGLE"));
+        p.set("width", expr("0.75 mm"));
+        p.set("angle", expr("45 deg"));
+    });
+    let r = s.ok();
+    let sh = &r.context.bodies[0].shape;
+    let area = |up: bool| {
+        sh.faces().iter().filter(|f| !matches!(f.face_surface(), Ok(noshape_kernel::Surface::Plane(_) | noshape_kernel::Surface::Cylinder { .. }))).filter(|f| (f.centroid().unwrap().y > 0.0) == up).map(|f| f.area().unwrap() / (mm(1.0) * mm(1.0))).sum::<f64>()
+    };
+    let (pos, neg) = (area(true), area(false));
+    assert!((pos - 18.856481).abs() < 0.02 && (neg - 19.444938).abs() < 0.02, "the rims' chamfers {pos} / {neg} mm² (live 18.856 / 19.445)");
+    assert!((neg - pos - 0.588457).abs() < 0.002, "their difference {} mm² (live 0.588)", neg - pos);
+}
+
 /// c2-impeller-loft's Fillet 1 in small (live 2479): an R10 round where a Ø20 tube leaves a wall tilted 30° from square
 /// to it, the tube ending 15 mm past the wall at its axis: at the top (a 60° corner) the ball would touch the tube
 /// 17.3 mm along it, past its end, and rolls over the end's rim instead (overflow off): live's JWO, the ball touching

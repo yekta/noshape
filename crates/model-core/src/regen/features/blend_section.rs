@@ -2030,6 +2030,19 @@ impl Rim {
         (x, self.axis.cross(x))
     }
 
+    /// The angle of a whole rim's middle, where Parasolid's ellipse is halfway round from its start (its major axis's
+    /// end opposite the cylinder's axis seen on the plane), the end toward that axis.
+    fn whole_middle(&self) -> f64 {
+        let (x, y) = self.frame();
+        match (self.np - self.axis * self.axis.dot(self.np)).try_normalize() {
+            Some(n) => {
+                let v = -n * self.axis.dot(self.np).signum();
+                v.dot(y).atan2(v.dot(x))
+            }
+            None => 0.0,
+        }
+    }
+
     /// The angle about the axis of `q`.
     fn angle_of(&self, q: DVec3) -> f64 {
         let (x, y) = self.frame();
@@ -2043,15 +2056,49 @@ impl Rim {
     }
 }
 
-/// A rim's blend: a round of a radius, or a chamfer of equal distances.
+/// A rim's blend: a round of a radius, a chamfer of equal distances, or an Offset chamfer of a distance and an angle or
+/// two distances.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum RimBlend {
     Round,
     Chamfer,
+    /// An Offset chamfer measured on the cylinder (`on_wall`) or the plane, the other side an angle or a distance:
+    /// constant offsets from both faces sized at the rim's middle (live c2-hunting-knife's Chamfer 2).
+    Offset { on_wall: bool, other: OffsetOther },
+}
+
+/// An Offset chamfer's other side.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum OffsetOther {
+    Angle(f64),
+    Distance(f64),
 }
 
 /// The rims a blend's edges make ([`rims_of`]), found once for [`rims_overflow`] and [`ring_blend`].
 pub struct Rims(Vec<(Rim, usize)>);
+
+/// Whether every rim is all of its plane and cylinder's intersection (no arc of it).
+pub fn rims_whole(rims: &Rims) -> bool {
+    rims.0.iter().all(|(rim, _)| rim.arc.is_empty())
+}
+
+/// Whether each rim's chamfer measures from its cylinder: a picked cylinder (faces `picked`: live
+/// c2-hunting-knife's Chamfer 2, its hole's wall picked, 0.75 mm on the wall; whether that holds beyond an Offset
+/// chamfer of whole rims is open: a pin's picked top measures Distance 1 down its sides), else each edge's Distance 1
+/// face (`reference`, in `edges`' order). None where they differ or one is neither face.
+pub fn rims_measure_on_wall(rims: &Rims, picked: &[Shape], reference: &[Shape]) -> Option<bool> {
+    let mut on: Option<bool> = None;
+    for (rim, i) in &rims.0 {
+        let r = reference.get(*i)?;
+        let picked_wall = picked.iter().any(|f| f.is_same(&rim.wall));
+        let wall = if picked_wall || r.is_same(&rim.wall) { true } else if r.is_same(&rim.plane) { false } else { return None };
+        if on.is_some_and(|o| o != wall) {
+            return None;
+        }
+        on = Some(wall);
+    }
+    on
+}
 
 /// These edges' rims, if they all are (see [`rims_of`]).
 pub fn rims(shape: &Shape, edges: &[usize]) -> Option<Rims> {
@@ -2177,8 +2224,8 @@ pub fn rims_overflow(rims: &Rims, shape: &Shape, sizes: &[f64], kind: RimBlend) 
                     let c = p + (rim.np + n_w) * (-r / (1.0 + rim.np.dot(n_w)));
                     (c + rim.np * r, c + n_w * r)
                 }
-                // r along each face, square to the rim.
-                RimBlend::Chamfer => {
+                // r along each face, square to the rim (an Offset chamfer's sizes near enough for this check).
+                RimBlend::Chamfer | RimBlend::Offset { .. } => {
                     let t = (rim.at(x, y, a + 1e-4).0 - rim.at(x, y, a - 1e-4).0).normalize();
                     let along = |n: DVec3, into: DVec3| {
                         let u = t.cross(n).normalize();
@@ -2331,7 +2378,7 @@ pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], siz
             // A chamfer: the chord of one rolling ball all round (live 2384 / 2441); on a rim square to its plane that is
             // OCCT's chamfer (the setback the same all round), faster.
             RimBlend::Chamfer if rim.axis.dot(rim.np).abs() >= 1.0 - 1e-9 => k::cut(&wedge, &k::chamfer(&wedge, std::slice::from_ref(&edge), k::ChamferSpec::Equal(r), &[])?.shape)?.shape,
-            RimBlend::Chamfer => rim_chamfer_tool(rim, &shape.sub_shape(ShapeType::Edge, e)?, r, &wedge, seam_where_whole(rim, r)?, scale)?,
+            RimBlend::Chamfer | RimBlend::Offset { .. } => rim_chamfer_tool(rim, &shape.sub_shape(ShapeType::Edge, e)?, r, kind, &wedge, seam_where_whole(rim, r)?, scale)?,
         };
         if !tool.is_valid() || tool.count(ShapeType::Solid) != 1 {
             return Err(fail("the rim's blend left no one solid to cut"));
@@ -3065,42 +3112,59 @@ pub fn cliff_rim_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], sizes: &[f6
 /// wedge split by the closed sheet through the ball's touch points (each chord a little longer both ways), the piece
 /// at the rim kept: its faces on the plane and the cylinder are theirs. The sheet starts at `seam` (a radial off the
 /// part).
-fn rim_chamfer_tool(rim: &Rim, edge: &Shape, d: f64, wedge: &Shape, seam: DVec3, scale: f64) -> FResult<Shape> {
+fn rim_chamfer_tool(rim: &Rim, edge: &Shape, d: f64, kind: RimBlend, wedge: &Shape, seam: DVec3, scale: f64) -> FResult<Shape> {
     let (x, y) = rim.frame();
     let angle = |v: DVec3| v.dot(y).atan2(v.dot(x));
-    // The edge's middle: an arc's; a whole rim's, where Parasolid's ellipse is halfway round from its start (its major
-    // axis's end opposite the cylinder's axis seen on the plane), the end toward that axis.
+    // The edge's middle: an arc's; a whole rim's, where Parasolid's ellipse is halfway round from its start. An equal
+    // chamfer (live 2441, our axis): the major axis's end toward the cylinder's axis seen on the plane; an Offset one
+    // (live c2-hunting-knife's Chamfer 2, Parasolid's axis = ours: its hole's rims start at x 27.5 and 32.5): the end
+    // away from it. (Which is Parasolid's rule for both is open.)
     let a_mid = if rim.arc.is_empty() {
-        match (rim.np - rim.axis * rim.axis.dot(rim.np)).try_normalize() {
-            Some(n) => angle(-n * rim.axis.dot(rim.np).signum()),
-            None => 0.0,
-        }
+        rim.whole_middle() + if matches!(kind, RimBlend::Offset { .. }) { std::f64::consts::PI } else { 0.0 }
     } else {
         let info = edge.edge_info()?;
         rim.angle_of(edge.point_at(0.5 * (info.first_param + info.last_param))?)
     };
-    let ball = |a: f64, r: f64| -> (DVec3, DVec3, DVec3) {
+    // The point `ow` off the cylinder and `op` under the plane at angle `a`, and its feet on the plane and the cylinder.
+    let ball = |a: f64, ow: f64, op: f64| -> (DVec3, DVec3, DVec3) {
         let (p, radial) = rim.at(x, y, a);
-        let base = rim.origin + radial * (rim.rc + rim.out * r);
-        let c = base + rim.axis * (((p - base).dot(rim.np) - r) / rim.axis.dot(rim.np));
-        (p, c + rim.np * r, c - radial * (rim.out * r))
+        let base = rim.origin + radial * (rim.rc + rim.out * ow);
+        let c = base + rim.axis * (((p - base).dot(rim.np) - op) / rim.axis.dot(rim.np));
+        (p, c + rim.np * op, c - radial * (rim.out * ow))
     };
     let (_, radial) = rim.at(x, y, a_mid);
     let phi = std::f64::consts::PI - rim.np.dot(-radial * rim.out).clamp(-1.0, 1.0).acos();
-    let r = d * (phi / 2.0).tan();
-    if !r.is_finite() || r <= 0.0 {
+    // An equal chamfer: one rolling ball, its setback `d` at the middle. An Offset one: the offsets whose feet lie at
+    // the asked distances there (Distance 1 on its face, the other from the angle or its distance).
+    let (ow, op) = match kind {
+        RimBlend::Offset { on_wall, other } => {
+            let e = match other {
+                OffsetOther::Angle(a) if a + phi < std::f64::consts::PI - 1e-9 => d * a.sin() / (a + phi).sin(),
+                OffsetOther::Angle(_) => return Err(fail("the chamfer's angle doesn't meet the other face")),
+                OffsetOther::Distance(e) => e,
+            };
+            let (o_ref, o_other) = feet_offsets(d, e, phi.cos())?;
+            if on_wall { (o_ref, o_other) } else { (o_other, o_ref) }
+        }
+        _ => {
+            let r = d * (phi / 2.0).tan();
+            (r, r)
+        }
+    };
+    let r = ow.max(op);
+    if !r.is_finite() || ow <= 0.0 || op <= 0.0 {
         return Err(fail("the rim's faces are tangent"));
     }
     const N: usize = 64;
     let mut chords = Vec::new();
     for k in 0..N {
         // (From the wedge's seam, off the part: the sheet's own seam would split the chamfer face.)
-        let (_, t1, t2) = ball(angle(seam) + k as f64 * std::f64::consts::TAU / N as f64, r);
+        let (_, t1, t2) = ball(angle(seam) + k as f64 * std::f64::consts::TAU / N as f64, ow, op);
         let past = (t2 - t1) * 0.25;
         chords.push(k::make_wire(&[k::make_line(t1 - past, t2 + past)?])?);
     }
     let sheet = k::loft(&chords, &k::LoftOptions { solid: false, closed: true, ..Default::default() })?.shape;
-    let (p, t1, t2) = ball(a_mid, r);
+    let (p, t1, t2) = ball(a_mid, ow, op);
     let inside = (p + t1 + t2) / 3.0;
     let pieces = k::split(std::slice::from_ref(wedge), std::slice::from_ref(&sheet), &k::BooleanOptions::default())?.shape.solids();
     // The piece keeping the wedge's rim edge (closed, through the rim's point): no classification against the sheet's
