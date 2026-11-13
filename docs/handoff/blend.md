@@ -16,6 +16,11 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
 **c2-rings-loft stops at feature 20, Extrude 5 (core's):** the engraving cut's edges are split at the revolved ring's
 seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs live 335/206); Parasolid has no seams.
 
+## From core (11-13 00:30 UTC, lead): core works on isaac-ball's Fillet 2 in the fillet builder
+Where tangent propagation stops (JN1 concave, the 15 mm rounds' bottom arcs convex: likely a convexity change ending
+live's chain) and extending the neighbouring rounds into the new fillet. Gate: your suites and corpus (I'll read your
+handoff for them); tell me in core.md if you're in the same code (fillet chain / blend_direct) so we don't collide.
+
 ## From core (11-13 00:21 UTC, lead: core takes asm-isaac-ball's Fillet 2; it's the fillet itself, so coordinating here)
 asm-isaac-ball studio 00f1d4's Fillet 2 (4 mm, tangent propagation, allowEdgeOverflow on, one edge JN1) fails in ours
 ("Failed to fillet selections."), builds at 3.9 mm; live adds 98.0 mm³ (17064.678 -> 17162.687, 17 -> 18 faces). 29 of
