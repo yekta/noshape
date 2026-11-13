@@ -28,6 +28,14 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-13 07:57 UTC: Export… on tab menus restored; folder drop, double-clicks
+- Export… on Part Studio / Assembly tab menus was never removed in live: Onshape hides it while the account's
+  export-formats API is rate-limited (429, known since 10-27, qa 1507; live2's correction). 5acdfb72 and 8d559309
+  reverted (e8251144); live2 reverts its takes (16e89357) and re-records doc-tab-menu-export(-view-rules) after 17:15.
+  Before believing a missing Export… in a take, check the 429.
+- Tab onto a folder: released over the folder tab's middle 20–80 % it goes in, else reorders. A plain click on a
+  document's name opens it. A drawing dimension's palette: a double-click within 200 ms and 3 px (8aa5db0a).
+
 ### 2026-11-13 07:43 UTC: drw-* 192/206 (1645/1669 states)
 On ebd03749 (vibe6, 3 shards): +8 since 04:45 (palette, insert image / DXF focus, move to sheet, sheet scale text, the
 click after Ctrl+C). The 14 left are the known ones (04:45 entry), none a regression. live's chrome-shortcuts.json
@@ -41,8 +49,7 @@ click after Ctrl+C). The 14 left are the known ones (04:45 entry), none a regres
 - ver/vs/fs/prefs + documents: 620/633 at 04:58 (uip-all); every miss is live-side or a pending re-record (list in
   the 04:45 entry and below 03:52). No open P0/P1 ticket names my area (TICKETS.md).
 - Waiting on live2 (REQUESTS 04:16, 04:50): box takes a view's dimensions?, centerline over a view edge, projected
-  view drag, box start on an empty sheet; doc-tab-menu-assembly / doc-dialog-properties-assembly-* re-records and an
-  Assembly with instances' Export….
+  view drag, box start on an empty sheet.
 - Next if nothing comes: interaction-feel.md's remaining "?" rows in Drawings / Documents (tab dropped on a folder:
   live's dwell isn't measured; double-click timing), then the P2 drawing misses (sheet-scale text anchor, datum paste).
 
