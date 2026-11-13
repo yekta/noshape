@@ -30,8 +30,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   segments (2319), so it doesn't floor edge segments; what it limits asked in REQUESTS 13:33. Apply it after.
 - live.igs' 12-tooth gear 806.58 mm² (model 807.57): its Fine mesh has 807.51, so the B-rep is right and our
   integral is short, on the 24 flanks (extruded after the import's B-spline-to-extrusion merge: 9.99 for 10.03).
-  Their edges' p-curves are tight (8 of ~96 off 0.08-0.29 mm, re-projecting those changes nothing). Next: face_moments
-  on those extruded faces (the same gear by STEP reads 807.59).
+  Their edges' p-curves are tight (8 of ~96 off 0.08-0.29 mm, re-projecting those changes nothing). It is our
+  segmented integral (common.cpp face_moments): each flank is a cubic x linear B-surface with 45 u-knots, all C2,
+  so its 8 Gauss segments run across them (ours 9.987 mm², OCCT's adaptive 10.026). Breaking at every knot (C3,
+  branch dx-props 886874f1b) reads 807.52 but makes query_parts on the spur gear 4.5-5.6 -> 7.7-8.9 s and moves 6
+  kernel tests' recorded volumes 7e-7..3e-6: not landed. A cheaper rule (fewer Gauss points per knot span, or only
+  where the knots are dense) is the way if the lead wants it.
 
 ## 11-13 11:52 UTC: hose x_t whole without the refit; spur gear STL and STEP; sheet metal STEP to core (lead 10:20, 11:00)
 - Hose (cf-hose-routing): 6a311c2b (a periodic refit, 1.8 s, 8x the file) withdrawn from the queue. The inner walls'
