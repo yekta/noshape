@@ -1,0 +1,25 @@
+{
+ "name": "vs-row-drag",
+ "about": "Variable Studio 1: drag count's row (pressed on its Name cell) above width's: the rows read count, width, height (live2 studios.json variableStudioGrid dragReorder)",
+ "area": "studios",
+ "source": "live2 feel/studios.json variableStudioGrid (studios 11-13)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "drag",
+   "from": {
+    "var_cell": "count:Name"
+   },
+   "to": {
+    "var_cell": "width:Name",
+    "edge": "top"
+   }
+  }
+ ]
+}

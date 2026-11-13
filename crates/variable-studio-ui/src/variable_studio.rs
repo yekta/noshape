@@ -11,6 +11,19 @@ use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use noshape_model::TabContent;
+
+actions!(variable_studio, [GridTab, GridTabPrev]);
+
+/// Tab / Shift+Tab in a Variable Studio's table walk its cells (live2 studios.json variableStudioGrid), over the
+/// window's focus cycle and a field's own Tab (bound after the kit's, so they win).
+pub fn bind_keys(cx: &mut App) {
+    cx.bind_keys([
+        KeyBinding::new("tab", GridTab, Some("VariableGrid")),
+        KeyBinding::new("shift-tab", GridTabPrev, Some("VariableGrid")),
+        KeyBinding::new("tab", GridTab, Some("VariableGrid > Input")),
+        KeyBinding::new("shift-tab", GridTabPrev, Some("VariableGrid > Input")),
+    ]);
+}
 use noshape_model::document::TabId;
 use noshape_model::variables::{VarKind, VariableStudio, VsField};
 use std::collections::{HashMap, HashSet};
@@ -360,9 +373,8 @@ impl VariableStudioView {
         cx.notify();
     }
 
-    /// The grid's keys (live2 studios.json variableStudioGrid). A selected cell: arrows move (↑ / ↓ wrap), Tab /
-    /// Shift+Tab right / left, Enter edits, Backspace clears into an edit (Delete does nothing). Editing: Tab commits
-    /// and moves right. The add row's field: Tab to the first row's Name.
+    /// The grid's keys (live2 studios.json variableStudioGrid) on a selected cell: arrows move (↑ / ↓ wrap), Enter
+    /// edits, Backspace clears into an edit (Delete does nothing). Tab: `grid_tab_action`.
     fn grid_key(&mut self, e: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let m = &e.keystroke.modifiers;
         if m.control || m.alt || m.platform || self.completion.is_some() || self.type_search.is_some() {
@@ -370,21 +382,11 @@ impl VariableStudioView {
         }
         let n = self.studio(cx).map_or(0, |s| s.variables.len());
         let key = e.keystroke.key.as_str();
-        let tab = key == "tab";
-        let in_add_row = self.inputs.get("new").is_some_and(|(st, _)| st.read(cx).focus_handle(cx).is_focused(window));
-        let from = if in_add_row {
-            "new".to_string()
-        } else if let Some(k) = self.cell_editing.clone().filter(|_| tab) {
-            k
-        } else if self.cell_editing.is_none() && self.cell_has_keyboard(window) && let Some(k) = self.cell_selected.clone() {
-            k
-        } else {
+        if self.cell_editing.is_some() || !self.cell_has_keyboard(window) {
             return false;
-        };
-        let editing = in_add_row || self.cell_editing.is_some();
+        }
+        let Some(from) = self.cell_selected.clone() else { return false };
         let to = match key {
-            "tab" => grid_tab(&from, m.shift, n),
-            _ if editing => return false,
             "up" => grid_step(&from, -1, 0, n, true),
             "down" => grid_step(&from, 1, 0, n, true),
             "left" => grid_step(&from, 0, -1, n, false),
@@ -396,12 +398,33 @@ impl VariableStudioView {
             _ => return false,
         };
         if let Some(to) = to {
-            if self.cell_editing.is_some() {
-                self.cell_selected = Some(to.clone());
-            }
             self.select_cell(&to, window, cx);
         }
         true
+    }
+
+    /// Tab / Shift+Tab: from the selected cell, the one being edited (committed as it loses the keyboard) or the add
+    /// row's field, to the next / previous cell.
+    fn grid_tab_action(&mut self, back: bool, window: &mut Window, cx: &mut Context<Self>) {
+        // An open `#` list takes the Tab: its entry goes in (live vs-value-autocomplete).
+        if self.completion.is_some() && !back {
+            self.accept_completion(None, false, window, cx);
+            return;
+        }
+        let n = self.studio(cx).map_or(0, |s| s.variables.len());
+        let in_add_row = self.inputs.get("new").is_some_and(|(st, _)| st.read(cx).focus_handle(cx).is_focused(window));
+        let from = if in_add_row {
+            Some("new".to_string())
+        } else if self.cell_editing.is_some() {
+            self.cell_editing.clone()
+        } else {
+            self.cell_selected.clone().filter(|_| self.cell_has_keyboard(window))
+        };
+        let Some(to) = from.and_then(|k| grid_tab(&k, back, n)) else {
+            cx.propagate();
+            return;
+        };
+        self.select_cell(&to, window, cx);
     }
 
     /// A table cell (not one being typed in) has the keyboard.
@@ -1591,6 +1614,9 @@ impl VariableStudioView {
                     // The drop line: 2 px blue across the table, a hollow dot at its left end.
                     div().absolute().left_0().right_0().top(px(y - 1.)).h(px(2.)).bg(rgb(0x1651b0)).child(div().absolute().left(px(-3.)).top(px(-2.)).size(px(6.)).rounded_full().border_1().border_color(rgb(0x1651b0)).bg(rgb(0xffffff)))
                 }))
+                .key_context("VariableGrid")
+                .on_action(cx.listener(|this, _: &GridTab, window, cx| this.grid_tab_action(false, window, cx)))
+                .on_action(cx.listener(|this, _: &GridTabPrev, window, cx| this.grid_tab_action(true, window, cx)))
                 .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
                     if this.grid_key(e, window, cx) {
                         cx.stop_propagation();

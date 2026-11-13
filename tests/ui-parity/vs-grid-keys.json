@@ -1,0 +1,45 @@
+{
+ "name": "vs-grid-keys",
+ "about": "Variable Studio 1: click width's Value, ↑ wraps to the last row's (count), typing 9 edits it, Enter commits and moves down (wrapping no further: the add row's field is not a Value), then Tab to the next cell (live2 studios.json variableStudioGrid)",
+ "area": "studios",
+ "source": "live2 feel/studios.json variableStudioGrid (studios 11-13)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Value"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Up"
+  },
+  {
+   "do": "type",
+   "text": "9"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  },
+  {
+   "do": "type",
+   "text": "x"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}
