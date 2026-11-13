@@ -1,5 +1,30 @@
 # Core modelling (agent "core")
 
+## core state (11-13 12:25 UTC)
+**Landed today:** 4cc0dc86 (a new Remove extrude picked fast keeps Remove's flip: std_edit_logic's dropped run passed its
+old values on; psui's start hole-sketch cut nothing; UI tests `a_remove_extrude_*` in sketch_ui_tests.rs) and 82a6adad
+(sheet metal queries: tracking rejects entities by each body's cached sub-shape boxes (`QueryCx::sub_box`) before making
+their shapes; attribute filters by a string field (`attributeId`) use an index (`attributes_with_field`), filter caches
+remapped on removal, kept on moves). Release, quiet vibe5, same run: c2-sm-louver 7.3-8.6 s -> 5.3-5.6 s (loaded),
+3.4-5.2 s quiet (live 5.0); Flange 9 257-417 ms (live 222), Extrude 3 374-556 (live 266); corner-break 1.75-2.5 s (live
+1.97), Corner break 1 654-896 (live 750). Gate 859/947, no count changed; CPU A/B on cf-fill-pattern level.
+**Open:**
+- Remove after flip: live asked (REQUESTS 11-13 11:23, start hole-sketch): does a user flip after Remove point away?
+- Flange 9 bisect (lead: finish it): systemd unit core-bisect2-flange9, worktree core-bis2, log hb/bisect2-flange9.log
+  (each step: Flange 9 ms + the louver's match count / first difference). 11-06's 34 ms was a louver matching 4/36
+  (Flange 9 then "Cannot create flange..." until skasm's 56603985f): expect it to name a commit that made Flange 9 build.
+- What's left on the louver (FS profile, fn): Extrude 3/4 queries ~170-200 ms each (qAttributeQuery without a
+  subquery builds all ~9000 entities a call; owned-by-part intersections ~0.5 ms each), evCollisionDetection 67;
+  build_part (all calls 1.4-1.7 s): walls 0.9-1.1 s, of which the slab's relief cut 437 ms and hole cut 183 ms (Rust
+  Boolean build), final fuse 263-327. One combined hole+relief cut: louver faster, corner-break slower 4/4: reverted.
+  Timers: /root/core-scratch/rmx/smprof.patch (NOSHAPE_SMPROF); query-kind profiler: rmx/smq-prof.patch (NOSHAPE_QPROF).
+- cf-part-draft: Part Draft 2 380-577 ms (live 39): opDraft's Reapply fillet = OCCT Defeaturing of 18 rounds (cylinders,
+  sphere corners, a torus) on each split half, ~190 ms each, then draft, fillet again. Our in-place removers
+  (delete_inner_loops, delete_prism_rounds) don't cover a rounded box; lead: no Defeaturing patch for now. Part Draft 3
+  683-1084 (live 865): level. Dumps vibe5 ~/tmp/core/pddump (NOSHAPE_DUMP_OPS).
+- c2-impeller-loft: Move face 1 / Delete face 2 run on a wrong part (Move face 1 fails after 2.7 s): Boolean
+  Flansch+Gehäuse to bool2 (lead 11-13). Isaac Fillet 2 gate failed (below): rework pending.
+
 ## From bool (11-13 03:55 UTC, lead: documents slower than live, by feature)
 Baseline qa's 02:00 vibe7 release run (head 91a90caf); per feature ours from a profiled suite run on vibe5 (loaded: rough),
 live's from live.jsonl per_feature_ms. Yours:
