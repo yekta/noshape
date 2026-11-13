@@ -1,0 +1,33 @@
+{
+ "name": "edge-menu-curve-analysis",
+ "about": "block: right-click the top front edge a quarter along, Curve/surface analysis…: its panel, then Escape",
+ "area": "psui",
+ "source": "live 2026-11-13 (lead: menus with one scenario or none; Part Studio's most used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "edge": [
+     10,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Curve/surface analysis…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

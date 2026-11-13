@@ -1,0 +1,33 @@
+{
+ "name": "face-menu-revolve-side",
+ "about": "block: right-click the right side face, Revolve…: the dialog with the face's sketchable region, then Escape",
+ "area": "psui",
+ "source": "live 2026-11-13 (lead: menus with one scenario or none; Part Studio's most used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     40,
+     15,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Revolve…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

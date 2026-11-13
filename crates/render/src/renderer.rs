@@ -70,10 +70,10 @@ const POINT_DEPTH_BIAS: wgpu::DepthBiasState = wgpu::DepthBiasState { constant: 
 /// on a part face): a small pull toward the camera on top of the faces' push.
 const PICK_PRIORITY_DEPTH_BIAS: wgpu::DepthBiasState = wgpu::DepthBiasState { constant: 4, slope_scale: 0.0, clamp: 0.0 };
 
-/// How much wider lines and points are in the pick pass, in CSS px (`g.viewport.w`: the shaders multiply it by the
-/// device pixel ratio). It was given ×dpr too, so on a Retina display a sketch point picked 16 px around itself: a
-/// neighbouring point took the hover and the click, and a snap shown on hover was dropped by the click's 10 px check.
-pub const PICK_EXTRA_CSS_PX: f32 = 8.0;
+/// How much wider lines (and half that narrower points) are in the pick pass, in CSS px (`g.viewport.w`: the shaders multiply it
+/// by the device pixel ratio). With the 10 px pick square around the pointer, a part edge (1 px) lights from 6–7 px
+/// off it and a vertex (a 6 px disc) from 7, 9 diagonally, as live's (live/feel/3d.json "hover_reach_px").
+pub const PICK_EXTRA_CSS_PX: f32 = 2.0;
 
 /// Upper bound of color frames one target may have in flight (rendering or
 /// being read back); see [`Renderer::frames_in_flight`].
@@ -346,17 +346,13 @@ impl PickBuffer {
         x0 >= self.x0 as i32 && y0 >= self.y0 as i32 && x1 < (self.x0 + self.width) as i32 && y1 < (self.y0 + self.height) as i32
     }
 
-    /// Pick id at pixel, searching a small radius for the nearest non-zero id
-    /// so thin edges and points are easy to hit. Prefers lines/points over faces
-    /// through the caller-supplied priority function (higher wins at equal distance).
+    /// Pick id at pixel: in the square of `radius` around it (live's pick rectangle), the id of the highest priority
+    /// (the caller's function), the nearest of those.
     pub fn pick(&self, x: i32, y: i32, radius: i32, priority: impl Fn(u32) -> i32) -> Option<u32> {
         let mut best: Option<(i32, i32, u32)> = None; // (priority, -dist2, id)
         for dy in -radius..=radius {
             for dx in -radius..=radius {
                 let d2 = dx * dx + dy * dy;
-                if d2 > radius * radius {
-                    continue;
-                }
                 let Some(id) = self.id_at(x + dx, y + dy) else { continue };
                 if id == 0 {
                     continue;

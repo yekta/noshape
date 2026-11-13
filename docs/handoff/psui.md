@@ -15,6 +15,14 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**2026-11-13 03:09 UTC:** the user's model-edge snap P0 landed (d90b4f6f, with live2's sketch feel batch; hand-checked on
+a mode-700 hat15 copy, deleted). Next, the "3D picking as live measured it" commit (local, not queued): live's 3D picking (docs/parity/interaction-feel.md
+3D) and the press thresholds, plus tests/ui-parity/hole-remembers-last for live to record. Before landing: the 593
+viewport-pick scenarios (/root/psui-scratch/cov/pick3d.txt, vibe6 ~/tmp/psui/p3d) against the green build's results
+for the same names (~/tmp/psui/base.sh; green copy ~/tmp/psui/green-noshape). Left in the feel queue: mate connector
+reach (live 23 / 14 px), box select's rules, double-click on a face, the sketch hover delay (asked live2), the glyph
+position, the Dimension tool placement rules. Ours switches a Tapped hole to Drilled on the Inch tab: check live's take.
+
 **2026-11-12 23:37 UTC (lead: 3D picking after the sketch reach fix):** outside sketch mode a click already acts on the
 hovered entity (the viewport's Click uses `pick_at` at the click, as the hover; the Part Studio applies the same Alt
 pick-through, field filter and midpoint target; the assembly maps both through `self.pick`). Our reach, measured

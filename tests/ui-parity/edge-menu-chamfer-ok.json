@@ -1,0 +1,43 @@
+{
+ "name": "edge-menu-chamfer-ok",
+ "about": "block: right-click the top front edge a quarter along, Chamfer…: the dialog with the edge in, ✓",
+ "area": "psui",
+ "source": "live 2026-11-13 (lead: menus with one scenario or none; Part Studio's most used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "edge": [
+     10,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Chamfer…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

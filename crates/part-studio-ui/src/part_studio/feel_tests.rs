@@ -61,12 +61,26 @@ impl Pointer {
             cx.executor().advance_clock(std::time::Duration::from_millis(20));
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
+        // A few frames more: the scene shows the new hover, so the next pick holds a lit line (a person's pointer
+        // takes many frames to get anywhere).
+        self.frames(cx, view);
     }
 
-    fn click(&self, cx: &mut TestAppContext, at: DVec2) {
+    fn frames(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>) {
+        for _ in 0..5 {
+            cx.update(|cx| self.vp.update(cx, |v, cx| v.request_frame(cx)));
+            cx.update(|cx| view.read(cx).gpu.deliver_frames());
+            draw(cx, self.window);
+            cx.executor().advance_clock(std::time::Duration::from_millis(20));
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+
+    /// Clicks there and lets the click's pick come back (a hover just changed is picked again first).
+    fn click(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>, at: DVec2) {
         let win = self.window_point(cx, at);
         gpui_kit::VisualTestContext::from_window(self.window, cx).simulate_click(win, Modifiers::default());
-        draw(cx, self.window);
+        self.frames(cx, view);
     }
 }
 
@@ -76,10 +90,10 @@ fn at_scale(cx: &mut TestAppContext, window: AnyWindowHandle, scale: f32) {
     draw(cx, window);
 }
 
-/// Outside sketch mode a click acts on exactly what is lit (lead 11-12, after the sketch reach fix): the pointer 5 to
-/// 12 px either side of a part edge (a quarter along it), the click selects what lights there. The edge lights from
-/// 5 px off it on both sides, not from 12; today it reaches 9 px over the background but only 5 over its own face
-/// (interaction-feel.md "Edge hover reach"; live's is being measured).
+/// Outside sketch mode a click acts on exactly what is lit (lead 11-12, after the sketch reach fix), and an edge lights
+/// as live's (live/feel/3d.json "hover_reach_px", a level edge: lights at 6–7 px, stays lit to 9–10) on either side,
+/// over the background and over its own face. The pointer moves across a part edge a quarter along it, toward it and
+/// back out on each side, and the click selects what lights there.
 #[gpui::test]
 fn a_click_beside_an_edge_selects_what_is_lit(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -110,17 +124,31 @@ fn a_click_beside_an_edge_selects_what_is_lit(cx: &mut TestAppContext) {
                 .map(|(r, m, n, _)| (r, m, n))
                 .unwrap()
         });
-        for off in [-12.0, -9.0, -5.0, 5.0, 6.0, 12.0f64] {
-            cx.update_window(window, |_, _, cx| view.update(cx, |v, _| v.selection.clear())).unwrap();
+        // The pick square reaches a slanted edge further than a level one: 5 px × (|nx| + |ny|) to its pick band (1.5
+        // px each side at rest, 4.5 lit).
+        let square = 5.0 * (across.x.abs() + across.y.abs());
+        let (reach, hold) = (square + 1.5, square + 4.5);
+        let steps = [-1.0, 1.0f64].into_iter().flat_map(|side| {
+            [(2.0 * hold, false), (reach + 1.5, false), (reach - 1.0, true), (hold - 1.5, true), (hold + 1.5, false)].map(|(d, lit)| (side * d, lit))
+        });
+        for (off, lights) in steps {
+            cx.update_window(window, |_, _, cx| {
+                view.update(cx, |v, cx| {
+                    // (Each click on its own: not the second of a double-click on the plane behind.)
+                    v.selection.clear();
+                    v.ui.last_click = None;
+                    v.rebuild_scene(cx);
+                })
+            })
+            .unwrap();
+            pointer.frames(cx, &view);
             let at = on + across * off;
             pointer.move_to(cx, &view, at);
             let lit = cx.update(|cx| view.read(cx).hover.clone());
-            pointer.click(cx, at);
+            pointer.click(cx, &view, at);
             let selected = cx.update(|cx| view.read(cx).selection.clone());
             assert_eq!(selected, lit.clone().into_iter().collect::<Vec<_>>(), "scale {scale}, {off} px off the edge: the click selects what was lit");
-            if off.abs() <= 5.0 || off.abs() >= 12.0 {
-                assert_eq!(lit.as_ref() == Some(&edge), off.abs() <= 5.0, "scale {scale}, {off} px off the edge: lit {lit:?}");
-            }
+            assert_eq!(lit.as_ref() == Some(&edge), lights, "scale {scale}, {off} px off the edge: lit {lit:?}");
         }
     }
 }
@@ -162,5 +190,61 @@ fn the_dimension_tool_takes_the_hovered_line(cx: &mut TestAppContext) {
             let picks = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().tool_picks());
             assert_eq!(picks.contains(&line), lit, "scale {scale}: the click {off} px off takes the line: {picks:?}");
         }
+    }
+}
+
+/// Live/feel/3d.json "drag_thresholds" through the real pointer: a right drag orbits from its first pixel and its
+/// release still opens the context menu within 4 px (not from 5); a left press moved 6 px within its first 50 ms is
+/// a click, moved 3 px later a box.
+#[gpui::test]
+fn presses_orbit_box_and_open_the_menu_as_live(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    for scale in [1.0, 2.0] {
+        let (window, view, _top, _) = block_part(cx, &format!("presses-{scale}"));
+        at_scale(cx, window, scale);
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        let pointer = Pointer::new(cx, window, &view);
+        // The part's middle on screen.
+        let at = cx.update(|cx| {
+            let v = view.read(cx);
+            let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+            let c = b.mesh.positions.iter().fold(glam::DVec3::ZERO, |c, p| c + glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)) / b.mesh.positions.len() as f64;
+            v.viewport.read(cx).project(c).unwrap()
+        });
+        pointer.move_to(cx, &view, at);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let right = |vcx: &mut gpui_kit::VisualTestContext, dx: f64| {
+            let (from, to) = (pointer.window_point(vcx, at), pointer.window_point(vcx, at + DVec2::new(dx, 0.0)));
+            vcx.simulate_mouse_down(from, gpui_kit::MouseButton::Right, Modifiers::default());
+            vcx.simulate_mouse_move(to, gpui_kit::MouseButton::Right, Modifiers::default());
+            vcx.simulate_mouse_up(to, gpui_kit::MouseButton::Right, Modifiers::default());
+        };
+        for (dx, menu) in [(3.0, true), (4.0, true), (6.0, false)] {
+            cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.close_context_menu(cx))).unwrap();
+            pointer.frames(cx, &view);
+            let before = cx.update(|cx| pointer.vp.read(cx).camera);
+            right(&mut vcx, dx);
+            pointer.frames(cx, &view);
+            assert_ne!(cx.update(|cx| pointer.vp.read(cx).camera), before, "scale {scale}: a {dx} px right drag orbits");
+            assert_eq!(cx.update(|cx| view.read(cx).context_menu.is_some()), menu, "scale {scale}: the menu after a {dx} px right drag");
+        }
+        cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.close_context_menu(cx))).unwrap();
+        pointer.frames(cx, &view);
+        // Left: 6 px at once is still a click (it selects what is under the pointer); 3 px after 60 ms is a box.
+        let left = |vcx: &mut gpui_kit::VisualTestContext, dx: f64, wait: u64| {
+            let (from, to) = (pointer.window_point(vcx, at), pointer.window_point(vcx, at + DVec2::new(dx, 0.0)));
+            vcx.simulate_mouse_down(from, gpui_kit::MouseButton::Left, Modifiers::default());
+            std::thread::sleep(std::time::Duration::from_millis(wait));
+            vcx.simulate_mouse_move(to, gpui_kit::MouseButton::Left, Modifiers::default());
+            let boxed = vcx.update(|_, cx| pointer.vp.read(cx).box_drag());
+            vcx.simulate_mouse_up(to, gpui_kit::MouseButton::Left, Modifiers::default());
+            boxed
+        };
+        pointer.move_to(cx, &view, at);
+        assert!(!left(&mut vcx, 6.0, 0), "scale {scale}: 6 px within 50 ms stays a click");
+        pointer.frames(cx, &view);
+        assert!(cx.update(|cx| !view.read(cx).selection.is_empty()), "scale {scale}: the click selected what is under the pointer");
+        assert!(left(&mut vcx, 3.0, 60), "scale {scale}: 3 px after 60 ms is a box");
     }
 }

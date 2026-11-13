@@ -1,0 +1,21 @@
+{
+ "name": "plane-menu-hide-other-planes",
+ "about": "block: right-click the Front plane in the graphics, Hide other planes",
+ "area": "psui",
+ "source": "live 2026-11-13 (lead: menus with one scenario or none; Part Studio's most used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "plane": "Front"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Hide other planes"
+   }
+  }
+ ]
+}

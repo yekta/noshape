@@ -1,0 +1,25 @@
+{
+ "name": "part-row-menu-assign-material",
+ "about": "block: right-click Part 1 in the Parts list, Assign material…: the material dialog, then Escape",
+ "area": "psui",
+ "source": "live 2026-11-13 (lead: menus with one scenario or none; Part Studio's most used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Assign material…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -15,27 +15,32 @@ P1 (lead 11-12). Live measures the 3D side (live/feel/3d.json, behaviours.md "fe
 
 ## 3D (Part Studio and assemblies, outside sketch mode)
 
+Live: live/feel/3d.json and behaviours "feel (3D)" (11-13 02:10; DPR 1, two zooms, the same in px). Onshape's client:
+`MOUSE_PICK_RADIUS_PX` 5, the pick a 10 × 10 px square round the pointer (×DPR, so CSS px at any ratio), sorted by
+priority, then the front-most, then the nearest.
+
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
-| Edge hover reach, pointer over the background | ? | 9 px (pick footprint: drawn width + `PICK_EXTRA_CSS_PX` 8, nearest within `PICK_RADIUS` 5) | offscreen `our_3d_pick_reach_for_edges_and_vertices`; GPU `feel::a_click_beside_an_edge_selects_what_is_lit` | ? |
-| Edge hover reach, pointer over its own face | ? | 5 px (the face wins from 6) | GPU `feel::a_click_beside_an_edge_selects_what_is_lit` | ? |
-| Silhouette edge reach | ? | – | – | ? |
-| Two edges 6 px apart: which lights | ? | the nearer (nearest within the 5 px search) | – | ? |
-| Vertex hover reach | ? | 11 px (6 px sprite) | offscreen `our_3d_pick_reach_for_edges_and_vertices` | ? |
-| Vertex vs the edge it ends | ? | the vertex wins within its reach | offscreen, same | ? |
-| Edge vs the face it bounds | ? | the edge within its reach (5 px over the face) | GPU, same | ? |
-| Mate connector reach | ? | – | – | ? |
-| Shown sketch's curve / point reach (not editing) | ? | – | – | ? |
-| Datum plane border reach | ? | – | – | ? |
+| Pick area | a square of 5 px each way | the same (`PickBuffer::pick`, `PICK_RADIUS`) | offscreen `our_3d_pick_reach_for_edges_and_vertices` | = |
+| Priority | sketch point > sketch line > mate connector > vertex > edge > origin > sketch region > face > plane; the nearest within it | the same (`PickKind::priority`) | same | = |
+| Edge reach (a level edge, over the background or its face) | lights at 6–7 px, stays lit to 9–10 (the lit edge's overlay holds it) | 6 px, 7–8 on a slanted edge (the square's corner); held to 9 (`PICK_EXTRA_CSS_PX` 2 wider than drawn; a hovered line 9 px wide in the pick, re-picked on each hover change) | offscreen, same; GPU `feel::a_click_beside_an_edge_selects_what_is_lit` | = |
+| Silhouette edge | lights at 6, stays lit to 9–10 | as an edge | – | = |
+| Vertex reach | 7 px across, 9 diagonally; stays lit to 7–8 | 7 / 9 (its 6 px disc picked 1 px smaller) | offscreen, same | = |
+| Vertex vs its edge | the vertex wins anywhere in its reach (from 8 px along the edge); a lit edge holds against it to ~4 px | the vertex wins in its reach (7 px); no hold against it | offscreen, same | ≈ |
+| Edge vs edge 5.6 px apart | the lit one holds until 3–4 px past the other; fresh: the nearer | the held band (4.5 px) wins by distance | – | ≈ |
+| Mate connector | its triad and ring: 23 px across, 14 down | – | – | – |
+| Sketch line / point (not editing) | 5–6 px, held to 9 / 7, held to 8 | as an edge / a vertex | – | ≈ |
+| Plane border | 7–8 px, no hold | 7 (a 2 px border, picked 4) | – | = |
+| Assembly instance edge / vertex | 6 / 7 px, no hold | as the Part Studio's (held) | – | ≈ |
+| Hover timing | a pick on every move below 0.15 px/ms; faster: after a pause of min(5 × the average pick, 250 ms) | the same (`prehighlight_delay`) | app-core `prehighlight_waits_for_a_pause_as_live` | = |
 | Edge midpoint target after a rest | live 1954, behaviours "icons2 midpoint radius": 9 px square, a short dwell | `update_hover`, `MIDPOINT_DWELL` | existing midpoint tests | = |
-| Hover timing: highlight during a fast move | live "nav2 pre-highlight": none above a speed, then after a pause | `prehighlight_delay`: speed ≥ 0.15 px/ms waits 5 × the average pick, at most 250 ms | – | ? |
-| Click = hover (the click takes what is lit) | ? | yes: the click's pick is the hover's at the same pixel (`pick_at`), with the same Alt pick-through, field filter and midpoint target; assemblies map both through `pick` | GPU `feel::a_click_beside_an_edge_selects_what_is_lit` | ? |
-| Click on a selected entity | deselects (Onshape) | deselects (`pick`) | – | – |
-| Shift / Ctrl + click | ? | – | – | ? |
-| Double-click | ? | 450 ms window (`is_double_click`); a face's second click deselects, its feature lit | – | ? |
-| Select other | ? | – | – | ? |
-| Box select: left to right / right to left | window / crossing (`BoxSelector`) | window / crossing; Ctrl+drag deselects | – | ? |
-| Click vs drag threshold | ≈ 5 px from the press, not time-based | 5 px on screen (`DRAG_START_PX`) | scene `a_press_drags_from_5_px` | = |
+| Click | adds; on a selected entity removes; on empty space clears; Shift+click on empty space keeps; Shift+click on an entity as a plain one | the same (`on_viewport_event`'s Click) | – | = |
+| Ctrl+click | the context menu of what is under the pointer, selects nothing (every OS; on a Mac Cmd+click is a plain click) | the same (`Drag::Pending` + Ctrl) | – | = |
+| Double-click | a face: shows its feature's sketch, the two clicks select then deselect; an edge: nothing | a face's second click deselects, its feature lit | – | ? |
+| Select other (`) | the "Select other" panel, bottom right, everything under the pointer through the model | `SelectOther` | – | – |
+| Box select | a left drag; left → right: window (blue), faces and edges fully inside, hidden ones too, no vertices, no part; right → left: crossing (yellow dashed), everything touched, sketch entities too; vertical direction irrelevant; adds; Ctrl at the start deselects | window / crossing (`BoxSelector`); Ctrl+drag deselects | – | – |
+| Left press → drag (box) | more than 2 px and 50 ms after the press; moves within the first 50 ms stay a click | the same (`press_becomes_drag`) | app-core `presses_drag_and_open_the_menu_as_live`; GPU `feel::presses_orbit_box_and_open_the_menu_as_live` | = |
+| Right press | orbits from the first pixel; the menu still opens on release within 4 px and 1 s | the same (`right_release_opens_menu`) | same | = |
 
 ## Sketch (editing a sketch)
 
@@ -125,6 +130,7 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
    Ctrl+click~~ (psui 11-13).
 2. Sketch hover timing: live2's 270–300 ms after the pointer stops (no tool) vs 30 ms with the Dimension tool: asked
    whether it is Onshape's or the recording Chrome's slow redraws before copying a delay.
-3. 3D reach, once live's numbers are in (an edge reaches 9 px over the background but 5 over its face today).
+3. ~~3D reach, priority, press thresholds~~ (psui 11-13). Left: mate connector reach, box select's rules, double-click
+   on a face, the held edge against its own vertex.
 4. Inference glyph position against the pointer (live ≈ 30, 30).
 5. Dimension tool placement rules (H / V / aligned by the bounding box, angle quadrant, Ø): a test each.

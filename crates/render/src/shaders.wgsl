@@ -942,6 +942,10 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     let own_edge = (l.style & 64u) != 0u && (st & (HOVER | SELECTED)) != 0u && !face_band;
     if (face_band) { width = 2.0 / max(g.viewport.z, 1.0); }
     if (own_edge) { width = 5.0; }
+    // The pick pass (`g.viewport.w` > 0): a line hovered itself holds the hover to 9–10 px off it, as live's lit
+    // overlay does (live/feel/3d.json: an edge lights at 6–7 px, stays lit to 9–10).
+    let picking = g.viewport.w > 0.0;
+    if (picking) { width = select(l.width * inst.extra.x + g.viewport.w, 9.0, (st & (HOVER | OUTLINE)) == HOVER); }
     let half = max(width * g.viewport.z * 0.5, 0.5);
 
     var wa = (inst.model * vec4(l.a, 1.0)).xyz;
@@ -951,7 +955,8 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     // the band (live selection/06b: centred on the edge).
     // Lifted lines too (a hovered part's silhouette over its own faces).
     var lift = 0.0;
-    if (lit || (l.style & 32u) != 0u) { lift = 1.5 * half; }
+    // (Picked lines too: the face side of an edge's pick band is in reach as much as the background side.)
+    if (lit || picking || (l.style & 32u) != 0u) { lift = 1.5 * half; }
     var ca = g.view_proj * vec4(wa, 1.0);
     var cb = g.view_proj * vec4(wb, 1.0);
     if (lift > 0.0) {
@@ -1121,12 +1126,15 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
     var c = g.view_proj * vec4(w, 1.0);
     let pick = global_pick(p.pick);
     let st = state_of(pick);
-    var size = p.size + g.viewport.w;
+    var size = p.size;
     // Live (behaviours "icons2 plane/origin highlight"): the hovered or
     // selected origin (style 4) is a 13 px filled disc; other points grow.
     if ((st & (HOVER | SELECTED)) != 0u) { size = select(size * 1.5 + 1.0, size + 2.0, (p.style & 4u) != 0u); }
     // A lit spline handle tip (style 64): a 14 px disc hovered, 15 px selected (live 2221), whatever its size at rest.
-    if ((st & (HOVER | SELECTED)) != 0u && (p.style & 64u) != 0u) { size = select(14.0, 15.0, (st & SELECTED) != 0u) + g.viewport.w; }
+    if ((st & (HOVER | SELECTED)) != 0u && (p.style & 64u) != 0u) { size = select(14.0, 15.0, (st & SELECTED) != 0u); }
+    // The pick pass takes half of `g.viewport.w` off a point's disc (a vertex lights from 7 px off it, 9 diagonally:
+    // live).
+    if (g.viewport.w > 0.0) { size = max(size - 0.5 * g.viewport.w, 2.0); }
     let half = size * g.viewport.z * 0.5;
     // A sketch point's disc stands off its plane toward the eye by twice its radius: drawn flat at the point's depth,
     // the half of an 11 px hover disc over a tilted plane's far side was hidden by the plane (the user's "offset" disc).

@@ -1,0 +1,29 @@
+{
+ "name": "part-row-menu-copy-here",
+ "about": "block: right-click Part 1 in the Parts list, Copy here…: the dialog, then Escape",
+ "area": "psui",
+ "source": "live 2026-11-13 (lead: menus with one scenario or none; Part Studio's most used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy here…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

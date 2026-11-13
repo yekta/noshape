@@ -1,0 +1,21 @@
+{
+ "name": "plane-menu-size-to-part-studio",
+ "about": "block: right-click the Right plane in the graphics, Size to Part Studio",
+ "area": "psui",
+ "source": "live 2026-11-13 (lead: menus with one scenario or none; Part Studio's most used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "plane": "Right"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Size to Part Studio"
+   }
+  }
+ ]
+}

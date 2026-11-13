@@ -30,15 +30,20 @@ pub enum PickKind {
 }
 
 impl PickKind {
-    /// Higher wins when several candidates are under the cursor radius.
+    /// Higher wins when several candidates are under the cursor radius, in live's order (live/feel/3d.json
+    /// "pick_priority": a sketch point over a sketch line over a mate connector over a vertex over an edge over the
+    /// origin over a sketch region over a face over a plane).
     pub fn priority(self) -> i32 {
         match self {
-            // (A mate connector above a vertex: live's client priorities 46 / 30 / 20 / 5.)
-            PickKind::Connector => 4,
-            PickKind::Vertex | PickKind::SketchPoint | PickKind::Origin => 3,
-            PickKind::Edge | PickKind::SketchCurve => 2,
-            PickKind::SketchRegion => 1,
-            PickKind::Face | PickKind::Plane => 0,
+            PickKind::SketchPoint => 8,
+            PickKind::SketchCurve => 7,
+            PickKind::Connector => 6,
+            PickKind::Vertex => 5,
+            PickKind::Edge => 4,
+            PickKind::Origin => 3,
+            PickKind::SketchRegion => 2,
+            PickKind::Face => 1,
+            PickKind::Plane => 0,
         }
     }
 }
@@ -323,22 +328,15 @@ impl PickMap {
     /// Like [`Self::priority_fn`], but kinds `allow` rejects are never
     /// picked or hovered (a dialog field's selection filter, Onshape).
     pub fn priority_fn_filtered(&self, allow: impl Fn(PickKind) -> bool) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
-        self.priority_fn_with(allow, false)
+        self.priority_fn_with(allow)
     }
 
-    /// While a sketch is edited its points and curves win over the model's vertices and edges they lie on (a sketch
-    /// line drawn along a part's edge is the line under the pointer).
-    pub fn priority_fn_sketching(&self) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
-        self.priority_fn_with(|_| true, true)
-    }
-
-    fn priority_fn_with(&self, allow: impl Fn(PickKind) -> bool, sketch_first: bool) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
-        // (×4: a sketch entity two above its kind, a boosted id one above, both below the next kind.)
-        let sketch = |k: PickKind| sketch_first && matches!(k, PickKind::SketchPoint | PickKind::SketchCurve);
+    fn priority_fn_with(&self, allow: impl Fn(PickKind) -> bool) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
+        // (×2: a boosted id one above its kind, below the next kind.)
         let prio: Vec<i32> = self
             .iter()
             .zip(1u32..)
-            .map(|(t, id)| if allow(t.kind) { 4 * t.kind.priority() + 2 * i32::from(sketch(t.kind)) + i32::from(self.boosted.binary_search(&id).is_ok()) } else { i32::MIN })
+            .map(|(t, id)| if allow(t.kind) { 2 * t.kind.priority() + i32::from(self.boosted.binary_search(&id).is_ok()) } else { i32::MIN })
             .collect();
         Arc::new(move |id| if id == 0 { -1 } else { prio.get(id as usize - 1).copied().unwrap_or(0) })
     }

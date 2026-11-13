@@ -1,0 +1,29 @@
+{
+ "name": "plane-menu-new-sketch-top",
+ "about": "block: right-click the Top plane in the graphics, New sketch…: the sketch dialog on Top, then Escape",
+ "area": "psui",
+ "source": "live 2026-11-13 (lead: menus with one scenario or none; Part Studio's most used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "New sketch…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

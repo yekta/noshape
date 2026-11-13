@@ -569,8 +569,8 @@ fn a_line_in_an_edge_on_plane_picks_over_the_plane() {
     assert_eq!(at(-0.01), 1, "below the line the plane's edge picks the plane");
 }
 
-/// A point picks around its drawn centre, PICK_EXTRA_CSS_PX wider in CSS px, at a pixel ratio of 1 and 2 alike (the
-/// user's Retina: the margin was multiplied by the ratio twice, so a 6 px sketch point picked 11 px round itself, a
+/// A point picks around its drawn centre, PICK_EXTRA_CSS_PX / 2 narrower in CSS px, at a pixel ratio of 1 and 2 alike (the
+/// user's Retina: a margin multiplied by the ratio twice made a 6 px sketch point pick 11 px round itself, a
 /// neighbouring point won the hover and the click, and a snap shown on hover didn't commit).
 #[test]
 fn a_point_picks_round_its_drawn_centre_at_any_pixel_ratio() {
@@ -597,16 +597,16 @@ fn a_point_picks_round_its_drawn_centre_at_any_pixel_ratio() {
         // CSS px to the right of the drawn centre.
         let at = |css: f64| pick.id_at((c.x + css * dpr as f64) as i32, c.y as i32).unwrap_or(0);
         assert_eq!(at(0.0), 7, "dpr {dpr}: the drawn centre");
-        assert_eq!(at(6.0), 7, "dpr {dpr}: within its radius and the pick margin (3 + {PICK_EXTRA_CSS_PX} / 2 px)");
-        assert_eq!(at(9.0), 0, "dpr {dpr}: past them");
+        assert_eq!(at(1.0), 7, "dpr {dpr}: within its radius less the pick margin (3 - {PICK_EXTRA_CSS_PX} / 4 px)");
+        assert_eq!(at(3.0), 0, "dpr {dpr}: past it");
     }
 }
 
-/// Our 3D pick reach outside sketch mode, as the viewport picks (the nearest id within PICK_RADIUS 5 CSS px of the
-/// pointer, vertices before edges before faces), measured on the pick buffer at a pixel ratio of 1 and 2: a part
-/// edge (drawn 1 px, picked PICK_EXTRA_CSS_PX wider) lights from 9 px off it; a vertex (a 6 px sprite) from 11 px,
-/// and beats the edge it ends. (In the app an edge reaches only 5 px over its own face: part-studio-ui
-/// `feel::a_click_beside_an_edge_selects_what_is_lit`.) docs/parity/interaction-feel.md; these move with live's numbers.
+/// Our 3D pick reach outside sketch mode, as the viewport picks (in the square of PICK_RADIUS 5 CSS px round the
+/// pointer, vertices before edges before faces, then the nearest), measured on the pick buffer at a pixel ratio of 1
+/// and 2, against live/feel/3d.json: a part edge (drawn 1 px, picked PICK_EXTRA_CSS_PX wider) lights from 6–7 px off
+/// it on either side; a vertex (a 6 px disc, picked PICK_EXTRA_CSS_PX / 2 narrower) from 7 px across, 9 diagonally, and
+/// beats the edge it ends. docs/parity/interaction-feel.md.
 #[test]
 fn our_3d_pick_reach_for_edges_and_vertices() {
     let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
@@ -634,12 +634,12 @@ fn our_3d_pick_reach_for_edges_and_vertices() {
         ],
         ..Default::default()
     };
-    // Priorities as `PickMap::priority_fn` gives them (×2): vertex 6, edge 4, face 0.
+    // Priorities as `PickMap::priority_fn` gives them (×2): vertex 10, edge 8, face 2.
     let prio = |id: u32| match id {
-        60 => 6,
-        50 => 4,
+        60 => 10,
+        50 => 8,
         0 => -1,
-        _ => 0,
+        _ => 2,
     };
     for dpr in [1.0f32, 2.0] {
         let (dw, dh) = ((w as f32 * dpr) as u32, (h as f32 * dpr) as u32);
@@ -654,15 +654,17 @@ fn our_3d_pick_reach_for_edges_and_vertices() {
         let inward = (screen([0.0, 0.0, hi[2]]) - mid).normalize();
         let reach = |dir: glam::DVec2, id: u32| (0..40).take_while(|k| at(mid + dir * (*k as f64 * dpr as f64)) == Some(id)).count() as i32 - 1;
         let (out, inn) = (reach(-inward, 50), reach(inward, 50));
-        assert!((8..=10).contains(&out) && (8..=10).contains(&inn), "dpr {dpr}: an edge lights from {out} px off it over the background, {inn} over its face");
-        // The vertex, along the diagonal away from the part; and it beats the edge where both are in reach.
+        assert!((6..=7).contains(&out) && (6..=7).contains(&inn), "dpr {dpr}: an edge lights from {out} px off it over the background, {inn} over its face");
+        // The vertex straight out (left of the part) and along the diagonal away from it; it beats the edge where both
+        // are in reach.
         let corner = screen([lo[0], lo[1], hi[2]]);
-        let away = (corner - screen([0.0, 0.0, hi[2]])).normalize();
-        let v = (0..40).take_while(|k| at(corner + away * (*k as f64 * dpr as f64)) == Some(60)).count() as i32 - 1;
-        assert!((10..=13).contains(&v), "dpr {dpr}: a vertex lights from {v} px off it");
+        let vertex_reach = |dir: glam::DVec2| (0..40).take_while(|k| at(corner + dir * (*k as f64 * dpr as f64)) == Some(60)).count() as i32 - 1;
         let along = (screen([hi[0], lo[1], hi[2]]) - corner).normalize();
-        assert_eq!(at(corner + along * (8.0 * dpr as f64)), Some(60), "dpr {dpr}: on its edge 8 px from the vertex, the vertex wins");
-        eprintln!("dpr {dpr}: edge {out} px out / {inn} px in, vertex {v} px");
+        let (v, diag) = (vertex_reach(-along), vertex_reach((-along - inward).normalize()));
+        assert_eq!(v, 7, "dpr {dpr}: a vertex lights from {v} px off it");
+        assert!((8..=9).contains(&diag), "dpr {dpr}: a vertex lights from {diag} px off it diagonally");
+        assert_eq!(at(corner + along * (6.0 * dpr as f64)), Some(60), "dpr {dpr}: on its edge 6 px from the vertex, the vertex wins");
+        eprintln!("dpr {dpr}: edge {out} px out / {inn} px in, vertex {v} px ({diag} diagonally)");
     }
 }
 

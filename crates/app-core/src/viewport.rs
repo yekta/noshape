@@ -150,7 +150,7 @@ enum PickPurpose {
 /// Half size (device pixels) of the pick rectangle read around the cursor:
 /// small cursor moves are answered from the cached rectangle.
 const PICK_HALF: i32 = 40;
-/// Pick radius in logical pixels.
+/// Half the pick square around the pointer, CSS px (live's MOUSE_PICK_RADIUS_PX).
 const PICK_RADIUS: f64 = 5.0;
 
 /// Onshape's pre-highlight with "reduce mouse hover highlight" (on for
@@ -159,6 +159,33 @@ const PICK_RADIUS: f64 = 5.0;
 const PREHIGHLIGHT_SPEED_THRESHOLD: f64 = 0.15;
 const PAUSED_PREHIGHLIGHT_MULTIPLIER: f64 = 5.0;
 const PAUSED_PREHIGHLIGHT_MAX_MS: f64 = 250.0;
+
+/// A left press becomes a drag (a box) once the pointer is this far from it, CSS px (live: 3 px drags, 2 doesn't;
+/// halfway, as a pixel ratio's positions aren't whole), and…
+const LEFT_DRAG_PX: f64 = 2.5;
+/// …the press is older than this: moves within it still make a click (live/feel/3d.json "drag_thresholds",
+/// `LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE`, `_TIME_TOLERANCE`).
+const LEFT_DRAG_TIME: Duration = Duration::from_millis(50);
+/// A right press's release opens the context menu if the pointer got less than this far from it, CSS px (live: 4 px
+/// opens it, 5 doesn't), within…
+const RIGHT_MENU_PX: f64 = 4.5;
+/// …this long (`CONTEXT_MENU_DISTANCE_THRESHOLD`, `_TIME_THRESHOLD`).
+const RIGHT_MENU_HOLD: Duration = Duration::from_millis(1000);
+
+/// Whether a press `travel` px from where it was, `held` after it, is a drag now: a left press from 3 px after 50 ms, a right one (orbit) from its first pixel, others past [`nav::DRAG_THRESHOLD_PX`]. A right press macOS
+/// converted from Ctrl+left never navigates: it keeps its threshold.
+fn press_becomes_drag(button: MouseButton, travel: f64, held: Duration, converted_ctrl_click: bool) -> bool {
+    match button {
+        MouseButton::Left => travel > LEFT_DRAG_PX && held > LEFT_DRAG_TIME,
+        MouseButton::Right if !converted_ctrl_click => travel > 0.0,
+        _ => travel > nav::DRAG_THRESHOLD_PX,
+    }
+}
+
+/// Whether releasing a right press that got `travel` px from where it was, `held` after it, opens the context menu.
+fn right_release_opens_menu(travel: f64, held: Duration) -> bool {
+    travel < RIGHT_MENU_PX && held < RIGHT_MENU_HOLD
+}
 
 /// InputHandler `onMouseMove`: a move of `dist` px `ms` after the previous
 /// one (none for the first move) pre-highlights at once below the speed
@@ -310,6 +337,10 @@ pub struct Viewport {
     pick_dirty: bool,
     drag: Drag,
     press_pos: DVec2,
+    /// When the press was, and how far the pointer has got from it since (live: a right press orbits from its
+    /// first pixel and still opens the menu on release within 4 px and 1 s).
+    press_at: Instant,
+    press_travel: f64,
     last_pos: DVec2,
     /// The hover was cleared by a fast move before a pick said what is under the pointer.
     hover_unconfirmed: bool,
@@ -619,6 +650,8 @@ impl Viewport {
             pick_dirty: true,
             drag: Drag::None,
             press_pos: DVec2::ZERO,
+            press_at: Instant::now(),
+            press_travel: 0.0,
             last_pos: DVec2::ZERO,
             hover_unconfirmed: false,
             selection_count: 0,
@@ -689,9 +722,11 @@ impl Viewport {
             // Nothing visible changed (e.g. a refresh with the same highlights).
             return;
         }
-        // Pick-only state (a field's filter) changes the pick buffer too.
-        let no_pick = |s: &Scene| s.states.iter().enumerate().filter(|(_, f)| **f & noshape_render::scene::state::NO_PICK != 0).map(|(i, _)| i).collect::<Vec<_>>();
-        let picks_changed = no_pick(&scene) != no_pick(&self.scene);
+        // Pick-only state (a field's filter) changes the pick buffer too, and so does the hover (a lit line holds it
+        // further off: live's hold overlay).
+        use noshape_render::scene::state::{HOVER, NO_PICK};
+        let picked = |s: &Scene| s.states.iter().enumerate().filter(|(_, f)| **f & (NO_PICK | HOVER) != 0).map(|(i, f)| (i, f & (NO_PICK | HOVER))).collect::<Vec<_>>();
+        let picks_changed = picked(&scene) != picked(&self.scene);
         self.scene_bounds = scene.bounds();
         self.scene = scene;
         noshape_render::perf::frame_milestone(self.seq + 1, "scene set");
@@ -734,6 +769,11 @@ impl Viewport {
     /// The pointer's last position over the viewport (logical px).
     pub fn pointer_position(&self) -> DVec2 {
         self.last_pos
+    }
+
+    /// Whether a left drag draws a selection box now.
+    pub fn box_drag(&self) -> bool {
+        self.drag == Drag::Box
     }
 
     /// The pointer there, as a move would put it, without picking (a view's tests that send its events themselves).
@@ -2078,6 +2118,8 @@ impl Viewport {
             return;
         }
         self.press_pos = p;
+        self.press_at = Instant::now();
+        self.press_travel = 0.0;
         self.last_pos = p;
         if let Some(id) = self.label_at(p) {
             cx.emit(ViewportEvent::LabelDown { id, button: e.button, click_count: e.click_count, modifiers: e.modifiers });
@@ -2167,8 +2209,9 @@ impl Viewport {
                 return;
             }
         }
+        self.press_travel = self.press_travel.max(p.distance(self.press_pos));
         if let Drag::Pending(button) = self.drag
-            && p.distance(self.press_pos) > nav::DRAG_THRESHOLD_PX
+            && press_becomes_drag(button, self.press_travel, self.press_at.elapsed(), self.ctrl_click_press)
         {
             // `onDragStart`: what this button + modifier combination does.
             let resolver = ModeResolver::new(MouseControls::current(), nav::Space::ThreeD);
@@ -2265,6 +2308,7 @@ impl Viewport {
         }
         let p = self.local(e.position);
         self.buttons.set(e.button, false);
+        let menu = e.button == MouseButton::Right && right_release_opens_menu(self.press_travel, self.press_at.elapsed());
         if self.drag == Drag::Nav {
             if self.buttons.any() {
                 self.update_nav_mode(e.modifiers, p);
@@ -2273,6 +2317,10 @@ impl Viewport {
                 }
             }
             self.end_nav(cx);
+            // A right drag's orbit of a few pixels still opens the menu (live).
+            if menu && !self.buttons.any() {
+                self.context_menu_at(p, e.position, cx);
+            }
             return;
         }
         let drag = std::mem::replace(&mut self.drag, Drag::None);
@@ -2282,7 +2330,7 @@ impl Viewport {
             // release and leaves the selection as it is.
             Drag::Pending(MouseButton::Left) if e.modifiers.control => self.context_menu_at(p, e.position, cx),
             Drag::Pending(MouseButton::Left) => self.click_at(p, e.modifiers, cx),
-            Drag::Pending(MouseButton::Right) => self.context_menu_at(p, e.position, cx),
+            Drag::Pending(MouseButton::Right) if menu => self.context_menu_at(p, e.position, cx),
             Drag::Box => {
                 if let Some((a, b, crossing)) = self.box_rect.take() {
                     self.finish_box(a, b, crossing, e.modifiers, cx);
@@ -2980,5 +3028,26 @@ mod prehighlight_tests {
         assert_eq!(prehighlight_delay(1.0, None, -1.0), Some(Duration::ZERO));
         assert_eq!(average_pick_ms(-1.0, 10.0), 10.0);
         assert!((average_pick_ms(10.0, 20.0) - 12.0).abs() < 1e-12);
+    }
+}
+
+#[cfg(test)]
+mod press_tests {
+    use super::{Duration, MouseButton, press_becomes_drag, right_release_opens_menu};
+
+    /// Live/feel/3d.json "drag_thresholds", each measured press.
+    #[::core::prelude::v1::test]
+    fn presses_drag_and_open_the_menu_as_live() {
+        let ms = Duration::from_millis;
+        // Left, held 150 ms: 1 and 2 px stay a click, 3 px is a drag (a box); within the first 50 ms nothing drags.
+        assert!(!press_becomes_drag(MouseButton::Left, 2.0, ms(150), false));
+        assert!(press_becomes_drag(MouseButton::Left, 3.0, ms(150), false));
+        assert!(!press_becomes_drag(MouseButton::Left, 6.0, ms(10), false));
+        // Right: an orbit from the first pixel; the menu still opens on release after up to 4 px within 1 s.
+        assert!(press_becomes_drag(MouseButton::Right, 1.0, ms(1), false));
+        assert!(right_release_opens_menu(0.0, ms(200)) && right_release_opens_menu(4.0, ms(200)));
+        assert!(!right_release_opens_menu(5.0, ms(200)) && !right_release_opens_menu(0.0, ms(1200)));
+        // macOS's Ctrl+click arrives as a right press that never navigates: it keeps the 3 px threshold.
+        assert!(!press_becomes_drag(MouseButton::Right, 3.0, ms(150), true));
     }
 }

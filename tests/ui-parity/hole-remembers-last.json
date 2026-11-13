@@ -1,0 +1,155 @@
+{
+ "name": "hole-remembers-last",
+ "about": "Hole at Sketch 2's circle centre: Metric, Tapped, Through all, ✓; a new Hole opens with them (Esc); a third Hole put back on Inch, Drilled, Blind, ✓, so the account is left on Onshape's defaults",
+ "area": "psui",
+ "source": "live REQUESTS 2026-11-13 02:20 (lead → psui): Hole remembers the last settings committed with ✓, new or edited, per account",
+ "start": "hole-sketch",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     20,
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Metric"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Drilled",
+    "pick": "Tapped"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Blind",
+    "pick": "Through all"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     20,
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Inch"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Tapped",
+    "pick": "Drilled"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Through all",
+    "pick": "Blind"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

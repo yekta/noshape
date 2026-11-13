@@ -658,8 +658,8 @@ pub struct UiState {
     pub env_picker: Option<super::reflection::EnvPicker>,
     /// Thickness analysis (stays on after its dialog is accepted).
     pub thickness: Option<super::thickness::ThicknessState>,
-    /// Pick kinds last given to the viewport (`None` in it: all) and whether a sketch was open.
-    pub pick_filter: Option<(Option<Vec<PickKind>>, bool)>,
+    /// Pick kinds last given to the viewport (`None` in it: all).
+    pub pick_filter: Option<Option<Vec<PickKind>>>,
     /// The open Flatten surfaces dialog.
     pub flatten: Option<super::flatten_tool::FlattenState>,
     /// Interference detection: the hovered row of its Interferences list.
@@ -1355,18 +1355,17 @@ impl PartStudioView {
     /// Give the viewport the pick priorities for the current filter (only
     /// when it changes).
     pub(super) fn sync_pick_filter(&mut self, cx: &mut Context<Self>) {
-        let key = (self.pick_kinds(cx), self.sketch.is_some());
+        let key = self.pick_kinds(cx);
         if self.ui.pick_filter.as_ref() == Some(&key) {
             return;
         }
         let Some(built) = &self.built else { return };
         let prio = match &key {
-            (Some(k), _) => {
+            Some(k) => {
                 let k = k.clone();
                 built.picks.priority_fn_filtered(move |kind| k.contains(&kind))
             }
-            (None, true) => built.picks.priority_fn_sketching(),
-            (None, false) => built.picks.priority_fn(),
+            None => built.picks.priority_fn(),
         };
         self.ui.pick_filter = Some(key);
         self.viewport.update(cx, |vp, _| vp.pick_priority = prio);
