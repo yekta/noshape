@@ -486,6 +486,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-13 17:00 release (qa list 17:52, candidate release/v0.4.49 = b441978c6; the latest release is v0.4.48)
+- **qa 17:52: NO-GO unless core shows it is live's. P1 ROUNDS-REMOVER-F197 (core):** qa's ticket document
+  rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v0.4.48, "Failed to fillet selections." on main; Fillet 2's missing
+  selections 2 -> 1 (a saved reference resolves differently). From core's 92d89cc2f (rounds deleted by core's own code instead
+  of OCCT's Defeaturing), the only code change between greens 44e54906 and 47c19496 (compat-loop alert 16:17, read late).
+  - Checked on 456ae0514's binary (vibe7), the candidate's engine (b441978c6 adds psui's dialog field colour and tests only).
+  - User documents against v0.4.48: every feature's status the same; hat8, hat15, hat15b: the STEP reference part 51188.66 ->
+    51188.65 mm³ (same topology); the dock the same.
+  - App (hat15 mode-700 copy): the autocomplete, the model-edge snap (Coincident to the edge) and the thinner edges as expected.
+  - Other ticket changes are fixes: cli-fillet-hang's and bop-pairs-gpf-5267's Shell 1 Error -> Ok; cli-draft-hang's Chamfer 3
+    names the chamfer again (CHAMFER-SAYS-FILLET fixed).
+
 ## Release blockers for the 2026-11-13 05:00 release (qa list 04:18, candidate 6932701dc, watcher green 03:44; the latest release is v0.4.47)
 - **qa 04:18: GO on 6932701dc: no blocker.** It holds studios' a6a18313 (variable autocomplete) and psui's d90b4f6f8 (a sketch
   point lands on a lit model edge). CI 43358766456 green on Linux, Windows and macOS. Checked on the green binary 0c5c10a6b (the

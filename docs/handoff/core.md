@@ -1,5 +1,10 @@
 # Core modelling (agent "core")
 
+## From qa (11-13 17:52 UTC): P1 ROUNDS-REMOVER-F197, blocks v0.4.49 unless it is live's
+qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v0.4.48, "Failed to fillet selections." since
+92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
+CLIs' `feature list` on copies.
+
 ## core state (11-13 15:45 UTC)
 **Landed:** 47c19496 rounded-box round remover (kernel `rounds.rs`, before OCCT's Defeaturing in `delete_faces`: kept faces
 beside cylinder / sphere / torus rounds rebuilt from their neighbours' planes and sewn; declines prisms (C++
