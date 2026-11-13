@@ -418,6 +418,9 @@ pub struct UiState {
     pub mass_state: Option<serde_json::Value>,
     /// The bottom-right Measure readout as live's recorder reads it (`measure.readout`: name, value, units).
     pub measure_readout: Vec<serde_json::Value>,
+    /// Summary bar values clicked to 5 decimals (live measure.json "value_click": a click toggles 3 / 5), for the
+    /// selection they were clicked on.
+    pub measure_precise: (Vec<Reference>, std::collections::BTreeSet<String>),
     /// An in-feature mate connector's own editor beside the feature's dialog (live 1851), while open.
     pub sub_dialog: Option<(Entity<crate::feature_dialog::FeatureDialog>, Subscription)>,
     /// The no-material notice is due (shown ≈ 1 s after measuring; the ui-parity driver waits for it).
@@ -813,6 +816,7 @@ impl UiState {
             mass_variance: false,
             mass_state: None,
             measure_readout: Vec::new(),
+            measure_precise: Default::default(),
             sub_dialog: None,
             material_notice_pending: false,
             mass_job: None,

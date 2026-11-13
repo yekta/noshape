@@ -989,6 +989,16 @@ impl PartStudioView {
         if line.is_empty() {
             return None;
         }
+        if self.ui.measure_precise.0 != self.selection {
+            self.ui.measure_precise = (self.selection.clone(), Default::default());
+        }
+        let precise = self.ui.measure_precise.1.clone();
+        let units = self.doc.read(cx).session.doc.settings.units;
+        // A value clicked: its 5 decimals, its unit kept ("20.00000 mm").
+        let five = |label: &str, text: String, si: Option<(f64, Dim)>| match si.filter(|_| precise.contains(label)) {
+            Some((x, d)) => format!("{} {}", noshape_units::to_fixed(x / units.si_factor(d), 5), text.split_once(' ').map(|(_, u)| u).unwrap_or_default()),
+            None => text,
+        };
         let pal = p();
         // "12.5 mm" -> number (monospace, underlined) and unit.
         let value = |text: String| {
@@ -1012,6 +1022,7 @@ impl PartStudioView {
                     Measurement::Angle(x) => self.measure_fmt(Quantity::new(x, Dim::ANGLE), cx),
                     Measurement::Percent(x) => format!("{} %", noshape_units::to_fixed(x, 2)),
                 };
+                let text = five(label, text, measured_si(m));
                 let (value, units) = text.rsplit_once(' ').map(|(v, u)| (v.to_string(), u.replace('²', "2").replace('³', "3"))).unwrap_or((text, String::new()));
                 serde_json::json!({ "name": label, "value": value, "units": units })
             })
@@ -1064,10 +1075,25 @@ impl PartStudioView {
                         Measurement::Point(_) => (String::new(), None),
                     };
                     // Live (behaviours "qa (2026-10-28, P3) measure status readout", READOUT-VALUE-TOOLTIP): the
-                    // value's tooltip is the number with 5 decimals ("600.00000").
-                    let units = self.doc.read(cx).session.doc.settings.units;
+                    // value's tooltip is the number with 5 decimals ("600.00000"); a click shows them (measure.json
+                    // "value_click"), another goes back.
                     match full {
-                        Some((x, d)) => item.child(div().id(SharedString::from(format!("readout-{label}"))).child(value(text)).tooltip(crate::ui::tooltip(noshape_units::to_fixed(x / units.si_factor(d), 5)))),
+                        Some((x, d)) => {
+                            let (l1, l2, l3) = (label.clone(), label.clone(), label.clone());
+                            let v = div()
+                                .id(SharedString::from(format!("readout-{label}")))
+                                .debug_selector(move || format!("measure_value:{l1}"))
+                                .child(value(five(&label, text, full)))
+                                .tooltip(crate::ui::tooltip(noshape_units::to_fixed(x / units.si_factor(d), 5)))
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    let set = &mut this.ui.measure_precise.1;
+                                    if !set.remove(&l3) {
+                                        set.insert(l3.clone());
+                                    }
+                                    cx.notify();
+                                }));
+                            item.child(crate::ui_script::mark(v, move || format!("measure_value:{l2}")))
+                        }
                         None => item.child(value(text)),
                     }
                 }
@@ -2440,5 +2466,16 @@ mod face_moment_tests {
         let (m, lzz) = face_area_moments(&props, &plane, 0.001);
         assert_eq!(m, [["26666.667".to_string(), "0".to_string()], ["0".to_string(), "106666.667".to_string()]]);
         assert_eq!(lzz, "133333.333");
+    }
+}
+
+/// A measurement's value in SI and its dimension (none for a point or a percentage).
+fn measured_si(m: &Measurement) -> Option<(f64, Dim)> {
+    match *m {
+        Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) | Measurement::Distance { distance: x, .. } => Some((x, Dim::LENGTH)),
+        Measurement::Area(x) => Some((x, Dim { length: 2, angle: 0 })),
+        Measurement::Volume(x) => Some((x, Dim { length: 3, angle: 0 })),
+        Measurement::Angle(x) => Some((x, Dim::ANGLE)),
+        Measurement::Point(_) | Measurement::Percent(_) => None,
     }
 }

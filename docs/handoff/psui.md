@@ -25,6 +25,14 @@ target folder's own mtime doesn't move when files inside it are rebuilt). Wall t
   (after part-studio-ui / app-core edits): 1 m 30 s, then 41 s with a 6-scenario run.
 - 71 feature-list ui-parity scenarios on vibe6, 3 shards: 2 m 44 s.
 
+**08:51 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
+document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's
+`{"measure_value": "<name>"}` target (live2's measure-value-click-precision). Seen on the way: in a start, an Extrude
+Remove of a circle on Top under a block on Top (z 0..10) cut nothing with THROUGH_ALL either way or BLIND 10 mm flipped
+("Selected tools and targets do not intersect"); symmetric worked. To check against live (which direction a Remove
+from a plane under the part takes, and whether our oppositeDirection is applied twice). Next: select_other_row target,
+then the navigation and chrome batches.
+
 **08:20 UTC:** matrix 54 / 54 with the hover tooltip (160 ms + fade), the 100 ms geometry debounce and folders; a drop keeps the selection as it was (live 08:18 corrected its catalogue); the tooltip slot is per thread and always noted (UI tests read it). Open: multi-part Properties… (live: one "2 selected" dialog).
 
 **08:04 UTC: the feature list / Parts list matrix** (interaction-feel.md "Feature list and Parts list", part-studio-ui

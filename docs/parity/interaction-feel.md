@@ -214,6 +214,28 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Multi-part Properties… | one "2 selected" dialog, both parts listed, Name "Multiple values", shared fields editable (live 08:18) | the first part's Properties | ≠ (not a row yet) |
 | Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); an expanded folder's halves and sideways steps, nesting; an empty new folder's caret (live2's new-folder-empty, queued); the insertion line's look | – | – |
 
+## Measure (matrix)
+
+live2's measure.json (11-13 06:50–06:56) on live's own document, rebuilt (Part 1 40 × 30 × 10 with an r4 hole at
+(20, 15), a 2 mm fillet on its x = 0 top edge, a 1 mm chamfer on its x = 40 one; Part 2 x 60–80 × 20 × 15; Part 3
+100–110 × 10 × 5; live's "Center dist 43.875" from (60, 0, 0) places the hole): a selection and the summary bar it
+gives, at a device pixel ratio of 1 and 2. part-studio-ui `measure::the_measure_matrix_matches_live` (T1, no GPU,
+entities found with `query_entities` by a point on them); `MEASURE_ROW=<part of an id>` runs some rows.
+
+**Matched: 18 / 18** (11-13 08:51 UTC; 15 / 17 at the first run). ui-parity: the 12 measure scenarios 12 / 12.
+
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| One vertex / straight edge / circular edge / face | Point (X, Y, Z) / Length 40.000 / Diameter 8.000 / Area 398.642 mm² | the same | = |
+| Two vertices / a vertex and a circle | Min dist 20.000 / Min 39.990, Max 47.778, Center 43.875 | the same | = |
+| Two circles | Min dist, Max dist, Center dist | the same (was Center, Max, Min: `measure::quick_line`) | = (fixed) |
+| Parallel faces / a face and a parallel line / collinear edges | Parallel dist 5.000 / 10.000 / 0.000 | the same | = |
+| Perpendicular edges / faces / a face and a plane | Perp lines angle 90.000 deg / Perp planes angle 90.000 deg (×2) | the same | = |
+| Three vertices, a part, a feature | nothing | the same | = |
+| The details panel open (`[`) | the summary bar empty; `[` again closes it | the same | = |
+| A value clicked | 5 decimals ("20.00000"); again: 3 | the same (was nothing; `ui.measure_precise`, per selection) | = (fixed) |
+| Not yet in the matrix | a click near an edge's middle takes its midpoint (3D pick); a value's or a panel row's hover draws the dashed line (and the X/Y/Z legs); no preview while hovering a second entity; the panel's contents (220 × 345, Measure type, units, the (x) Add variable rows); the click also selects the value's text for Ctrl+C | – | – |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).

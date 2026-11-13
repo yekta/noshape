@@ -383,6 +383,12 @@ pub fn quick_line(rows: &[(String, Measurement)], count: usize) -> Vec<(String, 
     if rows.iter().any(|(l, _)| CIRCULAR.contains(&l.as_str())) {
         out.extend(rows[first + 1..].iter().filter(|(l, _)| LINE_DISTANCES.contains(&l.as_str())).cloned());
     }
+    // Live (measure.json "two circles / circle + edge"): Min dist | Max dist | Center dist, the centres' last.
+    if out.len() > 1 && out[0].0 == "Center dist" {
+        let rank = |l: &str| ["Min dist", "Max dist", "Center dist"].iter().position(|x| *x == l);
+        let point_distances = out.iter().take_while(|(l, _)| rank(l).is_some()).count();
+        out[..point_distances].sort_by_key(|(l, _)| rank(l));
+    }
     out
 }
 
@@ -1174,6 +1180,11 @@ mod tests {
         assert!(matches!(rows[2].1, Measurement::Distance { distance, .. } if (distance - 0.022).abs() < 1e-9));
         let line: Vec<String> = quick_line(&rows, 2).into_iter().map(|(l, _)| l).collect();
         assert_eq!(line, ["Parallel axes dist", "Min dist", "Max dist"]);
+        // Two circles (live measure.json): the centres' distance after Min and Max.
+        let d = |x: f64| Measurement::Distance { distance: x, a: DVec3::ZERO, b: DVec3::X * x, dx: x, dy: 0.0, dz: 0.0 };
+        let circles = [("Center dist".to_string(), d(1.0)), ("Max dist".to_string(), d(3.0)), ("Min dist".to_string(), d(2.0)), ("Diameter".to_string(), Measurement::Diameter(1.0))];
+        let line: Vec<String> = quick_line(&circles, 2).into_iter().map(|(l, _)| l).collect();
+        assert_eq!(line, ["Min dist", "Max dist", "Center dist"]);
         let one = measure_shapes(&[vec![a]]);
         let labels: Vec<&str> = one.iter().map(|(l, _)| l.as_str()).collect();
         assert_eq!(labels, ["Diameter", "Area", "Radius"]);
