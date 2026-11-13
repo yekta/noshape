@@ -5,6 +5,19 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-13 23:18 UTC)
+- **Landed:** be63331b guided loft between two smooth closed profiles: one side face round the loop from the first
+  guide (knife Loft 1 "Loft guides need a profile with corners yet" before). With skasm's a5c1925e2 Loft 1 builds.
+- **Knife Loft 1 / Extrude 10 (open):** our HANDLE 7 faces (5 B-spline sides), live 3/20/20 (one side, 8291.8 mm² total,
+  ours 8266.9). Profile A (Sketch 12, the guard end) has joints off tangent by 3e-6 .. 4.4e-4 rad and our corner test
+  (`corners()` in loft_guided.cpp, both builders) splits at > 1e-6 rad. Live's own stored Sketch 12 has 2.7e-6 and
+  2.1e-4 rad at those joints and makes one face: live's threshold is >= 2.1e-4. Asked live for the rule (REQUESTS 23:07:
+  a stadium with a 1e-4 .. 3e-2 rad kink, lofted with and without guides). Extrude 10 (up to the handle's side face RxBG,
+  both ways) waits on the same one face. Debug print: /root/core-scratch/loftdbg.patch (NOSHAPE_LOFTDBG).
+- **Ranking, x86 (vibe7):** cf-surface-pattern Surface Pattern 3 2.10 s vs live 537 is bool's (op_boolean 1.59 s of the
+  85-sphere cut, shape_inside_out 0.22 s): sent to bool. Next in core's area: c2-valve-config Circular pattern 1 (234 vs
+  67), c2-helical-sweep Sweep 1 (144 vs 28), profiling (hb/valve-helix-prof.log).
+
 ## Knife Loft 3, parked (11-13 21:16 UTC)
 - Live's exact faces at rollback 12 (q2620b): all 14 areas equal ours to < 0.005 mm², planes in place; the part 2.8 mm³
   under (ours 4983.62, a mesh integration agrees; live 4986.43). The loft face is the source: normal deviations up to 6 µm
