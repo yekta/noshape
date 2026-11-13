@@ -24,18 +24,28 @@ pub(crate) struct Marched {
 pub(crate) enum Implicit {
     /// `n · p = d` (n unit).
     Plane { n: DVec3, d: f64 },
+    /// Radius `r` about the line through `o` along `a` (unit).
+    Cylinder { o: DVec3, a: DVec3, r: f64 },
 }
 
 impl Implicit {
     fn at(&self, p: DVec3) -> f64 {
         match *self {
             Implicit::Plane { n, d } => n.dot(p) - d,
+            Implicit::Cylinder { o, a, r } => {
+                let w = p - o;
+                (w - a * w.dot(a)).length() - r
+            }
         }
     }
 
-    fn grad(&self, _at: DVec3) -> DVec3 {
+    fn grad(&self, p: DVec3) -> DVec3 {
         match *self {
             Implicit::Plane { n, .. } => n,
+            Implicit::Cylinder { o, a, .. } => {
+                let w = p - o;
+                (w - a * w.dot(a)).normalize_or_zero()
+            }
         }
     }
 
@@ -46,6 +56,17 @@ impl Implicit {
                 let hi = DVec3::new(if n.x >= 0.0 { h.x } else { l.x }, if n.y >= 0.0 { h.y } else { l.y }, if n.z >= 0.0 { h.z } else { l.z });
                 let lo = DVec3::new(if n.x >= 0.0 { l.x } else { h.x }, if n.y >= 0.0 { l.y } else { h.y }, if n.z >= 0.0 { l.z } else { h.z });
                 (n.dot(lo) - d, n.dot(hi) - d)
+            }
+            // (Farthest from the axis at a corner; nearest no nearer than the centre's distance less the half
+            // diagonal.)
+            Implicit::Cylinder { o, a, r } => {
+                let off = |p: DVec3| {
+                    let w = p - o;
+                    (w - a * w.dot(a)).length()
+                };
+                let far = (0..8).map(|k| off(DVec3::new(if k & 1 == 0 { l.x } else { h.x }, if k & 2 == 0 { l.y } else { h.y }, if k & 4 == 0 { l.z } else { h.z }))).fold(0.0, f64::max);
+                let near = (off((l + h) * 0.5) - 0.5 * (h - l).length()).max(0.0);
+                (near - r, far - r)
             }
         }
     }

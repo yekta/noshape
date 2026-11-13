@@ -4435,8 +4435,10 @@ uint32_t brep_own_section(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint3
   size_t            k    = 0;
   const double      tol  = data[k++];
   // (Which of fa, fb is the free-form face.)
-  const bool free_first = (data[k++] == 0) != swap;
-  const size_t nk       = static_cast<size_t>(data[k++]);
+  const bool   free_first = (data[k++] == 0) != swap;
+  const double t0         = data[k++];
+  const double t1         = data[k++];
+  const size_t nk         = static_cast<size_t>(data[k++]);
   if (k + nk > data.size())
     return UINT32_MAX;
   NCollection_Array1<double> flat(1, static_cast<int>(nk));
@@ -4475,6 +4477,13 @@ uint32_t brep_own_section(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint3
       }
       ono = new Geom2d_BSplineCurve(q, knots, mults, 3);
     }
+    else if (k >= data.size())
+    {
+      // (None from Rust (a cylinder's, which Rust maps itself): OCCT's projection.)
+      ono = GeomProjLib::Curve2d(c3, t0, t1, BRep_Tool::Surface(other));
+      if (ono.IsNull())
+        return UINT32_MAX;
+    }
     else
     {
       // (Its curve there from Rust (a sphere's projection): degree, knots, poles.)
@@ -4499,7 +4508,10 @@ uint32_t brep_own_section(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint3
       BSplCLib::Knots(oflat, oknots, omults);
       ono = new Geom2d_BSplineCurve(oq, oknots, omults, deg);
     }
-    const IntTools_Curve ic(c3, free_first ? onf : ono, free_first ? ono : onf, tol, tol);
+    // (The part this section is, its curves trimmed alike.)
+    const occ::handle<Geom_Curve>   part = t0 > c3->FirstParameter() || t1 < c3->LastParameter() ? occ::handle<Geom_Curve>(new Geom_TrimmedCurve(c3, t0, t1)) : occ::handle<Geom_Curve>(c3);
+    const occ::handle<Geom2d_Curve> pf   = new Geom2d_TrimmedCurve(onf, t0, t1);
+    const IntTools_Curve            ic(part, free_first ? pf : ono, free_first ? ono : pf, tol, tol);
     const uint32_t       id = static_cast<uint32_t>(t_free->curves.size());
     t_free->curves.push_back({{fa, fb}, ic});
     t_free->moved.emplace_back();

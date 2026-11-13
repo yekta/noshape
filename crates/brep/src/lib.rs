@@ -324,6 +324,8 @@ pub struct OwnSection<'a> {
     pub free_is_a: bool,
     pub curve: &'a nurbs::NurbsCurve,
     pub uv: &'a nurbs::NurbsCurve,
+    /// The part of them this section is (a piece between a cylinder's or sphere's seams).
+    pub range: (f64, f64),
     pub other: Option<&'a nurbs::NurbsCurve>,
     pub tol: f64,
 }

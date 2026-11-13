@@ -785,8 +785,9 @@ pub(crate) mod ffi {
         fn brep_occt_ahead(pairs: &[u32]);
         /// A section of faces `a`, `b` the Boolean made itself (brep's march: a plane or sphere with a free-form
         /// face), kept with OCCT's for building edges: its id, u32::MAX if not. `data`: tolerance, which face is the
-        /// free-form one (0: `a`), the cubic's knots (count, then each), its poles in space (count, then x y z each),
-        /// its poles on the free-form face (u v each, as many).
+        /// free-form one (0: `a`), the part of the cubic it is (from, to), the cubic's knots (count, then each), its
+        /// poles in space (count, then x y z each), its poles on the free-form face (u v each, as many), then the
+        /// other face's curve if it isn't a plane or cylinder (degree, knots, poles u v).
         fn brep_own_section(a_arg: u32, a_face: u32, b_arg: u32, b_face: u32, data: &[f64]) -> u32;
         fn op_enclose(shapes: &OcShapeList) -> Result<OpOut>;
         fn op_transform(s: &OcShape, m: &[f64], copy: bool) -> Result<OpOut>;

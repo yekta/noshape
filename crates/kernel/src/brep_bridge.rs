@@ -354,7 +354,7 @@ impl SectionSource for Occt {
         if curve.degree != 3 || !curve.weights.is_empty() || uv.poles.len() != curve.poles.len() {
             return None;
         }
-        let mut data = vec![s.tol, if s.free_is_a { 0.0 } else { 1.0 }, curve.knots.len() as f64];
+        let mut data = vec![s.tol, if s.free_is_a { 0.0 } else { 1.0 }, s.range.0, s.range.1, curve.knots.len() as f64];
         data.extend(&curve.knots);
         data.push(curve.poles.len() as f64);
         data.extend(curve.poles.iter().flat_map(|p| p.to_array()));

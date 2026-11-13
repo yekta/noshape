@@ -2623,6 +2623,7 @@ impl Ctx<'_> {
         }
         let implicit = |f: usize| match (&self.faces[f].s, self.faces[f].ns.as_deref()) {
             (&Surf::Plane { n, d, .. }, _) => Some(march::Implicit::Plane { n, d }),
+            (&Surf::Cyl { o, a, r0, k, .. }, _) if k.abs() <= 1e-12 && r0 > 0.0 => Some(march::Implicit::Cylinder { o, a, r: r0 }),
             _ => None,
         };
         let free = |f: usize| matches!(self.faces[f].s, Surf::Nurbs { .. }) && self.faces[f].ns.as_ref().is_some_and(|ns| !ns.periodic().iter().any(|&p| p));
@@ -2647,9 +2648,9 @@ impl Ctx<'_> {
         let (fi, ff) = if implicit_is_a { (fa, fb) } else { (fb, fa) };
         let g = &self.faces[ff];
         let reach = GREY * self.tol;
-        // (On a plane, within its face's box in the plane grown by a tenth of its size: the runs' ends kept clear of
+        // (On a plane, within its face's box in the plane grown by a tenth of its size (a cylinder's whole): the runs' ends kept clear of
         // the face's corners, where three faces' sections micrometres apart decide its vertices.)
-        let bx = self.face_box(fi);
+        let bx = if matches!(self.faces[fi].s, Surf::Plane { .. }) { self.face_box(fi) } else { None };
         let within = |_: DVec2, p: DVec3| bx.is_none_or(|(l, h)| {
             let q = self.faces[fi].to2(p);
             let m = reach.max(0.1 * (h - l).length());
@@ -2711,15 +2712,18 @@ impl Ctx<'_> {
             // as an edge's on a free-form face.)
             let sphere = matches!(self.faces[fi].s, Surf::Nurbs { .. });
             let mut cuts = vec![0.0];
-            if sphere {
-                cuts.extend(free::seam_crossings(&self.faces[fi], &at, 0.0, m.t1).into_iter().filter(|&t| t > 1e-12 && t < m.t1 - 1e-12));
-            }
+            // (On a cylinder: likewise at its seam, a piece a turn at most.)
+            let seams = if sphere { free::seam_crossings(&self.faces[fi], &at, 0.0, m.t1) } else if matches!(self.faces[fi].s, Surf::Cyl { .. }) { free::seam_cuts(self, [fi, fi], &m.curve, 0.0, m.t1) } else { Vec::new() };
+            let mut seams: Vec<f64> = seams.into_iter().filter(|&t| t > 1e-12 && t < m.t1 - 1e-12).collect();
+            seams.sort_by(f64::total_cmp);
+            seams.dedup();
+            cuts.extend(seams);
             cuts.push(m.t1);
             for w in cuts.windows(2) {
                 let (t0, t1) = (w[0], w[1]);
                 let on_implicit = if sphere { (*free::projected(&self.faces[fi], &at, t0, t1, GREY * self.tol)?).clone() } else { m.uv.clone() };
                 let other = sphere.then_some(&on_implicit);
-                let Some(id) = src.own(a, b, &crate::OwnSection { free_is_a: !implicit_is_a, curve: &m.curve, uv: &m.uv, other, tol }) else {
+                let Some(id) = src.own(a, b, &crate::OwnSection { free_is_a: !implicit_is_a, curve: &m.curve, uv: &m.uv, range: (t0, t1), other, tol }) else {
                     if std::env::var_os("X_MARCH").is_some() {
                         eprintln!("XMARCH none: own");
                     }
