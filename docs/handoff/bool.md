@@ -33,15 +33,26 @@ scratch /root/bool-scratch.
   when both built at once).
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
-- **asm-hand-drill-pinslot's Sweep 1 (lead 11-13 00:35; core's note below), 11-13 02:17 UTC, not landed:** the thread's
-  inner face is a B-spline on the shaft's r 4.1 mm cylinder (12 nm inside it). Our Boolean can't take it: read as that
-  cylinder (`as_cylinder`) the face winds round three times, which our cylinder faces can't (one turn), else "a piece's
-  point on another solid's face". OCCT: fuzzy changes nothing; rebuilt on the exact cylinder it is still wrong; with
-  GlueShift (checked) it is one valid solid of 4896.37 mm³ (live 4896.29), 7.5 s as before. WIP (uncommitted, branch
-  bool2-cov, /root/bool2-scratch/hdp-wip2.patch): a fuse whose argument has a B-spline face on another's cylinder runs
-  the checked glue. In the studio Sweep 1 then matches live (first difference moves to Split 1: 21/29/10 against
-  20/28/10), but Sketch 11 (feature 26) then runs for minutes: not in a Boolean; being timed (its solve / regions /
-  imprint). Not landing until that is found: a hang is worse than the split shaft.
+- **asm-hand-drill-pinslot's Sweep 1 (lead 11-13 00:35, 03:30), 11-13 03:50 UTC, gating 55e4b476 (branch bool2-cov):**
+  the thread's inner face is a B-spline on the shaft's r 4.1 mm cylinder (12 nm inside). Ours can't take it (read as
+  that cylinder it winds round three times; our cylinder faces cover one turn); OCCT's plain fuse cuts the shaft in
+  three. A fuse whose argument has a B-spline face on another's cylinder (`as_cylinder`, rust_boolean.cpp) now runs
+  OCCT's checked glue: one valid shaft, 4896.37 mm³ (live 4896.29). The studio: 21 -> 23 of 35 features, first
+  difference Split 1 (21/29/10 against live's 20/28/10: OCCT splits the thread's exposed band of the cylinder into a
+  face a turn, live's is one face). 13.1 s (Sweep 1 11.2 s: OCCT's glued fuse, as slow as main's plain one; live 28 ms).
+  T2 bool_patterns::a_thread_on_its_shafts_cylinder_fuses_into_one_solid. Next: the band merge.
+- **To core (11-13 03:50 UTC), two things the hand-drill showed:**
+  - The kernel's `self_intersects()` (common.cpp, used by solid_a.rs's sweep check) now stops after a CPU second
+    (run_budgeted) and then finds nothing: Sweep 2's check of a 20-turn helical slot ran for minutes, now 1.06 s (live
+    138 ms). solid_a.rs is unchanged.
+  - Sweep 2 reached that check because our Helix 2 starts half a turn from live's: it is a helix on the bore's circle
+    (r 2.25 mm, Extrude 7's) with oppositeDirection, start angle 0. helix.fs keeps the circle's coordSystem x and
+    flips only z; live's helix 2 midpoint is (+2.25, 0, -32.47) mm, so live's circle x is +X. Ours is -X:
+    op_prism's `seat_circles` restarts every extruded circle at gp_Ax2's default x for the swept-back z (the cylinder
+    face frame live "fs (10-26 b)" (a) has). Live's circle edge keeps the sketch circle's frame (Sketch 7 on the end
+    cap, x +X, the circle's xDir +1) while its cylinder face takes the default. So a circle edge's frame and its
+    cylinder's differ in live; ours ties them. Sketch 11's slot profile sits at +X, the tool at -X, and core's
+    `helical_sweep_clear` (b5da62f83) then can't place the tool's corners on the profile. Not changed by me.
 - **Completion (11-12 23:03 UTC, main 909e48460, all 98 suite documents recorded on vibe5, each distinct Boolean once a
   document; /root/bool2-scratch/tally.py, replay-docs.sh):** 928 Booleans, 656 ours (70.7 %), 44 more on our other
   shortcuts (on_face, through_holes), 228 OCCT; without cf-fill-pattern's 140 empty probes 656 / 788 (83.2 %). 48 of
