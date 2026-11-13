@@ -23,6 +23,16 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
 **c2-rings-loft stops at feature 20, Extrude 5 (core's):** the engraving cut's edges are split at the revolved ring's
 seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs live 335/206); Parasolid has no seams.
 
+## 11-13 14:30 UTC: oversized fillets fail as live (psui's 40 x 30 x 10 start block)
+- A fillet of R100 on the block's top edge (and R1000 on a vertical edge) regenerated "OK" with a body of no faces: the
+  checked blend's `valid_changed` passed a result with no new face, and an empty solid has none. Now `valid_changed` and
+  `valid_shape` want a face, and `fillet` / `chamfer` (detail.rs) fail "Failed to fillet / chamfer selections." when a
+  body they touched has no solid or no face. T1 `kernel_robustness::an_oversized_blend_fails_as_live_never_an_empty_body`.
+- Open (live REQUESTS 14:18): psui reports live fails R100 on the **vertical** edge too, where ours builds the ball's
+  roll-over (599.887 mm³, 5 faces: exactly block ∩ the ball's cylinder, the same shape as live's 10-29 R45 on 40 x 20,
+  4267.940743, 5 faces, OK). Live's limit for a single edge's roll-over isn't recorded; the request asks R30-R100 here
+  and the top edge's R10-R20 (ours: R20 on the 40 long top edge OK, 8913.479 mm³).
+
 ## From qa (11-13 04:18 UTC): P3 CHAMFER-SAYS-FILLET (fixed with blend-chamfer2: the prism cut's own failure no longer
 replaces OCCT's error)
 qa's ticket document cli-draft-hang (vibe5 ~/qa/tickets): Chamfer 3 fails with "Failed to fillet selections." on main 6932701dc
