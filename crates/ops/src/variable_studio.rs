@@ -141,6 +141,14 @@ pub fn move_variable(s: &mut VariableStudio, i: usize, down: bool) {
     }
 }
 
+/// A row dragged from `i` to `to` (its index after the move).
+pub fn move_variable_to(s: &mut VariableStudio, i: usize, to: usize) {
+    if i < s.variables.len() && to < s.variables.len() {
+        let v = s.variables.remove(i);
+        s.variables.insert(to, v);
+    }
+}
+
 /// The row menu's Delete ("Delete variable"): its configured cells go too.
 pub fn delete_variable(s: &mut VariableStudio, i: usize) {
     if i < s.variables.len() {

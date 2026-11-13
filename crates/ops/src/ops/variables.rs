@@ -176,7 +176,7 @@ pub fn ops() -> Vec<Op> {
             verb: "move",
             summary: "Move a variable up or down in the Variable table or a Variable Studio",
             description: "",
-            fields: vec![doc_field(), var_tab(), req("variable", s(), "Variable name or feature id."), req("by", json!({ "type": "integer" }), "-1: up, 1: down.")],
+            fields: vec![doc_field(), var_tab(), req("variable", s(), "Variable name or feature id."), req("by", json!({ "type": "integer" }), "-1: up, 1: down (a Variable Studio's row: any number of rows, as its row dragged there).")],
             mutates: true,
             destructive: false,
             run: move_row,
@@ -709,8 +709,9 @@ fn move_row(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = match table(ctx, a)? {
         (od, Table::Vs(tab)) => {
             let i = vs_find(vs_studio(od, tab)?, a.str("variable")?)?;
-            let down = a.get("by").and_then(Value::as_i64).ok_or_else(|| OpError::param("by", "-1 or 1"))? > 0;
-            vs_edit(od, tab, vs::move_description(down), |s| vs::move_variable(s, i, down))?;
+            let by = a.get("by").and_then(Value::as_i64).filter(|b| *b != 0).ok_or_else(|| OpError::param("by", "a non-zero number of rows"))?;
+            let to = (i as i64 + by).clamp(0, vs_studio(od, tab)?.variables.len() as i64 - 1) as usize;
+            vs_edit(od, tab, vs::move_description(by > 0), |s| vs::move_variable_to(s, i, to))?;
             return Ok(vs_list(od, tab)?.into());
         }
         (od, Table::Studio(tab)) => (od, tab),

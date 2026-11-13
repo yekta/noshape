@@ -3186,6 +3186,14 @@ fn variable_studio_table() {
     let r = call(&mut ctx, "variable_move", json!({ "tab": "vs all", "variable": "n", "by": -1 }));
     assert_eq!(r["variables"][1]["name"], "#n", "{r}");
     assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Move variable up"));
+    // A row dragged further: one step, past the end stops at the last row.
+    let n1 = call(&mut ctx, "history_list", json!({}))["history"].as_array().unwrap().len();
+    let r = call(&mut ctx, "variable_move", json!({ "tab": "vs all", "variable": "width", "by": 5 }));
+    let names: Vec<&str> = r["variables"].as_array().unwrap().iter().map(|v| v["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["#n", "#half", "#width"], "{r}");
+    assert_eq!(call(&mut ctx, "history_list", json!({}))["history"].as_array().unwrap().len(), n1 + 1);
+    let e = try_call(&mut ctx, "variable_move", json!({ "tab": "vs all", "variable": "n", "by": 0 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("by"), "{e:?}");
     let r = call(&mut ctx, "variable_delete", json!({ "tab": "vs all", "variable": "n" }));
     assert_eq!(r["variables"].as_array().unwrap().len(), 2, "{r}");
     // Errors name the parameter.

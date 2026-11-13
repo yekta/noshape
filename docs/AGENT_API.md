@@ -2190,7 +2190,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `variable` | string | required | Variable name or feature id. |
-| `by` | integer | required | -1: up, 1: down. |
+| `by` | integer | required | -1: up, 1: down (a Variable Studio's row: any number of rows, as its row dragged there). |
 
 #### variable_insert_studio
 

@@ -43,6 +43,8 @@ pub struct VariableStudioView {
     collapse_seen: u64,
     /// A header edge being dragged: its column and the guide's x in the table (its own tab only).
     col_drag: Option<(usize, f32)>,
+    /// A row being dragged: the gap it would drop into and that gap's y in the table (px).
+    row_drop: Option<(usize, f32)>,
     /// Enter added a variable from the Name row: focus the next (empty)
     /// Name row once it's rebuilt, as Onshape does.
     focus_add_row: bool,
@@ -160,6 +162,7 @@ impl VariableStudioView {
             inserted_views: HashMap::new(),
             collapse_seen: collapse_generation(tab),
             col_drag: None,
+            row_drop: None,
             focus_add_row: false,
             cell_focus: HashMap::new(),
             cell_selected: None,
@@ -342,6 +345,65 @@ impl VariableStudioView {
         cx.notify();
     }
 
+    /// Select cell `key` (the add row's Name: its field) and give it the keyboard.
+    fn select_cell(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if key == "new" {
+            self.cell_selected = None;
+            if let Some((st, _)) = self.inputs.get("new").cloned() {
+                st.update(cx, |s, cx| s.focus(window, cx));
+            }
+        } else {
+            self.cell_selected = Some(key.to_string());
+            let fh = self.cell_focus_handle(key, cx);
+            window.focus(&fh, cx);
+        }
+        cx.notify();
+    }
+
+    /// The grid's keys (live2 studios.json variableStudioGrid). A selected cell: arrows move (↑ / ↓ wrap), Tab /
+    /// Shift+Tab right / left, Enter edits, Backspace clears into an edit (Delete does nothing). Editing: Tab commits
+    /// and moves right. The add row's field: Tab to the first row's Name.
+    fn grid_key(&mut self, e: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let m = &e.keystroke.modifiers;
+        if m.control || m.alt || m.platform || self.completion.is_some() || self.type_search.is_some() {
+            return false;
+        }
+        let n = self.studio(cx).map_or(0, |s| s.variables.len());
+        let key = e.keystroke.key.as_str();
+        let tab = key == "tab";
+        let in_add_row = self.inputs.get("new").is_some_and(|(st, _)| st.read(cx).focus_handle(cx).is_focused(window));
+        let from = if in_add_row {
+            "new".to_string()
+        } else if let Some(k) = self.cell_editing.clone().filter(|_| tab) {
+            k
+        } else if self.cell_editing.is_none() && self.cell_has_keyboard(window) && let Some(k) = self.cell_selected.clone() {
+            k
+        } else {
+            return false;
+        };
+        let editing = in_add_row || self.cell_editing.is_some();
+        let to = match key {
+            "tab" => grid_tab(&from, m.shift, n),
+            _ if editing => return false,
+            "up" => grid_step(&from, -1, 0, n, true),
+            "down" => grid_step(&from, 1, 0, n, true),
+            "left" => grid_step(&from, 0, -1, n, false),
+            "right" => grid_step(&from, 0, 1, n, false),
+            "enter" | "backspace" if !from.starts_with('t') => {
+                self.start_cell_edit(&from, (key == "backspace").then(String::new), window, cx);
+                return true;
+            }
+            _ => return false,
+        };
+        if let Some(to) = to {
+            if self.cell_editing.is_some() {
+                self.cell_selected = Some(to.clone());
+            }
+            self.select_cell(&to, window, cx);
+        }
+        true
+    }
+
     /// A table cell (not one being typed in) has the keyboard.
     fn cell_has_keyboard(&self, window: &Window) -> bool {
         self.cell_focus.values().any(|f| f.is_focused(window))
@@ -445,10 +507,13 @@ impl VariableStudioView {
                 // click away leaves it.
                 if this.cell_editing.as_deref() == Some(k.as_str()) {
                     this.cell_editing = None;
-                    this.cell_selected = matches!(ev, InputEvent::PressEnter { .. }).then(|| k.clone());
-                    if this.cell_selected.is_some() {
-                        let fh = this.cell_focus_handle(&k, cx);
-                        window.focus(&fh, cx);
+                    if matches!(ev, InputEvent::PressEnter { .. }) {
+                        // Live2 studios.json variableStudioGrid: Enter commits and moves down a row.
+                        let n = this.studio(cx).map_or(0, |s| s.variables.len());
+                        let below = grid_step(&k, 1, 0, n, false).unwrap_or_else(|| k.clone());
+                        this.select_cell(&below, window, cx);
+                    } else if this.cell_selected.as_deref() == Some(k.as_str()) {
+                        this.cell_selected = None;
                     }
                     cx.notify();
                 }
@@ -476,6 +541,47 @@ impl VariableStudioView {
         self.inputs.insert(key, (st.clone(), value));
         st
     }
+}
+
+/// The grid's columns by their cell keys' letter: Name, Variable type, Value, Description.
+const GRID_COLS: [char; 4] = ['n', 't', 'e', 'd'];
+
+/// (row, column) of cell key `k` ("e3"); the add row's Name ("new") is row `n`.
+fn grid_pos(k: &str, n: usize) -> Option<(usize, usize)> {
+    if k == "new" {
+        return Some((n, 0));
+    }
+    let c = GRID_COLS.iter().position(|c| k.starts_with(*c))?;
+    Some((k.get(1..)?.parse().ok()?, c))
+}
+
+fn grid_key_at(row: usize, col: usize, n: usize) -> String {
+    if row >= n { "new".into() } else { format!("{}{row}", GRID_COLS[col]) }
+}
+
+/// The cell `dr` rows and `dc` columns from `k` among `n` variables; `wrap`: past the first or last row to the other
+/// end (live2: ↑ on the first row goes to the last).
+fn grid_step(k: &str, dr: i32, dc: i32, n: usize, wrap: bool) -> Option<String> {
+    let (r, c) = grid_pos(k, n)?;
+    if r >= n || n == 0 {
+        return None;
+    }
+    let c = c as i32 + dc;
+    if !(0..4).contains(&c) {
+        return None;
+    }
+    let r = r as i32 + dr;
+    let r = if wrap { r.rem_euclid(n as i32) } else if (0..n as i32).contains(&r) { r } else { return None };
+    Some(grid_key_at(r as usize, c as usize, n))
+}
+
+/// Tab (Shift+Tab) from `k`: the next (previous) cell along the rows, the last row's Description then the add row,
+/// the add row then the first row's Name.
+fn grid_tab(k: &str, back: bool, n: usize) -> Option<String> {
+    let (r, c) = grid_pos(k, n)?;
+    let at = (r * 4 + c) as i32 + if back { -1 } else { 1 };
+    let at = if r >= n && !back { 0 } else { at };
+    (0..=(n * 4) as i32).contains(&at).then(|| grid_key_at(at as usize / 4, at as usize % 4, n))
 }
 
 /// Onshape's table metrics (live DOM): 140 px columns, 34 px rows, `#aaa`
@@ -558,6 +664,19 @@ struct VsColDrag(usize);
 impl Render for VsColDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         div()
+    }
+}
+
+/// A variable row being dragged: its index and first letter (the badge).
+#[derive(Clone)]
+struct VsRowDrag {
+    from: usize,
+    letter: String,
+}
+
+impl Render for VsRowDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().size(px(28.)).rounded_full().bg(rgb(0x1651b0)).text_color(rgb(0xffffff)).text_size(px(14.)).font_weight(FontWeight::BOLD).flex().items_center().justify_center().child(self.letter.clone())
     }
 }
 
@@ -862,6 +981,9 @@ impl Render for VariableStudioView {
 impl VariableStudioView {
     fn render_view(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
+        if !cx.has_active_drag() {
+            self.row_drop = None;
+        }
         // "Collapse all tables" ran in this table's group.
         let generation = collapse_generation(self.group());
         if generation != self.collapse_seen {
@@ -1100,9 +1222,13 @@ impl VariableStudioView {
             let desc_cell = self.text_cell(format!("d{i}"), 3, &desc, desc_shown, window, cx);
             let kinds = view.clone();
             let menu_view = view.clone();
+            let letter: String = v.name.chars().take(1).collect();
+            let draggable = self.host.is_none() && self.cell_editing.is_none();
             rows.push(
                 h_flex()
                     .id(("vs-row", i))
+                    // Live2 studios.json variableStudioGrid: a pressed row drags as a round badge of its first letter.
+                    .when(draggable, |d| d.on_drag(VsRowDrag { from: i, letter }, |d, _, _, cx| cx.new(|_| d.clone())))
                     .border_l_1()
                     .border_color(rgb(RULE))
                     .bg(rgb(0xffffff))
@@ -1410,8 +1536,9 @@ impl VariableStudioView {
                                             .absolute()
                                             .top_0()
                                             .bottom_0()
-                                            .right_0()
-                                            .w(px(5.))
+                                            // Live2 studios.json: the cursor turns only 3-6 px inside the edge.
+                                            .right(px(2.))
+                                            .w(px(4.))
                                             .cursor(CursorStyle::ResizeColumn)
                                             .when(dragging, |d| d.bg(rgb(0xaaaaaa)))
                                             .hover(|d| d.bg(rgb(0xaaaaaa)))
@@ -1440,6 +1567,35 @@ impl VariableStudioView {
                 )
                 .children(self.col_drag.map(|(_, x)| div().absolute().top(px(35.)).bottom_0().left(px(x)).w(px(1.)).bg(rgb(0x000000))))
                 .child(probe)
+                .on_drag_move(cx.listener(|this, e: &DragMoveEvent<VsRowDrag>, _, cx| {
+                    let (Some(clip), Some(n)) = (this.rows_clip.get(), this.studio(cx).map(|s| s.variables.len())) else { return };
+                    let gap = ((f32::from(e.event.position.y) - clip.top) / ROW_H).round().clamp(0., n as f32);
+                    let at = (gap as usize, clip.top - f32::from(e.bounds.top()) + gap * ROW_H);
+                    if this.row_drop != Some(at) {
+                        this.row_drop = Some(at);
+                        cx.notify();
+                    }
+                }))
+                .on_drop(cx.listener(|this, d: &VsRowDrag, _, cx| {
+                    if let Some((gap, _)) = this.row_drop.take() {
+                        let to = if gap > d.from { gap - 1 } else { gap };
+                        if to != d.from {
+                            this.inputs.clear();
+                            this.cell_selected = None;
+                            this.edit(noshape_ops::variable_studio::move_description(to > d.from), cx, |s| noshape_ops::variable_studio::move_variable_to(s, d.from, to));
+                        }
+                    }
+                    cx.notify();
+                }))
+                .children(self.row_drop.map(|(_, y)| {
+                    // The drop line: 2 px blue across the table, a hollow dot at its left end.
+                    div().absolute().left_0().right_0().top(px(y - 1.)).h(px(2.)).bg(rgb(0x1651b0)).child(div().absolute().left(px(-3.)).top(px(-2.)).size(px(6.)).rounded_full().border_1().border_color(rgb(0x1651b0)).bg(rgb(0xffffff)))
+                }))
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                    if this.grid_key(e, window, cx) {
+                        cx.stop_propagation();
+                    }
+                }))
                 .children(rows)
                 .when(only.is_none(), |t| {
                     // The add row's other columns are one borderless cell band
@@ -1541,4 +1697,37 @@ fn row_menu(m: crate::os_menu::OsMenu, view: Entity<VariableStudioView>, i: usiz
     let m = m.item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.delete_variable(i, cx))));
     let m = if i > 0 { m.item(crate::os_menu::OsMenuItem::new("Move up").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.move_variable(i, false, cx)))) } else { m };
     if i + 1 < n { m.item(crate::os_menu::OsMenuItem::new("Move down").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.move_variable(i, true, cx)))) } else { m }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Live2 studios.json variableStudioGrid: arrows move one cell, ↑ on the first row wraps to the last (↓ the
+    /// other way), sideways stops at the table's edge; Enter after an edit goes down a row and not past the last.
+    #[::core::prelude::v1::test]
+    fn arrows_move_a_cell_and_wrap_up_and_down() {
+        assert_eq!(grid_step("e0", -1, 0, 3, true).as_deref(), Some("e2"));
+        assert_eq!(grid_step("e2", 1, 0, 3, true).as_deref(), Some("e0"));
+        assert_eq!(grid_step("n1", 0, 1, 3, false).as_deref(), Some("t1"));
+        assert_eq!(grid_step("n1", 0, -1, 3, false), None);
+        assert_eq!(grid_step("d1", 0, 1, 3, false), None);
+        assert_eq!(grid_step("d1", 1, 0, 3, false).as_deref(), Some("d2"), "Enter: the cell below");
+        assert_eq!(grid_step("d2", 1, 0, 3, false), None, "not past the last row");
+        assert_eq!(grid_step("new", -1, 0, 3, true), None, "the add row is its field's");
+    }
+
+    /// Tab walks right along the rows, from the last Description to the add row and from the add row back to the
+    /// first row's Name; Shift+Tab walks back.
+    #[::core::prelude::v1::test]
+    fn tab_walks_the_rows_and_the_add_row() {
+        assert_eq!(grid_tab("n0", false, 2).as_deref(), Some("t0"));
+        assert_eq!(grid_tab("d0", false, 2).as_deref(), Some("n1"));
+        assert_eq!(grid_tab("d1", false, 2).as_deref(), Some("new"));
+        assert_eq!(grid_tab("new", false, 2).as_deref(), Some("n0"));
+        assert_eq!(grid_tab("new", true, 2).as_deref(), Some("d1"));
+        assert_eq!(grid_tab("n1", true, 2).as_deref(), Some("d0"));
+        assert_eq!(grid_tab("n0", true, 2), None);
+        assert_eq!(grid_tab("new", false, 0).as_deref(), Some("new"), "no rows: the add row keeps it");
+    }
 }
