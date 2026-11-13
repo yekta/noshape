@@ -2410,3 +2410,26 @@ fn a_sheet_cut_by_a_sheet_on_one_of_its_faces_as_occt() {
     }
 }
 
+/// c2-rings-loft's wedge cut (Chamfer 1): its torus faces' own extents worked out in closed form (OCCT's optimal box
+/// was two thirds of the cut's time), the faces apart across a slab told as before: as OCCT's.
+#[test]
+fn a_rings_wedge_cut_through_its_tori_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "78cd8309c8ccd7ac").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid(), "noshape's result invalid");
+    let counts = |s: &k::Shape| [k::ShapeType::Solid, k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), counts(&o.shape), "solids, faces, edges, vertices");
+    let volume = |s: &k::Shape| k::volume_properties(s).unwrap().mass;
+    let (vr, vo) = (volume(&r.shape), volume(&o.shape));
+    assert!((vr - vo).abs() <= 1e-8 * vo.abs(), "volume {vr} against OCCT's {vo}");
+}
+

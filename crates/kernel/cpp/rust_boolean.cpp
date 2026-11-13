@@ -42,6 +42,7 @@
 #include <BRepTools_History.hxx>
 #include <ElCLib.hxx>
 #include <ElSLib.hxx>
+#include <gp_Torus.hxx>
 #include <Geom2d_Line.hxx>
 #include <gp_Circ.hxx>
 #include <gp_Lin.hxx>
@@ -1001,6 +1002,49 @@ struct EllEdge
 // OCCT's sections of pairs of the arguments' faces (arg, face, arg, face; the earlier argument's first).
 using Sections = std::map<std::array<uint32_t, 4>, std::vector<IntTools_Curve>>;
 
+// A ring torus's face: its extent along each axis over its UV bounds, exact there (a little larger than the face
+// where it is trimmed off them; OCCT's optimal box searches it, most of c2-rings-loft's wedge cut's time). Along a
+// direction, (R + r cos v) cos(u - phi) rho + r c sin v: the u extreme of cos(u - phi) is the same for every v, then
+// a cos v + b sin v over v0..v1.
+static bool torus_box(const TopoDS_Face& f, Bnd_Box& box)
+{
+  const BRepAdaptor_Surface s(f, false);
+  if (s.GetType() != GeomAbs_Torus)
+    return false;
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  const gp_Torus t = s.Torus();
+  const double   R = t.MajorRadius(), r = t.MinorRadius();
+  if (!(R > r && r > 0) || u1 - u0 > 2 * M_PI + 1e-9 || v1 - v0 > 2 * M_PI + 1e-9 || u1 < u0 || v1 < v0)
+    return false;
+  const gp_Ax3& ax = t.Position();
+  const gp_XYZ  o = ax.Location().XYZ(), x = ax.XDirection().XYZ(), y = ax.YDirection().XYZ(), z = ax.Direction().XYZ();
+  // (Whether angle `a` is in lo..hi, a turn either way.)
+  const auto in = [](double a, double lo, double hi) { return lo + std::remainder(a - lo - M_PI, 2 * M_PI) + M_PI <= hi; };
+  // (The greatest of p cos w + q sin w over lo..hi.)
+  const auto most = [&](double p, double q, double lo, double hi) {
+    double m = std::max(p * std::cos(lo) + q * std::sin(lo), p * std::cos(hi) + q * std::sin(hi));
+    if (in(std::atan2(q, p), lo, hi))
+      m = std::max(m, std::hypot(p, q));
+    return m;
+  };
+  double lo[3], hi[3];
+  for (int k = 0; k < 3; ++k)
+  {
+    const double a = x.Coord(k + 1), b = y.Coord(k + 1), c = z.Coord(k + 1), rho = std::hypot(a, b);
+    const double phi = std::atan2(b, a);
+    // (cos(u - phi)'s greatest and least over u0..u1.)
+    const double cu0 = std::cos(u0 - phi), cu1 = std::cos(u1 - phi);
+    const double cmax = in(phi, u0, u1) ? 1.0 : std::max(cu0, cu1), cmin = in(phi + M_PI, u0, u1) ? -1.0 : std::min(cu0, cu1);
+    hi[k] = o.Coord(k + 1) + R * rho * cmax + most(r * rho * cmax, r * c, v0, v1);
+    lo[k] = o.Coord(k + 1) + R * rho * cmin - most(-r * rho * cmin, -r * c, v0, v1);
+  }
+  // (Padded as OCCT's optimal box is.)
+  const double pad = Precision::Confusion();
+  box.Update(lo[0] - pad, lo[1] - pad, lo[2] - pad, hi[0] + pad, hi[1] + pad, hi[2] + pad);
+  return true;
+}
+
 // During one of noshape's own Booleans (rust_boolean): its arguments, and the sections of free-form faces it
 // asked for (brep_occt_sections), by id: the curve and its two faces (in the order of its curves on them).
 // Faces' own extents (BRepBndLib::AddOptimal, without tolerances), each made once for a Boolean's sections (a face in
@@ -1017,7 +1061,8 @@ struct ExactBoxes
         return *b;
     }
     Bnd_Box b;
-    BRepBndLib::AddOptimal(f, b, false, false);
+    if (!torus_box(f, b))
+      BRepBndLib::AddOptimal(f, b, false, false);
     const std::lock_guard<std::mutex> lock(m);
     boxes.Bind(f, b);
     return b;
