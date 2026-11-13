@@ -4,26 +4,57 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-13 03:55 UTC; lead: documents slower than live, for any reason)
-- **Landed 11-13:** ca0e4044 (Shell's offset edges take the original curve when within tolerance), 3770108f
-  (c2-extension-spring's Mirror 1 ours: OCCT's sections along an edge of both faces dropped, 88 ms vs OCCT 377; Shell
-  builds a hollow (no face removed) and checks walls of planes / cylinders / cones / spheres / tori on one thread:
-  cf-lighten's hollows 20-55 -> 8-16 ms; a NURBS curve's length from a per-span table: cf-surface-pattern's 85-tool cut
-  ~10 % quicker). Before: 43e18118 / 1766ff34 (rings-loft Shell 1 ~950 -> ~580 ms on the probe).
-- **Gating:** 05921b9da, Shell's self-interference check without its face-to-face proximity rule (snap hook's Shell check
-  73-80 -> 42-61 ms, rings-loft's 165-195 -> 136-171; byte-identical).
-- **Ranking (qa's 02:00 vibe7 release run, ours minus live):** impeller +9.9 s, rings-loft +1.2, knife +0.76, part-draft
-  +0.58, snap-hook +0.45, face-blend +0.33, valve-config +0.27. Per feature, hand-offs in core.md / blend.md (11-13 03:55).
-  bool's: rings-loft Shell 1; snap-hook's Shell 1 and Snap Hook Booleans; the knife's Mirror 1.
-- **Private documents (mode-700 copies, vibe5 ~/tmp/bool/private; nothing of them in the repo):** the dock's three biggest
-  tabs record 44 Booleans, 18 ours (all as OCCT); 12 declines "an edge on another argument's free-form face", ~4.9 s of
-  OCCT: a small arc (r 0.4 mm) on a ball-ended face that goes a whole turn round (periodic B-spline), crossing its
-  seam; `free::projected` sees the parameter jump and fails. Needs the edge split at the seam and its curve on the face
-  in two parts (the face's pcurves hold one curve an edge today). Debug prints: /root/bool-scratch/xeof-debug.patch.
-  Next after it: a 1355-face cut "a point near two vertices" (1.24 s), "a new edge on a free-form face" (589 ms), "a
-  non-manifold result" (582 ms). hat8: its biggest Boolean ours 1.44 s (794 Rust, 565 build): speed.
-- **Profiling tools (vibe5):** ~/tmp/bool/docprof.sh + /root/bool-scratch/docprof.py (each suite document alone,
-  kernel profile + Shell paths), featgap.py (ours vs live per feature), ~/agents/profile-callers.py.
+## bool, now (11-13 06:01 UTC; restart from here)
+Lead's goal (11-13): all 84 suite documents faster than live. qa's baseline: SCORE "Speed window" (9febdf588, vibe7
+02:00, release). Ranking and split posted to the lead 11-13 04:03; core's and blend's rows in core.md / blend.md
+("From bool (11-13 03:55)" and the 04:03 additions). bool2 has the impeller's and rings-loft's Booleans.
+
+**Hosts (lead 11-13 05:50):** gates and probes on vibe7 (NOSHAPE_GATE_HOST=vibe7, NOSHAPE_RB_HOST=vibe7; knurls left out
+there too); the land queue on vibe5 (NOSHAPE_LAND_QUEUE_HOST=vibe5 NOSHAPE_LAND_HOSTS="vibe5 vibe3" for land.sh). One gate
+at a time; CARGO_BUILD_JOBS=6 (gate.sh sets it). vibe7 has the corpora (~/agents/bool-corpora, copied 05:55), the Shell
+dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording (~/tmp/bool/private/rec-dock, mode 700).
+
+**Worktree /root/projects/noshape-wt/bool-hat:**
+- branch bool-hat = main + 51e469c67 "Shell's self-interference check drops its face-to-face mesh proximity rule"
+  (same content as 05921b9da). Its gate runs on vibe5 (started 04:58 after waiting on the lock; built 05:45; log
+  /root/bool-hat-scratch/chain-05921b9da.out, gate-05921b9da.log). Expect CHECK (knurls out) with 0 differences: then
+  land it from bool-hat (`git checkout crates/kernel/tests/all.rs` first, see below; land.sh with the env above).
+- branch bool-wip-seam (pushed, 900421d04) = that + the dock's seam work, uncommitted before: `free::seam_crossings`
+  and `edge_in_face` cutting an edge's parts where it crosses a full-turn free-form face's seam, each part its own
+  curve on the face (Pending::InFace now holds a curve per part). XEOF debug prints still in it.
+- Uncommitted scratch, never land: crates/kernel/tests/all.rs (mod sampler; mod xprobe), tests/xprobe.rs, sampler.rs
+  (copies /root/bool-scratch/xprobe-1112.rs, sampler-1112.rs; re-apply with probe-allrs.patch).
+
+**Next, in order:**
+1. **The private dock (the user's own document; lead: first).** vibe5/vibe7 ~/tmp/bool/private (mode 700: dock.noshape,
+   hat8, hat15, rec-dock = its three biggest tabs' Booleans; nothing of it in the repo or the corpora). 44 distinct
+   cases, 18 ours (all as OCCT); 12 decline "an edge on another argument's free-form face", ~4.9 s of OCCT: a small arc
+   (r 0.4 mm, a half circle) on a torus face (periodic both ways, a whole turn in v) crossing its v seam; projected sees
+   v jump 0 -> 2π and fails. With bool-wip-seam the case 5e1d4d0a77371efc still declines: the last probe (XEOF=1
+   NOSHAPE_BREP_ONLY=5e1d4d0a77371efc NOSHAPE_BOOL_CORPUS=~/tmp/bool/private/rec-dock, kernel tests on vibe7) was to
+   show whether seam_crossings finds the crossing, a part's projection fails (one starting on the seam: projected's
+   k == 0 turn-over needs uv_span == TAU), or the decline comes from the edge_on site (line ~2195). Then: replay the
+   whole rec-dock (0 differences), the gate, a T1 test that doesn't use the private data (a synthetic: a box with a
+   torus-ended rib, an arc over the torus's seam).
+   Next declines there: a 1355-face cut "a point near two vertices" (1.24 s), "a new edge on a free-form face" (589 ms),
+   "a non-manifold result" (582 ms), 5 x "a face's vertex off its plane". hat8: its biggest Boolean is ours, 1.44 s (794
+   Rust, 565 build): speed.
+2. **cf-surface-pattern's Surface Pattern 3 (+4.3 s):** our 85-tool cut 1.6-3.6 s (case sp-1113/7ecd5a8b6e7c4f6b,
+   vibe5 ~/agents/bool-corpora/sp-1113). Profile (xprobe::probe_case_sample, release, LTO off): C2::at 29 %,
+   intervals_on 25 %, ray_state 22 %, chords 15 %; the length table landed (3770108f). Ideas: fewer samples per C2,
+   ray_state's inside tests.
+3. **The rest of bool's rows:** valve-config's Booleans (Circular pattern 1 one-by-one 320 ms, Extrude 3 sections ahead
+   136 ms), corner-break's 34 Booleans (461 ms), learning-center's Fillet 2 Boolean (283 ms), the snap hooks' Booleans,
+   cf-part-draft's glued Boolean (223 ms), rings-loft Shell 1 (~580 ms on the probe, live 235), the knife's Mirror 1.
+4. Untried: eval_grad_near's NextValueOfUV without maxpreci (byte-identical, gain unclear under load).
+
+**Tools:** /root/bool-scratch/gate-chain.sh <sha> (main's gate, then the branch's, detached; set NOSHAPE_GATE_HOST /
+RB_HOST inside for vibe7); docprof.py / featgap.py (per-document and per-feature profiles from vibe5 ~/tmp/bool/docprof,
+made with ~/tmp/bool/docprof.sh); ~/agents/profile-in.py, profile-lines.py, profile-callers.py on vibe5 (copy to vibe7).
+The suite's per-feature kernel profiles count its own measuring (props_surface via face_json) against the next feature.
+
+**Landed 11-12 / 11-13:** d93e7f6f, 31d0d8ba, 78ef7ff8, 43e18118, 1766ff34, ca0e4044, 3770108f (extension-spring's
+Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
 - **asm-hand-drill-pinslot's Sweep 1 (lead 11-13 00:35, 03:30), 11-13 05:33 UTC, queued to land (e23bc68f; gate CHECK, knurls only):**
