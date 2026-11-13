@@ -97,6 +97,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (spur gear Extrude 6). Left: Cylindrical 23 (9c7c54's Fillet 3 rounds another hole's edge: dx), Planar 11 (0d1e01's APEX_RANGE Chamfer 1
   fails: core), Cylindrical 22 (BOTTOM_AXIS_POINT takes the other end: asm), the Gear 5 Connector (in-feature
   connector on a Spur gear's internal sketch: dx), 15 mates on it.
+  **dx 11-13 05:12 (suite 22/67; the suite now prints each failing mate's ends against live's):** the 11 overdefined
+  (Ball 1–6, Pin slot 6, 8–11) have both ends on live's frames (0.000 mm, 0°): asm's solver. The 16 "cannot resolve"
+  (Pin slot 1–5, Cylindrical 1–6, 15, 26, 27, Planar 1, 10) all have one end on Chuck to Gearbox Shaft <19> (studio
+  7ed710): its Sketch 13, live's on Extrude 1's end cap (z 3 mm, +z), is on a plane facing −x in ours, so its two
+  circles project onto their centres and aren't drawn; Extrude 9 / 10 then have no region. Why (dx 06:19): the studio
+  diverges at **Sweep 1** (ADD, merge scope the shaft JHD, all translated): live's shaft grows by the thread's lip as one
+  part (box to z −42.876 mm); ours leaves the sweep as two separate parts (Fdb95c3f7bb54.10001 / .10002) and the shaft
+  with 12 of its 15 faces, so by Sketch 13 the shaft's z 3 mm end cap is gone and live's J1C is matched to Sweep 2's
+  cap. Sweep / Boolean evaluation: core or bool (repro: asm-hand-drill-pinslot's studio 7ed710 alone, features 0-21).
 
 ## psui, 2026-11-11
 - [ ] P2 STD-ORACLE-SWEEP-POLYLINE (core, lead 17:11; psui 2026-11-11 17:11, red on main 5428600a9 too) **std Sweep along a

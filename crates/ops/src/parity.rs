@@ -99,6 +99,8 @@ pub struct Translator<'a> {
     /// Onshape sketch frames by feature id (`sketches` from `GET …/sketches`):
     /// origin, x, y in metres.
     frames: HashMap<String, [[f64; 3]; 3]>,
+    /// Live's sketch bodies (`sketchBodies`' sketches), for an in-context sketch's frame.
+    sketch_bodies: Vec<Value>,
     /// Free sketch points (Onshape sketch id, ours), in drawing order.
     sketch_points: Vec<(String, String)>,
     /// Onshape sketch curves by (sketch feature id, entity id), sampled as
@@ -329,7 +331,7 @@ impl<'a> Translator<'a> {
             // (A boolean configuration's default is a JSON boolean.)
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -778,7 +780,14 @@ impl<'a> Translator<'a> {
     fn in_context_face(&mut self, sketch: &str) -> Result<String, String> {
         use glam::{DVec2, DVec3};
         use noshape_kernel as k;
-        let [o, x, y] = *self.frames.get(sketch).ok_or("live's sketch frame wasn't fetched")?;
+        // (Live's fetch leaves an in-context sketch's frame out: fitted from where its curves lie in live's sketch bodies,
+        // asm-scissor-lift's and asm-suspension's brackets. Only here: elsewhere a sketch without a fetched frame is drawn
+        // in its own coordinates, which a fitted frame would move.)
+        let fitted = || {
+            let bodies = self.sketch_bodies.iter().find(|s| s["featureId"] == sketch)?;
+            frame_from_bodies(self.features.iter().find(|f| f["featureId"] == sketch)?, bodies)
+        };
+        let [o, x, y] = self.frames.get(sketch).copied().or_else(fitted).ok_or("live's sketch frame wasn't fetched")?;
         let (o, x, y) = (DVec3::from(o), DVec3::from(x), DVec3::from(y));
         let corners = [DVec2::new(-0.5, -0.5), DVec2::new(0.5, -0.5), DVec2::new(0.5, 0.5), DVec2::new(-0.5, 0.5)];
         let square: Vec<k::Segment2d> = (0..4).map(|i| k::Segment2d::Line { a: corners[i], b: corners[(i + 1) % 4] }).collect();
@@ -5102,6 +5111,90 @@ fn arc_span(e: &Value) -> Option<(f64, f64)> {
     Some((a, if b < a { b + tau * ((a - b) / tau).ceil() } else { b }))
 }
 
+/// A sketch's frame ([origin, x, y]) from where its curves' ends and points (`sketch`'s entities, in its own coordinates)
+/// lie in live's sketch bodies (`bodies`: `{ "bodies": [{ "vertices": [{ "point" }] }] }`): the plane through those points,
+/// turned and moved in it (or mirrored) so every one of the sketch's points lands on one of live's. `None` when they
+/// don't all land, or are too few to tell.
+fn frame_from_bodies(sketch: &Value, bodies: &Value) -> Option<[[f64; 3]; 3]> {
+    use glam::{DVec2, DVec3};
+    const TOL: f64 = 1e-6;
+    let mut local: Vec<DVec2> = Vec::new();
+    let add = |p: DVec2, to: &mut Vec<DVec2>| {
+        if !to.iter().any(|q| q.distance(p) < TOL) {
+            to.push(p);
+        }
+    };
+    // (Construction geometry isn't in live's sketch bodies.)
+    for e in sketch["entities"].as_array()?.iter().filter(|e| e["isConstruction"] != true) {
+        if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchPoint")) {
+            if let (Some(x), Some(y)) = (e["x"].as_f64(), e["y"].as_f64()) {
+                add(DVec2::new(x, y), &mut local);
+            }
+            continue;
+        }
+        let Some(poly) = sampled(e) else { continue };
+        let (a, b) = (DVec2::from(poly[0]), DVec2::from(poly[poly.len() - 1]));
+        if a.distance(b) > TOL {
+            add(a, &mut local);
+            add(b, &mut local);
+        }
+    }
+    let mut world: Vec<DVec3> = Vec::new();
+    for v in bodies["bodies"].as_array()?.iter().flat_map(|b| b["vertices"].as_array().into_iter().flatten()) {
+        let p = DVec3::from(f3(&v["point"])?);
+        if !world.iter().any(|q| q.distance(p) < TOL) {
+            world.push(p);
+        }
+    }
+    if local.len() < 3 || world.len() < local.len() {
+        return None;
+    }
+    // Live's plane: its farthest two points and the one farthest off their line.
+    let (i, j) = (0..world.len()).flat_map(|i| (i + 1..world.len()).map(move |j| (i, j))).max_by(|a, b| world[a.0].distance(world[a.1]).total_cmp(&world[b.0].distance(world[b.1])))?;
+    let u = (world[j] - world[i]).normalize();
+    let off = |p: DVec3| (p - world[i]).reject_from_normalized(u).length();
+    let k = (0..world.len()).max_by(|a, b| off(world[*a]).total_cmp(&off(world[*b])))?;
+    if off(world[k]) < 1e-5 {
+        return None;
+    }
+    // The sketch's normal: its region faces' (live's sketch faces face along it), else either way.
+    let given = bodies["bodies"].as_array()?.iter().flat_map(|b| b["faces"].as_array().into_iter().flatten()).find_map(|f| f3(&f["surface"]["normal"])).map(|m| DVec3::from(m).normalize());
+    let n = given.unwrap_or_else(|| u.cross(world[k] - world[i]).normalize());
+    let v = n.cross(u);
+    if world.iter().any(|p| (*p - world[i]).dot(n).abs() > TOL) {
+        return None;
+    }
+    let flat: Vec<DVec2> = world.iter().map(|p| DVec2::new((*p - world[i]).dot(u), (*p - world[i]).dot(v))).collect();
+    // The sketch's farthest pair, onto each pair of live's as far apart.
+    let (a, b) = (0..local.len()).flat_map(|i| (i + 1..local.len()).map(move |j| (i, j))).max_by(|x, y| local[x.0].distance(local[x.1]).total_cmp(&local[y.0].distance(local[y.1])))?;
+    let span = local[a].distance(local[b]);
+    // Every frame that fits; a symmetric sketch fits turned (or mirrored) too, and then which is live's can't be told
+    // (one curve's middle would land on another's), so none.
+    let mut fits: Vec<[[f64; 3]; 3]> = Vec::new();
+    for (p, q) in (0..flat.len()).flat_map(|p| (0..flat.len()).map(move |q| (p, q))).filter(|(p, q)| p != q && (flat[*p].distance(flat[*q]) - span).abs() < TOL) {
+        for mirror in [false, true].into_iter().filter(|m| !*m || given.is_none()) {
+            let m = |w: DVec2| if mirror { DVec2::new(w.x, -w.y) } else { w };
+            let turn = (flat[q] - flat[p]).to_angle() - (m(local[b]) - m(local[a])).to_angle();
+            let rot = DVec2::from_angle(turn);
+            let place = |w: DVec2| flat[p] + rot.rotate(m(w) - m(local[a]));
+            if !local.iter().all(|w| flat.iter().any(|f| f.distance(place(*w)) < TOL)) {
+                continue;
+            }
+            let (o, x, y) = (place(DVec2::ZERO), place(DVec2::X) - place(DVec2::ZERO), place(DVec2::Y) - place(DVec2::ZERO));
+            let to3 = |c: DVec2| c.x * u + c.y * v;
+            let frame: [[f64; 3]; 3] = [(world[i] + to3(o)).into(), to3(x).into(), to3(y).into()];
+            let same = |f: &[[f64; 3]; 3]| f.iter().zip(&frame).all(|(a, b)| DVec3::from(*a).distance(DVec3::from(*b)) < TOL);
+            if !fits.iter().any(same) {
+                fits.push(frame);
+            }
+        }
+    }
+    match fits.as_slice() {
+        [one] => Some(*one),
+        _ => None,
+    }
+}
+
 /// An Onshape sketch curve as a polyline in its sketch plane (metres).
 fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
     let g = &e["geometry"];
@@ -6575,6 +6668,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     order.push(0);
     let mut mate_names: Vec<(String, String)> = Vec::new();
     let mut sub_mates: Vec<(usize, String, String)> = Vec::new();
+    let mut suppressed: Vec<(String, Vec<String>)> = Vec::new();
     for &k in &order {
         let l = &levels[k];
         if k != 0
@@ -6686,6 +6780,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             {
                 res.untranslated.push(format!("{name}: placed: {e}"));
             }
+        }
+        // Suppressed as live's, once its mates are in (below).
+        let names: Vec<String> = l.instances.iter().filter(|i| i["suppressed"] == true).filter_map(|i| ours.get(&(l.element.clone(), i["id"].as_str()?.to_string())).cloned()).collect();
+        if !names.is_empty() {
+            suppressed.push((l.tab.clone(), names));
         }
         // An occurrence path of this level as our instance names ("Sub <1> > Part 1 <1>").
         let path_names = |path: &[String]| -> Option<String> {
@@ -6916,7 +7015,20 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         }
     }
     // Freed: live's places satisfy its mates, so ours shouldn't move them.
-    let after = if held.is_empty() { Ok(ours_list.clone()) } else { placer.call("assembly_set_state", json!({ "tab": "Assembly 1", "instances": held, "fixed": false })).and_then(|_| placer.call("assembly_list", json!({ "tab": "Assembly 1" }))) };
+    // Instances suppressed in the configuration live fetched (asm-config-assembly's washers, retaining rings and screws
+    // in its default), after their places are compared (live lists their occurrences): their mates are inactive, which
+    // live's capture reports as ERROR.
+    for (tab, names) in &suppressed {
+        if let Err(e) = placer.call("assembly_set_state", json!({ "tab": tab, "instances": names, "suppressed": true })) {
+            res.untranslated.push(format!("{tab}: suppressed instances: {e}"));
+        }
+    }
+    let after = if held.is_empty() && suppressed.is_empty() {
+        Ok(ours_list.clone())
+    } else {
+        let freed = if held.is_empty() { Ok(Value::Null) } else { placer.call("assembly_set_state", json!({ "tab": "Assembly 1", "instances": held, "fixed": false })) };
+        freed.and_then(|_| placer.call("assembly_list", json!({ "tab": "Assembly 1" })))
+    };
     let Ok(after) = after else {
         res.differences.push("freeing the placed instances failed".into());
         return res;
@@ -6926,7 +7038,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         res.mates += 1;
         let live_ok = states[id.as_str()]["featureStatus"].as_str().unwrap_or("OK") == "OK";
         let Some(m) = after["mates"].as_array().into_iter().flatten().find(|m| m["name"] == name.as_str()) else { continue };
-        let ok = m["ok"] == true;
+        // (An inactive mate, an instance of it suppressed, is ERROR in live's capture: asm-config-assembly, live 2580.)
+        let inactive = m["message"].as_str().is_some_and(|t| t.contains("instances is suppressed"));
+        let ok = m["ok"] == true && !inactive;
         if ok == live_ok {
             res.mates_matching += 1;
         } else {
@@ -6994,6 +7108,38 @@ fn pattern_alias(sketch: &Value, id: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+
+    /// An in-context sketch's frame (live's fetch has none) from its curves' ends in live's sketch bodies: an L-shaped
+    /// profile and a construction line (not in the bodies) on a plane through (100, -50, 200) mm whose x is world z and
+    /// y world x, its region face's normal +y: the frame comes back exactly.
+    #[test]
+    fn an_in_context_sketchs_frame_is_fitted_from_live_sketch_bodies() {
+        use glam::{DVec2, DVec3};
+        use serde_json::json;
+        let corners = [[0.0, 0.0], [0.04, 0.0], [0.04, 0.01], [0.01, 0.01], [0.01, 0.03], [0.0, 0.03]];
+        let line = |a: [f64; 2], b: [f64; 2], construction: bool| {
+            let d = DVec2::from(b) - DVec2::from(a);
+            json!({ "btType": "BTMSketchCurveSegment-155", "isConstruction": construction, "startParam": 0.0, "endParam": d.length(), "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": a[0], "pntY": a[1], "dirX": d.x / d.length(), "dirY": d.y / d.length() } })
+        };
+        let mut entities: Vec<serde_json::Value> = (0..6).map(|i| line(corners[i], corners[(i + 1) % 6], false)).collect();
+        entities.push(line([0.0, 0.0], [0.1, 0.1], true));
+        let (o, x, y) = (DVec3::new(0.1, -0.05, 0.2), DVec3::Z, DVec3::X);
+        let world: Vec<serde_json::Value> = corners.iter().map(|c| json!({ "point": (o + c[0] * x + c[1] * y).to_array() })).collect();
+        let bodies = json!({ "bodies": [{ "vertices": world }, { "vertices": [], "faces": [{ "surface": { "type": "PLANE", "normal": [0.0, 1.0, 0.0] } }] }] });
+        let frame = super::frame_from_bodies(&json!({ "entities": entities }), &bodies).expect("a frame");
+        for (got, want) in frame.iter().zip([o, x, y]) {
+            assert!(DVec3::from(*got).distance(want) < 1e-9, "{frame:?}");
+        }
+        // With the region's normal the other way nothing fits: an L has no mirror symmetry.
+        let flipped = json!({ "bodies": [bodies["bodies"][0].clone(), { "vertices": [], "faces": [{ "surface": { "normal": [0.0, -1.0, 0.0] } }] }] });
+        assert_eq!(super::frame_from_bodies(&json!({ "entities": entities }), &flipped), None);
+        // A rectangle fits turned half a turn too: which frame is live's can't be told, so none.
+        let rect = [[0.0, 0.0], [0.04, 0.0], [0.04, 0.02], [0.0, 0.02]];
+        let sides: Vec<serde_json::Value> = (0..4).map(|i| line(rect[i], rect[(i + 1) % 4], false)).collect();
+        let at: Vec<serde_json::Value> = rect.iter().map(|c| json!({ "point": (o + c[0] * x + c[1] * y).to_array() })).collect();
+        let square = json!({ "bodies": [{ "vertices": at }, { "vertices": [], "faces": [{ "surface": { "normal": [0.0, 1.0, 0.0] } }] }] });
+        assert_eq!(super::frame_from_bodies(&json!({ "entities": sides }), &square), None);
+    }
 
     /// A written query's `var subQk=…;` definitions put in where they're used (subQ10 not read as subQ1 + "0"), and
     /// a written list split at its own commas only.

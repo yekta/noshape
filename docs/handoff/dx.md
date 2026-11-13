@@ -17,6 +17,34 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-13 05:53 UTC: in-context sketch frames, live's suppressed instances; the arc cap-edge match dropped
+- Landed f9947add (the 21:45 batch below) and d4a0cf15 (asm.md: clamp-pattern's 14 -> 12 is 6ab30b272's early stop).
+- In-context sketches have no frame in live's fetch (17 cases: keyboard 11, suspension 5, scissor 1). The frame is now
+  fitted from the sketch's non-construction curve ends onto its points in live's sketch bodies, with the regions' face
+  normal for the side; a sketch that fits more than one way (symmetric) gets none (test
+  `an_in_context_sketchs_frame_is_fitted_from_live_sketch_bodies`). It places only the in-context stand-in face:
+  given to every frameless sketch, it moved infento's sketches (drawn in their own coordinates otherwise) and cost
+  8 mates. scissor-lift 13 -> 16/16 mates.
+- config-assembly (live 2580): Fastened 5, 6, 11-18 are inactive in live, their washers / rings / screws suppressed in
+  the default configuration (assembly.json `suppressed`); live's capture reports inactive as ERROR. The translator now
+  suppresses those instances once the mates are in and the places compared (live lists their occurrences), and the
+  suite counts our inactive mates as live's ERROR: config-assembly 0 -> 4/4 mates, xdev-subs 4/6 -> 6/6.
+- Tried and dropped: matching a CAP_EDGE on an open arc by the arc's middle (`query_entities`' edge `midpoint` is the
+  curve's centroid, inside an arc, so arcs never match by name and fall to live's geometry). It cost infento 8-67 mates
+  (features of 1dc32b / f0eedd failing, 74d3d6's sketches conflicting), even with ambiguous arcs left out. infento's
+  Fillet 2 (SFCxB) needs it; left for a version that checks the part. Also dropped: an Extrude up to an untranslated
+  in-context face made blind to live's part's end (suspension's bracket came in but its two mates sat 6-28 mm off and
+  overdefined Shock Angle).
+- Gate (vibe7, 07:44-09:09): assemblies 1518/1731 occurrences, 386/573 mates; against main alone infento 142/167,
+  107/182 and tvc-mount 4/10 as main, config-assembly 0 -> 4/4, xdev-subs 4/6 -> 6/6, scissor-lift 13 -> 16/16 (earlier
+  run), the rest unchanged. Model suite: see the land.
+- REQUESTS (dx 00:33, 01:08): asm-corexy's 3 Derived sources and its Transform 1s' in-feature connectors (empty in
+  the fetch, live OK); asm-robotic-arm's 4 Part Studios from other documents (5 instances not inserted). live: REST
+  429 until ~18:30 UTC. keyboard-pattern's Plane 1 needs a vertex of a feature not in live's feature list.
+- HAND-DRILL (TICKETS, 05:12): the 11 overdefined mates have both ends on live's frames (asm's solver); 16 "cannot
+  resolve" are all Chuck to Gearbox Shaft <19>: its studio 7ed710's Sketch 13 is on a face facing −x in ours (live:
+  Extrude 1's end cap, z 3 mm, +z), so its circles project onto their centres. dx next.
+
 ## 11-12 21:45 UTC: config-assembly's 4 mates (core's bisect), infento past Boolean 6, keyboard's Derived source
 - config-assembly's scored mates are Fastened 11-14 (washers on the brackets' holes). They "matched" before 6c63ab5a only
   because ours failed like live's: Flange 1 failed, so the bracket wasn't there. The "its connectors not translated"
