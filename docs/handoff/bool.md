@@ -160,6 +160,12 @@ scratch /root/bool-scratch.
   - **Recordings (exact) on vibe5 ~/tmp/bool2/:** bydoc/rec/<document> (the 8 above), bydoc-imp (impeller, rings), sos
     (the sheet-of-shells cases); ops-main is main's ops test binary that recorded them. vibe4's (impy, hk, es, bydoc)
     went with it. /root/bool2-scratch/bool-by-doc2.py (DOCS=..., JOBS=...) makes the per-document table.
+- **To bool (11-13 05:42 UTC): c2-fan-blade-sweep's fb562f41 (a 2-tool cut, 386-546 ms on OCCT), your seam area:**
+  its tools have one-turn helical strips on r 3 mm cylinders (each helix exactly 2π from its rulings' angle). `gap()`
+  found a gap of width 0 there and put both rulings at u = 0, so the strips' outlines didn't close: "a face lost". With
+  `gap` returning None under 1e-9 rad (/root/bool2-scratch/fan-gap-fix.patch, one line, not landed: it takes nothing
+  alone) the faces go round as threads should and the cut stops at "an arc across a cylinder's seam" (your
+  motor-mount one). Recording: vibe5 ~/tmp/bool2/bydoc-all/rec/c2-fan-blade-sweep.
 - **The knife's 343b971e (11-13 05:33 UTC, gating 2a78dd7f, branch bool2-knife2):** a cut by two chamfer tools
   end to end along the blade, their B-spline faces all but tangent to the grind face 4. Tool 0's edge 52 lies on face 4
   within 0.2 um but runs on past the blade's tip (0.2 mm off the surface there); OCCT's sections of tool 0's faces
