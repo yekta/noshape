@@ -1299,6 +1299,16 @@ struct BallEdge {
     straight: bool,
 }
 
+/// Whether an arc about `axis` through `center` runs between a plane square to the axis and a cylinder about it.
+fn coaxial_supports(sup: &[Support; 2], center: DVec3, axis: DVec3, scale: f64) -> bool {
+    let square = |s: &Support| matches!(s, Support::Plane { n, .. } if n.dot(axis).abs() > 1.0 - 1e-9);
+    let about = |s: &Support| match s {
+        Support::Cylinder { o, a, .. } => a.dot(axis).abs() > 1.0 - 1e-9 && (center - *o - *a * (center - *o).dot(*a)).length() < scale * 1e-9,
+        _ => false,
+    };
+    (square(&sup[0]) && about(&sup[1])) || (about(&sup[0]) && square(&sup[1]))
+}
+
 fn ball_edge(c: &ChainEdge, faces: [usize; 2], ff: [&Shape; 2], scale: f64) -> FResult<BallEdge> {
     let info = c.shape.edge_info()?;
     // Each face's own normal reversed into the material (no classifier: c2-hunting-knife's Fillet 3 classified 70
@@ -1454,6 +1464,74 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             return Ok(k::extrude(&k::make_face_from_wire(&first, true)?, d * (s1 - s0))?.shape);
         }
         let info = c.shape.edge_info()?;
+        // An arc between a plane square to its axis and a cylinder about it: the balls' centres run round that axis, the
+        // round a torus (live's; a loft only approximates it): the section revolved.
+        if let k::Curve::Circle { center, axis, .. } = info.curve
+            && coaxial_supports(&e.sup, center, axis.normalize(), scale)
+        {
+            let t0 = tangent_dir(c, true)?;
+            let a = {
+                let a = axis.normalize();
+                if a.dot((c.start - center).cross(t0)) < 0.0 { -a } else { a }
+            };
+            let closed = near(c.start, c.end);
+            // The point and travel direction `phi` round the axis from the edge's start.
+            let at = |phi: f64| {
+                let q = rotate(c.start, center, a, phi);
+                (q, a.cross(q - center).normalize())
+            };
+            let ball = |phi: f64| {
+                let (q, t) = at(phi);
+                rolling_ball(q, t, &e.sup, r, q + e.inward * r)
+            };
+            let angle_of = |v: DVec3| {
+                let v0 = c.start - center;
+                let (x, y) = (v0 - a * v0.dot(a), v - center - a * (v - center).dot(a));
+                a.dot(x.cross(y)).atan2(x.dot(y))
+            };
+            let span = if closed { std::f64::consts::TAU } else { angle_of(c.end).rem_euclid(std::f64::consts::TAU) };
+            // Run on past a free end until the section is off the part.
+            let (centre0, _) = ball(0.0)?;
+            let reach = ((centre0 - center) - a * (centre0 - center).dot(a)).length().max(r);
+            let mut ext = [0.0f64; 2];
+            for (end, e_end) in ext.iter_mut().enumerate() {
+                if closed || !rolls_on(end) {
+                    continue;
+                }
+                for k in 1..=12 {
+                    *e_end = 0.5 * r * k as f64 / reach;
+                    let phi = if end == 0 { -*e_end } else { span + *e_end };
+                    let (cb, tb) = ball(phi)?;
+                    if off(&ball_section(cb, tb, &e.sup, r)?.0)? {
+                        break;
+                    }
+                }
+            }
+            // From the ball at its start to the one at its end (a junction's ball off the vertex's plane).
+            let phi0 = match &ends[0] {
+                Some(j) => angle_of(j.0),
+                None => -ext[0],
+            };
+            let phi1 = match &ends[1] {
+                Some(j) => {
+                    let p = angle_of(j.0);
+                    if p < phi0 + 1e-9 { p + std::f64::consts::TAU } else { p }
+                }
+                None => span + ext[1],
+            };
+            let (first, _) = match &ends[0] {
+                Some(j) => ball_section_as(j, ball(phi0)?.1, &e.sup, r)?,
+                None => {
+                    let (cb, tb) = ball(phi0)?;
+                    ball_section(cb, tb, &e.sup, r)?
+                }
+            };
+            let tool = k::revolve(&k::make_face_from_wire(&first, true)?, center, a, if closed { std::f64::consts::TAU } else { phi1 - phi0 })?.shape;
+            if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+                eprintln!("ball torus: {:.4} rad from {:.4}: valid {} volume {:?}", phi1 - phi0, phi0, tool.is_valid(), tool.volume());
+            }
+            return Ok(tool);
+        }
         let at = |f: f64| -> FResult<(DVec3, DVec3)> {
             let t = info.first_param + (info.last_param - info.first_param) * if c.forward { f } else { 1.0 - f };
             Ok((c.shape.point_at(t)?, c.shape.tangent_at(t)?.normalize()))
