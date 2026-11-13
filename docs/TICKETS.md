@@ -5,6 +5,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## blend, 2026-11-13
+- [ ] P2 PRISM-ROUNDS-RUNOUT (blend; 2026-11-13 07:01 UTC; parked by the lead, **needs a direct builder for prismatic rounds**)
+  asm-hand-drill-pinslot's studio 9fbc05 (a 33-tooth spur gear from the Spur gear feature): Fillet 1, 0.3 mm with tangent
+  propagation, 231 edges (132 flank / end-plane B-splines, 66 root arcs r 0.29, 33 axial tip lines), fails in ours after
+  30 s ("Failed to fillet selections."); live builds it in ~1 s, one face per edge (135 -> 366 faces). Each end face's tooth
+  gap is one G1 chain (flank, root arc, flank) ending on a tooth top 0.401 mm wide (the tip cylinder r 12.621), so two
+  R0.3 rounds run out onto it from either side and overlap: OCCT's ChFi3d fails any two rounds ending on one tooth top (each
+  alone builds; even gaps then odd gaps fail at the second pass). Tried: (1) rolling-ball lofts per edge with run-on and the
+  direct build: 602 lofts, direct build fails, 363 s; (2) exact swept tools per chain (constant section, plane normal as
+  binormal) and side lines extruded, cut together: OCCT's Boolean of 99 tools 327 s and fails. Patches:
+  /root/blend-scratch/parked/gear-rolling-balls-wip.patch, gear-prism-sweeps-wip.patch. Repro: the studio as a model
+  (vibe7 ~/tmp/blend/hd/hd-9fbc05, NOSHAPE_PARITY_MODELS there), the fillet's dump blend-scratch/hd/fillet-5.*. Also
+  holds f79298's Chamfer 1 (15-tooth gear) likely alike.
+
 ## core, 2026-11-12
 - [ ] P3 STEP-ANALYTIC-REFIT (core; 2026-11-12 15:12 UTC) **Live's STEP import refits geometry; ours keeps the file's** (not
   imitated, lead 11-12; recorded in case circle recognition ever matters for mates). c2-wire-clip-imported and c2-gamma-imported's
