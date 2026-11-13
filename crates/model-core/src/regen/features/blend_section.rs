@@ -487,8 +487,17 @@ fn trimmed_run_on(shape: &Shape, supports: [usize; 2], (tool, names): (Shape, Ve
     // (Boxes first: a distance to each of the knife's faces took 100 ms of its Fillet 2.)
     let boxes: Vec<k::BoundingBox> = run_on.iter().filter_map(|p| p.bounding_box(false).ok()).collect();
     let near_box = |f: &Shape| f.bounding_box(false).map_or(true, |b| boxes.iter().any(|r| (b.min - DVec3::splat(tol)).cmple(r.max).all() && r.min.cmple(b.max + DVec3::splat(tol)).all()));
-    for (i, f) in shape.faces().iter().enumerate() {
-        if supports.contains(&i) || !near_box(f) || !run_on.iter().any(|p| k::distance(f, p).is_ok_and(|d| d.distance <= tol)) {
+    // (The faces it meets in parallel: a distance to a free-form face takes ms.)
+    use rayon::prelude::*;
+    let body_faces = shape.faces();
+    let legacy = k::kernel_legacy();
+    let met: Vec<bool> = body_faces
+        .par_iter()
+        .enumerate()
+        .map(|(i, f)| !supports.contains(&i) && near_box(f) && k::with_kernel_legacy(legacy.clone(), || run_on.iter().any(|p| k::distance(f, p).is_ok_and(|d| d.distance <= tol))))
+        .collect();
+    for (i, f) in body_faces.iter().enumerate() {
+        if !met[i] {
             continue;
         }
         if matches!(f.face_surface()?, k::Surface::BSpline { .. }) {
@@ -2361,8 +2370,8 @@ pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], siz
     let shape = &body.shape;
     let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
     let feature = ev.feature;
-    let mut cuts = Vec::new();
-    for (rim, i) in &rims.0 {
+    // Each rim's tool on its own (in parallel: OCCT's round of its wedge and two Booleans each).
+    let tool_of = |(rim, i): &(Rim, usize)| -> FResult<NamedShape> {
         let i = *i;
         let r = sizes.get(i).or(sizes.first()).copied().ok_or_else(|| fail("no size"))?;
         let e = edges[i];
@@ -2408,8 +2417,11 @@ pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], siz
             .iter()
             .map(|f| if matches!(f.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. })) { generated.clone() } else { blend.clone() })
             .collect();
-        cuts.push(NamedShape::new(tool, names));
-    }
+        Ok(NamedShape::new(tool, names))
+    };
+    use rayon::prelude::*;
+    let legacy = k::kernel_legacy();
+    let cuts = rims.0.par_iter().map(|x| k::with_kernel_legacy(legacy.clone(), || tool_of(x))).collect::<FResult<Vec<_>>>()?;
     // A round built directly where it can be (the tools' touch curves put on the part's faces, no cut: c2-rings-loft's
     // Fillet 1 375 -> ~95 ms), else the cut.
     let tools: Vec<Shape> = cuts.iter().map(|c| c.shape.clone()).collect();
