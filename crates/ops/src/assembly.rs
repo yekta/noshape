@@ -66,6 +66,10 @@ pub fn insert_part(a: &mut Assembly, studio: TabId, studio_name: &str, part: Opt
 /// "… with same part and same configuration" (live qa5 CA2).
 pub fn same_configuration(a: &Assembly, id: InstanceId, same_part: bool) -> Vec<InstanceId> {
     let Some(inst) = a.instance(id) else { return Vec::new() };
+    // Standard content: the same component, size and options (each is its own part and configuration).
+    if let InstanceSource::Standard { spec } = &inst.source {
+        return a.instances.iter().filter(|i| i.source.standard() == Some(spec)).map(|i| i.id).collect();
+    }
     let key = |s: &InstanceSource| match s {
         InstanceSource::Part { studio, body, config } => Some((*studio, Some(body.clone()), config.clone())),
         InstanceSource::PartStudio { studio, config } => Some((*studio, None, config.clone())),

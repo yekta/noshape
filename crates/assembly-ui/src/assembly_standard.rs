@@ -973,7 +973,13 @@ pub(super) fn standard_panel_text(spec: &StandardSpec) -> Vec<String> {
     let mut out: Vec<String> = ["Standard content", "Standard", "Category", "Class", "Component"].map(String::from).to_vec();
     let Some(c) = standard::component(spec) else { return out };
     out.push(c.size_label().to_string());
-    out.extend(c.params.iter().map(|p| p.label.clone()));
+    // A checkbox reads as its label and its box ("[x] Head slot").
+    for p in &c.params {
+        out.push(p.label.clone());
+        if p.checkbox {
+            out.push(format!("{} {}", if spec.param(&p.label) == "checked" { "[x]" } else { "[ ]" }, p.label));
+        }
+    }
     if let Some(size) = spec.size_row()
         && c.shape.has_length()
         && !c.lengths(size).is_empty()

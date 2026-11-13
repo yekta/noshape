@@ -1269,7 +1269,8 @@ impl AssemblyView {
                 t.refresh_scene(false, cx);
             }));
         }
-        if !multi {
+        // (Not on standard content: live asm-standard-content-edit-instance.)
+        if !multi && !matches!(inst.source, InstanceSource::Standard { .. }) {
             edit.push(icon_item("Add mate connector to instance origin…", "add-mate-connector", move |t, w, cx| t.mc_at_instance_origin(top, w, cx)));
         }
         if !suppressed {
@@ -1409,7 +1410,8 @@ impl AssemblyView {
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
         m.push(item("Add selection to folder…", move |t, w, cx| t.folder_from_instances(tg.clone(), w, cx)));
-        let has_children = self.result.node(&[top]).is_some_and(|n| !n.children.is_empty());
+        // (Standard content's row expands to its part in live: Expand / Collapse there too.)
+        let has_children = self.result.node(&[top]).is_some_and(|n| !n.children.is_empty()) || self.assembly(cx).and_then(|a| a.instance(top)).is_some_and(|i| matches!(i.source, InstanceSource::Standard { .. }));
         if has_children {
             m.push(MenuEntry::Sub {
                 label: "Expand".into(),
@@ -1519,6 +1521,11 @@ impl AssemblyView {
         }
         if matches!(inst.source, InstanceSource::Standard { .. }) {
             m.push(icon_item("Edit standard content instance…", "standard-content", move |t, _, cx| t.edit_standard_instance(top, cx)));
+            // Live asm-standard-content-edit-instance: both selections follow it.
+            if !multi {
+                m.push(item("Select instances with same configuration", move |t, _, cx| t.select_same_configuration(top, false, cx)));
+                m.push(item("Select instances with same part and same configuration", move |t, _, cx| t.select_same_configuration(top, true, cx)));
+            }
         }
         if !multi && matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Standard { .. }) {
             // Change configuration: only for configured Part Studios.

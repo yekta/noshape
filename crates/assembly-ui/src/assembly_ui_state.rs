@@ -69,6 +69,13 @@ impl AssemblyView {
             let dialog = crate::ui_script::bounds_of("dialog");
             let mut grid: Vec<glam::DVec2> = (1..8).flat_map(|i| (1..8).map(move |j| glam::DVec2::new(size.x * i as f64 / 8.0, size.y * j as f64 / 8.0))).collect();
             grid.sort_by(|a, b| (*a - size * 0.5).length().total_cmp(&(*b - size * 0.5).length()));
+            // Live's recorder clicks "empty" at window pixel (1560, 960) (live-pw uip/run.mjs): there first when it
+            // is free here too, so a placement on empty space lands where live's does (live 2736's bolt).
+            let o = vp.origin();
+            let live = glam::DVec2::new(1560.0 - f64::from(f32::from(o.x)), 960.0 - f64::from(f32::from(o.y)));
+            if live.cmpge(glam::DVec2::ZERO).all() && live.cmplt(size).all() {
+                grid.insert(0, live);
+            }
             let free = grid.into_iter().find(|at| {
                 let win = vp.origin() + point(px(at.x as f32), px(at.y as f32));
                 let on_part = boxes.iter().any(|(min, max)| at.cmpge(*min - glam::DVec2::splat(10.0)).all() && at.cmple(*max + glam::DVec2::splat(10.0)).all());
@@ -637,6 +644,18 @@ impl AssemblyView {
         }
         if let Some(f) = &self.ui.folder_name {
             out.push(panel("Folder name", vec![f.input.read(cx).value().to_string()]));
+        }
+        // Edit standard content (live asm-standard-content-edit-instance): the Standard content tab's rows, with
+        // Update.
+        if self.ui.std.editing.is_some()
+            && let Some(spec) = &self.ui.std.spec
+        {
+            let mut text = super::standard_content::standard_panel_text(spec);
+            text.retain(|t| t != "Standard content");
+            if let Some(last) = text.last_mut() {
+                *last = "Update".into();
+            }
+            out.push(panel("Edit standard content", text));
         }
         if let Some(text) = self.config_panel_text(cx) {
             out.push(panel("Change configuration", text));

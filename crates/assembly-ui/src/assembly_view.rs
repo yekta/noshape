@@ -1492,7 +1492,10 @@ impl AssemblyView {
         // Live Onshape: the instance following the cursor is selected (amber),
         // and deselected once it is placed (assembly/04, 06).
         self.selected = ids.clone();
-        self.ui.place_rotations = ids.iter().filter_map(|id| self.result.solved.placement(*id).map(|p| (*id, p.rotation))).collect();
+        // (Not solved yet just after its insert: its own placement, identity for standard content, so it turns back
+        // to that off a snap: live 2736's bolt.)
+        let stored = |id: &InstanceId| self.assembly(cx).and_then(|a| a.instance(*id)).map(|i| i.placement);
+        self.ui.place_rotations = ids.iter().filter_map(|id| self.result.solved.placement(*id).or_else(|| stored(id)).map(|p| (*id, p.rotation))).collect();
         self.placing = Some(ids);
         self.placing_point = None;
         self.ui.place_moved = false;
@@ -1596,6 +1599,24 @@ impl AssemblyView {
         (den.abs() > 1e-9).then(|| (o + d * ((DVec3::ZERO - o).dot(n) / den), false))
     }
 
+    /// Standard content placed on empty space goes by its mating point, on its axis (live 2736): a countersunk
+    /// head's cone apex (its top is our z = 0; the apex is the head radius over tan 41° below), else our z = 0 (a
+    /// screw's head underside, a nut's or washer's bottom face). World point, for one instance being placed.
+    fn std_mating_point(&self, ids: &[InstanceId], on_face: bool, cx: &App) -> Option<DVec3> {
+        let [id] = ids else { return None };
+        if on_face {
+            return None;
+        }
+        let spec = self.assembly(cx)?.instance(*id)?.source.standard()?.clone();
+        let o = self.result.occurrences.iter().find(|o| o.path == [*id])?;
+        let countersunk = [&spec.component, &spec.class].iter().any(|t| t.to_lowercase().contains("countersunk"));
+        let z = match (countersunk, o.local_bounds) {
+            (true, Some((lo, hi))) => -(hi.x.max(-lo.x)) / 41f64.to_radians().tan(),
+            _ => 0.0,
+        };
+        Some(o.transform.transform_point3(DVec3::new(0.0, 0.0, z)))
+    }
+
     /// The point of the instances' bounds a placement puts at the cursor point: on a face their bottom centre, in
     /// empty space their centre (live 2509: a Part Studio part's bounding-box centre on the view ray).
     fn place_anchor(lo: DVec3, hi: DVec3, on_face: bool) -> DVec3 {
@@ -1626,7 +1647,7 @@ impl AssemblyView {
             }
         }
         let Some((lo, hi)) = bb else { return false };
-        let delta = p - Self::place_anchor(lo, hi, on_face);
+        let delta = p - self.std_mating_point(&ids, on_face, cx).unwrap_or_else(|| Self::place_anchor(lo, hi, on_face));
         let unturn = ids.iter().any(|id| self.ui.place_rotations.iter().any(|(i, r)| i == id && self.result.solved.placement(*id).is_some_and(|p| p.rotation != *r)));
         if delta.length() < 1e-12 && !unturn {
             return false;
@@ -1660,7 +1681,7 @@ impl AssemblyView {
             }
         }
         let Some((lo, hi)) = bb else { return true };
-        let delta = p - Self::place_anchor(lo, hi, on_face);
+        let delta = p - self.std_mating_point(ids, on_face, cx).unwrap_or_else(|| Self::place_anchor(lo, hi, on_face));
         let mut solved = self.result.solved.clone();
         for (id, pl) in &mut solved.placements {
             if ids.contains(id) {
@@ -1983,6 +2004,8 @@ impl AssemblyView {
             None if self.ui.np_driver.is_some() => (false, false),
             // Nor the Dynamic suppression panel (live: Undo off while it is open).
             None if self.ui.dynamic_suppression.is_some() => (false, false),
+            // Nor Edit standard content (live asm-standard-content-edit-instance).
+            None if self.ui.std.editing.is_some() => (false, false),
             None => {
                 let d = self.doc.read(cx);
                 (d.can_undo(), d.can_redo())
@@ -6497,6 +6520,11 @@ impl AssemblyView {
             window.focus(&self.focus, cx);
         } else if self.step_edit.is_some() {
             self.cancel_step_edit(cx);
+            cx.notify();
+        } else if self.ui.std.editing.is_some() {
+            // Edit standard content closes as its ✕ (live asm-standard-content-edit-instance).
+            self.ui.std.editing = None;
+            self.ui.std.props_edit = None;
             cx.notify();
         } else if self.placing.is_some() || self.insert_open {
             // Esc cancels the insertion as ✕ (live: the inserted instances go).
