@@ -457,6 +457,79 @@ pub(super) fn surface_distance(g: &GFace, p: DVec3) -> f64 {
     }
 }
 
+/// The distance from `p` to face `f`'s whole surface: a torus's or a sphere's exactly, where a face's own parameters
+/// hold only part of it (two parts of one torus, the private dock's rib ends, else not seen as one surface); else
+/// [`surface_distance`].
+pub(super) fn whole_surface_distance(g: &GFace, p: DVec3) -> f64 {
+    match g.ns.as_deref() {
+        Some(FreeSurface::Torus { o, z, major, minor, .. }) if matches!(g.s, Surf::Nurbs { .. }) => {
+            let w = p - *o;
+            let h = w.dot(*z);
+            let rho = (w - *z * h).length();
+            (((rho - major) * (rho - major) + h * h).sqrt() - minor).abs()
+        }
+        Some(FreeSurface::Sphere { o, r, .. }) if matches!(g.s, Surf::Nurbs { .. }) => ((p - *o).length() - r).abs(),
+        _ => surface_distance(g, p),
+    }
+}
+
+/// Where a curve lying on free-form face `g` (its point at `t` from `at`) crosses the seam of a face going a whole turn
+/// round: its parameters (its parameters on the face jump by a turn there), in its own order.
+pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, t1: f64) -> Vec<f64> {
+    let Some(ns) = g.ns.as_ref() else { return Vec::new() };
+    let round: Vec<usize> = ns
+        .periodic()
+        .into_iter()
+        .enumerate()
+        .filter(|&(i, p)| {
+            let (lo, hi) = uv_span(g, i);
+            p && (hi - lo - TAU).abs() <= 1e-6
+        })
+        .map(|x| x.0)
+        .collect();
+    if round.is_empty() {
+        return Vec::new();
+    }
+    const N: usize = 64;
+    // (Its parameter followed a turn at a time from the one before; param_of's own may run on into the face's margin
+    // past the seam before it turns over.)
+    let unwrap = |x: f64, near: f64| x + TAU * ((near - x) / TAU).round();
+    let mut out = Vec::new();
+    let mut prev: Option<(f64, DVec2, DVec2)> = None;
+    for k in 0..=N {
+        let t = t0 + (t1 - t0) * k as f64 / N as f64;
+        let p = at(t).0;
+        let (uv, _) = ns.param_of(p, prev.map_or_else(|| g.uv_of(p), |q| q.1), g.uvbox);
+        let mut w = uv;
+        if let Some((tp, up, pw)) = prev {
+            for &i in &round {
+                w[i] = unwrap(uv[i], pw[i]);
+                let (lo, hi) = uv_span(g, i);
+                for edge in [lo, hi] {
+                    if (pw[i] - edge) * (w[i] - edge) >= 0.0 {
+                        continue;
+                    }
+                    // (Bisected: where its followed parameter passes the seam.)
+                    let (mut a, mut b, mut ua, mut wa) = (tp, t, up, pw[i]);
+                    for _ in 0..60 {
+                        let mid = 0.5 * (a + b);
+                        let (um, _) = ns.param_of(at(mid).0, ua, g.uvbox);
+                        let wm = unwrap(um[i], wa);
+                        if (wa - edge) * (wm - edge) < 0.0 {
+                            b = mid;
+                        } else {
+                            (a, ua, wa) = (mid, um, wm);
+                        }
+                    }
+                    out.push(0.5 * (a + b));
+                }
+            }
+        }
+        prev = Some((t, uv, w));
+    }
+    out
+}
+
 /// A straight or round edge lying on free-form face `g` (its point and derivative at `t` from `at`): its curve on the
 /// face, in the face's own parameters and the edge's parameter, `t0` to `t1`: its points' parameters there (Newton
 /// from the one before), cubic between them with the surface's own tangents. None where a point is off the face's
@@ -470,7 +543,18 @@ pub(super) fn projected(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, 
         let t = t0 + (t1 - t0) * k as f64 / N as f64;
         let (p, dp) = at(t);
         let seed = qs.last().map_or_else(|| g.uv_of(p), |q| q.0);
-        let (uv, dist) = ns.param_of(p, seed, g.uvbox);
+        let (mut uv, dist) = ns.param_of(p, seed, g.uvbox);
+        // (Ending on the seam of a face going a whole turn round: its last point on the side it came from.)
+        if k == N
+            && let Some(q) = qs.last()
+        {
+            for (i, round) in ns.periodic().into_iter().enumerate() {
+                let (lo, hi) = uv_span(g, i);
+                if round && (hi - lo - TAU).abs() <= 1e-6 {
+                    uv[i] += TAU * ((q.0[i] - uv[i]) / TAU).round();
+                }
+            }
+        }
         if dist > tol {
             return None;
         }
