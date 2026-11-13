@@ -46,8 +46,9 @@ disabledButtons emitted by ours). parts-multi-properties 7 / 8: live's Save leav
 purpose: a non-undoable tab edit is wiped by undoing an earlier feature (whole-tab undo snapshots; tried and reverted,
 needs properties outside the tab's undo: a store change, not filed yet). Ticket PROPERTIES-OUTSIDE-TAB-UNDO (P2). 11:13: the
 orange corners on edited fields, checkboxes and the rows to be written (single-part dialog too), the list flush with
-the title's rule (the kit's body clips its top 8 px: several parts get an 8 px shorter title and draw the rule). Next: queue item 3, chrome (chrome.json, chrome-shortcuts.json: shortcut map diff for Part Studio,
-sketch, assembly), then look.json.
+the title's rule (the kit's body clips its top 8 px: several parts get an 8 px shorter title and draw the rule). **11:30:** chrome done (interaction-feel.md "Chrome": shortcut map 196 / 196, chrome matrix
+11 / 11; tooltips 400 ms with live's warm switch in vendored gpui div.rs, toolbar help 2 s, the feature dialog clamped
+and snapped). Next: look.json, then live2's batches (sheet metal, sketch tools, editing, dialogs, feedback).
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's

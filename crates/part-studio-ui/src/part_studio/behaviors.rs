@@ -137,6 +137,26 @@ pub struct SelectOther {
 /// The offset as live places it (behaviours "spec: psui part-studio.md 2.16 /
 /// 2.17 … Select other": the pointer + (100, 51); the bundle's −25 is from
 /// another origin).
+/// Where a feature dialog dragged to `p` (its top left, in the graphics area of `area`) lands (live feel/chrome.json
+/// "dialogs"): inside the area, and within 10 px of its top, right or bottom edge snapped to it, 3, 0 and 2 px off;
+/// the left edge doesn't snap.
+pub(crate) fn place_feature_dialog(p: Point<Pixels>, size: Size<Pixels>, area: Size<Pixels>) -> Point<Pixels> {
+    const REACH: f32 = 10.;
+    let (w, h) = (f32::from(size.width), f32::from(size.height));
+    let (aw, ah) = (f32::from(area.width), f32::from(area.height));
+    let mut x = f32::from(p.x).min(aw - w).max(0.);
+    let mut y = f32::from(p.y).min(ah - h).max(0.);
+    if aw - (x + w) <= REACH {
+        x = (aw - w).max(0.);
+    }
+    if y <= 3. + REACH {
+        y = 3.;
+    } else if ah - (y + h) <= 2. + REACH {
+        y = (ah - h - 2.).max(3.);
+    }
+    point(px(x.round()), px(y.round()))
+}
+
 pub(super) const SELECT_OTHER_OFFSET: (f32, f32) = (100., 51.);
 const SELECT_OTHER_ZONE_PX: f64 = 8.;
 /// The zoom-window mode's prompt (live part-studio/psui-kb-w-armed).
@@ -442,6 +462,8 @@ pub struct UiState {
     pub measure_angle_unit: Option<noshape_units::AngleUnit>,
     /// Feature dialog position after the user moved it.
     pub dialog_pos: Option<Point<Pixels>>,
+    /// The feature dialog's size as last drawn (dragging keeps it inside the graphics area).
+    pub dialog_size: std::rc::Rc<std::cell::Cell<Size<Pixels>>>,
     /// Feature dialog width after the user resized it.
     pub dialog_width: Option<Pixels>,
     /// Toolbar customization (removed tools, group order, S toolbar).
@@ -829,6 +851,7 @@ impl UiState {
             measure_length_unit: None,
             measure_angle_unit: None,
             dialog_pos: None,
+            dialog_size: Default::default(),
             dialog_width: None,
             toolbar: super::toolbar_prefs::ToolbarPrefs::load(),
             my_custom_rev: 0,

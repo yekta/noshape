@@ -338,7 +338,7 @@ pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<Share
         let view = cx.new(|cx| {
             if !description.is_empty() {
                 cx.spawn(async move |this: WeakEntity<RichTooltip>, cx| {
-                    cx.background_executor().timer(std::time::Duration::from_millis(1500)).await;
+                    cx.background_executor().timer(TOOLTIP_EXPAND_DELAY).await;
                     let _ = this.update(cx, |t, cx| {
                         t.expanded = true;
                         cx.notify();
@@ -404,6 +404,10 @@ pub struct PlacedTooltip {
 }
 
 /// A feature list row's tooltip: shown 160 ms after the pointer arrives, fully by 390 ms (live feel/featurelist.json).
+/// A menu row's side tooltip unfolds sooner (live fs-ps-ws-feature-tooltip: unfolded within a 1.5 s hover).
+const SIDE_TIP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_millis(1500);
+/// A toolbar tooltip's longer help unfolds this long after it shows (live: `data-expand-delay` 2000 ms, feel/chrome.json).
+pub const TOOLTIP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_millis(2000);
 pub const ROW_TIP_DELAY: std::time::Duration = std::time::Duration::from_millis(160);
 const ROW_TIP_FADE: std::time::Duration = std::time::Duration::from_millis(230);
 
@@ -543,7 +547,7 @@ pub fn with_side_tooltip_expanded(row: Stateful<Div>, text: impl Into<SharedStri
             let (text, extra, anchor) = (text.clone(), extra.clone(), anchor.get());
             cx.new(|cx| {
                 cx.spawn(async move |this: WeakEntity<PlacedTooltip>, cx| {
-                    cx.background_executor().timer(std::time::Duration::from_millis(1500)).await;
+                    cx.background_executor().timer(SIDE_TIP_EXPAND_DELAY).await;
                     let _ = this.update(cx, |t, cx| {
                         if let Some((_, shown)) = &mut t.expanded {
                             *shown = true;

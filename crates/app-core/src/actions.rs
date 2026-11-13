@@ -505,3 +505,7 @@ mod sketch_key_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "shortcut_map_tests.rs"]
+mod shortcut_map_tests;

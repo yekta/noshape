@@ -50,7 +50,21 @@ type StackSafe<T> = stacksafe::StackSafe<T>;
 type StackSafe<T> = T;
 
 const DRAG_THRESHOLD: f64 = 2.;
-const DEFAULT_TOOLTIP_SHOW_DELAY: Duration = Duration::from_millis(500);
+// NOSHAPE PATCH: Onshape's Bootstrap tooltips show after 400 ms (live feel/chrome.json "tooltips").
+const DEFAULT_TOOLTIP_SHOW_DELAY: Duration = Duration::from_millis(400);
+// NOSHAPE PATCH: while a tooltip shows, or just after it went (live: gone ~200 ms after the pointer left), the next
+// element's default tooltip shows at once (live "warm_switch").
+const TOOLTIP_WARM_WINDOW: Duration = Duration::from_millis(200);
+
+thread_local! {
+    static TOOLTIP_GONE_AT: Cell<Option<scheduler::Instant>> = const { Cell::new(None) };
+}
+
+/// (The executor's clock: tests drive it.)
+fn tooltip_warm(window: &Window, cx: &App) -> bool {
+    let now = cx.background_executor().now();
+    window.rendered_frame.tooltip_requests.iter().any(Option::is_some) || TOOLTIP_GONE_AT.with(|t| t.get().is_some_and(|t| now.saturating_duration_since(t) < TOOLTIP_WARM_WINDOW))
+}
 const HOVERABLE_TOOLTIP_HIDE_DELAY: Duration = Duration::from_millis(500);
 
 /// The styling information for a given group.
@@ -3989,6 +4003,7 @@ fn handle_tooltip_mouse_move(
             active_tooltip.borrow_mut().take();
         }
         Action::ScheduleShow => {
+            let show_delay = if show_delay == DEFAULT_TOOLTIP_SHOW_DELAY && tooltip_warm(window, cx) { Duration::ZERO } else { show_delay };
             let delayed_show_task = window.spawn(cx, {
                 let weak_active_tooltip = Rc::downgrade(active_tooltip);
                 let build_tooltip = build_tooltip.clone();
@@ -4111,7 +4126,11 @@ fn handle_tooltip_check_visible_and_update(
 
     match action {
         Action::None => {}
-        Action::Hide => clear_active_tooltip(active_tooltip, window),
+        Action::Hide => {
+            let now = cx.background_executor().now();
+            TOOLTIP_GONE_AT.with(|t| t.set(Some(now)));
+            clear_active_tooltip(active_tooltip, window)
+        }
         Action::ScheduleHide(tooltip) => {
             let delayed_hide_task = window.spawn(cx, {
                 let weak_active_tooltip = Rc::downgrade(active_tooltip);

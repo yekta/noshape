@@ -265,6 +265,33 @@ Alt+right drags, view keys, animations, double middle click, acted out with real
 | Double middle click | two middle releases within 500 ms fit (150 ms did, 600 ms didn't) | the OS's double click count; now live's own 500 ms timer | = (fixed) |
 | Not yet in the matrix | inertia (a flick keeps turning, ×0.77 per 16.67 ms; none held still 50 ms; none below 20 fps); a press on empty space rotates about the view centre; Alt+right on a tilted view animates upright first; the view cube (150 px, 15 px margins, face / edge / corner 500 ms, arrows 15° in 250 ms, curved arrows roll, hover fill) and its menu | – | – |
 
+## Chrome (matrix)
+
+live2's chrome.json and chrome-shortcuts.json (11-13 07:18–07:31). Two tests: app-core
+`actions::shortcut_map_tests::the_shortcut_map_matches_lives` (T1: every key of live's map for the `all`, `partStudio`,
+`sketchEdit` and `assembly` scopes looked up in our keymap in that context, the Windows / Linux keys and the Mac keys
+both checked on every OS) and part-studio-ui `chrome::the_chrome_matrix_matches_live` (T1, no GPU; tooltips on the
+executor's clock).
+
+**Shortcut map: 196 / 196** (11-13 11:20 UTC; 194 / 196 at the first run: the mate connector dialog's A / Q, bound
+in its dialog as live acts on them). Live's Feedback / Report a bug (Ctrl+U) and Open Debug Panel are cloud /
+debugging rows, left out. Ours binds besides live's map, in those scopes: the desktop shell's New / Open document,
+Close window, Quit (secondary-n / o / w / q) and the dialog Tab / Enter / Shift+Enter keys live's client handles
+outside its map (its "client side entries").
+
+**Chrome: 11 / 11** (11-13 11:30 UTC; 7 / 11 at the first run).
+
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| Tooltip delay | 400 ms (fully shown 470–545 ms with the fade) | 500 ms; now 400 (vendored gpui `DEFAULT_TOOLTIP_SHOW_DELAY`) | = (fixed) |
+| Warm switch | while one shows, or within ~200 ms of it going, the next button's shows at once | always the full wait; now at once (gpui `tooltip_warm`, executor clock) | = (fixed) |
+| Cold again | after a pause, the 400 ms wait again | the same | = |
+| Longer help | a toolbar tooltip's description 2000 ms after it shows | 1500; now 2000 (`ui::TOOLTIP_EXPAND_DELAY`; a menu row's side tooltip keeps 1500: live fs-ps-ws-feature-tooltip) | = (fixed) |
+| Feature dialog place | graphics area's top left, 3 px down | the same | = |
+| Feature dialog drag | clamped inside the graphics area; within ~10 px of the top / right / bottom it snaps (3 / 0 / 2 px); the left doesn't | could leave the area by all but 80 × 40 px, no snap; now live's (`behaviors::place_feature_dialog`) | = (fixed) |
+| Select other place | pointer + (100, 51) | the same | = |
+| Not yet in the matrix | tooltip fade-in / fade-out; tooltips closing on click, wheel, drag; toolbar dropdowns (click only, below the toolbar at the group's left, stay open, Esc); context menus (pointer + (0, 2) in the graphics, + (10, 12) on list rows, flip at the right / bottom edge, submenus on hover); the list's width remembered per tab (ours: one for all); feature dialogs sharing one stored layout; Select other's 220 px dialog, 24 px rows, "(No selections found)" 83 px | – | – |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).

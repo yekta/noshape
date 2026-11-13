@@ -6242,7 +6242,13 @@ impl PartStudioView {
         // Moved dialogs keep their place (Onshape lets you drag them).
         let (left, top) = self.ui.dialog_pos.map(|p| (p.x, p.y)).unwrap_or((px(0.), px(3.)));
         // Onshape: at the viewport's left edge, 3 px under the toolbar.
-        let d = div().absolute().left(left).top(top).child(e.dialog.clone());
+        let size = self.ui.dialog_size.clone();
+        let d = div()
+            .absolute()
+            .left(left)
+            .top(top)
+            .child(e.dialog.clone())
+            .child(canvas(move |b, _, _| size.set(b.size), |_, _, _, _| {}).absolute().inset_0());
         // An in-feature mate connector's editor sits right of it, level with it (live 1851: 467 vs the Hole's 246).
         let nested = self.ui.sub_dialog.as_ref().map(|(n, _)| div().absolute().left(left + px(221.)).top(top).child(n.clone()));
         // (A zero-size anchor: nothing between the dialogs covers the graphics.)
@@ -7348,9 +7354,7 @@ impl Render for PartStudioView {
                             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::feature_dialog::DialogMove>, _, cx| {
                                 let grab = *e.drag(cx).0.lock();
                                 let p = e.event.position - e.bounds.origin - grab;
-                                let max_x = (e.bounds.size.width - px(80.)).max(px(0.));
-                                let max_y = (e.bounds.size.height - px(40.)).max(px(0.));
-                                this.ui.dialog_pos = Some(point(p.x.clamp(px(0.), max_x), p.y.clamp(px(0.), max_y)));
+                                this.ui.dialog_pos = Some(behaviors::place_feature_dialog(point(p.x, p.y), this.ui.dialog_size.get(), e.bounds.size));
                                 cx.notify();
                             }))
                             .child(self.viewport.clone())
