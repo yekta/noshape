@@ -107,7 +107,7 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | Box on empty sheet | shows by 12 px, not seen at ≤ 8 (D5, inconclusive below) | 3 px | – | ? |
 | Dragging a projected view | follows its parent's axis (bm 13993); live2 saw a projected Top move freely (F4) | locked to the axis (`MoveViews`) | – | ? (asked) |
 | Dragging a view near another's alignment | no snap at 16 down to 1 px, Shift or not (F4) | none (built 11-13, removed on live2's answer) | – | = |
-| Double-click | ? | the OS's (GPUI: Linux 400 ms, 5 px) | – | ? |
+| Double-click | the OS's (live2's Linux: 400 ms, 2 px); a dimension's palette only within ~200 ms and 3 px (live2 11-13) | the OS's (GPUI's Linux constant: 400 ms, 5 px); a dimension's palette within 200 ms and 3 px (`quick_double_click`) | `a_dimensions_palette_needs_a_quick_close_double_click` | = (Linux distance 5 vs 2 px: GPUI's constant) |
 
 ## Documents page and tabs (studios, from 2026-11-13)
 
@@ -125,9 +125,10 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | Row hover / selected | #def1fb / #b2ddf6 (bm 20) | the same | – | = |
 | Tab drag: ghost, gap | 100 px ghost, a tab-wide gap, no line (bm 6562) | the same | – | = |
 | Tab drag start | 6 px (5 is a click), the tab lifts and leaves a grey slot (feel/documents.json `tabBar.dragStartPx`) | 6 px (`TAB_DRAG_PX`, gpui `drag_threshold`) | – | = |
-| Tab dropped on a folder | lights (`hovered-group`), needs a dwell (bm 6576, 13328) | lights #def1fb, drops at once | – | ? |
+| Tab dropped on a folder | where it's released decides, not a dwell: the folder tab's middle 20–80 % puts it in (lit), near its ends it reorders (live2 11-13) | the same (`drops_into_folder`, `TabGap.into`) | `a_tab_goes_into_a_folder_released_over_its_middle` | = |
 | Tab bar auto-scroll while dragging | from 45 px of an end (not 60), faster nearer it: 13–24 / 51–59 / 66–75 / 94–119 / 108–119 px/s at 45 / 30 / 20 / 10 / 3 px; the tab lands where the pointer is in the scrolled bar (`tabBar.autoScroll`, `dropWhileAutoScrolled`) | the two ends' mean, interpolated (`TAB_AUTOSCROLL`), whatever the frame rate; the pointer's place re-sent each tick so the gap follows the tabs scrolling under it | `a_tab_dragged_to_an_end_of_the_strip_scrolls_it`; app check 11-13 07:02 (held 10 px from the end 2 s: ~250 px, landed under the pointer) | = |
 | Tab manager drag and drop | 6 px start; the pressed row selected; a dark-blue pill (white bold name or "N items") below-right of the pointer; between rows a ~2 px dark-blue line with a ring at its left end; a folder row's thirds: above / into (light-blue fill, 1 px dark-blue frame, » at its left) / below; out of a folder to the root; no dwell opens a folder; Esc cancels (`tabManager`) | the same (`TmDrag`, `tm_zone`, `tm_drop_line`; folder rows now laid out as tab rows, 54 px, "Folder" under the name); not undoable (tab operations) | `a_folder_row_takes_drops_in_its_middle_third`, `rows_dropped_beside_a_folder_land_before_or_after_it`, `rows_dropped_on_a_folder_go_into_it`, `rows_dropped_on_a_tab_row_land_before_or_after_it`; app check 11-13 07:02 (ghost, line, Esc) | = |
+| Click on a document's name / double-click on a tab | a single click on the name opens the document; a double-click on a tab does nothing (live2 11-13) | the same (`doc-name` click; the tab bar ignores a second click) | – | = |
 | Ctrl / Shift + click a tab | opens it in a new window (rq 2403) | the same | – | = |
 
 ## Sketch snaps (matrix)
