@@ -4098,18 +4098,21 @@ impl<'a> Translator<'a> {
         Ok((id, row["status"].as_str().unwrap_or("Ok").to_string(), row["message"].as_str().map(str::to_string)))
     }
 
-    /// An assembly mate connector argument's Z in its part's coordinates, as ours places it now.
-    fn connector_z_local(&mut self, tab: &str, c: &Value) -> Option<glam::DVec3> {
+    /// An assembly mate connector argument's Z and origin in its part's coordinates (metres), as ours places it now.
+    fn connector_frame_local(&mut self, tab: &str, c: &Value) -> Option<(glam::DVec3, glam::DVec3)> {
         let instance = c["instance"].as_str()?;
         let list = self.call("assembly_list", json!({ "tab": tab })).ok()?;
+        let k = per_unit(&list["units"]);
         let occ = list["occurrences"].as_array()?.iter().find(|o| o["path"] == instance).or_else(|| list["instances"].as_array()?.iter().find(|i| i["name"] == instance))?;
         let r = occ["rotation"].as_array()?;
         let q = glam::DQuat::from_xyzw(r[0].as_f64()?, r[1].as_f64()?, r[2].as_f64()?, r[3].as_f64()?);
+        let v3 = |v: &Value, s: f64| Some(glam::DVec3::new(v[0].as_f64()? * s, v[1].as_f64()? * s, v[2].as_f64()? * s));
+        let t = v3(&occ["translation"], k)?;
         let cands = self.call("assembly_connectors", json!({ "tab": tab, "instance": instance, "entity": c["entity"] })).ok()?;
+        let kc = per_unit(&cands["units"]);
         let want = format!("implicit:{}:", c["inference"].as_str()?);
-        let z = cands["connectors"].as_array()?.iter().find(|x| x["reference"].as_str().is_some_and(|r| r.starts_with(&want)))?;
-        let z = glam::DVec3::new(z["z"][0].as_f64()?, z["z"][1].as_f64()?, z["z"][2].as_f64()?);
-        Some(q.inverse() * z)
+        let x = cands["connectors"].as_array()?.iter().find(|x| x["reference"].as_str().is_some_and(|r| r.starts_with(&want)))?;
+        Some((q.inverse() * v3(&x["z"], 1.0)?, q.inverse() * (v3(&x["position"], kc)? - t)))
     }
 
     /// The areas of live's regions of sketch `oid` (its sketch bodies file), m².
@@ -6727,39 +6730,46 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 let end = (|| {
                     let id = q["featureId"].as_str()?;
                     if let Some(name) = origin_connectors.get(id) {
-                        return Some((json!({ "connector": name }), String::new(), None));
+                        return Some((json!({ "connector": name }), String::new(), None, None));
                     }
                     // A Part Studio's Mate connector on an instance: ours there.
                     if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMPartStudioMateConnectorQuery")) {
                         let path = ids(&q["path"]);
                         let ours = path.last().and_then(|i| element_of.get(i)).and_then(|e| studio_features.get(e)).and_then(|f| f.get(id))?;
-                        return Some((json!({ "instance": path_names(&path)?, "reference": format!("mc:{}.0", ours.trim_start_matches("mc:")) }), String::new(), None));
+                        return Some((json!({ "instance": path_names(&path)?, "reference": format!("mc:{}.0", ours.trim_start_matches("mc:")) }), String::new(), None, None));
                     }
                     let key = (l.element.clone(), id.to_string());
                     let (path, inf, _) = connectors.get(&key)?;
                     if let Some(edge) = loops.get(&key) {
-                        return Some((json!({ "instance": path_names(path)?, "reference": format!("implicit:centroid:{edge}"), "align": entities.get(&key)? }), inf.clone(), None));
+                        return Some((json!({ "instance": path_names(path)?, "reference": format!("implicit:centroid:{edge}"), "align": entities.get(&key)? }), inf.clone(), None, None));
                     }
                     let mut c = json!({ "instance": path_names(path)?, "entity": entities.get(&key)? });
                     if let Some(i) = inference(inf) {
                         c["inference"] = json!(i);
                     }
-                    Some((c, inf.clone(), connector_z.get(&key).copied()))
+                    Some((c, inf.clone(), connector_z.get(&key).copied(), connector_origins.get(&key).copied()))
                 })();
-                // An axis point's Z runs along its cylinder's axis, an edge's midpoint along its curve, in the
-                // kernel's own sense (Parasolid's and OCCT's differ: rack-pinion's full round fillet,
-                // robotic-arm's base edge midpoint): flipped where live's frame has it the other way. (A face's
-                // point has its outward normal: no such choice.)
-                ends.push(end.map(|(mut c, inf, live_z)| {
-                    // (A circle's centre not yet: scissor-lift's Revolute 12 / 13 then hold, but pull a link of its
-                    // subassembly 6 mm along their axis; nor a part inside a subassembly.)
-                    let on_edge = inf == "MID_POINT" && c["entity"].as_str().is_some_and(|e| e.starts_with("edge:")) && c["instance"].as_str().is_some_and(|i| !i.contains(" > "));
+                // An axis point's Z runs along its cylinder's axis, an edge point's along its curve or circle axis, in
+                // the kernel's own sense (Parasolid's and OCCT's differ: rack-pinion's full round fillet, robotic-arm's
+                // base edge midpoint): flipped where live's frame has it the other way. A circle's centre then often
+                // sits on the hole's other rim: moved along its axis to live's (scissor-lift's Revolute 13: 6 mm). (A
+                // face's point has its outward normal: no such choice; a part inside a subassembly not yet.)
+                ends.push(end.map(|(mut c, inf, live_z, live_o)| {
+                    let on_edge = matches!(inf.as_str(), "MID_POINT" | "CENTER") && c["entity"].as_str().is_some_and(|e| e.starts_with("edge:")) && c["instance"].as_str().is_some_and(|i| !i.contains(" > "));
                     if (inf.ends_with("AXIS_POINT") || on_edge)
-                        && let Some(z) = live_z
-                        && placer.connector_z_local(&l.tab, &c).is_some_and(|ours| ours.dot(glam::DVec3::from(z)) < -0.999)
+                        && let Some(z) = live_z.map(glam::DVec3::from)
+                        && let Some((ours_z, ours_o)) = placer.connector_frame_local(&l.tab, &c)
+                        && ours_z.dot(z) < -0.999
                     {
                         c["flip"] = json!(true);
-                        trace(&format!("{name}: {inf} on {} flipped to live's Z", c["instance"]));
+                        if let Some(o) = live_o.map(glam::DVec3::from) {
+                            let d = o - ours_o;
+                            let along = d.dot(z);
+                            if along.abs() > 1e-7 && (d - z * along).length() < 1e-6 {
+                                c["move"] = json!({ "z": format!("{} mm", along * 1e3) });
+                            }
+                        }
+                        trace(&format!("{name}: {inf} on {} flipped to live's Z{}", c["instance"], c.get("move").map(|m| format!(", moved {m}")).unwrap_or_default()));
                     }
                     c
                 }));
