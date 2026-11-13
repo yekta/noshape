@@ -18,9 +18,10 @@ pub struct NurbsCurve {
 
 /// A NURBS curve's non-empty knot spans as Bézier pieces of its homogeneous form (w x, w y, w z, w): (start, end,
 /// control points). Evaluated by de Casteljau's algorithm instead of the basis functions each time. Then their
-/// control points' boxes, then `param_of`'s samples as runs on one span each (span, first, past the last).
+/// control points' boxes, then `param_of`'s samples as runs on one span each (span, first, past the last), then the
+/// spans' lengths summed (`length`: the length before each span).
 #[derive(Debug, Default)]
-pub struct Spans(OnceLock<Vec<(f64, f64, Vec<DVec4>)>>, OnceLock<Vec<(DVec3, DVec3)>>, OnceLock<Vec<(usize, usize, usize)>>);
+pub struct Spans(OnceLock<Vec<(f64, f64, Vec<DVec4>)>>, OnceLock<Vec<(DVec3, DVec3)>>, OnceLock<Vec<(usize, usize, usize)>>, OnceLock<Vec<f64>>);
 
 impl Clone for Spans {
     /// (Empty: a copy's poles may be changed, scaled.)
@@ -407,6 +408,39 @@ impl NurbsCurve {
             out += right.windows(2).map(|w| (w[1].truncate() / w[1].w - w[0].truncate() / w[0].w).length()).sum::<f64>();
         }
         Some(out)
+    }
+
+    /// Its length from `t0` to `t1` (Gauss–Legendre, 4 points on each of 4 pieces of a knot span; the whole spans
+    /// between the ends' from a table made once). None: no spans, or past the knots.
+    pub(crate) fn length(&self, t0: f64, t1: f64) -> Option<f64> {
+        const G: [(f64, f64); 4] = [
+            (0.069_431_844_202_973_71, 0.173_927_422_568_726_9),
+            (0.330_009_478_207_571_9, 0.326_072_577_431_273_1),
+            (0.669_990_521_792_428_1, 0.326_072_577_431_273_1),
+            (0.930_568_155_797_026_3, 0.173_927_422_568_726_9),
+        ];
+        let gauss = |a: f64, b: f64| {
+            let h = (b - a) / 4.0;
+            (0..4).map(|k| G.iter().map(|&(x, w)| w * self.derivs(a + h * (k as f64 + x))[1].length()).sum::<f64>() * h.abs()).sum::<f64>()
+        };
+        let spans = self.spans();
+        let (lo, hi) = (t0.min(t1), t0.max(t1));
+        let (Some(first), Some(last)) = (spans.first(), spans.last()) else { return None };
+        if lo < first.0 || hi > last.1 {
+            return None;
+        }
+        let (i0, i1) = (self.span_of(lo), self.span_of(hi));
+        if i0 == i1 {
+            return Some(gauss(lo, hi));
+        }
+        let before = self.spans.3.get_or_init(|| {
+            let mut acc = vec![0.0];
+            for sp in spans {
+                acc.push(acc[acc.len() - 1] + gauss(sp.0, sp.1));
+            }
+            acc
+        });
+        Some(gauss(lo, spans[i0].1) + (before[i1] - before[i0 + 1]) + gauss(spans[i1].0, hi))
     }
 
     /// The span (of `spans`) the point at `t` is found on.

@@ -91,6 +91,9 @@ pub(super) fn samples(ns: &FreeSurface, uv: [f64; 4]) -> Vec<(DVec2, DVec3)> {
 
 /// A NURBS curve's length from `t0` to `t1` (Gauss–Legendre, 4 points on each of 4 pieces a knot span it is on).
 pub(super) fn length(c: &NurbsCurve, t0: f64, t1: f64) -> f64 {
+    if let Some(l) = c.length(t0, t1) {
+        return l;
+    }
     const G: [(f64, f64); 4] = [
         (0.069_431_844_202_973_71, 0.173_927_422_568_726_9),
         (0.330_009_478_207_571_9, 0.326_072_577_431_273_1),
