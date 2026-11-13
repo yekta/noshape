@@ -4193,6 +4193,50 @@ fn an_offset_chamfer_of_a_holes_two_tilted_rims_sizes_each_at_its_own_middle_as_
     assert!((neg - pos - 0.588457).abs() < 0.002, "their difference {} mm² (live 0.588)", neg - pos);
 }
 
+/// The same hole's rims chamfered with Two distances 0.75 / 0.4 (live 2675 on c2-hunting-knife): Distance 1 goes down the
+/// hole's wall and Distance 2 onto the side, on both rims, whether the wall or its two rim edges are picked (live's
+/// faces 14.534829 and 14.291051 mm² either way).
+#[test]
+fn a_two_distance_chamfer_of_a_holes_rims_puts_distance_1_down_the_wall_whatever_is_picked_as_live() {
+    use noshape_kernel::{Plane, cut, extrude, make_cylinder, make_face_from_wire, make_line, make_wire};
+    let k = 0.008727 / 0.999962;
+    let (top, bottom) = (|x: f64| 1.701397 - k * (x - 27.5), |x: f64| -1.657763 + k * (x - 32.5));
+    let corners = [(20.0, bottom(20.0)), (40.0, bottom(40.0)), (40.0, top(40.0)), (20.0, top(20.0))].map(|(x, y)| DVec3::new(mm(x), mm(y), mm(-8.0)));
+    let lines: Vec<_> = (0..4).map(|i| make_line(corners[i], corners[(i + 1) % 4]).unwrap()).collect();
+    let slab = extrude(&make_face_from_wire(&make_wire(&lines).unwrap(), true).unwrap(), DVec3::new(0.0, 0.0, mm(10.0))).unwrap().shape;
+    let axis = DVec3::new(mm(30.0), mm(-10.0), mm(-3.231827));
+    let hole = make_cylinder(&Plane::new(axis, DVec3::Y, DVec3::X), mm(2.5), mm(20.0), std::f64::consts::TAU).unwrap();
+    let brep = String::from_utf8(cut(&slab, &hole).unwrap().shape.to_brep_bytes().unwrap()).unwrap();
+    for pick_edges in [false, true] {
+        let mut s = Studio::new();
+        let blob = brep.clone();
+        s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(blob)));
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let wall = b.shape.faces().iter().position(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).unwrap();
+        let picked: Vec<Reference> = if pick_edges {
+            b.shape.edges().iter().enumerate().filter(|(_, e)| e.edge_info().is_ok_and(|i| i.closed)).map(|(i, _)| Reference::Edge((*b.edges[i]).clone())).collect()
+        } else {
+            vec![Reference::Face((*b.faces[wall]).clone())]
+        };
+        assert_eq!(picked.len(), if pick_edges { 2 } else { 1 });
+        s.add("chamfer", move |p| {
+            p.set("entities", ParamValue::Query(picked));
+            p.set("chamferMethod", en("FACE_OFFSET"));
+            p.set("chamferType", en("TWO_OFFSETS"));
+            p.set("width1", expr("0.75 mm"));
+            p.set("width2", expr("0.4 mm"));
+        });
+        let r = s.ok();
+        let sh = &r.context.bodies[0].shape;
+        let area = |up: bool| {
+            sh.faces().iter().filter(|f| !matches!(f.face_surface(), Ok(noshape_kernel::Surface::Plane(_) | noshape_kernel::Surface::Cylinder { .. }))).filter(|f| (f.centroid().unwrap().y > 0.0) == up).map(|f| f.area().unwrap() / (mm(1.0) * mm(1.0))).sum::<f64>()
+        };
+        let (pos, neg) = (area(true), area(false));
+        assert!((pos - 14.291051).abs() < 0.02 && (neg - 14.534829).abs() < 0.02, "pick edges {pick_edges}: the rims' chamfers {pos} / {neg} mm² (live 14.291 / 14.535)");
+    }
+}
+
 /// c2-impeller-loft's Fillet 1 in small (live 2479): an R10 round where a Ø20 tube leaves a wall tilted 30° from square
 /// to it, the tube ending 15 mm past the wall at its axis: at the top (a 60° corner) the ball would touch the tube
 /// 17.3 mm along it, past its end, and rolls over the end's rim instead (overflow off): live's JWO, the ball touching

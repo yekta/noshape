@@ -936,7 +936,6 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
     if groups.is_empty() {
         return crate::regen::eval::err_at(&["entities"], "Select edges or faces to chamfer.");
     }
-    let picked_faces = ev.resolve_faces(refs);
     let touched: Vec<usize> = groups.keys().copied().collect();
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
@@ -949,7 +948,6 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         let edges: Vec<usize> = edges.into_iter().filter(|&e| !(solid && adjacency.get(e).is_some_and(|f| f.len() < 2 || f[0] == f[1]))).collect();
         let shapes: Vec<k::Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
         let flipped: BTreeSet<usize> = overrides.iter().filter(|(b, _)| *b == bi).map(|&(_, e)| e).collect();
-        let picked: Vec<k::Shape> = picked_faces.iter().filter(|(b, _)| *b == bi).filter_map(|&(_, f)| body.shape.sub_shape(ShapeType::Face, f).ok()).collect();
         use super::blend_section::ChamferSides;
         let sides = match (ev.enum_("chamferMethod") == "APEX_RANGE", spec) {
             (true, k::ChamferSpec::Equal(d)) => Some(ChamferSides::Tangent(d, d)),
@@ -1004,7 +1002,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         }
         // Whole rims tilted to their plane, an Offset chamfer of a distance and an angle (or two distances): each rim's
         // chamfer at constant offsets from both faces sized at its own middle (live c2-hunting-knife's Chamfer 2: a hole
-        // through sides tilted 0.5°, its rims' chamfers 19.445 and 18.856 mm²), measured on a picked wall.
+        // through sides tilted 0.5°, its rims' chamfers 19.445 and 18.856 mm²), the first distance down the wall.
         let offset = match asked {
             k::ChamferSpec::DistanceAngle(d, a) => Some((d, super::blend_section::OffsetOther::Angle(a))),
             k::ChamferSpec::TwoDistances(d, e) => Some((d, super::blend_section::OffsetOther::Distance(e))),
@@ -1014,7 +1012,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
             && let Some(rims) = rims(&body.shape, &edges)
             && super::blend_section::rims_whole(&rims)
             && rims_tilted(&rims)
-            && let Some(on_wall) = super::blend_section::rims_measure_on_wall(&rims, &picked, &distance_one_faces(ev, &body, &edges, &flipped, ev.bool("oppositeDirection"))?)
+            && let Some(on_wall) = super::blend_section::rims_measure_on_wall(&rims, |i| rim_flipped(&body.shape, &edges, i, &flipped, ev.bool("oppositeDirection")))
             && ring_blend(ev, bi, &rims, &edges, &[d], RimBlend::Offset { on_wall, other }).is_ok()
         {
             continue;
@@ -1145,6 +1143,20 @@ fn face_order_in(ev: &EvalCtx, body: &crate::regen::context::Body, face: &Name, 
         _ => 4,
     };
     (position, class, face.clone())
+}
+
+/// Whether a rim's direction is flipped (its first edge `edges[i]`): an odd number of its edges (those between the same
+/// two faces) overridden, or Opposite direction.
+fn rim_flipped(shape: &k::Shape, edges: &[usize], i: usize, overrides: &BTreeSet<usize>, opposite: bool) -> bool {
+    let ef = shape.edge_faces().unwrap_or_default();
+    let pair = |e: usize| ef.get(e).map(|f| {
+        let mut f = f.clone();
+        f.sort_unstable();
+        f
+    });
+    let mine = pair(edges[i]);
+    let flips = edges.iter().filter(|&&e| pair(e) == mine && overrides.contains(&e)).count();
+    (flips % 2 == 1) != opposite
 }
 
 /// The face each edge's Distance 1 (or the distance of Distance and angle) is

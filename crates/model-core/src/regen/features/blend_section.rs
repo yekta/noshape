@@ -2123,16 +2123,14 @@ pub fn rims_whole(rims: &Rims) -> bool {
     rims.0.iter().all(|(rim, _)| rim.arc.is_empty())
 }
 
-/// Whether each rim's chamfer measures from its cylinder: a picked cylinder (faces `picked`: live
-/// c2-hunting-knife's Chamfer 2, its hole's wall picked, 0.75 mm on the wall; whether that holds beyond an Offset
-/// chamfer of whole rims is open: a pin's picked top measures Distance 1 down its sides), else each edge's Distance 1
-/// face (`reference`, in `edges`' order). None where they differ or one is neither face.
-pub fn rims_measure_on_wall(rims: &Rims, picked: &[Shape], reference: &[Shape]) -> Option<bool> {
+/// Whether an Offset chamfer's first distance runs down every rim's wall: live 2675 puts it on the cylinder, the face or
+/// the edges picked alike (c2-hunting-knife's hole rims, c2-fan-blade-sweep's pin tops); `flipped(i)` (a rim, by its
+/// first edge's index: a direction override on its edges, or Opposite direction) puts it on the plane. None where the
+/// rims disagree.
+pub fn rims_measure_on_wall(rims: &Rims, flipped: impl Fn(usize) -> bool) -> Option<bool> {
     let mut on: Option<bool> = None;
-    for (rim, i) in &rims.0 {
-        let r = reference.get(*i)?;
-        let picked_wall = picked.iter().any(|f| f.is_same(&rim.wall));
-        let wall = if picked_wall || r.is_same(&rim.wall) { true } else if r.is_same(&rim.plane) { false } else { return None };
+    for (_, i) in &rims.0 {
+        let wall = !flipped(*i);
         if on.is_some_and(|o| o != wall) {
             return None;
         }
