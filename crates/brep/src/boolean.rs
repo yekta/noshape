@@ -2647,11 +2647,13 @@ impl Ctx<'_> {
         let (fi, ff) = if implicit_is_a { (fa, fb) } else { (fb, fa) };
         let g = &self.faces[ff];
         let reach = GREY * self.tol;
-        // (On a plane, within its face's box in the plane.)
+        // (On a plane, within its face's box in the plane grown by a tenth of its size: the runs' ends kept clear of
+        // the face's corners, where three faces' sections micrometres apart decide its vertices.)
         let bx = self.face_box(fi);
         let within = |_: DVec2, p: DVec3| bx.is_none_or(|(l, h)| {
             let q = self.faces[fi].to2(p);
-            q.x >= l.x - reach && q.y >= l.y - reach && q.x <= h.x + reach && q.y <= h.y + reach
+            let m = reach.max(0.1 * (h - l).length());
+            q.x >= l.x - m && q.y >= l.y - m && q.x <= h.x + m && q.y <= h.y + m
         });
         let (lo, hi) = (self.faces[fi].lo, self.faces[fi].hi);
         let near = |(l, h): (DVec3, DVec3)| (l - hi).max_element() <= reach && (lo - h).max_element() <= reach;
