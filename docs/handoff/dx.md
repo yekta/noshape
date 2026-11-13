@@ -17,6 +17,22 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-13 13:45 UTC: a Custom STL at a tiny chord no longer needs 12 GB (lead); min facet width waits on live
+- 31b71bdb landed (the STL hollow fix, the STEP p-curves on cylinders / cones / spheres / tori, handoffs). The hose
+  x_t (dx-fan) still waits on live's probe (REQUESTS 11:54).
+- The 8 GB: not the imported faces. At a 0.002 mm chord (0.002 x 0.002 mm deflection, as Onshape takes it) the
+  32-tooth gear's two sides have 35,908 boundary nodes; our planar triangulation (planar_cdt.hpp) refused them
+  because a sliver came out flat or a hair inverted in the doubles after the 2^22 grid's snap, and BRepMesh's
+  Delaunay then took 12.5 GB / 35 s (the import: out of memory). Slivers within the snap's error are kept now:
+  4.3 s / 380 MB, the same 9,062,484-byte file; 0.0005 mm 5.5 s. Kernel `a_notched_plate_at_a_tiny_chord_keeps_the_
+  planar_triangulation` (fails before: both plate faces to BRepMesh, 28 s).
+- Minimum facet width (still kept, not applied): live's Medium (0.254 mm) cuts clamp-hms' 5 mm rim into ~0.07 mm
+  segments (2319), so it doesn't floor edge segments; what it limits asked in REQUESTS 13:33. Apply it after.
+- live.igs' 12-tooth gear 806.58 mm² (model 807.57): its Fine mesh has 807.51, so the B-rep is right and our
+  integral is short, on the 24 flanks (extruded after the import's B-spline-to-extrusion merge: 9.99 for 10.03).
+  Their edges' p-curves are tight (8 of ~96 off 0.08-0.29 mm, re-projecting those changes nothing). Next: face_moments
+  on those extruded faces (the same gear by STEP reads 807.59).
+
 ## 11-13 11:52 UTC: hose x_t whole without the refit; spur gear STL and STEP; sheet metal STEP to core (lead 10:20, 11:00)
 - Hose (cf-hose-routing): 6a311c2b (a periodic refit, 1.8 s, 8x the file) withdrawn from the queue. The inner walls'
   seams are tangent within 4e-4 rad but not C1, so the seam knot wouldn't come down. xt.cpp `smooth_u_seam`: knots of
