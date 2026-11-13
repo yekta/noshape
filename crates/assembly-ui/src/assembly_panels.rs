@@ -3655,7 +3655,18 @@ impl AssemblyView {
         }
         let targets = Self::moved_placements(&m, &start);
         let all: HashMap<InstanceId, Placement> = self.result.solved.placements.iter().cloned().collect();
-        let solved = self.result.prepared.solve(&SolveOptions { targets, start: Some(all), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() });
+        let solved = self.result.prepared.solve(&SolveOptions { targets: targets.clone(), start: Some(all), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() });
+        // Mates that keep an instance from its target: nothing moves (live asm-triad-move-to-origin-mated, the pin on
+        // its Revolute).
+        let reached = |want: &Placement, got: &Placement| {
+            let (a, b) = (placement_to_frame(want), placement_to_frame(got));
+            a.origin.distance(b.origin) < 1e-7 && a.rotation.angle_between(b.rotation) < 1e-7
+        };
+        if targets.iter().any(|(id, want)| solved.placement(*id).is_none_or(|got| !reached(want, &got))) {
+            self.message = Some((true, "Unable to apply transform. Instance(s) may be constrained.".into()));
+            cx.notify();
+            return;
+        }
         let name = self.assembly(cx).and_then(|a| ids.first().and_then(|id| a.instance(*id)).map(|i| i.name.clone())).unwrap_or_default();
         let what = match action {
             TriadAction::MoveToOrigin => "Move to origin",
