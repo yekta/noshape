@@ -49,6 +49,14 @@ orange corners on edited fields, checkboxes and the rows to be written (single-p
 the title's rule (the kit's body clips its top 8 px: several parts get an 8 px shorter title and draw the rule). **11:30:** chrome done (interaction-feel.md "Chrome": shortcut map 196 / 196, chrome matrix
 11 / 11; tooltips 400 ms with live's warm switch in vendored gpui div.rs, toolbar help 2 s, the feature dialog clamped
 and snapped). Next: look.json, then live2's batches (sheet metal, sketch tools, editing, dialogs, feedback).
+**11:44 look.json, started:** most colours match 1:1 (scene `palette.rs`: hover #ffc685, selection #ffa90a, secondary
+#f2ff80, error #bd3039, sketch states, region, planes, axes, driven dimensions; shader `BODY_OUTLINE` = the selected
+part's #ffc04c in linear). First difference, measured (`/root/psui-scratch/chrome/ink.py`: ink across an edge per
+column, corrected for its slope): live's part edges (1 px) carry ~0.84 px of ink at DPR 1 and never reach black (darkest
+L ~60, live/feel/look/part-studio-iso.png); ours ~1.2 px, solid black (`EDGE_WIDTH` 1.25 in shaders.wgsl and the
+builder's 1.25 px polylines); inactive sketches 1.5 px vs live 1 px. Next: find the width giving live's ink at DPR 1
+(and check DPR 2 on the Mac), then the look matrix (scene / render T1 rows: colours, widths, glyph 20 px tiles,
+dimension arrows 16 × 8, value 18 px, mate connector 36 px).
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's
