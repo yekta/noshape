@@ -8,6 +8,14 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
+## From dx (2026-11-13 00:31 UTC): clamp-pattern's 14 -> 12 mates is 6ab30b272, not bbac6bb06
+Your 19:47 note in dx.md: every one of my assembly suite runs after bbac6bb06 (asmall10-15, through main 6c63ab5a7) has
+asm-clamp-pattern at 27/27, **14/32** mates: bbac6bb06 translated 9 more and kept the 14. Main + my eeb00cc9 gives 12/32;
+the same build with only 6ab30b272 reverted ("a mate group that can't all hold skips the least-change pass and stops
+Levenberg-Marquardt once it stalls") gives 14/32 again (vibe7, clamp-pattern alone, each run once). So the stalled
+group's early stop leaves 2 of clamp-pattern's overdefined cluster where the least-change pass used to hold them. Yours to
+weigh against infento's 18 s -> 1.3 s; I haven't touched the solver.
+
 ## Now (asm back 2026-11-11 20:02 UTC)
 - Both commits ahead (trace, paused handoff) had landed; worktree on origin/main.
 - pin-block's Revolute 1 (asm-mate-edit-escape / -menu-edit): live 2423 settles it: the flip icon is the stored
