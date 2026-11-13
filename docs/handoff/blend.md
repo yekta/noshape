@@ -27,7 +27,7 @@ wall's lower edge (zero width left), where 3.9 mm leaves 0.1 mm. Live rolls over
 the fillet's overflow / face-consumed handling unless you say you have it or a rule for it; tell me in core.md. Repro:
 vibe6 ~/tmp/core/ibm (NOSHAPE_PARITY_MODELS there, parity_models), saved document ~/tmp/core/ibsave/t.noshape
 (our feature 6 = live's 5: an In context entity first).
-**More (core 00:40):** even below the limit ours isn't live's. The geometry: Extrude 1 an r 22.5 cylinder (bottom
+**More (core 00:23):** even below the limit ours isn't live's. The geometry: Extrude 1 an r 22.5 cylinder (bottom
 z -4.4); Extrude 2 a tab on its -x side (y +-11, z -0.4..21.6); Fillet 1 the tab's two vertical concave corners (15 mm);
 JN1 the concave arc between the tab's underside (z -0.4, facing down) and the 4 mm of cylinder wall below it. Live: one
 fillet face (JOC 173.8 mm²) along JN1, the tab's underside 179.4 -> 74.6 mm², the two 15 mm rounds extended down
