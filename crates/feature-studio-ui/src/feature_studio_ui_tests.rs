@@ -158,5 +158,13 @@ fn ace_line_keys_comment_move_duplicate_and_remove(cx: &mut TestAppContext) {
     assert_eq!(lines(cx), "\nb\na");
     cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
     assert_eq!(lines(cx), "\nb\nb\na", "Ctrl+D is one undo step");
+    // Ctrl+\ from after a ')' to after its '(' (the caret at the text's end).
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
+    for k in ["f", "(", "x", ")"] {
+        type_key(cx, window, k);
+    }
+    type_key(cx, window, "secondary-\\");
+    type_key(cx, window, "y");
+    assert!(lines(cx).ends_with("f(yx)"), "{}", lines(cx));
     let _ = std::fs::remove_dir_all(&dir);
 }

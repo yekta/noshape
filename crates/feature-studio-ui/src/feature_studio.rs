@@ -28,7 +28,7 @@ const ACE_DRAWN_ROWS: usize = 9;
 /// A popup anchor: the trigger's bounds from the last paint.
 type BoundsCell = Rc<std::cell::Cell<Bounds<Pixels>>>;
 
-actions!(feature_studio, [Commit, CommitAll, SearchStudios, ModuleOutline, BackReference, ForwardReference, ToggleComment, RemoveLine, DuplicateSelection, MoveLinesUp, MoveLinesDown, CopyLinesUp, CopyLinesDown]);
+actions!(feature_studio, [Commit, CommitAll, SearchStudios, ModuleOutline, BackReference, ForwardReference, ToggleComment, RemoveLine, DuplicateSelection, MoveLinesUp, MoveLinesDown, CopyLinesUp, CopyLinesDown, FindNext, FindPrevious, JumpToMatching, NextError, PreviousError]);
 
 /// Onshape's Feature Studio shortcuts (live dom/keyboard-shortcuts.txt):
 /// Commit, Commit all, Top level symbols dropdown (the Module outline),
@@ -71,6 +71,11 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("alt-down", MoveLinesDown, code),
         KeyBinding::new(&ace("alt-shift-up", "cmd-alt-up"), CopyLinesUp, code),
         KeyBinding::new(&ace("alt-shift-down", "cmd-alt-down"), CopyLinesDown, code),
+        KeyBinding::new(&ace("ctrl-k", "cmd-g"), FindNext, code),
+        KeyBinding::new(&ace("ctrl-shift-k", "cmd-shift-g"), FindPrevious, code),
+        KeyBinding::new(&ace("ctrl-\\", "cmd-\\"), JumpToMatching, code),
+        KeyBinding::new(&ace("alt-e", "f4"), NextError, code),
+        KeyBinding::new(&ace("alt-shift-e", "shift-f4"), PreviousError, code),
     ]);
     cx.bind_keys(bindings);
 }
@@ -701,6 +706,47 @@ impl FeatureStudioView {
             e.replace(edit.text, window, cx);
             e.set_selected_range(edit.sel, cx);
         });
+    }
+
+    /// Ace's Find next / previous: the search box's last text (else the selection, else the word at the caret) from
+    /// the caret on, wrapping; the match selected.
+    fn find_next(&mut self, back: bool, cx: &mut Context<Self>) {
+        self.editor.update(cx, |e, cx| {
+            let text = e.value().to_string();
+            let sel = e.selected_range();
+            let word = |at: usize| {
+                let is_w = |c: char| c.is_alphanumeric() || c == '_';
+                let a = text[..at].rfind(|c: char| !is_w(c)).map_or(0, |i| i + 1);
+                let b = text[at..].find(|c: char| !is_w(c)).map_or(text.len(), |i| at + i);
+                text[a..b].to_string()
+            };
+            let query = Some(e.search_session().query.clone()).filter(|q| !q.is_empty()).or_else(|| (!sel.is_empty()).then(|| text[sel.clone()].to_string())).unwrap_or_else(|| word(sel.start));
+            let Some(found) = crate::fs_lines::find_from(&text, &query, if back { sel.start } else { sel.end }, back) else { return };
+            e.set_selected_range(found, cx);
+        });
+        cx.notify();
+    }
+
+    /// Ctrl+\\: the caret to the bracket matching the one beside it.
+    fn jump_to_matching(&mut self, cx: &mut Context<Self>) {
+        self.editor.update(cx, |e, cx| {
+            let at = e.selected_range().end;
+            if let Some(to) = crate::fs_lines::matching_bracket(&e.value(), at) {
+                e.set_selected_range(to..to, cx);
+            }
+        });
+    }
+
+    /// Alt+E / Alt+Shift+E (Ace's goToNextError): the caret to the next / previous notice's place, wrapping.
+    fn go_to_notice(&mut self, back: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let here = self.editor.read(cx).cursor_position();
+        let here = (here.line as usize + 1, here.character as usize + 1);
+        let mut places: Vec<(usize, usize)> = self.notices.iter().filter(|n| n.line > 0).map(|n| (n.line, n.column.max(1))).collect();
+        places.sort();
+        places.dedup();
+        let next = if back { places.iter().rev().find(|p| **p < here).or(places.last()) } else { places.iter().find(|p| **p > here).or(places.first()) };
+        let Some(&(line, column)) = next else { return };
+        self.editor.update(cx, |e, cx| e.set_cursor_position(Position { line: (line - 1) as u32, character: (column - 1) as u32 }, window, cx));
     }
 
     /// Undo/redo or history browsing replaced the text.
@@ -1995,6 +2041,11 @@ impl Render for FeatureStudioView {
             .on_action(cx.listener(|this, _: &MoveLinesDown, window, cx| this.line_op(crate::fs_lines::LineOp::MoveDown, window, cx)))
             .on_action(cx.listener(|this, _: &CopyLinesUp, window, cx| this.line_op(crate::fs_lines::LineOp::CopyUp, window, cx)))
             .on_action(cx.listener(|this, _: &CopyLinesDown, window, cx| this.line_op(crate::fs_lines::LineOp::CopyDown, window, cx)))
+            .on_action(cx.listener(|this, _: &FindNext, _, cx| this.find_next(false, cx)))
+            .on_action(cx.listener(|this, _: &FindPrevious, _, cx| this.find_next(true, cx)))
+            .on_action(cx.listener(|this, _: &JumpToMatching, _, cx| this.jump_to_matching(cx)))
+            .on_action(cx.listener(|this, _: &NextError, window, cx| this.go_to_notice(false, window, cx)))
+            .on_action(cx.listener(|this, _: &PreviousError, window, cx| this.go_to_notice(true, window, cx)))
             .on_action(cx.listener(|this, _: &ForwardReference, window, cx| this.navigate(1, window, cx)))
             .bg(rgb(0xffffff))
             .child(match self.doc.read(cx).session.viewing_version() {

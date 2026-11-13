@@ -114,6 +114,83 @@ fn toggle_comment(text: &str, b: Range<usize>, sel: Range<usize>) -> LineEdit {
     LineEdit { range: b, text: out.join("\n"), sel: map(sel.start)..map(sel.end) }
 }
 
+/// Byte offsets of the brackets outside strings and comments, each with its kind.
+fn code_brackets(text: &str) -> Vec<(usize, u8)> {
+    let b = text.as_bytes();
+    let (mut i, mut out) = (0, Vec::new());
+    while i < b.len() {
+        match b[i] {
+            b'/' if b.get(i + 1) == Some(&b'/') => i = text[i..].find('\n').map_or(b.len(), |n| i + n),
+            b'/' if b.get(i + 1) == Some(&b'*') => i = text[i + 2..].find("*/").map_or(b.len(), |n| i + n + 4),
+            q @ (b'"' | b'\'') => {
+                i += 1;
+                while i < b.len() && b[i] != q {
+                    i += if b[i] == b'\\' { 2 } else { 1 };
+                }
+                i += 1;
+            }
+            c @ (b'(' | b')' | b'[' | b']' | b'{' | b'}') => {
+                out.push((i, c));
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+    out
+}
+
+/// Ctrl+\ (Ace's jumptomatching): with a bracket right after the caret, the caret goes before its partner; else with
+/// one right before it, after its partner. Brackets in strings and comments don't count.
+pub fn matching_bracket(text: &str, at: usize) -> Option<usize> {
+    let brackets = code_brackets(text);
+    let partner = |k: usize| -> Option<usize> {
+        let (_, c) = brackets[k];
+        let (open, close) = match c {
+            b'(' | b')' => (b'(', b')'),
+            b'[' | b']' => (b'[', b']'),
+            _ => (b'{', b'}'),
+        };
+        let mut depth = 0i32;
+        if c == open {
+            for (j, &(_, d)) in brackets.iter().enumerate().skip(k) {
+                depth += if d == open { 1 } else if d == close { -1 } else { 0 };
+                if depth == 0 {
+                    return Some(j);
+                }
+            }
+        } else {
+            for j in (0..=k).rev() {
+                let d = brackets[j].1;
+                depth += if d == close { 1 } else if d == open { -1 } else { 0 };
+                if depth == 0 {
+                    return Some(j);
+                }
+            }
+        }
+        None
+    };
+    if let Some(k) = brackets.iter().position(|(p, _)| *p == at) {
+        return partner(k).map(|j| brackets[j].0);
+    }
+    let k = brackets.iter().position(|(p, _)| *p + 1 == at)?;
+    partner(k).map(|j| brackets[j].0 + 1)
+}
+
+/// The next (`back`: previous) case-insensitive occurrence of `query` from `at`, wrapping round the text (Ace's
+/// findnext / findprevious).
+pub fn find_from(text: &str, query: &str, at: usize, back: bool) -> Option<Range<usize>> {
+    if query.is_empty() {
+        return None;
+    }
+    let (t, q) = (text.to_lowercase(), query.to_lowercase());
+    if t.len() != text.len() {
+        return None;
+    }
+    let hits: Vec<usize> = t.match_indices(&q).map(|(i, _)| i).collect();
+    let start = if back { hits.iter().rev().find(|&&i| i + q.len() <= at).or(hits.last()) } else { hits.iter().find(|&&i| i >= at).or(hits.first()) };
+    start.map(|&i| i..i + q.len())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,5 +233,26 @@ mod tests {
         assert_eq!(run("a\nbb\nc", 0..5, LineOp::MoveDown), ("c\na\nbb".into(), 2..7), "two lines (the selection ends at c's start)");
         assert_eq!(run("a\nbb\nc", 3..3, LineOp::CopyUp), ("a\nbb\nbb\nc".into(), 3..3));
         assert_eq!(run("a\nbb\nc", 3..3, LineOp::CopyDown), ("a\nbb\nbb\nc".into(), 6..6));
+    }
+
+    /// Ctrl+\\ jumps between a bracket and its partner, past nested ones and those in strings or comments.
+    #[::core::prelude::v1::test]
+    fn ctrl_backslash_jumps_to_the_matching_bracket() {
+        let t = "f(a, [b], \")\") { // }\n}";
+        assert_eq!(matching_bracket(t, 1), Some(13), "before ( : before its )");
+        assert_eq!(matching_bracket(t, 14), Some(2), "after ) : after its (");
+        assert_eq!(matching_bracket(t, 15), Some(22), "the brace past the comment's");
+        assert_eq!(matching_bracket(t, 3), None);
+    }
+
+    /// Ctrl+K / Ctrl+Shift+K: the next / previous occurrence from the caret, wrapping, any case.
+    #[::core::prelude::v1::test]
+    fn find_next_and_previous_wrap() {
+        let t = "ab Ab x ab";
+        assert_eq!(find_from(t, "ab", 1, false), Some(3..5));
+        assert_eq!(find_from(t, "ab", 9, false), Some(0..2), "wraps to the top");
+        assert_eq!(find_from(t, "ab", 3, true), Some(0..2));
+        assert_eq!(find_from(t, "ab", 0, true), Some(8..10), "wraps to the end");
+        assert_eq!(find_from(t, "zz", 0, false), None);
     }
 }
