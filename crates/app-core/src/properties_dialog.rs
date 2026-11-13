@@ -242,6 +242,9 @@ pub struct MetaForm {
     card: Option<ItemCard>,
     /// Several parts at once.
     multi: Option<Multi>,
+    /// The modal's own focus: it opens with no field focused (live feel/dialogs.json "propertiesDialog": typing does
+    /// nothing until a field is clicked; the document's shortcuts are off behind it).
+    focus: FocusHandle,
     /// The fields edited since the form was filled or saved (by label), worked out once per frame.
     edited: Vec<String>,
     /// Release management: the release-create icon at the top left
@@ -371,6 +374,7 @@ impl MetaForm {
             spec_category: spec.category,
             card: None,
             multi: None,
+            focus: cx.focus_handle(),
             edited: Vec::new(),
             material: spec.material,
             computed_mass: spec.computed_mass,
@@ -618,6 +622,17 @@ impl MetaForm {
 
     fn is_edited(&self, f: &str) -> bool {
         self.edited.iter().any(|x| x == f)
+    }
+
+    /// Whether a field (any text input) has the keyboard, not the modal itself.
+    pub fn a_field_has_focus(&self, window: &Window, cx: &App) -> bool {
+        let fields = [&self.name, &self.part_number, &self.revision, &self.vendor, &self.project, &self.product_line, &self.titles[0], &self.titles[1], &self.titles[2]];
+        fields.iter().any(|f| f.read(cx).focus_handle(cx).is_focused(window)) || self.description.read(cx).focus_handle(cx).is_focused(window)
+    }
+
+    /// Whether the modal itself has the keyboard.
+    pub fn has_focus(&self, window: &Window) -> bool {
+        self.focus.is_focused(window)
     }
 
     /// Fields whose parts differ, shown "Multiple values" (several parts).
@@ -1244,6 +1259,7 @@ impl Render for MetaForm {
         let (header, form_header) = (header_row(false), header_row(true));
         v_flex()
             .w_full()
+            .track_focus(&self.focus)
             // The kit dialog puts 8 px between title and body (several parts: their title is 8 px shorter instead).
             .when(self.multi.is_none(), |d| d.mt(px(-8.)))
             .text_color(pal.text)
@@ -1417,10 +1433,9 @@ pub fn bootstrap_modal(dialog: gpui_kit::component::dialog::Dialog, title: &'sta
 pub fn open_properties(spec: MetaSpec, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
     let on_save: SaveFn = Rc::new(on_save);
     let form = cx.new(|cx| MetaForm::new(spec, on_save, window, cx));
-    let name = form.read(cx).name.clone();
+    let focus = form.read(cx).focus.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
-    // Live: the first field (Name) has the focus when the modal opens.
-    name.update(cx, |s, cx| s.focus(window, cx));
+    window.focus(&focus, cx);
 }
 
 /// [`open_properties`] with the Release icon at the top left (`on_release` opens the Create Release candidate dialog;
@@ -1433,9 +1448,9 @@ pub fn open_properties_with_release(spec: MetaSpec, on_save: impl Fn(MetaValues,
         f.on_release = Some(on_release);
         f
     });
-    let name = form.read(cx).name.clone();
+    let focus = form.read(cx).focus.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
-    name.update(cx, |s, cx| s.focus(window, cx));
+    window.focus(&focus, cx);
 }
 
 /// [`open_properties_with_release`] whose computed mass arrives later (`mass`, as [`open_properties_mass_later`]):
@@ -1449,9 +1464,9 @@ pub fn open_properties_mass_later_with_release(spec: MetaSpec, mass: Task<Option
         f
     });
     mass_arrives_later(&form, mass, window, cx);
-    let name = form.read(cx).name.clone();
+    let focus = form.read(cx).focus.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
-    name.update(cx, |s, cx| s.focus(window, cx));
+    window.focus(&focus, cx);
 }
 
 /// [`open_properties`] whose computed mass arrives later (`mass`, worked out off the UI thread: an assembly's from
@@ -1460,9 +1475,9 @@ pub fn open_properties_mass_later(spec: MetaSpec, mass: Task<Option<String>>, on
     let on_save: SaveFn = Rc::new(on_save);
     let form = cx.new(|cx| MetaForm::new(spec, on_save, window, cx));
     mass_arrives_later(&form, mass, window, cx);
-    let name = form.read(cx).name.clone();
+    let focus = form.read(cx).focus.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
-    name.update(cx, |s, cx| s.focus(window, cx));
+    window.focus(&focus, cx);
 }
 
 /// The form's computed mass, worked out off the UI thread (`mass`): "Calculating…" until it arrives.
@@ -1497,9 +1512,9 @@ pub fn open_properties_with_card(spec: MetaSpec, card: ItemCard, on_save: impl F
         f.card = Some(card);
         f
     });
-    let name = form.read(cx).name.clone();
+    let focus = form.read(cx).focus.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
-    name.update(cx, |s, cx| s.focus(window, cx));
+    window.focus(&focus, cx);
 }
 
 /// [`open_properties`] for a Part Studio part, with the release-create icon
@@ -1521,10 +1536,9 @@ pub fn open_part_properties_configured(spec: MetaSpec, part: PartExtras, on_save
     if let Some(mass) = mass {
         mass_arrives_later(&form, mass, window, cx);
     }
-    let name = form.read(cx).name.clone();
+    let focus = form.read(cx).focus.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
-    // Live: the first field (Name) has the focus when the modal opens.
-    name.update(cx, |s, cx| s.focus(window, cx));
+    window.focus(&focus, cx);
 }
 
 /// Several parts' Properties: each part's name, values and what Reset all restores (in the list's order), and their
@@ -1558,12 +1572,12 @@ pub fn open_parts_properties(spec: MetaSpec, parts: PartsProperties, on_save: im
         });
     })
     .detach();
-    let name = form.read(cx).name.clone();
+    let focus = form.read(cx).focus.clone();
     window.open_dialog(cx, move |dialog, _, _| {
         let width = props_size().0;
         resizable_props(bootstrap_modal(dialog, "Properties", width, 15.).title(modal_header_ruled_by_body("Properties", width)).keyboard(false).child(form.clone()))
     });
-    name.update(cx, |s, cx| s.focus(window, cx));
+    window.focus(&focus, cx);
 }
 
 /// [`open_properties`] with `read_only` fields shown greyed, not edited (a standard content part's Name, live skb

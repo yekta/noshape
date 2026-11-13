@@ -839,11 +839,15 @@ impl Viewport {
             if glyph_px > 0.0 {
                 b = a + (b - a).normalize_or_zero() * glyph_px;
             }
+            // Live (feel/dialogs.json "grabReach"): within 14 px across the drawn arrow, from 4 px behind its base to
+            // its tip; nothing past the tip.
             let d = b - a;
-            let u = ((p - a).dot(d) / d.length_squared().max(1e-9)).clamp(0.0, 1.0);
-            let (line, end) = ((a + d * u - p).length(), (b - p).length());
-            if (line < 8.0 || end < 14.0) && best.is_none_or(|(_, x)| line.min(end) < x) {
-                best = Some((i, line.min(end)));
+            let len = d.length();
+            let dir = d / len.max(1e-9);
+            let along = (p - a).dot(dir);
+            let across = ((p - a) - dir * along).length();
+            if (-4.0..=len).contains(&along) && across <= 14.0 && best.is_none_or(|(_, x)| across < x) {
+                best = Some((i, across));
             }
         }
         best.map(|(i, _)| i)

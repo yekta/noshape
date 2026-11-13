@@ -2075,7 +2075,7 @@ fn knurl_edges_take_two_then_targets_and_rearm_after_a_removal(cx: &mut TestAppC
 fn revolve_angles_snap_to_five_degrees_as_live() {
     use super::super::manipulators::snap_degrees;
     for (dragged, shown) in [(47.5365, 47.5365), (48.1, 50.0), (52.2405, 52.2405), (52.8758, 52.8758), (53.2, 55.0), (62.9932, 62.9932), (63.5, 65.0), (359.0, 360.0), (365.0, 360.0)] {
-        assert!((snap_degrees(dragged) - shown).abs() < 1e-9, "{dragged} → {}", snap_degrees(dragged));
+        assert!((snap_degrees(dragged, 200.) - shown).abs() < 1e-9, "{dragged} → {}", snap_degrees(dragged, 200.));
     }
 }
 
@@ -4088,6 +4088,8 @@ mod sm;
 mod sketchtools;
 #[path = "editing_feel_tests.rs"]
 mod editing;
+#[path = "dialogs_feel_tests.rs"]
+mod dialogs;
 
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.

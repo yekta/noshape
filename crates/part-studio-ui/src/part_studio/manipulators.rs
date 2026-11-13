@@ -27,9 +27,9 @@ pub(super) struct Arrow {
 }
 
 /// The arrow glyph (pixels at the arrow, drawn in 3D like live's): shaft
-/// length, head length and head width. Live (dialogs/extrude-03, 05; iso,
-/// Z up, seen at 0.816): head 24.5 px tall on screen, 20 px wide, shaft 24 px.
-pub(super) const ARROW_SHAFT_PX: f64 = 29.;
+/// length, head length and head width. Live (feel/dialogs.json "look", the client's constants): shaft 30 px + head 30
+/// px, head radius 10 px (dialogs/extrude-03, 05 seen foreshortened at 0.816: 24 + 24.5 px).
+pub(super) const ARROW_SHAFT_PX: f64 = 30.;
 pub(super) const ARROW_HEAD_PX: f64 = 30.;
 const ARROW_HEAD_W_PX: f64 = 20.;
 /// An angle handle's stem past the arc's end and its head (live 11-01 Draft,
@@ -655,6 +655,11 @@ impl PartStudioView {
     }
 
     /// Axis parameter of the point on the arrow axis closest to a view ray.
+    /// How far the pointer at `position` is from an arc's centre on screen (px): the angular snap's level.
+    fn arc_radius_px(&self, origin: DVec3, position: glam::DVec2, cx: &App) -> f64 {
+        self.viewport.read(cx).project(origin).map_or(0.0, |c| c.distance(position))
+    }
+
     fn axis_param(a: &Arrow, origin: DVec3, dir: DVec3) -> Option<f64> {
         // Closest points between the axis line and the ray.
         let w0 = a.base - origin;
@@ -745,13 +750,17 @@ impl PartStudioView {
                 if a.param == "extensionDistance" {
                     len = len.max(0.0);
                 }
-                // Live (dialogs/extrude-06, the triad and section arrows): a
-                // dragged length moves in 0.1 mm steps ("13.9 mm", "2.6 mm"),
-                // or 0.01 in in imperial units ("2.06 in", "1.76 in").
+                // Live (feel/dialogs.json "drag"): the step follows the zoom at the arrow; Shift drags freely.
                 let units = self.doc.read(cx).session.doc.settings.units;
-                let imperial = matches!(units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
-                let step = if imperial { 0.000254 } else { 0.0001 };
-                let len = ((len.abs() / step).round() * step).max(step);
+                let vp = self.viewport.read(cx);
+                let view = noshape_render::camera_geometry::View { camera: vp.camera, size: vp.size() };
+                let m_per_px = view.world_per_px(a.base + a.dir * len).unwrap_or(0.00025);
+                let len = if window.modifiers().shift {
+                    len.abs()
+                } else {
+                    let step = linear_step(m_per_px, units.length.meters());
+                    ((len.abs() / step).round() * step).max(step)
+                };
                 let text = noshape_units::format_quantity(Quantity::new(len, Dim::LENGTH), &units);
                 if let Some(e) = &self.edit {
                     e.dialog.update(cx, |dlg, cx| {
@@ -841,7 +850,14 @@ impl PartStudioView {
                 // Only the first arc flips; the second keeps its magnitude (std angleBack = abs).
                 let flip = value < 0.0 && h.flip.is_some();
                 // Draft (not checked on live): no 5° snap, tenths of a degree.
-                let deg = if h.max < std::f64::consts::TAU { ((value.abs().to_degrees() * 10.0).round() / 10.0).min(h.max.to_degrees()) } else { snap_degrees(value.abs().to_degrees()) };
+                let radius = self.arc_radius_px(h.origin, *position, cx);
+                let deg = if h.max < std::f64::consts::TAU {
+                    ((value.abs().to_degrees() * 10.0).round() / 10.0).min(h.max.to_degrees())
+                } else if window.modifiers().shift {
+                    value.abs().to_degrees().min(360.0)
+                } else {
+                    snap_degrees(value.abs().to_degrees(), radius)
+                };
                 value = deg.to_radians();
                 let units = self.doc.read(cx).session.doc.settings.units;
                 let text = if matches!(units.angle, noshape_units::AngleUnit::Degree) {
@@ -988,7 +1004,7 @@ impl PartStudioView {
     }
 
     /// A FeatureScript length or flip arrow: a drag moves a length along
-    /// its direction (signed, within its min / max, 0.1 mm steps as ours);
+    /// its direction (signed, within its min / max, in live's zoom-dependent steps);
     /// a click on a flip arrow flips it.
     fn std_arrow_event(&mut self, a: Arrow, i: usize, which: usize, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
         use noshape_model::display::FeatureManipulator as M;
@@ -1007,10 +1023,14 @@ impl PartStudioView {
                 let M::Linear { min, max, .. } = m else { return true };
                 let (o, d) = ray(self, *position, cx);
                 let Some(t) = Self::axis_param(&a, o, d) else { return true };
+                // The step follows the zoom at the arrow (live: on the manipulator's offset, Fillet's bisector offset too);
+                // Shift drags freely.
                 let units = self.doc.read(cx).session.doc.settings.units;
-                let imperial = matches!(units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
-                let step = if imperial { 0.000254 } else { 0.0001 };
-                let value = (((t - md.grab_offset) / step).round() * step).clamp(min, max);
+                let raw = t - md.grab_offset;
+                let vp = self.viewport.read(cx);
+                let view = noshape_render::camera_geometry::View { camera: vp.camera, size: vp.size() };
+                let step = linear_step(view.world_per_px(a.base + a.dir * raw).unwrap_or(0.00025), units.length.meters());
+                let value = if window.modifiers().shift { raw } else { (raw / step).round() * step }.clamp(min, max);
                 let mut moved = m.clone();
                 if let M::Linear { offset, .. } = &mut moved {
                     *offset = value;
@@ -1067,7 +1087,8 @@ impl PartStudioView {
                 let a = md.grab_offset + (raw - md.grab_offset + pi).rem_euclid(tau) - pi;
                 self.manip_drag = Some(ManipDrag { grab_offset: a, ..md });
                 let value = a - md.delta;
-                let value = (snap_degrees(value.abs().to_degrees()).to_radians() * value.signum()).clamp(min, max);
+                let deg = if window.modifiers().shift { value.abs().to_degrees().min(360.0) } else { snap_degrees(value.abs().to_degrees(), self.arc_radius_px(h.origin, *position, cx)) };
+                let value = (deg.to_radians() * value.signum()).clamp(min, max);
                 let mut moved = m.clone();
                 if let M::Angular { angle, .. } = &mut moved {
                     *angle = value;
@@ -1105,11 +1126,25 @@ fn std_handle(m: &noshape_model::display::FeatureManipulator, i: usize) -> Optio
     })
 }
 
-/// A dragged angle (degrees, ≥ 0) as live sets it: a multiple of 5° within
-/// 2° of one, else as dragged; at most a whole turn.
-pub(super) fn snap_degrees(deg: f64) -> f64 {
-    let near = (deg / 5.0).round() * 5.0;
-    (if (deg - near).abs() < 2.0 { near } else { deg }).min(360.0)
+/// A dragged length's step (live getLinearSnapValue: MANIPULATOR_LINEAR_SNAP_RESOLUTION_PX 100, INCREMENT_DIVISOR 10):
+/// 10^(round(log10(100 px in the document's length unit)) − 2) of that unit, `m_per_px` the pixel size at the arrow,
+/// `unit_m` the unit in meters (0.1 mm at 0.207–0.293 mm/px, 1 mm from 0.316 mm/px).
+pub(super) fn linear_step(m_per_px: f64, unit_m: f64) -> f64 {
+    let span = 100.0 * m_per_px / unit_m;
+    if !(span.is_finite() && span > 0.0) {
+        return 0.0001;
+    }
+    10f64.powf(span.log10().round() - 2.0) * unit_m
+}
+
+/// A dragged angle (degrees, ≥ 0) as live sets it (feel/dialogs.json "angularStep"): the step is 5° while 5° of arc at
+/// the pointer is at most 50 px (`radius_px` ≤ 573), else 1° (≤ 2865 px), else 0.1°; it snaps within 0.4 step of a
+/// multiple at 5° (2°), less at the finer levels (÷ (1 + level / 3): 0.3° at 1°; live's note reads "× (1 + level / 3)",
+/// which would always snap a 1° step), and is free in between; at most a whole turn.
+pub(super) fn snap_degrees(deg: f64, radius_px: f64) -> f64 {
+    let (step, level) = if radius_px <= 573.0 { (5.0, 0.0) } else if radius_px <= 2865.0 { (1.0, 1.0) } else { (0.1, 2.0) };
+    let near = (deg / step).round() * step;
+    (if (deg - near).abs() <= 0.4 * step / (1.0 + level / 3.0) { near } else { deg }).min(360.0)
 }
 
 /// A point on a triangulated region near its area centroid (the centroid of
@@ -1275,4 +1310,33 @@ fn arrow_glyph(a: &Arrow, hover: bool, dragging: bool, view: &noshape_render::ca
         Instance::new(Drawable::Lines(up.upload_lines(&back))).per_primitive_color().unpickable().ignore_clip().layer(40),
         Instance::new(Drawable::Lines(up.upload_lines(&front))).per_primitive_color().unpickable().ignore_clip().layer(41),
     ]
+}
+
+#[cfg(test)]
+mod snap_tests {
+    use super::{linear_step, snap_degrees};
+
+    /// Live feel/dialogs.json "linearStep": 0.1 mm at 0.207–0.293 mm/px, 1 mm at 0.414 mm/px (the switch at 0.316),
+    /// 0.01 mm below 0.0316 mm/px; inches by the inch.
+    #[test]
+    fn a_dragged_length_steps_with_the_zoom_as_live() {
+        let mm = 0.001;
+        for (mm_per_px, step_mm) in [(0.207, 0.1), (0.293, 0.1), (0.31, 0.1), (0.32, 1.0), (0.414, 1.0), (0.03, 0.01)] {
+            let got = linear_step(mm_per_px * mm, mm) / mm;
+            assert!((got - step_mm).abs() < 1e-9, "{mm_per_px} mm/px: {got} mm");
+        }
+        let inch = 0.0254;
+        assert!((linear_step(0.01 * inch, inch) / inch - 0.01).abs() < 1e-9);
+    }
+
+    /// Live "angularStep": 5° within 2° up to a 573 px radius, then 1° (within 0.3°), then 0.1°; free in between.
+    #[test]
+    fn a_dragged_angle_snaps_by_its_radius_as_live() {
+        assert_eq!(snap_degrees(43.5, 300.), 45.0);
+        assert_eq!(snap_degrees(42.4154, 300.), 42.4154);
+        assert_eq!(snap_degrees(42.25, 1000.), 42.0);
+        assert_eq!(snap_degrees(42.6, 1000.), 42.6);
+        assert!((snap_degrees(42.42, 4000.) - 42.4).abs() < 1e-9);
+        assert_eq!(snap_degrees(42.45, 4000.), 42.45);
+    }
 }

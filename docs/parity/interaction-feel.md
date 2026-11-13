@@ -393,6 +393,23 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 | Y / Shift+Y with nothing selected or under the pointer | nothing (Shift+Y isn't "show all") | the same | = |
 | Not yet in the matrix | the toolbar's Undo tooltip (always "Undo (cmd+z/ctrl+z)": ours the same), undo in a feature dialog (an existing test), sketch copy / paste (at the pointer, selected, with a 2D triad, constraints kept), the assembly rows (asm's), eye icons | – | – |
 
+## Dialogs (matrix)
+
+live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). part-studio-ui
+`dialogs::the_dialogs_matrix_matches_live` (T1, no GPU) on the block start, and `manipulators::snap_tests`.
+
+**Matched: 5 / 5** (11-13 12:48 UTC; 1 / 5 at the first run).
+
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| Which features have a manipulator | Extrude one arrow; Chamfer, Shell none | the same | = |
+| An arrow's grab reach | within 14 px across (16 no), from 4 px behind its base to its tip, nothing past the tip | 8 px of the shaft or 14 px round the tip (past it too); now live's (`Viewport::manipulator_index_at`) | = (fixed) |
+| The arrow | shaft 30 + head 30 px, head radius 10 | shaft 29; now 30 | = (fixed) |
+| A dragged length's step | 10^(round(log10(100 px in the unit)) − 2) of the unit at the arrow (0.1 mm at 0.25 mm/px, 1 mm from 0.316); Shift: free | always 0.1 mm / 0.01 in, Shift ignored; now live's (`manipulators::linear_step`, our own and std arrows) | = (fixed) |
+| A dragged angle's step | 5° within 2° up to a 573 px radius, 1° up to 2865 px, then 0.1°; free between; Shift: free | always 5° within 2°; now by radius (the finer windows divided by 1 + level / 3: asked, REQUESTS 12:48) | = (fixed) |
+| Properties on opening | no field has the keyboard (live's recordings: a div / ul); typing does nothing | Name focused; now the modal itself (`MetaForm::focus`), document keys still off behind it | = (fixed) |
+| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, an arrow click flipping; preview timing (Enter / Tab / blur, every ~0.4 s while dragging); a selected entity clicked again leaves the field, a row hovered lighting it yellow-green, the field's Tab order, Esc in a value field (discard, then cancel), Enter on the canvas committing; the Appearance and Material dialogs' layout and keys; Properties' Tab order, Enter and Esc doing nothing | – | – |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
