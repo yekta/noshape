@@ -319,6 +319,25 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     off (up to the inner wall); feature 25 Boolean 1 is then 32/81/50 (live 30/83/54) with OCCT's result identical to
     ours on its inputs (a1af84e6, 3998eb43), then Chamfer Stevenrohr Halterung fails. Recording of the whole document
     with this branch: vibe5 ~/agents/bool2-keep/rec-imp2; per-feature diff ~/agents/bool2-keep/imp-diff.log.
+- **Our own sections (lead 15:40 UTC; split with bool on REQUESTS 15:45 / 15:49: plane∩B-spline, lofted∩B-spline,
+  sphere∩B-spline mine; bool keeps sections_ahead's plumbing). WIP branch bool2-march (pushed, e9d8c7a83; debug prints
+  in, not to land).** brep `boolean/march.rs`: an elementary surface's signed distance over the free-form face's
+  parameter grid (its spans x4, >= 32 a way, points evaluated lazily for cells whose hull is near the other face and
+  reaches its surface), crossings on the grid lines chained through the cells (a cell crossed 4 times, or one whose
+  corners / middle come within 2 tol without a crossing and no crossed neighbour: None = OCCT's), cubic pieces filled
+  in to a tenth of the tolerance, then thinned (32 -> ~3 pieces) and checked over every piece. `brep_own_section`
+  (rust_boolean.cpp) keeps each as an IntTools_Curve with OCCT's (its plane curve the poles in the plane's
+  parameters), so the build is unchanged; `SectionSource::own`, `Ctx::own_sections` in occt_sections, the pairs left
+  out of the ahead list and marched ahead on all threads, cached over boolean_with's rounds (`Round`, `Marches`).
+  - c2-rings-loft's 51-slot cut bd8a6b96 (all cores, vibe6): 808 ms without, 840 unclipped (results as OCCT's,
+    "equivalent"), 680 with the runs clipped to the plane face's box in its plane, but then one vertex more than OCCT
+    (at a three-face corner OCCT's section ends 14 um short, on the ring face's boundary; ours stops one grid point
+    past the box). Ending runs exactly on both faces' boundaries declined two cuts (non-manifold). Patches:
+    /root/bool2-scratch/march-{box-clip,exact-trim,with-sphere}.patch.
+  - Spheres (bool's 85 balls, sp-1113 7ecd5a8b): marched curves cut at the sphere's seam (free::seam_crossings) and
+    projected onto it, but the cut declines non-manifold (156 open edges): ours aren't trimmed to the faces as
+    OCCT's (longer, some where OCCT has none). Off on the branch (march-with-sphere.patch has it).
+  - Next: make clipped runs end as OCCT's walks do (on the first face boundary met, both faces), then the gate.
 - **c2-hunting-knife (10:52 UTC, gating 1ff449d86): to blend, I changed your blend_section.rs.** The chamfer's
   section Booleans with lofted tools ran under `with_occt_boolean` (11b4acf22: "noshape's own Boolean takes planes,
   cylinders and cones only"). Ours takes them since the knife fix (82cfec7d), so the skip is gone (and with it
