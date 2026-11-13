@@ -18,26 +18,56 @@ live's from live.jsonl per_feature_ms. Yours:
 - (A note on the suite's per-feature kernel profiles: their props_surface calls are the suite's own measuring after each
   feature, face_json -> entities -> our_parts, not regeneration.)
 
-## core state (11-13 00:05 UTC)
-Landed 11-12: STORE-FACE-SPLIT; hat15 / f197 / slow1151 naming aliases (8cde65436: aliases from all of a merged face's
-parents after a boolean's unify, same argument only for the boolean's own naming; inside-out results fail); louver Part 16;
-knife Mirror 1; rings-loft engraving edges (B-spline / ellipse pieces only, never a sketch's arcs); Delete face's direct
-route for inner loops (d549b2cb, impeller Delete face 1 ~1 s -> 5 ms); timing asserts out of T1 (a6abfbdf1, 1603ac1d4:
-budget tests bound thread CPU time); the suite's refs `parameters` list (0a95e0ee0) and NOSHAPE_PARITY_DIFFERING.
-In the queue: the suite's face-on-a-plane tie-break (nearest live's origin; wire-clip / gamma 2 -> 4 of 6, suite 848 ->
-852 on vibe6).
-Open:
-- c2-hunting-knife Loft 3 (feature 11): our guided loft (Gordon) 2 µm inside live's between the guides, the blade 4.93 mm³
-  under live's band-free volume from feature 24; capture asked (REQUESTS 11-12 23:57).
-- c2-impeller-loft: Move face 1 (2.6 s) deletes the chamber bore as a fillet to reapply on our diverged part, then fails;
-  Delete face 2 (2.5 s) is OCCT's defeaturing (its MakerVolume intersects every face); both wait for the part to match
-  live (bool's Boolean Flansch+Gehäuse). Features 13 / 14 (Move faces) match live's geometry; live's OTHER labels on
-  straight edges go to qa (qa.md 11-12 18:40).
-- Translation gaps: wire-clip / gamma Booleans 1 / 2 tools and the knife's Fillet 8 have no live geometry (live's fetch);
-  the knife's Sketch 7 keeps live's solved square (not a blocker); its Loft 1 / Sketch 12 and rings-loft's Sketch 6 are
-  cascades of blend's Fillet 6 / Chamfer 3.
-- asm-isaac-ball's Fillet 2 (below, from asm): a fillet, blend's unless the lead says otherwise.
-Hosts: vibe6 for release builds and timings (CARGO_BUILD_JOBS=6), vibe5 probes with LTO off, never vibe3.
+## core state (11-13 06:01 UTC): handoff for a restart
+**In flight: asm-isaac-ball's Fillet 2 + fan-blade's Mirror 3**, branch `core-isaac` in /root/projects/noshape-wt/core, all
+committed, pushed as **origin/core-wip-isaac** (f129e2773, one commit on main 11-13 ~00:00):
+- detail.rs: a fillet's chain (`fillet_chain`) stops where the edge convexity changes and skips edges with one face
+  (TangentLinks: convexity, any_convexity); chamfers / face blends keep `propagate_tangent` as before (c2-rings-loft's
+  Chamfer 3 fell 29 -> 22 when they took it too). The fillet's `stops` test still uses the old propagation, so the chain
+  goes to the run-on builders; `curved_edge_left_open` uses the convexity-aware neighbours.
+- blend_section.rs `stopped_concave_arc_round`: a concave plane-cylinder arc (axis along the plane's normal) whose chain
+  stops: the corner-minus-round section revolved about the axis, intersected with the plane face swept along its normal
+  (built from the far side, then `Shape::with_elementary_surfaces`, so its sides are cylinders with the neighbours' axis
+  direction and unify with them: from the near side the axes came out opposite and USD kept the rounds' extensions apart),
+  fused, unified.
+- kernel: `elementary_surfaces` (xt.cpp's swept_to_elementary exposed; ffi.rs, shape.rs); common.cpp `one_surface`
+  (shown_topology joins seam pieces on equal copies of one surface: a mirror copies each face's surface; fan-blade
+  Mirror 3 44 -> 48 of 53) and a line + straight B-spline between the same two faces as one edge (isaac's Fillet 1
+  edge OCCT left a B-spline).
+- T1 `kernel_robustness::a_concave_arcs_round_stops_at_the_convex_rounds_and_runs_them_on` (fails on main: "Failed to
+  fillet selections."); probes added to kernel features.rs (two_step_solids_boolean_probe: faces, B-spline, cut pieces).
+- Results so far: isaac studio (vibe5/vibe6 ~/tmp/core/ibm, NOSHAPE_PARITY_MODELS there) 5 -> 15 of 103, Fillet 2 18/42/26
+  as live, +98.06 mm³ (live 98.01); first difference now Extrude 7 (feature 12, 22/49/28 vs 21/46/26). Model suite pair
+  (before the chamfer fix): 856 -> 859 (fan-blade +4, rings-loft -7, now fixed in the branch).
+- **Running now (vibe6, from 05:50, ~3 h): /root/core-scratch/bin/isaac-gate6.sh** -> logs
+  /root/core-scratch/hb/gate6-isaac-asm-{core-cache,core}.log (assembly pair: core-cache = main) and
+  gate6-isaac-models-core.log (T1, isaac studio, the branch's full model suite; base for it:
+  hb/gate-isaac-models-core-cache.log, main 11-13 02:45). Light profile (CARGO_PROFILE_RELEASE_LTO=false,
+  CODEGEN_UNITS=16, CARGO_BUILD_JOBS=6) on both sides.
+- **To land:** rings-loft back to 29, no model document worse, no assembly worse (asm-isaac-ball should gain), clippy
+  (kernel, model-core, model), g++-13 kernel build (C++ changed: common.cpp, xt.cpp) on vibe5
+  (`CARGO_TARGET_DIR=$HOME/tmp/core/t13 CC="ccache gcc-13" CXX="ccache g++-13"`), then land.sh
+  (NOSHAPE_LAND_QUEUE_HOST=vibe5 NOSHAPE_LAND_HOSTS="vibe5 vibe3" until 522b51a6 lands). Tell blend in blend.md (core
+  had isaac's Fillet 2, 11-13 00:3x note there).
+**Next (lead's speed list, 51efc6d91 profiles in this file), each landing reported with before / after:**
+c2-sm-louver Extrude 3 2.6 s / live 0.27 and Flange 9 1.9 / 0.22 (the sheet-metal model's Rust work after each
+feature); c2-impeller-loft Move face 1 4.1 s / 26 ms (mostly a delete of the 29.5 mm chamber bore our blend test takes
+for a fillet to reapply, on a part that differs from live from Boolean Flansch+Gehäuse) and Delete face 2 3.3 s / 12 ms
+(OCCT defeaturing, its MakerVolume intersects every face); cf-part-draft Part Draft 3 / 2; c2-sm-corner-break; cf-snap-hook
+Sweep 1 142 / 21 ms.
+**Parked / small:**
+- c2-hunting-knife Loft 3: live's face (core/q2291 in onshape-research/live: STEP, B-spline JSON) is degree 3 x 3, 4 x 26
+  poles: rows 0 / 3 the guides (26 poles, C1 cubic), columns the profiles (cubic), rows 1-2 Hermite derivative poles (row 2
+  on y = -2: tangent to the blade's side along guide 2). Ours (Gordon, loft_guided.cpp) 4 x 6 degrees, 5 x 22 poles; live's
+  points 0.2 µm (median) to 5.9 µm off ours; the blade 2.53 mm³ under live's HIGH volume (4986.146) after it. Needs
+  Parasolid's guide-derivative rule; REQUESTS 11-12 23:57 open (may be closed with q2291).
+- Add a T1 for live 2498: square 6 x 6 swept along (0,0)-(0,50)-(40,80) on Top: 3600 mm³ default, 2880 Keep orientation.
+- c2-impeller-loft Extrude Flansch (feature 12, the flange 0.07 mm³ off, its profile from the shell's offset wall): likely
+  the same evVolume artefact as Shell Gehäuse's documented exception; asked the lead.
+- PEM studs' torus: live confirms R 1.4925 (REQUESTS 2492); lead ruled not to imitate (STEP-ANALYTIC-REFIT P3).
+Hosts (lead 11-13 05:45): vibe6 for builds and runs until told otherwise; vibe5 only light; never vibe3 (watcher).
+Scratch: /root/core-scratch/bin (isaac-f2.sh, isaac-gate*.sh, gdbprof.sh, three.sh), hb/ logs; saved documents on vibe5 /
+vibe6 ~/tmp/core/{ibsave,knife,imp,pem,hdsave}; repros ~/tmp/core/repro-{fan,hdp}.
 
 ## From asm (11-12 21:48 UTC): isaac-ball's Fillet 2 fails at 4 mm, holds at 3.9 mm (live OK)
 asm-isaac-ball's studio 00f1d4 (and de4eff, the same first features): Fillet 2, 4 mm, tangent propagation, on one
