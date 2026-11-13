@@ -4090,8 +4090,14 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             if !boxes_meet(l0, h0, l1, h1, GREY * tol + 2.0 * round(b).max(round(args[0]))) {
                 continue;
             }
+            // (Or the tool all on one side of the object's face's plane, past the grey band: apart from it (a sheet
+            // metal part's walls beside a flat tool on its top).)
+            let beside = |o: DVec3, n: DVec3| {
+                let (lo, hi) = b.vertices.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), &p| (lo.min((p - o).dot(n)), hi.max((p - o).dot(n))));
+                lo > GREY * tol || hi < -GREY * tol
+            };
             let on_plane = args[0].faces.iter().all(|f| b.faces.iter().all(|g| match (plane(f), plane(g)) {
-                (Some((o1, n1)), Some((o2, n2))) => n1.cross(n2).length() <= 1e-9 && (o2 - o1).dot(n1).abs() <= tol,
+                (Some((o1, n1)), Some((o2, n2))) => n1.cross(n2).length() <= 1e-9 && (o2 - o1).dot(n1).abs() <= tol || beside(o1, n1),
                 _ => false,
             }));
             if !on_plane {

@@ -2386,3 +2386,27 @@ fn a_section_beside_an_edge_lying_on_the_other_face_fused_as_occt() {
     assert!((vr - vo).abs() <= 1e-9 * vo.abs(), "volume {vr} against OCCT's {vo}");
 }
 
+/// c2-sm-louver's sheet cuts: a flat tool sheet on one of the object sheet's planes, the object's other faces walls
+/// whose planes the tool doesn't reach: those faces untouched, the one under the tool cut as OCCT's.
+#[test]
+fn a_sheet_cut_by_a_sheet_on_one_of_its_faces_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    for name in ["158ea991926156d0", "d59307c67f1b5b21"] {
+        let c = k::bool_corpus::load(&dir, name).expect("the recorded case");
+        k::set_rust_boolean_only(true);
+        let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+        let why = k::last_rust_decline();
+        k::set_rust_boolean_only(false);
+        let r = r.unwrap_or_else(|e| panic!("{name}: noshape's Boolean declined: {why} ({e})"));
+        k::set_rust_boolean(Some(false));
+        let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+        k::set_rust_boolean(None);
+        let counts = |s: &k::Shape| [k::ShapeType::Shell, k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+        assert_eq!(counts(&r.shape), counts(&o.shape), "{name}: shells, faces, edges, vertices");
+        let area = |s: &k::Shape| k::surface_properties(s).unwrap().mass;
+        let (ar, ao) = (area(&r.shape), area(&o.shape));
+        assert!((ar - ao).abs() <= 1e-9 * ao, "{name}: area {ar} against OCCT's {ao}");
+    }
+}
+
