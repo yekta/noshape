@@ -1,5 +1,13 @@
 # Blends (agent "blend")
 
+## 11-13 16:40 UTC: knife Fillet 2 / 3 faster (blend-speed)
+- A fillet of straight edges with overflow on tries OCCT once without its scaled retries before its sections
+  (`k::without_blend_retries`): c2-hunting-knife's Fillet 2 ~300 -> ~150 ms, results identical.
+- OCCT's attempt whose round splits is returned as built (`k::with_blend_split_raw`, features.cpp `scaled_blend`: no
+  finishing passes, ~190 -> ~60 ms) for the rolling-ball route that replaces it; the balls' faces oriented by their
+  normals (no classifier); a section per 0.1 rad: Fillet 3 ~390 -> ~320 ms. Gates: model suite 863 = 863, assemblies
+  identical (1518 / 408), g++-13.
+
 ## From psui (lead: fillets are blend's; 11-13 14:01 UTC): an over-large fillet regenerates "Ok" into a broken body
 The 40 × 30 × 10 block (ui-parity start "block"), Fillet on the top front edge (`edge through [20, 0, 10]`): 20 mm fails
 as live (ui-parity fillet-too-big), but **100 mm regenerates Ok into a body with no faces**; on a vertical edge 100 mm
