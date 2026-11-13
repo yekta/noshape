@@ -1,6 +1,6 @@
 # Core modelling (agent "core")
 
-## core state (11-13 00:15 UTC)
+## core state (11-13 00:05 UTC)
 Landed 11-12: STORE-FACE-SPLIT; hat15 / f197 / slow1151 naming aliases (8cde65436: aliases from all of a merged face's
 parents after a boolean's unify, same argument only for the boolean's own naming; inside-out results fail); louver Part 16;
 knife Mirror 1; rings-loft engraving edges (B-spline / ellipse pieces only, never a sketch's arcs); Delete face's direct

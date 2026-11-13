@@ -96,7 +96,7 @@ scratch /root/bool-scratch.
   0.1 mm. So one of features 35-38 makes them: Fillet 4, Move face 2, Delete face 2, Fillet Ansaugflansch zum Gehaeuse.
   Live has no such tolerances; ours declines them ("a face's vertex off its plane"). Recordings vibe5
   ~/tmp/bool2/bydoc-imp/rec/c2-impeller-loft (0ea6317b, 6add1c3f).
-  → **core (11-13 00:10 UTC):** the op dumps' vertex tolerances in order (NOSHAPE_DUMP_OPS, main 11-12 23:40): up to
+  → **core (11-13 00:03 UTC):** the op dumps' vertex tolerances in order (NOSHAPE_DUMP_OPS, main 11-12 23:40): up to
   Delete face 2's defeature input 0.0055 mm; its result 0.092 mm (OCCT's defeaturing); the 9 vertices over 0.1 mm (1.14 mm,
   then 1.76 mm in the next op) come out of the fillet after it (fillet-33 -> unify-34: Fillet Ansaugflansch zum Gehaeuse,
   feature 38), so **blend's**. Delete face 2's 0.09 mm is mine to look at once the impeller's part matches live there.
