@@ -7,6 +7,8 @@
 #include <BRepBuilderAPI_Transform.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
+#include <Geom2dAPI_Interpolate.hxx>
+#include <ElSLib.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepCheck_Analyzer.hxx>
@@ -273,7 +275,7 @@ void collect(const occ::handle<XCAFDoc_ShapeTool>& st, const occ::handle<XCAFDoc
 }
 
 // The largest distance between an edge and its pcurve on `f` (sampled).
-double pcurve_deviation(const TopoDS_Edge& e, const TopoDS_Face& f)
+double pcurve_deviation(const TopoDS_Edge& e, const TopoDS_Face& f, int n = 64)
 {
   double                          a, b;
   const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, f, a, b);
@@ -282,9 +284,9 @@ double pcurve_deviation(const TopoDS_Edge& e, const TopoDS_Face& f)
   const BRepAdaptor_Curve   c(e);
   const BRepAdaptor_Surface s(f, false);
   double                    m = 0;
-  for (int k = 0; k <= 64; ++k)
+  for (int k = 0; k <= n; ++k)
   {
-    const double   t = a + (b - a) * k / 64;
+    const double   t = a + (b - a) * k / n;
     const gp_Pnt2d q = pc->Value(t);
     m                = std::max(m, s.Value(q.X(), q.Y()).Distance(c.Value(t)));
   }
@@ -333,10 +335,56 @@ occ::handle<Geom2d_Curve> snapped_to_iso(const occ::handle<Geom2d_Curve>& c, con
   return {};
 }
 
+// The edge's curve on a cylinder, cone, sphere or torus through its 3D curve's points' parameters (closed form), at the
+// 3D curve's own parameters: the edge's curves on its other faces still agree with it point for point. Starting in
+// the period of `from` (its old curve's start). Null when it can't be interpolated.
+occ::handle<Geom2d_Curve> elementary_pcurve(const TopoDS_Edge& e, const BRepAdaptor_Surface& s, const gp_Pnt2d& from)
+{
+  const BRepAdaptor_Curve c(e);
+  const double            a = c.FirstParameter(), b = c.LastParameter();
+  const int               n = c.GetType() == GeomAbs_BSplineCurve ? std::clamp(4 * c.NbPoles() + 1, 65, 801) : 65;
+  occ::handle<NCollection_HArray1<gp_Pnt2d>> uv = new NCollection_HArray1<gp_Pnt2d>(1, n);
+  occ::handle<NCollection_HArray1<double>>   ts = new NCollection_HArray1<double>(1, n);
+  gp_Pnt2d                                   last = from;
+  for (int k = 0; k < n; ++k)
+  {
+    const double t = a + (b - a) * k / (n - 1);
+    const gp_Pnt q = c.Value(t);
+    double       u = 0, v = 0;
+    switch (s.GetType())
+    {
+      case GeomAbs_Cylinder: ElSLib::Parameters(s.Cylinder(), q, u, v); break;
+      case GeomAbs_Cone: ElSLib::Parameters(s.Cone(), q, u, v); break;
+      case GeomAbs_Sphere: ElSLib::Parameters(s.Sphere(), q, u, v); break;
+      case GeomAbs_Torus: ElSLib::Parameters(s.Torus(), q, u, v); break;
+      default: return nullptr;
+    }
+    // (Unwrapped: each within half a period of the last.)
+    if (s.IsUPeriodic())
+      u += std::round((last.X() - u) / s.UPeriod()) * s.UPeriod();
+    if (s.IsVPeriodic())
+      v += std::round((last.Y() - v) / s.VPeriod()) * s.VPeriod();
+    last.SetCoord(u, v);
+    uv->SetValue(k + 1, last);
+    ts->SetValue(k + 1, t);
+  }
+  try
+  {
+    Geom2dAPI_Interpolate in(uv, ts, false, 1e-12);
+    in.Perform();
+    return in.IsDone() ? occ::handle<Geom2d_Curve>(in.Curve()) : nullptr;
+  }
+  catch (const Standard_Failure&)
+  {
+    return nullptr;
+  }
+}
+
 // A STEP file without p-curves (Onshape's own, ours): the reader projects each edge onto its face loosely, 3.6 µm
-// off on cf-spur-gear's involute flanks (surfaces of extrusion), and the faces bounded by them lose area (the
-// 32-tooth gear -0.3 mm², live's file -1.0). On free-form faces an edge whose p-curve strays from it is projected
-// again, a thousand times tighter; kept when twice as close.
+// off on cf-spur-gear's involute flanks (surfaces of extrusion), 7.6 µm on its chamfer cones (live's file: 2e-5 m
+// uncertainty), and the faces bounded by them lose area (the 32-tooth gear -0.3 mm² and -0.7 mm², live's file
+// -1.0). On curved faces an edge whose p-curve strays from it is projected again, a thousand times tighter; kept when
+// twice as close.
 void refine_freeform_pcurves(const std::vector<TopoDS_Shape>& shapes)
 {
   ShapeIMap faces;
@@ -345,14 +393,19 @@ void refine_freeform_pcurves(const std::vector<TopoDS_Shape>& shapes)
   BRep_Builder B;
   for (int i = 1; i <= faces.Extent(); ++i)
   {
-    const TopoDS_Face f = TopoDS::Face(faces(i).Oriented(TopAbs_FORWARD));
-    switch (BRepAdaptor_Surface(f, false).GetType())
+    const TopoDS_Face         f    = TopoDS::Face(faces(i).Oriented(TopAbs_FORWARD));
+    const GeomAbs_SurfaceType type = BRepAdaptor_Surface(f, false).GetType();
+    switch (type)
     {
       case GeomAbs_BSplineSurface:
       case GeomAbs_BezierSurface:
       case GeomAbs_SurfaceOfExtrusion:
       case GeomAbs_SurfaceOfRevolution:
       case GeomAbs_OffsetSurface:
+      case GeomAbs_Cylinder:
+      case GeomAbs_Cone:
+      case GeomAbs_Sphere:
+      case GeomAbs_Torus:
         break;
       default:
         continue;
@@ -361,6 +414,8 @@ void refine_freeform_pcurves(const std::vector<TopoDS_Shape>& shapes)
     const occ::handle<Geom_Surface> S = BRep_Tool::Surface(f, loc);
     if (S.IsNull())
       continue;
+    const bool analytic = type == GeomAbs_Cylinder || type == GeomAbs_Cone || type == GeomAbs_Sphere || type == GeomAbs_Torus;
+    const bool round    = type == GeomAbs_Cylinder || type == GeomAbs_Cone;
     // (A small face: projecting onto NIST's healed cap screw's 1300-pole thread surfaces takes 0.15-0.25 s an edge
     // and brings nothing closer; the gear's surfaces have up to 155.)
     if (const auto bs = occ::down_cast<Geom_BSplineSurface>(S); !bs.IsNull() && bs->NbUPoles() * bs->NbVPoles() > 200)
@@ -372,6 +427,12 @@ void refine_freeform_pcurves(const std::vector<TopoDS_Shape>& shapes)
       double            c0, c1;
       if (BRep_Tool::Degenerated(ed) || BRep_Tool::IsClosed(ed, f) || BRep_Tool::Curve(ed, cl, c0, c1).IsNull())
         continue;
+      // (Lines and circles on a cylinder or cone are its isos, projected exactly; on an analytic face a few points
+      // first: a filleted part's many tori.)
+      if (const GeomAbs_CurveType ct = BRepAdaptor_Curve(ed).GetType(); round && (ct == GeomAbs_Line || ct == GeomAbs_Circle))
+        continue;
+      if (analytic && pcurve_deviation(ed, f, 4) < 1e-7)
+        continue;
       // (Not a long spline: projecting NIST's healed cap screw's 848-pole thread edges again takes 0.1-0.3 s each and
       // doesn't bring them closer; the gear's involutes have 67 poles.)
       if (const auto bs = occ::down_cast<Geom_BSplineCurve>(BRep_Tool::Curve(ed, cl, c0, c1)); !bs.IsNull() && bs->NbPoles() > 200)
@@ -381,9 +442,24 @@ void refine_freeform_pcurves(const std::vector<TopoDS_Shape>& shapes)
         continue;
       double                          a, b;
       const occ::handle<Geom2d_Curve> old = BRep_Tool::CurveOnSurface(ed, f, a, b);
-      B.UpdateEdge(ed, occ::handle<Geom2d_Curve>(), S, loc, 0.);
-      ShapeFix_Edge fx;
-      if (!fx.FixAddPCurve(ed, f, false, before / 1000) || !(pcurve_deviation(ed, f) < before / 2))
+      bool                            better;
+      if (analytic)
+      {
+        // (In closed form, not by OCCT's projection: the gear's 288 such edges in a few ms, not 0.15 s.)
+        const occ::handle<Geom2d_Curve> pc = elementary_pcurve(ed, BRepAdaptor_Surface(f, false), old->Value(a));
+        if (pc.IsNull())
+          continue;
+        B.UpdateEdge(ed, pc, S, loc, 0.);
+        B.Range(ed, S, loc, c0, c1);
+        better = pcurve_deviation(ed, f) < before / 2;
+      }
+      else
+      {
+        B.UpdateEdge(ed, occ::handle<Geom2d_Curve>(), S, loc, 0.);
+        ShapeFix_Edge fx;
+        better = fx.FixAddPCurve(ed, f, false, before / 1000) && pcurve_deviation(ed, f) < before / 2;
+      }
+      if (!better)
       {
         B.UpdateEdge(ed, old, S, loc, 0.);
         B.Range(ed, S, loc, a, b);

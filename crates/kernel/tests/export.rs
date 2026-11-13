@@ -1817,3 +1817,27 @@ fn iges_postprocessing_makes_straight_spline_edges_lines() {
     let (v0, v1) = (solid.volume().unwrap(), out.volume().unwrap());
     assert!((v0 - v1).abs() < 1e-12, "{v0} vs {v1}");
 }
+
+/// A STEP file whose uncertainty is loose (live's: 2e-5 m) has its edges projected onto curved faces as tightly as
+/// they lie on them (cf-spur-gear's chamfer cones, bounded by the flanks' B-spline edges: 7.6 µm off, the 32-tooth
+/// gear 0.7 mm² short): a cone cut by planes along its axis (hyperbolas on it) reads back with its area.
+#[test]
+fn a_loose_step_files_edges_on_a_cone_read_back_tight() {
+    let mm = 1e-3;
+    let cone = make_cone(&Plane::from_normal(DVec3::ZERO, DVec3::Z), 10.0 * mm, 8.0 * mm, mm, std::f64::consts::TAU).unwrap();
+    let block = make_box_corners(DVec3::new(-9.0, -9.0, -1.0) * mm, DVec3::new(9.0, 9.0, 2.0) * mm).unwrap();
+    let part = common(&cone, &block).unwrap().shape;
+    let want = surface_properties(&part).unwrap().mass;
+    let dir = std::env::temp_dir().join(format!("noshape-loose-step-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("cone.step");
+    write_step(&path, &[ExportShape { shape: part, name: Some("Part 1".into()), color: None }], LengthUnit::Meter).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let at = text.find("UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(").expect("an uncertainty") + "UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(".len();
+    let end = at + text[at..].find(')').unwrap();
+    std::fs::write(&path, format!("{}0.02{}", &text[..at], &text[end..])).unwrap();
+    let back = read_step(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    let got: f64 = back.iter().map(|p| surface_properties(&p.shape).unwrap().mass).sum();
+    assert!((got - want).abs() < 1e-6 * want, "area {} mm², the part's {}", got / (mm * mm), want / (mm * mm));
+}
