@@ -569,7 +569,7 @@ fn a_line_in_an_edge_on_plane_picks_over_the_plane() {
     assert_eq!(at(-0.01), 1, "below the line the plane's edge picks the plane");
 }
 
-/// A point picks around its drawn centre, PICK_EXTRA_CSS_PX / 2 narrower in CSS px, at a pixel ratio of 1 and 2 alike (the
+/// A point picks around its drawn centre, 1 px narrower in CSS px (at most 5 px), at a pixel ratio of 1 and 2 alike (the
 /// user's Retina: a margin multiplied by the ratio twice made a 6 px sketch point pick 11 px round itself, a
 /// neighbouring point won the hover and the click, and a snap shown on hover didn't commit).
 #[test]
@@ -597,15 +597,15 @@ fn a_point_picks_round_its_drawn_centre_at_any_pixel_ratio() {
         // CSS px to the right of the drawn centre.
         let at = |css: f64| pick.id_at((c.x + css * dpr as f64) as i32, c.y as i32).unwrap_or(0);
         assert_eq!(at(0.0), 7, "dpr {dpr}: the drawn centre");
-        assert_eq!(at(1.0), 7, "dpr {dpr}: within its radius less the pick margin (3 - {PICK_EXTRA_CSS_PX} / 4 px)");
+        assert_eq!(at(1.0), 7, "dpr {dpr}: within its pick radius (2.5 px)");
         assert_eq!(at(3.0), 0, "dpr {dpr}: past it");
     }
 }
 
 /// Our 3D pick reach outside sketch mode, as the viewport picks (in the square of PICK_RADIUS 5 CSS px round the
 /// pointer, vertices before edges before faces, then the nearest), measured on the pick buffer at a pixel ratio of 1
-/// and 2, against live/feel/3d.json: a part edge (drawn 1 px, picked PICK_EXTRA_CSS_PX wider) lights from 6–7 px off
-/// it on either side; a vertex (a 6 px disc, picked PICK_EXTRA_CSS_PX / 2 narrower) from 7 px across, 9 diagonally, and
+/// and 2, against live/feel/3d.json: a part edge (drawn 1 px, picked 3 px wide) lights from 6–7 px off it on either
+/// side; a vertex (a 6 px disc, picked 5 px wide) from 7 px across, 9 diagonally, and
 /// beats the edge it ends. docs/parity/interaction-feel.md.
 #[test]
 fn our_3d_pick_reach_for_edges_and_vertices() {
@@ -2697,4 +2697,123 @@ fn depth24_child() {
     let px = |x: usize, y: usize| { let i = (y * 400 + x) * 4; [f.bgra[i + 2], f.bgra[i + 1], f.bgra[i]] };
     let (centre, corner) = (px(200, 150), px(5, 5));
     assert_ne!(centre, corner, "the box over the background: centre {centre:?}, corner {corner:?}");
+}
+
+/// The 3D pick matrix (docs/parity/interaction-feel.md "3D"): live's reach outside sketch mode (live/feel/3d.json
+/// "hover_reach_px", "priority_results"), one row per target and direction, at a device pixel ratio of 1 and 2, on
+/// the pick buffer as the viewport picks it (the 5 px square, the kinds' priorities as `PickKind::priority` × 2).
+/// From above: a 40 × 20 × 10 mm block with its front top edge (1 px, as the builder draws a part edge) and that
+/// edge's left vertex (6 px); a shown sketch's line (2 px) and standalone point (7 px) off the part; a plane's border
+/// (2 px); an assembly instance's edge; a sketch line over another part edge and a sketch point on another vertex.
+/// Prints matched / total; fails when a matched row stops matching, or a gap starts to.
+#[test]
+fn the_3d_pick_matrix_matches_live() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (360u32, 240u32);
+    let (lo, hi) = ([-0.02f32, -0.01, -0.005], [0.02f32, 0.01, 0.005]);
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Top);
+    cam.fit_sphere(glam::DVec3::new(0.0, 0.01, 0.0), 0.05, w as f64 / h as f64);
+    let (edge, vertex, line, point, border, line_on_edge, point_on_vertex) = (50u32, 60u32, 70u32, 80u32, 90u32, 71u32, 81u32);
+    let mut lines = LineData::default();
+    // The front top edge's left half, and a sketch line drawn over its right half (a part edge under it).
+    lines.push_polyline(&[[lo[0], lo[1], hi[2]], [0.0, lo[1], hi[2]]], [0, 0, 0, 255], edge, 1.0, LineSegment::CORE);
+    lines.push_polyline(&[[0.0, lo[1], hi[2]], [hi[0], lo[1], hi[2]]], [0, 0, 0, 255], 51, 1.0, LineSegment::CORE);
+    lines.push_polyline(&[[0.0, lo[1], hi[2]], [hi[0], lo[1], hi[2]]], [0, 0, 255, 255], line_on_edge, 2.0, 0);
+    // Off the part: a shown sketch's line, a plane's border.
+    lines.push_polyline(&[[-0.03, 0.03, 0.0], [0.0, 0.03, 0.0]], [0, 0, 255, 255], line, 2.0, 0);
+    lines.push_polyline(&[[-0.03, 0.045, 0.0], [0.03, 0.045, 0.0]], [0, 0, 0, 255], border, 2.0, LineSegment::NO_HOLD | LineSegment::WIDE_PICK);
+    // An assembly instance's edge (1.25 px, NO_HOLD as the assembly draws it), off the part.
+    let asm_edge = 92u32;
+    lines.push_polyline(&[[0.05, -0.02, 0.0], [0.05, 0.04, 0.0]], [0, 0, 0, 255], asm_edge, 1.25, LineSegment::NO_HOLD);
+    let sprite = |p: [f32; 3], id: u32, size: f32, style: u32| PointSprite { position: p, color: [0, 0, 0, 255], pick_id: id, size, style, _pad: 0 };
+    let points = PointData {
+        points: vec![
+            sprite([lo[0], lo[1], hi[2]], vertex, 6.0, 0),
+            sprite([hi[0], lo[1], hi[2]], 61, 6.0, 0),
+            sprite([hi[0], lo[1], hi[2]], point_on_vertex, 7.0, 128),
+            sprite([0.015, 0.03, 0.0], point, 7.0, 128),
+        ],
+    };
+    let base = Scene {
+        instances: vec![
+            Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh(lo, hi, 1)))).with_color([0.6, 0.7, 0.8, 1.0]),
+            Instance::new(Drawable::Lines(r.upload_lines(&lines))).per_primitive_color().layer(10),
+            Instance::new(Drawable::Points(r.upload_points(&points))).per_primitive_color().layer(11),
+        ],
+        ..Default::default()
+    };
+    let prio = move |id: u32| match id {
+        0 => -1,
+        x if x == point || x == point_on_vertex => 16,
+        x if x == line || x == line_on_edge => 14,
+        60 | 61 => 10,
+        50 | 51 | 92 => 8,
+        x if x == border => 0,
+        _ => 2,
+    };
+    // (Row, the target's id, its anchor, the direction off it on screen (x right, y down; measured both ways and
+    // averaged: where a target sits in its pixel moves one side's reach a pixel against the other's, live's too),
+    // hovered, live's "lights at" range in px, ours not there yet.)
+    type Row = (&'static str, u32, [f32; 3], (f64, f64), bool, (i32, i32), bool);
+    let d = std::f64::consts::FRAC_1_SQRT_2;
+    let rows: Vec<Row> = vec![
+        ("edge / across (over the background and its face)", edge, [-0.01, lo[1], hi[2]], (0.0, 1.0), false, (6, 7), false),
+        ("edge, lit / holds", edge, [-0.01, lo[1], hi[2]], (0.0, 1.0), true, (9, 10), false),
+        ("vertex / straight out", vertex, [lo[0], lo[1], hi[2]], (1.0, 0.0), false, (7, 7), false),
+        ("vertex / diagonally", vertex, [lo[0], lo[1], hi[2]], (d, d), false, (8, 10), false),
+        ("vertex, lit / stays lit", vertex, [lo[0], lo[1], hi[2]], (1.0, 0.0), true, (7, 8), false),
+        ("sketch line (not editing)", line, [-0.015, 0.03, 0.0], (0.0, 1.0), false, (5, 6), false),
+        ("sketch line, lit / stays lit", line, [-0.015, 0.03, 0.0], (0.0, 1.0), true, (8, 10), false),
+        ("sketch point (not editing)", point, [0.015, 0.03, 0.0], (1.0, 0.0), false, (7, 7), false),
+        ("sketch point, lit / stays lit", point, [0.015, 0.03, 0.0], (1.0, 0.0), true, (7, 8), false),
+        ("plane border", border, [0.0, 0.045, 0.0], (0.0, 1.0), false, (7, 8), false),
+        ("plane border, lit / no hold", border, [0.0, 0.045, 0.0], (0.0, 1.0), true, (7, 8), false),
+        ("assembly instance edge", asm_edge, [0.05, 0.0, 0.0], (1.0, 0.0), false, (6, 6), false),
+        ("assembly instance edge, lit / no hold", asm_edge, [0.05, 0.0, 0.0], (1.0, 0.0), true, (6, 6), false),
+        // Priority: on the spot, the sketch line over the part edge under it, the sketch point over the vertex.
+        ("priority / sketch line over a part edge", line_on_edge, [0.01, lo[1], hi[2]], (0.0, 1.0), false, (0, 99), false),
+        ("priority / sketch point over a vertex", point_on_vertex, [hi[0], lo[1], hi[2]], (1.0, 0.0), false, (0, 99), false),
+    ];
+    let mut report = Vec::new();
+    let mut moved = Vec::new();
+    for (name, id, anchor, dir, lit, (a, b), gap) in &rows {
+        let mut scene = base.clone();
+        if *lit {
+            scene.add_flag(*id, noshape_render::scene::state::HOVER);
+        }
+        let mut ok = true;
+        let mut seen = Vec::new();
+        for dpr in [1.0f32, 2.0] {
+            let (dw, dh) = ((w as f32 * dpr) as u32, (h as f32 * dpr) as u32);
+            let f = r.render(RenderParams { scene: &scene, camera: &cam, width: dw, height: dh, device_pixel_ratio: dpr, style: &Style::default(), pick: true }).unwrap();
+            let pick = f.pick.unwrap();
+            let at0 = cam.project(glam::DVec3::new(anchor[0] as f64, anchor[1] as f64, anchor[2] as f64), glam::DVec2::new(dw as f64, dh as f64), 0.05).unwrap();
+            let dir = glam::DVec2::new(dir.0, dir.1);
+            let at = |k: f64| {
+                let q = at0 + dir * (k * dpr as f64);
+                pick.pick(q.x.round() as i32, q.y.round() as i32, (5.0 * dpr) as i32, prio)
+            };
+            let at_dir = |at: &dyn Fn(f64) -> Option<u32>, k: i32, s: f64| at(k as f64 * s);
+            let side = |s: f64| (0..40).take_while(|k| at_dir(&at, *k, s) == Some(*id)).count() as i32 - 1;
+            // (Both ways, averaged: half a pixel rounds up.)
+            let reach = (side(1.0) + side(-1.0) + 1) / 2;
+            seen.push(reach);
+            ok &= (*a..=*b).contains(&reach);
+        }
+        report.push(format!("{} {name}: ours {seen:?}, live {a}–{b}", if ok { "=" } else { "≠" }));
+        if ok == *gap {
+            moved.push(*name);
+        }
+    }
+    let matched = report.iter().filter(|l| l.starts_with('=')).count();
+    eprintln!("3D pick matrix: {matched} / {} rows match live\n{}", rows.len(), report.join("\n"));
+    assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md \"3D\" and the row's gap): {moved:?}");
 }

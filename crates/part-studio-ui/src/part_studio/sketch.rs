@@ -495,13 +495,32 @@ impl PartStudioView {
         Some(e)
     }
 
-    /// Snap candidate from the hovered model vertex/edge (sketching on parts).
+    /// Snap candidate from the hovered model vertex / edge / other sketch's entity (sketching on parts), or a
+    /// circular model edge's centre in the plane, lit or not (live: a CONCENTRIC point, below the coincident points
+    /// and above the curves).
     fn model_snap(&self, cursor: DVec2, vp: &Viewport) -> Option<ExternalSnap> {
-        self.model_snap_of(self.hover.as_ref()?, cursor, vp)
+        let lit = self.hover.as_ref().and_then(|r| self.model_snap_of(r, cursor, vp));
+        if matches!(lit, Some(ExternalSnap::Vertex { .. } | ExternalSnap::Edge { midpoint: true, .. })) {
+            return lit;
+        }
+        self.centre_snap(cursor, vp).or(lit)
     }
 
-    /// A lit model vertex or edge as a snap (live/feel/sketch-snaps.json "modelEntities"): only one lying in the
-    /// sketch's plane (off it nothing is offered), a vertex as a 15 px square on screen, an edge as a 15 px band.
+    /// A circular model edge's centre in the sketch's plane within a point's 15 px square of the pointer.
+    fn centre_snap(&self, cursor: DVec2, vp: &Viewport) -> Option<ExternalSnap> {
+        let ed = self.sketch.as_ref()?;
+        let centres = ed.model_centres.get_or_init(|| model_circle_centres(&self.display, &ed.frame));
+        let at = vp.project(ed.frame.to_world(cursor))?;
+        centres.iter().find_map(|(c, r)| {
+            let d = (vp.project(ed.frame.to_world(*c))? - at).abs();
+            (d.x.max(d.y) < 7.5).then(|| ExternalSnap::Centre { position: *c, reference: r.clone() })
+        })
+    }
+
+    /// A lit model vertex or edge, or another sketch's point or curve, as a snap (live/feel/sketch-snaps.json
+    /// "modelEntities", "toolSets": other sketches' entities are offered as the model's): only one lying in the
+    /// sketch's plane (off it nothing is offered), a point as a 15 px square on screen, a curve as a 15 px band (a
+    /// straight one's midpoint first, as a point).
     fn model_snap_of(&self, r: &Reference, cursor: DVec2, vp: &Viewport) -> Option<ExternalSnap> {
         let ed = self.sketch.as_ref()?;
         let frame = ed.frame;
@@ -509,52 +528,60 @@ impl PartStudioView {
         let to_screen = |w: DVec3| vp.project(w);
         let cursor_s = to_screen(frame.to_world(cursor))?;
         let in_plane = |w: DVec3| (frame.to_world(frame.to_local(w)) - w).length() < 1e-6;
+        let world = |v: &[f32; 3]| DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64);
+        let point = |w: DVec3| {
+            let d = (to_screen(w)? - cursor_s).abs();
+            (in_plane(w) && d.x.max(d.y) < half_px).then(|| ExternalSnap::Vertex { position: frame.to_local(w), reference: r.clone() })
+        };
+        let curve = |pl: &[[f32; 3]]| {
+            if !pl.iter().all(|v| in_plane(world(v))) {
+                return None;
+            }
+            let pts: Vec<DVec2> = pl.iter().map(|v| frame.to_local(world(v))).collect();
+            let mut best: Option<(f64, DVec2, DVec2)> = None;
+            for w in pts.windows(2) {
+                let (a, b) = (w[0], w[1]);
+                let d = b - a;
+                let t = if d.length_squared() < 1e-30 { 0.0 } else { ((cursor - a).dot(d) / d.length_squared()).clamp(0.0, 1.0) };
+                let q = a + d * t;
+                let dist = (q - cursor).length();
+                if best.is_none_or(|bb| dist < bb.0) {
+                    best = Some((dist, q, d));
+                }
+            }
+            let (_, q, d) = best?;
+            // A straight edge's midpoint first (a point beats a curve), as a 15 px square.
+            if let (Some(&a), Some(&z)) = (pts.first(), pts.last())
+                && pts.iter().all(|p| (z - a).perp_dot(*p - a).abs() <= 1e-9 * (z - a).length_squared().max(1e-30))
+            {
+                let m = (a + z) * 0.5;
+                let off = (to_screen(frame.to_world(m))? - cursor_s).abs();
+                if off.x.max(off.y) < half_px {
+                    return Some(ExternalSnap::Edge { position: m, tangent: (z - a).try_normalize().unwrap_or(DVec2::X), reference: r.clone(), midpoint: true });
+                }
+            }
+            let s = to_screen(frame.to_world(q))?;
+            // (The edge's direction there: a direction inference meets the edge along it.)
+            let tangent = d.try_normalize().unwrap_or(DVec2::X);
+            ((s - cursor_s).length() < half_px).then_some(ExternalSnap::Edge { position: q, tangent, reference: r.clone(), midpoint: false })
+        };
         match r {
             Reference::Vertex(_) => {
                 let b = self.display.bodies.iter().find(|b| b.vertex_refs.contains(r))?;
                 let i = b.vertex_refs.iter().position(|x| x == r)?;
-                let v = b.mesh.vertices.get(i)?;
-                let w = DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64);
-                let local = frame.to_local(w);
-                let s = to_screen(w)?;
-                let d = (s - cursor_s).abs();
-                (in_plane(w) && d.x.max(d.y) < half_px).then(|| ExternalSnap::Vertex { position: local, reference: r.clone() })
+                point(world(b.mesh.vertices.get(i)?))
             }
             Reference::Edge(_) => {
                 let b = self.display.bodies.iter().find(|b| b.edge_refs.contains(r))?;
                 let i = b.edge_refs.iter().position(|x| x == r)?;
-                let pl = b.mesh.edges.get(i)?;
-                if !pl.iter().all(|v| in_plane(DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64))) {
-                    return None;
+                curve(b.mesh.edges.get(i)?)
+            }
+            Reference::SketchEntity { sketch, entity } if *sketch != ed.feature => {
+                let s = self.display.sketches.iter().find(|s| s.feature == *sketch && !s.hidden)?;
+                match s.points.iter().find(|p| p.entity == *entity) {
+                    Some(p) => point(world(&p.position)),
+                    None => curve(&s.curves.iter().find(|c| c.entity == *entity)?.points),
                 }
-                let pts: Vec<DVec2> = pl.iter().map(|v| frame.to_local(DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64))).collect();
-                let mut best: Option<(f64, DVec2, DVec2)> = None;
-                for w in pts.windows(2) {
-                    let (a, b) = (w[0], w[1]);
-                    let d = b - a;
-                    let t = if d.length_squared() < 1e-30 { 0.0 } else { ((cursor - a).dot(d) / d.length_squared()).clamp(0.0, 1.0) };
-                    let q = a + d * t;
-                    let dist = (q - cursor).length();
-                    if best.is_none_or(|bb| dist < bb.0) {
-                        best = Some((dist, q, d));
-                    }
-                }
-                let (_, q, d) = best?;
-                // A straight edge's midpoint first (a point beats a curve), as a 15 px square.
-                if let (Some(&a), Some(&z)) = (pts.first(), pts.last())
-                    && pts.iter().all(|p| (z - a).perp_dot(*p - a).abs() <= 1e-9 * (z - a).length_squared().max(1e-30))
-                {
-                    let m = (a + z) * 0.5;
-                    let ms = to_screen(frame.to_world(m))?;
-                    let off = (ms - cursor_s).abs();
-                    if off.x.max(off.y) < half_px {
-                        return Some(ExternalSnap::Edge { position: m, tangent: (z - a).try_normalize().unwrap_or(DVec2::X), reference: r.clone(), midpoint: true });
-                    }
-                }
-                let s = to_screen(frame.to_world(q))?;
-                // (The edge's direction there: a direction inference meets the edge along it.)
-                let tangent = d.try_normalize().unwrap_or(DVec2::X);
-                ((s - cursor_s).length() < half_px).then_some(ExternalSnap::Edge { position: q, tangent, reference: r.clone(), midpoint: false })
             }
             _ => None,
         }
@@ -941,6 +968,13 @@ impl PartStudioView {
                             None => {}
                         }
                     }
+                }
+                // A snap onto a circular model edge's centre uses the circle, the new point concentric with it.
+                if let Some(ExternalSnap::Centre { reference, .. }) = self.sketch.as_ref().filter(|s| s.tool.draws()).and_then(|s| s.external_snap.clone())
+                    && let Some(id) = self.external_entity(&reference, false, true, cx)
+                    && let Some(ed) = &mut self.sketch
+                {
+                    ed.link_centre_snap(id);
                 }
                 // A snap onto a model edge links the new point to it.
                 if let Some(ExternalSnap::Edge { reference, .. }) = self.sketch.as_ref().filter(|s| s.tool.draws()).and_then(|s| s.external_snap.clone())
@@ -5217,3 +5251,36 @@ mod ui_tests;
 /// `dimension_menu_items` (several configuration inputs).
 const CONFIGURE_SUBMENU: &str = "Configure dimension\u{25b8}";
 
+/// The centres of the circular (or arc) model edges lying in `frame`'s plane, in the sketch, with their edges.
+fn model_circle_centres(display: &noshape_model::display::StudioDisplay, frame: &PlaneFrame) -> Vec<(DVec2, Reference)> {
+    let mut out = Vec::new();
+    for b in display.bodies.iter().filter(|b| !b.hidden) {
+        for (r, pl) in b.edge_refs.iter().zip(&b.mesh.edges) {
+            if pl.len() < 4 {
+                continue;
+            }
+            let w: Vec<DVec3> = pl.iter().map(|v| DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64)).collect();
+            if !w.iter().all(|p| (frame.to_world(frame.to_local(*p)) - *p).length() < 1e-6) {
+                continue;
+            }
+            let q: Vec<DVec2> = w.iter().map(|p| frame.to_local(*p)).collect();
+            let (a, m, z) = (q[0], q[q.len() / 3], q[2 * q.len() / 3]);
+            let Some(c) = circumcentre(a, m, z) else { continue };
+            let r0 = (a - c).length();
+            if q.iter().all(|p| ((*p - c).length() - r0).abs() <= r0 * 1e-4) {
+                out.push((c, r.clone()));
+            }
+        }
+    }
+    out
+}
+
+/// The centre of the circle through three points (none when they are in a line).
+fn circumcentre(a: DVec2, b: DVec2, c: DVec2) -> Option<DVec2> {
+    let d = 2.0 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+    if d.abs() < 1e-24 {
+        return None;
+    }
+    let (a2, b2, c2) = (a.length_squared(), b.length_squared(), c.length_squared());
+    Some(DVec2::new((a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d, (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d))
+}

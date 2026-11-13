@@ -131,6 +131,8 @@ pub enum AutoConstraint {
     TangentTo(EntityId),
     /// New point at an end of an ellipse's major (`true`) or minor axis.
     QuadrantOf(EntityId, bool),
+    /// New point at a circle's centre (live: a circular model edge's centre is a CONCENTRIC point).
+    ConcentricTo(EntityId),
 }
 
 impl AutoConstraint {
@@ -149,6 +151,7 @@ impl AutoConstraint {
             ParallelTo(l) => ConstraintKind::Parallel { a: new_curve?, b: l },
             TangentTo(c) => ConstraintKind::Tangent { a: new_curve?, b: c },
             QuadrantOf(e, major) => ConstraintKind::Quadrant { point: new_point, ellipse: e, major },
+            ConcentricTo(c) => ConstraintKind::Concentric { a: new_point, b: c },
         })
     }
 }

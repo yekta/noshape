@@ -911,7 +911,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             let mut border = LineData::default();
             let mut loop_pts = corners.to_vec();
             loop_pts.push(corners[0]);
-            border.push_polyline(&loop_pts, [0, 0, 0, 0], id, 2.0, 0);
+            border.push_polyline(&loop_pts, [0, 0, 0, 0], id, 2.0, LineSegment::NO_HOLD | LineSegment::WIDE_PICK);
             // Onshape: CONSTRUCTION_PLANE_AMBIENT_COLOR at CONSTRUCTION_PLANE_OPACITY, outline at 35%.
             let fill = theme::lin(theme::pick(theme::viewport::PLANE_FILL, theme::viewport_dark::PLANE_FILL));
             let outline = theme::lin(theme::pick(theme::viewport::PLANE_OUTLINE, theme::viewport_dark::PLANE_OUTLINE));

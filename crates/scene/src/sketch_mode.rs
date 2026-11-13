@@ -514,6 +514,8 @@ fn is_direction_line(i: &Inference) -> bool {
 pub enum ExternalSnap {
     /// A model vertex projected onto the sketch plane.
     Vertex { position: DVec2, reference: noshape_model::reference::Reference },
+    /// The centre of a circular model edge in the sketch's plane (live: a CONCENTRIC point, offered lit or not).
+    Centre { position: DVec2, reference: noshape_model::reference::Reference },
     /// A point on a model edge projected onto the sketch plane, and the edge's direction there; or (`midpoint`) a
     /// straight edge's midpoint.
     Edge { position: DVec2, tangent: DVec2, reference: noshape_model::reference::Reference, midpoint: bool },
@@ -532,6 +534,8 @@ pub struct SketchEditor {
     pub cursor: Option<DVec2>,
     pub inference: Option<Inference>,
     pub external_snap: Option<ExternalSnap>,
+    /// The centres of the model's circular edges in the sketch's plane (the view fills it once a sketch is open).
+    pub model_centres: std::sync::OnceLock<Vec<(DVec2, noshape_model::reference::Reference)>>,
     pub selection: Vec<EntityId>,
     pub selected_constraints: Vec<ConstraintId>,
     /// Hovered sketch entity (from the viewport pick).
@@ -1183,6 +1187,7 @@ impl SketchEditor {
             cursor: None,
             inference: None,
             external_snap: None,
+            model_centres: std::sync::OnceLock::new(),
             selection: Vec::new(),
             selected_constraints: Vec::new(),
             hover: None,
@@ -1817,6 +1822,7 @@ impl SketchEditor {
         }
         let (position, kind) = match &snap {
             ExternalSnap::Vertex { position, .. } => (*position, InferenceKind::Endpoint),
+            ExternalSnap::Centre { position, .. } => (*position, InferenceKind::Center),
             ExternalSnap::Edge { position, midpoint: true, .. } => (*position, InferenceKind::Midpoint),
             ExternalSnap::Edge { position, .. } => (*position, InferenceKind::OnCurve),
         };
@@ -1922,6 +1928,15 @@ impl SketchEditor {
             }
         }
         data.sketch.solve();
+    }
+
+    /// Constrain the next click to the centre of an external circle (a circular model edge used): CONCENTRIC.
+    pub fn link_centre_snap(&mut self, id: EntityId) {
+        if let Some(inf) = &mut self.inference {
+            inf.kind = InferenceKind::Center;
+            inf.constraints = vec![AutoConstraint::ConcentricTo(id)];
+        }
+        self.external_snap = None;
     }
 
     /// Constrain the next click onto an external entity (a snapped model edge), keeping a direction met on it; at a
@@ -3971,20 +3986,25 @@ impl SketchEditor {
         // (On screen, as live measures it: in an iso view a pixel across the plane's foreshortened axis is longer in it.)
         let metric = self.screen_metric();
         let seen = |v: DVec2| metric.as_ref().map_or(v.length(), |m| m.len(v));
+        // A point (or a midpoint) is live's 15 px square on screen (live/feel/sketch-snaps.json), its distance the
+        // larger screen coordinate; without a view, a circle.
+        let in_point = |v: DVec2, headless: f64| match &metric {
+            Some(m) => (m.box_len(v) < r).then(|| m.box_len(v)),
+            None => (v.length() <= headless).then(|| v.length()),
+        };
         let users: Vec<EntityId> = sk.users_of_point(id);
         // Points of curves using the dragged point would collapse those curves.
         let siblings: Vec<EntityId> = users.iter().filter_map(|u| sk.entity(*u)).flat_map(|e| e.point_refs()).collect();
         let best_pt = sk
             .entities()
             .filter(|e| e.kind() == EntityKind::Point && e.id != id && !siblings.contains(&e.id))
-            .filter_map(|e| sk.point(e.id).map(|q| (e.id, q, seen(q - pos))))
-            .filter(|x| x.2 <= r_point)
+            .filter_map(|e| sk.point(e.id).and_then(|q| Some((e.id, q, in_point(q - pos, r_point)?))))
             .min_by(|a, b| a.2.total_cmp(&b.2));
         if let Some((e, q, _)) = best_pt {
             return Some((e, q, Drop::Merge));
         }
         // The sketch origin (a fixed point is created on drop).
-        if seen(pos) <= r_point && !sk.entity(id).is_some_and(|e| e.external) {
+        if in_point(pos, r_point).is_some() && !sk.entity(id).is_some_and(|e| e.external) {
             return Some((noshape_sketch::ORIGIN, DVec2::ZERO, Drop::Merge));
         }
         let curves = || sk.entities().filter(|e| e.kind() != EntityKind::Point && !users.contains(&e.id) && !e.point_refs().contains(&id));
@@ -3993,8 +4013,7 @@ impl SketchEditor {
             .filter_map(|e| {
                 let Some(Curve2::Line { a, b }) = sk.curve(e.id) else { return None };
                 let q = (a + b) * 0.5;
-                let d = seen(q - pos);
-                (d <= r_mid).then_some((e.id, q, d))
+                Some((e.id, q, in_point(q - pos, r_mid)?))
             })
             .min_by(|a, b| a.2.total_cmp(&b.2));
         if let Some((e, q, _)) = mid {
@@ -6339,7 +6358,7 @@ pub fn origin_point(sk: &mut Sketch) -> EntityId {
 fn auto_target(c: &AutoConstraint) -> Option<EntityId> {
     use AutoConstraint::*;
     match *c {
-        CoincidentPoint(e) | OnCurve(e) | MidpointOf(e) | HorizontalWith(e) | VerticalWith(e) | PerpendicularTo(e) | ParallelTo(e) | TangentTo(e) | QuadrantOf(e, _) => Some(e),
+        CoincidentPoint(e) | OnCurve(e) | MidpointOf(e) | HorizontalWith(e) | VerticalWith(e) | PerpendicularTo(e) | ParallelTo(e) | TangentTo(e) | QuadrantOf(e, _) | ConcentricTo(e) => Some(e),
         HorizontalLine | VerticalLine => None,
     }
 }
@@ -6357,6 +6376,7 @@ fn retarget_auto(c: AutoConstraint, from: EntityId, to: EntityId) -> AutoConstra
         ParallelTo(e) => ParallelTo(m(e)),
         TangentTo(e) => TangentTo(m(e)),
         QuadrantOf(e, major) => QuadrantOf(m(e), major),
+        ConcentricTo(e) => ConcentricTo(m(e)),
         other => other,
     }
 }

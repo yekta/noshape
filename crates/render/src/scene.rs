@@ -66,6 +66,10 @@ impl LineSegment {
     /// state OUTLINE) it keeps a dark core under the highlight (live
     /// selection/06b, 07b).
     pub const CORE: u32 = 64;
+    /// Hovered, it doesn't hold the hover further off (a plane's border, an assembly's edges: live/feel/3d.json).
+    pub const NO_HOLD: u32 = 128;
+    /// Picked 5 px wide whatever its drawn width (a plane's border: live lights it from 7–8 px).
+    pub const WIDE_PICK: u32 = 256;
 }
 
 impl LineData {

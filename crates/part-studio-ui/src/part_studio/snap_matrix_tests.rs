@@ -18,6 +18,8 @@ enum Pt {
     EdgeQuarter,
     EdgeMid,
     Origin,
+    /// The centre of a cylinder's top face (its round edge's centre; the "pin" Part Studio).
+    PinCentre,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -34,6 +36,9 @@ enum Lit {
     Nothing,
     Vertex,
     Edge,
+    /// Another (finished) sketch's line, from C(-100, 60) to C(0, 100): its end there, the line.
+    OtherPoint,
+    OtherCurve,
 }
 
 struct Row {
@@ -42,6 +47,10 @@ struct Row {
     setup: &'static [Draw],
     /// The tool's first click, before the probe.
     start: Option<Pt>,
+    /// The tool's further clicks before the probe (a 3 point arc's end).
+    clicks: &'static [Pt],
+    /// Select: the probe drags the point here onto the target instead of clicking.
+    drag_from: Option<Pt>,
     /// Points rested on (live acquires a point after ~100 ms on it) before the probe.
     rest: &'static [Pt],
     /// Where the probe aims, and the direction (screen px, y up) it is moved off it.
@@ -72,7 +81,7 @@ struct Row {
 /// `aim`: the target and the direction the probe moves off it; `reach`: snaps up to, not from.
 const fn row(id: &'static str, tool: Tool, setup: &'static [Draw], start: Option<Pt>, aim: (Pt, (f64, f64)), reach: (f64, Option<f64>), want: &'static [&'static str]) -> Row {
     let ((at, dir), (snaps, not_from)) = (aim, reach);
-    Row { id, tool, setup, start, rest: &[], at, dir, snaps, not_from, far: Far::Without, shift: false, then: None, lit: Lit::Nothing, rest_lit: Lit::Nothing, want, not: &[], on_target: false, gap: false }
+    Row { id, tool, setup, start, clicks: &[], drag_from: None, rest: &[], at, dir, snaps, not_from, far: Far::Without, shift: false, then: None, lit: Lit::Nothing, rest_lit: Lit::Nothing, want, not: &[], on_target: false, gap: false }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -150,6 +159,27 @@ fn rows() -> Vec<Row> {
         Row { rest: &[C(130., 0.)], ..row("wake/circle/tangent-line", Tool::Line, CIRCLE, Some(C(-60., -120.)), (C(-60. + 120. * 0.5548, -120. + 120. * 0.8320), (0.8320, -0.5548)), (2., Some(6.)), &["TANGENT"]) },
         // Per tool: a circle's radius point takes coincident points and tangent points only: no midpoint, no curve.
         Row { not: &["MIDPOINT", "COINCIDENT"], ..row("tool/circle-radius/no-midpoint", Tool::Circle, VERTICAL_LINE, Some(C(-100., 0.)), (C(0., 0.), (1., 0.)), (3., None), &[]) },
+        // A rectangle's second corner: the full set but no horizontal / vertical through its first corner (3 px off
+        // its level the corner stays where it is), its midpoints and curves kept.
+        Row { on_target: true, ..row("tool/rectangle-corner/no-level", Tool::CornerRect, &[], Some(C(-150., -20.)), (C(0., -17.), (0., 0.)), (0., None), &[]) },
+        Row { on_target: true, ..row("tool/rectangle-corner/midpoint", Tool::CornerRect, VERTICAL_LINE, Some(C(-150., -100.)), (C(0., 0.), (1., 0.)), (3., None), &["MIDPOINT"]) },
+        // A 3 point arc's third point: coincident points only (and its own chord's midpoint): not onto a line.
+        Row { clicks: &[C(-60., -100.)], not: &["COINCIDENT", "MIDPOINT"], ..row("tool/arc-third/no-curve", Tool::Arc3, VERTICAL_LINE, Some(C(-60., 60.)), (C(0., 30.), (1., 0.)), (3., None), &[]) },
+        Row { clicks: &[C(-60., -100.)], ..row("tool/arc-third/point", Tool::Arc3, POINT_P, Some(C(-150., 60.)), (C(-60., 70.), (1., 0.)), (3., None), &["COINCIDENT"]) },
+        // Drags (live2 "feel (sketch)" (2), the catalogue's "dragExistingPoint"): a free line end dragged onto a point
+        // (7–9 px), a midpoint (6, not 8), a circle's rim (≤ 6); no horizontal / vertical while dragging.
+        Row { drag_from: Some(C(-60., -40.)), far: Far::OffTarget, on_target: true, ..row("drag/onto-point", Tool::Select, &[Draw::Line(C(-150., -100.), C(-60., -40.)), Draw::Point(C(-60., 70.))], None, (C(-60., 70.), (1., 0.)), (6.5, Some(8.5)), &["COINCIDENT"]) },
+        Row { drag_from: Some(C(-60., -40.)), far: Far::OffTarget, on_target: true, ..row("drag/onto-point/diagonal", Tool::Select, &[Draw::Line(C(-150., -100.), C(-60., -40.)), Draw::Point(C(-60., 70.))], None, (C(-60., 70.), (H, H)), (9.5, Some(11.5)), &["COINCIDENT"]) },
+        Row { drag_from: Some(C(-60., -40.)), on_target: true, ..row("drag/onto-midpoint", Tool::Select, &[Draw::Line(C(-150., -100.), C(-60., -40.)), Draw::Line(C(0., -80.), C(0., 80.))], None, (C(0., 0.), (0., 1.)), (6., Some(8.5)), &["MIDPOINT"]) },
+        Row { drag_from: Some(C(-60., -40.)), ..row("drag/onto-circle-rim", Tool::Select, &[Draw::Line(C(-150., -100.), C(-60., -40.)), Draw::Circle(C(80., 0.), 50.)], None, (C(30., 0.), (-1., 0.)), (6., Some(8.5)), &["COINCIDENT"]) },
+        Row { drag_from: Some(C(-60., -40.)), not: &["HORIZONTAL", "VERTICAL"], ..row("drag/no-level", Tool::Select, &[Draw::Line(C(-150., -100.), C(-60., -40.))], None, (C(40., -97.), (0., 0.)), (0., None), &[]) },
+        // A circular model edge in the plane: its centre is a CONCENTRIC point (catalogue "circularEdgeCentre"), lit or
+        // not.
+        Row { on_target: true, far: Far::Without, ..point_row("model-circle/centre/concentric", &[], S, Pt::PinCentre, (1., 0.), false, &["CONCENTRIC"]) },
+        Row { on_target: true, far: Far::Without, ..point_row("model-circle/centre/concentric/diagonal", &[], S, Pt::PinCentre, (H, H), true, &["CONCENTRIC"]) },
+        // Another sketch's entities (catalogue: other-sketch line end 8 / 9, circle rim 6–8): a point, a curve.
+        Row { lit: Lit::OtherPoint, ..point_row("other-sketch/line-end", &[], S, C(0., 100.), (1., 0.), false, &["COINCIDENT"]) },
+        Row { lit: Lit::OtherCurve, ..band_row("other-sketch/line", &[], S, C(-75., 70.), (0.37, -0.93), &["COINCIDENT"]) },
         // Combinations and priority (live2 "feel (sketch)", the catalogue's priority classes).
         // A circle's centre onto a circle's centre: COINCIDENT, not CONCENTRIC (catalogue: 7 px, not 8).
         Row { on_target: true, far: Far::OffTarget, then: Some(C(80., 20.)), not: &["CONCENTRIC"], ..row("circle-centre/centre/coincident", Tool::Circle, CIRCLE, None, (C(80., 0.), (0., -1.)), (6.5, Some(8.5)), &["COINCIDENT"]) },
@@ -195,6 +225,8 @@ struct Bench {
     ey: DVec2,
     vertex_pick: u32,
     edge_pick: u32,
+    /// Another sketch's line end at C(0, 100) and the line (the "other" Part Studio).
+    other_picks: (u32, u32),
 }
 
 impl Bench {
@@ -226,15 +258,15 @@ impl Bench {
                 let lo = on_top.iter().fold(DVec2::splat(f64::MAX), |a, p| a.min(*p));
                 let hi = on_top.iter().fold(DVec2::splat(f64::MIN), |a, p| a.max(*p));
                 let picks = &v.built.as_ref().unwrap().picks;
-                let vi = b.mesh.vertices.iter().position(|q| (local(q) - lo).length() < 1e-6 && (q[2] - top_z).abs() < 1e-7).expect("the corner's vertex");
-                let vertex = picks.ids_for(&b.vertex_refs[vi]).first().copied().expect("the vertex is pickable");
-                let ei = b
+                // (A block's; a round face has neither.)
+                let vertex = b.mesh.vertices.iter().position(|q| (local(q) - lo).length() < 1e-6 && (q[2] - top_z).abs() < 1e-7).and_then(|vi| picks.ids_for(&b.vertex_refs[vi]).first().copied()).unwrap_or(0);
+                let edge = b
                     .mesh
                     .edges
                     .iter()
                     .position(|pl| pl.iter().all(|p| (p[2] - top_z).abs() < 1e-7 && (local(p).y - lo.y).abs() < 1e-6))
-                    .expect("the face's bottom edge");
-                let edge = picks.ids_for(&b.edge_refs[ei]).first().copied().expect("the edge is pickable");
+                    .and_then(|ei| picks.ids_for(&b.edge_refs[ei]).first().copied())
+                    .unwrap_or(0);
                 (lo, hi, vertex, edge)
             }),
         };
@@ -260,7 +292,18 @@ impl Bench {
         let ey = (screen(cx, mid + DVec2::Y * 1e-3) - centre).normalize();
         let size = (screen(cx, hi) - corner).abs();
         assert!(size.x.min(size.y) > 250.0, "the face fills enough of the view ({size:?} px)");
-        Self { window, view: view.clone(), centre, corner, quarter, edge_mid, origin, ex, ey, vertex_pick: vertex, edge_pick: edge }
+        // Another sketch shown (the "other" Part Studio): its line's end nearest C(0, 100) and the line.
+        let end_at = centre + ey * 100.0;
+        let other_picks = cx.update(|cx| {
+            let v = view.read(cx);
+            let (vp, editing) = (v.viewport.read(cx), v.sketch.as_ref().unwrap().feature);
+            let Some(sk) = v.display.sketches.iter().find(|s| s.feature != editing) else { return (0, 0) };
+            let w = |p: &[f32; 3]| glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64);
+            let end = sk.points.iter().min_by(|a, b| (vp.project(w(&a.position)).unwrap() - end_at).length().total_cmp(&(vp.project(w(&b.position)).unwrap() - end_at).length()));
+            let pick = |entity: u32| v.built.as_ref().unwrap().picks.ids_for(&Reference::SketchEntity { sketch: sk.feature, entity }).first().copied().unwrap_or(0);
+            (end.map_or(0, |p| pick(p.entity)), sk.curves.first().map_or(0, |c| pick(c.entity)))
+        });
+        Self { window, view: view.clone(), centre, corner, quarter, edge_mid, origin, ex, ey, vertex_pick: vertex, edge_pick: edge, other_picks }
     }
 
     /// The probe's sketch cancelled: the Part Studio as it was, for the next probe.
@@ -277,6 +320,7 @@ impl Bench {
             Pt::EdgeQuarter => self.quarter,
             Pt::EdgeMid => self.edge_mid,
             Pt::Origin => self.origin,
+            Pt::PinCentre => self.centre,
         }
     }
 
@@ -375,22 +419,28 @@ fn entity_ids(cx: &mut TestAppContext, b: &Bench) -> std::collections::HashSet<n
 /// What one probe click created: the new constraints' names (a new curve's point merged into an existing point counts
 /// as COINCIDENT, as Onshape makes one), and how far from the target, on screen, the new curve's nearest point is.
 fn probe(cx: &mut TestAppContext, studios: &Studios, r: &Row, scale: f32, off: f64) -> (Vec<String>, f64) {
-    let on_model = r.lit != Lit::Nothing || r.rest_lit != Lit::Nothing || matches!(r.at, Pt::Corner | Pt::EdgeQuarter | Pt::EdgeMid);
-    let b = match on_model {
-        true => Bench::open(cx, studios.block.0, &studios.block.1, Some(&studios.block.2), scale),
-        false => Bench::open(cx, studios.plain.0, &studios.plain.1, None, scale),
+    let other = matches!(r.lit, Lit::OtherPoint | Lit::OtherCurve);
+    let on_model = !other && (r.lit != Lit::Nothing || r.rest_lit != Lit::Nothing || matches!(r.at, Pt::Corner | Pt::EdgeQuarter | Pt::EdgeMid));
+    let b = match (other, on_model) {
+        _ if matches!(r.at, Pt::PinCentre) => Bench::open(cx, studios.pin.0, &studios.pin.1, Some(&studios.pin.2), scale),
+        (true, _) => Bench::open(cx, studios.other.0, &studios.other.1, None, scale),
+        (_, true) => Bench::open(cx, studios.block.0, &studios.block.1, Some(&studios.block.2), scale),
+        _ => Bench::open(cx, studios.plain.0, &studios.plain.1, None, scale),
     };
+    assert!(!other || (b.other_picks.0 != 0 && b.other_picks.1 != 0), "{}: the other sketch's end and line are pickable", r.id);
     for d in r.setup {
         b.draw_setup(cx, d);
     }
     b.tool(cx, r.tool);
-    if let Some(s) = r.start {
-        b.click(cx, b.at(s), None);
+    for s in r.start.iter().chain(r.clicks) {
+        b.click(cx, b.at(*s), None);
     }
     let lit = |l: Lit| match l {
         Lit::Nothing => None,
         Lit::Vertex => Some(b.vertex_pick),
         Lit::Edge => Some(b.edge_pick),
+        Lit::OtherPoint => Some(b.other_picks.0),
+        Lit::OtherCurve => Some(b.other_picks.1),
     };
     for p in r.rest {
         let q = b.at(*p);
@@ -404,7 +454,29 @@ fn probe(cx: &mut TestAppContext, studios: &Studios, r: &Row, scale: f32, off: f
     let old = entity_ids(cx, &b);
     let target = b.at(r.at);
     let at = target + b.along(r.dir) * off;
-    b.click_with(cx, at, lit(r.lit), Modifiers { shift: r.shift, ..Default::default() });
+    // A drag: the point under its start, moved in steps onto the probe (live's drags snap on release).
+    let dragged = r.drag_from.and_then(|f| {
+        let from = b.at(f);
+        let id = cx.update(|cx| {
+            let v = b.view.read(cx);
+            let (data, ed, vp) = (v.sketch_data(cx).unwrap(), v.sketch.as_ref().unwrap(), v.viewport.read(cx));
+            data.sketch
+                .entities()
+                .filter(|e| e.kind() == noshape_sketch::EntityKind::Point)
+                .filter_map(|e| Some((e.id, vp.project(ed.frame.to_world(data.sketch.point(e.id)?))?)))
+                .min_by(|x, y| (x.1 - from).length().total_cmp(&(y.1 - from).length()))
+                .map(|(id, _)| id)
+        });
+        let m = Modifiers::default();
+        let mut evs = vec![ViewportEvent::PointerMove { position: from, modifiers: m }, ViewportEvent::ToolDown { position: from, modifiers: m, click_count: 1 }];
+        evs.extend((1..=8).map(|k| ViewportEvent::ToolDrag { position: from + (at - from) * (k as f64 / 8.0) }));
+        evs.push(ViewportEvent::ToolUp { position: at, modifiers: m });
+        b.events(cx, &evs);
+        id
+    });
+    if r.drag_from.is_none() {
+        b.click_with(cx, at, lit(r.lit), Modifiers { shift: r.shift, ..Default::default() });
+    }
     if let Some(t) = r.then {
         b.click(cx, b.at(t), None);
     }
@@ -433,6 +505,13 @@ fn probe(cx: &mut TestAppContext, studios: &Studios, r: &Row, scale: f32, off: f
                 }
             }
         }
+        // A dragged point: itself, or (merged into the target) gone.
+        if let Some(id) = dragged {
+            return match data.sketch.point(id).and_then(|q| vp.project(ed.frame.to_world(q))) {
+                Some(s) => (Some(id), curves, false, (s - target).length()),
+                None => (None, curves, true, 0.0),
+            };
+        }
         let (landed, probed) = best.map_or((f64::MAX, None), |(d, p)| (d, Some(p)));
         // (Merged into an existing point, or a model vertex's used point.)
         let merged = probed.is_some_and(|p| old.contains(&p) || data.sketch.entity(p).is_some_and(|e| e.external));
@@ -452,10 +531,58 @@ fn probe(cx: &mut TestAppContext, studios: &Studios, r: &Row, scale: f32, off: f
     (created, landed)
 }
 
+/// A cylinder (a circle on Top extruded) and its top face, as `block_part` makes a block.
+fn pin_part(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>, Reference) {
+    let (window, view) = sketch_with(cx, name, Tool::Circle);
+    click(cx, window, &view, (575., 350.));
+    click(cx, window, &view, (650., 350.));
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.finish_sketch(w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let sk = v.display.sketches.first().expect("the sketch");
+            v.selection = vec![Reference::SketchRegion { sketch: sk.feature, key: sk.regions.first().expect("a region").key.clone() }];
+            v.start_feature("extrude", w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    wait_until(cx, window, |cx| view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).can_submit()));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).context.as_ref().is_some_and(|c| !c.bodies.is_empty()));
+    let top = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the pin");
+        let top_z = b.mesh.positions.iter().map(|p| p[2]).fold(f32::MIN, f32::max);
+        // The flat face highest up.
+        b.face_refs
+            .iter()
+            .enumerate()
+            .filter_map(|(i, r)| {
+                let &(first, count) = b.mesh.face_ranges.get(i)?;
+                let z: Vec<f32> = b.mesh.indices[first as usize..(first + count) as usize].iter().map(|&k| b.mesh.positions[k as usize][2]).collect();
+                let (lo, hi) = z.iter().fold((f32::MAX, f32::MIN), |(a, c), x| (a.min(*x), c.max(*x)));
+                ((hi - lo).abs() < 1e-7 && (hi - top_z).abs() < 1e-7).then(|| r.clone())
+            })
+            .next()
+            .expect("the top face")
+    });
+    (window, view, top)
+}
+
 /// The Part Studios the probes sketch in: a block (its top face) and an empty one.
 struct Studios {
     block: (AnyWindowHandle, Entity<PartStudioView>, Reference),
     plain: (AnyWindowHandle, Entity<PartStudioView>),
+    /// An empty one but for a finished Sketch 1 on Top: a line from C(-100, 60) to C(0, 100).
+    other: (AnyWindowHandle, Entity<PartStudioView>),
+    /// A cylinder (a circle extruded) and its top face.
+    pin: (AnyWindowHandle, Entity<PartStudioView>, Reference),
 }
 
 /// The matrix at a device pixel ratio of 1 and 2: every row's snap at live's "snaps up to" and none at its "not
@@ -467,7 +594,22 @@ fn the_sketch_snaps_matrix_matches_live(cx: &mut TestAppContext) {
         let (window, view, top, _) = block_part(cx, "snaps-block");
         let plain = part_studio(cx, "snaps-plain");
         cx.update_window(plain.0, |_, w, _| w.activate_window()).unwrap();
-        Studios { block: (window, view, top), plain }
+        let other = part_studio(cx, "snaps-other");
+        cx.update_window(other.0, |_, w, _| w.activate_window()).unwrap();
+        let b = Bench::open(cx, other.0, &other.1, None, 1.0);
+        b.tool(cx, Tool::Line);
+        b.click(cx, b.at(C(-100., 60.)), None);
+        b.click(cx, b.at(C(0., 100.)), None);
+        cx.update_window(other.0, |_, w, cx| {
+            other.1.update(cx, |v, cx| {
+                v.finish_sketch(w, cx);
+            })
+        })
+        .unwrap();
+        draw(cx, other.0);
+        wait_until(cx, other.0, |cx| other.1.read(cx).sketch.is_none() && !other.1.read(cx).ui_busy() && !other.1.read(cx).display.sketches.is_empty());
+        let pin = pin_part(cx, "snaps-pin");
+        Studios { block: (window, view, top), plain, other, pin }
     };
     let mut report = Vec::new();
     let mut wrong = Vec::new();

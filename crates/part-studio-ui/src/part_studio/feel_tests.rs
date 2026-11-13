@@ -265,3 +265,49 @@ fn presses_orbit_box_and_open_the_menu_as_live(cx: &mut TestAppContext) {
         assert!(left(&mut vcx, 3.0, 60), "scale {scale}: 3 px after 60 ms is a box");
     }
 }
+
+/// Box select as live's counts on a block (live/feel/3d.json "box_select"), from above: a window round the whole block
+/// takes its 6 faces and 12 edges (18: the hidden ones too, no vertices, no part); round its right half (the right
+/// end face, edge-on) 5; a crossing box over that half 13 (the 5 faces and 8 edges it touches). No GPU: what the box
+/// takes comes from the shown geometry.
+#[gpui::test]
+fn box_select_takes_what_live_takes(cx: &mut TestAppContext) {
+    let (window, view, _top, _) = block_part(cx, "box-counts");
+    for scale in [1.0f32, 2.0] {
+        at_scale(cx, window, scale);
+        let (lo, hi) = cx.update_window(window, |_, _, cx| {
+            view.update(cx, |v, cx| {
+                let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+                let p = |q: &[f32; 3]| glam::DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64);
+                let lo = b.mesh.positions.iter().fold(glam::DVec3::splat(f64::MAX), |a, q| a.min(p(q)));
+                let hi = b.mesh.positions.iter().fold(glam::DVec3::splat(f64::MIN), |a, q| a.max(p(q)));
+                v.viewport.update(cx, |vp, cx| {
+                    let size = vp.size();
+                    vp.camera.set_view(noshape_render::StandardView::Top);
+                    vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, size.x / size.y);
+                    vp.request_frame(cx);
+                });
+                (lo, hi)
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+        let (a, b) = cx.update(|cx| {
+            let vp = view.read(cx).viewport.read(cx);
+            let (a, b) = (vp.project(lo).unwrap(), vp.project(hi).unwrap());
+            (a.min(b), a.max(b))
+        });
+        let mid_x = (a.x + b.x) * 0.5;
+        let m = DVec2::splat(15.0);
+        // (Row, the box's corners, crossing, live's count.)
+        let rows = [
+            ("window round the block", (a - m, b + m), false, 18),
+            ("window round its right half", (DVec2::new(mid_x + 20.0, a.y - 15.0), b + m), false, 5),
+            ("crossing over its right half", (DVec2::new(mid_x + 20.0, a.y - 15.0), b + m), true, 13),
+        ];
+        for (name, corners, crossing, live) in rows {
+            let n = cx.update(|cx| view.read(cx).box_ids(corners, crossing, cx).len());
+            assert_eq!(n, live, "scale {scale}: {name}");
+        }
+    }
+}

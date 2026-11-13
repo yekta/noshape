@@ -19,27 +19,32 @@ Live: live/feel/3d.json and behaviours "feel (3D)" (11-13 02:10; DPR 1, two zoom
 `MOUSE_PICK_RADIUS_PX` 5, the pick a 10 × 10 px square round the pointer (×DPR, so CSS px at any ratio), sorted by
 priority, then the front-most, then the nearest.
 
+Reach, hold and priority are one table-driven offscreen test, render `the_3d_pick_matrix_matches_live` (the pick
+buffer as the viewport picks it, at DPR 1 and 2; each target measured both ways and averaged, as where it sits in its
+pixel moves one side a pixel against the other, live's too): **matched 15 / 15** (11-13 06:02 UTC); box select 3 / 3
+(part-studio-ui `feel::box_select_takes_what_live_takes`); presses 5 / 5 (app-core `presses_drag_and_open_the_menu_as_live`,
+GPU `feel::presses_orbit_box_and_open_the_menu_as_live`).
+
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
-| Pick area | a square of 5 px each way | the same (`PickBuffer::pick`, `PICK_RADIUS`) | offscreen `our_3d_pick_reach_for_edges_and_vertices` | = |
-| Priority | sketch point > sketch line > mate connector > vertex > edge > origin > sketch region > face > plane; the nearest within it | the same (`PickKind::priority`) | same | = |
-| Edge reach (a level edge, over the background or its face) | lights at 6–7 px, stays lit to 9–10 (the lit edge's overlay holds it) | 6 px, 7–8 on a slanted edge (the square's corner); held to 9 (`PICK_EXTRA_CSS_PX` 2 wider than drawn; a hovered line 9 px wide in the pick, re-picked on each hover change) | offscreen, same; GPU `feel::a_click_beside_an_edge_selects_what_is_lit` | = |
-| Silhouette edge | lights at 6, stays lit to 9–10 | as an edge | – | = |
-| Vertex reach | 7 px across, 9 diagonally; stays lit to 7–8 | 7 / 9 (its 6 px disc picked 1 px smaller) | offscreen, same | = |
-| Vertex vs its edge | the vertex wins anywhere in its reach (from 8 px along the edge); a lit edge holds against it to ~4 px | the vertex wins in its reach (7 px); no hold against it | offscreen, same | ≈ |
-| Edge vs edge 5.6 px apart | the lit one holds until 3–4 px past the other; fresh: the nearer | the held band (4.5 px) wins by distance | – | ≈ |
+| Pick area | a square of 5 px each way | the same (`PickBuffer::pick`, `PICK_RADIUS`) | matrix | = |
+| Priority | sketch point > sketch line > mate connector > vertex > edge > origin > sketch region > face > plane; the nearest within it | the same (`PickKind::priority`) | matrix (a sketch line over a part edge, a sketch point on a vertex) | = |
+| Edge (over the background or its face) | lights at 6–7 px; stays lit to 9–10 | 6; 9 (a line picks at least 3 px wide, 9 hovered itself; the shaders' `picking`) | matrix; GPU `feel::a_click_beside_an_edge_selects_what_is_lit` | = |
+| Vertex | 7 px across, 9 diagonally; stays lit to 7–8 | 7 / 9; 7 (a point picks at most 5 px wide) | matrix | = |
+| Sketch line / point, not editing | 5–6, lit to 9 / 7, lit to 8 | 6, 9 / 7, 7 | matrix | = |
+| Plane border | 7–8, no hold | 7, no hold (`LineSegment::WIDE_PICK`, `NO_HOLD`) | matrix | = |
+| Assembly instance edge / vertex | 6 / 7, no hold | 6, no hold (`NO_HOLD`) / 7 | matrix | = |
+| Silhouette edge | lights at 6, stays lit to 9–10 | as an edge | – | ≈ |
 | Mate connector | its triad and ring: 23 px across, 14 down | – | – | – |
-| Sketch line / point (not editing) | 5–6 px, held to 9 / 7, held to 8 | as an edge / a vertex | – | ≈ |
-| Plane border | 7–8 px, no hold | 7 (a 2 px border, picked 4) | – | = |
-| Assembly instance edge / vertex | 6 / 7 px, no hold | as the Part Studio's (held) | – | ≈ |
+| Vertex vs its edge; edge vs edge 5.6 px apart | the vertex anywhere in its reach (a lit edge holds against it to ~4 px); the lit edge holds 3–4 px past the other | the vertex in its reach; the held band wins by distance | – | ≈ |
 | Hover timing | a pick on every move below 0.15 px/ms; faster: after a pause of min(5 × the average pick, 250 ms) | the same (`prehighlight_delay`) | app-core `prehighlight_waits_for_a_pause_as_live` | = |
-| Edge midpoint target after a rest | live 1954, behaviours "icons2 midpoint radius": 9 px square, a short dwell | `update_hover`, `MIDPOINT_DWELL` | existing midpoint tests | = |
+| Edge midpoint target after a rest | live 1954: 9 px square, a short dwell | `update_hover`, `MIDPOINT_DWELL` | existing midpoint tests | = |
 | Click | adds; on a selected entity removes; on empty space clears; Shift+click on empty space keeps; Shift+click on an entity as a plain one | the same (`on_viewport_event`'s Click) | – | = |
-| Ctrl+click | the context menu of what is under the pointer, selects nothing (every OS; on a Mac Cmd+click is a plain click) | the same (`Drag::Pending` + Ctrl) | – | = |
+| Ctrl+click | the context menu of what is under the pointer, selects nothing (every OS; on a Mac Cmd+click is a plain click) | the same | – | = |
 | Double-click | a face: shows its feature's sketch, the two clicks select then deselect; an edge: nothing | a face's second click deselects, its feature lit | – | ? |
-| Select other (`) | the "Select other" panel, bottom right, everything under the pointer through the model | `SelectOther` | – | – |
-| Box select | a left drag; left → right: window (blue), faces and edges fully inside, hidden ones too, no vertices, no part; right → left: crossing (yellow dashed), everything touched, sketch entities too; vertical direction irrelevant; adds; Ctrl at the start deselects | window / crossing (`BoxSelector`); Ctrl+drag deselects | – | – |
-| Left press → drag (box) | more than 2 px and 50 ms after the press; moves within the first 50 ms stay a click | the same (`press_becomes_drag`) | app-core `presses_drag_and_open_the_menu_as_live`; GPU `feel::presses_orbit_box_and_open_the_menu_as_live` | = |
+| Select other (`) | the "Select other" panel, bottom right | `SelectOther` | – | – |
+| Box select | left → right: window (faces and edges wholly inside, hidden ones too, no vertices, no part: 18 round a block, 5 round its right half); right → left: crossing (13 over that half); adds; Ctrl at the start deselects | the same (`box_ids`) | `feel::box_select_takes_what_live_takes` | = |
+| Left press → drag (box) | more than 2 px and 50 ms after the press | the same (`press_becomes_drag`) | app-core, GPU feel | = |
 | Right press | orbits from the first pixel; the menu still opens on release within 4 px and 1 s | the same (`right_release_opens_menu`) | same | = |
 
 ## Sketch (editing a sketch)
@@ -140,7 +145,7 @@ a line crossing a curve near the pointer gives the crossing with both constraint
 point → H + V through it; a sketch line → parallel + perpendicular through the start; a model edge → perpendicular;
 a circle → the two tangent lines from the start; a spline → nothing. Shift: no snapping. In-plane model entities only.
 
-**Matched: 42 / 42** (11-13 05:26 UTC). Probes: a point 6.5 px straight out snaps, 8.5 doesn't; 9.5 / 11.5 diagonally;
+**Matched: 55 / 55** (11-13 06:02 UTC). Probes: a point 6.5 px straight out snaps, 8.5 doesn't; 9.5 / 11.5 diagonally;
 a band 6.5 / 8.5 across (live's own takes vary by a pixel with where its target sits in its pixel).
 
 | Row (tool / target / inference) | Live | Ours (where) | Status |
@@ -160,7 +165,12 @@ a band 6.5 / 8.5 across (live's own takes vary by a pixel with where its target 
 | Shift / a line's end 3 px off | no snap, nothing made | the same | = |
 | Two at once: horizontal + on a free line; a point over horizontal; a point over its line; two acquired points' H × V | both; the point; the end point; H + V | the same | = |
 | Curves over lines (a line zone and a curve: the crossing if near, else the curve) | catalogue "priority" | `is_direction_line` + `direction_onto_curve` | = |
-| Not yet in the matrix | a circular model edge's centre (CONCENTRIC); other sketches' entities; crossing lines' midpoint; spline through-points; a woken model edge's perpendicular; the rectangle's second corner and the 3 point arc's third point sets; the Dimension tool (8 px, not 9: GPU `feel::the_dimension_tool_takes_the_hovered_line`); drags | – | – |
+| A circular model edge in the plane / its centre (lit or not) | CONCENTRIC, a point zone below the coincident points | the same (`centre_snap`, `ExternalSnap::Centre`, `AutoConstraint::ConcentricTo`) | = (new) |
+| Another sketch's line end / its line | COINCIDENT (used), 8 / 7 px | the same (`model_snap_of` takes `SketchEntity`) | = (new) |
+| Rectangle, second corner | the full set but no H / V through its first corner; midpoints kept | the same | = |
+| 3 point arc, third point | coincident points (and its chord's midpoint) only | the same | = |
+| Drags: a free end onto a point (straight, diagonally), a midpoint, a circle's rim; no H / V | 7–9 / 6, not 8 / ≤ 6; COINCIDENT / MIDPOINT on release | the squares and bands (`point_drop_target`; points were an 8.5 px circle) | = (fixed) |
+| Not yet in the matrix | crossing lines' midpoint; spline through-points; a woken model edge's perpendicular; the other tools live2 is still filling | – | – |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
