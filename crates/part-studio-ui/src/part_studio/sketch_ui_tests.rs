@@ -1110,6 +1110,49 @@ fn a_dragged_point_lands_on_a_line_within_7_px(cx: &mut TestAppContext) {
     }
 }
 
+/// ui-parity sketch-offset under load (vibe6 11-13): the GPU's pick of a line is narrower than live's sketch reach,
+/// so with the pointer near a line but nothing of the sketch in the GPU's pick, nothing lit and a quick click took the
+/// line while a later one didn't. What a click there takes (the line, within reach) lights, and the click selects it.
+#[gpui::test]
+fn a_line_in_reach_lights_and_is_clicked_when_the_gpu_pick_misses_it(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "reach-not-gpu", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (700., 400.));
+    keys(cx, window, &["escape", "escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    draw(cx, window);
+    let (line, at) = cx.update(|cx| {
+        let v = view.read(cx);
+        let data = v.sketch_data(cx).unwrap();
+        let ed = v.sketch.as_ref().unwrap();
+        let line = data.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+        let Some(noshape_sketch::Curve2::Line { a, b }) = data.sketch.curve(line) else { panic!("a line") };
+        let vp = v.viewport.read(cx);
+        let (sa, sb) = (vp.project(ed.frame.to_world(a)).unwrap(), vp.project(ed.frame.to_world(b)).unwrap());
+        (line, (sa + sb) * 0.5 + (sb - sa).perp().normalize() * 5.0)
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::Hover(None), w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover), Some(line), "the line in reach lights");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: at, modifiers: Modifiers::default() }, w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().selection.clone()), vec![line], "the click selects it");
+}
+
 /// ui-parity sketch-constraint-refusals step 58 (qa 11-12): a click on a small circle's rim, its centre 11 px away. Our
 /// pick pass reaches a point from about 12 px and points win, so the GPU's hover was the centre; held to live's reach
 /// (a point 10 px) the circle under the pointer is what lights and what the click selects, as live.

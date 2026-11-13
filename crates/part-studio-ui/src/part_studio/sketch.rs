@@ -559,24 +559,28 @@ impl PartStudioView {
         }
     }
 
-    /// The open sketch's entity a click at plane point `p` takes when the hover doesn't (none for a drawing tool).
+    /// The open sketch's entity a click at plane point `p` takes when the hover doesn't (none for a drawing tool): the
+    /// nearest within [`Self::in_sketch_reach`], the reach the hover is held to (sketch-offset under load: the GPU's
+    /// hover of a line 3 mm off went to nothing before the click, and a 5 px pick here missed what live hits).
     fn sketch_pick_at(&self, p: DVec2, cx: &App) -> Option<noshape_sketch::EntityId> {
         let ed = self.sketch.as_ref()?;
         if ed.tool.draws() {
             return None;
         }
-        let r = ed.world_per_px * 5.0;
+        let r = ed.world_per_px * 10.0;
         let data = self.sketch_data(cx)?;
         let screen = ed.screen_metric();
-        match self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)) {
+        let e = match self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)) {
             Some(s) => data.sketch.pick_with_report_on_screen(p, r, &s.report, screen.as_ref()),
             None => data.sketch.pick_on_screen(p, r, screen.as_ref()),
-        }
+        }?;
+        self.in_sketch_reach(e, p, cx).then_some(e)
     }
 
     /// The GPU's hover pick in sketch mode, held to live's reach: the open sketch's entity it found beyond it gives way
     /// to what a click there takes (the user's lit line whose click did nothing; a circle's centre 5 mm off lit and
-    /// taken over the circle under the pointer), so what lights is what a click acts on.
+    /// taken over the circle under the pointer), and so does a pick of something else with an entity in reach (the
+    /// GPU's pick of a line is narrower than live's 3 mm hit in sketch-offset), so what lights is what a click acts on.
     fn sketch_hover_id(&self, id: Option<u32>, cx: &App) -> Option<u32> {
         let ed = self.sketch.as_ref()?;
         let built = self.built.as_ref()?;
@@ -584,7 +588,6 @@ impl PartStudioView {
             Some(Reference::SketchEntity { sketch, entity }) if *sketch == ed.feature => Some(noshape_sketch::EntityId(*entity)),
             _ => None,
         };
-        let Some(e) = id.and_then(own) else { return id };
         let vp = self.viewport.read(cx);
         let Some(p) = self.ui.pointer.and_then(|pos| {
             let (o, d) = vp.ray(pos + DVec2::splat(0.5));
@@ -592,11 +595,13 @@ impl PartStudioView {
         }) else {
             return id;
         };
+        let pick_of = |e: noshape_sketch::EntityId| built.picks.ids_for(&Reference::SketchEntity { sketch: ed.feature, entity: e.0 }).first().copied();
+        // Nothing of the sketch under the GPU's pick (a plane, a region, the background): what a click there takes.
+        let Some(e) = id.and_then(own) else { return self.sketch_pick_at(p, cx).and_then(pick_of).or(id) };
         if self.in_sketch_reach(e, p, cx) {
             return id;
         }
-        let other = self.sketch_pick_at(p, cx)?;
-        built.picks.ids_for(&Reference::SketchEntity { sketch: ed.feature, entity: other.0 }).first().copied()
+        self.sketch_pick_at(p, cx).and_then(pick_of)
     }
 
     fn snap_to_hover(&mut self, hover: Option<&Reference>, cx: &mut Context<Self>) {
