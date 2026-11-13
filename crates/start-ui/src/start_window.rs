@@ -25,7 +25,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-actions!(noshape_start, [OpenSelected, FocusSearch, SelectNext, SelectPrev, SelectAllRows]);
+actions!(noshape_start, [SelectNext, SelectPrev, ToggleRow, SelectAllRows]);
 
 const CONTEXT: &str = "StartWindow";
 
@@ -37,18 +37,16 @@ pub fn init(cx: &mut App) {
     cx.bind_keys(key_bindings());
 }
 
-/// The documents page's keys: only its list's and search box's (live chrome.json: no Onshape shortcuts there; Shift+/,
-/// Alt+C, Ctrl+Space, Alt+T, Ctrl+Z do nothing; live2 feel/documents.json: Ctrl+A selects every row).
+/// The documents page's keys: only its list's (live chrome.json: no Onshape shortcuts there; Shift+/, Alt+C,
+/// Ctrl+Space, Alt+T, Ctrl+Z do nothing). Live2 11-13: ↑ / ↓ move the selection (the Details pane follows), Space
+/// toggles the row, Ctrl+A selects every row; Enter does nothing (a double-click opens), Ctrl+F is the browser's find.
 fn key_bindings() -> Vec<KeyBinding> {
     let ctx = Some("StartWindow && !Input");
     vec![
-        KeyBinding::new("enter", OpenSelected, ctx),
         KeyBinding::new("secondary-a", SelectAllRows, ctx),
-        KeyBinding::new("right", SelectNext, ctx),
         KeyBinding::new("down", SelectNext, ctx),
-        KeyBinding::new("left", SelectPrev, ctx),
         KeyBinding::new("up", SelectPrev, ctx),
-        KeyBinding::new("secondary-f", FocusSearch, Some(CONTEXT)),
+        KeyBinding::new("space", ToggleRow, ctx),
     ]
 }
 
@@ -1016,17 +1014,25 @@ impl StartView {
         self.docs.iter().find(|d| &d.path == sel).cloned()
     }
 
+    /// ↑ / ↓: the row above / below the current one (the anchor, else the selected) alone, as a plain click selects it.
     fn move_selection(&mut self, delta: isize, cx: &mut Context<Self>) {
-        let vis = self.visible();
-        if vis.is_empty() {
+        let order = self.page_order();
+        if order.is_empty() {
             return;
         }
-        let cur = self.selected.as_ref().and_then(|s| vis.iter().position(|d| &d.path == s));
-        let next = match cur {
+        let current = self.anchor.clone().or_else(|| self.selected.clone());
+        let next = match current.and_then(|c| order.iter().position(|p| *p == c)) {
             None => 0,
-            Some(i) => (i as isize + delta).clamp(0, vis.len() as isize - 1) as usize,
+            Some(i) => (i as isize + delta).clamp(0, order.len() as isize - 1) as usize,
         };
-        self.selected = Some(vis[next].path.clone());
+        self.click_row(&order[next].clone(), &Modifiers::default());
+        cx.notify();
+    }
+
+    /// Space: the current row (the anchor) in or out of the selection, as a Ctrl+click.
+    fn toggle_current_row(&mut self, cx: &mut Context<Self>) {
+        let Some(row) = self.anchor.clone().or_else(|| self.selected.clone()) else { return };
+        self.click_row(&row, &Modifiers { control: true, platform: cfg!(target_os = "macos"), ..Default::default() });
         cx.notify();
     }
 
@@ -4321,15 +4327,10 @@ impl Render for StartView {
             .on_action(cx.listener(|this, _: &crate::actions::ToggleShortcutHelp, window, cx| this.toggle_shortcut_sheet(window, cx)))
             .on_action(cx.listener(|this, _: &OpenDocument, window, cx| this.import_files(window, cx)))
             .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
-            .on_action(cx.listener(|this, _: &OpenSelected, window, cx| {
-                if let Some(d) = this.selected_entry() {
-                    this.open_path(d.path, window, cx);
-                }
-            }))
             .on_action(cx.listener(|this, _: &SelectAllRows, _, cx| this.select_all_rows(cx)))
             .on_action(cx.listener(|this, _: &SelectNext, _, cx| this.move_selection(1, cx)))
             .on_action(cx.listener(|this, _: &SelectPrev, _, cx| this.move_selection(-1, cx)))
-            .on_action(cx.listener(|this, _: &FocusSearch, window, cx| this.search.update(cx, |s, cx| s.focus(window, cx))))
+            .on_action(cx.listener(|this, _: &ToggleRow, _, cx| this.toggle_current_row(cx)))
             // Dragging the folders divider.
             .on_mouse_move(cx.listener(|this, e: &MouseMoveEvent, _, cx| {
                 if let Some((y0, h0)) = this.split_drag {
@@ -5188,7 +5189,7 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
 
 #[cfg(test)]
 mod tests {
-    use super::{SelectAllRows, click_rows, history_change_matches, key_bindings, lib, move_rows, rows_to_move};
+    use super::{SelectAllRows, SelectNext, SelectPrev, ToggleRow, click_rows, history_change_matches, key_bindings, lib, move_rows, rows_to_move};
     use std::path::PathBuf;
 
     /// Live chrome.json (07:33): no Onshape shortcut works on the documents page, only its list's keys.
@@ -5200,9 +5201,13 @@ mod tests {
         let keymap = Keymap::new(all);
         let page = [KeyContext::parse("StartWindow").unwrap()];
         let action = |key: &str| keymap.bindings_for_input(&[Keystroke::parse(key).unwrap()], &page).0.first().map(|b| b.action().name());
-        for key in ["shift-?", "alt-c", "ctrl-space", "alt-t", "secondary-z", "secondary-y", "delete", "f2", "/", "s", "f", "space"] {
+        for key in ["shift-?", "alt-c", "ctrl-space", "alt-t", "secondary-z", "secondary-y", "delete", "f2", "/", "s", "f", "enter", "secondary-f", "left", "right"] {
             assert_eq!(action(key), None, "{key}");
         }
+        // Live2 11-13: ↑ / ↓ move the selection, Space toggles the row.
+        assert_eq!(action("down"), Some(SelectNext.name()));
+        assert_eq!(action("up"), Some(SelectPrev.name()));
+        assert_eq!(action("space"), Some(ToggleRow.name()));
         // The list's own keys (live2 feel/documents.json: Ctrl+A selects every row).
         assert_eq!(action("secondary-a"), Some(SelectAllRows.name()));
     }
