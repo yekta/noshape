@@ -103,7 +103,6 @@ pub enum Panel {
     /// Table cell formatting; `scope`: 0 cell, 1 row, 2 column, 3 table.
     CellFormat { table: u64, row: usize, col: usize, scope: usize, align: CellAlign, bold: bool, height: Entity<InputState> },
     /// BOM cell: the value and "Override" (`enabled`: the row has a part number).
-    BomCell { table: u64, item: String, col: usize, input: Entity<InputState>, over: bool, enabled: bool },
     /// Table cell › Resize: the column's width and the row height (sheet mm).
     CellResize { table: u64, col: usize, width: Entity<InputState>, height: Entity<InputState> },
     DatumTarget { id: u64, label: Entity<InputState>, area: usize, width: Entity<InputState>, height: Entity<InputState> },

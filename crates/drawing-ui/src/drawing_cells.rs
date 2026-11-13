@@ -308,54 +308,6 @@ impl DrawingEditor {
         (callouts, part_edges)
     }
 
-    /// Double-click a BOM cell: its value with "Override" (grayed out when
-    /// the row has no part number).
-    pub fn open_bom_cell(&mut self, t: &Table, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((r, c)) = self.built.as_ref().and_then(|b| b.table_layout(t.id)).and_then(|l| l.cell_at(self.cursor)) else { return };
-        let item = self.cell_text(t.id, r, 0);
-        if item.is_empty() || item == "Item" {
-            return;
-        }
-        let value = self.cell_text(t.id, r, c);
-        let enabled = !self.cell_text(t.id, r, 2).trim().is_empty();
-        let over = matches!(&t.kind, TableKind::Bom { overrides, .. } if overrides.iter().any(|(i, k, _)| *i == item && *k == c));
-        let input = self.input(&value, window, cx);
-        self.panel = Some(Panel::BomCell { table: t.id, item, col: c, input, over, enabled });
-        cx.notify();
-    }
-
-    pub fn bom_cell_rows(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-                use gpui_kit::component::input::Input;
-        use gpui_kit::component::Sizable as _;
-        use gpui_kit::prelude::FluentBuilder as _;
-        let Some(Panel::BomCell { input, over, enabled, .. }) = &self.panel else { return Vec::new() };
-        let (input, over, enabled) = (input.clone(), *over, *enabled);
-        vec![
-            div().w(px(220.)).when(!over, |d| d.opacity(0.5)).child(Input::new(&input).small()).into_any_element(),
-            div()
-                .when(!enabled, |d| d.opacity(0.4))
-                .child(crate::drawing_chrome::DrCheckbox::new("bom-override").label("Override").checked(over).when(enabled, |c| c.on_click(cx.listener(|this, v: &bool, _, cx| {
-                    if let Some(Panel::BomCell { over, .. }) = &mut this.panel {
-                        *over = *v;
-                    }
-                    cx.notify();
-                }))))
-                .into_any_element(),
-        ]
-    }
-
-    pub fn apply_bom_cell(&mut self, table: u64, item: String, col: usize, value: String, over: bool, cx: &mut Context<Self>) {
-        self.edit_table(table, "BOM cell override", cx, |t| {
-            if let TableKind::Bom { overrides, .. } = &mut t.kind {
-                overrides.retain(|(i, k, _)| !(*i == item && *k == col));
-                if over {
-                    overrides.push((item, col, value));
-                }
-            }
-            t.col_widths.clear();
-        });
-    }
-
     /// Spreadsheet cells on the clipboard: its HTML table (merges, formats,
     /// sizes; drawing.md TB12), else its tab-separated text.
     pub fn clipboard_cells(&self, cx: &App) -> Option<noshape_scene::drawing_tools::paste_html::PastedTable> {

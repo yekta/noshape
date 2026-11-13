@@ -478,3 +478,35 @@ fn centermark_lights_a_circle_from_6_px_and_skips_a_marked_one(cx: &mut TestAppC
     cx.update(|cx| editor.update(cx, |e, cx| e.centermark_click(cx)));
     assert_eq!(marks(cx), before + 1, "nothing added");
 }
+
+/// Live2 feel/drawing.json (tables_live2_1013 noteEditor): in a note, Tab inserts a tab.
+#[gpui::test]
+fn tab_in_a_note_inserts_a_tab(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "note-tab");
+    real_sheet(cx, window, &editor);
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_note_panel(None, [100.0, 100.0], w, cx))).unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_keystrokes("a tab b");
+    draw(cx, window);
+    let text = cx.update(|cx| match &editor.read(cx).panel {
+        Some(crate::drawing_view::Panel::Note { input, .. }) => Some(input.read(cx).value().to_string()),
+        _ => None,
+    });
+    assert_eq!(text.as_deref(), Some("a\tb"));
+}
+
+/// Live2 tables_live2_1013 (dw4-resized): dragging a BOM's inner border moves that border only (the left column
+/// widens, the right one narrows, the total stays); a general table's grows the column on the fixed corner's side
+/// (live 1613 (b)).
+#[::core::prelude::v1::test]
+fn a_bom_border_drag_moves_only_that_border() {
+    use crate::drawing_extra::divider_widths;
+    let w = [20.0, 30.0, 40.0, 50.0];
+    assert_eq!(divider_widths(&w, 3, 10.0, true, true), [20.0, 30.0, 50.0, 40.0]);
+    assert_eq!(divider_widths(&w, 3, 60.0, true, true), [20.0, 30.0, 87.0, 3.0], "the right column keeps its minimum");
+    assert_eq!(divider_widths(&w, 1, -30.0, true, true), [3.0, 47.0, 40.0, 50.0], "and the left one");
+    assert_eq!(divider_widths(&w, 3, 10.0, true, false), [20.0, 30.0, 40.0, 40.0], "general, fixed right: the right column");
+    assert_eq!(divider_widths(&w, 3, 10.0, false, false), [20.0, 30.0, 50.0, 50.0], "general, fixed left: the left column");
+    assert_eq!(divider_widths(&w, 4, 10.0, true, true), [20.0, 30.0, 40.0, 60.0], "a BOM's outer border as before");
+}

@@ -81,7 +81,6 @@ impl DrawingEditor {
             }
             Panel::Datum { .. } | Panel::SurfaceFinish { .. } | Panel::Cell { .. } | Panel::SheetName { .. } | Panel::Rotation { .. } => self.extra_panel_rows(cx)?,
             Panel::BrokenOut { .. } | Panel::CellFormat { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. } => self.more_panel_rows(cx)?,
-            Panel::BomCell { .. } => ("BOM cell", self.bom_cell_rows(cx)),
             Panel::ImageProps { rows, tab } => {
                 let tab = *tab;
                 // Its texts for the ui-parity runner (live behaviours: Document, Workspace, Reference with its "In

@@ -298,7 +298,7 @@ impl DrawingEditor {
             && let Some(name) = doc.tab(key.tab).map(|t| t.name.clone())
         {
             let tab = key.tab;
-            out.push(MenuEntry::item(format!("Switch to {name}"), move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)));
+            out.push(MenuEntry::item(format!("Switch to BOM : {name}"), move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)));
         }
         if let TableKind::Custom { studio, fs, fs_version, .. } = &t.kind {
         let (studio, fs) = (*studio, *fs);

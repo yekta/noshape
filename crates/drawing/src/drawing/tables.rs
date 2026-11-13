@@ -955,8 +955,42 @@ fn text_widths(table: &Table, data: &TableData) -> Vec<f64> {
     w
 }
 
-/// Height (mm) a row's content needs (`vpad`: vertical padding).
-pub fn row_need(table: &Table, data: &TableData, ri: usize, row: &[String], vpad: f64) -> f64 {
+/// A cell's text lines. A BOM column dragged narrower than its text wraps it (live2 tables_live2_1013:
+/// "Descrip/tion"): at spaces, and inside a word that doesn't fit by itself.
+pub fn cell_lines(table: &Table, data: &TableData, ri: usize, ci: usize, text: &str, width: Option<f64>) -> Vec<String> {
+    let lines = text.split('\n').map(str::to_string);
+    let (true, Some(width)) = (data.text_sized && table.col_widths.len() == data.columns(), width) else { return lines.collect() };
+    let h = cell_height(table, data, ri, ci);
+    let f = table.cell_formats.iter().find(|s| s.row == ri && s.col == ci).map(|s| s.format.clone()).unwrap_or_else(|| data.default_format(ri, ci, data.all_rows().len()));
+    let family = f.font.as_deref().unwrap_or(font::DEFAULT_FAMILY);
+    let fits = |s: &str| font::text_width_font(s, h, family, f.bold, f.italic) <= width - h / 3.0 - data.padding[0] * 2.0 + 1e-6;
+    let mut out = Vec::new();
+    for line in lines {
+        let mut cur = String::new();
+        for word in line.split(' ') {
+            let joined = if cur.is_empty() { word.to_string() } else { format!("{cur} {word}") };
+            if fits(&joined) {
+                cur = joined;
+                continue;
+            }
+            if !cur.is_empty() {
+                out.push(std::mem::take(&mut cur));
+            }
+            for ch in word.chars() {
+                cur.push(ch);
+                if !fits(&cur) && cur.chars().count() > 1 {
+                    cur.pop();
+                    out.push(std::mem::replace(&mut cur, ch.to_string()));
+                }
+            }
+        }
+        out.push(cur);
+    }
+    out
+}
+
+/// Height (mm) a row's content needs (`vpad`: vertical padding; `widths`: the columns').
+pub fn row_need(table: &Table, data: &TableData, ri: usize, row: &[String], vpad: f64, widths: &[f64]) -> f64 {
     let th = data.row_text_height(table, ri);
     // Live 2232's BOM rows: 5/3 of the text height (26/15 in a bold header) and the padding.
     let line = |h: f64| if data.text_sized { h * if data.default_format(ri, 0, data.all_rows().len()).bold { 26.0 / 15.0 } else { 5.0 / 3.0 } } else { h };
@@ -967,7 +1001,7 @@ pub fn row_need(table: &Table, data: &TableData, ri: usize, row: &[String], vpad
             continue;
         }
         let h = cell_height(table, data, ri, ci);
-        let more = (c.split('\n').count().max(1) - 1) as f64 * h * 1.5;
+        let more = (cell_lines(table, data, ri, ci, c, widths.get(ci).copied()).len().max(1) - 1) as f64 * h * 1.5;
         need = need.max(line(h) + 2.0 * vpad + more);
         if !data.text_sized {
             need = need.max(table.row_height - th + h + more);
@@ -985,7 +1019,7 @@ pub fn layout(table: &Table, data: &TableData) -> TableLayout {
     let all = data.all_rows();
     let set = table.row_heights.len() == all.len();
     for (ri, r) in all.iter().enumerate() {
-        let need = row_need(table, data, ri, r, data.padding[1]);
+        let need = row_need(table, data, ri, r, data.padding[1], &widths);
         // A dragged height holds unless the text needs more.
         heights.push(if set { table.row_heights[ri].max(data.row_text_height(table, ri) * 1.4) } else { need });
     }
@@ -1109,7 +1143,7 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
             let fmt = table.cell_formats.iter().find(|s| s.row == ri && s.col == ci).map(|s| s.format.clone()).unwrap_or_else(|| data.default_format(ri, ci, nrows));
             let h = cell_height(table, data, ri, ci);
             let row_color = data.style.as_ref().and_then(|s| if data.is_header(ri, nrows) { s.header_text.color } else { s.content_text.color });
-            let lines: Vec<&str> = c.split('\n').collect();
+            let lines = cell_lines(table, data, ri, ci, c, (cols_n == 1).then_some(xb - xa));
             let n = lines.len().max(1) as f64;
             let line_h = h * 1.5;
             let pad = data.padding[0];
@@ -1260,6 +1294,35 @@ mod tests {
         assert!(near(&w, &[25.4, 25.4, 1.2252 * 25.4, 1.1150 * 25.4], 0.02), "{w:?}");
         assert!(near(&h, &[0.328 * 25.4, 0.32 * 25.4, 0.32 * 25.4], 1e-4), "{h:?}");
         assert_eq!(data.style.as_ref().map(|s| (s.line, s.lineweight)), Some((0.13, Some(0.13))));
+    }
+
+    /// Live2 tables_live2_1013 (dw4-resized): a BOM column dragged narrower than its header wraps it inside the word
+    /// ("Descrip/tion") and the header row grows; text that fits stays on one line.
+    #[test]
+    fn a_narrowed_bom_column_wraps_its_text() {
+        let bom = TableKind::Bom { view: super::super::ViewId(0), structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source: None };
+        let mut t = Table::new(1, bom, [400.0, 280.0]);
+        let header = ["Item", "Quantity", "Part number", "Description"].map(String::from).to_vec();
+        let rows = vec![["1", "1", "", ""].map(String::from).to_vec()];
+        let mut d = Drawing::default();
+        (d.props.ann_text_height, d.props.table_h_padding, d.props.table_v_padding) = (3.5, 1.5, 1.5);
+        let data = finish(&d, &t, TableData { header: Some(header.clone()), rows: rows.clone(), ..Default::default() });
+        let before = layout(&t, &data);
+        let widths: Vec<f64> = before.xs.windows(2).map(|x| x[1] - x[0]).collect();
+        assert_eq!(cell_lines(&t, &data, 0, 3, "Description", Some(widths[3])), ["Description"], "its own width: one line");
+        // The border between Part number and Description moved right: Description 60 % of its width.
+        let dx = widths[3] * 0.4;
+        t.col_widths = vec![widths[0], widths[1], widths[2] + dx, widths[3] - dx];
+        let after = layout(&t, &data);
+        let lines = cell_lines(&t, &data, 0, 3, "Description", Some(widths[3] - dx));
+        assert!(lines.len() == 2 && lines.concat() == "Description" && lines[0].starts_with("Descri"), "{lines:?}");
+        assert_eq!(cell_lines(&t, &data, 0, 0, "Item", Some(widths[0])), ["Item"]);
+        let (h0, h1) = (before.ys[0] - before.ys[1], after.ys[0] - after.ys[1]);
+        assert!(h1 > h0 * 1.4, "the header row grows: {h0} -> {h1}");
+        assert!(((after.xs[4] - after.xs[0]) - (before.xs[4] - before.xs[0])).abs() < 1e-9, "the total width stays");
+        let mut g = SheetGeometry::new(420.0, 297.0);
+        render(&mut g, &t, &data, &after, 1);
+        assert!(g.texts.iter().any(|x| x.text == lines[1]) && !g.texts.iter().any(|x| x.text == "Description"));
     }
 
     #[test]

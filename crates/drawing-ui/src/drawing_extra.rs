@@ -1669,25 +1669,15 @@ impl DrawingEditor {
                 }
             }
             Drag::TableDivider { id, col, row, start, widths, heights } => {
-                // Live 1613 (b): a dragged grid line resizes only the column
-                // (row) on the fixed corner's side of it (fixed top right: the
-                // column right of a vertical line, the row above a horizontal
-                // one); the table grows, the others keep their size and move.
-                // An outer line with nothing on that side resizes the other.
+                // Live 1613 (b): a horizontal grid line resizes only the row on
+                // the fixed corner's side of it; columns: `divider_widths`.
                 let d = sub(c, *start);
                 let min = 3.0;
                 if let Some(t) = sheet.table_mut(*id) {
                     let fixed_right = matches!(t.corner, TableCorner::TopRight | TableCorner::BottomRight);
                     let fixed_top = matches!(t.corner, TableCorner::TopLeft | TableCorner::TopRight);
                     if let Some(i) = *col {
-                        let mut w = widths.clone();
-                        // (column, its change): right of the line −dx, left of it +dx.
-                        let right = (i < w.len()).then_some((i, -d[0]));
-                        let left = (i > 0).then_some((i.wrapping_sub(1), d[0]));
-                        if let Some((k, dw)) = if fixed_right { right.or(left) } else { left.or(right) } {
-                            w[k] = (w[k] + dw).max(min);
-                        }
-                        t.col_widths = w;
+                        t.col_widths = divider_widths(widths, i, d[0], fixed_right, matches!(t.kind, TableKind::Bom { .. }));
                     }
                     if let Some(j) = *row {
                         let mut h = heights.clone();
@@ -2271,8 +2261,9 @@ impl DrawingEditor {
             self.open_revision_cell(&t, window, cx);
             return;
         }
+        // Live2 (tables_live2_1013 bomTable): a BOM's cells aren't edited in the drawing (no editor on a double-click;
+        // the menu's Switch to BOM takes edits to the assembly).
         if let TableKind::Bom { .. } = t.kind {
-            self.open_bom_cell(&t, window, cx);
             return;
         }
         if let TableKind::Custom { .. } = t.kind {
@@ -2514,10 +2505,6 @@ impl DrawingEditor {
             }
             Panel::Datum { edit: None, .. } => {}
             p @ (Panel::BrokenOut { .. } | Panel::CellFormat { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. }) => self.apply_more_panel(p, cx),
-            Panel::BomCell { table, item, col, input, over, .. } => {
-                let value = input.read(cx).value().to_string();
-                self.apply_bom_cell(table, item, col, value, over, cx);
-            }
             _ => {}
         }
         cx.notify();
@@ -2535,4 +2522,25 @@ pub type NoteGrip = (u8, [f64; 2]);
 /// (18x18 ink, live drawing/760), unlike the feature list's 17 px at 80 %.
 fn sheets_icon(name: &str, cx: &App) -> Div {
     div().w(px(20.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(name, 20., cx))
+}
+
+/// Column widths after grid line `i` (0 = the left border) moved `dx` mm. Live 1613 (b): only the column on the fixed
+/// corner's side changes and the table grows (an outer line with nothing on that side: the other). Live2
+/// tables_live2_1013: a BOM's inner border moves alone, the left column widens and the right one narrows.
+pub(crate) fn divider_widths(widths: &[f64], i: usize, dx: f64, fixed_right: bool, bom: bool) -> Vec<f64> {
+    const MIN: f64 = 3.0;
+    let mut w = widths.to_vec();
+    if bom && i > 0 && i < w.len() {
+        let dx = dx.clamp(MIN - w[i - 1], (w[i] - MIN).max(MIN - w[i - 1]));
+        w[i - 1] += dx;
+        w[i] -= dx;
+        return w;
+    }
+    // (column, its change): right of the line −dx, left of it +dx.
+    let right = (i < w.len()).then_some((i, -dx));
+    let left = (i > 0).then_some((i.wrapping_sub(1), dx));
+    if let Some((k, dw)) = if fixed_right { right.or(left) } else { left.or(right) } {
+        w[k] = (w[k] + dw).max(MIN);
+    }
+    w
 }

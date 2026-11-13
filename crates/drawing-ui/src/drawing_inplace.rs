@@ -185,6 +185,13 @@ impl DrawingEditor {
                         this.discard_inplace(cx);
                     }
                 }))
+                // Live2 (tables_live2_1013 noteEditor): in a note Tab inserts a tab (the ruler's stops place it).
+                .capture_action(cx.listener(|this, _: &IndentInline, window, cx| {
+                    if let Some(Panel::Note { input, .. }) = &this.panel {
+                        input.update(cx, |s, cx| s.insert("\t", window, cx));
+                        cx.stop_propagation();
+                    }
+                }))
                 .flex()
                 .flex_col()
                 // Clicks in the editor stay in it (a click away commits).

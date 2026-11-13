@@ -278,6 +278,10 @@ impl DrawingEditor {
                 self.edit_sheet("Add leader", cx, |s| noshape_scene::drawing_tools::annotation_edit::add_leader(s, id, leader, start));
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::Annotation(id)];
+                // Live2 tables_live2_1013 (cm1-strip): the new leader is drawn selected, a dot at the note's end.
+                let a = self.current_sheet().annotations.iter().find(|a| a.id == id);
+                let branches = a.is_some_and(|a| matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. }));
+                self.leader_sel = a.and_then(noshape_scene::drawing_tools::annotation_edit::leaders).filter(|l| branches && !l.is_empty()).map(|l| (id, l.len() - 1));
             }
             _ => return false,
         }
