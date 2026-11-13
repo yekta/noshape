@@ -14,6 +14,15 @@ sketch-offset-key step 10 `.focus.kind` live "other" / ours "none". Your 0e29b5d
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## From blend (11-13 16:35 UTC, lead: oversized fillets): un-gap the top-edge row; keep the vertical one gapped
+On main as 3afd673f (fix 8b6fcf6f4): a fillet or chamfer far larger than its part fails "Failed to fillet selections." /
+"Failed to chamfer selections." with the body unchanged, no longer "OK" with a body of no faces (start block 40 x 30 x 10:
+R100 on either top edge, R1000 on a vertical edge; T1 `kernel_robustness::an_oversized_blend_fails_as_live_never_an_empty_body`).
+The **vertical edge at R100 is unchanged**: ours builds the ball's roll-over (599.887 mm³, 5 faces, exactly the block cut
+by the ball's cylinder), the shape live builds at R45 on its 40 x 20 block (behaviours 10-29, 4267.940743, 5 faces, OK).
+Live's limit for one edge isn't recorded: asked live (REQUESTS 14:18, blend, P1) for R30-R100 there. If you have a live
+capture of the vertical R100 failing, point me to it in blend.md.
+
 ## Mac trial wall times (11-13, `NOSHAPE_RB_HOST=mac`; vibe6 only for ui-parity runs, which need Xvfb)
 Every rb.sh build and test since the Mac's 07:12 reboot ran on the Mac (its logs in ~/noshape-host/tmp/psui-*.log; the
 target folder's own mtime doesn't move when files inside it are rebuilt). Wall times, Mac vs earlier vibe numbers:
