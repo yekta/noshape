@@ -292,21 +292,39 @@ outside its map (its "client side entries").
 | Select other place | pointer + (100, 51) | the same | = |
 | Not yet in the matrix | tooltip fade-in / fade-out; tooltips closing on click, wheel, drag; toolbar dropdowns (click only, below the toolbar at the group's left, stay open, Esc); context menus (pointer + (0, 2) in the graphics, + (10, 12) on list rows, flip at the right / bottom edge, submenus on hover); the list's width remembered per tab (ours: one for all); feature dialogs sharing one stored layout; Select other's 220 px dialog, 24 px rows, "(No selections found)" 83 px | – | – |
 
-## Look (in progress)
+## Look
 
-live2's look.json (11-13 07:34–07:47, light theme, DPR 1; constants in live/feel/client-constants-raw.json). Ink is
-measured as darkness summed down a pixel column through a line against the darker surface beside it, times its slope
-(/root/psui-scratch/chrome/ink.py on screenshots; render `edge_ink` offscreen).
+live2's look.json (11-13 07:34–07:47, light theme, DPR 1; constants in live/feel/client-constants-raw.json, screenshots
+in live/feel/look/). Ink is measured as darkness summed down a pixel column through a line against the darker surface
+beside it, times its slope (/root/psui-scratch/chrome/ink.py, ink2.py on screenshots of ours from the runner,
+`shot.sh` on vibe6; render `edge_ink` offscreen). Measured 11-13 11:44–11:57 UTC.
 
-| Row | Live | Ours | Status | Test |
+**Matched: 16 / 16 rows compared** (2 fixed).
+
+| Row | Live | Ours | Status | Evidence / test |
 |---|---|---|---|---|
-| Part edges | 1 px (DEFAULT_LINE_WIDTH), ~0.84 px of ink at 1×, never solid black (darkest L ~60) | 1.25 px, ~1.15–1.2 px of ink, solid black; now 1 px (`PART_EDGE_WIDTH`), 0.81 offscreen, 0.85–1.0 in the app | = (fixed) | render `part_edges_carry_lives_ink` |
-| Back-face silhouettes | 1.2 × the edge width (BACKFACE_SILHOUETTE_WIDTH_FACTOR) | 1.25 px; now 1.2 × | = (fixed) | scene `cylinder_sides_show_silhouettes` |
-| Inactive sketch lines | 1 px | 1.5 px; now 1 px (the inactive line width preference) | = (fixed) | – |
-| Highlight colours | hover #ffc685, selected #ffa90a, selected part #ffc04c, secondary #f2ff80, error #bd3039 | the same (scene `palette.rs`; the selected part's in shaders.wgsl, linear) | = | scene `edge_and_face_highlights_look_as_live` (hover / selected) |
-| Sketch colours | under #0000d0, fully #000, over #cd0000, inactive #999, region #9aa5af at 0.2 | the same (`palette.rs`) | = | – |
+| Part edges | 1 px, ~0.84 px of ink at 1×, never solid black (darkest L ~60) | was 1.25 px (~1.15–1.2 px, solid black); now 1 px (`PART_EDGE_WIDTH`): 0.81 offscreen, 0.85–1.0 in the app | = (fixed) | render `part_edges_carry_lives_ink` |
+| Back-face silhouettes | 1.2 × the edge (BACKFACE_SILHOUETTE_WIDTH_FACTOR) | was 1.25 px; now 1.2 × | = (fixed) | scene `cylinder_sides_show_silhouettes` |
+| Inactive sketch lines | 1 px | was 1.5 px; now 1 px | = (fixed) | – |
+| Active sketch lines | #0000d0, 2 px (1.73 px of ink on sketch-underconstrained.png) | #0000d0, 1.79 px | = | screenshots |
+| Sketch region | #9aa5af 0.2 (212,220,227 over the plane) | 210,219,225 | = | screenshots |
+| Sketch points | ~9 × 8 px blue dots | 9 × 9 | = | screenshots |
+| Highlight colours | hover #ffc685, selected #ffa90a, selected part #ffc04c, secondary #f2ff80, error #bd3039 | the same (`palette.rs`; the selected part in shaders.wgsl, linear) | = | scene `edge_and_face_highlights_look_as_live` |
+| Sketch colours | under #0000d0 (#4040ff seen through), fully #000, over #cd0000, inactive #999 | the same (`palette.rs`, `graphics_prefs.rs`) | = | – |
+| Construction | the entity's colour, dash-dot 4-6-30-6 px | the same (graphics preferences) | = | – |
+| Drawing preview | rgb(68,156,205) | #449ccd (`SKETCH_PREVIEW_COLOR`) | = | – |
+| Constraint glyphs | 20 px white tiles 2 px apart, centre 20 px off the entity inside the shape, corners 17 px diagonally out | 20 px tiles on a 22 px pitch, 20.5 px off, corners centred (-17, -16) | = | – |
+| Dimension values | Flama 18 px: digits 11 px tall, 8 px wide, 10 px pitch | 12 / 8 / ~10 px | = | screenshots (glyphs-show-constraints-x3.png) |
+| Dimension arrows | 16 × 8 px (measured 16 × 7) | 16 × 7 | = | – |
 | Planes, origin, axes | fill #cedbe5 0.2, outline #1d60aa 0.35, text #1651b0; origin #000; X #cd0000, Y #009400, Z #0000d0 | the same | = | – |
-| Not yet compared | related part (#ffcd70 0.5 / 0.8), filtered-out (#ff1d05), in-context (#d403f9), edges through geometry rgb(64,64,64), the sketch preview rgb(68,156,205), constraint glyph tiles (20 px, 2 px apart, 20 px off the entity), dimensions (Flama 18 px, arrows 16 × 8, witness lines 7 / 4 px), mate connectors (36 px, axes 12 / 20 px), section caps | – | – | – |
+| Mate connectors | 36 px, 4 px ring | MATE_CONNECTOR_DIAMETER_PX 36, RING 4 | = | – |
+| In-context references | rgba(212,3,249,0.3) / 0.6 | calibrated on live's screenshots (assembly/504–706: #c573e4 fill, #dc62f7 outline) | = | – |
+| Not compared | filtered-out entities (no selection filter in the Part Studio for live's account); a selected feature's related part (part-studio/110 compared when the feature list was done) | – | – | – |
+
+Seen on the way: live's start "block" sketch shows all four rectangle lines blue (the rectangle not tied to the
+origin); ours draws the two lines from the origin black, as live colours such a line when its corner is at the origin
+(qsnap). So the two runners' starts likely differ (whether the rectangle's corner is tied to the origin), not the
+colouring: to check.
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
