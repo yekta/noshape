@@ -1614,6 +1614,15 @@ pub trait StatefulInteractiveElement: InteractiveElement {
     /// drag and drop operation. This API should also be used as the equivalent of 'on drag start' with
     /// the [`InteractiveElement::on_drag_move`] API.
     /// The callback also has access to the offset of triggering click from the origin of parent element.
+    /// NOSHAPE PATCH: a drag from this element starts once the pointer moved more than `px` (default 2).
+    fn drag_threshold(mut self, px: f32) -> Self
+    where
+        Self: Sized,
+    {
+        self.interactivity().drag_threshold = Some(f64::from(px));
+        self
+    }
+
     /// The fluent API equivalent to [`Interactivity::on_drag`].
     ///
     /// See [`Context::listener`](crate::Context::listener) to get access to a view's state from this callback.
@@ -2183,6 +2192,8 @@ pub struct Interactivity {
     pub(crate) click_listeners: Vec<ClickListener>,
     pub(crate) aux_click_listeners: Vec<ClickListener>,
     pub(crate) drag_listener: Option<DragListener>,
+    // NOSHAPE PATCH: how far (px) the pointer moves before a drag starts, instead of DRAG_THRESHOLD.
+    pub(crate) drag_threshold: Option<f64>,
     pub(crate) hover_listener: Option<Box<dyn Fn(&bool, &mut Window, &mut App)>>,
     pub(crate) hover_listener_mode: HoverListenerMode,
     pub(crate) tooltip_builder: Option<TooltipBuilder>,
@@ -2903,6 +2914,7 @@ impl Interactivity {
         let drag_cursor_style = self.base_style.as_ref().mouse_cursor;
 
         let mut drag_listener = mem::take(&mut self.drag_listener);
+        let drag_threshold = self.drag_threshold.unwrap_or(DRAG_THRESHOLD);
         let drop_listeners = mem::take(&mut self.drop_listeners);
         let click_listeners = mem::take(&mut self.click_listeners);
         let aux_click_listeners = mem::take(&mut self.aux_click_listeners);
@@ -2987,7 +2999,7 @@ impl Interactivity {
                         let mut pending_mouse_down = pending_mouse_down.borrow_mut();
                         if let Some(mouse_down) = pending_mouse_down.clone()
                             && !cx.has_active_drag()
-                            && (event.position - mouse_down.position).magnitude() > DRAG_THRESHOLD
+                            && (event.position - mouse_down.position).magnitude() > drag_threshold
                             && let Some(listener) = drag_listener.take()
                             && mouse_down.button == MouseButton::Left
                         {

@@ -25,7 +25,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-actions!(noshape_start, [OpenSelected, RenameSelected, TrashSelected, FocusSearch, SelectNext, SelectPrev]);
+actions!(noshape_start, [OpenSelected, RenameSelected, TrashSelected, FocusSearch, SelectNext, SelectPrev, SelectAllRows]);
 
 const CONTEXT: &str = "StartWindow";
 
@@ -39,6 +39,7 @@ pub fn init(cx: &mut App) {
         KeyBinding::new("enter", OpenSelected, ctx),
         KeyBinding::new("f2", RenameSelected, ctx),
         KeyBinding::new("delete", TrashSelected, ctx),
+        KeyBinding::new("secondary-a", SelectAllRows, ctx),
         KeyBinding::new("right", SelectNext, ctx),
         KeyBinding::new("down", SelectNext, ctx),
         KeyBinding::new("left", SelectPrev, ctx),
@@ -118,7 +119,7 @@ pub fn show_with_error(message: impl Into<String>, cx: &mut App) {
         // a slow start showed the window.
         let _ = handle.update(cx, |_, window, cx| {
             let id = cx.default_global::<StartToast>().1 + 1;
-            *cx.default_global::<StartToast>() = StartToast(Some((window.window_handle().window_id(), Toast { kind: AlertKind::Error.into(), bold: None, text: message, restore: None, brief: false })), id);
+            *cx.default_global::<StartToast>() = StartToast(Some((window.window_handle().window_id(), Toast { kind: AlertKind::Error.into(), bold: None, text: message, restore: Vec::new(), brief: false })), id);
             window.refresh();
         });
     }
@@ -342,6 +343,12 @@ pub struct StartView {
     also_of: Option<PathBuf>,
     /// Shift + click's range start.
     anchor: Option<PathBuf>,
+    /// Ctrl+A selected every row (live: the Details panel shows no selection then).
+    select_all: bool,
+    /// A row took this click (the list's own click clears the selection otherwise).
+    row_hit: bool,
+    /// The rows being dragged (drawn faded).
+    dragging: Vec<PathBuf>,
     /// Onshape's document labels and whether the nav section is expanded.
     labels: lib::Labels,
     labels_open: bool,
@@ -563,6 +570,9 @@ impl StartView {
             also: Vec::new(),
             also_of: None,
             anchor: None,
+            select_all: false,
+            row_hit: false,
+            dragging: Vec::new(),
             labels: lib::Labels::load(),
             labels_open: false,
             label_search,
@@ -764,6 +774,8 @@ impl StartView {
 
     /// A folder or document row clicked (`click_rows`).
     fn click_row(&mut self, row: &Path, m: &Modifiers) {
+        self.row_hit = true;
+        self.select_all = false;
         let (sel, anchor) = click_rows(&self.selection(), self.anchor.as_deref(), &self.page_order(), row, m.shift, m.secondary());
         self.selected = sel.first().cloned();
         self.also = sel.into_iter().skip(1).collect();
@@ -776,6 +788,7 @@ impl StartView {
         if self.selection().len() > 1 && self.is_selected(row) {
             return true;
         }
+        self.select_all = false;
         self.selected = Some(row.to_path_buf());
         self.anchor = Some(row.to_path_buf());
         false
@@ -798,19 +811,101 @@ impl StartView {
     }
 
     /// The menu of a multiple selection: what applies to every row in it.
-    fn selection_menu(view: Entity<StartView>, menu: OsMenu) -> OsMenu {
-        let (v1, v2) = (view.clone(), view);
+    /// Live (feel/documents.json `contextMenuForN`): Details, Labels…, Move selected (N) to…, Send to trash.
+    fn selection_menu(view: Entity<StartView>, menu: OsMenu, cx: &App) -> OsMenu {
+        let n = view.read(cx).selection().len();
+        let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view);
         menu.list_no_icons()
-            .item(OsMenuItem::new("Move to…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.move_selected(window, cx))))
-            .item(OsMenuItem::new("Send to trash").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.trash_selected(window, cx))))
+            .item(OsMenuItem::new("Details").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.show_selection_panel(false, cx))))
+            .item(OsMenuItem::new("Labels…").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.show_selection_panel(true, cx))))
+            .item(OsMenuItem::new(format!("Move selected ({n}) to…")).on_click(move |_, window, cx| v3.update(cx, |t, cx| t.move_selected(window, cx))))
+            .item(OsMenuItem::new("Send to trash").on_click(move |_, window, cx| v4.update(cx, |t, cx| t.trash_selected(window, cx))))
+    }
+
+    /// The Details panel on the selection (`labels`: its Labels section open).
+    fn show_selection_panel(&mut self, labels: bool, cx: &mut Context<Self>) {
+        self.panel = Some(DocPanel::Details);
+        if labels {
+            self.details_labels_open = true;
+        }
+        self.save_prefs();
+        cx.notify();
+    }
+
+    /// Ctrl+A: every row of the list.
+    fn select_all_rows(&mut self, cx: &mut Context<Self>) {
+        let order = self.page_order();
+        self.selected = order.first().cloned();
+        self.also = order.into_iter().skip(1).collect();
+        self.also_of = self.selected.clone();
+        self.select_all = true;
+        cx.notify();
+    }
+
+    /// Clears the selection (a click on the list's empty space, the panel's Deselect all).
+    fn deselect_all(&mut self, cx: &mut Context<Self>) {
+        self.selected = None;
+        self.also.clear();
+        self.also_of = None;
+        self.select_all = false;
+        cx.notify();
+    }
+
+    /// One row out of a multiple selection (the panel's ×).
+    fn deselect(&mut self, row: &Path, cx: &mut Context<Self>) {
+        let rest: Vec<PathBuf> = self.selection().into_iter().filter(|p| p != row).collect();
+        self.selected = rest.first().cloned();
+        self.also = rest.into_iter().skip(1).collect();
+        self.also_of = self.selected.clone();
+        cx.notify();
+    }
+
+    /// Live (feel/documents.json `rightPanelForN`, docs-f1-shift-range): "⌄ N selections", a bordered list of the
+    /// rows (each with its ✕), Trash and Deselect all, then "⌄ Labels" with the label checklist for all of them.
+    fn render_selection_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let items = self.selection_items();
+        let view = cx.entity();
+        let heading = |label: String| h_flex().h(px(32.)).gap(px(8.)).text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text)).child(label);
+        let rows = v_flex().mt(px(6.)).border_1().border_color(rgb(0xcccccc)).children(items.iter().enumerate().map(|(i, (path, name, folder))| {
+            let (v, p1) = (view.clone(), path.clone());
+            h_flex()
+                .h(px(36.))
+                .px(px(10.))
+                .gap(px(8.))
+                .when(i > 0, |d| d.border_t_1().border_color(rgb(0xcccccc)))
+                .text_size(px(14.))
+                .text_color(pal.text)
+                .child(os::glyph(if *folder { os::GLYPH_FOLDER } else { os::GLYPH_DOCUMENT }, 18., pal.text))
+                .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())))
+                .child(div().id(("sel-remove", i)).cursor_pointer().child(os::glyph(os::GLYPH_CLOSE, 14., rgb(0x666666))).on_click(move |_, _, cx| v.update(cx, |t, cx| t.deselect(&p1, cx))))
+        }));
+        let button = |id: &'static str| h_flex().id(id).h(px(32.)).px(px(10.)).gap(px(6.)).rounded(px(3.)).border_1().border_color(rgb(0xaaaaaa)).bg(rgb(0xffffff)).cursor_pointer().text_size(px(14.)).text_color(pal.text).map(move |d| crate::ui_script::mark(d, move || format!("button:{}", if id == "sel-trash" { "Trash" } else { "Deselect all" })));
+        let (v1, v2) = (view.clone(), view.clone());
+        let docs: Vec<PathBuf> = items.iter().filter(|i| !i.2).map(|i| i.0.clone()).collect();
+        v_flex()
+            .px(px(14.))
+            .pt(px(10.))
+            .child(heading(format!("{} selections", items.len())))
+            .child(rows)
+            .child(
+                h_flex()
+                    .mt(px(14.))
+                    .justify_between()
+                    .child(button("sel-trash").child(os::glyph(os::GLYPH_TRASH, 16., pal.text)).child("Trash").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.trash_selected(window, cx))))
+                    .child(button("sel-deselect").child("Deselect all").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.deselect_all(cx)))),
+            )
+            .child(div().mt(px(20.)).child(heading("Labels".into())))
+            .child(div().mt(px(8.)).rounded(px(2.)).border_1().border_color(rgb(0xcccccc)).child(Self::label_checklist(&view, &docs, &self.label_search, &self.labels, cx)))
+            .into_any_element()
     }
 
     /// What a drag from `row` carries: the selection if the row is in a multiple one, else the row.
     fn drag_items(&self, row: &Path, name: &str, folder: bool) -> DocsDrag {
         if self.is_selected(row) && self.selection().len() > 1 {
-            return DocsDrag { items: self.selection_items() };
+            return DocsDrag::new(self.selection_items());
         }
-        DocsDrag { items: vec![(row.to_path_buf(), name.to_string(), folder)] }
+        DocsDrag::new(vec![(row.to_path_buf(), name.to_string(), folder)])
     }
 
     /// Dragged rows dropped on folder `dir`: moved into it (those already there, and a folder onto itself, stay).
@@ -825,6 +920,16 @@ impl StartView {
             return;
         }
         self.move_items(&items, &dir, window, cx);
+        Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: None, text: "Selected items moved.".into(), restore: Vec::new(), brief: true });
+    }
+
+    /// Dragged rows dropped on the left panel's Trash: Send to trash for them (live: its dialog).
+    fn drop_into_trash(&mut self, drag: &DocsDrag, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some((_, name, _)) = drag.items.iter().find(|(p, _, folder)| !folder && crate::doc_files::is_document_open(p, cx)) {
+            Self::notify(window, cx, AlertKind::Warning, format!("{name}: Close the document's window before moving it to the trash"));
+            return;
+        }
+        self.confirm_trash(drag.items.clone(), window, cx);
     }
 
     /// Send to trash on the selected rows (none of them open).
@@ -849,10 +954,26 @@ impl StartView {
         location.exclude = items.iter().find(|i| i.2).map(|i| i.0.clone());
         let location = Rc::new(location);
         let view = cx.entity();
+        let shown = Rc::new(std::cell::Cell::new(false));
         window.open_dialog(cx, move |dialog, _, cx| {
             let (loc, view, items) = (location.clone(), view.clone(), items.clone());
+            let pal = p();
+            let s2 = shown.clone();
+            // Live (docs-move-dialog): "N items will be moved." and Show details under the folders.
+            let count = h_flex()
+                .mt(px(10.))
+                .px(px(10.))
+                .py(px(10.))
+                .gap(px(14.))
+                .bg(rgb(0xf0f0f0))
+                .text_size(px(14.))
+                .child(div().font_weight(FontWeight::BOLD).text_color(pal.text).child(format!("{} items will be moved.", items.len())))
+                .child(div().id("move-details").cursor_pointer().text_color(pal.info_text).hover(|d| d.underline()).child(if shown.get() { "Hide details" } else { "Show details" }).on_click(move |_, window, _| {
+                    s2.set(!s2.get());
+                    window.refresh();
+                }));
             os::modal_doc_page(dialog, "Move documents and folders to", 460.)
-                .child(os::modal_body().child(os::field_label("Location")).child(location.render(cx)))
+                .child(os::modal_body().child(os::field_label("Location")).child(location.render(cx)).child(count).when(shown.get(), |d| d.child(Self::selection_box(&items))))
                 .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
                     let dir = loc.chosen.borrow().clone();
@@ -906,7 +1027,7 @@ impl StartView {
     /// Onshape's message bubble at the top center of the page (replaces the
     /// previous one; closes with its × or after 8 s).
     fn notify(window: &mut Window, cx: &mut App, kind: AlertKind, message: impl Into<String>) {
-        Self::toast(window, cx, Toast { kind: kind.into(), bold: None, text: message.into(), restore: None, brief: false });
+        Self::toast(window, cx, Toast { kind: kind.into(), bold: None, text: message.into(), restore: Vec::new(), brief: false });
     }
 
     /// Show a message bubble at the top of the page for 8 s.
@@ -1377,8 +1498,8 @@ impl StartView {
         self.selected = None;
         match sent.as_slice() {
             [] => {}
-            [(name, id)] => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name.clone()), text: " has been sent to the trash and will be automatically deleted after 30 days.".into(), restore: Some(id.clone()), brief: true }),
-            many => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(format!("{} items", many.len())), text: " have been sent to the trash and will be automatically deleted after 30 days.".into(), restore: None, brief: true }),
+            [(name, id)] => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name.clone()), text: " has been sent to the trash and will be automatically deleted after 30 days.".into(), restore: vec![id.clone()], brief: true }),
+            many => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(format!("{} items", many.len())), text: " have been sent to the trash and will be automatically deleted after 30 days.".into(), restore: many.iter().map(|(_, id)| id.clone()).collect(), brief: true }),
         }
         self.force_rescan(cx);
     }
@@ -1389,7 +1510,7 @@ impl StartView {
             Ok((_, item)) => {
                 self.trash = crate::start_trash::Trash::load();
                 // Live documents/86: "<name> has been restored." (brief).
-                Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(item.name.clone()), text: " has been restored.".into(), restore: None, brief: true });
+                Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(item.name.clone()), text: " has been restored.".into(), restore: Vec::new(), brief: true });
                 self.folders = ScanInput::current().folders;
                 self.selected = None;
                 self.force_rescan(cx);
@@ -1418,7 +1539,7 @@ impl StartView {
                     view.update(cx, |this, cx| match this.trash.delete(&id) {
                         Ok(()) => {
                             this.selected = None;
-                            Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name), text: " has been permanently deleted.".into(), restore: None, brief: false });
+                            Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name), text: " has been permanently deleted.".into(), restore: Vec::new(), brief: false });
                             this.force_rescan(cx);
                         }
                         Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Could not delete: {e:#}")),
@@ -1534,7 +1655,7 @@ impl StartView {
                     Ok(same) => {
                         t.libraries = noshape_ops::prefs::LibraryFolders::load().0;
                         let text = if same { format!("Your{kind} library is already up to date.") } else { format!("Successfully updated your{kind} library.") };
-                        Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text, restore: None, brief: false });
+                        Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text, restore: Vec::new(), brief: false });
                     }
                     Err(message) => {
                         cx.default_global::<StartToast>().0 = None;
@@ -1570,7 +1691,7 @@ impl StartView {
         }
         self.libraries.remove(key);
         let (kind, _, _) = library_texts(key);
-        Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text: format!("Successfully unset your{kind} library."), restore: None, brief: false });
+        Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text: format!("Successfully unset your{kind} library."), restore: Vec::new(), brief: false });
         cx.notify();
     }
 
@@ -1725,7 +1846,7 @@ impl StartView {
     /// by the search), and "Create new label".
     /// `labels` is passed in: the Details panel draws this while the view is
     /// being rendered, so it can't read the view.
-    fn label_checklist(view: &Entity<StartView>, path: &Path, search: &Entity<InputState>, labels: &lib::Labels, cx: &App) -> AnyElement {
+    fn label_checklist(view: &Entity<StartView>, paths: &[PathBuf], search: &Entity<InputState>, labels: &lib::Labels, cx: &App) -> AnyElement {
         let pal = p();
         let labels = labels.clone();
         let query = search.read(cx).value().trim().to_lowercase();
@@ -1746,14 +1867,20 @@ impl StartView {
             col = col.child(div().pt(px(6.)).pb(px(34.)).text_center().text_size(px(14.)).text_color(pal.text).child("You have no labels yet"));
         }
         for (k, l) in labels.labels.iter().enumerate().filter(|(_, l)| query.is_empty() || l.to_lowercase().contains(&query)) {
-            let on = labels.has(path, l);
-            let (v, p2, l2) = (view.clone(), path.to_path_buf(), l.clone());
+            // Several documents: ticked when all have it; a click gives it to all, or takes it from all.
+            let on = !paths.is_empty() && paths.iter().all(|p| labels.has(p, l));
+            let (v, ps, l2) = (view.clone(), paths.to_vec(), l.clone());
             col = col.child(os::user_checkbox(("label-check", k), l.clone(), on).on_click(move |_, window, cx| {
-                v.update(cx, |t, cx| t.toggle_label(&p2, &l2, cx));
+                v.update(cx, |t, cx| {
+                    let flip: Vec<PathBuf> = ps.iter().filter(|p| t.labels.has(p, &l2) == on).cloned().collect();
+                    for p in &flip {
+                        t.toggle_label(p, &l2, cx);
+                    }
+                });
                 window.refresh();
             }));
         }
-        let (v, p2) = (view.clone(), path.to_path_buf());
+        let (v, p2) = (view.clone(), paths.first().cloned().unwrap_or_default());
         col.child(
             h_flex()
                 .id("label-create")
@@ -2051,7 +2178,12 @@ impl StartView {
     fn render_doc_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let panel = self.panel?;
         let pal = p();
-        let entry = self.selected_entry();
+        let many = self.selection().len() > 1;
+        if many && !self.select_all && panel == DocPanel::Details {
+            let body = self.render_selection_panel(cx);
+            return Some(self.doc_panel_frame("Details", body, cx).into_any_element());
+        }
+        let entry = if self.select_all { None } else { self.selected_entry() };
         let details = entry.as_ref().and_then(|e| self.details_of(&e.path));
         let folder = if entry.is_none() { self.selected_folder() } else { None };
         // Onshape writes the user as "me".
@@ -2173,7 +2305,7 @@ impl StartView {
                                     cx.notify();
                                 })),
                         )
-                        .when(self.details_labels_open, |d| d.child(div().mt(px(14.)).rounded(px(2.)).border_1().border_color(rgb(0xcccccc)).child(Self::label_checklist(&cx.entity(), &e.path, &self.label_search, &self.labels, cx)))),
+                        .when(self.details_labels_open, |d| d.child(div().mt(px(14.)).rounded(px(2.)).border_1().border_color(rgb(0xcccccc)).child(Self::label_checklist(&cx.entity(), std::slice::from_ref(&e.path), &self.label_search, &self.labels, cx)))),
                 )
                 .child(section("Created by", vec![who(&d.created_by), lib::format_onshape_time(d.created)]))
                 .child(section("Last modified by", vec![who(&d.modified_by), lib::format_onshape_time(d.modified)]))
@@ -2427,37 +2559,40 @@ impl StartView {
                 .child(div().text_center().text_size(px(14.67)).text_color(rgb(0x666666)).child("Select a document or folder to view its details"))
                 .into_any_element(),
         };
-        Some(
-            v_flex()
-                .w(px(340.))
-                .h_full()
-                .flex_none()
-                .border_l_1()
-                .border_color(pal.border)
-                .child(
-                    h_flex()
-                        .h(px(32.))
-                        .flex_none()
-                        .px(px(10.))
-                        .border_b_1()
-                        .border_color(rgb(0xd0dbe5))
-                        .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(title))
-                        .child(
-                            div()
-                                .id("doc-panel-close")
-                                .cursor_pointer()
-                                .child(os::glyph(os::GLYPH_CLOSE, 16., pal.text_faint))
-                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    this.panel = None;
-                                    this.save_prefs();
-                                    cx.notify();
-                                })),
-                        ),
-                )
-                .child(div().id("doc-panel-body").flex_1().min_h_0().overflow_y_scroll().child(body))
-                .when(panel == DocPanel::Properties && entry.is_some(), |d| d.children(self.render_props_footer(cx)))
-                .into_any_element(),
-        )
+        let footer = if panel == DocPanel::Properties && entry.is_some() { self.render_props_footer(cx) } else { None };
+        Some(self.doc_panel_frame(title, body, cx).children(footer).into_any_element())
+    }
+
+    /// The right panel's frame: its title bar with ✕, the scrolling body.
+    fn doc_panel_frame(&self, title: &'static str, body: AnyElement, cx: &mut Context<Self>) -> Div {
+        let pal = p();
+        v_flex()
+            .w(px(340.))
+            .h_full()
+            .flex_none()
+            .border_l_1()
+            .border_color(pal.border)
+            .child(
+                h_flex()
+                    .h(px(32.))
+                    .flex_none()
+                    .px(px(10.))
+                    .border_b_1()
+                    .border_color(rgb(0xd0dbe5))
+                    .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(title))
+                    .child(
+                        div()
+                            .id("doc-panel-close")
+                            .cursor_pointer()
+                            .child(os::glyph(os::GLYPH_CLOSE, 16., pal.text_faint))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.panel = None;
+                                this.save_prefs();
+                                cx.notify();
+                            })),
+                    ),
+            )
+            .child(div().id("doc-panel-body").flex_1().min_h_0().overflow_y_scroll().child(body))
     }
 
     /// The Properties panel's fields follow the selected document.
@@ -2862,7 +2997,11 @@ impl StartView {
                     .child(self.nav_item("nav-recent", os::GLYPH_RECENT, "Recently opened", Source::Recent, cx))
                     .child(self.nav_item("nav-created", os::GLYPH_CREATED, "Created by me", Source::Created, cx))
                     .child(labels_nav)
-                    .child(self.nav_item("nav-trash", os::GLYPH_TRASH, "Trash", Source::Trash, cx)),
+                    // Rows dragged onto it go to the trash (live: a light-blue fill with a blue bottom border).
+                    .child(self.nav_item("nav-trash", os::GLYPH_TRASH, "Trash", Source::Trash, cx).drag_over::<DocsDrag>(|st, d, _, _| {
+                        d.over.set(true);
+                        st.bg(rgb(0xdef1fb)).border_b_2().border_color(rgb(0x1651b0))
+                    }).on_drop(cx.listener(|this, drag: &DocsDrag, window, cx| this.drop_into_trash(drag, window, cx)))),
             )
             .into_any_element()
     }
@@ -3018,8 +3157,6 @@ impl StartView {
                             .text_color(rgb(0x666666))
                             .cursor_pointer()
                             .hover(|d| d.text_color(pal.accent))
-                            .drag_over::<DocsDrag>(|st, _, _, _| st.bg(rgb(0xdef1fb)))
-                            .on_drop(cx.listener(|this, drag: &DocsDrag, window, cx| this.drop_into_folder(drag, &crate::file_dialogs::documents_dir(), window, cx)))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_source(Source::All, cx)))
                     }),
             );
@@ -3031,13 +3168,10 @@ impl StartView {
                     let name = folder_label(&c);
                     crate::ui_script::mark(d, move || format!("crumb:{name}"))
                 }).child(folder_label(&c)).tooltip(crate::ui::user_tooltip(folder_label(&c))).when(i < last, |d| {
-                    let into = target.clone();
                     d.font_weight(FontWeight::NORMAL)
                         .text_color(rgb(0x666666))
                         .cursor_pointer()
                         .hover(|d| d.text_color(pal.accent))
-                        .drag_over::<DocsDrag>(|st, _, _, _| st.bg(rgb(0xdef1fb)))
-                        .on_drop(cx.listener(move |this, drag: &DocsDrag, window, cx| this.drop_into_folder(drag, &into, window, cx)))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_source(Source::Folder(target.clone()), cx)))
                 }),
             );
@@ -3133,8 +3267,8 @@ impl StartView {
                     .child(self.inline_rename_field(&f, cx).unwrap_or_else(|| div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())).into_any_element()))
                     .when(trash_id.is_none(), |t| {
                         let target = f.clone();
-                        t.on_drag(self.drag_items(&f, &name, true), |d, _, _, cx| cx.new(|_| d.clone()))
-                            .drag_over::<DocsDrag>(|st, _, _, _| st.bg(rgb(0xdef1fb)))
+                        t.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(&f, &name, true), start_docs_drag(cx.entity().downgrade()))
+                            .drag_over::<DocsDrag>(|st, d, _, _| folder_drop_style(st, d))
                             .on_drop(cx.listener(move |this, drag: &DocsDrag, window, cx| this.drop_into_folder(drag, &target, window, cx)))
                     })
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
@@ -3152,7 +3286,7 @@ impl StartView {
                             cx.notify();
                             many
                         }) {
-                            return Self::selection_menu(view.clone(), menu);
+                            return Self::selection_menu(view.clone(), menu, cx);
                         }
                         Self::folder_menu(view.clone(), f.clone(), name.clone(), trash_id.clone(), menu, window, cx)
                     }),
@@ -3333,8 +3467,8 @@ impl StartView {
                     .child(div().w(px(200.)).flex_none().pl(px(16.)).child("me"))
                     .when(trash_id.is_none(), |r| {
                         let target = f.clone();
-                        r.on_drag(self.drag_items(f, &name_for_drag, true), |d, _, _, cx| cx.new(|_| d.clone()))
-                            .drag_over::<DocsDrag>(|st, _, _, _| st.bg(rgb(0xdef1fb)))
+                        r.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(f, &name_for_drag, true), start_docs_drag(cx.entity().downgrade()))
+                            .drag_over::<DocsDrag>(|st, d, _, _| folder_drop_style(st, d))
                             .on_drop(cx.listener(move |this, drag: &DocsDrag, window, cx| this.drop_into_folder(drag, &target, window, cx)))
                     })
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
@@ -3352,7 +3486,7 @@ impl StartView {
                             cx.notify();
                             many
                         }) {
-                            return Self::selection_menu(v.clone(), menu);
+                            return Self::selection_menu(v.clone(), menu, cx);
                         }
                         Self::folder_menu(v.clone(), f3.clone(), menu_name.clone(), tid.clone(), menu, window, cx)
                     }),
@@ -3849,6 +3983,8 @@ impl StartView {
                     .border_color(rgb(0xececec))
                     .when(selected, |r| r.bg(pal.accent_soft))
                     .when(!selected, |r| r.hover(|r| r.bg(pal.row_hover)))
+                    // Dragged: faded in place (live docs-f2-onto-document-row).
+                    .when(self.dragging.contains(&d.path), |r| r.opacity(0.55))
                     .when(d.trashed, |r| r.tooltip(crate::ui::tooltip("This document is in the trash and cannot be opened.")))
                     .child(
                         h_flex()
@@ -3899,7 +4035,7 @@ impl StartView {
                                 }))),
                         )
                     })
-                    .when(!d.trashed, |r| r.on_drag(self.drag_items(&d.path, &d.name, false), |d, _, _, cx| cx.new(|_| d.clone())))
+                    .when(!d.trashed, |r| r.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(&d.path, &d.name, false), start_docs_drag(cx.entity().downgrade())))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
                     // Right-click selects the row too (live documents/25); the
                     // menu's own handler stops propagation, so select here.
@@ -3909,7 +4045,7 @@ impl StartView {
                             cx.notify();
                             many
                         }) {
-                            return Self::selection_menu(v2.clone(), menu);
+                            return Self::selection_menu(v2.clone(), menu, cx);
                         }
                         let in_recent = v2.read(cx).source == Source::Recent;
                         Self::doc_menu(v2.clone(), d2.clone(), in_recent, menu)
@@ -3959,7 +4095,19 @@ impl StartView {
                         .child(if empty {
                             self.render_empty(cx)
                         } else {
-                            div().id("doc-list").flex_1().min_h_0().overflow_y_scrollbar().child(v_flex().child(probe).children(rows)).into_any_element()
+                            // A click on the list's empty space clears the selection (live feel/documents.json).
+                            div()
+                                .id("doc-list")
+                                .flex_1()
+                                .min_h_0()
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    if !std::mem::take(&mut this.row_hit) {
+                                        this.deselect_all(cx);
+                                    }
+                                }))
+                                .overflow_y_scrollbar()
+                                .child(v_flex().child(probe).children(rows))
+                                .into_any_element()
                         }),
                 ),
             )
@@ -4092,6 +4240,10 @@ impl Render for StartView {
             self.search.update(cx, |s, cx| s.set_placeholder(placeholder, window, cx));
         }
         self.ensure_props(window, cx);
+        if !cx.has_active_drag() && !self.dragging.is_empty() {
+            self.dragging.clear();
+            self.refresh_body(cx);
+        }
         let body = match &self.body {
             Some(b) => b.clone(),
             None => {
@@ -4106,6 +4258,8 @@ impl Render for StartView {
             .text_color(pal.text)
             .key_context(CONTEXT)
             .track_focus(&self.focus)
+            // Dragged rows: off any target until one under the pointer says so as it is drawn (the ghost's icon).
+            .on_drag_move::<DocsDrag>(|e, _, cx| e.drag(cx).over.set(false))
             // A press anywhere but on Create takes the focus off it, as a
             // click on the page blurs a focused button (live request 1669).
             .on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, window, cx| {
@@ -4139,6 +4293,7 @@ impl Render for StartView {
                     }
                 }
             }))
+            .on_action(cx.listener(|this, _: &SelectAllRows, _, cx| this.select_all_rows(cx)))
             .on_action(cx.listener(|this, _: &SelectNext, _, cx| this.move_selection(1, cx)))
             .on_action(cx.listener(|this, _: &SelectPrev, _, cx| this.move_selection(-1, cx)))
             .on_action(cx.listener(|this, _: &FocusSearch, window, cx| this.search.update(cx, |s, cx| s.focus(window, cx))))
@@ -4202,13 +4357,16 @@ impl Render for StartView {
                     cx.default_global::<StartToast>().0 = None;
                     window.refresh();
                 };
-                let said = format!("{}{}{}", t.bold.clone().unwrap_or_default(), t.text, if t.restore.is_some() { " Restore" } else { "" });
-                let bubble = match t.restore.clone() {
-                    Some(id) => {
-                        let view = cx.entity();
-                        os::message_bubble_with_link("start-toast", t.kind, text, "Restore", move |_, window, cx| view.update(cx, |this, cx| this.restore_trashed(id.clone(), window, cx)), close, cx)
-                    }
-                    None => os::message_bubble("start-toast", t.kind, text, close, cx),
+                let said = format!("{}{}{}", t.bold.clone().unwrap_or_default(), t.text, if t.restore.is_empty() { "" } else { " Restore" });
+                let bubble = if t.restore.is_empty() {
+                    os::message_bubble("start-toast", t.kind, text, close, cx)
+                } else {
+                    let (view, ids) = (cx.entity(), t.restore.clone());
+                    os::message_bubble_with_link("start-toast", t.kind, text, "Restore", move |_, window, cx| view.update(cx, |this, cx| {
+                        for id in &ids {
+                            this.restore_trashed(id.clone(), window, cx);
+                        }
+                    }), close, cx)
                 };
                 crate::ui_script::mark_message(div().absolute().top(px(8.)).left_0().right_0().flex().justify_center().child(bubble), || said)
             }))
@@ -4222,29 +4380,70 @@ impl Render for StartView {
 #[derive(Clone)]
 struct DocsDrag {
     items: Vec<(PathBuf, String, bool)>,
+    /// Where the row was grabbed (the ghost sits 10 px left of and 8 px above the pointer).
+    offset: Point<Pixels>,
+    /// Over a target this frame (the ghost's move icon, else ⊘).
+    over: Rc<std::cell::Cell<bool>>,
 }
 
+impl DocsDrag {
+    fn new(items: Vec<(PathBuf, String, bool)>) -> Self {
+        Self { items, offset: Point::default(), over: Rc::default() }
+    }
+}
+
+/// How far a row moves before it drags (live: 4 px or less is a click, 5 a drag).
+const DOCS_DRAG_PX: f32 = 4.;
+
+/// The drag ghost's icons (ag-grid's move arrows and not-allowed).
+const GLYPH_DRAG_MOVE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5v15M2.5 10h15M7.8 4.7 10 2.5l2.2 2.2M7.8 15.3l2.2 2.2 2.2-2.2M4.7 7.8 2.5 10l2.2 2.2M15.3 7.8l2.2 2.2-2.2 2.2"/></svg>"#;
+const GLYPH_DRAG_NO: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="7"/><path d="m5.1 5.1 9.8 9.8"/></svg>"#;
+
 impl Render for DocsDrag {
+    /// Live (feel/documents.json `ghost`, docs-f2-over-crop): a light-blue pill rgb(178,221,246), 48 px high, its
+    /// top-left 10 px left of and 8 px above the pointer: the move icon over a target (⊘ elsewhere), then the name in
+    /// bold, or "N items".
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        let (label, folder) = match self.items.as_slice() {
-            [(_, name, folder)] => (name.clone(), *folder),
-            many => (format!("{} items", many.len()), false),
+        let label = match self.items.as_slice() {
+            [(_, name, _)] => name.clone(),
+            many => format!("{} items", many.len()),
         };
-        h_flex()
-            .gap(px(8.))
-            .px(px(10.))
-            .h(px(32.))
-            .rounded(px(3.))
-            .bg(rgb(0xffffff))
-            .border_1()
-            .border_color(rgb(0xcccccc))
-            .shadow_md()
-            .text_size(px(14.))
-            .text_color(pal.text)
-            .child(os::glyph(if folder { os::GLYPH_FOLDER } else { os::GLYPH_DOCUMENT }, 18., pal.text))
-            .child(crate::ui::user_text(label))
+        div().pl(self.offset.x - px(10.)).pt(self.offset.y - px(8.)).child(
+            h_flex()
+                .h(px(48.))
+                .px(px(18.))
+                .gap(px(10.))
+                .rounded_full()
+                .bg(rgb(0xb2ddf6))
+                .shadow_md()
+                .text_size(px(14.))
+                .font_weight(FontWeight::BOLD)
+                .text_color(pal.text)
+                .child(os::glyph(if self.over.get() { GLYPH_DRAG_MOVE } else { GLYPH_DRAG_NO }, 18., pal.text))
+                .child(crate::ui::user_text(label)),
+        )
     }
+}
+
+/// The drag start of documents-page rows: the ghost, and the rows drawn faded while they're dragged.
+fn start_docs_drag(view: WeakEntity<StartView>) -> impl Fn(&DocsDrag, Point<Pixels>, &mut Window, &mut App) -> Entity<DocsDrag> {
+    move |d, offset, _, cx| {
+        let rows: Vec<PathBuf> = d.items.iter().map(|i| i.0.clone()).collect();
+        let _ = view.update(cx, |v, cx| {
+            v.dragging = rows;
+            cx.notify();
+        });
+        let mut ghost = d.clone();
+        ghost.offset = offset;
+        cx.new(|_| ghost)
+    }
+}
+
+/// A folder under dragged rows (live: a 2 px blue rgb(22,81,176) border on a light rgb(232,238,247) fill).
+fn folder_drop_style(st: StyleRefinement, d: &DocsDrag) -> StyleRefinement {
+    d.over.set(true);
+    st.border_2().border_color(rgb(0x1651b0)).bg(rgb(0xe8eef7))
 }
 
 #[derive(Clone)]
@@ -4252,7 +4451,7 @@ struct Toast {
     kind: os::BubbleKind,
     bold: Option<String>,
     text: String,
-    restore: Option<String>,
+    restore: Vec<String>,
     /// Fades after ~3 s (Onshape's restore toast) instead of 8 s.
     brief: bool,
 }
@@ -4336,7 +4535,7 @@ fn user_menu(cx: &App) -> AnyElement {
                     let dark = !gpui_kit::hex_theme_active();
                     noshape_preferences_ui::prefs_general::show_theme(dark, cx);
                     if dark {
-                        StartView::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: None, text: "You are now viewing in dark mode. You may persist this setting. Go to user preferences.".into(), restore: None, brief: false });
+                        StartView::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: None, text: "You are now viewing in dark mode. You may persist this setting. Go to user preferences.".into(), restore: Vec::new(), brief: false });
                     }
                 }))
                 .item(OsMenuItem::new("Company settings").on_click(|_, _, cx| crate::company_settings::show(crate::company_settings::Section::ReleaseManagement, cx)))
@@ -4418,13 +4617,17 @@ fn move_rows(items: &[(PathBuf, String, bool)], dir: &Path) -> (Vec<Moved>, Vec<
 
 /// A row clicked on the documents page (folders and documents, `order` as on the page), `sel` selected before (the
 /// last clicked first): the selection after it, the clicked row first, and Shift's anchor. Alone it selects the row;
-/// Ctrl (Cmd on a Mac) toggles it; Shift selects from the anchor (the last row clicked without Shift) to it.
+/// Ctrl (Cmd on a Mac) toggles it; Shift adds the rows from the anchor (the last row clicked without Shift) to it
+/// (live feel/documents.json `multiSelect`).
 fn click_rows(sel: &[PathBuf], anchor: Option<&Path>, order: &[PathBuf], row: &Path, shift: bool, toggle: bool) -> (Vec<PathBuf>, Option<PathBuf>) {
     let at = |p: &Path| order.iter().position(|q| q == p);
     if shift && let Some(a) = anchor && let (Some(i), Some(j)) = (at(a), at(row)) {
         let range = &order[i.min(j)..=i.max(j)];
         let mut out = vec![row.to_path_buf()];
-        out.extend(range.iter().filter(|q| q.as_path() != row).cloned());
+        out.extend(range.iter().chain(sel.iter()).filter(|q| q.as_path() != row).cloned());
+        out.dedup_by(|a, b| a == b);
+        let mut seen = std::collections::HashSet::new();
+        out.retain(|q| seen.insert(q.clone()));
         return (out, Some(a.to_path_buf()));
     }
     if toggle {
@@ -4981,9 +5184,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Lead 11-13 (interaction feel): the documents page's rows multi-select as a list does: a click selects one row,
-    /// Ctrl toggles one, Shift selects from the anchor (the last click without Shift) to the row, folders and documents
-    /// alike in the page's order.
+    /// Lead 11-13 (interaction feel; live2 feel/documents.json): a click selects one row, Ctrl toggles one, Shift adds
+    /// the rows from the anchor (the last click without Shift) to the row, folders and documents alike in page order.
     #[test]
     fn rows_select_alone_with_ctrl_toggles_and_with_shift_ranges_from_the_anchor() {
         let order: Vec<PathBuf> = ["f1", "f2", "a", "b", "c", "d", "e"].iter().map(PathBuf::from).collect();
@@ -4999,14 +5201,28 @@ mod tests {
         assert_eq!(names(&sel), "f1 e b c d");
         let (sel, anchor) = click_rows(&sel, anchor.as_deref(), &order, &p("c"), false, true);
         assert_eq!((names(&sel), anchor.clone()), ("f1 e b d".into(), Some(p("c"))));
-        // Shift from the new anchor upward replaces the selection with the range.
+        // Shift from the new anchor upward adds the range to the selection.
         let (sel, anchor) = click_rows(&sel, anchor.as_deref(), &order, &p("f2"), true, false);
-        assert_eq!((names(&sel), anchor.clone()), ("f2 a b c".into(), Some(p("c"))));
+        assert_eq!((names(&sel), anchor.clone()), ("f2 a b c f1 e d".into(), Some(p("c"))));
         // A plain click: that row alone.
         let (sel, _) = click_rows(&sel, anchor.as_deref(), &order, &p("d"), false, false);
         assert_eq!(names(&sel), "d");
         // Shift with no anchor (nothing clicked yet): the row alone.
         assert_eq!(names(&click_rows(&[], None, &order, &p("c"), true, false).0), "c");
+        // live2's three sequences (rows 3, 6, 5, 4, 2 in that order).
+        let order: Vec<PathBuf> = ["3", "6", "5", "4", "2"].iter().map(PathBuf::from).collect();
+        let run = |clicks: &[(&str, bool, bool)]| {
+            let (mut sel, mut anchor) = (Vec::new(), None);
+            for (r, shift, ctrl) in clicks {
+                (sel, anchor) = click_rows(&sel, anchor.as_deref(), &order, &p(r), *shift, *ctrl);
+            }
+            let mut v: Vec<String> = sel.iter().map(|q| q.display().to_string()).collect();
+            v.sort();
+            v.join(" ")
+        };
+        assert_eq!(run(&[("6", false, false), ("4", false, true), ("3", true, false)]), "3 4 5 6");
+        assert_eq!(run(&[("3", false, false), ("5", false, true), ("6", true, false)]), "3 5 6");
+        assert_eq!(run(&[("6", false, false), ("4", true, false), ("2", true, false)]), "2 4 5 6");
     }
     use noshape_model::document::TabId;
     use noshape_ops::history_filter::HistoryFilter;

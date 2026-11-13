@@ -424,7 +424,8 @@ impl WorkspaceUnits {
         let shown = options.get(current).cloned().unwrap_or_default();
         let id = SharedString::from(format!("wu-{label}"));
         let id2 = id.clone();
-        noshape_app_core::ui_script::note_field(|| serde_json::json!({ "label": label, "kind": "enum", "text": shown }));
+        // Live reads them as native selects with their value (live2's units re-records).
+        noshape_app_core::ui_script::note_field(|| serde_json::json!({ "label": label, "kind": "select", "value": shown }));
         div()
             .w(px(w))
             .map(|d| noshape_app_core::ui_script::mark(d, || format!("field:{label}")))

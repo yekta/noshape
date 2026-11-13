@@ -95,16 +95,22 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (asked 11-13 00:
 | Ctrl + click | ? | as a plain click | – | ? |
 | Click vs drag | ? (runs used a 0.5 s hold) | 3 px (`drawing_tools.rs` 1269) | – | ? |
 | Dragging a projected view | follows its parent's axis (bm 13993) | locked to the axis (`MoveViews`) | – | = |
-| Dragging a view near another's alignment | ? (asked: F4) | a free view's centre held on another's centre line within the inference reach, its line shown; Shift free (`align_view_drag`) | GPUI `a_dragged_view_holds_on_another_views_centre_line` | ? (kept or removed by live2's F4) |
+| Dragging a view near another's alignment | no snap at 16 down to 1 px, Shift or not (feel/drawing.json F4) | none (built 11-13, removed 11-13 on live2's answer) | – | = |
 | Double-click | ? | the OS's (GPUI: Linux 400 ms, 5 px) | – | ? |
 
 ## Documents page and tabs (studios, from 2026-11-13)
 
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
-| Documents list: click / Ctrl / Shift | ? (asked: F1) | a click selects one row, Ctrl (Cmd) toggles, Shift selects from the anchor, folders and documents in page order (`click_rows`) | `rows_select_alone_with_ctrl_toggles_and_with_shift_ranges_from_the_anchor` | ? (built 11-13) |
-| Actions on N selected | "N selection(s)" wording (bm 35) | right-click menu Move to… / Send to trash, Delete key; "N selections will be sent to the trash." | – | ? |
-| Documents dragged onto a folder | ? (asked: F2) | rows, folder tiles and parent crumbs take a drop (#def1fb); the selection moves, "N items" ghost | `rows_dropped_on_a_folder_move_into_it`; app check 11-13 (4 moved) | ? (built 11-13) |
+| Documents list: click / Ctrl / Shift | click one row; Ctrl toggles; Shift **adds** anchor..row; the anchor is the last plain or Ctrl click (feel/documents.json `multiSelect`, three sequences) | the same (`click_rows`) | `rows_select_alone_with_ctrl_toggles_and_with_shift_ranges_from_the_anchor` (live2's sequences) | = |
+| Ctrl+A / Esc / click on empty list | all rows (the panel shows no details) / keeps / clears | the same (`select_all_rows`, `doc-list` click) | – | = |
+| Right panel for N | "⌄ N selections", the rows with ✕, Trash, Deselect all, "⌄ Labels" (docs-f1-shift-range) | the same (`render_selection_panel`) | – | = |
+| Menu for N | Details, Labels…, Move selected (N) to…, Send to trash | the same (`selection_menu`) | – | = |
+| Move to… for N | the folder tree, "N items will be moved." + Show details, New folder / Move here / Cancel | the count bar and details; our folder picker | – | ≠ (New folder in the picker) |
+| Send to trash for N | "N selections will be sent to the trash."; toast "N items have been sent … Restore" | the same, Restore brings all back | – | = |
+| Row drag start | 5 px (4 is a click) | 4 px threshold (`DOCS_DRAG_PX`, gpui `drag_threshold`) | – | = |
+| Drag ghost | light-blue pill rgb(178,221,246), 48 px, 10 px left / 8 px above the pointer, ✥ over a target, ⊘ elsewhere, bold name or "N items"; source rows faded | the same (`DocsDrag`) | – | = |
+| Drop targets | folder tiles (2 px rgb(22,81,176) border, rgb(232,238,247) fill; toast "Selected items moved."), left panel Trash (Send to trash dialog); not: document rows, "Owned by me" crumb or nav; no dwell-open | the same; folder rows too (list view) | `rows_dropped_on_a_folder_move_into_it`; app check 11-13 (4 moved) | = |
 | Row hover / selected | #def1fb / #b2ddf6 (bm 20) | the same | – | = |
 | Tab drag: ghost, gap | 100 px ghost, a tab-wide gap, no line (bm 6562) | the same | – | = |
 | Tab drag start | ? | GPUI's 2 px | – | ? |
