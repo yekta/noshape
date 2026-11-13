@@ -295,7 +295,7 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   lofted tools' faces with the blade's in sections_ahead, bool's; ours 268-380 ms against OCCT's whole Boolean 788-991),
   Fillet 2 364 (Boolean 87), Mirror 1 349 (op_unify 259: bool's row), Chamfer 2 172 (Booleans 74). Boolean time left
   ~600 ms, mostly OCCT's sections; the rest of the gap is blend's.
-- **c2-impeller-loft's Boolean Flansch+Gehäuse (user 12:00 UTC; queued to land 13:53 as fe20f69d: the gate's replay and suite clean, its crate tests killed by vibe5's earlyoom, rerun on vibe6: kernel 405, model 456, model-core 107; g++-13 builds):** the flange's inner
+- **c2-impeller-loft's Boolean Flansch+Gehäuse (user 12:00 UTC; landed 14:18 as df95cac8):** the flange's inner
   wall is extruded from the shell's inner wall's top edge; where the shell's wall slopes away under it the flange's
   wall stands in the cavity (0.04-0.27 mm proud at x 30-65 mm each side, 3 mm at the far tip). We declined (the
   flange's top edge, the same curve as the shell's own edge e15, is 2.3 um off the wall: that edge is off its own face
@@ -308,6 +308,13 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   135.66 / 136.74 (live 135.6 / 134.3), inner wall 13,216.16 (live 13,219.1). Feature 15: 19/51/34, live 19/56/39
   (faces and volume as live; the 5 edges / vertices asked of live, REQUESTS 12:35). T1
   bool_patterns::a_flange_drawn_from_a_shells_wall_fused_as_live. Kernel 404/404.
+  - **Before / after (vibe6, main 82a88125 vs df95cac8, two alternating rounds, load 25-40):** features 15-23 had faces
+    and volume off (15/41/30 at 15, 26.6 mm³ short), now faces, volume and area as live (5 edges / vertices short);
+    feature 25 volume 71,468.31 -> 71,495.45 (live 71,495.17). From feature 24 on the same failures (Chamfer, Fillet
+    3, Fillet zum Halter, Move face 1; Boolean 3 9,000 mm³ short). The suite's count stays 12/48 (first difference
+    feature 12, upstream). Times: Boolean Flansch+Gehäuse 2964/2461 -> 1479/1605 ms (live 154), Boolean 3 347/204 ->
+    168/156 (live 94), Fillet Stevenrohr einnschub 640/612 -> 65/70; Move face 1 ~6 s and Delete face 2 ~3-4 s either
+    way (core's defeaturing); the document 26-32 s either way under that load (live 2.8).
   - **To core:** the next difference downstream is yours: feature 24 Extrude 4's Part 3 5/9/6, live 5/10/7, 0.009 mm³
     off (up to the inner wall); feature 25 Boolean 1 is then 32/81/50 (live 30/83/54) with OCCT's result identical to
     ours on its inputs (a1af84e6, 3998eb43), then Chamfer Stevenrohr Halterung fails. Recording of the whole document
