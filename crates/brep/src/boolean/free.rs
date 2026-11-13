@@ -496,6 +496,9 @@ pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: 
     let unwrap = |x: f64, near: f64| x + TAU * ((near - x) / TAU).round();
     let mut out = Vec::new();
     let mut prev: Option<(f64, DVec2, DVec2)> = None;
+    // (The side of each seam the curve was last off it, for a sample exactly on it: the private dock's rib end, a
+    // torus's minor circle with its midpoint on the seam.)
+    let mut side = [[0.0f64; 2]; 2];
     for k in 0..=N {
         let t = t0 + (t1 - t0) * k as f64 / N as f64;
         let p = at(t).0;
@@ -505,7 +508,11 @@ pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: 
             for &i in &round {
                 w[i] = unwrap(uv[i], pw[i]);
                 let (lo, hi) = uv_span(g, i);
-                for edge in [lo, hi] {
+                for (j, edge) in [lo, hi].into_iter().enumerate() {
+                    if pw[i] == edge && w[i] != edge && side[i][j] * (w[i] - edge) < 0.0 {
+                        out.push(tp);
+                        continue;
+                    }
                     if (pw[i] - edge) * (w[i] - edge) >= 0.0 {
                         continue;
                     }
@@ -522,6 +529,14 @@ pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: 
                         }
                     }
                     out.push(0.5 * (a + b));
+                }
+            }
+        }
+        for &i in &round {
+            let (lo, hi) = uv_span(g, i);
+            for (j, edge) in [lo, hi].into_iter().enumerate() {
+                if w[i] != edge {
+                    side[i][j] = w[i] - edge;
                 }
             }
         }
