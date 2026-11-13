@@ -214,21 +214,29 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   clamp-hms 1309375f (a fuse, 13 ms) has its seam line at u -0.078 on one side and 0.1215 on the other (r 31.75 mm,
   one turn apart), so the outline doesn't close; cf-lighten a28978f4 (a 4-tool cut, 40 ms) loses tool face 26 likewise.
   The gap fix doesn't help them. Cases: vibe5 ~/tmp/bool2/lost.
-- **Gating 07:28 UTC on vibe5 (queued behind bool's fe8859ed4): branch bool2-knife2 e6de34123, three commits:**
-  - f7768ac9b the knife (below). Its first gate (2a78dd7f, vibe7) FAILED: 4 new differences, 47 cases declined, 6
+- **Gating 07:43 UTC on vibe5 (gate24.out): branch bool2-knife2 b0cec4ed7, four commits:**
+  - 5c810e4fc the knife (below). Its first gate (2a78dd7f, vibe7) FAILED: 4 new differences, 47 cases declined, 6
     crate tests, clamp-hms worse. Two bugs, fixed: the "section along an edge" test measured distance to the edge's
     infinite line (seg_param), so sections running on straight past an edge's end were dropped; now within its range,
     and for B-spline sections only (exact ones don't stray: two shfall slab fuses were taken and differed). And
     "past the face's edge" counted points past it inside an edge (a circle on a torus leaving one face and coming back)
-    or with one point on; now only at its ends, three points or more on. All bool_patterns pass; the 4 cases as main.
-  - d7994c86a cf-setback-fillet's last two fuses: OCCT's section passes 0.5-4 um from the face's edge, which lies on
+    or with one point on; now only at its ends, three points or more on, and asked only of points clearly off (it
+    had cost 9 % of the rings' wedge cut). All bool_patterns pass; the gate's 4 cases as main.
+  - c0a44f936 cf-setback-fillet's last two fuses: OCCT's section passes 0.5-4 um from the face's edge, which lies on
     the other face's surface all along (OCCT: edge on face, no vertex), so not "a section touching a face's
     boundary". An edge touching at one point (bool-corpus 890acd4d, 0.1 nm) still declines: OCCT puts a vertex there.
     All 5 of its fuses ours, as OCCT's, 1.1-1.5x. T1 a_section_beside_an_edge_lying_on_the_other_face_fused_as_occt.
-  - e6de34123 sheet metal: a sheet cut by flat sheets on one of its planes, its other faces' planes past the tools'
+  - d511a9ca5 sheet metal: a sheet cut by flat sheets on one of its planes, its other faces' planes past the tools'
     reach: corner-break 1, louver 2, as OCCT's. T1 a_sheet_cut_by_a_sheet_on_one_of_its_faces_as_occt.
-- **Next (user 07:20): c2-rings-loft's ring wedges.** blend found OCCT's Boolean faster than ours there (Chamfer 1
-  534 -> ~380 ms, Fillet 1 223 -> ~128 ms, identical results; branch blend-speed on blend8): profile, make ours win.
+  - b0cec4ed7 **c2-rings-loft's wedges (user 07:20, blend: OCCT's Boolean faster there).** The wedge cut 78cd8309 (137
+    faces, 2 tools; Chamfer 1's) took 200-225 ms ours against OCCT's 90: two thirds of it was apart_across_slab's
+    exact face boxes, BRepBndLib::AddOptimal's search on torus faces (PSO + Extrema against six planes). A torus
+    face's box is now worked out in closed form over its UV bounds (torus_box; within 1.3e-10 of OCCT's on the inside,
+    up to 0.19 mm larger where a face is trimmed off its UV rectangle: only more cautious). Ours 66-85 ms against
+    OCCT's 78-118 on the same host, same result; every rings-loft Boolean now ours at OCCT's time or less (all 99:
+    ~1.8 s ours against ~7.4 s). T1 a_rings_wedge_cut_through_its_tori_as_occt. The saving (~150 ms) is blend's
+    Chamfer 1 gap (534 -> 380); Fillet 1's (223 -> 128) Boolean isn't in my 11-12 recording: blend, re-measure on
+    this branch, and send me the case if Fillet 1 still loses.
 - **Suite declines left (07:00 UTC replay of all 98 documents, 47 cases):** impeller 3 upstream (blend / core); fan's
   two cuts (05cd5358, fb562f41: helical strips on full-turn cylinders, bool's seam area; a circle cut at a seam now
   goes round past its own start: /root/bool2-scratch/fan-wrap-gap.patch with the gap fix, then "a non-manifold
