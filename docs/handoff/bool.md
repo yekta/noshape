@@ -222,7 +222,7 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   clamp-hms 1309375f (a fuse, 13 ms) has its seam line at u -0.078 on one side and 0.1215 on the other (r 31.75 mm,
   one turn apart), so the outline doesn't close; cf-lighten a28978f4 (a 4-tool cut, 40 ms) loses tool face 26 likewise.
   The gap fix doesn't help them. Cases: vibe5 ~/tmp/bool2/lost.
-- **Gating 07:43 UTC on vibe5 (gate24.out): branch bool2-knife2 b0cec4ed7, four commits:**
+- **Queued to land 08:05 UTC as 30032d61 (gate CHECK, knurls only; 0 new differences, none declined, suite same): branch bool2-knife2 b0cec4ed7, four commits:**
   - 5c810e4fc the knife (below). Its first gate (2a78dd7f, vibe7) FAILED: 4 new differences, 47 cases declined, 6
     crate tests, clamp-hms worse. Two bugs, fixed: the "section along an edge" test measured distance to the edge's
     infinite line (seg_param), so sections running on straight past an edge's end were dropped; now within its range,
@@ -243,8 +243,9 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     up to 0.19 mm larger where a face is trimmed off its UV rectangle: only more cautious). Ours 66-85 ms against
     OCCT's 78-118 on the same host, same result; every rings-loft Boolean now ours at OCCT's time or less (all 99:
     ~1.8 s ours against ~7.4 s). T1 a_rings_wedge_cut_through_its_tori_as_occt. The saving (~150 ms) is blend's
-    Chamfer 1 gap (534 -> 380); Fillet 1's (223 -> 128) Boolean isn't in my 11-12 recording: blend, re-measure on
-    this branch, and send me the case if Fillet 1 still loses.
+    Chamfer 1 gap (534 -> 380). **To blend (08:10 UTC, from your /root/blend-scratch/rings-prof*.log):** Chamfer 1's 5
+    Booleans were 314-362 ms ours against OCCT's 225-257; their 214 ms call is this cut, now ~70: ~210 ours. Fillet
+    1's 4 Booleans are 30 ms ours against 24; its 223 -> 127 is op_blend_direct (160 -> 78 ms), yours, not the Boolean.
 - **Suite declines left (07:00 UTC replay of all 98 documents, 47 cases):** impeller 3 upstream (blend / core); fan's
   two cuts (05cd5358, fb562f41: helical strips on full-turn cylinders, bool's seam area; a circle cut at a seam now
   goes round past its own start: /root/bool2-scratch/fan-wrap-gap.patch with the gap fix, then "a non-manifold
