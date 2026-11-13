@@ -1091,7 +1091,7 @@ impl VariableStudioView {
             });
             // Onshape (behaviours.md, Variable Studio): a plain value shows as
             // typed; an expression (`#width * 2`) shows its result ("4 in")
-            // until the cell is clicked; a failing one is red with the error
+            // until the cell is clicked; a failing one is pink with the error
             // as its tooltip.
             let (error, result) = match eval.results.get(i) {
                 Some(Err(e)) => (Some(e.to_string()), None),
@@ -1200,7 +1200,7 @@ impl VariableStudioView {
                     .into_any_element()
                 }
                 // The cell: its value (an expression's result), the stored text
-                // as the tooltip, red with the error when it fails.
+                // as the tooltip, pink with the error when it fails.
                 shown => {
                     let fh = self.cell_focus_handle(&format!("e{i}"), cx);
                     // The blue border while the cell has the focus (clicking elsewhere drops it).
@@ -1212,7 +1212,8 @@ impl VariableStudioView {
                         .px(px(7.))
                         .track_focus(&fh)
                         .when(selected, |d| d.border_2().border_color(rgb(0x1651b0)).px(px(6.)))
-                        .when(error.is_some(), |d| d.text_color(pal.error))
+                        // Live2 vs-drag.png: a value that fails sits on live's invalid-field pink, its text unchanged.
+                        .when(error.is_some(), |d| d.bg(crate::theme::themed(0xf9ebec, 0x4a2326)))
                         .tooltip(crate::ui::tooltip(tip))
                         .child(div().min_w_0().truncate().child(text))
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| {
