@@ -1033,7 +1033,8 @@ impl StartView {
     /// Show a message bubble at the top of the page for 8 s.
     fn toast(window: &mut Window, cx: &mut App, toast: Toast) {
         let id = cx.default_global::<StartToast>().1 + 1;
-        let secs = if toast.brief { 3 } else { 8 };
+        // Live (feel documents page): a toast with Restore stays ~5 s (4.97), a brief one 3, others 8.
+        let secs = if !toast.restore.is_empty() { 5 } else if toast.brief { 3 } else { 8 };
         *cx.default_global::<StartToast>() = StartToast(Some((window.window_handle().window_id(), toast)), id);
         window.refresh();
         let handle = window.window_handle();
@@ -1499,24 +1500,35 @@ impl StartView {
         match sent.as_slice() {
             [] => {}
             [(name, id)] => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name.clone()), text: " has been sent to the trash and will be automatically deleted after 30 days.".into(), restore: vec![id.clone()], brief: true }),
-            many => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(format!("{} items", many.len())), text: " have been sent to the trash and will be automatically deleted after 30 days.".into(), restore: many.iter().map(|(_, id)| id.clone()).collect(), brief: true }),
+            many => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: None, text: format!("{} items have been sent to the trash and will be automatically deleted after 30 days.", many.len()), restore: many.iter().map(|(_, id)| id.clone()).collect(), brief: true }),
         }
         self.force_rescan(cx);
     }
 
     /// Trash row menu › Restore and the toast's Restore link.
     fn restore_trashed(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
-        match lib::restore(&id, &crate::file_dialogs::documents_dir()) {
-            Ok((_, item)) => {
-                self.trash = crate::start_trash::Trash::load();
-                // Live documents/86: "<name> has been restored." (brief).
-                Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(item.name.clone()), text: " has been restored.".into(), restore: Vec::new(), brief: true });
-                self.folders = ScanInput::current().folders;
-                self.selected = None;
-                self.force_rescan(cx);
+        self.restore_all(&[id], window, cx);
+    }
+
+    /// Trash items back where they were (the toast's Restore: all it sent), the selection cleared; live: "<name> has
+    /// been restored." (documents/86), "N items have been restored." (feel documents page).
+    fn restore_all(&mut self, ids: &[String], window: &mut Window, cx: &mut Context<Self>) {
+        let mut names = Vec::new();
+        for id in ids {
+            match lib::restore(id, &crate::file_dialogs::documents_dir()) {
+                Ok((_, item)) => names.push(item.name),
+                Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Could not restore: {e:#}")),
             }
-            Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Could not restore: {e:#}")),
         }
+        self.trash = crate::start_trash::Trash::load();
+        match names.as_slice() {
+            [] => return,
+            [name] => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name.clone()), text: " has been restored.".into(), restore: Vec::new(), brief: true }),
+            many => Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: None, text: format!("{} items have been restored.", many.len()), restore: Vec::new(), brief: true }),
+        }
+        self.folders = ScanInput::current().folders;
+        self.deselect_all(cx);
+        self.force_rescan(cx);
     }
 
     /// Trash row menu › Delete: Onshape's "Delete forever?" (live
@@ -4362,11 +4374,7 @@ impl Render for StartView {
                     os::message_bubble("start-toast", t.kind, text, close, cx)
                 } else {
                     let (view, ids) = (cx.entity(), t.restore.clone());
-                    os::message_bubble_with_link("start-toast", t.kind, text, "Restore", move |_, window, cx| view.update(cx, |this, cx| {
-                        for id in &ids {
-                            this.restore_trashed(id.clone(), window, cx);
-                        }
-                    }), close, cx)
+                    os::message_bubble_with_link("start-toast", t.kind, text, "Restore", move |_, window, cx| view.update(cx, |this, cx| this.restore_all(&ids, window, cx)), close, cx)
                 };
                 crate::ui_script::mark_message(div().absolute().top(px(8.)).left_0().right_0().flex().justify_center().child(bubble), || said)
             }))
