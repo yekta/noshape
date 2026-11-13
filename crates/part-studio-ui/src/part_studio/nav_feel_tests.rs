@@ -196,23 +196,29 @@ struct Row {
 }
 
 /// Live's rotation per CSS px: 3 turns across the canvas diagonal (in device px; per CSS px the same).
+/// Live's wheel notch on the running OS, in powers of two of the view scale: Onshape zooms 0.5 / 120 × wheelDelta,
+/// ×3 where `navigator.platform` is Windows, and scales by 2^(−amount / 6).
+fn live_notch() -> f64 {
+    if cfg!(target_os = "windows") { 1. / 4. } else { 1. / 12. }
+}
+
 fn live_deg_per_px(size: DVec2) -> f64 {
     360. * 3. / size.length()
 }
 
 fn rows() -> Vec<Row> {
     vec![
-        Row { id: "wheel / a notch in", live: "the view scale × 2^(-1/12) = 0.943874 (Linux, Mac)", gap: false, check: |n, cx| {
+        Row { id: "wheel / a notch in", live: "the view scale × 2^(-1/12) = 0.943874 on Linux and Mac, × 2^(-1/4) = 0.840896 on Windows", gap: false, check: |n, cx| {
             n.reset(cx);
             let (before, c) = (n.half_height(cx), n.centre(cx));
             n.wheel(cx, c, 1., false);
-            near(n.half_height(cx) / before, 2f64.powf(-1. / 12.), 1e-4, "scale")
+            near(n.half_height(cx) / before, 2f64.powf(-live_notch()), 1e-4, "scale")
         } },
-        Row { id: "wheel / a notch out", live: "× 2^(1/12) = 1.059463", gap: false, check: |n, cx| {
+        Row { id: "wheel / a notch out", live: "× 2^(1/12) = 1.059463 on Linux and Mac, × 2^(1/4) = 1.189207 on Windows", gap: false, check: |n, cx| {
             n.reset(cx);
             let (before, c) = (n.half_height(cx), n.centre(cx));
             n.wheel(cx, c, -1., false);
-            near(n.half_height(cx) / before, 2f64.powf(1. / 12.), 1e-4, "scale")
+            near(n.half_height(cx) / before, 2f64.powf(live_notch()), 1e-4, "scale")
         } },
         Row { id: "wheel / in and out toward the pointer", live: "the point under the pointer stays (within ~1 px), zooming out too (no central zoom out)", gap: false, check: |n, cx| {
             n.reset(cx);
@@ -275,6 +281,17 @@ fn rows() -> Vec<Row> {
             let w = n.on_part(cx, at).ok_or(format!("no part under the press at {at:?}"))?;
             n.drag(cx, MouseButton::Right, at, DVec2::new(80., 40.), NONE);
             near(n.project(cx, w).distance(at), 0., 0.4, "px the point moved")
+        } },
+        Row { id: "right drag / from empty space, about the view centre", live: "starting on empty space it rotates about the view centre (the old centre moved 2 px)", gap: false, check: |n, cx| {
+            n.reset(cx);
+            let (size, centre) = (n.size(cx), n.centre(cx));
+            let from = DVec2::new(40., size.y - 40.);
+            if n.on_part(cx, from).is_some() {
+                return Err("the press is on the part".into());
+            }
+            let w = n.under(cx, centre);
+            n.drag(cx, MouseButton::Right, from, DVec2::new(80., -40.), NONE);
+            near(n.project(cx, w).distance(centre), 0., 2., "px the view centre's point moved")
         } },
         Row { id: "Alt + right drag / turntable", live: "an upright view turns about the vertical axis: the view direction's z stays (-0.5774 from isometric)", gap: false, check: |n, cx| {
             n.reset(cx);
