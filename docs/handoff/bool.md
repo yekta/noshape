@@ -42,8 +42,9 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    free-form face") gets OCCT's exact projection: the 4 such dock cases were a plane's ellipse on a
    Geom_RectangularTrimmedSurface of a cylinder. The dock: 33 of 44 ours, 0 differing, 1 equivalent. If both gates are
    clean, land bool-seam (both commits) from bool-hat.
-   Next declines there: 5 x "a face's vertex off its plane", 2 x "a non-manifold result" (582 ms), "a point near two
-   vertices" (a 1355-face cut, 1.24 s). hat8: its
+   Next declines there: 2 x "a non-manifold result" (582 ms), "a point near two vertices" (a 1355-face cut, 1.24 s).
+   The 5 x "a face's vertex off its plane" are upstream: two vertices at (±21, 18, 1.274) mm with 1.195 mm tolerance,
+   0.4-1.1 mm off their planes (past the 1 mm cap), from a feature before them; noted for blend (blend.md 11-13 06:45). hat8: its
    biggest Boolean is ours, 1.44 s (794 Rust, 565 build): speed.
 2. **cf-surface-pattern's Surface Pattern 3 (+4.3 s):** our 85-tool cut 1.6-3.6 s (case sp-1113/7ecd5a8b6e7c4f6b,
    vibe5 ~/agents/bool-corpora/sp-1113). Profile (xprobe::probe_case_sample, release, LTO off): C2::at 29 %,

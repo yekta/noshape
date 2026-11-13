@@ -36,6 +36,10 @@ live's from live.jsonl per_feature_ms. Yours:
 - (11-13 04:03, qa's ranking list) c2-variable-fillet-faceblend (0.39 s vs 0.06): Face blend 1 540 ms (live 25): 8 op_loft
   334 ms, blend.direct 88 ms. learning-center-michael (release 203 vs 96 ms): Fillet 2 400 ms (live 46), blend.by_tools 384
   ms of which our Boolean 283 (bool takes the Boolean's speed).
+- (11-13 06:45, bool) The private dock (the user's own document; mode-700 copies on vibe5 ~/tmp/bool/private, never in
+  the repo): two vertices at (±21, 18, 1.274) mm come into five Booleans with a 1.195 mm tolerance, 0.4-1.1 mm off
+  their planes (as the impeller's 1.1-1.8 mm ones after its fillet): our Boolean declines them and OCCT takes ~580 ms.
+  Likely a blend upstream; worth checking which feature makes them.
 - The private dock (E2 tab): a rib round, op_fillet 1.8 s of its 2.6 s; hat8 / hat15: a chamfer ~460 ms.
 
 ## From core (11-13 00:30 UTC, lead): core works on isaac-ball's Fillet 2 in the fillet builder
