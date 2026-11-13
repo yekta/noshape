@@ -242,6 +242,8 @@ pub struct MetaForm {
     card: Option<ItemCard>,
     /// Several parts at once.
     multi: Option<Multi>,
+    /// The fields edited since the form was filled or saved (by label), worked out once per frame.
+    edited: Vec<String>,
     /// Release management: the release-create icon at the top left
     /// (Release__typical_release_workflow, "From any Properties dialog").
     on_release: Option<ReleaseFn>,
@@ -369,6 +371,7 @@ impl MetaForm {
             spec_category: spec.category,
             card: None,
             multi: None,
+            edited: Vec::new(),
             material: spec.material,
             computed_mass: spec.computed_mass,
             bom_options: spec.bom_options,
@@ -599,6 +602,22 @@ impl MetaForm {
             Some(m) => m.reset || m.shown.iter().any(|&i| m.values.get(i) != m.reset_to.get(i)),
             None => self.reset_to.as_ref().is_some_and(|r| *r != self.values(cx)),
         }
+    }
+
+    /// The fields whose value isn't the saved one (a mixed checkbox clicked counts): they get the orange corner.
+    fn edited_fields(&self, cx: &App) -> Vec<String> {
+        let v = self.values(cx);
+        let unmixed = |f: &str| self.multi.as_ref().is_some_and(|m| m.mixed_at_fill.iter().any(|x| x == f) && !m.mixed.iter().any(|x| x == f));
+        fields_of([&v, &self.saved].into_iter()).into_iter().filter(|f| field_of(&v, f) != field_of(&self.saved, f) || unmixed(f)).collect()
+    }
+
+    /// The fields marked edited as last drawn.
+    pub fn edited_marks(&self) -> Vec<String> {
+        self.edited.clone()
+    }
+
+    fn is_edited(&self, f: &str) -> bool {
+        self.edited.iter().any(|x| x == f)
     }
 
     /// Fields whose parts differ, shown "Multiple values" (several parts).
@@ -881,8 +900,17 @@ impl MetaForm {
             return gray_box(st.read(cx).value().to_string(), false).into_any_element();
         }
         // The scenario runner's `{"field": "<label>"}`.
-        div().w_full().map(|d| crate::ui_script::mark(d, || format!("field:{name}"))).child(text_field(st)).into_any_element()
+        edited_corner(text_field(st), self.is_edited(name)).map(|d| crate::ui_script::mark(d, || format!("field:{name}"))).into_any_element()
     }
+}
+
+/// `el` with the orange corner of an edited field or row at its top left when `on` (live q2962: 15 px, 2 px in).
+fn edited_corner(el: impl IntoElement, on: bool) -> Div {
+    div()
+        .relative()
+        .w_full()
+        .child(el)
+        .when(on, |d| d.child(div().absolute().top(px(2.)).left(px(2.)).child(crate::os_ui::glyph(crate::os_ui::GLYPH_DIRTY_CORNER, 15., rgb(0xfab603)))))
 }
 
 /// A Bootstrap checkbox row ("☐ Not revision managed").
@@ -940,6 +968,7 @@ impl Render for MetaForm {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let dirty = self.dirty(cx);
+        self.edited = self.edited_fields(cx);
         let view = cx.entity();
         let group = |l: Div, f: AnyElement| v_flex().w_full().gap(px(0.)).child(l).child(div().p(px(1.)).child(f));
         let state_ix = self.state.as_deref().and_then(|s| RELEASE_STATES.iter().position(|x| *x == s)).unwrap_or(0);
@@ -985,7 +1014,7 @@ impl Render for MetaForm {
                 } else if self.read_only.contains(&"Description") {
                     gray_box(self.description.read(cx).value().to_string(), false).h(px(56.)).into_any_element()
                 } else {
-                    div().w_full().map(|d| crate::ui_script::mark(d, || "field:Description".into())).child(Textarea::new(&self.description).h(px(56.)).text_size(px(14.))).into_any_element()
+                    edited_corner(Textarea::new(&self.description).h(px(56.)).text_size(px(14.)), self.is_edited("Description")).map(|d| crate::ui_script::mark(d, || "field:Description".into())).into_any_element()
                 },
             ))
             .child(group(label("Category", false), gray_box(self.spec_category.to_string(), true).into_any_element()));
@@ -1018,12 +1047,14 @@ impl Render for MetaForm {
             form = form.child(if self.read_only.contains(&"Not revision managed") {
                 readonly_check("Not revision managed", self.not_revision_managed)
             } else {
-                check_row_mixed("meta-nrm", "Not revision managed", self.not_revision_managed, self.mixed("Not revision managed"))
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                edited_corner(
+                    check_row_mixed("meta-nrm", "Not revision managed", self.not_revision_managed, self.mixed("Not revision managed")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.not_revision_managed = this.toggle_check("Not revision managed", this.not_revision_managed);
                         this.changed(cx);
-                    }))
-                    .into_any_element()
+                    })),
+                    self.is_edited("Not revision managed"),
+                )
+                .into_any_element()
             });
             if let Some(info) = self.drawing_info.clone() {
                 for (l, v) in DRAWING_INFO.iter().zip(info) {
@@ -1033,10 +1064,13 @@ impl Render for MetaForm {
         }
         if item {
         form = form
-            .child(check_row_mixed("meta-bom", "Exclude from all BOMs", self.exclude_from_bom, self.mixed("Exclude from all BOMs")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.exclude_from_bom = this.toggle_check("Exclude from all BOMs", this.exclude_from_bom);
-                this.changed(cx);
-            })))
+            .child(edited_corner(
+                check_row_mixed("meta-bom", "Exclude from all BOMs", self.exclude_from_bom, self.mixed("Exclude from all BOMs")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.exclude_from_bom = this.toggle_check("Exclude from all BOMs", this.exclude_from_bom);
+                    this.changed(cx);
+                })),
+                self.is_edited("Exclude from all BOMs"),
+            ))
             .child(group(
                 label("Unit of measure", false),
                 crate::os_ui::select_field("meta-unit", UNITS_OF_MEASURE.iter().map(|s| s.to_string()).collect(), unit_ix, {
@@ -1196,27 +1230,33 @@ impl Render for MetaForm {
                 .child(svg().path(crate::assets::icon_path(icon)).size(px(20.)).text_color(rgb(0x333333)))
         };
         let title = self.header();
-        let header_row = move || {
+        // (Beside several parts' list: 41 px from the rule above, the name in its middle, live q2962.)
+        let header_row = move |beside_list: bool| {
             div()
-                .mt(px(10.))
-                .h(px(31.))
+                .mt(px(if beside_list { 0. } else { 10. }))
+                .h(px(if beside_list { 41. } else { 31. }))
+                .when(beside_list, |d| d.flex().items_center())
                 .px(px(15.))
                 .border_b_1()
                 .border_color(rgb(0xcccccc))
                 .child(div().pl(px(4.)).text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).truncate().child(title.clone()))
         };
-        let (header, form_header) = (header_row(), header_row());
+        let (header, form_header) = (header_row(false), header_row(true));
         v_flex()
             .w_full()
-            // The kit dialog puts 8 px between title and body.
-            .mt(px(-8.))
+            // The kit dialog puts 8 px between title and body (several parts: their title is 8 px shorter instead).
+            .when(self.multi.is_none(), |d| d.mt(px(-8.)))
             .text_color(pal.text)
             // The item's name under the title, over a #ccc rule (several parts: over the form, beside their list).
             .when(self.multi.is_none(), |d| d.child(header))
             .child({
                 let scroll = div().id("meta-scroll").h(px(381. + props_size().1 - PROPS_MIN.1)).overflow_y_scroll().track_scroll(&self.scroll).p(px(15.)).child(form);
                 match (&self.multi, &self.card) {
-                    (Some(m), _) => parts_list(m, v_flex().w_full().child(form_header).child(scroll), cx),
+                    (Some(m), _) => v_flex()
+                        .w_full()
+                        .child(div().w_full().h(px(1.)).bg(rgb(0xdee2e6)))
+                        .child(parts_list(m, dirty, v_flex().w_full().child(form_header).child(scroll), cx))
+                        .into_any_element(),
                     (None, None) => scroll.into_any_element(),
                     (None, Some(card)) => {
                         let picture = match &card.thumb {
@@ -1297,7 +1337,7 @@ impl Render for MetaForm {
 
 /// Several parts' left list (live q2962): 300 px, a 55 px row per part with its picture, its name and "Part" in
 /// italics; the form's rows highlighted.
-fn parts_list(m: &Multi, form: impl IntoElement, cx: &mut Context<MetaForm>) -> AnyElement {
+fn parts_list(m: &Multi, dirty: bool, form: impl IntoElement, cx: &mut Context<MetaForm>) -> AnyElement {
     // The form's height and its 41 px header.
     let h = px(381. + props_size().1 - PROPS_MIN.1 + 41.);
     let rows = m.names.iter().enumerate().map(|(i, name)| {
@@ -1306,7 +1346,7 @@ fn parts_list(m: &Multi, form: impl IntoElement, cx: &mut Context<MetaForm>) -> 
             None => crate::assets::icon("part", 30., cx),
         };
         let on = m.shown.contains(&i);
-        h_flex()
+        let row = h_flex()
             .id(("meta-part-row", i))
             .map(|d| crate::ui_script::mark(d, || format!("row:{name}")))
             .w_full()
@@ -1327,7 +1367,9 @@ fn parts_list(m: &Multi, form: impl IntoElement, cx: &mut Context<MetaForm>) -> 
                     .child(div().text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).truncate().child(name.clone()))
                     .child(div().text_size(px(12.)).italic().text_color(rgb(0x666666)).child("Part")),
             )
-            .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| this.click_row(i, e.modifiers(), window, cx)))
+            .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| this.click_row(i, e.modifiers(), window, cx)));
+        // An edit marks every part it will be written to.
+        edited_corner(row, dirty && on)
     });
     h_flex()
         .w_full()
@@ -1345,6 +1387,17 @@ pub fn modal_header(title: &'static str, width: f32) -> Div {
         .px(px(10.))
         .border_b_1()
         .border_color(rgb(0xdee2e6))
+        .child(div().text_size(px(24.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).child(title))
+}
+
+/// [`modal_header`] without its rule and 8 px shorter (the title where it was): the body draws the rule, so what it
+/// shows can start right at it (the kit puts 8 px between title and body; several parts' list, live q2962).
+fn modal_header_ruled_by_body(title: &'static str, width: f32) -> Div {
+    h_flex()
+        .w(px(width - 2.))
+        .h(px(49.))
+        .pt(px(8.))
+        .px(px(10.))
         .child(div().text_size(px(24.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).child(title))
 }
 
@@ -1506,7 +1559,10 @@ pub fn open_parts_properties(spec: MetaSpec, parts: PartsProperties, on_save: im
     })
     .detach();
     let name = form.read(cx).name.clone();
-    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
+    window.open_dialog(cx, move |dialog, _, _| {
+        let width = props_size().0;
+        resizable_props(bootstrap_modal(dialog, "Properties", width, 15.).title(modal_header_ruled_by_body("Properties", width)).keyboard(false).child(form.clone()))
+    });
     name.update(cx, |s, cx| s.focus(window, cx));
 }
 

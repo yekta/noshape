@@ -33,6 +33,8 @@ pub const GLYPH_FOLDER_LIBRARY: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/s
 pub const GLYPH_FOLDER_FILLED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" stroke="currentColor" stroke-linejoin="round"><path d="M1.5 3.5h6.6l1.6 2h8.8v11h-17z"/></svg>"#;
 /// Onshape's 10 px section toggles (`svg-icon-expanded` / collapsed).
 pub const GLYPH_EXPANDED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M.95 3 5 6.85 9.05 3"/></svg>"#;
+/// An edited field's or row's corner mark (Properties, live q2962: a 15 px triangle at the top left).
+pub const GLYPH_DIRTY_CORNER: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15 15" fill="currentColor"><path d="M0 0h15L0 15z"/></svg>"#;
 pub const GLYPH_COLLAPSED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M3 .95 6.85 5 3 9.05"/></svg>"#;
 /// Onshape's overflow "•••" (`svg-icon-overflow`, 20 px).
 pub const GLYPH_OVERFLOW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><circle cx="3" cy="10" r="2"/><circle cx="10" cy="10" r="2"/><circle cx="17" cy="10" r="2"/></svg>"#;

@@ -664,6 +664,7 @@ fn several_parts_share_one_properties_dialog(cx: &mut TestAppContext) {
     assert_eq!(rows, [("Part 1".to_string(), true), ("Part 2".to_string(), true)]);
     cx.update_window(l.window, |_, w, cx| form.update(cx, |f, cx| f.focus_field("Description", w, cx))).unwrap();
     l.keys(cx, "D");
+    assert_eq!(cx.update(|cx| form.read(cx).edited_marks()), ["Description"], "the orange corner on the edited field (and on both rows)");
     cx.update_window(l.window, |_, w, cx| form.update(cx, |f, cx| f.press_save(true, w, cx))).unwrap();
     draw(cx, l.window);
     let props = |cx: &mut TestAppContext, i: usize| cx.update(|cx| l.view.read(cx).studio(cx).and_then(|s| s.part_properties.get(&parts[i]).cloned()).unwrap_or_default());

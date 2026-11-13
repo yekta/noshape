@@ -44,9 +44,9 @@ Ctrl / Shift, Save writes only the edited fields to every shown part, Reset all)
 the runner's reading of live's 11-13.1 Properties recorder (Mass group first; placeholder / disabled / indeterminate /
 disabledButtons emitted by ours). parts-multi-properties 7 / 8: live's Save leaves Undo off; ours stays an undo step on
 purpose: a non-undoable tab edit is wiped by undoing an earlier feature (whole-tab undo snapshots; tried and reverted,
-needs properties outside the tab's undo: a store change, not filed yet). Not done: the orange "dirty" triangles on
-edited fields and rows (the single-part dialog lacks them too), an 8 px strip above the list (the dialog body clips a
-negative margin). Next: queue item 3, chrome (chrome.json, chrome-shortcuts.json: shortcut map diff for Part Studio,
+needs properties outside the tab's undo: a store change, not filed yet). Ticket PROPERTIES-OUTSIDE-TAB-UNDO (P2). 11:13: the
+orange corners on edited fields, checkboxes and the rows to be written (single-part dialog too), the list flush with
+the title's rule (the kit's body clips its top 8 px: several parts get an 8 px shorter title and draw the rule). Next: queue item 3, chrome (chrome.json, chrome-shortcuts.json: shortcut map diff for Part Studio,
 sketch, assembly), then look.json.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own

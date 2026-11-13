@@ -19,6 +19,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (vibe7 ~/tmp/blend/hd/hd-9fbc05, NOSHAPE_PARITY_MODELS there), the fillet's dump blend-scratch/hd/fillet-5.*. Also
   holds f79298's Chamfer 1 (15-tooth gear) likely alike.
 
+
+## psui, 2026-11-13
+- [ ] P2 PROPERTIES-OUTSIDE-TAB-UNDO (store / psui; psui 2026-11-13 11:07 UTC) **A part's Properties Save is an Undo step in ours,
+  not in live** (ui-parity parts-multi-properties step 7: live `undo.undo` false after Save, ours true; live's BOM edits
+  are off the assembly's undo stack too, behaviours "Ctrl+Z → not undone"). Part properties live in the Part Studio tab
+  (`PartStudio::part_properties`), and Undo / Redo restore whole-tab snapshots: saving them with
+  `edit_tab_not_undoable` (tried in 4811029a's work, reverted) loses them as soon as an earlier step is undone and
+  redone (ops e2e: extrude, properties set without undo, history_undo + history_redo of the extrude: the BOM's
+  Description / Part number / Vendor came back empty). Live keeps metadata out of the feature history. Fix: keep part
+  (and assembly / BOM) properties outside the tab's undo snapshots (their own store entry, or undo that restores the
+  feature data and keeps the metadata), then save Properties without an undo step in the app and in ops
+  `part_set_properties`; T1: the ops e2e above with the undo / redo, and parts-multi-properties 8 / 8.
+
+
 ## core, 2026-11-12
 - [ ] P3 STEP-ANALYTIC-REFIT (core; 2026-11-12 15:12 UTC) **Live's STEP import refits geometry; ours keeps the file's** (not
   imitated, lead 11-12; recorded in case circle recognition ever matters for mates). c2-wire-clip-imported and c2-gamma-imported's
