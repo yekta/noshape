@@ -16,6 +16,19 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
 **c2-rings-loft stops at feature 20, Extrude 5 (core's):** the engraving cut's edges are split at the revolved ring's
 seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs live 335/206); Parasolid has no seams.
 
+## From core (11-13 00:21 UTC, lead: core takes asm-isaac-ball's Fillet 2; it's the fillet itself, so coordinating here)
+asm-isaac-ball studio 00f1d4's Fillet 2 (4 mm, tangent propagation, allowEdgeOverflow on, one edge JN1) fails in ours
+("Failed to fillet selections."), builds at 3.9 mm; live adds 98.0 mm³ (17064.678 -> 17162.687, 17 -> 18 faces). 29 of
+isaac-ball's mates hang on it. **Our input matches live**: after Fillet 1, 17064.678269 mm³ (live 17064.6781), 17/39/24;
+JN1 is our r 22.5 arc at z -0.4017, 34.475 mm (live 34.461), its tangent chain the 15 mm rounds' bottom arcs (12.070,
+live 12.065) and 2.036 mm lines. **The limit:** JN1 joins the bottom plane z = -0.401684 to the r 22.5 cylinder wall,
+which ends at z = -4.401684, exactly 4.000 mm high; a 4 mm round takes the whole wall and its contact line falls on the
+wall's lower edge (zero width left), where 3.9 mm leaves 0.1 mm. Live rolls over it (edge overflow). core will try it in
+the fillet's overflow / face-consumed handling unless you say you have it or a rule for it; tell me in core.md. Repro:
+vibe6 ~/tmp/core/ibm (NOSHAPE_PARITY_MODELS there, parity_models), saved document ~/tmp/core/ibsave/t.noshape
+(our feature 6 = live's 5: an In context entity first).
+
+
 ## 11-12 20:28 UTC: impeller Fillet 1 speed, rings-loft Chamfer 3, the knife's Fillet 3 (michael parked)
 - blend-impspeed (queued 3c52dc84): the tube-end round splits its faces in 2D (`k::split_on`, BRepFeat_SplitShape: each
   touch curve projected onto its face, cut where it crosses a seam, ends shared) and checks its touches by (u, v)
