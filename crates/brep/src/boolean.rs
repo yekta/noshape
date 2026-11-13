@@ -963,6 +963,9 @@ struct Ctx<'a> {
     canon_secs: HashMap<FacePair, Vec<SectionCurve>>,
     /// Pairs of faces found clearly apart or not (`free::apart`), by the two faces as paired.
     apart: HashMap<(usize, usize), bool>,
+    /// Pairs of free-form faces of arguments that must only touch, sharing an edge: they meet there alone (else the
+    /// arguments overlap, which the classification tells), so OCCT's section isn't asked.
+    edge_only: HashSet<(usize, usize)>,
     /// Edges as polylines (`edge_polyline`), made as asked.
     polylines: HashMap<usize, Arc<(Vec<DVec3>, f64)>>,
     /// Whether an edge lies on a face, where that takes points along it (`on_free_surface`), found ahead.
@@ -2481,6 +2484,9 @@ impl Ctx<'_> {
         // (One surface (a cone and a B-spline of it, two copies of a patch): coincident, like coplanar faces.)
         if self.same_surface(fs, ft) {
             self.coplanar.push((fs, ft));
+            return Ok(());
+        }
+        if self.edge_only.contains(&(fs, ft)) || self.edge_only.contains(&(ft, fs)) {
             return Ok(());
         }
         let (a, b) = ((self.faces[fs].arg, self.faces[fs].index), (self.faces[ft].arg, self.faces[ft].index));
@@ -4037,6 +4043,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         canonical: HashMap::default(),
         canon_secs: HashMap::default(),
         apart: HashMap::default(),
+        edge_only: HashSet::default(),
         polylines: HashMap::default(),
         on_surface: HashMap::default(),
         ncurves: Vec::new(),
@@ -4646,6 +4653,18 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             }
             (k1 != 0.0 || k2 != 0.0) && (w - a1 * w.dot(a1)).length() > GREY * tol
         };
+        // (Each face's edges by their two vertices and middle, for the pairs sharing one.)
+        let edge_keys = |f: usize| -> Vec<([u32; 2], DVec3)> {
+            cx.faces[f].edges.iter().map(|&(e, _)| {
+                let g = &cx.edges[e];
+                ([g.v[0].min(g.v[1]), g.v[0].max(g.v[1])], cx.seg_at(&Seg { v: g.v, g: g.g }, 0.5))
+            }).collect()
+        };
+        let shares_edge = |fs: usize, ft: usize| {
+            let kt = edge_keys(ft);
+            edge_keys(fs).iter().any(|(k, m)| kt.iter().any(|(l, n)| k == l && k[0] != k[1] && (*m - *n).length() <= GREY * tol))
+        };
+        let mut edge_only: Vec<(usize, usize)> = Vec::new();
         for s in 0..ns {
             for t in s + 1..ns {
                 let (a, b) = (&cx.solids[s], &cx.solids[t]);
@@ -4659,6 +4678,10 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                             continue;
                         }
                         if matches!((&x.s, &y.s), (Surf::Nurbs { .. }, _) | (_, Surf::Nurbs { .. })) {
+                            if touching_only && !cx.same_surface(fs, ft) && shares_edge(fs, ft) {
+                                edge_only.push((fs, ft));
+                                continue;
+                            }
                             pairs.push((fs, ft));
                         } else if occt_round(x, y) {
                             round_pairs.push((fs, ft));
@@ -4667,6 +4690,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 }
             }
         }
+        cx.edge_only.extend(edge_only);
         // (Which are clearly apart, on all threads, kept for the pairing.)
         let apart = par_map(pairs.len(), &|k| {
             let (fs, ft) = pairs[k];
