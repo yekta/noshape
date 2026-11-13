@@ -57,6 +57,8 @@ pub struct RefManager {
     pub docs: Vec<RefDoc>,
     pub checked: HashSet<usize>,
     pub chosen: HashMap<usize, usize>,
+    /// The row whose Version graph is open (live reads its header: the document over the picked version).
+    pub picking: Option<usize>,
 }
 
 /// A base view's own reference: this document (workspace or a version id)
@@ -123,7 +125,7 @@ impl DrawingEditor {
 
     pub fn open_ref_manager(&mut self, cx: &mut Context<Self>) {
         let docs = self.referenced_docs(false, cx);
-        self.ref_manager = Some(RefManager { tab: 0, change_to_version: false, docs, checked: HashSet::new(), chosen: HashMap::new() });
+        self.ref_manager = Some(RefManager { tab: 0, change_to_version: false, docs, checked: HashSet::new(), chosen: HashMap::new(), picking: None });
         cx.notify();
     }
 
@@ -132,7 +134,7 @@ impl DrawingEditor {
     pub fn open_change_to_version(&mut self, cx: &mut Context<Self>) {
         let docs = self.referenced_docs(true, cx);
         let tab = u8::from(docs.iter().all(|d| !d.newer));
-        self.ref_manager = Some(RefManager { tab, change_to_version: true, docs, checked: HashSet::new(), chosen: HashMap::new() });
+        self.ref_manager = Some(RefManager { tab, change_to_version: true, docs, checked: HashSet::new(), chosen: HashMap::new(), picking: None });
         cx.notify();
     }
 
@@ -240,11 +242,16 @@ impl DrawingEditor {
         }
         self.ensure_sources(false, cx);
         let docs = self.referenced_docs(m.change_to_version, cx);
-        self.ref_manager = Some(RefManager { tab: m.tab, change_to_version: m.change_to_version, docs, checked: HashSet::new(), chosen: HashMap::new() });
+        self.ref_manager = Some(RefManager { tab: m.tab, change_to_version: m.change_to_version, docs, checked: HashSet::new(), chosen: HashMap::new(), picking: None });
         cx.notify();
     }
 
     pub fn render_ref_manager(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        // A Version graph closed without a pick: its list goes with it.
+        if let Some(m) = self.ref_manager.as_mut().filter(|m| m.picking.is_some() && !crate::os_menu::is_open(cx)) {
+            m.picking = None;
+            crate::ui_script::note_list(None);
+        }
         let m = self.ref_manager.as_ref()?;
         let pal = p();
         let tab = m.tab;
@@ -319,7 +326,7 @@ impl DrawingEditor {
                                 .cursor_pointer()
                                 .tooltip(crate::ui::tooltip("Version graph"))
                                 .child(crate::ui::glyph("version-graph", 20., ink))
-                                .on_click(cx.listener(move |_, ev: &ClickEvent, window, cx| {
+                                .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                                     // Picking a version ticks the row (live 296).
                                     let entries: Vec<MenuEntry> = labels
                                         .iter()
@@ -329,11 +336,16 @@ impl DrawingEditor {
                                                 if let Some(m) = &mut t.ref_manager {
                                                     m.chosen.insert(i, k);
                                                     m.checked.insert(i);
+                                                    m.picking = None;
                                                 }
+                                                crate::ui_script::note_list(None);
                                                 cx.notify();
                                             })
                                         })
                                         .collect();
+                                    if let Some(m) = &mut this.ref_manager {
+                                        m.picking = Some(i);
+                                    }
                                     let ed = cx.entity();
                                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
                                     crate::drawing_view::open_drawing_menu(ev.position(), menu, window, cx);
@@ -351,6 +363,15 @@ impl DrawingEditor {
             let to = d.choices.get(m.chosen.get(&i).copied().unwrap_or(d.latest)).map(|c| c.0.clone()).unwrap_or_default();
             let text = format!("{} ⇨ {to}", d.current);
             fields.push(if tab == 1 { serde_json::json!({ "label": d.name, "kind": "boolean", "checked": m.checked.contains(&i), "text": text }) } else { serde_json::json!({ "label": d.name, "kind": "string", "text": text }) });
+        }
+        // The open Version graph: its header, the document over its picked version, and its rows as live's reader
+        // reads them (a list, the picked row highlighted; live drw-ref-selective-update-pin).
+        if let Some(d) = m.picking.filter(|_| crate::os_menu::is_open(cx)).and_then(|i| m.docs.get(i).map(|d| (i, d))) {
+            let picked = m.chosen.get(&d.0).copied().unwrap_or(d.1.latest);
+            let to = d.1.choices.get(picked).map(|c| c.0.clone()).unwrap_or_default();
+            fields.push(serde_json::json!({ "label": d.1.name, "kind": "string", "text": to }));
+            let rows: Vec<String> = d.1.choices.iter().map(|c| c.0.clone()).collect();
+            crate::ui_script::note_list(Some(serde_json::json!({ "kind": "list", "rows": rows, "highlighted": picked, "disabled": [] })));
         }
         crate::ui_script::note_dialog_pinned(|| {
             serde_json::json!({ "title": "Reference manager", "kind": "feature", "tabs": [{ "label": "Update to latest", "selected": tab == 0 }, { "label": "Selective update", "selected": tab == 1 }], "fields": fields, "error": null, "ok": if enabled { "enabled" } else { "disabled" }, "okLabel": if tab == 0 { "Update all" } else { "Update selected" } })

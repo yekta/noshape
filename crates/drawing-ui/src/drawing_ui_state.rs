@@ -490,6 +490,10 @@ impl DrawingEditor {
     /// menu of the drawing's own, which is in live's drawing iframe where its recorder can't read it (live
     /// drw-note-delete, drw-view-properties: list null, focus other).
     fn ui_list(&self, cx: &App) -> Option<Value> {
+        // The Reference manager's open Version graph (noted as a list by `render_ref_manager`).
+        if self.ref_manager.as_ref().is_some_and(|m| m.picking.is_some()) && noshape_app_core::os_menu::is_open(cx) {
+            return noshape_app_core::ui_script::open_list();
+        }
         if self.frame_menu.as_ref().is_some_and(|m| noshape_app_core::os_menu::is_open_menu(m, cx)) {
             return None;
         }

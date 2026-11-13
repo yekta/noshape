@@ -734,7 +734,8 @@ impl DrawingEditor {
             let mark = name.clone();
             // Another document's version (live 2303): "In progress", ⧫ and its version name ("V1"), the ⧫ a blue
             // update icon while a newer version exists (not pinned); hovered, only the row's text in full.
-            let other = pin.as_ref().filter(|p| p.id.starts_with("ext:")).map(|p| {
+            // This document's version reads the same (live drw-ref-selective-update-pin: "In progress", "V1").
+            let other = pin.as_ref().map(|p| {
                 let (label, newer) = this.ext_info_of(p).unwrap_or_else(|| (p.name.clone(), false));
                 (label, newer && !p.locked)
             });
@@ -874,7 +875,8 @@ impl DrawingEditor {
                     let key = format!("dr-sheet-ref-{i}-{k}");
                     let (name, version) = r.split_once('\u{1}').unwrap_or((r.as_str(), "In progress"));
                     // Another document's version: "In progress", its version, the name (live 2303).
-                    match vs.first().and_then(|v| self.reference_pin(s, v.id)).filter(|p| p.id.starts_with("ext:")) {
+                    // (This document's version too: live drw-ref-selective-update-pin.)
+                    match vs.first().and_then(|v| self.reference_pin(s, v.id)) {
                         Some(p) => text.extend(["In progress".to_string(), self.ext_info_of(&p).map_or(p.name.clone(), |i| i.0), name.to_string()]),
                         None => text.extend([version.to_string(), name.to_string()]),
                     }
@@ -885,7 +887,7 @@ impl DrawingEditor {
                     };
                     if self.sheets_ref_hover.as_deref() == Some(key.as_str()) {
                         // Live (drw-ref-pin-reference): another document's version reads "Part 1 In progress V1".
-                        let ext = vs.first().and_then(|v| self.reference_pin(s, v.id)).filter(|p| p.id.starts_with("ext:"));
+                        let ext = vs.first().and_then(|v| self.reference_pin(s, v.id));
                         text.push(match ext {
                             Some(p) => format!("{name} In progress {}", self.ext_info_of(&p).map_or(p.name.clone(), |i| i.0)),
                             None => format!("{name} {version}"),

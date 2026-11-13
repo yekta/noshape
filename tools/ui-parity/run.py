@@ -600,17 +600,26 @@ def runner_names(state, start, live_side):
     document ("noshape ui parity live2-1") and ours (the start's name) read alike, and live2's Part Studio, which its
     runner names after the start, as ours' "Part Studio 1"."""
     d = (state or {}).get("dialog")
-    if not (isinstance(d, dict) and d.get("kind") == "panel" and isinstance(d.get("text"), list) and start):
+    if not (isinstance(d, dict) and start):
         return state
     def name(t):
         if live_side and isinstance(t, str) and re.fullmatch(r"noshape ui parity( live2-\d+[a-z]?)?", t):
+            return "<document>"
+        # live2's per-start documents since 11-13 ("live2 uip block-drawing-v1 2026-11-13T19:06:18").
+        if live_side and isinstance(t, str) and re.fullmatch(rf"live2 uip {re.escape(start)}( \S+)?", t):
             return "<document>"
         if live_side and t == f"start {start}":
             return "Part Studio 1"
         if not live_side and t == start:
             return "<document>"
         return t
-    d["text"] = [name(t) for t in d["text"]]
+    if d.get("kind") == "panel" and isinstance(d.get("text"), list):
+        d["text"] = [name(t) for t in d["text"]]
+    # A feature dialog's rows by their labels (the Reference manager's documents, drw-ref-selective-update-pin).
+    if d.get("kind") == "feature" and isinstance(d.get("fields"), list):
+        for f in d["fields"]:
+            if isinstance(f, dict) and "label" in f:
+                f["label"] = name(f["label"])
     return state
 
 
