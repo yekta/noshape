@@ -1796,12 +1796,25 @@ GProp_GProps surface_props(const TopoDS_Shape& s)
   return out;
 }
 
+static bool self_intersects_unbudgeted(const TopoDS_Shape& shape);
+
+// (Within a CPU second: OCCT's analysis of a 20-turn thread's sweep ran for minutes, asm-hand-drill-pinslot's Sweep 2,
+// live's sweep 28 ms. Past it nothing is found: the sweep stands, as live's.)
 bool self_intersects(const OcShape& s)
 {
   if (s.shape.IsNull())
     return false;
+  bool      faulty = false;
+  const int r      = run_budgeted(1.0, [&] { faulty = self_intersects_unbudgeted(s.shape); });
+  if (r == 2)
+    fail_op("cancelled");
+  return r == 0 && faulty;
+}
+
+static bool self_intersects_unbudgeted(const TopoDS_Shape& shape)
+{
   BOPAlgo_ArgumentAnalyzer a;
-  a.SetShape1(s.shape);
+  a.SetShape1(shape);
   a.ArgumentTypeMode()   = false;
   a.SelfInterMode()      = true;
   a.SmallEdgeMode()      = false;

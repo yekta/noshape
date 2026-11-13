@@ -154,6 +154,63 @@ occ::handle<Geom_Surface> as_plane(const occ::handle<Geom_Surface>& s, const Top
   return s;
 }
 
+// A B-spline face lying on a cylinder (a thread's inner face swept on its shaft's: asm-hand-drill-pinslot's Sweep 1):
+// that cylinder, its normal the surface's own way (left-handed where that is inward), all 81 points of the face's
+// parameter box within 1e-7 of it; else `s`.
+occ::handle<Geom_Surface> as_cylinder(const occ::handle<Geom_Surface>& s, const TopoDS_Face& f)
+{
+  occ::handle<Geom_Surface> base = s;
+  while (const occ::handle<Geom_RectangularTrimmedSurface> tr = occ::down_cast<Geom_RectangularTrimmedSurface>(base))
+    base = tr->BasisSurface();
+  if (occ::down_cast<Geom_BSplineSurface>(base).IsNull() && occ::down_cast<Geom_BezierSurface>(base).IsNull())
+    return s;
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  auto at = [&](double a, double b, gp_Pnt& p, gp_Vec& n) {
+    gp_Vec du, dv;
+    base->D1(u0 + a * (u1 - u0), v0 + b * (v1 - v0), p, du, dv);
+    n = du.Crossed(dv);
+    return n.Magnitude() > 1e-12 && (n.Normalize(), true);
+  };
+  gp_Pnt p1, p2;
+  gp_Vec n1, n2;
+  if (!at(0.25, 0.3, p1, n1) || !at(0.75, 0.7, p2, n2))
+    return s;
+  const gp_Vec d = n1.Crossed(n2);
+  if (d.Magnitude() < 1e-3)
+    return s;
+  const gp_Dir axis(d);
+  // The normals' lines meet the axis: their closest points, seen along it.
+  const gp_Vec a1 = n1 - gp_Vec(axis) * n1.Dot(gp_Vec(axis)), a2 = n2 - gp_Vec(axis) * n2.Dot(gp_Vec(axis));
+  const gp_Vec w(p1, p2);
+  const double den = a1.Crossed(a2).Dot(gp_Vec(axis));
+  if (std::abs(den) < 1e-12)
+    return s;
+  const gp_Pnt c = p1.Translated(a1 * (w.Crossed(a2).Dot(gp_Vec(axis)) / den));
+  const gp_Lin line(c, axis);
+  const double r = line.Distance(p1);
+  if (r < 1e-6)
+    return s;
+  bool inward = false;
+  for (int i = 0; i <= 8; ++i)
+    for (int j = 0; j <= 8; ++j)
+    {
+      gp_Pnt p;
+      gp_Vec n;
+      if (!at(i / 8.0, j / 8.0, p, n) || std::abs(line.Distance(p) - r) > Precision::Confusion() || std::abs(n.Dot(gp_Vec(axis))) > 1e-6)
+        return s;
+      const gp_Vec radial = gp_Vec(c, p) - gp_Vec(axis) * gp_Vec(c, p).Dot(gp_Vec(axis));
+      const bool   in     = n.Dot(radial) < 0;
+      if (i + j > 0 && in != inward)
+        return s;
+      inward = in;
+    }
+  gp_Ax3 frame(c, axis, gp_Dir(gp_Vec(c, p1) - gp_Vec(axis) * gp_Vec(c, p1).Dot(gp_Vec(axis))));
+  if (inward)
+    frame.YReverse();
+  return new Geom_CylindricalSurface(frame, r);
+}
+
 namespace {
 
 // Declines (the replay's strict mode, or NOSHAPE_BOOL_FALLBACK=0: fails at once, the reason in the error).

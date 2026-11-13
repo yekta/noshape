@@ -7826,6 +7826,73 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   return r;
 }
 
+namespace
+{
+// An argument's B-spline face lying on another argument's cylinder (a thread swept on its shaft, its inner face on the
+// shaft's: asm-hand-drill-pinslot's Sweep 1; OCCT's fuse of the two cut the shaft in three, live's keeps one).
+bool on_anothers_cylinder(const std::vector<TopoDS_Shape>& all)
+{
+  // A face's outward normal at its parameters' middle.
+  auto normal_at = [](const TopoDS_Face& f, gp_Pnt& p, gp_Vec& n) {
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    BRepGProp_Face gf(f);
+    gf.Normal(0.5 * (u0 + u1), 0.5 * (v0 + v1), p, n);
+    return n.Magnitude() > 1e-12;
+  };
+  for (size_t i = 0; i < all.size(); ++i)
+  {
+    std::vector<TopoDS_Face> others;
+    for (size_t j = 0; j < all.size(); ++j)
+      if (j != i)
+        for (TopExp_Explorer e(all[j], TopAbs_FACE); e.More(); e.Next())
+          if (BRepAdaptor_Surface(TopoDS::Face(e.Current())).GetType() == GeomAbs_Cylinder)
+            others.push_back(TopoDS::Face(e.Current()));
+    if (others.empty())
+      continue;
+    for (TopExp_Explorer e(all[i], TopAbs_FACE); e.More(); e.Next())
+    {
+      const TopoDS_Face&                         f = TopoDS::Face(e.Current());
+      TopLoc_Location                            loc;
+      const occ::handle<Geom_Surface>            s = BRep_Tool::Surface(f, loc);
+      const occ::handle<Geom_CylindricalSurface> c = occ::down_cast<Geom_CylindricalSurface>(as_cylinder(s, f));
+      if (c.IsNull())
+        continue;
+      const gp_Cylinder g = c->Cylinder().Transformed(loc.Transformation());
+      gp_Pnt            p;
+      gp_Vec            n;
+      if (!normal_at(f, p, n))
+        continue;
+      Bnd_Box fb;
+      BRepBndLib::Add(f, fb);
+      // (On it, over it and facing it: touching it from the other side, as a thread its shaft.)
+      for (const TopoDS_Face& o : others)
+      {
+        const gp_Cylinder oc = BRepAdaptor_Surface(o).Cylinder();
+        if (std::abs(oc.Radius() - g.Radius()) > Precision::Confusion() || !oc.Axis().Direction().IsParallel(g.Axis().Direction(), 1e-6)
+            || gp_Lin(oc.Axis()).Distance(g.Location()) > Precision::Confusion())
+          continue;
+        Bnd_Box ob;
+        BRepBndLib::Add(o, ob);
+        if (fb.IsOut(ob))
+          continue;
+        gp_Pnt q;
+        gp_Vec m;
+        if (!normal_at(o, q, m))
+          continue;
+        // (The two normals radial at their points: opposite ways round the axis.)
+        const gp_Dir ax = oc.Axis().Direction();
+        const gp_Vec rp = gp_Vec(oc.Location(), p) - gp_Vec(ax) * gp_Vec(oc.Location(), p).Dot(gp_Vec(ax));
+        const gp_Vec rq = gp_Vec(oc.Location(), q) - gp_Vec(ax) * gp_Vec(oc.Location(), q).Dot(gp_Vec(ax));
+        if (n.Dot(rp) * m.Dot(rq) < 0)
+          return true;
+      }
+    }
+  }
+  return false;
+}
+} // namespace
+
 static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts)
 {
   const TrimAfter trim_after;
@@ -8386,6 +8453,29 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
         hist = h;
         res  = cut.Shape();
       }
+    }
+  }
+  // A fuse come out invalid where an argument's free-form face lies on another's cylinder, touching it from outside
+  // (asm-hand-drill-pinslot's thread on its shaft: OCCT's fuse cut the shaft in three): again with OCCT's glue for
+  // shapes that touch, kept when valid and the volumes add up (one shaft, as live's).
+  if (op == 0 && !scaled && t_bool_path == std::string("occt") && first.glue == 0 && first.fuzzy <= 0 && facets.source.empty() && all_solids(inputs)
+      && on_anothers_cylinder(inputs) && !BRepCheck_Analyzer(res).IsValid())
+  {
+    const KernelTimer timer("boolean.glued_on_cylinder");
+    BoolOpts          glued = first;
+    glued.glue              = 1;
+    std::unique_ptr<BRepAlgoAPI_BooleanOperation> b2 = make();
+    b2->SetArguments(to_list(args.items));
+    b2->SetTools(to_list(tools.items));
+    apply_opts(*b2, glued);
+    build_cancellable(*b2);
+    fail_if_cancelled();
+    if (!b2->HasErrors() && b2->IsDone() && volumes_add_up(inputs, b2->Shape()) && BRepCheck_Analyzer(b2->Shape()).IsValid())
+    {
+      t_bool_path = "occt_glued";
+      inputs      = concat(args.items, tools.items);
+      hist        = cancellable_history(inputs, *b2);
+      res         = b2->Shape();
     }
   }
   if (opts.unify)

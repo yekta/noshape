@@ -2292,3 +2292,18 @@ fn coplanar_sheets_fused_and_on_a_box_as_occt() {
     valid_as_occt("05812712d8ae43d8", 1e-9);
     valid_as_occt("040e7d4edf9355a0", 1e-9);
 }
+
+/// asm-hand-drill-pinslot's Sweep 1 (recorded): a thread swept along a helix with Add into its shaft, its inner face a
+/// B-spline on the shaft's r 4.1 mm cylinder. OCCT's plain fuse cut the shaft in three (invalid); again with glue for
+/// touching shapes it is one valid solid as live's (4896.29 mm³; ours 4896.37, the two volumes' sum).
+#[test]
+#[ignore = "T2: OCCT's fuses of the 20-turn thread take ~12 s"]
+fn a_thread_on_its_shafts_cylinder_fuses_into_one_solid() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "d70c6b5d26213daf").expect("the recorded case");
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("the fuse");
+    assert_eq!(r.shape.count(k::ShapeType::Solid), 1, "one solid");
+    assert!(r.shape.is_valid(), "valid");
+    let v = r.shape.volume().unwrap() * 1e9;
+    assert!((v - 4896.29).abs() <= 0.2, "volume {v} mm³ against live's 4896.29");
+}
