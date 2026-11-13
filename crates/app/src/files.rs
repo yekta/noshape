@@ -3,6 +3,7 @@
 use crate::gpu::Gpu;
 use crate::{doc_model, session, workspace};
 use gpui_kit::component::TitleBar;
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use std::path::PathBuf;
 
@@ -67,10 +68,49 @@ pub fn prefetch_session(path: &std::path::Path) {
     }
 }
 
-/// The prefetched session of `path`, waiting for it if it isn't open yet.
-fn take_prefetched(path: &std::path::Path) -> Option<anyhow::Result<session::Session>> {
-    let (_, h) = PREFETCHED.lock().ok()?.take_if(|(p, _)| p == path)?;
-    h.join().ok()
+/// The prefetched session of `path` (its thread, to join off the UI thread).
+fn take_prefetched(path: &std::path::Path) -> Option<std::thread::JoinHandle<anyhow::Result<session::Session>>> {
+    PREFETCHED.lock().ok()?.take_if(|(p, _)| p == path).map(|(_, h)| h)
+}
+
+/// A document window while its document opens: Onshape's large spinner with "Loading document…", then "Loading
+/// workspace…" (live2 feedback.json documentLoad), past the studios' `LOADING_DELAY`; the workspace replaces it.
+struct DocLoading {
+    step: &'static str,
+    since: std::time::Instant,
+    _timer: Task<()>,
+}
+
+impl Render for DocLoading {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let shown = self.since.elapsed() >= noshape_app_core::display_cache::LOADING_DELAY;
+        gpui_kit::component::v_flex()
+            .size_full()
+            .bg(rgb(0xffffff))
+            .child(TitleBar::new().h(px(crate::ui::NAVBAR_H)))
+            .child(div().flex_1().relative().when(shown, |d| d.child(noshape_app_core::display_cache::loading_overlay(self.step))))
+    }
+}
+
+/// What to do with a document's workspace once its window has it (an open still loading runs it then).
+type OnWorkspace = Box<dyn FnOnce(&Entity<workspace::Workspace>, &mut Window, &mut App)>;
+#[derive(Default)]
+struct PendingOpens(std::collections::HashMap<PathBuf, Vec<OnWorkspace>>);
+impl Global for PendingOpens {}
+
+/// Run `f` on the open document `path`'s workspace: now, or when its window has finished opening.
+fn with_workspace(path: &std::path::Path, f: impl FnOnce(&Entity<workspace::Workspace>, &mut Window, &mut App) + 'static, cx: &mut App) {
+    let key = canonical(path);
+    let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&key).copied()) else { return };
+    let mut f = Some(f);
+    let _ = h.update(cx, |_, window, cx| {
+        if let Some(ws) = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<workspace::Workspace>().ok()) {
+            (f.take().expect("once"))(&ws, window, cx);
+        }
+    });
+    if let Some(f) = f {
+        cx.default_global::<PendingOpens>().0.entry(key).or_default().push(Box::new(f));
+    }
 }
 
 pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Document>, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
@@ -79,34 +119,80 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
             return Ok(());
         }
     noshape_render::perf::milestone("opening document");
-    let session = if let Some(s) = take_prefetched(&path) {
-        s?
-    } else if path.exists() {
-        session::Session::open(&path)?
-    } else {
-        session::Session::create(&path, create_with.unwrap_or_else(crate::units_prefs::new_document))?
+    // The store opens off the UI thread while the window already shows (live2 documentLoad's steps).
+    let prefetched = take_prefetched(&path);
+    let p = path.clone();
+    let open = move || -> anyhow::Result<session::Session> {
+        match prefetched {
+            Some(h) => h.join().map_err(|_| anyhow::anyhow!("the document's reader stopped"))?,
+            None if p.exists() => session::Session::open(&p),
+            None => session::Session::create(&p, create_with.unwrap_or_else(crate::units_prefs::new_document)),
+        }
     };
-    noshape_render::perf::milestone("document session opened");
-    add_recent(&path);
-    let (handle, _) = open_session_window(session, gpu, cx)?;
-    noshape_render::perf::milestone("document window opened");
+    let title = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+    let (handle, loading) = open_document_frame(&title, cx)?;
     if cx.has_global::<OpenDocs>() {
         cx.global_mut::<OpenDocs>().0.insert(canonical(&path), handle);
     }
+    cx.spawn(async move |cx| {
+        let opened = cx.background_spawn(async move { open() }).await;
+        let session = match opened {
+            Ok(s) => s,
+            Err(e) => {
+                // As before: a file that can't be opened lands on the Documents page with the error.
+                log::error!("could not open {}: {e:#}", path.display());
+                cx.update(|cx| {
+                    crate::start_window::show_with_error(format!("Could not open document: {e:#}"), cx);
+                    let _ = handle.update(cx, |_, window, _| window.remove_window());
+                });
+                return;
+            }
+        };
+        noshape_render::perf::milestone("document session opened");
+        // "Loading workspace…" gets a frame before the workspace builds.
+        loading.update(cx, |l, cx| {
+            l.step = "Loading workspace…";
+            cx.notify();
+        });
+        cx.background_executor().timer(std::time::Duration::from_millis(1)).await;
+        let _ = handle.update(cx, |_, window, cx| {
+            add_recent(&path);
+            let ws = build_workspace(session, gpu, window, cx);
+            crate::os_menu::replace_content(window, ws.clone().into(), cx);
+            noshape_render::perf::milestone("document window opened");
+            let waiting = cx.try_global::<PendingOpens>().is_some().then(|| cx.global_mut::<PendingOpens>().0.remove(&canonical(&path))).flatten();
+            for f in waiting.unwrap_or_default() {
+                f(&ws, window, cx);
+            }
+        });
+    })
+    .detach();
     Ok(())
+}
+
+/// A document window with its loading state, before the document is read.
+fn open_document_frame(title: &str, cx: &mut App) -> anyhow::Result<(AnyWindowHandle, Entity<DocLoading>)> {
+    let title = format!("{title} — Noshape");
+    crate::os_menu::open_window(document_window_options(cx), cx, move |window, cx| {
+        noshape_render::perf::milestone("window: created");
+        window.set_window_title(&title);
+        cx.new(|cx| DocLoading {
+            step: "Loading document…",
+            since: std::time::Instant::now(),
+            // A redraw once the delay is up, to show the spinner if the open is still going.
+            _timer: cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(noshape_app_core::display_cache::LOADING_DELAY).await;
+                let _ = this.update(cx, |_, cx| cx.notify());
+            }),
+        })
+    })
 }
 
 /// Open a document (or bring its window to the front) with `tab` active
 /// (the documents page's search results: a part or a tab).
 pub fn open_document_at(path: PathBuf, tab: noshape_model::document::TabId, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
     open_document_window(path.clone(), None, gpu, cx)?;
-    if let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(&path)).copied()) {
-        let _ = h.update(cx, |_, window, cx| {
-            if let Some(ws) = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<workspace::Workspace>().ok()) {
-                ws.update(cx, |w, cx| w.activate(tab, window, cx));
-            }
-        });
-    }
+    with_workspace(&path, move |ws, window, cx| ws.update(cx, |w, cx| w.activate(tab, window, cx)), cx);
     Ok(())
 }
 
@@ -147,13 +233,7 @@ pub fn update_linked_instance(window: &mut Window, other: noshape_app_core::asse
 /// page's row › Versions and history: live lands on the document's /versionsAndHistory).
 pub fn open_document_history(path: PathBuf, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
     open_document_window(path.clone(), None, gpu, cx)?;
-    if let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(&path)).copied()) {
-        let _ = h.update(cx, |_, window, cx| {
-            if let Some(ws) = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<workspace::Workspace>().ok()) {
-                ws.update(cx, |w, cx| w.show_history(window, cx));
-            }
-        });
-    }
+    with_workspace(&path, |ws, window, cx| ws.update(cx, |w, cx| w.show_history(window, cx)), cx);
     Ok(())
 }
 
@@ -202,17 +282,20 @@ pub fn open_tab_window(doc: Entity<doc_model::DocModel>, tab: noshape_model::doc
     Ok(())
 }
 
-fn open_session_window(session: session::Session, gpu: Gpu, cx: &mut App) -> anyhow::Result<(AnyWindowHandle, Entity<workspace::Workspace>)> {
-    let options = WindowOptions {
+fn document_window_options(cx: &App) -> WindowOptions {
+    WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1440.), px(900.)), cx))),
         window_min_size: Some(size(px(900.), px(560.))),
         #[cfg(target_os = "linux")]
         window_decorations: Some(WindowDecorations::Client),
         app_id: Some("dev.noshape.noshape".into()),
         ..TitleBar::window_options()
-    };
+    }
+}
+
+fn open_session_window(session: session::Session, gpu: Gpu, cx: &mut App) -> anyhow::Result<(AnyWindowHandle, Entity<workspace::Workspace>)> {
     noshape_render::perf::milestone("window: opening");
-    let (handle, ws) = crate::os_menu::open_window(options, cx, move |window, cx| {
+    let (handle, ws) = crate::os_menu::open_window(document_window_options(cx), cx, move |window, cx| {
         noshape_render::perf::milestone("window: created");
         build_workspace(session, gpu, window, cx)
     })?;
