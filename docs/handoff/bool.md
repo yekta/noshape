@@ -258,6 +258,23 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     Chamfer 1 gap (534 -> 380). **To blend (08:10 UTC, from your /root/blend-scratch/rings-prof*.log):** Chamfer 1's 5
     Booleans were 314-362 ms ours against OCCT's 225-257; their 214 ms call is this cut, now ~70: ~210 ours. Fillet
     1's 4 Booleans are 30 ms ours against 24; its 223 -> 127 is op_blend_direct (160 -> 78 ms), yours, not the Boolean.
+- **c2-impeller-loft's Boolean Flansch+Gehäuse (user 12:00 UTC; gating 48780e115 on vibe5, 12:29):** the flange's inner
+  wall is extruded from the shell's inner wall's top edge; where the shell's wall slopes away under it the flange's
+  wall stands in the cavity (0.04-0.27 mm proud at x 30-65 mm each side, 3 mm at the far tip). We declined (the
+  flange's top edge, the same curve as the shell's own edge e15, is 2.3 um off the wall: that edge is off its own face
+  by that much, tolerance 1e-7, upstream) and OCCT's fuse lost the strip (16 raw faces, 26.6 mm³ short). Now:
+  `twin_pcurve` (an edge that is one of the face's own edges takes that edge's curve on it), `off_shared_edges`
+  (rust_boolean.cpp: OCCT's walking lines run along the shared edge, then turn off down the walls' crossing: the
+  stretch along it dropped, each turn-off a trimmed section from its back-extrapolated meeting with the edge), and a
+  section end on an edge of one face lying on the other within the section's tolerance gets a vertex on that edge
+  reaching it. Ours 59,138.42 mm³ (live 59,137.89), slivers 6.75 / 6.82 mm² (live 6.8 / 6.7), flange wall pieces
+  135.66 / 136.74 (live 135.6 / 134.3), inner wall 13,216.16 (live 13,219.1). Feature 15: 19/51/34, live 19/56/39
+  (faces and volume as live; the 5 edges / vertices asked of live, REQUESTS 12:35). T1
+  bool_patterns::a_flange_drawn_from_a_shells_wall_fused_as_live. Kernel 404/404.
+  - **To core:** the next difference downstream is yours: feature 24 Extrude 4's Part 3 5/9/6, live 5/10/7, 0.009 mm³
+    off (up to the inner wall); feature 25 Boolean 1 is then 32/81/50 (live 30/83/54) with OCCT's result identical to
+    ours on its inputs (a1af84e6, 3998eb43), then Chamfer Stevenrohr Halterung fails. Recording of the whole document
+    with this branch: vibe5 ~/agents/bool2-keep/rec-imp2; per-feature diff ~/agents/bool2-keep/imp-diff.log.
 - **c2-hunting-knife (10:52 UTC, gating 1ff449d86): to blend, I changed your blend_section.rs.** The chamfer's
   section Booleans with lofted tools ran under `with_occt_boolean` (11b4acf22: "noshape's own Boolean takes planes,
   cylinders and cones only"). Ours takes them since the knife fix (82cfec7d), so the skip is gone (and with it
