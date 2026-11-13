@@ -1,0 +1,36 @@
+{
+ "name": "asm-triad-rotate-90-undo",
+ "about": "Part 2's triad, the Z ring's menu \u203a Rotate 90 deg, then Undo.",
+ "area": "asm",
+ "source": "asm 11-13: assembly menu takes, a second one each (live asked for the thinnest)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "triad": "ring-z"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rotate 90 deg"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  }
+ ]
+}

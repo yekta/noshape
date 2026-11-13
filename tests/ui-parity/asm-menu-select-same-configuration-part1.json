@@ -1,0 +1,21 @@
+{
+ "name": "asm-menu-select-same-configuration-part1",
+ "about": "A configured Part Studio's other instance: Part 1's row menu \u203a Select instances with same configuration.",
+ "area": "asm",
+ "source": "asm 11-13: assembly menu takes, a second one each (live asked for the thinnest)",
+ "start": "config-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Select instances with same configuration"
+   }
+  }
+ ]
+}

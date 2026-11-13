@@ -1,0 +1,21 @@
+{
+ "name": "asm-root-menu-unfix-all-mated",
+ "about": "The assembly row's menu \u203a Unfix all (Part 1 fixed, the pin on Revolute 1 in its hole).",
+ "area": "asm",
+ "source": "asm 11-13: assembly menu takes, a second one each (live asked for the thinnest)",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "start pin-block asm"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Unfix all"
+   }
+  }
+ ]
+}

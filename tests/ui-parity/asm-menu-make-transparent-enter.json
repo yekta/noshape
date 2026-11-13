@@ -1,0 +1,25 @@
+{
+ "name": "asm-menu-make-transparent-enter",
+ "about": "Part 2's row menu \u203a Make transparent\u2026, then Enter (applied).",
+ "area": "asm",
+ "source": "asm 11-13: assembly menu takes, a second one each (live asked for the thinnest)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Make transparent\u2026"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

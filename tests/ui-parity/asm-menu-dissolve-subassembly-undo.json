@@ -1,0 +1,37 @@
+{
+ "name": "asm-menu-dissolve-subassembly-undo",
+ "about": "Part 2 moved to a new subassembly, that row's menu \u203a Dissolve subassembly, then Undo.",
+ "area": "asm",
+ "source": "asm 11-13: assembly menu takes, a second one each (live asked for the thinnest)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move to new subassembly"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Assembly"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Dissolve subassembly"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  }
+ ]
+}
