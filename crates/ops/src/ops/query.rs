@@ -249,7 +249,7 @@ fn joined_face_json(b: &Body, pieces: &[usize], k: f64, v: &mut Value) -> DVec3 
     let (mut area, mut moment) = (0.0, DVec3::ZERO);
     for &j in pieces {
         let Ok(f) = b.shape.sub_shape(ShapeType::Face, j) else { continue };
-        let (Ok(a), Ok(c)) = (f.area(), f.centroid()) else { continue };
+        let (c, Some(a)) = face_props(&f) else { continue };
         area += a;
         moment += c * a;
     }
@@ -259,21 +259,49 @@ fn joined_face_json(b: &Body, pieces: &[usize], k: f64, v: &mut Value) -> DVec3 
     c
 }
 
-fn face_json(b: &Body, i: usize, k: f64, names: &dyn Fn(Option<noshape_model::reference::FeatureId>) -> Option<String>) -> Option<(Value, DVec3, &'static str, Option<DVec3>)> {
+/// A face's area centroid and area, kept with the face itself (holding it keeps its identity from being reused): OCCT's
+/// surface integration was a tenth of a big Part Studio's queries (asm-infento-subs' 349-feature studio, every query
+/// over every face). Dropped whole past 50 000 faces.
+fn face_props(f: &noshape_kernel::Shape) -> (DVec3, Option<f64>) {
+    use std::collections::HashMap;
+    use std::sync::{LazyLock, Mutex};
+    type Props = Vec<(noshape_kernel::Shape, DVec3, Option<f64>)>;
+    static CACHE: LazyLock<Mutex<(usize, HashMap<u64, Props>)>> = LazyLock::new(|| Mutex::new((0, HashMap::new())));
+    let h = f.hash_code();
+    if let Some(hit) = CACHE.lock().ok().and_then(|c| c.1.get(&h).and_then(|v| v.iter().find(|(s, ..)| s.is_same(f)).map(|(_, c, a)| (*c, *a)))) {
+        return hit;
+    }
+    let (c, a) = (f.centroid().unwrap_or_default(), f.area().ok());
+    if let Ok(mut cache) = CACHE.lock() {
+        if cache.0 >= 50_000 {
+            *cache = (0, HashMap::new());
+        }
+        cache.0 += 1;
+        cache.1.entry(h).or_default().push((f.clone(), c, a));
+    }
+    (c, a)
+}
+
+fn face_json(b: &Body, i: usize, k: f64, names: &dyn Fn(Option<noshape_model::reference::FeatureId>) -> Option<String>, surface: Option<&str>) -> Option<(Value, DVec3, &'static str, Option<DVec3>)> {
     let f = b.shape.sub_shape(ShapeType::Face, i).ok()?;
     let name = b.faces.get(i)?;
+    let face_surface = f.face_surface().ok();
+    // (Of another kind than asked for: no more.)
+    if surface.is_some_and(|want| face_surface.as_ref().map_or("other", surface_name) != want) {
+        return None;
+    }
     let mut v = json!({ "id": refs::to_id(&Reference::Face((**name).clone())), "part": refs::body_id(&b.id) });
     if let Some(n) = names(name.creator()) {
         v["created_by"] = json!(n);
     }
-    let c = f.centroid().unwrap_or_default();
+    let (c, area) = face_props(&f);
     v["centroid"] = pt(c, k);
-    if let Ok(a) = f.area() {
+    if let Some(a) = area {
         v["area"] = json!(r6(a * k * k));
     }
     let mut kind = "other";
     let mut normal = None;
-    if let Ok(s) = f.face_surface() {
+    if let Some(s) = face_surface {
         kind = surface_name(&s);
         match s {
             Surface::Cylinder { origin, axis, radius, .. } => {
@@ -469,12 +497,9 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                     if pieces.first() != Some(&i) {
                         continue;
                     }
-                    let Some((mut v, mut c, sk, n)) = face_json(b, i, k, &names) else { continue };
+                    let Some((mut v, mut c, _, n)) = face_json(b, i, k, &names, surface) else { continue };
                     if pieces.len() > 1 {
                         c = joined_face_json(b, &pieces, k, &mut v);
-                    }
-                    if surface.is_some_and(|s| s != sk) {
-                        continue;
                     }
                     if let Some(want) = normal
                         && !n.is_some_and(|n| n.angle_between(want) < 1f64.to_radians())
