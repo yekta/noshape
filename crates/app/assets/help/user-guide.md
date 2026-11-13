@@ -68,6 +68,10 @@ A **Material Library** tab holds your own materials (density and properties); ad
 
 In an Assembly, **Exploded views** (right strip) move instances away from their mated positions step by step, to show how the parts fit together. The assembly itself is unchanged.
 
+### Named positions
+
+In an Assembly, **Named positions** (right strip) keep positional variations of the assembly: the values of its driving mates and the positions of its subassemblies, each under a name. Apply one to put the assembly in that position.
+
 ## Versions and workspaces
 
 - **Versions and history** (the clock on the left rail) lists versions, workspaces and every change.
