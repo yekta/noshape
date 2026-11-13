@@ -246,12 +246,17 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     Chamfer 1 gap (534 -> 380). **To blend (08:10 UTC, from your /root/blend-scratch/rings-prof*.log):** Chamfer 1's 5
     Booleans were 314-362 ms ours against OCCT's 225-257; their 214 ms call is this cut, now ~70: ~210 ours. Fillet
     1's 4 Booleans are 30 ms ours against 24; its 223 -> 127 is op_blend_direct (160 -> 78 ms), yours, not the Boolean.
-- **Suite declines left (07:00 UTC replay of all 98 documents, 47 cases):** impeller 3 upstream (blend / core); fan's
-  two cuts (05cd5358, fb562f41: helical strips on full-turn cylinders, bool's seam area; a circle cut at a seam now
-  goes round past its own start: /root/bool2-scratch/fan-wrap-gap.patch with the gap fix, then "a non-manifold
-  result" / "an arc across a cylinder's seam"); snap-hook 2 (bool's); 7 "an edge on another argument's free-form face"
-  (edges along a free-form face's v=0 edge 1-8 um off its surface: ambiguous); cf-box-dovetail-joint's 4 cuts (an
-  object face inside the tool kept whole: coincident-face classification); "a shared shape" 8.
+- **Completion and speed (08:45 UTC; all 98 documents recorded again with branch 64d5d5501's binaries, vibe5
+  ~/agents/bool2-keep/bydoc, kept out of ~/tmp's pruning):** 936 distinct Booleans, 25 on OCCT (97.3 % ours or our
+  shortcuts); the replay declines 22. Left: c2-impeller-loft 4 (7519a27a 2.5 s, 9522310b 2.1 s, b4a6c1dc 1.5 s,
+  84f92d10 0.6 s; upstream tolerances, blend / core), c2-fan-blade-sweep 2 (fb562f41, 05cd5358: helical strips on
+  whole cylinders, bool's seam area; /root/bool2-scratch/fan-wrap-gap.patch), "a shared shape OCCT may keep or remake"
+  8 (o-ring 4, impeller 2, hex-bookcase, duct: OCCT's rounding decides, deliberate), single others. The dovetail /
+  shaped-flange "non-manifold" ones of the 07:00 list were the knife commit's bug, gone with its fix.
+  Our time against OCCT's on the 860 taken (same run, alternating per case): 10.7 s against 42.7 s. Slower than OCCT
+  by over 10 % and 3 ms, six: **cf-snap-hook 45eceb50 131 ms against 51 (bool: your snap hooks' row)**, sheet metal
+  0067e217 (model-plus) 14 / 3.5, 446d711a (louver) 13 / 3.6, f90a60d9 (corner-break) 22 / 17, 271bc46c 12 / 8,
+  dfe6d971 5 / 2.
 - **The knife's 343b971e (11-13 05:33 UTC, branch bool2-knife2):** a cut by two chamfer tools
   end to end along the blade, their B-spline faces all but tangent to the grind face 4. Tool 0's edge 52 lies on face 4
   within 0.2 um but runs on past the blade's tip (0.2 mm off the surface there); OCCT's sections of tool 0's faces
