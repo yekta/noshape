@@ -30,6 +30,11 @@ pub const PANEL_W: f32 = 380.;
 /// Graph column width and row heights (live DOM).
 const GRAPH_W: f32 = 140.;
 const ROW_H: f32 = 50.;
+
+/// A row's graph column: a click there opens nothing (live2 studios.json versionsPanel).
+fn graph_column(key: &str) -> Stateful<Div> {
+    div().id(SharedString::from(format!("hist-graph-{key}"))).w(px(GRAPH_W + 5.)).h_full().flex_none().cursor_default().on_click(|_, _, cx| cx.stop_propagation())
+}
 const CHANGE_H: f32 = 26.;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1338,8 +1343,8 @@ impl Render for HistoryPanel {
                         d.bg(rgb(fill)).border_l(px(3.)).border_color(rgb(bar))
                     })
                     .when(picked, |d| d.bg(rgb(crate::compare_mode::BASE_ROW)))
-                    .when(!selected && compare_side.is_none(), |d| d.hover(|d| d.bg(pal.panel_hover)))
-                    .child(div().w(px(GRAPH_W + 5.)).flex_none())
+                    .when(!selected && compare_side.is_none(), |d| d.hover(|d| d.bg(crate::theme::themed(0xdef1fb, 0x666666))))
+                    .child(graph_column(&r.key))
                     .child(div().w(px(115.)).flex_none().truncate().child(crate::ui::user_text(r.name.clone())))
                     .child(div().pl(px(3.)).flex_1().min_w_0().truncate().child(history_time(r.time)))
             } else {
@@ -1382,12 +1387,12 @@ impl Render for HistoryPanel {
                         d.bg(rgb(fill)).border_l(px(3.)).border_color(rgb(bar))
                     })
                     .when(picked, |d| d.bg(rgb(crate::compare_mode::BASE_ROW)))
-                    .when(!selected && compare_side.is_none(), |d| d.hover(|d| d.bg(pal.panel_hover)))
+                    .when(!selected && compare_side.is_none(), |d| d.hover(|d| d.bg(crate::theme::themed(0xdef1fb, 0x666666))))
                     .tooltip(crate::ui::tooltip(match r.kind {
                         RowKind::Workspace(_) => format!("Open workspace {}", r.name),
                         _ => format!("Open version {}", r.name),
                     }))
-                    .child(div().w(px(GRAPH_W + 5.)).flex_none())
+                    .child(graph_column(&r.key))
                     .child(
                         v_flex()
                             .w(px(115.))
