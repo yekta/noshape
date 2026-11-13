@@ -28,6 +28,19 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-13 18:10 UTC: the assembly UI's feel is studios' (lead 11-13; asm keeps the mate solver)
+- docs/parity/interaction-feel.md "Assembly": four matrices from live's mates.json, asm-views.json, fields.json's
+  instance list and 3d.json's assembly section: mates 24 / 28, views 13 / 15, instance list 17 / 22, 3D 9 / 10. The
+  one ≠ left is Animate…'s toggle (ours "Reverse"); the ? rows are asked (REQUESTS 17:19: Ctrl+click and right-click
+  on rows, the folder's inline name, a face click in Section view, the mate toolbar's place, the 0.85 s highlight).
+- Landed: implicit connector at a face's centroid / an edge's midpoint (Shift picks among the points), double-click an
+  instance → its Part Studio with "<assembly> displayed" (`show_in_context`), two-instance and mixed-selection menus,
+  Shift range after a deselect from the top row, Section view on Front, explode rotation 5° steps and step-row hover,
+  named positions' empty state (+ the guide's section), "(Suppressed)" tooltips, error red rgb(170,37,45), list drag
+  pill + line, row tooltips at 160 ms, mate connectors as the 36 px disc picked across it (`ConnectorGlyphs::picked`),
+  mate axes 50 px at screen size (`ScreenTriads`). asm-* ui-parity 159 / 161 (two known live-side).
+- Runner script now in vibe6 ~/agents/studios-keep/uip-names.sh (~/tmp is pruned).
+
 ### 2026-11-13 12:58 UTC: live2's drawing tables batch and the studios feel batches
 - tables_live2_1013: a BOM's inner border drag moves only that border (left widens, right narrows; general tables keep
   live 1613 (b)'s growing table), a narrowed BOM column wraps its text (`tables::cell_lines`, the row grows); BOM cells
