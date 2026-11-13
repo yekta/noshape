@@ -169,6 +169,8 @@ pub use standard_content::*;
 struct DragState {
     top: InstanceId,
     press: DVec2,
+    /// When the press was (live's client starts a drag after more than 2 px and 50 ms).
+    pressed_at: std::time::Instant,
     started: bool,
     /// Grab point in instance coordinates, drag plane point/normal (world).
     local: DVec3,
@@ -293,6 +295,11 @@ pub struct StepEdit {
     pub base_dir: DVec3,
     pub pivot: Option<[f64; 3]>,
     pub _sub: Subscription,
+}
+
+/// [`AssemblyView::arrow_snap_step`] for an arrow that spans `px_per_mm` pixels per millimetre (metres).
+fn arrow_snap_step_for(px_per_mm: f64) -> Option<f64> {
+    (px_per_mm > 1e-9).then(|| 10f64.powf((100.0 / px_per_mm / 10.0).log10().floor()) * 1e-3)
 }
 
 /// An explode drag's value as live rounds it (qa5 EXV5, live 805/810:
@@ -2799,6 +2806,7 @@ impl AssemblyView {
                     self.drag = Some(DragState {
                         top,
                         press: *position,
+                        pressed_at: std::time::Instant::now(),
                         started: false,
                         local,
                         plane_point: f.origin,
@@ -2864,6 +2872,7 @@ impl AssemblyView {
                 self.drag = Some(DragState {
                     top,
                     press: *position,
+                    pressed_at: std::time::Instant::now(),
                     started: false,
                     local,
                     plane_point: grab,
@@ -2894,7 +2903,7 @@ impl AssemblyView {
                     return;
                 }
                 let Some(d) = &self.drag else { return };
-                if !d.started && position.distance(d.press) > 3.0 {
+                if !d.started && position.distance(d.press) > 2.0 && d.pressed_at.elapsed() > std::time::Duration::from_millis(50) {
                     let (top, explode) = (d.top, d.explode);
                     self.drag.as_mut().unwrap().started = true;
                     // A fixed instance does not move (live 562: no-drop cursor and
@@ -2940,6 +2949,8 @@ impl AssemblyView {
                         let mut s = (b * e - c * dd) / den;
                         if d.explode {
                             s = explode_drag_round(s, false, &self.units(cx));
+                        } else if let Some(step) = self.arrow_snap_step(d.plane_point, axis, cx) {
+                            s = (s / step).round() * step;
                         }
                         let p = d.plane_point + axis * s;
                         let d = self.drag.as_mut().unwrap();
@@ -3182,6 +3193,7 @@ impl AssemblyView {
         self.drag = Some(DragState {
             top: ids.first().copied().unwrap_or(self.selected[0]),
             press: position,
+            pressed_at: std::time::Instant::now(),
             started: false,
             local: DVec3::ZERO,
             plane_point: grab,
@@ -3417,6 +3429,14 @@ impl AssemblyView {
             });
         })
         .detach();
+    }
+
+    /// A triad arrow drag's snap step (metres): live's client snaps to the power of ten under a tenth of what
+    /// 100 px spans along the arrow (live feel 3D: 0.1 mm at 0.071 mm/px).
+    fn arrow_snap_step(&self, at: DVec3, axis: DVec3, cx: &App) -> Option<f64> {
+        let vp = self.viewport.read(cx);
+        let (a, b) = (vp.project(at)?, vp.project(at + axis.normalize_or_zero() * 1e-3)?);
+        arrow_snap_step_for(a.distance(b))
     }
 
     fn view(&mut self, v: StandardView, cx: &mut Context<Self>) {
@@ -6838,6 +6858,16 @@ mod tests {
         assert!((explode_drag_round((-37.565f64).to_radians(), true, &mm).to_degrees() + 38.0).abs() < 1e-9);
         let inch = noshape_units::UnitPrefs { length: noshape_units::LengthUnit::Inch, ..Default::default() };
         assert!((explode_drag_round(0.0254 * 0.7432, false, &inch) / 0.0254 - 0.74).abs() < 1e-9);
+    }
+
+    /// Live feel (3D) assembly: a triad arrow drag at 0.071 mm/px snaps to 0.1 mm; the step follows the zoom.
+    #[test]
+    fn arrow_drags_snap_to_a_step_that_follows_the_zoom() {
+        use super::arrow_snap_step_for;
+        let step = |mm_per_px: f64| arrow_snap_step_for(1.0 / mm_per_px).unwrap();
+        assert!((step(0.071) - 1e-4).abs() < 1e-15, "{}", step(0.071));
+        assert!((step(0.0071) - 1e-5).abs() < 1e-16, "{}", step(0.0071));
+        assert!((step(0.71) - 1e-3).abs() < 1e-14, "{}", step(0.71));
     }
 
     /// qa5 A3: new mates are hidden, and hidden rows are listed in grey.

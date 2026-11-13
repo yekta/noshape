@@ -33,7 +33,9 @@ impl PickKind {
     /// Higher wins when several candidates are under the cursor radius.
     pub fn priority(self) -> i32 {
         match self {
-            PickKind::Vertex | PickKind::SketchPoint | PickKind::Origin | PickKind::Connector => 3,
+            // (A mate connector above a vertex: live's client priorities 46 / 30 / 20 / 5.)
+            PickKind::Connector => 4,
+            PickKind::Vertex | PickKind::SketchPoint | PickKind::Origin => 3,
             PickKind::Edge | PickKind::SketchCurve => 2,
             PickKind::SketchRegion => 1,
             PickKind::Face | PickKind::Plane => 0,
@@ -2151,6 +2153,18 @@ mod connector_zoom_tests {
         for (p, w) in pts.iter().zip(want) {
             assert!(p.distance(w) < 1e-12, "{p:?} vs {w:?}");
         }
+    }
+}
+
+#[cfg(test)]
+mod pick_priority_tests {
+    use super::PickKind;
+
+    /// Live's client pick priorities: mate connector 46, vertex 30, edge 20, face 5 (feel 3D, assembly).
+    #[test]
+    fn a_mate_connector_wins_over_a_vertex_an_edge_and_a_face() {
+        let order = [PickKind::Connector, PickKind::Vertex, PickKind::Edge, PickKind::Face].map(PickKind::priority);
+        assert!(order.windows(2).all(|w| w[0] > w[1]), "{order:?}");
     }
 }
 
