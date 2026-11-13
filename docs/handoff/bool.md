@@ -37,7 +37,12 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    flips to 2π beyond it, so the bisection lands past the seam and part 1's last point flips (projected: "point 64
    jumps -0.037 -> 6.22"). Fix: (a) in seam_crossings, bisect on the unwrapped v (param_of's v shifted by a turn to the
    side it came from) against the face's own seam value (uv_span's lo / hi, 0 = 2π), not on param_of's flip; (b) in
-   projected, a part ending on the seam unwraps its last point by a turn (as k == 0 does at the start). Then: replay the
+   projected, a part ending on the seam unwraps its last point by a turn (as k == 0 does at the start). **Done on
+   bool-wip-seam (pushed, 06:15):** the crossing is now at 3π/2 (v = 0), the parts project, and all 12 cases get one
+   step further, to "a piece's point on another solid's face" (ray_state: a piece's point within the tolerance of the
+   other argument's face). The arc's torus face and the other argument's seem to coincide (a rib's round end fused
+   onto a body with the same torus): next, look at which piece and face (XEOF prints are in the branch), likely the
+   same-surface (coincident faces) handling for tori. Then: replay the
    whole rec-dock (0 differences), the gate, a T1 test that doesn't use the private data (a synthetic: a box with a
    torus-ended rib, an arc over the torus's seam).
    Next declines there: a 1355-face cut "a point near two vertices" (1.24 s), "a new edge on a free-form face" (589 ms),
