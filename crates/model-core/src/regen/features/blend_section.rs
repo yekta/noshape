@@ -1276,21 +1276,40 @@ struct BallEdge {
     straight: bool,
 }
 
-fn ball_edge(shape: &Shape, c: &ChainEdge, faces: [usize; 2], ff: [&Shape; 2], scale: f64) -> FResult<BallEdge> {
+fn ball_edge(c: &ChainEdge, faces: [usize; 2], ff: [&Shape; 2], scale: f64) -> FResult<BallEdge> {
     let info = c.shape.edge_info()?;
-    // (Oriented where the classifier answers: at the middle of c2-hunting-knife's corner edge it didn't.)
-    for f in [0.5, 0.3, 0.7] {
-        let t = info.first_param + (info.last_param - info.first_param) * f;
-        let (p, tangent) = (c.shape.point_at(t)?, c.shape.tangent_at(t)?.normalize());
-        let Ok(fr) = frame_at(shape, ff, p, tangent, scale) else { continue };
-        if fr.u[0].dot(fr.m[1]) <= 0.0 {
-            return Err(fail("a concave edge's rolling ball"));
-        }
-        let sup = [Support::of(ff[0], p, fr.m[0])?, Support::of(ff[1], p, fr.m[1])?];
-        let straight = matches!(info.curve, k::Curve::Line { .. }) && sup.iter().all(|s| matches!(s, Support::Plane { .. }));
-        return Ok(BallEdge { faces, sup, inward: (fr.m[0] + fr.m[1]).normalize(), straight });
+    // Each face's own normal reversed into the material (no classifier: c2-hunting-knife's Fillet 3 classified 70
+    // points ~30 ms), and the side of the edge it lies on.
+    let t = info.first_param + (info.last_param - info.first_param) * 0.5;
+    let (p, tangent) = (c.shape.point_at(t)?, c.shape.tangent_at(t)?.normalize());
+    let step = (info.length * 1e-3).max(scale * 1e-7);
+    let mut m = [DVec3::ZERO; 2];
+    let mut u = [DVec3::ZERO; 2];
+    for k in 0..2 {
+        let Some((uk, mk)) = into_face(ff[k], p, tangent, step)? else {
+            return Err(fail("could not orient a face at the edge"));
+        };
+        (u[k], m[k]) = (uk, mk);
     }
-    Err(fail("could not orient a face at the edge"))
+    if u[0].dot(m[1]) <= 0.0 {
+        return Err(fail("a concave edge's rolling ball"));
+    }
+    let sup = [Support::of(ff[0], p, m[0])?, Support::of(ff[1], p, m[1])?];
+    let straight = matches!(info.curve, k::Curve::Line { .. }) && sup.iter().all(|s| matches!(s, Support::Plane { .. }));
+    Ok(BallEdge { faces, sup, inward: (m[0] + m[1]).normalize(), straight })
+}
+
+/// The direction into face `f` from a point `p` of its edge across `tangent`, and the face's normal into the material;
+/// None where neither side is on the face.
+fn into_face(f: &Shape, p: DVec3, tangent: DVec3, step: f64) -> FResult<Option<(DVec3, DVec3)>> {
+    let m = -f.normal_at_point(p)?.normalize();
+    let dir = m.cross(tangent).normalize();
+    let on = |v: DVec3| f.project_point(p + v * step).is_ok_and(|q| q.distance < step * 1e-2);
+    Ok(match (on(dir), on(-dir)) {
+        (true, false) => Some((dir, m)),
+        (false, true) => Some((-dir, m)),
+        _ => None,
+    })
 }
 
 /// The ball where two chain edges meet whose faces other than a common one are tangent along an edge there (a line's
@@ -1347,7 +1366,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
         .iter()
         .map(|c| {
             let fs = ef.get(c.index).filter(|f| f.len() == 2).ok_or_else(|| fail("the edge doesn't have two faces"))?;
-            ball_edge(shape, c, [fs[0] as usize, fs[1] as usize], [&faces[fs[0] as usize], &faces[fs[1] as usize]], scale)
+            ball_edge(c, [fs[0] as usize, fs[1] as usize], [&faces[fs[0] as usize], &faces[fs[1] as usize]], scale)
         })
         .collect::<FResult<Vec<_>>>()?;
     // The ball at a chain vertex shared by two edges; None at a free end.
@@ -1423,7 +1442,8 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             prev = t;
         }
         let closed = near(c.start, c.end);
-        let n = ((turn / 0.05).ceil() as usize).clamp(8, 240);
+        // (A section per 0.1 rad of turn: the knife's R3.5 tip within 1e-6 mm of its balls.)
+        let n = ((turn / 0.1).ceil() as usize).clamp(8, 240);
         let (mut secs, mut starts, mut centres) = (Vec::new(), Vec::new(), Vec::new());
         let mut guess = at(0.0)?.0 + e.inward * r;
         for k in 0..if closed { n } else { n + 1 } {

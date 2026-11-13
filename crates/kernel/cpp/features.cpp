@@ -6036,6 +6036,20 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
     }
     // Kept (documents regenerate as before: a blend at the working scale may have other faces, and later features'
     // references would move, qa BLEND-TOL-REGEN-CHANGES), its new tolerances what they need.
+    // A round of an edge in several faces, its caller building it otherwise: as built.
+    if (valid && blend_split_raw() && !h.IsNull())
+    {
+      bool split = false;
+      for (TopExp_Explorer x(input, TopAbs_EDGE); x.More() && !split; x.Next())
+      {
+        int faces = 0;
+        for (ShapeList::Iterator it(h->Generated(x.Current())); it.More(); it.Next())
+          faces += it.Value().ShapeType() == TopAbs_FACE ? 1 : 0;
+        split = faces > 1;
+      }
+      if (split)
+        return as_is.finish(r, h);
+    }
     if (valid)
     {
       const KernelTimer timer("blend.finish");

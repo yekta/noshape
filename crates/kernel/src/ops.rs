@@ -561,6 +561,15 @@ pub fn without_blend_retries<R>(f: impl FnOnce() -> R) -> R {
     r
 }
 
+/// `f` with a blend whose round of an edge comes out in several faces returned as OCCT built it, without the finishing
+/// passes (the caller builds such a round otherwise: c2-hunting-knife's Fillet 3, ~100 ms of OCCT's 190 saved).
+pub fn with_blend_split_raw<R>(f: impl FnOnce() -> R) -> R {
+    ffi::set_blend_split_raw(true);
+    let r = f();
+    ffi::set_blend_split_raw(false);
+    r
+}
+
 /// The working scale [`set_working_scale`] set.
 pub fn working_scale() -> f64 {
     ffi::working_scale()

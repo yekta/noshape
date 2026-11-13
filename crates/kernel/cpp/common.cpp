@@ -119,11 +119,16 @@ double working_scale() { return g_working_scale.load(std::memory_order_relaxed);
 
 namespace {
 thread_local bool t_blend_retries = true;
+thread_local bool t_blend_split_raw = false;
 }
 
 bool blend_retries() { return t_blend_retries; }
 
 void set_blend_retries(bool on) { t_blend_retries = on; }
+
+bool blend_split_raw() { return t_blend_split_raw; }
+
+void set_blend_split_raw(bool on) { t_blend_split_raw = on; }
 
 void set_working_scale(double k)
 {

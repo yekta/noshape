@@ -314,6 +314,9 @@ std::string algo_errors(const Algo& a)
 double working_scale();
 // set_blend_retries's switch for this thread.
 bool blend_retries();
+// set_blend_split_raw's switch for this thread: a blend whose round of an edge came out in several faces returned as
+// OCCT built it, not finished (its caller builds it otherwise).
+bool blend_split_raw();
 
 // Corner faces of a fillet over smaller corner fillets rebuilt as Parasolid's
 // rolling-ball vertex blends (vertex_blend.cpp); `s` unchanged (and the

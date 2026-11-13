@@ -535,11 +535,13 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         // Straight edges with overflow on have sections to fall back on: OCCT tried once without its slower retries
         // first (c2-hunting-knife's Fillet 2: the scaled retry 105 of OCCT's 118 ms, building a bad solid again).
         let lines_overflow = !width && ev.bool("allowEdgeOverflow") && all_lines(&shapes);
-        let first = if lines_overflow { k::without_blend_retries(|| k::fillet_checked(&body.shape, &shapes, &radii)) } else { k::fillet_checked(&body.shape, &shapes, &radii) };
+        // (A round OCCT leaves in several faces is built as rolling balls below: OCCT's as built, not finished.)
+        let occt = || if width { k::fillet_checked(&body.shape, &shapes, &radii) } else { k::with_blend_split_raw(|| k::fillet_checked(&body.shape, &shapes, &radii)) };
+        let first = if lines_overflow { k::without_blend_retries(occt) } else { occt() };
         let first = match first {
             Err(_) if lines_overflow && !propagate && edges.len() == 1 && super::blend_section::section_blend(ev, bi, &edges, &unpropagated(radius)).is_ok() => continue,
             Err(_) if lines_overflow && super::blend_section::section_blend(ev, bi, &edges, &super::blend_section::BlendSpec { overflow: true, ..unpropagated(radius) }).is_ok() => continue,
-            Err(_) if lines_overflow => k::fillet_checked(&body.shape, &shapes, &radii),
+            Err(_) if lines_overflow => occt(),
             other => other,
         };
         let res = match first {
@@ -555,13 +557,20 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         };
         // OCCT's round of an edge in several faces (a tip's pinched at its apex, a corner's split where it runs past the
         // chain's end): rolling balls, one face per edge as live's (c2-hunting-knife's Fillet 3).
-        if !width && split_blends(&res) {
+        let res = if !width && split_blends(&res) {
             match super::blend_section::rolling_ball_blend(ev, bi, &edges, radius) {
                 Ok(()) => continue,
-                Err(e) if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() => eprintln!("rolling balls declined: {}", e.message),
-                Err(_) => {}
+                Err(e) => {
+                    if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+                        eprintln!("rolling balls declined: {}", e.message);
+                    }
+                    // OCCT's then, finished.
+                    k::fillet_checked(&body.shape, &shapes, &radii).map_err(fillet_failed)?
+                }
             }
-        }
+        } else {
+            res
+        };
         let t1 = std::time::Instant::now();
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
