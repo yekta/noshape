@@ -1,6 +1,6 @@
 {
  "name": "annotation-datum-delete",
- "about": "Model definitions (the Inspection table): Datum on the top face, placed in space (datum A), Escape; right-click the A label: Delete annotation",
+ "about": "Model definitions (the Inspection table): Datum on the top face, placed in space (datum A), ✓ (live's Escape cancels the datum); right-click the A label: Delete annotation",
  "area": "psui",
  "source": "live 2026-11-13 (REQUESTS 03:41 answers): the two Part Studio menu items no scenario covered",
  "start": "block",
@@ -34,8 +34,10 @@
    }
   },
   {
-   "do": "key",
-   "key": "Escape"
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
   },
   {
    "do": "rclick",

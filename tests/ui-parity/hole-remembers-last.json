@@ -1,6 +1,6 @@
 {
  "name": "hole-remembers-last",
- "about": "Hole at Sketch 2's circle centre: Metric, Tapped, Through all, ✓; a new Hole opens with them (Esc); a third Hole put back on Inch, Drilled, Blind, ✓, so the account is left on Onshape's defaults",
+ "about": "Hole at Sketch 2's circle centre: Metric (live switches Hole type to Tapped M6x0.75 itself), Through all, ✓; a new Hole opens with them (Esc); a third Hole put back on Inch (live switches back to Drilled 1/4 itself), Blind, ✓, so the account is left on Onshape's defaults",
  "area": "psui",
  "source": "live REQUESTS 2026-11-13 02:20 (lead → psui): Hole remembers the last settings committed with ✓, new or edited, per account",
  "start": "hole-sketch",
@@ -33,17 +33,6 @@
    "do": "click",
    "on": {
     "tab": "Metric"
-   }
-  },
-  {
-   "do": "wait",
-   "until": "regenerated"
-  },
-  {
-   "do": "click",
-   "on": {
-    "dropdown": "Drilled",
-    "pick": "Tapped"
    }
   },
   {
@@ -113,17 +102,6 @@
    "do": "click",
    "on": {
     "tab": "Inch"
-   }
-  },
-  {
-   "do": "wait",
-   "until": "regenerated"
-  },
-  {
-   "do": "click",
-   "on": {
-    "dropdown": "Tapped",
-    "pick": "Drilled"
    }
   },
   {

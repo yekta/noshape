@@ -1,0 +1,797 @@
+{
+ "scenario": "edge-menu-curve-analysis",
+ "recorded": "2026-11-13T06:20:57.950Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+ },
+ "live": {
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "23c67e6d0c6ddf28c5bf7798",
+  "start": "block",
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "edge": [
+      10,
+      0,
+      10
+     ]
+    }
+   },
+   "ok": true,
+   "hover": [
+    "JHV"
+   ],
+   "at": [
+    1114,
+    497
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Edit Extrude 1…",
+      "Edit Sketch 1…",
+      "Show dimensions",
+      "Show dependencies of Extrude 1…",
+      "Fillet…",
+      "Chamfer…",
+      "Hide Part 1",
+      "Curve/surface analysis…",
+      "Isolate…",
+      "Make transparent…",
+      "Copy Part 1",
+      "Create Drawing of Part 1…",
+      "Export…",
+      "Select",
+      "Select other…",
+      "Add comment",
+      "Zoom to fit",
+      "Zoom to selection",
+      "Align view with vertical axis",
+      "Delete Part 1…",
+      "Delete Extrude 1",
+      "Assign material for Part 1…",
+      "Edit appearance for Part 1…"
+     ],
+     "highlighted": 22,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 41246
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Curve/surface analysis…"
+    }
+   },
+   "ok": true,
+   "at": [
+    1226,
+    170
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "panel",
+     "title": "Curve/surface analysis",
+     "text": [
+      "Edges and faces to analyze",
+      "Edge of Extrude 1",
+      "×",
+      "[x] Curvature combs",
+      "Curvature combs",
+      "[x] Show U curves",
+      "Show U curves",
+      "U curves",
+      "8",
+      "[x] Show V curves",
+      "Show V curves",
+      "V curves",
+      "8",
+      "[ ] Sketch inflection points",
+      "Sketch inflection points",
+      "[x] Minimum radius",
+      "Minimum radius",
+      "[ ] Extend across face",
+      "Extend across face",
+      "[ ] Control point grids",
+      "Control point grids",
+      "[ ] Knot points",
+      "Knot points",
+      "[x] Details",
+      "Details",
+      "Comb size"
+     ],
+     "fields": [
+      {
+       "label": "Curvature combs",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Show U curves",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "U curves",
+       "kind": "input",
+       "value": "8"
+      },
+      {
+       "label": "Show V curves",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "V curves",
+       "kind": "input",
+       "value": "8"
+      },
+      {
+       "label": "Sketch inflection points",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Minimum radius",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Extend across face",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Control point grids",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Knot points",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Details",
+       "kind": "checkbox",
+       "value": true
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "edge-curvature-view",
+      "title": "Curve/surface analysis",
+      "text": "Curve/surface analysis / Edges and faces to analyze / Edge of Extrude 1 / × / Curvature combs / Show U curves / U curves / Show V curves / V curves / Sketch inflection points / Minimum radius / Extend across face / Control point grids / Knot points / Details / Comb size",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": "8"
+       },
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": "8"
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": true
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Length",
+       "value": "40.000",
+       "units": "mm"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 46944
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "panel",
+     "title": "Curve/surface analysis",
+     "text": [
+      "Edges and faces to analyze",
+      "Edge of Extrude 1",
+      "×",
+      "[x] Curvature combs",
+      "Curvature combs",
+      "[x] Show U curves",
+      "Show U curves",
+      "U curves",
+      "8",
+      "[x] Show V curves",
+      "Show V curves",
+      "V curves",
+      "8",
+      "[ ] Sketch inflection points",
+      "Sketch inflection points",
+      "[x] Minimum radius",
+      "Minimum radius",
+      "[ ] Extend across face",
+      "Extend across face",
+      "[ ] Control point grids",
+      "Control point grids",
+      "[ ] Knot points",
+      "Knot points",
+      "[x] Details",
+      "Details",
+      "Comb size"
+     ],
+     "fields": [
+      {
+       "label": "Curvature combs",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Show U curves",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "U curves",
+       "kind": "input",
+       "value": "8"
+      },
+      {
+       "label": "Show V curves",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "V curves",
+       "kind": "input",
+       "value": "8"
+      },
+      {
+       "label": "Sketch inflection points",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Minimum radius",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Extend across face",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Control point grids",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Knot points",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Details",
+       "kind": "checkbox",
+       "value": true
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "edge-curvature-view",
+      "title": "Curve/surface analysis",
+      "text": "Curve/surface analysis / Edges and faces to analyze / Edge of Extrude 1 / × / Curvature combs / Show U curves / U curves / Show V curves / V curves / Sketch inflection points / Minimum radius / Extend across face / Control point grids / Knot points / Details / Comb size",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": "8"
+       },
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": "8"
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": true
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Length",
+       "value": "40.000",
+       "units": "mm"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 51852
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     1226,
+     170
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 55796
+  }
+ ]
+}
