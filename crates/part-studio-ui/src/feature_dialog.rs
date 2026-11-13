@@ -2383,8 +2383,9 @@ impl FeatureDialog {
                 let pid = s.id.to_string();
                 let mut el = div().id(SharedString::from(format!("cfg-{pid}"))).child(r);
                 if is_configured {
-                    // Live: no "Configured" tag on a checkbox row.
-                    el = el.border_2().border_dashed().border_color(gpui_kit::rgb(0xfab601));
+                    // Live: no "Configured" tag on a checkbox row; a 2 px dotted outline round the row (live2
+                    // config.json dialogMarker, configured-field.png: #fab601 dots 2 px apart).
+                    el = el.relative().child(noshape_app_core::dotted::dotted_outline(gpui_kit::rgb(0xfab601), 2.));
                     if !matches!(s.kind, ParamKind::Bool { .. }) {
                         el = el.tooltip(crate::ui::tooltip("Configured"));
                     }
@@ -4388,7 +4389,7 @@ impl Render for FeatureDialog {
                     }
                 }));
                 if self.configured.contains(key) {
-                    el = el.border_2().border_dashed().border_color(gpui_kit::rgb(0xfab601));
+                    el = el.relative().child(noshape_app_core::dotted::dotted_outline(gpui_kit::rgb(0xfab601), 2.));
                 }
                 d.child(el)
             }))

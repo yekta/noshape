@@ -635,6 +635,8 @@ pub struct UiState {
     pub cfg_editing_focus: bool,
     /// The configured value cell framed by a click (live `os-table-cell-selected`): typing edits it in place.
     pub cfg_framed: Option<(String, FocusHandle)>,
+    /// A configured value cell's cell below (Enter after editing frames it: live2 config.json tableKeys).
+    pub cfg_enter_next: std::collections::HashMap<String, String>,
     /// What typing on the framed cell put in (replacing its value), for the input it opens.
     pub cfg_edit_initial: Option<String>,
     pub cfg_filter: Option<Entity<InputState>>,
@@ -899,6 +901,7 @@ impl UiState {
             cfg_editing: None,
             cfg_editing_focus: false,
             cfg_framed: None,
+            cfg_enter_next: Default::default(),
             cfg_edit_initial: None,
             cfg_filter: None,
             cfg_selects: Default::default(),

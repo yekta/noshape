@@ -166,6 +166,17 @@ impl PartStudioView {
                 if last.as_deref() != Some(v.as_str()) {
                     commit(this, v, cx);
                 }
+                // A configured value: Enter frames the cell below (live2 config.json: commits and moves the selection
+                // down one row).
+                if matches!(ev, InputEvent::PressEnter { .. })
+                    && let Some(next) = this.ui.cfg_enter_next.get(&k).cloned()
+                {
+                    let f = cx.focus_handle();
+                    window.focus(&f, cx);
+                    this.ui.cfg_framed = Some((next, f));
+                    cx.notify();
+                    return;
+                }
                 // Configured properties: Enter moves to the cell below.
                 if matches!(ev, InputEvent::PressEnter { .. })
                     && let Some(next) = this.cp_neighbour(&k, 1, 0)
@@ -1346,6 +1357,7 @@ impl PartStudioView {
                     })
                 }),
         );
+        let mut shown = 0;
         for input in &cfg.inputs {
             let kind_ix = match input.kind {
                 ConfigInputKind::List { .. } => 0,
@@ -1356,8 +1368,13 @@ impl PartStudioView {
             if (only.iter().any(|o| *o) && !only[kind_ix]) || !self.config_input_passes(&studio, input, &query) {
                 continue;
             }
+            shown += 1;
             let section = self.render_config_input(&studio, input, grid, window, cx);
             col = col.child(self.cfg_drop_target(&input.id, section, cx));
+        }
+        // Live2 config.json: a kind toggle (or the filter) leaving no input shows "No results found".
+        if shown == 0 {
+            col = col.child(div().px(px(10.)).py(px(12.)).text_size(px(14.)).text_color(pal.text_muted).child("No results found"));
         }
         if !cx.has_active_drag() {
             self.ui.cfg_drop = None;
@@ -1762,7 +1779,8 @@ impl PartStudioView {
                             })
                         });
                     for (q, (ci, c)) in columns.iter().enumerate() {
-                        row = row.child(cell(col_ws[q]).child(self.configured_value_cell(*ci, c, rk, window, cx)));
+                        // The active configuration's values are bold (live2 config.json cellColours).
+                        row = row.child(cell(col_ws[q]).when(active, |d| d.font_weight(FontWeight::BOLD)).child(self.configured_value_cell(*ci, c, rk, window, cx)));
                     }
                     section = section.child(row);
                 }
@@ -1938,6 +1956,13 @@ impl PartStudioView {
             _ => String::new(),
         };
         let cell = format!("cp-{ci}-{key}");
+        let rows: Vec<String> = match self.studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == c.input)).map(|i| &i.kind) {
+            Some(ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
+            _ => Vec::new(),
+        };
+        if let Some(below) = rows.iter().position(|r| r == key).and_then(|i| rows.get(i + 1)) {
+            self.ui.cfg_enter_next.insert(cell.clone(), format!("cp-{ci}-{below}"));
+        }
         // A plain number in a length or angle cell takes the workspace unit, as a quantity field writes it ("40" →
         // "40 mm").
         let dim = self.studio(cx).and_then(|s| s.feature(c.feature)).and_then(|f| noshape_model::features::get(&f.type_id)).and_then(|t| t.param(&c.param).and_then(|p| match &p.kind {
@@ -3051,7 +3076,7 @@ impl PartStudioView {
             self.flash_for(noshape_model::display::FeatureStatus::Info, text, std::time::Duration::from_millis(6700), cx);
         } else {
             let (fid, p) = (feature.id, param.to_string());
-            self.edit_config("Unconfigure parameter", cx, |ps| ps.configuration.configured.retain(|c| !(c.feature == fid && c.param == p)));
+            self.edit_config(noshape_ops::config::UNCONFIGURE_PARAMETER, cx, |ps| ps.configuration.configured.retain(|c| !(c.feature == fid && c.param == p)));
         }
         let (configured, _) = self.configured_of(feature.id, cx);
         dialog.update(cx, |d, cx| {

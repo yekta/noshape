@@ -2865,6 +2865,18 @@ impl PartStudioView {
 
     fn cancel_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.close_create_selection_of_dialog(cx);
+        // A field configured while the dialog was open goes with it (live2 config.json: the dialog must be committed; Esc
+        // takes the configured column away again): the Configure / Unconfigure steps since the dialog opened are undone.
+        if let Some(at_open) = self.edit.as_ref().map(|e| e.doc_undo_at_open) {
+            let configure_step = |s: &str| [noshape_ops::config::CONFIGURE_PARAMETER, noshape_ops::config::UNCONFIGURE_PARAMETER].iter().any(|n| s.ends_with(n));
+            for _ in 0..32 {
+                let d = self.doc.read(cx);
+                if d.session.undo_tops().0 == at_open || !d.can_undo() || !d.session.last_redone().is_some_and(configure_step) {
+                    break;
+                }
+                self.doc.update(cx, |d, cx| d.undo(cx));
+            }
+        }
         // Live Onshape: cancelling a sketch shows "Sketch N has been
         // canceled. Restore" (sketch/68); Restore reopens the draft. Not for
         // an existing sketch left unchanged: nothing is lost (live ui-parity

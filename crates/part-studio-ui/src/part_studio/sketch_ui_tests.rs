@@ -4198,3 +4198,61 @@ fn a_point_dragged_onto_a_model_edge_lands_on_it(cx: &mut TestAppContext) {
     assert!(on_edge, "coincident with the edge's used curve");
     assert!(off < 1e-6, "on the edge: {off} m off");
 }
+
+/// Live2 config.json (configureParameter): a field configured in an open dialog (right-click › Configure) adds its
+/// column, but the dialog must be committed: Esc takes the configured column away again (a Variable's value here).
+#[gpui::test]
+fn escape_on_a_dialog_takes_its_configured_field_away(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-esc", &[("width", "30 mm")]);
+    view.update(cx, |v, cx| v.add_config_input("List", cx));
+    let id = cx.update(|cx| view.read(cx).studio(cx).and_then(|s| s.features.iter().find(|f| f.type_id == "assignVariable")).map(|f| f.id)).expect("the variable");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    draw(cx, window);
+    let configured = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).map(|s| s.configuration.configured.len()).unwrap_or(0));
+    view.update(cx, |v, cx| v.configure_dialog_param("lengthValue", true, cx));
+    assert_eq!(configured(cx), 1, "Configure adds the column at once");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+    draw(cx, window);
+    assert_eq!(configured(cx), 0, "Esc takes it away");
+    assert!(cx.update(|cx| view.read(cx).studio(cx).is_some_and(|s| s.configuration.inputs.len() == 1)), "the input made before the dialog stays");
+}
+
+/// Live2 config.json (tableKeys): in the Configurations table, Enter on an edited value commits it and moves the
+/// selection down one row (the cell below framed).
+#[gpui::test]
+fn enter_in_a_configured_value_moves_down_a_row(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-enter", &[("width", "30 mm")]);
+    let (rows, input) = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let id = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.type_id == "assignVariable")).map(|f| f.id).expect("the variable");
+            let mut input = String::new();
+            v.edit_config("Configure", cx, |ps| {
+                input = noshape_ops::config::add_input(ps, "List");
+                noshape_ops::config::add_option(ps, &input, "A".into());
+                noshape_ops::config::configure_parameter(ps, id, "lengthValue", &input);
+            });
+            v.right_panel = Some(crate::part_studio::config_panel::RightPanel::Configurations);
+            let rows: Vec<String> = match v.studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == input)).map(|i| &i.kind) {
+                Some(noshape_model::configuration::ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
+                _ => Vec::new(),
+            };
+            (rows, input)
+        })
+    });
+    assert_eq!(rows.len(), 2, "Default and A in {input}");
+    draw(cx, window);
+    view.update(cx, |v, cx| {
+        v.ui.cfg_editing = Some(format!("cp-0-{}", rows[0]));
+        v.ui.cfg_editing_focus = true;
+        cx.notify();
+    });
+    draw(cx, window);
+    keys(cx, window, &["4", "0", "enter"]);
+    let (value, framed) = cx.update(|cx| {
+        let v = view.read(cx);
+        let value = v.studio(cx).and_then(|s| s.configuration.configured.first()).and_then(|c| c.values.get(&rows[0]).cloned());
+        (value, v.ui.cfg_framed.as_ref().map(|(k, _)| k.clone()))
+    });
+    assert!(value.map(|p| format!("{p:?}")).is_some_and(|t| t.contains("40 mm")), "committed as 40 mm");
+    assert_eq!(framed, Some(format!("cp-0-{}", rows[1])), "the cell below framed");
+}

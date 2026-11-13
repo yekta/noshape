@@ -14,6 +14,7 @@ pub mod custom_tables;
 pub mod date_time_field;
 pub mod derived;
 pub mod display_cache;
+pub mod dotted;
 pub mod result_store;
 pub mod doc_files;
 pub mod doc_model;
