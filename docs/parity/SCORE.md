@@ -214,6 +214,10 @@ c2-rings-loft, c2-sm-corner-break, cf-part-draft; none the other way.
 | cf-lighten | 129 ms | 114 ms | 1.1 | 229 ms |
 | c2-bottle-split | 49 ms | 40 ms | 1.2 | 92 ms |
 
+Same CLI (v0.4.48 Linux) and scripts on vibe7, 07:24–07:40, **under load 7–24 (median 10.8, other agents' builds; 8 cores),
+not comparable**: hats 7.1–10.0 s cold / 0.56–0.87 s reopen, the dock 25.7 / 5.8 s, 36 of 84 faster than live. The same run
+in the quiet 02:00 window (bin/w7-cli-window.sh, armed) replaces it.
+
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
 Of the recorded Booleans (each distinct call once), the share noshape's own Boolean takes instead of OCCT, by count and
