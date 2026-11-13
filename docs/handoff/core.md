@@ -18,6 +18,19 @@ live's from live.jsonl per_feature_ms. Yours:
 - (A note on the suite's per-feature kernel profiles: their props_surface calls are the suite's own measuring after each
   feature, face_json -> entities -> our_parts, not regeneration.)
 
+## P0 now (11-13 09:18 UTC): c2-sm-louver Flange 9 34 ms (11-06) -> 616 ms (release, main): bisecting
+Worktree /root/projects/noshape-wt/core-bis (detached), vibe5, light profile; script /root/core-scratch/bin/bisect-flange9.sh
+(setsid; good a27ea6ae9 11-06 06:59 .. origin/main; flange9.sh: good < 200 ms, bad > 400 ms, else skip); log
+/root/core-scratch/hb/bisect-flange9.log (one line per step, "BDONE" at the end), git output bisect-flange9-run.log. First two
+lines check the endpoints (main, then a27ea6ae): if main isn't > 400 or a27ea6ae isn't < 200, the bisect is meaningless:
+stop it and measure by hand. When it names the commit: profile Flange 9 there (NOSHAPE_KERNEL_PROFILE, gdbprof.sh), fix
+forward, land, report before / after to the lead.
+**Fillet 2 gate (vibe6) failed, don't land core-isaac yet:** the T1 fails on the branch, c2-rings-loft still 22 (the
+chamfer-revert edit may not have reached the run: check `fillet_chain` / `propagate_tangent` in the synced tree, touch
+detail.rs), and assemblies worse: hand-drill-pinslot mates 37 -> 22, infento-subs occurrences 142 -> 137, keyboard-pattern
+1 -> 0, robotic-arm 29 -> 22, scissor-lift 16 -> 13 (isaac-ball 63 -> 90). Logs hb/gate6-isaac-*. Likely the convexity rule
+or the new shown-topology joins (one_surface, line + B-spline) change other parts; rerun after the P0.
+
 ## core state (11-13 06:01 UTC): handoff for a restart
 **In flight: asm-isaac-ball's Fillet 2 + fan-blade's Mirror 3**, branch `core-isaac` in /root/projects/noshape-wt/core, all
 committed, pushed as **origin/core-wip-isaac** (f129e2773, one commit on main 11-13 ~00:00):
