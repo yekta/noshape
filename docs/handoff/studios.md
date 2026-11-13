@@ -86,7 +86,7 @@ Measured on vibe6 (8 cores, Xvfb, software GL, shared with psui), release app, N
 | Open a drawing, cold (no display cache) | asm 0.28 s, nist 0.21 s, spur / wave 0.17 s, parts 3.1 s, hat8 17 s (its Part Studio's regen) | open a document ≤ 0.5 s | Part 1 Drawing 20 from another tab: 23.0 s first visit; reload 27–36 s (live 2605) |
 | Open, warm (cached sheet first) | parts 0.25 s (frame 0.75), hat8 0.47 s (frame 1.0), full 1.9 s | ≤ 0.5 s | 3.2 / 3.7 s on later visits |
 | First views, hidden lines (4 views) | nist 0.2-0.45 s polygonal + 0.15-0.37 exact; asm 2.0-2.4 s, parts 1.3-2.7 s | ≤ 2× faster than live | Create Drawing: 3.0 s server, 30 s to the views drawn |
-| Update after a model change (parts) | 1.65-1.76 s click to views; 16 ms on the UI thread at the click | — | not recorded yet (live 2605 part 2, after ~18:30 UTC) |
+| Update after a model change (parts) | 1.65-1.76 s click to views; 16 ms on the UI thread at the click | — | 16.9 s median (12.3–17.4 s), Fillet 1's radius changed, ⟳ Update clicked to the views redrawn (live 2605 part 2; ⟳ yellow while out of date) |
 | Insert a view | nist 40 ms polygonal + 70 ms exact; wave spring 0.9 s polygonal, exact 15 s (probe) / 49 s (loaded app): **was never** | ≤ 2× faster than live | 3.0 s click to view drawn |
 | Pan / zoom frame | pan: 3-8 ms our CPU per frame (the 35-50 ms "frame" is Xvfb's pacing, the same on a tiny sheet); wheel zoom: 11-32 ms on the UI thread per step → **0** (lines remade in the background) | 120 fps | wheel zoom 1.7 fps with 2.5–3 s stalls, right-drag pan 4.4 fps (software GL, load 9–13) |
 | PDF / DXF export | asm 110-123 / 130-183 ms, parts 163-285 / 113-167 ms, nist 42-109 / 12-18 ms; wave spring **hung before** | — | to the download's start: PDF 12.7 s (8.2–12.8), DXF 12.7 s (12.7–14.1) |
@@ -113,8 +113,8 @@ Open:
 - ~100 ms UI-CPU stalls while a document opens on its Part Studio tab, before the drawing's source is in: not drawing
   work (psui's open path); told the lead.
 - hat8's cold open is its Part Studio's regen (Booleans 1.1-1.7 s each): core / bool.
-- Live's numbers (live 2605 part 1, behaviours "speed: drawings") in the table: ours is far faster everywhere; Update
-  after a model change and an assembly drawing come later (live's REST, ~18:30 UTC).
+- Live's numbers (live 2605 parts 1 and 2, behaviours "speed: drawings") in the table: ours is far faster everywhere
+  (Update 1.7 s against 16.9 s); an assembly drawing still to come from live.
 
 ### 2026-11-12 20:48 UTC: drawing positions from live2's takes (lead: the three anchors), table cells, import toasts
 - Section / detail labels sit 3.1 mm under their view's geometry (scale and user labels 6 mm): live2 positions put
