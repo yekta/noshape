@@ -143,6 +143,13 @@ struct ChainEdge {
 /// (Onshape's position 0 on a block's edge is its end nearest the origin).
 /// Edges that don't form one chain keep their order, each its own piece.
 fn chain(shape: &Shape, edges: &[usize]) -> FResult<Vec<ChainEdge>> {
+    chain_ordered(shape, edges, false)
+}
+
+/// [`chain`]; with `own_ends` each of several chains starts from its own free end (the rolling balls' junctions), else
+/// a later chain runs as its first edge does (the section route's run-ons read their ends so: qa's
+/// rust-zero-solid-f197's Fillet 1, two straight edges).
+fn chain_ordered(shape: &Shape, edges: &[usize], own_ends: bool) -> FResult<Vec<ChainEdge>> {
     let mut items = Vec::new();
     for &i in edges {
         let e = shape.sub_shape(ShapeType::Edge, i)?;
@@ -166,8 +173,7 @@ fn chain(shape: &Shape, edges: &[usize]) -> FResult<Vec<ChainEdge>> {
     let mut out = Vec::new();
     let mut left = items;
     while !left.is_empty() {
-        // (Several chains: each from its own free end.)
-        let at = match start.filter(|s| left.iter().any(|it| near(it.2, *s) || near(it.3, *s))) {
+        let at = match start.filter(|s| !own_ends || left.iter().any(|it| near(it.2, *s) || near(it.3, *s))) {
             Some(s) => s,
             None => first_free(&left).unwrap_or(left[0].2),
         };
@@ -594,7 +600,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     let faces = shape.faces();
     let ef = shape.edge_faces()?;
     let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
-    let chain = chain(shape, edges)?;
+    let chain = chain_ordered(shape, edges, ball)?;
     let total: f64 = chain.iter().map(|c| c.length).sum();
     // Distance along the chain of a bound.
     let along = |bd: Bound| -> FResult<f64> {
