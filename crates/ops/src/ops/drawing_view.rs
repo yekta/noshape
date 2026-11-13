@@ -801,7 +801,7 @@ fn sheet_prop_steps(od: &OpenDoc, d: &noshape_model::drawing::Drawing, i: usize,
                 steps.push((
                     "Sheet scale",
                     Box::new(move |d| {
-                        d.sheets[i].scale = sc;
+                        views::set_sheet_scale(&mut d.sheets[i], sc);
                         d.sheets[i].scale_text.clone_from(&text);
                     }),
                 ));

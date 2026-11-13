@@ -164,7 +164,7 @@ impl DrawingEditor {
         {
             let i = st.sheet;
             self.edit("Sheet scale", cx, |d| {
-                d.sheets[i].scale = s;
+                noshape_model::drawing::views::set_sheet_scale(&mut d.sheets[i], s);
                 d.sheets[i].scale_text = text;
             });
         }
@@ -232,7 +232,7 @@ impl DrawingEditor {
             .map(|&s| {
                 let act: Act = std::rc::Rc::new(move |t: &mut DrawingEditor, w: &mut Window, cx: &mut Context<DrawingEditor>| {
                     t.edit("Sheet scale", cx, |d| {
-                        d.sheets[si].scale = s;
+                        noshape_model::drawing::views::set_sheet_scale(&mut d.sheets[si], s);
                         d.sheets[si].scale_text = None;
                     });
                     if let Some(p) = &t.sheet_props {

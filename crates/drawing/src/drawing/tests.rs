@@ -5244,3 +5244,25 @@ fn projection_change_swaps_rows_as_live() {
         assert!((a.1[1] - b.1[1]).abs() < 1e-9 && (a.3.dir - b.3.dir).length() < 1e-9, "back where it was");
     }
 }
+
+/// Live2 (behaviours "A dimension's text after the sheet scale changes", block-drawing's 1.575 = 40 mm on Front's top
+/// edge): at 1:2 its centred value sits at x 91, 10 mm right of Front's centre: it keeps its distance from the left end.
+#[test]
+fn a_dimensions_value_keeps_its_distance_from_the_left_end_when_the_sheet_scale_changes() {
+    let (_, mut drawing) = demo();
+    let sheet = &mut drawing.sheets[0];
+    sheet.scale = 1.0;
+    let base = sheet.views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. }) && v.scale.is_none()).map(|v| v.id).unwrap();
+    sheet.view_mut(base).unwrap().rotation = 0.0;
+    let dim = |id, orientation| Annotation { id, kind: AnnotationKind::LinearDimension { view: base, a: [-0.02, 0.005], b: [0.02, 0.005], offset: 8.0, orientation, override_text: None }, ..Default::default() };
+    sheet.annotations.push(dim(901, DimOrientation::Horizontal));
+    sheet.annotations.push(dim(902, DimOrientation::Vertical));
+    let along = |s: &Sheet, id: u64| s.annotations.iter().find(|a| a.id == id).unwrap().text_along;
+    assert_eq!(views::view_scale(sheet, base), 1.0);
+    views::set_sheet_scale(sheet, 0.5);
+    assert_eq!(views::view_scale(sheet, base), 0.5);
+    assert_eq!((sheet.scale, along(sheet, 901)), (0.5, Some(10.0)), "half of the 20 mm the line lost, toward its far end");
+    assert_eq!(along(sheet, 902), None, "a vertical one over a horizontal edge measures nothing: unmoved");
+    views::set_sheet_scale(sheet, 1.0);
+    assert_eq!(along(sheet, 901), None, "back at 1:1: centred again");
+}

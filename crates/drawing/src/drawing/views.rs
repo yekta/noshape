@@ -1073,6 +1073,43 @@ pub fn view_scale(sheet: &Sheet, id: ViewId) -> f64 {
     if sheet.scale > 0.0 { sheet.scale } else { 1.0 }
 }
 
+/// A sheet's scale set to `scale` (Sheet properties, the scale list, the agent API's). Live (behaviours "A dimension's
+/// text after the sheet scale changes", live2 2578 (5)): a linear dimension's value isn't re-centred; it keeps its
+/// sheet-mm distance from the dimension's low end (left, bottom, or its first point), so a centred value shrunk to 1:2
+/// sits half the change toward the far end.
+pub fn set_sheet_scale(sheet: &mut Sheet, scale: f64) {
+    use super::{AnnotationKind, DimOrientation};
+    let before: Vec<(usize, f64, f64)> = sheet
+        .annotations
+        .iter()
+        .enumerate()
+        .filter_map(|(i, a)| {
+            let AnnotationKind::LinearDimension { view, a: pa, b: pb, orientation, .. } = &a.kind else { return None };
+            let d = [pb[0] - pa[0], pb[1] - pa[1]];
+            let len = match orientation {
+                DimOrientation::Aligned => d[0].hypot(d[1]),
+                o => {
+                    let axis = rotate2(if *o == DimOrientation::Horizontal { [1.0, 0.0] } else { [0.0, 1.0] }, -view_rotation(sheet, *view));
+                    (d[0] * axis[0] + d[1] * axis[1]).abs()
+                }
+            };
+            Some((i, len, view_scale(sheet, *view)))
+        })
+        .collect();
+    sheet.scale = scale;
+    for (i, len, k0) in before {
+        let AnnotationKind::LinearDimension { view, .. } = sheet.annotations[i].kind else { continue };
+        let k1 = view_scale(sheet, view);
+        if (k1 - k0).abs() < 1e-12 {
+            continue;
+        }
+        let a = &mut sheet.annotations[i];
+        // View metres to sheet mm.
+        let s = a.text_along.unwrap_or(0.0) + len * 1000.0 * (k0 - k1) / 2.0;
+        a.text_along = (s.abs() > 1e-6).then_some(s);
+    }
+}
+
 /// [`view_scale`]'s text: as typed on the view, or on the parent or sheet
 /// it follows (live request 1645).
 pub fn view_scale_text(sheet: &Sheet, id: ViewId) -> String {
