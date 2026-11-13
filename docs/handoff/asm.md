@@ -8,23 +8,32 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
-## Now (asm, 2026-11-13 07:47 UTC)
-- Landed since 00:30: connector flips to live's Z for edge midpoints and circle centres on top-level parts (the centre
-  moved along its axis to live's point: scissor-lift Revolute 12 / 13), robotic-arm 29/29; menu coverage 92/92 (Pin /
-  Unpin reference, Update linked document…); six second takes; feel 3D (drag after 2 px and 50 ms, connector beats
-  vertex in the pick, triad arrow snap follows the zoom); a part on empty space centres its box on the view ray at the
-  origin's depth (2509); standard content by its mating point, its menu and Edit panel as live's (b49ad21c).
-- Queued 4dddb7ca: triad Move to origin / Align with Z / Rotate on an instance its mates hold refuses with live's
-  "Unable to apply transform. Instance(s) may be constrained." and moves nothing.
-- Dropped: a face's CENTER connector taken as its edge's (lost 7 infento mates).
-- A triad ring drag snaps to whole 5° (live 2759: 30 / 55 / 80 px gave 15° / 25° / 35°); explode drags keep 1°.
-- Open: asm-triad-rotate-90-undo re-recorded by live (2795, landing); asm-triad-z-anti-align-with-z is the runner's
-  pixel (step 2's highlighted row); live's REST connector origins for standard content (2766) after ~18:30 UTC.
-- clamp-pattern's 2 mates (dx below): the stall rule moves nothing (every group in its cluster conflicts with or
-  without it, cost 8.07e-3); a shorter compromise only leaves Revolute 6 and Parallel 1 above the bound. Without the
-  rule clamp-pattern's test takes 22 s instead of 14 s: kept. The cluster conflicts because ends sit off live's:
-  Trunnion's circle centres (live z -9 / -15.7 axis -z / +z; ours has circles at z +9, +9.2, +15, +15.2 only),
-  Revolute 7 5.55 mm, 16 22.3 mm in plane, 21 / 22 10.4 mm along. Looking at Trunnion's studio (2d81da) next.
+## Now (asm, 2026-11-13 17:15 UTC)
+- Hosts: builds and suites on vibe7. The lead's disk loop prunes ~/tmp/<agent> after 6-12 h: scripts, binaries and
+  results live in vibe7 ~/agents/asm-keep (run-suite.sh: one process per assembly, SRC / OUT / BIN).
+- Landed today: Move to origin refusal on a mated part; ring snap (live's client rule, 5° / 1° / 0.1° by radius);
+  the mate dialog's ▶ preview (90 frames, out and back from the mate's zero); Insert Esc / ✓ with an instance on
+  the pointer; clamp-pattern 12 -> 32/32 mates (a region named by a whole line and a side, by live's line direction);
+  the solver's least-change pass stops at its noise floor and reuses its eigendecomposition (clamp-pattern's mates
+  placed in 7 s, was 18.5 s; big-assembly perf tests unchanged).
+- Gating: the translator keeps the sketches it read across steps (infento-subs' Part Studios 1677 -> 1460 s side by
+  side); query_entities checks a face's surface kind first and keeps area / centroid per face shape (bool's profile:
+  entity queries 15 %, OCCT's face props 11 % of the harness).
+- infento-subs is not hung (lead's P0 11-13): main and aaef71df give the same 142/167, 107/182, 25-40 min each
+  depending on host load; the time is the parity harness's per-step queries, not the kernel.
+- hand-drill-pinslot (37/67): one mate decides 30: suppressing **Cylindrical 31** (or flipping it) puts all 67 OK
+  (CLI batch: suppress each mate in turn, vibe7 ~/agents/asm-keep/hdx). Live has Cylindrical 29 (alignment true) and
+  31 (false) on the same tensioner face and housing axis, same Z directions, both OK, and Planar 3's ends 15.6 mm apart
+  against its -10 mm offset: either live ignores a Cylindrical's flip when solving or its states are stale. Asked
+  live (REQUESTS 17:09). Ours: axis_disagrees / orient_axial_mates hold every axial mate's sense.
+- isaac-ball: taking the region group closest in area (regions_by_sum) builds Studio 3c5c58 (83 -> 39 region
+  errors, 3 more occurrences) but 63 -> 37 mates as live: held back (~/asm-scratch-regions-by-sum.diff).
+- Standard content: live 2906 places a dropped part by its own mate connector's origin. Ours differ: the
+  countersunk connector sits at the head top (live: the cone apex), nuts start at z = 0 (live: centred), a socket
+  head screw's underside is z = 0 (live: its head top), connector Z points out of the part (live: into it). The cone
+  apex formula stays until live's per-family table (REQUESTS 12:36); the connector version is in
+  ~/asm-scratch-std-connector.diff.
+- studios now owns assembly-ui's feel work (11-13 16:30); asm keeps the solver, crates/assembly and the suites.
 
 ## From dx (2026-11-13 00:31 UTC): clamp-pattern's 14 -> 12 mates is 6ab30b272, not bbac6bb06
 Your 19:47 note in dx.md: every one of my assembly suite runs after bbac6bb06 (asmall10-15, through main 6c63ab5a7) has
