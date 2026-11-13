@@ -585,8 +585,8 @@ impl Session {
         let doc = &self.doc;
         let keep = |name: &str, v: Option<Vec<u8>>| keep_tab_bar(doc, name, v);
         let mv = match self.tab_scope() {
-            Some(scope) => self.undo.undo_in_keeping(&mut self.store, &scope, &keep)?,
-            None => self.undo.undo_in_keeping(&mut self.store, &|_| true, &keep)?,
+            Some(scope) => self.undo.undo_in_merging(&mut self.store, &scope, &keep, &three_way_tab)?,
+            None => self.undo.undo_in_merging(&mut self.store, &|_| true, &keep, &three_way_tab)?,
         };
         match mv {
             Some(mv) => {
@@ -602,8 +602,8 @@ impl Session {
         let doc = &self.doc;
         let keep = |name: &str, v: Option<Vec<u8>>| keep_tab_bar(doc, name, v);
         let mv = match self.tab_scope() {
-            Some(scope) => self.undo.redo_in_keeping(&mut self.store, &scope, &keep)?,
-            None => self.undo.redo_in_keeping(&mut self.store, &|_| true, &keep)?,
+            Some(scope) => self.undo.redo_in_merging(&mut self.store, &scope, &keep, &three_way_tab)?,
+            None => self.undo.redo_in_merging(&mut self.store, &|_| true, &keep, &three_way_tab)?,
         };
         match mv {
             Some(mv) => {
@@ -729,19 +729,74 @@ impl Session {
                 ours.map(|o| o.to_vec())
             }
         })?;
-        // Not an undo step, and the edits before it can't be undone across it (live ver-merge: Undo off after a
-        // merge; its notice's "Revert to before this merge" is a restore).
+        // Not an undo step; the edits before it stay undoable, each taken back with the merge's changes kept (live
+        // 21:00, ver-merge-both-edited-merge: Undo unsuppresses Extrude 2 and keeps B1's features). With none, Undo
+        // stays off (ver-merge). Its notice's "Revert to before this merge" is a restore.
         if !outcome.up_to_date {
-            self.forget_undo();
+            self.undo.passed_merge(outcome.microversion);
             self.reload(outcome.microversion)?;
         }
         Ok(outcome)
     }
 }
 
+/// Undo / redo of an edit a merge came after: a tab's blob merged per feature, other names as the edit left them.
+fn three_way_tab(name: &str, base: Option<&[u8]>, ours: Option<&[u8]>, theirs: Option<&[u8]>) -> Option<Vec<u8>> {
+    if name.starts_with("tab/") { noshape_model::merge::merge_tab_blobs(base, ours, theirs) } else { theirs.map(<[u8]>::to_vec) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live (21:00, ver-merge-both-edited-merge): an edit, then a merge of a branch's new feature; Undo takes back
+    /// the edit and keeps the merged feature, then Undo is off and Redo on; Redo puts the edit back, the feature kept.
+    #[test]
+    fn undo_after_a_merge_takes_back_the_edit_and_keeps_the_merge() {
+        use noshape_model::document::TabContent;
+        let dir = std::env::temp_dir().join(format!("noshape-session-merge-undo-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("m.noshape");
+        let _ = std::fs::remove_file(&path);
+        let mut doc = Document::new();
+        let units = doc.settings.units;
+        let tab = doc.tabs.iter_mut().find(|t| matches!(t.content, TabContent::PartStudio(_))).expect("a Part Studio");
+        let (tab_id, TabContent::PartStudio(ps)) = (tab.id, &mut tab.content) else { unreachable!() };
+        for _ in 0..2 {
+            let f = ps.new_feature("extrude", &units).expect("extrude");
+            ps.features.push(f);
+        }
+        let second = ps.features[1].id;
+        let mut s = Session::create(&path, doc).unwrap();
+        let main = s.branch;
+        let head = s.head().unwrap();
+        let b = s.branch_from(head, "B1").unwrap();
+        s.edit_tab(tab_id, "Add feature", |c| {
+            let TabContent::PartStudio(ps) = c else { unreachable!() };
+            let f = ps.new_feature("extrude", &units).expect("extrude");
+            ps.features.push(f);
+        })
+        .unwrap();
+        s.switch_branch(main).unwrap();
+        s.edit_tab(tab_id, "Suppress", |c| {
+            let TabContent::PartStudio(ps) = c else { unreachable!() };
+            ps.features.iter_mut().find(|f| f.id == second).unwrap().suppressed = true;
+        })
+        .unwrap();
+        s.merge_from(b).unwrap();
+        let read = |s: &Session| {
+            let Some(TabContent::PartStudio(ps)) = s.doc.tab(tab_id).map(|t| &t.content) else { unreachable!() };
+            (ps.features.len(), ps.features.iter().find(|f| f.id == second).unwrap().suppressed)
+        };
+        assert_eq!(read(&s), (3, true), "merged: B1's feature in, the edit kept");
+        assert!(s.can_undo() && !s.can_redo(), "Undo on, Redo off after the merge");
+        assert!(s.undo().unwrap());
+        assert_eq!(read(&s), (3, false), "the edit taken back, the merged feature kept");
+        assert!(!s.can_undo() && s.can_redo());
+        assert!(s.redo().unwrap());
+        assert_eq!(read(&s), (3, true), "redone, the merged feature still kept");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn protected_workspace_takes_merges_not_edits() {

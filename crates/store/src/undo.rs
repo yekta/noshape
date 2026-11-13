@@ -30,6 +30,10 @@ pub const NOT_UNDOABLE_PREFIXES: &[&str] = &[
 /// back for a blob: given its name and the value undo/redo would restore.
 pub type KeepBlob<'a> = dyn Fn(&str, Option<Vec<u8>>) -> Option<Vec<u8>> + 'a;
 
+/// A name's three-way merge (name, base, ours, theirs): how an edit is undone or redone on a state a merge changed
+/// since (the model's per-feature merge for a tab).
+pub type ThreeWay<'a> = dyn Fn(&str, Option<&[u8]>, Option<&[u8]>, Option<&[u8]>) -> Option<Vec<u8>> + 'a;
+
 /// Edits Ctrl+Z can't revert that also end the undo of the tabs they
 /// change: live (request 1582) disables an assembly's Undo after Move to new
 /// subassembly, and neither it nor Dissolve subassembly takes a step. (Live
@@ -61,6 +65,8 @@ struct Entry {
     /// The tab's name the edit was made in when that isn't one it changed (a Variable Studio's table edited in a
     /// Part Studio's panel): per-tab undo follows it.
     origin: Option<String>,
+    /// A merge came after it: undone (and redone) as a three-way merge onto the head, so the merge's changes stay.
+    merged_since: bool,
 }
 
 /// Undo/redo for one branch during one editing session.
@@ -281,6 +287,22 @@ impl UndoStack {
     /// (name, restored value) first, so parts of the current state an edit
     /// can't take back (tab names, the tab bar) stay as they are.
     pub fn undo_in_keeping(&mut self, doc: &mut Document, in_scope: &dyn Fn(&[String]) -> bool, keep: &KeepBlob<'_>) -> Result<Option<MicroversionId>> {
+        self.undo_in_merging(doc, in_scope, keep, &|_, _, _, theirs| theirs.map(<[u8]>::to_vec))
+    }
+
+    /// A merge made `head` (live: the merge isn't an undo step, and Undo then takes back the edit before it, the
+    /// merge's changes kept): the edits so far are undone three-way from now on; nothing to redo.
+    pub fn passed_merge(&mut self, head: MicroversionId) {
+        for e in &mut self.undo {
+            e.merged_since = true;
+        }
+        self.redo.clear();
+        self.expected_head = Some(head);
+    }
+
+    /// [`Self::undo_in_keeping`], an edit a merge came after undone with `three` (base: what the edit produced,
+    /// ours: the head, theirs: what was before it).
+    pub fn undo_in_merging(&mut self, doc: &mut Document, in_scope: &dyn Fn(&[String]) -> bool, keep: &KeepBlob<'_>, three: &ThreeWay<'_>) -> Result<Option<MicroversionId>> {
         self.check_fresh(doc)?;
         let mut found = None;
         for i in (0..self.undo.len()).rev() {
@@ -296,10 +318,12 @@ impl UndoStack {
         }
         let mut e = self.undo.remove(i);
         e.changed = Some(names.clone());
+        let head = doc.head(self.branch)?;
         let mut changes: Vec<(String, Option<Vec<u8>>)> = Vec::new();
         for n in names.into_iter().filter(|n| !newer.contains(n)) {
-            let v = keep(&n, doc.read(e.before, &n)?);
-            changes.push((n, v));
+            let before = doc.read(e.before, &n)?;
+            let v = if e.merged_since { three(&n, doc.read(e.after, &n)?.as_deref(), doc.read(head, &n)?.as_deref(), before.as_deref()) } else { before };
+            changes.push((n.clone(), keep(&n, v)));
         }
         let mv = doc.commit(self.branch, &changes, &format!("Undo {}", e.description))?;
         self.expected_head = Some(mv);
@@ -315,6 +339,12 @@ impl UndoStack {
 
     /// [`Self::redo_in`] with `keep` as in [`Self::undo_in_keeping`].
     pub fn redo_in_keeping(&mut self, doc: &mut Document, in_scope: &dyn Fn(&[String]) -> bool, keep: &KeepBlob<'_>) -> Result<Option<MicroversionId>> {
+        self.redo_in_merging(doc, in_scope, keep, &|_, _, _, theirs| theirs.map(<[u8]>::to_vec))
+    }
+
+    /// [`Self::redo_in_keeping`], an edit a merge came after redone with `three` (base: what was before it, ours:
+    /// the head, theirs: what the edit produced).
+    pub fn redo_in_merging(&mut self, doc: &mut Document, in_scope: &dyn Fn(&[String]) -> bool, keep: &KeepBlob<'_>, three: &ThreeWay<'_>) -> Result<Option<MicroversionId>> {
         self.check_fresh(doc)?;
         let mut found = None;
         for i in (0..self.redo.len()).rev() {
@@ -325,10 +355,12 @@ impl UndoStack {
         }
         let Some((i, names)) = found else { return Ok(None) };
         let e = self.redo.remove(i);
+        let head = doc.head(self.branch)?;
         let mut changes: Vec<(String, Option<Vec<u8>>)> = Vec::new();
         for n in names {
-            let v = keep(&n, doc.read(e.after, &n)?);
-            changes.push((n, v));
+            let after = doc.read(e.after, &n)?;
+            let v = if e.merged_since { three(&n, doc.read(e.before, &n)?.as_deref(), doc.read(head, &n)?.as_deref(), after.as_deref()) } else { after };
+            changes.push((n.clone(), keep(&n, v)));
         }
         let mv = doc.commit(self.branch, &changes, &format!("Redo {}", e.description))?;
         self.expected_head = Some(mv);
@@ -369,7 +401,7 @@ impl UndoStack {
             return Ok(after);
         }
         let changed = changes.iter().map(|(n, _)| n.as_ref().to_string()).collect();
-        self.push(Entry { before, after, description: description.to_string(), changed: Some(changed), origin: None });
+        self.push(Entry { before, after, description: description.to_string(), changed: Some(changed), origin: None, merged_since: false });
         Ok(after)
     }
 
@@ -387,6 +419,7 @@ impl UndoStack {
             description: description.to_string(),
             changed: None,
             origin: None,
+            merged_since: false,
         });
     }
 
