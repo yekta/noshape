@@ -12,12 +12,13 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_units::Dim;
-use noshape_units::complete::variable_completion;
+use noshape_units::complete::{variable_completion, words_match};
 use std::collections::BTreeMap;
 use std::ops::Range;
 
-/// Most entries shown at once.
-const MAX_ROWS: usize = 8;
+/// Rows shown at once; more scroll (live behaviours "Variable autocomplete in expression fields": 9).
+const VISIBLE_ROWS: usize = 9;
+const ROW_H: f32 = 31.;
 
 /// Live's functions and their argument placeholders, in its order.
 const FUNCTIONS: &[(&str, &[&str])] = &[
@@ -131,13 +132,16 @@ pub fn word_entries(text: &str, cursor: usize, variables: &[&str], dim: Option<D
     // after the matches (live vs-value-chip: mm, max(, min()).
     let after_number = before[..start].trim_end().ends_with(|c: char| c.is_ascii_digit() || c == '.');
     let first_letter = |e: &Entry| (after_number && matches!(e, Entry::Function(..)) && e.name().to_ascii_lowercase().starts_with(&needle[..1])).then_some(2);
-    let mut all: Vec<Entry> = variables.iter().map(|v| Entry::Variable(v.to_string())).collect();
-    all.extend(FUNCTIONS.iter().map(|(n, a)| Entry::Function(n, a)));
+    // Variables by Onshape's word-prefix rule, alphabetical (live: "fancontrol" finds #fan_control_board_depth);
+    // then the functions, units and constants: at the start, then at a camelCase word, each alphabetical.
+    let mut vars: Vec<&str> = variables.iter().copied().filter(|v| words_match(v, &needle)).collect();
+    vars.sort_by_key(|v| (v.to_ascii_lowercase(), v.to_string()));
+    let mut all: Vec<Entry> = FUNCTIONS.iter().map(|(n, a)| Entry::Function(n, a)).collect();
     all.extend(units_for(dim).iter().map(|u| Entry::Unit(u)));
     all.extend(CONSTANTS.iter().map(|c| Entry::Constant(c)));
     let mut ranked: Vec<(u8, String, usize, Entry)> = all.into_iter().enumerate().filter_map(|(i, e)| Some((match_rank(e.name(), &needle).or_else(|| first_letter(&e))?, e.name().to_ascii_lowercase(), i, e))).collect();
     ranked.sort_by(|a, b| (a.0, &a.1, a.2).cmp(&(b.0, &b.1, b.2)));
-    let entries: Vec<Entry> = ranked.into_iter().map(|r| r.3).collect();
+    let entries: Vec<Entry> = vars.into_iter().map(|v| Entry::Variable(v.to_string())).chain(ranked.into_iter().map(|r| r.3)).collect();
     (!entries.is_empty()).then_some((start..end, entries))
 }
 
@@ -149,6 +153,8 @@ pub struct VarCompletion {
     pub range: Range<usize>,
     pub entries: Vec<Entry>,
     pub selected: usize,
+    /// The list's scroll (the highlighted row kept in view).
+    scroll: ScrollHandle,
     /// Typing `#…`: the list ends with "(x) New variable…" for this name
     /// (live part-studio/152; shown even when the name exists).
     pub new_variable: Option<String>,
@@ -163,11 +169,11 @@ impl VarCompletion {
         if let Some((range, name)) = fragment(&text, cursor) {
             let matches = variable_completion(&text, cursor, variables.keys().map(String::as_str)).map(|c| c.matches).unwrap_or_default();
             let new_variable = (name.is_empty() || noshape_model::variable_table::is_identifier(&name)).then_some(name);
-            return Some(Self { key: key.to_string(), range, entries: matches.into_iter().map(Entry::Variable).collect(), selected: 0, new_variable });
+            return Some(Self { key: key.to_string(), range, entries: matches.into_iter().map(Entry::Variable).collect(), selected: 0, scroll: ScrollHandle::new(), new_variable });
         }
         let names: Vec<&str> = variables.keys().map(String::as_str).collect();
         let (range, entries) = word_entries(&text, cursor, &names, dim)?;
-        Some(Self { key: key.to_string(), range, entries, selected: 0, new_variable: None })
+        Some(Self { key: key.to_string(), range, entries, selected: 0, scroll: ScrollHandle::new(), new_variable: None })
     }
 
     /// `state.list` of the interaction parity suite: each row's first text, the highlighted one, and with the
@@ -185,7 +191,6 @@ impl VarCompletion {
         let mut rows: Vec<String> = self
             .entries
             .iter()
-            .take(MAX_ROWS)
             .map(|e| match e {
                 Entry::Variable(name) => match variables.get(name).map(|q| noshape_units::format_quantity(*q, units)) {
                     Some(value) if !value.is_empty() => format!("#{name} {value}"),
@@ -216,7 +221,6 @@ impl VarCompletion {
         let mut rows: Vec<String> = self
             .entries
             .iter()
-            .take(MAX_ROWS)
             .map(|e| match e {
                 Entry::Variable(n) => format!("#{n}"),
                 // Its first text: the placeholders are separate (live reads "max(").
@@ -232,19 +236,20 @@ impl VarCompletion {
 
     /// Rows: the entries, then "New variable…".
     fn rows(&self) -> usize {
-        self.entries.len().min(MAX_ROWS) + usize::from(self.new_variable.is_some())
+        self.entries.len() + usize::from(self.new_variable.is_some())
     }
 
     /// Whether entry `index` (the selected one when `None`) is "New variable…".
     pub fn picks_new(&self, index: Option<usize>) -> bool {
-        self.new_variable.is_some() && index.unwrap_or(self.selected) == self.entries.len().min(MAX_ROWS)
+        self.new_variable.is_some() && index.unwrap_or(self.selected) == self.entries.len()
     }
 
-    /// ↑ / ↓.
+    /// ↑ / ↓: no wrap (live: ↑ on the first row stays, ↓ stops on the last), the row scrolled into view.
     pub fn move_selection(&mut self, delta: isize) {
         let n = self.rows() as isize;
         if n > 0 {
-            self.selected = (self.selected as isize + delta).rem_euclid(n) as usize;
+            self.selected = (self.selected as isize + delta).clamp(0, n - 1) as usize;
+            self.scroll.scroll_to_item(self.selected);
         }
     }
 
@@ -303,7 +308,7 @@ impl VarCompletion {
                     on_pick(i, window, cx);
                 })
         };
-        let rows = self.entries.iter().take(MAX_ROWS).enumerate().map(|(i, e)| {
+        let rows = self.entries.iter().enumerate().map(|(i, e)| {
             let id = SharedString::from(format!("var-complete-{i}"));
             match e {
                 Entry::Variable(name) => {
@@ -325,22 +330,29 @@ impl VarCompletion {
             }
         });
         // Live 152: "(x) New variable…" (highlighted when selected).
-        let new_row = self.new_variable.as_ref().map(|_| row("var-complete-new".into(), self.entries.len().min(MAX_ROWS), "variable").child("New variable…"));
+        let new_row = self.new_variable.as_ref().map(|_| row("var-complete-new".into(), self.entries.len(), "variable").child("New variable…"));
         // Anchored at a zero-height box in the flow right below the field.
         let list = deferred(
             anchored().snap_to_window().child(
                 v_flex()
                     .id("var-complete")
                     .min_w(px(154.))
-                    .max_w(px(260.))
+                    .max_w(px(320.))
                     .p(px(1.))
                     .bg(rgb(0xffffff))
                     .border_1()
                     .border_color(rgb(0xd7d7d7))
                     .rounded(px(5.))
                     .shadow_md()
-                    .children(rows)
-                    .children(new_row),
+                    .child(
+                        v_flex()
+                            .id("var-complete-rows")
+                            .max_h(px(ROW_H * VISIBLE_ROWS as f32))
+                            .overflow_y_scroll()
+                            .track_scroll(&self.scroll)
+                            .children(rows)
+                            .children(new_row),
+                    ),
             ),
         )
         .with_priority(4);
@@ -416,6 +428,32 @@ mod tests {
         assert_eq!(shown("r", ang, &w), ["rad", "round(x)", "round(x,unit)", "roundToPrecision(x,precision)"]);
         assert_eq!(shown("c", ang, &w), ["ceil(x)", "ceil(x,unit)", "clamp(x,min,max)", "cos(angle)"]);
         assert!(word_entries("#w", 2, &w, len).is_none(), "`#` is the variable list");
+    }
+
+    /// Live behaviours "Variable autocomplete in expression fields" (the user's hat15 report): without `#` the
+    /// matching variables come first, by the word-prefix rule and alphabetical, then functions, constants and units.
+    #[test]
+    fn variables_come_first_by_their_word_prefixes() {
+        let len = Some(Dim::LENGTH);
+        let vars = ["fan_control_board_depth", "fan_clearance", "Fan_Diameter", "width"];
+        assert_eq!(shown("fancontrol", len, &vars), ["#fan_control_board_depth"]);
+        assert_eq!(shown("2*fcb", len, &vars), ["#fan_control_board_depth"]);
+        assert_eq!(shown("f", len, &vars), ["#fan_clearance", "#fan_control_board_depth", "#Fan_Diameter", "false", "floor(x)", "floor(x,unit)", "ft"]);
+        assert_eq!(shown("FAN", len, &vars), ["#fan_clearance", "#fan_control_board_depth", "#Fan_Diameter"]);
+    }
+
+    /// Live: ↓ stops on the last row and ↑ on the first (no wrap); every row is in the list (9 show, more scroll).
+    #[test]
+    fn arrows_stop_at_the_ends() {
+        let mut c = VarCompletion { key: "k".into(), range: 0..1, entries: (0..12).map(|i| Entry::Variable(format!("v{i}"))).collect(), selected: 0, scroll: ScrollHandle::new(), new_variable: Some("v".into()) };
+        assert_eq!(c.row_names().len(), 13, "all 12 and New variable…");
+        c.move_selection(-1);
+        assert_eq!(c.selected, 0);
+        for _ in 0..20 {
+            c.move_selection(1);
+        }
+        assert_eq!(c.selected, 12);
+        assert!(c.picks_new(None), "the last row is New variable…");
     }
 
     /// Live: Enter on "sq" gives `sqrt()` with the cursor inside, "cl"

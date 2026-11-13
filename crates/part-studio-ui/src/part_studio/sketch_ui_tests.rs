@@ -504,6 +504,70 @@ fn studio_with_wall_thickness(cx: &mut TestAppContext, name: &str) -> (AnyWindow
     (window, view)
 }
 
+/// A Part Studio with length Variables `name` = `value` (in feature order).
+fn studio_with_variables(cx: &mut TestAppContext, name: &str, vars: &[(&str, &str)]) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    let (window, view) = part_studio(cx, name);
+    cx.update(|cx| {
+        let (doc, tab) = { let v = view.read(cx); (v.doc.clone(), v.tab) };
+        doc.update(cx, |d, cx| {
+            let units = d.session.doc.settings.units;
+            d.edit_studio(tab, "Variable", cx, |ps| {
+                for (n, v) in vars {
+                    let mut f = ps.new_feature("assignVariable", &units).unwrap();
+                    f.params.set("name", noshape_model::ParamValue::Text((*n).into()));
+                    f.params.set("variableType", noshape_model::ParamValue::Enum("LENGTH".into()));
+                    f.params.set("lengthValue", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new(*v)));
+                    ps.features.push(f);
+                }
+            });
+        });
+    });
+    draw(cx, window);
+    (window, view)
+}
+
+const FAN_VARS: [(&str, &str); 4] = [("fan_control_board_depth", "2.4 mm"), ("fan_control_board_wall_length", "12 mm"), ("fan_clearance", "1 mm"), ("width", "30 mm")];
+
+/// The user's hat15 report (11-13): "fancontrol" typed in a sketch dimension's box lists #fan_control_board_depth
+/// and #fan_control_board_wall_length (live behaviours "Variable autocomplete in expression fields": word prefixes,
+/// `#` optional); Enter inserts the highlighted one, the next Enter commits it.
+#[gpui::test]
+fn dimension_box_lists_variables_by_their_word_prefixes(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "dim-fan", &FAN_VARS);
+    let (window, view) = sketch_in(cx, window, view, Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["5", "0", "enter", "escape", "escape"]);
+    let cid = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().find(|c| c.value().is_some()).unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_dim_edit(cid, w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["f", "a", "n", "c", "o", "n", "t", "r", "o", "l"]);
+    let rows = cx.update(|cx| view.read(cx).ui_ref().and_then(|u| u.dim_completion.as_ref()).map(|c| c.ui_state(None)["rows"].clone()));
+    assert_eq!(rows, Some(serde_json::json!(["#fan_control_board_depth", "#fan_control_board_wall_length"])));
+    keys(cx, window, &["down", "down", "up", "enter"]);
+    let box_text = cx.update(|cx| view.read(cx).dim_input.as_ref().map(|d| d.1.read(cx).value().to_string()));
+    assert_eq!(box_text.as_deref(), Some("#fan_control_board_depth"), "↑ / ↓ don't wrap; the typed word replaced");
+    keys(cx, window, &["enter"]);
+    assert!(near(&dimensions(cx, &view), &[0.0024]), "{:?}", dimensions(cx, &view));
+}
+
+/// The same list in a feature dialog's number field: "fcb" in Extrude's Depth, Tab inserts.
+#[gpui::test]
+fn dialog_field_lists_variables_by_their_word_prefixes(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "dlg-fan", &FAN_VARS);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    wait_until(cx, window, |cx| view.read(cx).display.variables.contains_key("fan_control_board_depth"));
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["f", "c", "b"]);
+    let rows = cx.update(|cx| dialog.read(cx).ui_list().map(|l| l["rows"].clone()));
+    assert_eq!(rows, Some(serde_json::json!(["#fan_control_board_depth", "#fan_control_board_wall_length"])));
+    keys(cx, window, &["down", "tab"]);
+    assert_eq!(dialog.update(cx, |d, cx| d.field_text("depth", cx)).as_deref(), Some("#fan_control_board_wall_length"));
+}
+
 /// VAR-AUTOCOMPLETE-ENTER (live 11-02): `#wall` + Enter in a dimension's value box inserts the highlighted
 /// `#wall_thickness` and the box stays; the next Enter commits it.
 #[gpui::test]
