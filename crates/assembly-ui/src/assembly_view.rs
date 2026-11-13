@@ -5082,8 +5082,10 @@ impl AssemblyView {
         // Tree rows: expander, 70x40 thumbnail cell, name (13.33 px light).
         self.request_insert_thumbs(cx);
         let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, thumb: Option<Arc<RenderImage>>, name: String, cx: &App| {
+            let row_name = name.clone();
             h_flex()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, move || format!("list_row:{row_name}")))
                 .flex_none()
                 .h(px(40.))
                 .pl(px(4. + indent))
@@ -6535,6 +6537,9 @@ impl AssemblyView {
             self.ui.std.editing = None;
             self.ui.std.props_edit = None;
             cx.notify();
+        } else if self.insert_open && self.placing.as_ref().is_some_and(|p| !p.is_empty()) {
+            // Live (feel mates insert_dialog): an instance on the pointer goes alone, the dialog stays.
+            self.drop_pending_insert(window, cx);
         } else if self.placing.is_some() || self.insert_open {
             // Esc cancels the insertion as ✕ (live: the inserted instances go).
             self.cancel_insert(window, cx);

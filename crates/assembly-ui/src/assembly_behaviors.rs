@@ -3145,10 +3145,38 @@ impl AssemblyView {
         self.close_insert(window, cx);
     }
 
-    /// Close the Insert dialog (checkmark, the toolbar's Insert): an
-    /// instance still following the cursor stays where it is.
+    /// Esc in the Insert dialog with an instance on the pointer: that one goes, the dialog and the instances already
+    /// dropped stay (live feel mates insert_dialog (2): "Inserted: 0"; a second Esc closes as ✕).
+    pub(super) fn drop_pending_insert(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(ids) = self.placing.take() else { return };
+        self.placing_point = None;
+        self.ui.place_snap = None;
+        self.message = None;
+        self.selected.retain(|s| !ids.contains(s));
+        self.ui.insert_inserted.retain(|i| !ids.contains(i));
+        if self.inserted_count(cx) == 0 && self.doc.read(cx).has_pending() {
+            // Nothing else in the session: the pending step goes whole (no empty step left behind).
+            self.doc.update(cx, |d, cx| d.undo(cx));
+        } else {
+            self.edit_insert(noshape_ops::assembly::DELETE_INSTANCES, cx, |a| noshape_ops::assembly::delete_instances(a, &ids));
+        }
+        self.schedule_eval(window, cx);
+        cx.notify();
+    }
+
+    /// Close the Insert dialog (checkmark, the toolbar's Insert): an instance still following the cursor is committed
+    /// where it was inserted, not at the pointer (live feel mates insert_dialog (3): its Part Studio position).
     pub(super) fn close_insert(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.placing.is_some() {
+        if let Some(ids) = self.placing.clone() {
+            let stored: Vec<(InstanceId, Placement)> = ids.iter().filter_map(|id| Some((*id, self.assembly(cx)?.instance(*id)?.placement))).collect();
+            let mut solved = self.result.solved.clone();
+            for (id, pl) in &mut solved.placements {
+                if let Some((_, p)) = stored.iter().find(|(i, _)| i == id) {
+                    *pl = *p;
+                }
+            }
+            self.ui.place_snap = None;
+            self.apply_solved(solved, cx);
             self.finish_placing(true, window, cx);
         }
         self.insert_open = false;
@@ -3421,9 +3449,8 @@ impl AnimState {
 /// with the agent API's assembly_animate).
 pub(super) use noshape_ops::assembly::anim_dofs;
 
-/// The mate dialog's Animate preview: two full turns, 90 frames (live feel mates.json: MATE_PLAY_ROTATION_FACTOR,
-/// MATE_PLAY_NO_OF_FRAMES; ~1.5 s at 60 fps).
-const PREVIEW_TURNS: f64 = 2.0;
+/// The mate dialog's Animate preview: out and back in 90 frames (live feel mates.json: MATE_PLAY_NO_OF_FRAMES;
+/// ~1.5 s at 60 fps).
 const PREVIEW_FRAMES: f64 = 90.0;
 /// Ascender of the mate value text (px; Onshape dimension text is 16 px, behaviours "Entity colours").
 const VALUE_TEXT_ASC: f64 = 11.5;
@@ -3496,9 +3523,9 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// Mate dialog ▶ Animate (live 575): the mate's first degree of freedom
-    /// runs once through full turns (a span for a slider) from its current
-    /// value, then the preview returns to the start pose. ▶ stays ▶.
+    /// Mate dialog ▶ Animate (live 575, 2959): the mate's first degree of freedom runs from the mate's zero out to a
+    /// full turn (a slider: a quarter of the view's width at the connector) and back, or from its lower limit to its
+    /// upper and back, over 90 frames; then the preview returns to the start pose. ▶ stays ▶.
     pub(super) fn toggle_mate_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.anim.as_ref().is_some_and(|a| a.preview) {
             return;
@@ -3516,13 +3543,23 @@ impl AssemblyView {
         };
         let Some(&(dof, _)) = noshape_model::assembly::eval::mate_dofs(m.mate_type).first() else { return };
         let now = self.result.solved.mate_values.get(&m.id).map(|v| v[dof]).unwrap_or(0.0);
-        let (a, b, steps) = if dof == 0 {
-            let deg = |v: f64| format!("{} deg", noshape_units::to_fixed(v.to_degrees(), 6));
-            (deg(now), deg(now + PREVIEW_TURNS * std::f64::consts::TAU), PREVIEW_FRAMES)
-        } else {
-            let (a, b) = self.anim_defaults(&m, dof, cx);
-            (a, b, PREVIEW_FRAMES)
-        };
+        let key = ["rz", "x", "y", "z"][dof.min(3)];
+        let limited = m.limits.iter().any(|(k, l)| k == key && l.min.is_some() && l.max.is_some());
+        let (a, mut b) = self.anim_defaults(&m, dof, cx);
+        if dof != 0 && !limited {
+            let units = self.units(cx);
+            let vp = self.viewport.read(cx);
+            let at = self.result.connector_world(&m.a, &units).map_or(DVec3::ZERO, |f| f.origin);
+            // Metres a pixel spans at the connector's depth: the ray 100 px to the side of it, at that depth.
+            let m_per_px = vp.project(at).map(|p| {
+                let (o, d) = vp.ray(p + glam::DVec2::new(100.0, 0.0));
+                (o + d * (at - o).dot(d) - at).length() / 100.0
+            });
+            if let Some(m) = m_per_px.filter(|m| *m > 0.0) {
+                b = noshape_units::format_quantity(noshape_units::Quantity::meters(0.25 * vp.size().x * m), &units);
+            }
+        }
+        let steps = PREVIEW_FRAMES;
         let [start, end] = self.anim_value_inputs(dof == 0, a, b, window, cx);
         let steps = self.anim_steps_input(format!("{steps}"), window, cx);
         self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, played: true, playback: Playback::Single, busy: false, current: now, task: None, preview: true, chosen: true, chooser: false });
@@ -3662,7 +3699,9 @@ impl AssemblyView {
                             }
                         }
                     }
-                    let v = start + (end - start) * a.t;
+                    // The dialog's preview runs out and back (a triangle), the Animate panel's straight.
+                    let shape = if a.preview { 1.0 - (2.0 * a.t - 1.0).abs() } else { a.t };
+                    let v = start + (end - start) * shape;
                     a.current = v;
                     a.busy = true;
                     let (mate, dof) = (a.mate, a.dof);

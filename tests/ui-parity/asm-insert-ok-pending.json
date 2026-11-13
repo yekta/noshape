@@ -1,0 +1,31 @@
+{
+ "name": "asm-insert-ok-pending",
+ "about": "Insert (I), click Part 1 (it follows the pointer), ✓: it stays at its Part Studio position, not at the pointer.",
+ "area": "asm",
+ "source": "asm 11-13: live's feel mates insert_dialog (Escape and ✓ with an instance on the pointer)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "key",
+   "key": "i"
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part 1"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  }
+ ]
+}
