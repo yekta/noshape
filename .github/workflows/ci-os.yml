@@ -170,6 +170,25 @@ jobs:
           $names = python tools/tiers/t2-names.py .
           cargo test --locked --workspace --no-fail-fast -- --ignored --exact @names
 
+      # A test binary killed by a signal (SIGTRAP, SIGSEGV) leaves no Rust backtrace; macOS writes its native one to a
+      # crash report. Print the ones this job's processes left, newest first.
+      - name: Crash reports (macOS)
+        if: failure() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          dir="$HOME/Library/Logs/DiagnosticReports"
+          # Only this checkout's binaries (a report holds the process's path), not the runner's own daemons.
+          reports=$(find "$dir" -maxdepth 1 -name '*.ips' -newer "$GITHUB_WORKSPACE/Cargo.toml" -print0 2>/dev/null | xargs -0 grep -lF "$GITHUB_WORKSPACE" 2>/dev/null | xargs ls -t 2>/dev/null | head -5)
+          if [ -z "$reports" ]; then
+            echo "No crash reports from this checkout's binaries in $dir."
+            exit 0
+          fi
+          while IFS= read -r f; do
+            echo "::group::$(basename "$f")"
+            head -n 600 "$f"
+            echo "::endgroup::"
+          done <<< "$reports"
+
       # The whole workspace (app included, tests included) must be warning-free.
       - name: Clippy (-D warnings)
         if: runner.os == 'Linux'
