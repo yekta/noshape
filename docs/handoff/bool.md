@@ -4,26 +4,33 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-12 19:43 UTC; lead: the tangent fillet-tool pairs, then tpd's sections, then rings-loft's Shell 1)
+## bool, now (11-13 00:34 UTC; lead: the tangent fillet-tool pairs, then tpd's sections, then rings-loft's Shell 1)
 - **Landed 11-12:** d93e7f6f (the knife's Mirror 1: faces apart across a slab, Boolean 242 -> 31 ms), 31d0d8ba
   (cf-snap-hook's Fillet 5: circle-profile revolutions against coaxial tori in exact circles, 57-69 -> 21-23 ms),
   78ef7ff8 (c2-tpd-fillet-variable's Fillet 1: `plane_tube_sections`, a plane against a one-span quadratic B-spline
   round, sections ahead 56-62 -> 34-36 ms). qa's af34f732b pattern-direction P0: fixed and landed in the morning.
-- **Gating (bool-hat, vibe5): c2-rings-loft's Shell 1 (by_quadrics), two commits, results byte-identical on the
-  rings-loft and impeller Shell dumps (vibe4 ~/agents/bool-cases/{rl,imp}-dump):**
+- **c2-rings-loft's Shell 1 (by_quadrics), landed 43e18118 (22:30) and 1766ff34 (00:33):**
   - the self-interference check tests edge / face pairs that don't touch, and vertex / face pairs, as points against
-    the face's mesh (BVH range query, `quad::mesh_within`): 703 + 726 pairs out, the check 232-266 -> 124-134 ms,
-    the Shell 952-1015 -> 853-880 ms (vibe5 alternated);
+    the face's mesh (BVH range query, `quad::mesh_within`): 703 + 726 pairs out, the check 232-266 -> 124-134 ms;
   - the repair's "no nearer a kept face than the wall" takes the kept face's mesh (made when first asked, a
-    twentieth of the wall) and measures exactly only near the wall: 250 -> 58 exact distances, the repair ~10 %.
-- **Left in Shell 1 (probe laps, ms):** repair ~500 (traces 190: `quad::eval`'s projections onto offset B-splines;
-  joins 75), self-interference ~130 (the 164 edge / face pairs that share a vertex with the face: OCCT's
-  BeanFaceIntersector, one pair 71 ms), edges 215 (GeomAPI_IntSS), faces 135, corners 115. Live 235 ms for the
-  feature.
-- **Candidate, not kept yet:** `quad::eval` asks NextValueOfUV with maxpreci 1e-9 for points a wall off the surface,
-  so every call also runs UVFromIso's iso projections. Without it rings-loft's traces 225-285 -> 124-130 ms, but the
-  Shell's total didn't move under load 23 (vibe4, alternated) and the result changes in the last digits (centroid
-  5.894733 -> 5.894734 mm): needs a quiet A/B and its own gate.
+    twentieth of the wall) and measures exactly only near the wall: 250 -> 58 exact distances;
+  - `quad::eval` / `eval_grad` ask NextValueOfUV without maxpreci (a point a wall off the surface is never within it,
+    so every call also ran UVFromIso's iso projections): Shell 1 773-850 -> 580-603 ms, Shell Gehäuse 941-980 ->
+    777-812 ms (vibe5 quiet, alternated); last digits only, topology and printed sizes the same on the five dumps;
+  - `normal_at` keeps a projector per surface for the Shell (a thread's, cleared by each Shell): Gehäuse's offsets
+    97-116 -> 30-38 ms, corners 193-204 -> 152-159 ms; byte-identical.
+  - Overall Shell 1 (probe, vibe5): ~950 -> ~580 ms; live 235 ms.
+- **Left in Shell 1 (probe laps under load, ms):** repair ~300-440 (traces 160: Newton in `quad::eval` itself; joins
+  80), edges 150-190 (GeomAPI_IntSS), faces 100-150 (ShapeConstruct_ProjectCurveOnSurface in `add_pcurve`),
+  self-interference ~100 (the 164 edge / face pairs sharing a vertex with the face: OCCT's BeanFaceIntersector, one
+  pair 71 ms), volumes 30-40, thin check 25-45.
+- **Tried, not kept:** `eval_grad_near`'s NextValueOfUV without maxpreci (1e-3 x the part's size, also always below
+  the wall): byte-identical, no clear gain under load 27; to measure again in a quiet 02:00-04:00 window.
+- **Scratch:** dumps and profilers now on vibe5 (~/agents/bool-cases/{rl,imp}-dump, ~/agents/profile*.py:
+  profile-lines.py <log> shell.cpp ranks shell.cpp lines); the probe (crates/kernel/tests/xprobe.rs, sampler.rs) in
+  /root/bool-scratch/xprobe-1112.rs, sampler-1112.rs, hooked by probe-allrs.patch. Gates one at a time:
+  /root/bool-scratch/gate-chain.sh <sha> (main's gate first, then the branch's; vibe5's earlyoom killed the ops link
+  when both built at once).
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
 - **Completion (11-12 23:03 UTC, main 909e48460, all 98 suite documents recorded on vibe5, each distinct Boolean once a
