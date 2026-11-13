@@ -1109,8 +1109,9 @@ fn with_input_focus_in(s: &mut Value, window: &mut Window, cx: &mut App) {
     use gpui_kit::component::WindowExt as _;
     use gpui_kit::component::input::AnyInputState;
     // A window modal over a panel that names its own field (Create version… over a drawing's Insert view chooser):
-    // the keyboard is the modal's (live ver-insert-create-version-esc: "other" with the Name's text).
-    if s["focus"]["kind"] == "field" && s["focus"]["text"].is_null() && window.has_active_dialog(cx) {
+    // the keyboard is the modal's (live ver-insert-create-version-esc: "other" with the Name's text). Not the file
+    // picker's own search box (live2 drw-insert-image: a field).
+    if s["focus"]["kind"] == "field" && s["focus"]["text"].is_null() && window.has_active_dialog(cx) && !noshape_app_core::file_tab_view::picker_search_focused(window, cx) {
         s["focus"] = serde_json::json!({ "kind": "other" });
     }
     let named = s["focus"]["text"].is_string() || !matches!(s["focus"]["kind"].as_str(), Some("none" | "other"));

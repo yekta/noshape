@@ -240,12 +240,15 @@ impl DrawingEditor {
         let tab = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
         let sheets: Vec<&str> = drawing.sheets.iter().map(|s| s.name.as_str()).collect();
         let Some(sheet) = drawing.sheets.get(self.sheet) else { return json!({ "tab": tab, "sheets": sheets }) };
+        // A view moved to another sheet: live lists it with no parent, and not its parent's stand-in there (live2
+        // drw-view-move-to-sheet-ok).
         let mut views: Vec<Value> = sheet
             .views
             .iter()
+            .filter(|v| !v.id.is_ghost())
             .map(|v| {
                 // (An aligned section's too: live names its parent, drw-aligned-section-edit.)
-                let parent = sheet.parent_of(v.id).map(|p| self.ui_view_name(p));
+                let parent = sheet.parent_of(v.id).filter(|p| !p.is_ghost()).map(|p| self.ui_view_name(p));
                 let pl = self.placement(v.id);
                 let scale = pl.map(|p| noshape_model::drawing::sheet::format_scale(p.scale));
                 // Live2 16:46: the centre of the view's frame, sheet mm (the frame's margin is even all round).

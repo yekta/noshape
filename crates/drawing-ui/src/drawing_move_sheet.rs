@@ -48,7 +48,11 @@ impl DrawingEditor {
         let Some(d) = self.move_sheet.take() else { return };
         if d.sheet != self.sheet {
             match d.target {
-                MoveTarget::View(id) => self.move_selected_views(id, Some(d.sheet), cx),
+                // Live2 drw-view-move-to-sheet-ok: the drawing shows the other sheet with nothing selected.
+                MoveTarget::View(id) => {
+                    self.move_selected_views(id, Some(d.sheet), cx);
+                    self.selection.clear();
+                }
                 MoveTarget::Table(id) => self.move_table_to_sheet(id, Some(d.sheet), cx),
             }
         }

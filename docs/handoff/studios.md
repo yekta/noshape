@@ -28,6 +28,21 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-13 04:45 UTC: drw-* 184/206 on the feel build; the rest
+The same 12 selection / position differences on the build before the feel changes (02:39): none of them is the feel
+work's. Fixed after the run: the dimension palette stays open on Enter and on the empty sheet (live2 2578 (4)); the
+file picker's search box reads as a field again (my modal rule had turned it to "other": drw-insert-image / -dxf /
+image-properties); a view moved to another sheet is listed alone with no parent (drw-view-move-to-sheet-ok). Left:
+- drw-sheet-properties-scale step 10 (text x 91, ours 81.5): live2's table fits "the text keeps its sheet-mm distance
+  from the dimension's left end; when it no longer fits it goes outside, 16.6 mm past the right end, and stays anchored
+  there" (1:1 81 -> 1:2 91 -> 1:4 102.6 -> 1:1 117.6). Ours keeps a never-dragged text centred (`text_along` None).
+  Needs the text's anchor stored at creation (every creation path) or set on each scale change from the built ends.
+- drw-insert-view-top-1to1 step 6: live's panel text still holds the scale list (1:1 … 1:16) just after the pick, in
+  its only recording of a scale pick: the list read while it closes. Not copied.
+- Known from dx's notes: sheet-properties / sheet-rename, view-align-*, view-replicate-annotations,
+  views-shift-select-properties (reader's EDGE), note-move-to-title-block, centermark-align, dimension-foreshorten,
+  format-painter, datum-target-hide-dim, dimension-3-point-angular, view-copy-paste-keys, datum-copy-paste (10 mm).
+
 ### 2026-11-13 04:13 UTC: drawings feel from live2's feel/drawing.json (D1-D6, F3, F4)
 docs/parity/interaction-feel.md "Drawings" has each number, ours and its test. Set: Select's reach (lines 7 px, texts
 9 px outside their box, a leader 11 px, a view 3.6 sheet mm), snap and inference 8 px, drag 5 px (a note 8), a box takes
