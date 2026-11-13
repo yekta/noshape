@@ -33,6 +33,11 @@
    "on": {
     "menu": "Paste tab"
    }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
   }
  ]
 }
