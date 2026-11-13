@@ -153,6 +153,20 @@ fn rows() -> Vec<Row> {
             s.frames(cx);
             expect(manip, false, "a manipulator")
         } },
+        Row { id: "flat view / a click on a bend zone", live: "selects that bend in both views and its row in the Bends table", gap: false, check: |s, cx| {
+            s.escape_all(cx);
+            let fv = cx.update(|cx| s.view.read(cx).flat_view.clone()).ok_or("no flat view")?;
+            // Inside the first bend's zone, off its centre line (a click there selects the line): 40 % of the way to its edge.
+            let at = cx.update(|cx| fv.read(cx).bend_zone_point(0, 0.4, cx)).ok_or("no bend zone")?;
+            let vp = cx.update(|cx| fv.read(cx).viewport.clone());
+            cx.update(|cx| vp.update(cx, |_, cx| cx.emit(ViewportEvent::Click { pick: None, position: at, modifiers: NONE })));
+            s.frames(cx);
+            let (faces, row) = cx.update(|cx| {
+                let v = s.view.read(cx);
+                (v.selection.iter().filter(|r| matches!(r, Reference::Face(_))).count(), v.ui.sm_cell.map(|(t, r, _)| (t, r)))
+            });
+            expect((faces, row), (1, Some((0, 0))), "faces selected in 3D, the Bends row selected")
+        } },
         Row { id: "flat view / starts from Top", live: "it starts looking straight down (Top), the view cube 'Top'", gap: false, check: |s, cx| {
             let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).viewport.clone())).ok_or("no flat view")?;
             let rot = cx.update(|cx| flat.read(cx).camera.rotation);

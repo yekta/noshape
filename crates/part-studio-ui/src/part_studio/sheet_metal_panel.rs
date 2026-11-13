@@ -336,17 +336,32 @@ impl PartStudioView {
                 }
                 self.refresh_scene(false, cx);
             }
-            FlatRow::Face { face, line, row } => {
-                self.selection = vec![face];
-                self.ui.sm_cell = Some((0, row, 0));
-                self.ui.sm_flat_bend = None;
-                if let Some(f) = &fv {
-                    f.update(cx, |f, cx| f.select_bend(Some(line), cx));
-                }
-                self.refresh_scene(false, cx);
-            }
+            FlatRow::Face { face, line, row } => self.select_flat_bend_face(face, line, row, cx),
         }
         cx.notify();
+    }
+
+    /// A bend's face selected in 3D, its line in the flat view and its Bends row.
+    fn select_flat_bend_face(&mut self, face: Reference, line: usize, row: usize, cx: &mut Context<Self>) {
+        self.selection = vec![face];
+        self.ui.sm_cell = Some((0, row, 0));
+        self.ui.sm_flat_bend = None;
+        if let Some(f) = self.flat_view.clone() {
+            f.update(cx, |f, cx| f.select_bend(Some(line), cx));
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
+    /// A click inside a bend's zone in the flat view: the bend (its first face, as Select other's "Face of …")
+    /// selected in both views and its Bends row (live feel/sheetmetal.json "flatView.select").
+    fn select_flat_bend_zone(&mut self, line: usize, cx: &mut Context<Self>) {
+        let Some(bend) = self.flat_view.as_ref().and_then(|f| f.read(cx).bend_of_line(line)) else { return };
+        let models = self.sheet_metal_models(cx);
+        let Some(data) = self.sheet_metal_context(&models).and_then(|m| self.sm_model_data(m)) else { return };
+        let Some(face) = data.bends.get(bend).and_then(|b| b.inner_faces.first().or(b.outer_faces.first())) else { return };
+        let row = noshape_ops::sheetmetal::joint_of(&data, bend);
+        self.select_flat_bend_face(Reference::Face((**face).clone()), line, row, cx);
     }
 
     /// The flat view's Select other list (live 1605 g-2, 1622 b-1): the 3D
@@ -1043,6 +1058,7 @@ impl PartStudioView {
                         FlatViewEvent::ContextMenu(at, on) => this.open_flat_menu(*at, *on == FlatPick::Face, window, cx),
                         FlatViewEvent::Selected(side) => this.select_flat_face(*side, cx),
                         FlatViewEvent::BendSelected(b) => this.ui.sm_flat_bend = *b,
+                        FlatViewEvent::BendZone(line) => this.select_flat_bend_zone(*line, cx),
                         // A sketch on the flat is drawn in the flat view (live 2468): its events go to sketch mode there.
                         FlatViewEvent::Sketching(ev) => {
                             let Some(fvp) = this.flat_view.as_ref().map(|f| f.read(cx).viewport.clone()) else { return };

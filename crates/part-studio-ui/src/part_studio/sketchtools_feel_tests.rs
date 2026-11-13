@@ -23,6 +23,35 @@ fn tool(cx: &mut TestAppContext, view: &Entity<PartStudioView>) -> Option<Tool> 
     cx.update(|cx| view.read(cx).sketch.as_ref().map(|s| s.tool))
 }
 
+/// A sketch with a horizontal line from x0 to x1 at y 300 (px) and two vertical ones at x, from 240 to 360.
+fn three_lines(cx: &mut TestAppContext, name: &str, xs: [(f64, f64); 3]) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    let (window, view) = sketch_with(cx, name, Tool::Line);
+    for (k, (a, b)) in xs.into_iter().enumerate() {
+        let (from, to) = if k == 0 { ((a, 300.), (b, 300.)) } else { ((a, 240.), (b, 360.)) };
+        click(cx, window, &view, from);
+        click(cx, window, &view, to);
+        keys(cx, window, &["escape"]);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    }
+    (window, view)
+}
+
+/// The pointer moved to `at` (viewport px) with nothing pressed.
+fn pointer(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, at: (f64, f64)) {
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let vp = v.viewport.clone();
+        v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: glam::DVec2::new(at.0, at.1), modifiers: Modifiers::default() }, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+}
+
+/// The lengths of the sketch's solid lines (metres).
+fn line_lengths(data: &noshape_model::sketch_feature::SketchData) -> Vec<f64> {
+    let sk = &data.sketch;
+    sk.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line && !e.construction).filter_map(|e| sk.endpoints(e.id)).filter_map(|(a, b)| Some((sk.point(b)? - sk.point(a)?).length())).collect()
+}
+
 fn expect<T: PartialEq + std::fmt::Debug>(got: T, want: T, what: &str) -> Result<(), String> {
     if got == want { Ok(()) } else { Err(format!("{what}: ours {got:?}, live {want:?}")) }
 }
@@ -120,6 +149,85 @@ fn rows() -> Vec<Row> {
             click(cx, window, &view, (450., 300.));
             // The crossed line keeps its two outer pieces: 3 lines -> 4.
             expect((before, lines(cx, &view)), (3, 4), "lines before, after the trim")
+        } },
+        Row { id: "trim / hover lights the piece", live: "the piece up to the nearest crossings lit tan with orange dots at its ends", gap: false, check: |cx| {
+            let (window, view) = three_lines(cx, "st-trim-hover", [(300., 600.), (400., 400.), (500., 500.)]);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Trim, w, cx))).unwrap();
+            pointer(cx, window, &view, (450., 300.));
+            // What the pick buffer under the pointer gives (no GPU here): the crossed line.
+            cx.update(|cx| view.update(cx, |v, cx| {
+                let data = v.sketch_data(cx).unwrap();
+                let sk = &data.sketch;
+                let longest = sk.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).max_by(|a, b| sk.curve(a.id).map(|c| c.length()).unwrap_or(0.).total_cmp(&sk.curve(b.id).map(|c| c.length()).unwrap_or(0.))).map(|e| e.id);
+                v.sketch.as_mut().unwrap().hover = longest;
+            }));
+            let (dots, piece, whole) = cx.update(|cx| {
+                let v = view.read(cx);
+                let (ed, data) = (v.sketch.as_ref().unwrap(), v.sketch_data(cx).unwrap());
+                let (_, points) = ed.overlay(&data, &noshape_units::UnitPrefs::default());
+                let lit = noshape_scene::palette::rgb8(noshape_scene::palette::viewport::PREHIGHLIGHT);
+                let dots: Vec<glam::Vec3> = points.points.iter().filter(|p| p.color == lit).map(|p| glam::Vec3::from(p.position)).collect();
+                let piece = if dots.len() == 2 { (dots[1] - dots[0]).length() as f64 } else { 0. };
+                (dots.len(), piece, line_lengths(&data).into_iter().fold(0f64, f64::max))
+            });
+            // The middle piece is a third of the crossed line.
+            expect((dots, (piece / whole * 3.).round()), (2, 1.), "end dots, the lit piece in thirds of the line")
+        } },
+        Row { id: "trim / a drag removes every piece its trail crosses", live: "tr0: after the middle piece's trim, one stroke across H's left piece and the line at -70 removes both (that line whole, nothing crosses it any more)", gap: false, check: |cx| {
+            // live's -100..0 at y 40, verticals at -70 and -40 (20..60), at 3 px a millimetre.
+            let (window, view) = three_lines(cx, "st-trim-drag", [(300., 600.), (390., 390.), (480., 480.)]);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Trim, w, cx))).unwrap();
+            click(cx, window, &view, (435., 300.));
+            let after_click = lines(cx, &view);
+            drag(cx, window, &view, (340., 320.), (420., 260.), 8);
+            let mut left: Vec<i64> = cx.update(|cx| line_lengths(&view.read(cx).sketch_data(cx).unwrap())).iter().map(|l| (l * 1000.).round() as i64).collect();
+            left.sort();
+            expect((after_click, lines(cx, &view), left.len()), (4, 2, 2), "lines after the click, after the drag")
+        } },
+        // Ours: Extend takes the curve, then the boundary; nothing drawn on hover. How a click acts is asked (REQUESTS 14:07).
+        Row { id: "extend / hover previews the extension", live: "hovering near a line's end lights the line orange and draws its extension in light blue up to the next entity", gap: true, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-extend-hover", Tool::Line);
+            for (a, b) in [((300., 300.), (400., 300.)), ((500., 240.), (500., 360.))] {
+                click(cx, window, &view, a);
+                click(cx, window, &view, b);
+                keys(cx, window, &["escape"]);
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+            }
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Extend, w, cx))).unwrap();
+            pointer(cx, window, &view, (395., 300.));
+            let ahead = cx.update(|cx| view.update(cx, |v, cx| {
+                let data = v.sketch_data(cx).unwrap();
+                let sk = &data.sketch;
+                // The short line (what the pick under the pointer gives) and the two x's past its end, to the vertical.
+                let short = sk.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).find(|e| sk.endpoints(e.id).and_then(|(a, b)| Some((sk.point(a)?.y - sk.point(b)?.y).abs() < 1e-9)).unwrap_or(false)).map(|e| e.id);
+                let ed = v.sketch.as_mut().unwrap();
+                ed.hover = short;
+                let ends = short.and_then(|l| sk.endpoints(l)).and_then(|(a, b)| Some((sk.point(a)?, sk.point(b)?)));
+                let (Some((a, b)), Some(far)) = (ends, sk.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).filter(|e| Some(e.id) != short).find_map(|e| sk.endpoints(e.id).and_then(|(p, _)| sk.point(p)))) else { return false };
+                let (we, wf) = (ed.frame.to_world(if a.x > b.x { a } else { b }), ed.frame.to_world(far));
+                let (lines, _) = ed.overlay(&data, &noshape_units::UnitPrefs::default());
+                // A segment lying past the line's end, toward the vertical line.
+                lines.segments.iter().any(|sg| {
+                    let mid = (glam::DVec3::from(glam::Vec3::from(sg.a)) + glam::DVec3::from(glam::Vec3::from(sg.b))) * 0.5;
+                    (mid - we).dot(wf - we) > 0. && (mid - we).length() < (wf - we).length() && (mid.y - we.y).abs() < 1e-4 && (mid.z - we.z).abs() < 1e-4
+                })
+            }));
+            expect(ahead, true, "an extension drawn past the line's end")
+        } },
+        Row { id: "text / two clicks, then its dialog", live: "the first corner, then the opposite one; the Text dialog opens with 'Default text' selected", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-text", Tool::Text);
+            click(cx, window, &view, (300., 300.));
+            let after_one = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().text_dialog_open());
+            click(cx, window, &view, (500., 350.));
+            let (open, text) = cx.update(|cx| view.read(cx).sketch.as_ref().map(|s| (s.text_dialog_open(), s.text_string.clone())).unwrap());
+            expect((after_one, open, text.as_str()), (false, true, "Default text"), "dialog after one click, after two, its text")
+        } },
+        Row { id: "search / in a sketch", live: "sketch tools: 'Offset o', 'Linear pattern', 'Circular pattern', 'Mirror', 'Text', 'Insert image', 'Trim', 'Extend'", gap: false, check: |_| {
+            let tools = noshape_ops::tool_search::searchable_sketch_tools();
+            let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();
+            let missing: Vec<&str> = ["Offset", "Linear pattern", "Circular pattern", "Mirror", "Text", "Insert image", "Trim", "Extend"].into_iter().filter(|n| !names.contains(n)).collect();
+            let offset_key = tools.iter().find(|t| t.name() == "Offset").and_then(|t| t.shortcut()).map(str::to_lowercase);
+            expect((missing, offset_key.as_deref()), (vec![], Some("o")), "missing, Offset's key")
         } },
         Row { id: "fillet / a click on a corner previews, nothing committed", live: "a preview arc 'R5' with an arrow; nothing committed yet; Esc cancels", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-fillet-click", Tool::Line);

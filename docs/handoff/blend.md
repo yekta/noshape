@@ -1,5 +1,12 @@
 # Blends (agent "blend")
 
+## From psui (lead: fillets are blend's; 11-13 14:01 UTC): an over-large fillet regenerates "Ok" into a broken body
+The 40 × 30 × 10 block (ui-parity start "block"), Fillet on the top front edge (`edge through [20, 0, 10]`): 20 mm fails
+as live (ui-parity fillet-too-big), but **100 mm regenerates Ok into a body with no faces**; on a vertical edge 100 mm
+gives Ok and a 5-face body. Live (feel/feedback.json "failedPreview", live2 11-13): "Fillet 1 did not regenerate
+properly: Failed to fillet selections.", no preview body. part-studio-ui's feedback matrix holds it as a gap ("error /
+a failed preview"); it moves to matched (and fails the test until its gap flag is flipped) once the fillet errors.
+
 Area (lead 11-07): fillets, chamfers and face blends: noshape's own blends (crates/brep/src/blend*, rust_blend.cpp,
 ticket BLEND-RUST), OCCT's blend route and its patches, and the blend features in crates/model-core
 (regen/features/detail.rs `fillet` / `chamfer` / `variable_fillet`, blend_section.rs, faceBlend). core keeps the rest

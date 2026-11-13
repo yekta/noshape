@@ -155,6 +155,35 @@ fn rows() -> Vec<Row> {
             let shown = cx.update(|cx| view.read(cx).display.bodies.iter().filter(|b| !b.hidden).count());
             expect((hidden_by_y, shown), (0, 0), "hidden by Y, shown by Shift+Y")
         } },
+        Row { id: "eye icons / a click toggles, the selection stays", live: "a row's eye (at its right on hover) toggles that item: Part 1 hidden -> shown, a hidden sketch's closed eye -> shown; the selection as it was", gap: false, check: |cx| {
+            let (window, view) = block(cx, "ed-eyes");
+            select_feature(cx, &view, "Extrude 1");
+            let part = cx.update(|cx| view.read(cx).display.bodies.first().map(|b| b.id.clone())).ok_or("no part")?;
+            let sketch = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Sketch 1").map(|f| f.id)).ok_or("no sketch")?;
+            let press = |cx: &mut TestAppContext, sel: String| -> Result<(), String> {
+                draw(cx, window);
+                let b = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(sel.clone().into_boxed_str())).ok_or(format!("no {sel}"))?;
+                let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+                vcx.simulate_event(gpui_kit::MouseMoveEvent { position: b.center(), pressed_button: None, modifiers: Modifiers::default() });
+                vcx.simulate_click(b.center(), Modifiers::default());
+                wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+                Ok(())
+            };
+            let part_hidden = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.id == part).map(|b| b.hidden));
+            let sketch_hidden = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.id == sketch).map(|f| f.hidden));
+            let before = (part_hidden(cx), sketch_hidden(cx));
+            press(cx, format!("part-eye-{part}"))?;
+            let hidden = part_hidden(cx);
+            press(cx, format!("part-eye-{part}"))?;
+            let shown = part_hidden(cx);
+            press(cx, format!("feat-eye-{sketch:?}"))?;
+            let sketch_after = sketch_hidden(cx);
+            let selected: Vec<String> = cx.update(|cx| {
+                let v = view.read(cx);
+                v.studio(cx).unwrap().features.iter().filter(|f| v.selected_features.contains(&f.id)).map(|f| f.name.clone()).collect()
+            });
+            expect((before, hidden, shown, sketch_after, selected), ((Some(false), Some(true)), Some(true), Some(false), Some(false), vec!["Extrude 1".to_string()]), "(part, sketch) hidden before; the part after one click, two; the sketch after its click; selected")
+        } },
     ]
 }
 

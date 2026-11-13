@@ -88,6 +88,14 @@ gap: Fillet 100 mm on the block's top edge regenerates Ok into a body with no fa
 their handoff. UI tests now bind keys once per App (`KeysBound`): bound per window, a matrix's 8th window ran one Enter
 8 times. edge-menu-chamfer-ok seeded with live's remembered Two distances (42 related scenarios on vibe6: 40 / 42, the
 2 fs-* misses known). Mac: suite 37-43 s, clippy 44 s; vibe6 app build + 42 scenarios in 2 shards 6 m 21 s.
+**14:24:** lead: the fillet gap is blend's (note moved to docs/handoff/blend.md). CI 43425254356 red on Windows: the
+navigation matrix's wheel rows held Linux / Mac's 2^(-1/12) per notch; ours zooms ×3 on Windows as live (2^(-1/4)),
+so the rows now take the running OS's live value (`live_notch`); landed alone first as 055377f9. Next batch, local:
+sketch tools 17 / 18 (trim hover, drag-trim as live's tr0, Text's two clicks, Search tools in a sketch; the gap:
+Extend's hover preview, ours takes the curve then the boundary: asked live REQUESTS 14:07 whether one click extends),
+editing 9 / 9 (eye icons), sheet metal 11 / 11 (fixed: a click inside a bend's zone in the flat view selects that
+bend's face in 3D, its line and its Bends row: `FlatViewEvent::BendZone`; only the centre line took a click before),
+navigation 20 / 20 (a rotate from empty space about the view centre).
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's

@@ -244,14 +244,15 @@ Alt+right drags, view keys, animations, double middle click, acted out with real
 `nav::the_navigation_matrix_matches_live` (T1, no GPU; the viewport's press and animation clock is the test's,
 `Viewport::set_clock`); `NAV_ROW=<part of an id>` runs some rows.
 
-**Matched: 19 / 19** (11-13 10:30 UTC; 9 / 14 at the first run).
+**Matched: 20 / 20** (11-13 14:14 UTC; 9 / 14 at the first run).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
-| Wheel notch in / out | the view scale × 2^(∓1/12) | the same | = |
+| Wheel notch in / out | the view scale × 2^(∓1/12) on Linux and Mac, 2^(∓1/4) on Windows (×3 there) | the same | = |
 | Wheel toward the pointer | the point under the pointer stays (≤ 1 px), zooming out too | the same | = |
 | Sideways wheel | ignored | the same | = |
 | Right drag | 3 turns per canvas diagonal (0.57049 °/px on 1673 × 886), about the part's point under the press (≤ 0.4 px), no world-up lock | the same; a drag released before the GPU's depth sample came lost its moves (now applied when it comes, or after 250 ms about the fallback centre) | = (fixed) |
+| Right drag from empty space | about the view centre (its point moved 2 px) | the same: the visible depths' average, else the model's centre (≤ 2 px) | = |
 | Shift + right drag | rotates as a plain right drag | the same | = |
 | Alt + right drag | turntable: an upright view's direction keeps its z | the same | = |
 | Ctrl pressed / released mid-drag | pan while held (1:1), rotate again after | the same | = |
@@ -263,7 +264,7 @@ Alt+right drags, view keys, animations, double middle click, acted out with real
 | Easing | smootherstep t³(6t² − 15t + 10) | the same | = |
 | A new animation while one runs | ignored until it ends | replaced the running one; now ignored | = (fixed) |
 | Double middle click | two middle releases within 500 ms fit (150 ms did, 600 ms didn't) | the OS's double click count; now live's own 500 ms timer | = (fixed) |
-| Not yet in the matrix | inertia (a flick keeps turning, ×0.77 per 16.67 ms; none held still 50 ms; none below 20 fps: it reads real time and the frame rate, so not a T1 row; navigation `inertia_decays_like_onshape` checks the decay); a press on empty space rotates about the view centre; Alt+right on a tilted view animates upright first; the view cube (150 px, 15 px margins, face / edge / corner 500 ms, arrows 15° in 250 ms, curved arrows roll, hover fill) and its menu | – | – |
+| Not yet in the matrix | inertia (a flick keeps turning, ×0.77 per 16.67 ms; none held still 50 ms; none below 20 fps: it reads real time and the frame rate, so not a T1 row; navigation `inertia_decays_like_onshape` checks the decay); Alt+right on a tilted view animates upright first; the view cube (150 px, 15 px margins, face / edge / corner 500 ms, arrows 15° in 250 ms, curved arrows roll, hover fill) and its menu | – | – |
 
 ## Chrome (matrix)
 
@@ -339,7 +340,7 @@ live2's sheetmetal.json (11-13 08:10–08:37, a 60 × 40 sheet metal model with 
 `sm::the_sheet_metal_matrix_matches_live` (T1, no GPU) on the sm-box start, the Sheet metal table and flat view
 panel open, a fresh document per row; cells carry `sm-cell-<table>-<row>-<column>` debug selectors.
 
-**Matched: 10 / 10** (11-13 13:33 UTC; 5 / 7 at the first run). ui-parity: the 11 sm-* scenarios 10 / 11
+**Matched: 11 / 11** (11-13 14:14 UTC; 5 / 7 at the first run). ui-parity: the 11 sm-* scenarios 10 / 11
 (sm-form-tool: live's Form dialog opens on "Circle emboss", ours "Select Part Studio…"; the same on green).
 
 | Row | Live | Ours | Status |
@@ -354,7 +355,8 @@ panel open, a fresh document per row; cells carry `sm-cell-<table>-<row>-<column
 | Flange | no length arrow, a preview wall | the same | = |
 | The flat view | its own camera: the wheel zooms it alone | the same | = |
 | The flat view's start | looking straight down (Top) | the same | = |
-| Not yet in the matrix | the panel's open time (0.9–1.4 s live on a software GPU), the flat view re-fitting, its bend lines (rgb(47,47,47), dashed centre), a flat bend hovered / clicked lighting both views and selecting its row, the Make joint / Corner / Bend relief picks, Tab filling its fields from the sketch | – | – |
+| A click inside a bend's zone in the flat view | selects that bend in both views and its Bends row | only the centre line (5 px) took a click, else the whole flat face; now the bend's face, line and row (`FlatViewEvent::BendZone`, as Select other's "Face of …") | = (fixed) |
+| Not yet in the matrix | the panel's open time (0.9–1.4 s live on a software GPU), the flat view re-fitting, its bend lines (rgb(47,47,47), dashed centre), a flat bend hovered lighting both views and selecting its row, the Make joint / Corner / Bend relief picks, Tab filling its fields from the sketch | – | – |
 
 ## Sketch tools (matrix)
 
@@ -362,7 +364,7 @@ live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-st
 `sketchtools::the_sketch_tools_matrix_matches_live` (T1, no GPU); Search tools' ranking through
 `noshape_ops::tool_search::studio_rank` over the toolbar's feature types.
 
-**Matched: 13 / 13** (11-13 13:33 UTC; 10 / 10 at the first run, then 3 rows added: 2 / 3 matched).
+**Matched: 17 / 18** (11-13 14:14 UTC; 10 / 10 at the first run, then 8 rows added: 6 / 8 matched, 1 fixed).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -377,16 +379,21 @@ live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-st
 | Esc with that menu open | sketch/405–408: the first Esc exits the tool, the menu stays, a second closes it (live2's note reads otherwise: asked, REQUESTS 12:33) | the same as sketch/405–408 | = |
 | Shift+F | the sketch fillet | the same | = |
 | Trim, a click | removes the piece between the crossings | the same | = |
+| Trim, hover | the piece up to the nearest crossings lit tan, orange dots at its ends | the same | = |
+| Trim, a drag | every piece the trail crosses goes; one that nothing crosses any more goes whole (tr0) | the same | = |
+| Extend, hover | the line lit, its extension drawn light blue up to the next entity (one click extends?) | nothing drawn; Extend takes the curve, then the boundary. Asked live (REQUESTS 14:07) before changing the tool | ≠ |
+| Text | two clicks (corners), then its dialog with "Default text" | the same | = |
+| Search tools in a sketch | the sketch tools (Offset o, Linear / Circular pattern, Mirror, Text, Insert image, Trim, Extend) | the same | = |
 | Sketch fillet, a click on a corner | a preview, nothing made; Esc cancels | the same | = |
 | Sketch fillet, a drag from the corner | made on release (arc, tangents, radius; its radius box opens) | only previewed (a second click made it); now made on release (`SketchEditor::corner_pressed`) | = (fixed) |
-| Not yet in the matrix | Search tools' panel (Recently used, the info box, Highlight tool in toolbar), the pattern labels (3x / 1x, spacing, inline boxes), Text's two-click rectangle and dialog (font list, "Default text" selected, n/250 characters: ours has them), Insert image's tabs and aspect-kept rectangle, trim hover / drag-trim, extend hover | – | – |
+| Not yet in the matrix | Search tools' panel (Recently used, the info box, Highlight tool in toolbar), the pattern labels (3x / 1x, spacing, inline boxes), Text's dash-dot rectangle and dialog layout (font list, "Default text" selected, n/250 characters: ours has them), Insert image's tabs and aspect-kept rectangle | – | – |
 
 ## Editing (matrix)
 
 live2's editing.json (11-13 09:27). part-studio-ui `editing::the_editing_matrix_matches_live` (T1, no GPU; outside a
 dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it there).
 
-**Matched: 8 / 8** (11-13 13:33 UTC; nothing to fix).
+**Matched: 9 / 9** (11-13 14:14 UTC; nothing to fix).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -398,7 +405,8 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 | Delete a part | "Delete part 1" (behaviours 1.12: its dialog opens pre-filled) | the same | = |
 | Y / Shift+Y with nothing selected or under the pointer | nothing (Shift+Y isn't "show all") | the same | = |
 | Sketch Ctrl+C, Ctrl+V | the copy's centre under the pointer at once, selected; one undo removes it | the same | = |
-| Not yet in the matrix | the toolbar's Undo tooltip (always "Undo (cmd+z/ctrl+z)": ours the same), undo in a feature dialog (an existing test), the paste's 2D triad and kept constraints, the assembly rows (asm's), eye icons | – | – |
+| Eye icons | a row's eye toggles it (Part 1 hidden, shown; a hidden sketch shown); the selection stays | the same | = |
+| Not yet in the matrix | the toolbar's Undo tooltip (always "Undo (cmd+z/ctrl+z)": ours the same), undo in a feature dialog (an existing test), the paste's 2D triad and kept constraints, the assembly rows (asm's) | – | – |
 
 ## Dialogs (matrix)
 
@@ -439,7 +447,7 @@ live2's feedback.json (11-13 09:39, for psui and studios). part-studio-ui `feedb
 | A warning's row | only lost selections: the name stays rgb(51,51,51), the icon's overlay only; no failures icon (one with a message of its own reads red, live L27) | red like an error; now black (`only_missing_selections`) | = (fixed) |
 | A warning's dialog | the title black with no tooltip, no bubble or toast; the lost entry a grey italic "Edge of Chamfer 1" | the title red with "… did not regenerate properly: 1 missing selection" and a yellow bubble; now live's (`status_reads_red`) | = (fixed) |
 | The red title's tooltip | "<Feature> did not regenerate properly: <message>" | the same | = |
-| A failed preview | Fillet 100 mm on the block's top edge: the title red, the entry red, "… Failed to fillet selections." | regenerates "Ok" into a body with no faces (20 mm fails as live, fillet-too-big): core's fillet, reported | ≠ |
+| A failed preview | Fillet 100 mm on the block's top edge: the title red, the entry red, "… Failed to fillet selections." | regenerates "Ok" into a body with no faces (20 mm fails as live, fillet-too-big): blend's fillet, reported | ≠ |
 | Its dialog | Sketch 1 deleted under Extrude 1: the title red, the lost region a red "Missing Face" entry, ✓ not disabled (an edge whose feature is only below reads "Edge of Extrude 1": live fillet-chip-edit-healthy-moment) | "Face of deleted feature"; now "Missing Face" | = (fixed) |
 | Not yet in the matrix | a failed preview drawing the edge in the error colour; the commit's working overlay (live first seen 1119 ms after ✓, polled every 40–150 ms; ours 1200 ms: within a frame or two, not changed without a finer measure); toasts (studios: success rgb(221,246,204), top centre, 5.1 s, no stacking, hover doesn't pause); empty states | – | – |
 

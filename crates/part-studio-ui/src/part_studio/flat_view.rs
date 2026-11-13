@@ -63,6 +63,9 @@ pub enum FlatViewEvent {
     Selected(Option<bool>),
     /// A bend line selected (the model's bend index), or none.
     BendSelected(Option<usize>),
+    /// A click inside bend line `n`'s zone, off its centre line (live feel/sheetmetal.json "flatView.select": the bend
+    /// selected in both views, its Bends row too).
+    BendZone(usize),
     /// While a sketch on the flat is open here (live 2468: you sketch inside the flat view): the view's events, for
     /// sketch mode.
     Sketching(ViewportEvent),
@@ -128,6 +131,12 @@ impl FlatView {
                 }
                 if this.selected_bend.take().is_some() {
                     cx.emit(FlatViewEvent::BendSelected(None));
+                }
+                if let Some(line) = this.bend_zone_at(*position, cx) {
+                    this.selected = None;
+                    this.compose(false, cx);
+                    cx.emit(FlatViewEvent::BendZone(line));
+                    return;
                 }
                 let side = pick.and_then(|id| this.face_side(id));
                 this.picked = pick.and_then(|id| this.face_index(id)).filter(|_| side.is_some());
@@ -220,6 +229,35 @@ impl FlatView {
     }
 
     /// The model's bend (index into its bends) of bend line `line`.
+    /// Bend line `line`'s zone on the flat (its developed width across the line), as four points in order.
+    fn bend_zone(&self, line: usize) -> Option<[glam::DVec3; 4]> {
+        let (f, _) = self.flat.as_ref()?;
+        let l = f.bend_lines.get(line)?;
+        let n = (l.b - l.a).try_normalize()?.perp() * (l.allowance * 0.5);
+        Some([l.a - n, l.b - n, l.b + n, l.a + n].map(|p| f.flat_view_point(p)))
+    }
+
+    /// The bend line whose zone holds viewport point `p`.
+    fn bend_zone_at(&self, p: glam::DVec2, cx: &App) -> Option<usize> {
+        let vp = self.viewport.read(cx);
+        let lines = self.flat.as_ref()?.0.bend_lines.len();
+        (0..lines).find(|&i| {
+            let Some(q) = self.bend_zone(i).and_then(|z| z.iter().map(|c| vp.project(*c)).collect::<Option<Vec<_>>>()) else { return false };
+            // Inside the convex quad: on the same side of all four edges.
+            let sides: Vec<f64> = (0..4).map(|k| (q[(k + 1) % 4] - q[k]).perp_dot(p - q[k])).collect();
+            sides.iter().all(|s| *s >= 0.0) || sides.iter().all(|s| *s <= 0.0)
+        })
+    }
+
+    /// The viewport point `frac` of the way from bend line `line`'s middle to its zone's edge.
+    #[cfg(test)]
+    pub(crate) fn bend_zone_point(&self, line: usize, frac: f64, cx: &App) -> Option<glam::DVec2> {
+        let z = self.bend_zone(line)?;
+        let mid = (z[0] + z[1] + z[2] + z[3]) * 0.25;
+        let edge = (z[2] + z[3]) * 0.5;
+        self.viewport.read(cx).project(mid + (edge - mid) * frac)
+    }
+
     pub fn bend_of_line(&self, line: usize) -> Option<usize> {
         self.flat.as_ref()?.0.bend_lines.get(line).map(|l| l.bend)
     }

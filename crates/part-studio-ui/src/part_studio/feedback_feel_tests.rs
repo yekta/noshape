@@ -145,7 +145,7 @@ fn rows() -> Vec<Row> {
             expect(tip.starts_with("Extrude 1 did not regenerate properly: "), true, &tip)
         } },
         // Ours: Fillet 100 mm on the 40 × 30 × 10 block's top edge regenerates "Ok" into a body with no faces (20 mm
-        // fails as live: fillet-too-big); core's fillet, reported 11-13.
+        // fails as live: fillet-too-big); blend's fillet, reported 11-13.
         Row { id: "error / a failed preview", live: "Fillet 100 mm on a block edge: no preview body, the title red, the field's entry 'Edge of Extrude 1' red; tooltip '… did not regenerate properly: Failed to fillet selections.'", gap: true, check: |cx| {
             let json = serde_json::json!({ "units": "mm", "features": [
                 { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
