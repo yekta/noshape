@@ -588,9 +588,10 @@ impl Focusable for DrawingEditor {
 
 impl DrawingEditor {
     /// A green success bubble at the top centre of the sheet (live: "✓
-    /// Successfully replicated 7/7 annotations ×"), gone after 5 s or on ×.
+    /// Successfully replicated 7/7 annotations ×"), gone after 5.1 s (live2 feedback.json toasts.success) or on ×; a
+    /// second one replaces it, a hover doesn't hold it.
     pub fn show_toast(&mut self, text: impl Into<SharedString>, cx: &mut Context<Self>) {
-        self.show_message(text, crate::os_ui::BubbleKind::Success, Some(std::time::Duration::from_secs(5)), cx);
+        self.show_message(text, crate::os_ui::BubbleKind::Success, Some(std::time::Duration::from_millis(5100)), cx);
     }
 
     /// The bubble at the top centre of the sheet, closed after `close_after`

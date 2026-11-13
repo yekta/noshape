@@ -1,0 +1,37 @@
+{
+  "name": "doc-plus-create-drawing-ok",
+  "about": "+ \u203a Create Drawing\u2026 with no source, OK: the drawing opens with the template's sheet and the Insert view panel open on its part picker (live2 feel/feedback.json emptyStates.drawing)",
+  "area": "studios",
+  "source": "studios 11-13 (live2 feedback.json: empty states)",
+  "start": "doc-tabs",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "button": "Insert new tab"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Create Drawing\u2026"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 500
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "OK"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2500
+    }
+  ]
+}
