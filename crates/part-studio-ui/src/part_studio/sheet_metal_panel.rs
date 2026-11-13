@@ -535,6 +535,19 @@ impl PartStudioView {
     }
 
     /// The faces of Bends row `row` of the active model.
+    /// Enter on a selected Radius or K Factor cell edits it (live feel/sheetmetal.json "cellEdit": a click selects, Enter
+    /// edits). True when it did.
+    pub(super) fn sm_enter_edits(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.right_panel != Some(super::config_panel::RightPanel::SheetMetal) || self.ui.sm_edit.is_some() {
+            return false;
+        }
+        let Some((0, row, col @ (2 | 5))) = self.ui.sm_cell else { return false };
+        self.ui.sm_edit = Some((row, col));
+        self.ui.sm_edit_focus = true;
+        cx.notify();
+        true
+    }
+
     fn sm_bend_refs(&self, row: usize) -> Vec<noshape_model::reference::Reference> {
         let Some(ctx) = self.context.as_ref() else { return Vec::new() };
         let model = self.ui.sm_context.filter(|m| ctx.sheet_metal.values().any(|d| d.model == *m)).or_else(|| noshape_model::sheetmetal::models_of(ctx).first().copied());
@@ -766,8 +779,10 @@ impl PartStudioView {
                 _ => fill,
             };
             let v = hover_view.clone();
+            let id = at.map_or_else(|| format!("sm-cell-{text}"), |(t, r, c)| format!("sm-cell-{t}-{r}-{c}"));
             div()
-                .id(SharedString::from(at.map_or_else(|| format!("sm-cell-{text}"), |(t, r, c)| format!("sm-cell-{t}-{r}-{c}"))))
+                .id(SharedString::from(id.clone()))
+                .debug_selector(move || id.clone())
                 .when_some(at, |d, a| {
                     d.on_hover(move |on: &bool, _, cx| {
                         let on = *on;
@@ -793,9 +808,10 @@ impl PartStudioView {
                     let v = hover_view.clone();
                     d.on_mouse_down(MouseButton::Left, move |_, _, cx| {
                         v.update(cx, |this, cx| {
+                            // Live (feel/sheetmetal.json "rowClick"): the row (cell) only, nothing selected in 3D; the
+                            // bend lights from the table's highlight.
                             this.ui.sm_cell = Some(a);
                             if a.0 == 0 && a.2 == 0 {
-                                this.selection = this.sm_bend_refs(a.1);
                                 this.refresh_scene(false, cx);
                             }
                             cx.notify();

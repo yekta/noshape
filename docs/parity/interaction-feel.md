@@ -331,6 +331,28 @@ origin); ours draws the two lines from the origin black, as live colours such a 
 (qsnap). So the two runners' starts likely differ (whether the rectangle's corner is tied to the origin), not the
 colouring: to check.
 
+## Sheet metal (matrix)
+
+live2's sheetmetal.json (11-13 08:10–08:37, a 60 × 40 sheet metal model with two flanges and a tab). part-studio-ui
+`sm::the_sheet_metal_matrix_matches_live` (T1, no GPU) on the sm-box start, the Sheet metal table and flat view
+panel open, a fresh document per row; cells carry `sm-cell-<table>-<row>-<column>` debug selectors.
+
+**Matched: 9 / 9** (11-13 12:28 UTC; 5 / 7 at the first run). ui-parity: the 11 sm-* scenarios 10 / 11
+(sm-form-tool: live's Form dialog opens on "Circle emboss", ours "Select Part Studio…"; the same on green).
+
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| Bends columns | #, Name, Radius(mm), Angle(deg), Bend direction, K Factor | the same | = |
+| A row click | selects the row (cell) only, nothing in 3D | also selected the bend in 3D; now the row only (the table's highlight still lights it) | = (fixed) |
+| Enter on a selected Radius / K Factor cell | edits it | only a double-click edited; now Enter too (`sm_enter_edits`) | = (fixed) |
+| A Radius edit | adds "Modify joint 1" at the end of the list | the same | = |
+| A bend row's menu | the first row: Move down, Convert Bend A to rip | the same | = |
+| Convert to rip | the row moves to Other joints (Joint A), the flange its own part (Parts (2)) | the same | = |
+| A row hovered | lights its bend in the 3D and flat views | the same | = |
+| Flange | no length arrow, a preview wall | the same | = |
+| The flat view | its own camera: the wheel zooms it alone | the same | = |
+| Not yet in the matrix | the panel's open time (0.9–1.4 s live on a software GPU), the flat view starting from Top and re-fitting, its bend lines (rgb(47,47,47), dashed centre), a flat bend hovered / clicked lighting both views and selecting its row, the Make joint / Corner / Bend relief picks, Tab filling its fields from the sketch | – | – |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).

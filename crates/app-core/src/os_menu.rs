@@ -915,6 +915,11 @@ pub fn is_open_menu(menu: &WeakEntity<OsMenu>, cx: &App) -> bool {
     cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).is_some_and(|(_, _, _, m, _)| m.downgrade() == *menu)
 }
 
+/// The open menu.
+pub fn open_menu(cx: &App) -> Option<Entity<OsMenu>> {
+    cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).map(|(_, _, _, m, _)| m.clone())
+}
+
 /// The open menu's bounds as last drawn (window coordinates).
 pub fn open_bounds(cx: &App) -> Option<Bounds<Pixels>> {
     cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).map(|(_, _, _, m, _)| m.read(cx).bounds.get())

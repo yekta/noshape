@@ -4082,6 +4082,8 @@ mod measure;
 mod nav;
 #[path = "chrome_feel_tests.rs"]
 mod chrome;
+#[path = "sm_feel_tests.rs"]
+mod sm;
 
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.

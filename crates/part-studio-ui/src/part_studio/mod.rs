@@ -7113,7 +7113,7 @@ impl Render for PartStudioView {
                 }
             }))
             .on_action(cx.listener(|this, _: &Accept, window, cx| {
-                if this.accept_view_tool(cx) {
+                if this.accept_view_tool(cx) || this.sm_enter_edits(cx) {
                     return;
                 }
                 if this.ui.section_dialog.is_some() {
