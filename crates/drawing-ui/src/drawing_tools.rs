@@ -1785,6 +1785,7 @@ impl DrawingEditor {
     }
 
     fn select_click(&mut self, pick: Option<u32>, m: Modifiers, cx: &mut Context<Self>) {
+        let armed = std::mem::take(&mut self.copy_armed);
         if self.linestyle_click(cx) || self.hide_edges_click(cx) || self.section_edit_click(cx) || self.replicate_click(cx) {
             return;
         }
@@ -1815,7 +1816,7 @@ impl DrawingEditor {
             return;
         }
         // Onshape: selection is additive with a plain click (clicking a
-        // selected entity again deselects it); clicking empty space clears.
+        // selected entity again deselects it); clicking empty space clears, but not the first click after Ctrl+C.
         match sel {
             Some(s) => {
                 if let Some(i) = self.selection.iter().position(|x| *x == s) {
@@ -1824,6 +1825,7 @@ impl DrawingEditor {
                     self.selection.push(s);
                 }
             }
+            None if armed => {}
             None => self.selection.clear(),
         }
         self.status = None;

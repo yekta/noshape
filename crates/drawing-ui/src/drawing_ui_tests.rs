@@ -312,7 +312,6 @@ fn a_views_vertex_snaps_within_8_px_on_screen(cx: &mut TestAppContext) {
 /// leaves the palette open; a click on the empty sheet leaves it open too; Esc (`cancel`) closes it, the edit kept.
 #[gpui::test]
 fn the_dimension_palette_stays_open_on_enter_and_on_the_empty_sheet(cx: &mut TestAppContext) {
-    use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent};
     SUGGESTED.set(true);
     DIMENSIONED.set(true);
     let (window, editor) = drawing(cx, "palette-open");
@@ -331,19 +330,8 @@ fn the_dimension_palette_stays_open_on_enter_and_on_the_empty_sheet(cx: &mut Tes
     });
     assert!(open, "Enter leaves the palette open");
     assert_eq!(prefix.as_deref(), Some("R"), "Enter made the edit");
-    // A press and release on the sheet's empty top-left corner.
-    let at = cx.update(|cx| {
-        let e = editor.read(cx);
-        let l = e.sheet_to_local([2.0, 2.0]);
-        e.bounds.origin + Point::new(px(l[0] as f32), px(l[1] as f32))
-    });
-    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
-        e.on_mouse_move(&MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }, w, cx);
-        e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false }, w, cx);
-        e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
-    }))
-    .unwrap();
-    draw(cx, window);
+    let empty = empty_sheet_point(cx, window, &editor);
+    click_sheet(cx, window, &editor, empty);
     assert!(cx.update(|cx| editor.read(cx).palette.is_some()), "a click on the empty sheet leaves it open");
     cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
     draw(cx, window);
@@ -353,4 +341,67 @@ fn the_dimension_palette_stays_open_on_enter_and_on_the_empty_sheet(cx: &mut Tes
     });
     assert!(!open, "Esc closes it");
     assert_eq!(prefix.as_deref(), Some("R"), "the edit made with Enter stays");
+}
+
+/// A sheet point (mm) with nothing under the pointer: no view, frame or annotation.
+fn empty_sheet_point(cx: &mut TestAppContext, window: AnyWindowHandle, editor: &Entity<DrawingEditor>) -> [f64; 2] {
+    use gpui_kit::MouseMoveEvent;
+    let (w, h) = cx.update(|cx| editor.read(cx).current_sheet().size.size_mm());
+    let candidates = (1..20).flat_map(|i| (1..20).map(move |j| [w * f64::from(i) / 20.0, h * f64::from(j) / 20.0]));
+    for at in candidates {
+        let empty = cx
+            .update_window(window, |_, win, cx| editor.update(cx, |e, cx| {
+                let l = e.sheet_to_local(at);
+                let pos = e.bounds.origin + Point::new(px(l[0] as f32), px(l[1] as f32));
+                e.on_mouse_move(&MouseMoveEvent { position: pos, pressed_button: None, modifiers: Modifiers::default() }, win, cx);
+                e.hover.is_none()
+            }))
+            .unwrap();
+        if empty {
+            return at;
+        }
+    }
+    panic!("no empty sheet point");
+}
+
+/// A press and release of the left button at sheet point `at` (mm), the pointer moved there first.
+fn click_sheet(cx: &mut TestAppContext, window: AnyWindowHandle, editor: &Entity<DrawingEditor>, at: [f64; 2]) {
+    use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent};
+    let at = cx.update(|cx| {
+        let e = editor.read(cx);
+        let l = e.sheet_to_local(at);
+        e.bounds.origin + Point::new(px(l[0] as f32), px(l[1] as f32))
+    });
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.on_mouse_move(&MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }, w, cx);
+        e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false }, w, cx);
+        e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+}
+
+/// Live2 drw-view-copy-paste-keys: after Ctrl+C the next click on the empty sheet keeps the selection (it marks where
+/// Ctrl+V pastes); a click there after that clears it, as always.
+#[gpui::test]
+fn the_first_click_on_the_empty_sheet_after_a_copy_keeps_the_selection(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "copy-armed");
+    real_sheet(cx, window, &editor);
+    let view = cx.update(|cx| editor.read(cx).current_sheet().views.first().map(|v| v.id)).expect("a view");
+    cx.update(|cx| editor.update(cx, |e, _| e.selection = vec![Sel::View(view)]));
+    cx.update_window(window, |_, w, cx| {
+        let focus = editor.read(cx).focus.clone();
+        w.focus(&focus, cx);
+        w.dispatch_action(Box::new(crate::actions::Copy), cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    let selected = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).selection.clone());
+    let empty = empty_sheet_point(cx, window, &editor);
+    click_sheet(cx, window, &editor, empty);
+    assert_eq!(selected(cx), vec![Sel::View(view)], "the click after Ctrl+C keeps the view");
+    click_sheet(cx, window, &editor, empty);
+    assert!(selected(cx).is_empty(), "the next one clears");
 }

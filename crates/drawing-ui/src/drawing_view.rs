@@ -494,6 +494,9 @@ pub struct DrawingEditor {
     pub replicate_dlg: Option<crate::drawing_replicate::ReplicateDlg>,
     /// The dimension palette / hole callout panel (double-click).
     pub palette: Option<crate::drawing_palette::PaletteDlg>,
+    /// Ctrl+C just copied: the next click on the empty sheet only marks where Ctrl+V pastes, the selection kept (live2
+    /// drw-view-copy-paste-keys).
+    pub copy_armed: bool,
     /// The "±0.1" launcher beside a selected dimension.
     pub launcher: crate::drawing_launcher::Launcher,
     /// The Datum dialog (Datum / Datum target tabs).
@@ -765,6 +768,7 @@ impl DrawingEditor {
             replication: None,
             replicate_dlg: None,
             palette: None,
+            copy_armed: false,
             launcher: Default::default(),
             datum_dlg: None,
             styles_gap: [None, None, None],
@@ -2064,7 +2068,8 @@ impl DrawingEditor {
             .on_action(cx.listener(|this, _: &DeleteSelection, _, cx| this.delete_selection(cx)))
             .on_action(cx.listener(|this, _: &Copy, _, cx| {
                 if !this.copy_cells(cx) && !this.copy_labels(cx) {
-                    this.copy_views(None, cx)
+                    this.copy_views(None, cx);
+                    this.copy_armed = !this.selection.is_empty();
                 }
             }))
             .on_action(cx.listener(|this, _: &ZoomWindow, _, cx| this.start_zoom_window(cx)))
