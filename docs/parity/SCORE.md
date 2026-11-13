@@ -148,6 +148,37 @@ mirror-face-type (a live DOM detail).
 | 2026-11-12 | e3552a6d (19:57 run; speed from the 02:00 vibe5 window, load 2–8, median 5.7: someone's build ran there; vs 96359491b: assembly results 73.1 -> 84.6 % (dx's suite placing subassembly instances and configurations, 1266 -> 1465 occurrences), speed 87.7 -> 91.8 %, geometry 86.7 -> 87.2 %, versions / documents / drawing interaction up) | 93.0 | 87.2 | 98.1 | 84.6 | 96.6 | 95.1 | 100.0 | 92.7 | 91.8 | 97.1 | 97.9 | 96.8 | 96.6 |
 | 2026-11-13 | 91a90caf (**speed on vibe7 from here: a new baseline**, the 02:00 window, load 0.9–1.9; models and speed from it, debug as the suite; the other areas from the 11-12 15:57 run, 52121e8b. Side by side in the same window: v0.4.46 (e06b09c83) 93.7, speed 91.2 % (77 of 97), geometry 89.5; release builds: head 92.0 %, v0.4.46 91.7 %, 81 of 97 each) | 93.8 | 90.0 | 96.4 | 85.8 | 96.8 | 95.1 | 100.0 | 92.7 | 91.4 | 97.8 | 99.2 | 98.2 | 98.4 |
 
+## Speed window (qa, 02:00–04:00 UTC; vibe7 from 2026-11-13, a new baseline; docs/parity/INDEX.md "Scoring changes")
+
+2026-11-13, vibe7 load 0.1–1.9, nothing else running; v0.4.46 (e06b09c83) and main's head (91a90caf) built there, run back to back.
+
+| user document, tab | cold open v0.4.46 | cold open head | reopen v0.4.46 | reopen head |
+|---|---|---|---|---|
+| hat8, Mac mini hat (137 features) | 4.49 s | 4.45 s | 0.27 s | 0.28 s |
+| hat8, Mac-mini-2024 | 0.46 s | 0.46 s | 0.23 s | 0.22 s |
+| hat15, Mac mini hat (140 features) | 4.42 s | 4.44 s | 0.27 s | 0.28 s |
+| hat15, Mac-mini-2024 | 0.47 s | 0.46 s | 0.23 s | 0.24 s |
+
+Medians of 3, each a CLI `feature list` of the tab on a fresh copy; cold: an empty result store, reopen: the same store.
+
+| model suite, documents faster than live (our regeneration vs live's) | v0.4.46 | head |
+|---|---|---|
+| debug (the suite's build) | 64 / 84 | 65 / 84 |
+| release | 68 / 84 | 68 / 84 |
+
+| furthest behind live (head, debug) | head | live | head / live | v0.4.46 |
+|---|---|---|---|---|
+| c2-impeller-loft | 12750 ms | 2773 ms | 4.6 | 13357 ms |
+| c2-rings-loft | 2934 ms | 1557 ms | 1.9 | 3608 ms |
+| c2-hunting-knife | 1189 ms | 408 ms | 2.9 | 1212 ms |
+| cf-part-draft | 1848 ms | 1241 ms | 1.5 | 1849 ms |
+| cf-snap-hook | 755 ms | 274 ms | 2.8 | 781 ms |
+| cf-surface-pattern | 4656 ms | 4178 ms | 1.1 | 4526 ms |
+| c2-sm-louver | 5327 ms | 4987 ms | 1.1 | 5270 ms |
+| c2-variable-fillet-faceblend | 390 ms | 58 ms | 6.7 | 384 ms |
+| c2-valve-config | 479 ms | 175 ms | 2.7 | 478 ms |
+| c2-sm-corner-break | 2261 ms | 1972 ms | 1.1 | 2352 ms |
+
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
 Of the recorded Booleans (each distinct call once), the share noshape's own Boolean takes instead of OCCT, by count and
