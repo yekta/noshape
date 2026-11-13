@@ -328,7 +328,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                                 if smooth.get(ei).copied().unwrap_or(false) {
                                     phantom.push_polyline(pl, [0, 0, 0, 255], 0, 1.0, LineSegment::DASH_DOT);
                                 } else {
-                                    sharp.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.25, LineSegment::NO_HOLD);
+                                    sharp.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, noshape_render::scene::PART_EDGE_WIDTH, LineSegment::NO_HOLD);
                                 }
                             }
                             let h = (up.upload_lines(&sharp), up.upload_lines(&phantom));
@@ -437,7 +437,7 @@ fn upload_body(m: &MeshBuffers, up: &Uploader) -> CachedBody {
     let mut lines = LineData::default();
     for (ei, pl) in m.edges.iter().enumerate() {
         // (Hovered, an assembly's edge holds nothing further off: live/feel/3d.json lights it at 6 px, lit to 6.)
-        lines.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.25, LineSegment::NO_HOLD);
+        lines.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, noshape_render::scene::PART_EDGE_WIDTH, LineSegment::NO_HOLD);
     }
     let points = PointData {
         points: m.vertices.iter().enumerate().map(|(i, p)| PointSprite { position: *p, color: [255; 4], pick_id: i as u32 + 1, size: 6.0, style: 0, _pad: 0 }).collect(),

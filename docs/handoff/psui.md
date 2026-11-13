@@ -54,8 +54,8 @@ and snapped). Next: look.json, then live2's batches (sheet metal, sketch tools, 
 part's #ffc04c in linear). First difference, measured (`/root/psui-scratch/chrome/ink.py`: ink across an edge per
 column, corrected for its slope): live's part edges (1 px) carry ~0.84 px of ink at DPR 1 and never reach black (darkest
 L ~60, live/feel/look/part-studio-iso.png); ours ~1.2 px, solid black (`EDGE_WIDTH` 1.25 in shaders.wgsl and the
-builder's 1.25 px polylines); inactive sketches 1.5 px vs live 1 px. Next: find the width giving live's ink at DPR 1
-(and check DPR 2 on the Mac), then the look matrix (scene / render T1 rows: colours, widths, glyph 20 px tiles,
+builder's 1.25 px polylines); inactive sketches 1.5 px vs live 1 px. 11:50: edges at live's 1 px
+(`PART_EDGE_WIDTH`, silhouettes 1.2 ×, inactive sketches 1 px; interaction-feel.md "Look"). Next: the look matrix (scene / render T1 rows: colours, widths, glyph 20 px tiles,
 dimension arrows 16 × 8, value 18 px, mate connector 36 px).
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own

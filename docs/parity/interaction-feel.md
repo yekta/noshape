@@ -292,6 +292,22 @@ outside its map (its "client side entries").
 | Select other place | pointer + (100, 51) | the same | = |
 | Not yet in the matrix | tooltip fade-in / fade-out; tooltips closing on click, wheel, drag; toolbar dropdowns (click only, below the toolbar at the group's left, stay open, Esc); context menus (pointer + (0, 2) in the graphics, + (10, 12) on list rows, flip at the right / bottom edge, submenus on hover); the list's width remembered per tab (ours: one for all); feature dialogs sharing one stored layout; Select other's 220 px dialog, 24 px rows, "(No selections found)" 83 px | – | – |
 
+## Look (in progress)
+
+live2's look.json (11-13 07:34–07:47, light theme, DPR 1; constants in live/feel/client-constants-raw.json). Ink is
+measured as darkness summed down a pixel column through a line against the darker surface beside it, times its slope
+(/root/psui-scratch/chrome/ink.py on screenshots; render `edge_ink` offscreen).
+
+| Row | Live | Ours | Status | Test |
+|---|---|---|---|---|
+| Part edges | 1 px (DEFAULT_LINE_WIDTH), ~0.84 px of ink at 1×, never solid black (darkest L ~60) | 1.25 px, ~1.15–1.2 px of ink, solid black; now 1 px (`PART_EDGE_WIDTH`), 0.81 offscreen, 0.85–1.0 in the app | = (fixed) | render `part_edges_carry_lives_ink` |
+| Back-face silhouettes | 1.2 × the edge width (BACKFACE_SILHOUETTE_WIDTH_FACTOR) | 1.25 px; now 1.2 × | = (fixed) | scene `cylinder_sides_show_silhouettes` |
+| Inactive sketch lines | 1 px | 1.5 px; now 1 px (the inactive line width preference) | = (fixed) | – |
+| Highlight colours | hover #ffc685, selected #ffa90a, selected part #ffc04c, secondary #f2ff80, error #bd3039 | the same (scene `palette.rs`; the selected part's in shaders.wgsl, linear) | = | scene `edge_and_face_highlights_look_as_live` (hover / selected) |
+| Sketch colours | under #0000d0, fully #000, over #cd0000, inactive #999, region #9aa5af at 0.2 | the same (`palette.rs`) | = | – |
+| Planes, origin, axes | fill #cedbe5 0.2, outline #1d60aa 0.35, text #1651b0; origin #000; X #cd0000, Y #009400, Z #0000d0 | the same | = | – |
+| Not yet compared | related part (#ffcd70 0.5 / 0.8), filtered-out (#ff1d05), in-context (#d403f9), edges through geometry rgb(64,64,64), the sketch preview rgb(68,156,205), constraint glyph tiles (20 px, 2 px apart, 20 px off the entity), dimensions (Flama 18 px, arrows 16 × 8, witness lines 7 / 4 px), mate connectors (36 px, axes 12 / 20 px), section caps | – | – | – |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).

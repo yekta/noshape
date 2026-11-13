@@ -153,7 +153,7 @@ fn mix(over: [u8; 3], under: [u8; 3], alpha: f32) -> [u8; 3] {
 /// edge is a 5 CSS px band in one colour (#FFC685 / #FFA90A), its rim opaque and its core at 78 % over the scene (the
 /// plain edge darkening the middle), with no dark outline and nothing changed outside it; hovered + selected looks
 /// like selected; a hovered face keeps its colour and its boundary is a ~2 device px #FFC685 line; a selected face
-/// is lit orange with a #FFA90A boundary; a plain edge is a 1 CSS px near-black line.
+/// is lit orange with a #FFA90A boundary; a plain edge is a 1 CSS px dark line.
 #[test]
 fn edge_and_face_highlights_look_as_live() {
     const HOVER: [u8; 3] = [0xFF, 0xC6, 0x85];
@@ -166,9 +166,10 @@ fn edge_and_face_highlights_look_as_live() {
         let rest = get("rest");
         let (top, side) = (rest[0], rest[rest.len() - 1]);
         let show = |c: &[[u8; 3]]| c.iter().map(|&x| hex(x)).collect::<Vec<_>>().join(" ");
-        // The plain edge: near-black at its middle, about 1 CSS px.
+        // The plain edge: dark at its middle, about 1 CSS px (live look.json: at 1× its darkest pixel ~L 60, it
+        // straddles two rows).
         let dark = rest.iter().filter(|c| c.iter().all(|&v| v < 0x60)).count();
-        assert!(rest.iter().any(|c| c.iter().all(|&v| v < 0x24)) && dark <= k + 1, "{dpr}x plain edge: {}", show(&rest));
+        assert!(rest.iter().any(|c| c.iter().all(|&v| v < 0x48)) && dark <= k + 1, "{dpr}x plain edge: {}", show(&rest));
         for (name, colour) in [("edge hovered", HOVER), ("edge selected", SELECT)] {
             let col = get(name);
             // The band: the rows that differ from the plain render.

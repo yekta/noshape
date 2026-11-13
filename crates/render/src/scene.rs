@@ -47,6 +47,10 @@ pub struct LineSegment {
     pub style: u32,
 }
 
+/// A part's edges, logical px (live feel/look.json: DEFAULT_LINE_WIDTH 1, ~0.84 px of ink at a pixel ratio of 1;
+/// 1.25 drew ~1.15 and solid black).
+pub const PART_EDGE_WIDTH: f32 = 1.0;
+
 impl LineSegment {
     pub const DASHED: u32 = 1;
     pub const ON_TOP: u32 = 2;
@@ -812,7 +816,7 @@ pub fn edge_line_lods(edges: &[Vec<[f32; 3]>], diagonal: f32) -> Vec<LineData> {
         .map(|t| {
             let mut l = LineData::default();
             for (ei, pl) in edges.iter().enumerate() {
-                l.push_polyline(&simplify_polyline(pl, t * diagonal), [0, 0, 0, 255], ei as u32 + 1, 1.25, LineSegment::CORE);
+                l.push_polyline(&simplify_polyline(pl, t * diagonal), [0, 0, 0, 255], ei as u32 + 1, PART_EDGE_WIDTH, LineSegment::CORE);
             }
             l
         })

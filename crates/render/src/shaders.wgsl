@@ -45,8 +45,10 @@ fn load_inst(slot: u32) {
     inst = insts[slots[slot]];
 }
 
-// The part edges' width in logical px (scene builder `push_polyline` 1.25).
-const EDGE_WIDTH: f32 = 1.25;
+// The part edges' width in logical px (`PART_EDGE_WIDTH`; live's DEFAULT_LINE_WIDTH 1: ~0.84 px of ink at DPR 1).
+const EDGE_WIDTH: f32 = 1.0;
+// Live's BACKFACE_SILHOUETTE_WIDTH_FACTOR (feel/look.json): back-face silhouettes 1.2 × the edge width.
+const BACKFACE_SILHOUETTE_WIDTH_FACTOR: f32 = 1.2;
 const HOVER: u32 = 1u;
 const SELECTED: u32 = 2u;
 const BODY: u32 = 256u;
@@ -425,9 +427,9 @@ fn vs_backsil(v: MeshIn, @builtin(instance_index) slot: u32) -> BackSilOut {
     let half_vp = g.viewport.xy * 0.5;
     let vel = (dn.xy - p.xy / p.w * dn.w) / p.w * half_vp;
     let len = length(vel);
-    // The part's edge width (EDGE_WIDTH × the line width preference): half of it out, less where the face turns
-    // straight away.
-    let width = EDGE_WIDTH * inst.extra.x;
+    // The part's silhouette width (EDGE_WIDTH × live's factor × the line width preference): half of it out, less
+    // where the face turns straight away.
+    let width = EDGE_WIDTH * BACKFACE_SILHOUETTE_WIDTH_FACTOR * inst.extra.x;
     let push = 0.5 * g.viewport.z * width * (1.0 - abs(ndv));
     var o: BackSilOut;
     o.pos = p;
@@ -935,7 +937,8 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     let lit = (st & (HOVER | SELECTED | ERROR)) != 0u;
     // From at most a part edge's width: a 2 px sketch line highlights like
     // an edge (live sketch/21, 22: the same 5 rows as selection/06b).
-    if (lit) { width = (min(l.width, 1.25) * inst.extra.x + g.viewport.w) * 1.8 + 2.2; }
+    // (The band as measured against live with 1.25 px edges, whatever the line's own width.)
+    if (lit) { width = (1.25 * inst.extra.x + g.viewport.w) * 1.8 + 2.2; }
     // Live (EDGE-HIGHLIGHT-LOOK): a hovered or selected face's boundary is an opaque line 2 device px wide at any
     // pixel ratio; a part edge hovered or selected itself a 5 CSS px band (fs_line).
     let face_band = lit && (st & OUTLINE) != 0u;

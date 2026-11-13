@@ -2817,3 +2817,67 @@ fn the_3d_pick_matrix_matches_live() {
     eprintln!("3D pick matrix: {matched} / {} rows match live\n{}", rows.len(), report.join("\n"));
     assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md \"3D\" and the row's gap): {moved:?}");
 }
+
+/// The ink across a part's edge at a device pixel ratio of 1, in px (darkness summed down a pixel column through the
+/// edge, against the darker surface beside it, times the edge's slope): live/feel/look.json's 1 px edges carry ~0.84
+/// (live/feel/look/part-studio-iso.png, never reaching black). Median over the block's visible edges.
+fn edge_ink(r: &mut Renderer, width: f32) -> f64 {
+    let (lo, hi) = ([0.0f32, 0.0, 0.0], [0.04f32, 0.03, 0.01]);
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh(lo, hi, 1)))).with_color(srgb(0x9a, 0xb4, 0xcc)));
+    let mut lines = LineData::default();
+    let corner = |i: u32| [if i & 1 == 0 { lo[0] } else { hi[0] }, if i & 2 == 0 { lo[1] } else { hi[1] }, if i & 4 == 0 { lo[2] } else { hi[2] }];
+    let pairs = [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)];
+    for (k, (a, b)) in pairs.iter().enumerate() {
+        lines.push_polyline(&[corner(*a), corner(*b)], [0, 0, 0, 255], 10 + k as u32, width, LineSegment::CORE);
+    }
+    scene.instances.push(Instance::new(Drawable::Lines(r.upload_lines(&lines))).per_primitive_color().layer(1));
+    let mut cam = Camera::default();
+    cam.set_view(noshape_render::StandardView::Isometric);
+    let (w, h) = (900u32, 600u32);
+    cam.fit_box(glam::Vec3::from(lo).as_dvec3(), glam::Vec3::from(hi).as_dvec3(), w as f64 / h as f64);
+    cam.distance *= 1.6;
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+    let lum = |x: i64, y: i64| {
+        let px = &f.bgra[((y as u32 * w + x as u32) * 4) as usize..][..3];
+        0.0722 * px[0] as f64 + 0.7152 * px[1] as f64 + 0.2126 * px[2] as f64
+    };
+    let vp = glam::DVec2::new(w as f64, h as f64);
+    let radius = (scene.bounds().map(|(a, b)| (b - a).length() * 0.5).unwrap_or(1.0)) as f64;
+    let c3 = |i: u32| glam::Vec3::from(corner(i)).as_dvec3();
+    let mut inks = Vec::new();
+    // The iso view's visible edges: the top face's four and the three verticals in front.
+    for (a, b) in [(4, 5), (6, 7), (4, 6), (5, 7), (1, 5), (2, 6), (3, 7)] {
+        let (sa, sb) = (cam.project(c3(a), vp, radius).unwrap(), cam.project(c3(b), vp, radius).unwrap());
+        let d = (sb - sa).normalize();
+        if d.x.abs() < 0.3 {
+            continue;
+        }
+        for k in 8..32 {
+            let s = sa.lerp(sb, k as f64 / 40.0);
+            let (x, y0) = (s.x.floor() as i64, s.y.round() as i64);
+            let col: Vec<f64> = (y0 - 8..=y0 + 8).map(|y| lum(x, y)).collect();
+            let m = (5..12).min_by(|i, j| col[*i].total_cmp(&col[*j])).unwrap();
+            let refl = ((col[m - 5] + col[m - 4]) * 0.5).min((col[m + 4] + col[m + 5]) * 0.5);
+            let ink: f64 = (m - 2..=m + 2).map(|i| ((refl - col[i]) / refl).clamp(0.0, 1.0)).sum();
+            inks.push(ink * d.x.abs());
+        }
+    }
+    inks.sort_by(f64::total_cmp);
+    inks[inks.len() / 2]
+}
+
+/// look.json: a part's edges carry live's ink (~0.84 px at a pixel ratio of 1; 1.25 px edges drew ~1.15).
+#[test]
+fn part_edges_carry_lives_ink() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let ink = edge_ink(&mut r, PART_EDGE_WIDTH);
+    assert!((ink - 0.84).abs() <= 0.1, "a part edge's ink: ours {ink:.2} px, live 0.84");
+}

@@ -714,7 +714,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                             if smooth.get(ei).copied().unwrap_or(false) {
                                 phantom.push_polyline(pl, [0, 0, 0, 255], 0, 1.0, LineSegment::DASH_DOT);
                             } else {
-                                sharp.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.25, 0);
+                                sharp.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, noshape_render::scene::PART_EDGE_WIDTH, 0);
                             }
                         }
                         let t = TangentLines { sharp: up.upload_lines(&sharp), phantom: up.upload_lines(&phantom) };
@@ -988,7 +988,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // (A handle arm on top: it runs along its spline from the end, and under it it couldn't be picked.)
                 let style = LineSegment::CORE | if c.handle { LineSegment::ON_TOP } else if c.construction { LineSegment::CONSTRUCTION } else { 0 };
                 // Graphics preferences: active 2 px, inactive 1 px by default.
-                let width = if c.handle { 1.0 } else if editing { opts.graphics.sketch_line_width } else { 1.5 * opts.graphics.inactive_line_width };
+                let width = if c.handle { 1.0 } else if editing { opts.graphics.sketch_line_width } else { opts.graphics.inactive_line_width };
                 lines.push_polyline(&c.points, color, id, width, style);
             }
             let mut points = PointData::default();
@@ -1274,7 +1274,7 @@ pub fn edge_lods(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Vec<
 /// Onshape's edge-based silhouettes: every tessellation edge inside a face
 /// (shared by two of its triangles) whose two facets aren't coplanar, with
 /// both facet normals; the renderer draws the ones where one facet faces
-/// the viewer and the other doesn't, like the part's edges (1.25 px).
+/// the viewer and the other doesn't, like the part's edges (`PART_EDGE_WIDTH`).
 pub fn silhouette_edges(m: &noshape_model::display::MeshBuffers) -> SilhouetteData {
     let mut out = SilhouetteData::default();
     let p = |i: u32| glam::Vec3::from_array(m.positions[i as usize]);
@@ -1294,7 +1294,7 @@ pub fn silhouette_edges(m: &noshape_model::display::MeshBuffers) -> SilhouetteDa
             for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
                 let key = (a.min(b), a.max(b));
                 match open.remove(&key) {
-                    Some(other) if other.dot(n) < 1.0 - 1e-6 => out.segments.push(SilhouetteSegment { a: m.positions[a as usize], b: m.positions[b as usize], n1: other.into(), n2: n.into(), pick_id: fi as u32 + 1, width: 1.25 }),
+                    Some(other) if other.dot(n) < 1.0 - 1e-6 => out.segments.push(SilhouetteSegment { a: m.positions[a as usize], b: m.positions[b as usize], n1: other.into(), n2: n.into(), pick_id: fi as u32 + 1, width: noshape_render::scene::PART_EDGE_WIDTH }),
                     Some(_) => {}
                     None => {
                         open.insert(key, n);
