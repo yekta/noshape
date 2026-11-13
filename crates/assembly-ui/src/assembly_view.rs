@@ -227,13 +227,13 @@ struct SnapDrag {
 
 /// Text colour of a Mate features row: suppressed / inactive and hidden
 /// rows grey (live qa5 asm-056: hidden mates in #999, icons dimmed),
-/// failing ones red.
+/// failing ones in the list's error red (live2 fields.json mateList.error: rgb(170,37,45), as a failed feature row).
 fn feature_row_color(inactive: bool, ok: bool, hidden: bool) -> Rgba {
     let pal = p();
     if inactive {
         pal.text_faint
     } else if !ok {
-        pal.error
+        pal.text_invalid
     } else if hidden {
         pal.text_faint
     } else {
@@ -3963,11 +3963,22 @@ impl AssemblyView {
                 .into_any_element();
         }
         // Drag and drop: reorder (drives BOM order), joining the target's folder.
-        let accent = pal.accent;
         let row = row
-            .on_drag(behaviors::InstanceDrag { id: top, label: name.clone().into() }, |d, _, _, cx| cx.new(|_| d.clone()))
-            .drag_over::<behaviors::InstanceDrag>(move |st, _, _, _| st.border_t_2().border_color(accent))
+            .relative()
+            .on_drag(behaviors::InstanceDrag { id: top, label: name.clone().into(), offset: Point::default() }, |d, offset, _, cx| cx.new(|_| behaviors::InstanceDrag { offset, ..d.clone() }))
+            .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<behaviors::InstanceDrag>, _, cx| {
+                let over = e.bounds.contains(&e.event.position);
+                if over && this.ui.list_drop != Some(top) {
+                    this.ui.list_drop = Some(top);
+                    cx.notify();
+                } else if !over && this.ui.list_drop == Some(top) {
+                    this.ui.list_drop = None;
+                    cx.notify();
+                }
+            }))
+            .when(self.ui.list_drop == Some(top) && cx.has_active_drag(), |d| d.child(behaviors::list_drop_line()))
             .on_drop(cx.listener(move |this, d: &behaviors::InstanceDrag, _, cx| {
+                this.ui.list_drop = None;
                 if d.id == top {
                     return;
                 }
@@ -6983,7 +6994,8 @@ mod tests {
         let pal = p();
         assert_eq!(feature_row_color(false, true, true), pal.text_faint);
         assert_eq!(feature_row_color(false, true, false), pal.text);
-        assert_eq!(feature_row_color(false, false, true), pal.error);
+        assert_eq!(feature_row_color(false, false, true), pal.text_invalid);
+        assert_eq!(pal.text_invalid, gpui_kit::rgb(0xaa252d));
         assert_eq!(pal.text_faint, gpui_kit::rgb(0x999999));
     }
 }

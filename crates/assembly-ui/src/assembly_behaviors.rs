@@ -74,18 +74,30 @@ pub fn fill_menu(m: OsMenu, entries: Vec<MenuEntry>, view: Entity<AssemblyView>,
     m
 }
 
-/// Instance row being dragged in the list.
+/// Instance row being dragged in the list; `offset` the pointer's in the row.
 #[derive(Clone)]
 pub struct InstanceDrag {
     pub id: InstanceId,
     pub label: SharedString,
+    pub offset: Point<Pixels>,
 }
 
+/// The list's drop marks (live2 fields.json drag, as6-drag-hover.png): dark blue.
+pub const LIST_DROP: u32 = 0x1651b0;
+
 impl Render for InstanceDrag {
+    /// Live2 (as6-drag-hover.png): a dark-blue pill with the name in white bold, below and right of the pointer.
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let pal = p();
-        div().px_2().py_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.accent).text_sm().text_color(pal.text).child(crate::ui::user_text(self.label.clone()))
+        div().pl(self.offset.x + px(30.)).pt(self.offset.y + px(8.)).child(
+            div().px(px(12.)).h(px(24.)).flex().items_center().rounded_full().bg(rgb(LIST_DROP)).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child(crate::ui::user_text(self.label.clone())),
+        )
     }
+}
+
+/// The insertion line where a dragged row lands: 2 px, a ring at its left end (live2 as6-drag-hover.png).
+pub fn list_drop_line() -> AnyElement {
+    let ring = div().absolute().left(px(-1.)).top(px(-3.)).size(px(8.)).rounded_full().border_1().border_color(rgb(LIST_DROP)).bg(rgb(0xffffff));
+    div().absolute().left_0().right_0().top(px(-1.)).h(px(2.)).bg(rgb(LIST_DROP)).child(ring).into_any_element()
 }
 
 /// Mate feature row being dragged in the list (reorder).
@@ -257,6 +269,8 @@ pub struct AsmUi {
     pub filter_focused: bool,
     /// Instance row under the cursor in the list (highlighted in the viewport).
     pub list_hover: Option<InstanceId>,
+    /// The instance row a dragged row would land above (its insertion line).
+    pub list_drop: Option<InstanceId>,
     /// The instances of the explode step row under the pointer (outlined orange, live2 asm-views.json activate).
     pub step_hover: Vec<InstanceId>,
     /// Last clicked instance row: the anchor of Shift+click ranges.

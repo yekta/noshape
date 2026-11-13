@@ -143,6 +143,108 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | FS editor navigation keys | Ctrl+K / Ctrl+Shift+K (Mac Cmd+G), Ctrl+\\, Alt+E / Alt+Shift+E (Mac F4) | the same | `find_next_and_previous_wrap`, `ctrl_backslash_jumps_to_the_matching_bracket`, the keystroke test | = |
 | FS autocomplete | keywords and snippets at the top level, std inside a function; opens 250–500 ms after a letter | the same lists; opens on the keystroke | fs_complete tests | timing asked (REQUESTS 12:58) |
 
+## Assembly (studios, from 2026-11-13)
+
+Live: live/feel/mates.json, asm-views.json, fields.json `assemblyInstanceList`, 3d.json `assembly` (live and live2,
+11-13). The UI is studios'; asm keeps the mate solver and landed the ring snap, the ▶ preview, Insert's Esc / ✓ and the
+drag thresholds (their commits below). Menus leave out "Add comment" (comments are cloud). Counts are matched / total
+per matrix (17:18 UTC): **mates 23 / 28, views 13 / 15, instance list 16 / 22, 3D 7 / 10**.
+
+### Mate dialog, mate list, Insert (mates.json): 23 / 28
+
+| Item | Live | Ours (where) | Test | Status |
+|---|---|---|---|---|
+| M | a new mate dialog, type Fastened, focus in Mate connectors | the same (`FastenMate`, `start_mate`) | ui-parity asm-m-fastened-escape | = |
+| A / Q | flip primary axis / reorient secondary 90° | the same (`flip`, `reorient`) | ui-parity asm-revolute-pin-hole-flip | = |
+| I / J / H / K | Insert / hide-show mates / Show mates mode / hide-show connectors | the same (actions.rs) | ui-parity asm-h-key-show-mates-mode, asm-j-shows-mates, asm-i-key-insert-escape | = |
+| Ctrl+M / Shift+S | Mate connector / Snap mode | the same | – | = |
+| Dialog on open | 220 px at the graphics' top left, "Fastened 1", the row in the list at once, red | the same (`assembly_mate_dialog`) | ui-parity asm-m-fastened-escape | = |
+| Fields | type ▾; Mate connectors with Reorder items; chips "… (Click to edit)" ×; Offset; Simulation connection; Flip / Reorient / ▶ / Solve | the same | – | = |
+| Type order | Slider, Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened, Parallel | the same (`MATE_TYPE_ORDER`) | – | = |
+| Which part moves | the first pick's part moves onto the second; a fixed part never | the same (`new_mate_stays`) | `a_mate_gets_its_heads_up_check_after_the_second_pick` | = |
+| After the second pick | the part jumps to its mated place, no animation | the same | – | = |
+| Mate axes | X/Y/Z 50 px at the connector (screen size) | 6 % of the model's size (world size) | – | ≠ |
+| Floating toolbar | grip, type, flip, reorient, Solve, ✓, ✗ | the same (`render_mate_hud`) | ui-parity asm-fastened-two-faces | = |
+| Toolbar's place | beside the connector (live2's shot: ~10 px right, 10 px below it) | centred over the second pick, bottom on it (dom/mate-hud.txt) | – | ? (the shot doesn't show the pick) |
+| Type switch | connectors, Offset, flip and reorient kept; the name follows the type; offset fields follow it | the same (`set_type`, `offset_axes`) | – | = |
+| Connector chip | Click to edit: the Mate connector sub-dialog beside (Realign adds the axis fields) | the same | – | = |
+| ▶ preview | 90 frames out and back from the mate's zero (a turn, ¼ of the view's width) | the same (asm 43736c55, e9941770) | asm's tests | = |
+| Mate row hover | both parts outlined, the marker, a flyout with the name and parameters | the same (`list_hover_mate`, `mate_tooltip`) | – | = |
+| Mate menu | Rename … Delete | the same | `two_selected_mates_have_lives_menu`, ui-parity | = |
+| Animate… | … Playback type Reciprocate with a loop toggle | a "Reverse" toggle there | – | ≠ |
+| Named positions, empty | the how-to text and its help link, Add named position | the same (17:18) | – | = |
+| Insert dialog | tabs, Part Studios / Assemblies, search, "Undo to remove instances", "Inserted: N" | the same | ui-parity asm-insert-* | = |
+| Insert preview | the instance follows the pointer, solid orange; a click drops it | the same | – | = |
+| Insert preview's hidden edges | outlined orange through other parts | not compared yet | – | ? |
+| Insert Esc, pending | drops only the instance on the pointer, keeps the dialog | the same (asm e9941770) | asm-insert-esc-pending (live take asked) | = |
+| Insert Esc, none pending | closes and removes the session's instances | the same (`cancel_insert`) | – | = |
+| Insert ✓ | keeps all, the pending one at identity; one undo step | the same (asm e9941770) | asm-insert-ok-pending (live take asked) | = |
+| Ring snap | 5° / 1° / 0.1° by the arc at the pointer's radius ≤ 50 px, within 0.4 × (1 + level/3) of a step | the same (asm 641ab465, `ring_snap`) | asm's tests | = |
+| Snap mode ghost | the source part at 0.3 opacity | the same (17:18) | – | = |
+| Snap mode lines | inference lines rgb(255,194,14) dashed 4-4, 8 px point box | none | – | ≠ |
+
+### Exploded, section and named views (asm-views.json): 13 / 15
+
+| Item | Live | Ours (where) | Test | Status |
+|---|---|---|---|---|
+| Exploded views panel | 3rd of the strip; empty: Add exploded view, illustration, how-to, help link | the same (Simulation left out: cloud) | ui-parity asm-explode-panel, asm-explode-add-view | = |
+| Add exploded view | "Explode 1" in edit mode: yellow "Editing Explode 1 / Done", toolbar only undo/redo, the blue how-to, the rollback bar | the same | – | = |
+| Selecting an instance | orange outline through other parts, a triad (3 arrows, 3 rings, centre) | the triad; the outline's see-through not compared | – | ? |
+| Arrow drag | moves live, no value box; on release the Explode step dialog; only that arrow stays | the same | – | = |
+| Ring drag | a Rotation step, 5° steps, Specify axis | the same (`ring_snap`, 17:18; was 1°) | `explode_drag_values_round` | = |
+| ✓ / Esc on the step | keeps / removes the step | the same | – | = |
+| Done | back to mated positions, toolbar back | the same | – | = |
+| Row click | selects (blue), tooltip with its name, no explode | the same (17:18: the tooltip) | – | = |
+| Row menus | collapsed: Activate, Rename, Reset starting position, Duplicate, Delete; active: Collapse, Rename, Show / Hide all explode lines, Delete | the same | ui-parity asm-explode-row-menu, -row-menu-editing | = |
+| Activate | the exploded state, editing again; a hovered step row outlines its instances | the same (17:18: the outline, `step_hover`) | – | = |
+| Camera menu | Isometric … Section view… | the same (camera_menu.rs) | – | = |
+| Section view… | "Section plane 1 (Front)" already in; Exclude / Include; Items to exclude | the same (17:18: the Front plane) | – | = |
+| Section: a face click | keeps Front, the manipulator on the face | adds the face's plane | – | ? (re-check asked) |
+| Section Esc | cancels | the same | – | = |
+| Named views | New view name + "+", No views created, Select a view + ⊗ | the same (named_views_dialog.rs) | – | = |
+
+### Instance list (fields.json): 16 / 22
+
+| Item | Live | Ours (where) | Test | Status |
+|---|---|---|---|---|
+| Hovered row | light blue, an eye at the right end | the same | – | = |
+| Row tooltip | ~70 ms | 400 ms (the app's Bootstrap delay, chrome.json) | – | ≠ |
+| 3D highlight on hover | ~0.85 s after the pointer arrives | at once | – | ? (live2's software-GL machine, as psui's sketch hover) |
+| Plain click | toggles the row | the same (`list_click`) | ui-parity asm-select-mate-row | = |
+| Ctrl+click | nothing | opens the row's menu (behaviours "skb (10-24)" (3), Linux Chrome) | – | ? (captures disagree; asked) |
+| Shift+click | the range from the last clicked row, added; after a deselecting click from the top row | the same (17:18: the top row) | – | = |
+| Esc / empty graphics | Esc keeps the selection; an empty graphics click clears | the same | – | = |
+| Double-click an instance | its Part Studio, the part selected, "<assembly> displayed" bar | the same (17:18, `show_in_context`) | – | = |
+| Rename | none for instances; Instance properties… (Reference designator) | the same | ui-parity asm-menu-instance-properties | = |
+| One instance's menu | Properties… … Delete | the same | `the_instance_and_top_row_menus_are_lives` | = |
+| Two instances' menu | … Dynamic suppression ▸, Check interference… \| Show / Hide mates, Replace instances…, … Clear selection, Delete | the same (17:18) | `two_selected_instances_have_lives_list_menu` | = |
+| Mate menu / folder menu | Rename … Delete; Rename … Unpack folder | the same | ui-parity asm-menu-* | = |
+| Mixed selection menu | the reduced menu | not compared | – | – |
+| Right-click an unselected row | acts on that row without selecting it | joins the selection (behaviours "audit 1943" (2): "Copy 2 items") | – | ? (captures disagree; asked) |
+| Add selection to folder… | the folder at once, its name in inline rename | a "Folder name" panel first, as live's asm-menu-add-selection-to-folder take reads it | ui-parity asm-menu-add-selection-to-folder | ? |
+| Folders | collapsed; double-click does nothing; one Ctrl+Z | the same | ui-parity asm-menu-unpack-folder | = |
+| Row drag look | a blue pill with the name; a blue line with a ring at its left end | the same (17:30, `InstanceDrag`, `list_drop_line`, as the Tab manager's) | – | = |
+| Row drop | reorders, one undo step | the same ("Reorder instances") | – | = |
+| Hidden mate | grey name and icon | the same | `hidden_mate_rows_are_grey` | = |
+| Suppressed mate | grey italic struck through; "Fastened 1 (Suppressed)" | the same (17:18: the tooltip) | – | = |
+| Failed mate's colour | rgb(170,37,45) | the same (17:18; was #bd3039) | `hidden_mate_rows_are_grey` | = |
+| Failed mate's marks | red "!" on the icon, "Fastened 1 has error: …", red Mate features icon and root overlay, ⚠ on the fixed instances | the same | – | = |
+
+### 3D in an assembly (3d.json `assembly`): 7 / 10
+
+| Item | Live | Ours (where) | Test | Status |
+|---|---|---|---|---|
+| Explicit connector's reach | 23 px across, 14 px up and down | the 5 px pick square | – | ≠ |
+| Explicit connector's priority | over vertex, edge, face | the same (overlay first) | psui's 3D matrix | = |
+| Explicit connector's look | a 36 px disc, 4 px ring, Z line 20 px, X/Y 12 px | a world-size triad and a 9 px dot | – | ≠ |
+| Implicit, over a face | the centroid wherever the pointer is; corner dots larger than midpoint dots | the same (17:18; Shift still picks among the points) | `a_faces_connector_is_its_centroid_wherever_the_pointer_is` | = |
+| Implicit, over an edge | the midpoint, Z along the edge | the same (17:18) | – | = |
+| Vertex / edge over the face | takes over within 6 px, not at 8 | the pick square (psui's 3D matrix: 15 / 15) | psui `the_3d_pick_matrix_matches_live` | = |
+| Free drag | moves in the screen plane by the full pointer delta | the same | – | = |
+| Drag start | > 2 px and > 50 ms | the same (asm ccbc333f) | asm's tests | = |
+| Short press | a click: the face selected, the triad there; its centre ball moves the triad | the same | – | = |
+| Constrained drag | a Revolute part turns about its axis, axial position kept | through the solver, grabbed nearest the part's box centre | – | ? |
+
 ## Sketch snaps (matrix)
 
 One row per target × inference × tool: live's reach and the constraints its click creates, ours, at a device pixel
