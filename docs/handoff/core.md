@@ -49,6 +49,14 @@ committed, pushed as **origin/core-wip-isaac** (f129e2773, one commit on main 11
   (`CARGO_TARGET_DIR=$HOME/tmp/core/t13 CC="ccache gcc-13" CXX="ccache g++-13"`), then land.sh
   (NOSHAPE_LAND_QUEUE_HOST=vibe5 NOSHAPE_LAND_HOSTS="vibe5 vibe3" until 522b51a6 lands). Tell blend in blend.md (core
   had isaac's Fillet 2, 11-13 00:3x note there).
+**Update 11-13 08:17 UTC:** the gate was killed by a session restart and re-run from 06:15 under setsid (vibe6,
+/root/core-scratch/bin/isaac-gate6.sh; G6DONE in hb/gate6-isaac-models-core.log when done; main's assembly side done:
+1518/1731 occurrences, 402/573 mates). vibe5 target cleared (lead: under 20 GB); vibe6's core target 21 GB: trim after the
+gate. Louver speed: qa's 2.6 s / 1.9 s are a debug build's; release (vibe6, main 11-12 ~23:00): Extrude 3 824 ms (live
+266), Flange 9 616 ms (live 222), Linear pattern 2 953 ms; bool's 11-06 profile (/root/bool-scratch/parity-louver-prof.log)
+had Extrude 3 537 ms, Flange 9 34 ms, so Flange 9 got slower since: bisect / profile it first. The sheet-metal rebuild after
+each std feature is custom/host/sheetmetal.rs `update_sheet_metal_geometry` (build_part, part_sources, keep_names,
+flat_of, sheet_data; inner_point calls contains_point up to 9 times a face).
 **Next (lead's speed list, 51efc6d91 profiles in this file), each landing reported with before / after:**
 c2-sm-louver Extrude 3 2.6 s / live 0.27 and Flange 9 1.9 / 0.22 (the sheet-metal model's Rust work after each
 feature); c2-impeller-loft Move face 1 4.1 s / 26 ms (mostly a delete of the 29.5 mm chamber bore our blend test takes
