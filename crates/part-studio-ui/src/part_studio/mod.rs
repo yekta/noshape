@@ -2867,7 +2867,9 @@ impl PartStudioView {
         self.close_create_selection_of_dialog(cx);
         // A field configured while the dialog was open goes with it (live2 config.json: the dialog must be committed; Esc
         // takes the configured column away again): the Configure / Unconfigure steps since the dialog opened are undone.
-        if let Some(at_open) = self.edit.as_ref().map(|e| e.doc_undo_at_open) {
+        // (Not in Configure features mode: its dialog has only ✕, and each click there configures for good, as the
+        // assembly's mate dialog in its mode, live behaviours 1295.)
+        if let Some(at_open) = self.edit.as_ref().filter(|e| !e.dialog.read(cx).configure_mode).map(|e| e.doc_undo_at_open) {
             let configure_step = |s: &str| [noshape_ops::config::CONFIGURE_PARAMETER, noshape_ops::config::UNCONFIGURE_PARAMETER].iter().any(|n| s.ends_with(n));
             for _ in 0..32 {
                 let d = self.doc.read(cx);

@@ -4215,6 +4215,17 @@ fn escape_on_a_dialog_takes_its_configured_field_away(cx: &mut TestAppContext) {
     draw(cx, window);
     assert_eq!(configured(cx), 0, "Esc takes it away");
     assert!(cx.update(|cx| view.read(cx).studio(cx).is_some_and(|s| s.configuration.inputs.len() == 1)), "the input made before the dialog stays");
+    // In Configure features mode (its dialog has only ✕) a click configures for good: Esc keeps it.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    draw(cx, window);
+    view.update(cx, |v, cx| {
+        let dialog = v.edit.as_ref().expect("the dialog").dialog.clone();
+        dialog.update(cx, |d, _| d.configure_mode = true);
+        v.configure_dialog_param("lengthValue", true, cx);
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+    draw(cx, window);
+    assert_eq!(configured(cx), 1, "kept in Configure features mode");
 }
 
 /// Live2 config.json (tableKeys): in the Configurations table, Enter on an edited value commits it and moves the
