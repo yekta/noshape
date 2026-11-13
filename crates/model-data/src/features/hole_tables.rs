@@ -464,22 +464,6 @@ pub fn sync_hole_standard(params: &mut ParamValues) -> bool {
     apply_table_to_params(params)
 }
 
-/// After the Units tab changed (`before`: the parameters on the other tab), the visible Standard keeps the hole type
-/// with its default size (live: a Metric Tapped M6 hole switched to Inch is Tapped 1/4-20 UNC, not Drilled), when the
-/// tables share that level and the type; then [`sync_hole_standard`].
-pub fn switch_hole_units(before: &ParamValues, params: &mut ParamValues) -> bool {
-    let ((bpid, btable), (pid, table)) = (hole_table_param(before), hole_table_param(params));
-    if let Some(kind) = canonical_path(btable, before.lookup(bpid)).first().cloned()
-        && bpid != pid
-        && table_level_name(btable, &[]) == table_level_name(table, &[])
-        && table_levels(table, &[]).iter().any(|(k, _)| *k == kind)
-        && params.lookup(pid).first() != Some(&kind)
-    {
-        params.set(pid, ParamValue::Lookup(complete_path(table, std::slice::from_ref(&kind))));
-    }
-    sync_hole_standard(params)
-}
-
 /// Path obtained by following every level's default from the top.
 pub fn default_path(table: &str) -> Vec<String> {
     let mut path = Vec::new();
@@ -722,23 +706,21 @@ mod tests {
         v.iter().map(|s| s.to_string()).collect()
     }
 
-    /// Live 11-13 (hole-remembers-last): a Metric Tapped hole switched to Inch stays Tapped, at the Inch table's
-    /// default tapped size (1/4-20 UNC), and back again keeps Tapped too; a Drilled one stays Drilled.
+    /// Live hole-remembers-last (11-13): each Units tab keeps its own pick: a Metric Tapped hole switched to Inch
+    /// shows the Inch tab's own (Drilled 1/4), and back on Metric it is Tapped again.
     #[test]
-    fn another_units_tab_keeps_the_hole_type() {
+    fn each_units_tab_keeps_its_own_pick() {
         let mut v = ParamValues::default();
         v.set("styleV2", ParamValue::Enum("SIMPLE".into()));
         v.set("unitsSystem", ParamValue::Enum("METRIC".into()));
         v.set("isoHoleTableEx", ParamValue::Lookup(complete_path(TABLE_ISO_HOLE_EX, &p(&["Tapped"]))));
         v.set("ansiHoleTableEx", ParamValue::Lookup(default_path(TABLE_ANSI_HOLE_EX)));
-        assert_ne!(v.lookup("ansiHoleTableEx").first().map(String::as_str), Some("Tapped"), "the Inch tab starts on its default");
-        let before = v.clone();
         v.set("unitsSystem", ParamValue::Enum("INCH".into()));
-        assert!(switch_hole_units(&before, &mut v));
-        assert_eq!(v.lookup("ansiHoleTableEx"), complete_path(TABLE_ANSI_HOLE_EX, &p(&["Tapped"])).as_slice());
-        let before = v.clone();
+        assert!(sync_hole_standard(&mut v));
+        assert_eq!(v.lookup("ansiHoleTableEx"), default_path(TABLE_ANSI_HOLE_EX).as_slice());
+        assert_ne!(v.lookup("ansiHoleTableEx").first().map(String::as_str), Some("Tapped"));
         v.set("unitsSystem", ParamValue::Enum("METRIC".into()));
-        switch_hole_units(&before, &mut v);
+        sync_hole_standard(&mut v);
         assert_eq!(v.lookup("isoHoleTableEx").first().map(String::as_str), Some("Tapped"));
     }
 

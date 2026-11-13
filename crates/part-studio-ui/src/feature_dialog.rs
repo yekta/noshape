@@ -654,19 +654,14 @@ impl FeatureDialog {
     /// Set a value on the user's behalf (automatic defaults): the field is
     /// not marked as user-set.
     pub fn set_value_auto(&mut self, path: &str, v: ParamValue, cx: &mut Context<Self>) {
-        let before = (self.feature.type_id == "hole" && path == "unitsSystem").then(|| self.feature.params.clone());
         if let Some((vals, id)) = self.values_for_path_mut(path) {
             vals.set(&id, v);
         }
         self.refocus_hidden_query();
-        // Hole: switching units or style shows another Standard; copy its values (the client's lookup table, also
-        // with std's holeEditLogic: HOLE-SIZE-NO-DIAMETER). Another Units tab keeps the hole type.
-        use noshape_model::features::hole_tables as ht;
-        let synced = match &before {
-            Some(b) => ht::switch_hole_units(b, &mut self.feature.params),
-            None => self.feature.type_id == "hole" && path == "styleV2" && ht::sync_hole_standard(&mut self.feature.params),
-        };
-        if synced {
+        // Hole: switching units or style shows another Standard (each Units tab keeps its own last pick, live
+        // hole-remembers-last); copy its values (the client's lookup table, also with std's holeEditLogic:
+        // HOLE-SIZE-NO-DIAMETER).
+        if self.feature.type_id == "hole" && matches!(path, "unitsSystem" | "styleV2") && noshape_model::features::hole_tables::sync_hole_standard(&mut self.feature.params) {
             self.inputs.clear();
         }
         cx.emit(DialogEvent::Changed);
