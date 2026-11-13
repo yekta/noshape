@@ -15,6 +15,15 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**2026-11-13 06:36 UTC:** landed 9a233601 (3D picking, snaps batch 1, Hole Units, scenarios). Local, not queued yet:
+the snaps matrix at 55 / 55 and the 3D pick matrix at 15 / 15 (render `the_3d_pick_matrix_matches_live`: a line picks
+≥ 3 px wide, a point ≤ 5, plane borders `WIDE_PICK` + `NO_HOLD`, assembly edges `NO_HOLD`), box counts, and the frame
+profiles library (`forms_library::Kind::Frames`, the picker's user library). They land once the 593 viewport-pick
+scenarios on vibe6 (~/tmp/psui/p3d2) are checked against the earlier run. Item 4 (Edit in context on another
+document's instance) is being debugged: ours opens nothing in the doc-linked scenario (temporary `EICDBG` logs in
+assembly_props.rs and a stderr dump in run.py: don't commit them). Live opens the source in the same browser tab;
+ours opens a window. Mac host trial: see the memory note and the report of 11-13.
+
 **2026-11-13 05:30 UTC:** the sketch snaps matrix (interaction-feel.md "Sketch snaps", part-studio-ui `snaps::`)
 is at 42 / 42 against live2's catalogue; its "Not yet in the matrix" row is the next work (a circular model edge's
 centre, other sketches, the rectangle / 3 point arc sets, drags). Follow-ups from live: Edit in context on an
