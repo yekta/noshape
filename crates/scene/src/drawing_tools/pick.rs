@@ -371,8 +371,10 @@ impl<'a> SheetPick<'a> {
     }
 
     /// A centermark already marks view `view`'s circle at `center` (live2 tables_live2_1013: clicking it adds nothing).
+    /// The drawing's own sheet: the displayed one holds the hovered circle's preview cross.
     pub fn has_centermark(&self, view: ViewId, center: [f64; 2]) -> bool {
-        self.current_sheet().annotations.iter().any(|a| matches!(&a.kind, AnnotationKind::Centermark { view: v, center: c, .. } if *v == view && (c[0] - center[0]).abs() < 1e-9 && (c[1] - center[1]).abs() < 1e-9))
+        let Some(sheet) = self.drawing.sheets.get(self.sheet) else { return false };
+        sheet.annotations.iter().any(|a| matches!(&a.kind, AnnotationKind::Centermark { view: v, center: c, .. } if *v == view && (c[0] - center[0]).abs() < 1e-9 && (c[1] - center[1]).abs() < 1e-9))
     }
 
     /// The geometry of view `view`'s edge `edge` (None: a silhouette with no model edge).

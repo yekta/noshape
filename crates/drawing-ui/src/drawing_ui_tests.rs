@@ -21,6 +21,8 @@ thread_local! {
     static DIMENSIONED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The next test drawing's block has a Ø6 hole through it at (20, 10).
     static HOLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The next test drawing is ui-parity's start of this name (tests/ui-parity/starts.json) instead.
+    static START: std::cell::Cell<Option<&'static str>> = const { std::cell::Cell::new(None) };
 }
 
 /// A drawing of a block (Drawing 1) in a test window.
@@ -33,7 +35,10 @@ fn drawing(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Draw
     for ext in ["", "-wal", "-shm"] {
         let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
     }
-    {
+    if let Some(name) = START.take() {
+        let starts: Value = serde_json::from_str(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/ui-parity/starts.json")).unwrap()).unwrap();
+        noshape_ops::ui_parity::build_start(&mut Ctx::new(), &path, &starts[name]).unwrap();
+    } else {
         let mut ctx = Ctx::new();
         call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
         let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
@@ -518,4 +523,43 @@ fn a_bom_border_drag_moves_only_that_border() {
     assert_eq!(divider_widths(&w, 3, 10.0, true, false), [20.0, 30.0, 40.0, 40.0], "general, fixed right: the right column");
     assert_eq!(divider_widths(&w, 3, 10.0, false, false), [20.0, 30.0, 50.0, 50.0], "general, fixed left: the left column");
     assert_eq!(divider_widths(&w, 4, 10.0, true, true), [20.0, 30.0, 40.0, 60.0], "a BOM's outer border as before");
+}
+
+/// ui-parity drw-centermark: Centermark, then a click on the hole's circle (at 45°, through the mouse) makes a
+/// centermark there.
+#[gpui::test]
+fn a_centermark_click_on_a_circle_marks_it(cx: &mut TestAppContext) {
+    use noshape_model::drawing::AnnotationKind;
+    use noshape_scene::drawing_tools::Tool;
+    START.set(Some("hole-plate-drawing"));
+    let (window, editor) = drawing(cx, "centermark-click");
+    real_sheet(cx, window, &editor);
+    let (center, radius) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        b.placements.iter().find_map(|pl| {
+            let g = e.geoms.get(&pl.id)?;
+            let (c, r, _) = g.circles().into_iter().next()?;
+            Some((pl.to_sheet(c), pl.len_to_sheet(r)))
+        })
+        .expect("a view showing the hole")
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Centermark, cx)));
+    draw(cx, window);
+    let k = std::f64::consts::FRAC_1_SQRT_2;
+    let on = [center[0] + radius * k, center[1] + radius * k];
+    // The pointer arrives first and a frame draws (the preview cross), then the click, as in the app.
+    let at = cx.update(|cx| {
+        let e = editor.read(cx);
+        let l = e.sheet_to_local(on);
+        e.bounds.origin + Point::new(px(l[0] as f32), px(l[1] as f32))
+    });
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.on_mouse_move(&gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }, w, cx))).unwrap();
+    draw(cx, window);
+    cx.update(|cx| editor.update(cx, |e, cx| e.update_preview(cx)));
+    let previewed = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().any(|a| matches!(a.kind, AnnotationKind::Centermark { .. })));
+    assert!(previewed, "the hovered circle's cross is in the displayed sheet");
+    click_sheet(cx, window, &editor, on);
+    let marks = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().filter(|a| matches!(a.kind, AnnotationKind::Centermark { .. })).count());
+    assert_eq!(marks, 1, "a centermark on the circle");
 }
