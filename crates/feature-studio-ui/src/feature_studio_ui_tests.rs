@@ -166,5 +166,14 @@ fn ace_line_keys_comment_move_duplicate_and_remove(cx: &mut TestAppContext) {
     type_key(cx, window, "secondary-\\");
     type_key(cx, window, "y");
     assert!(lines(cx).ends_with("f(yx)"), "{}", lines(cx));
+    // Ctrl+Shift+↑ (a Mac: Option+Shift+↑) nudges the number at the caret; Alt+Shift+X (Ctrl+T) transposes.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
+    for k in [" ", "4", "1"] {
+        type_key(cx, window, k);
+    }
+    type_key(cx, window, if cfg!(target_os = "macos") { "alt-shift-up" } else { "ctrl-shift-up" });
+    assert!(lines(cx).ends_with(" 42"), "{}", lines(cx));
+    type_key(cx, window, if cfg!(target_os = "macos") { "ctrl-t" } else { "alt-shift-x" });
+    assert!(lines(cx).ends_with(" 24"), "{}", lines(cx));
     let _ = std::fs::remove_dir_all(&dir);
 }

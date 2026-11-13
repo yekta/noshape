@@ -13,6 +13,8 @@ pub enum LineOp {
     MoveDown,
     CopyUp,
     CopyDown,
+    /// Ctrl+Alt+S: the lines in order.
+    SortLines,
 }
 
 /// An edit: replace `range` of the old text with `text`; then select `sel` (in the new text).
@@ -64,6 +66,11 @@ pub fn apply(text: &str, sel: Range<usize>, op: LineOp) -> Option<LineEdit> {
             let next = &text[b.end + 1..below_end];
             let shift = next.len() + 1;
             Some(LineEdit { range: b.start..below_end, text: format!("{next}\n{lines}"), sel: sel.start + shift..sel.end + shift })
+        }
+        LineOp::SortLines => {
+            let mut sorted: Vec<&str> = lines.split('\n').collect();
+            sorted.sort();
+            Some(LineEdit { range: b.clone(), text: sorted.join("\n"), sel: b.start..b.end })
         }
         // The copy goes above (the selection stays where it was, on the copy) or below (the selection moves to it).
         LineOp::CopyUp => Some(LineEdit { range: b.start..b.start, text: format!("{lines}\n"), sel }),
@@ -191,6 +198,49 @@ pub fn find_from(text: &str, query: &str, at: usize, back: bool) -> Option<Range
     start.map(|&i| i..i + q.len())
 }
 
+/// Ctrl+Shift+/ (Ace's toggleBlockComment): `/*` and `*/` round the selection, or taken away from round it.
+pub fn block_comment(text: &str, sel: Range<usize>) -> LineEdit {
+    let inner = &text[sel.clone()];
+    if let Some(body) = inner.strip_prefix("/*").and_then(|s| s.strip_suffix("*/")) {
+        return LineEdit { range: sel.clone(), text: body.to_string(), sel: sel.start..sel.start + body.len() };
+    }
+    if sel.start >= 2 && text[..sel.start].ends_with("/*") && text[sel.end..].starts_with("*/") {
+        return LineEdit { range: sel.start - 2..sel.end + 2, text: inner.to_string(), sel: sel.start - 2..sel.end - 2 };
+    }
+    LineEdit { range: sel.clone(), text: format!("/*{inner}*/"), sel: sel.start + 2..sel.end + 2 }
+}
+
+/// Ctrl+Shift+↑ / ↓ (Ace's modifyNumberUp / Down): the number at the caret up or down by one in the place the caret
+/// stands in (by 1 in the whole part, by 0.1 after the first decimal, …), keeping its decimals.
+pub fn modify_number(text: &str, at: usize, up: bool) -> Option<LineEdit> {
+    let num = |c: char| c.is_ascii_digit() || c == '.';
+    let start = text[..at].rfind(|c: char| !num(c)).map_or(0, |i| i + 1);
+    let end = text[at..].find(|c: char| !num(c)).map_or(text.len(), |i| at + i);
+    let start = if start > 0 && text[..start].ends_with('-') { start - 1 } else { start };
+    let word = &text[start..end];
+    let value: f64 = word.parse().ok()?;
+    let decimals = word.find('.').map_or(0, |d| word.len() - d - 1);
+    let place = match word.find('.') {
+        Some(d) if at > start + d => (at - start - d - 1).max(1) as i32,
+        _ => 0,
+    };
+    let step = 10f64.powi(-place) * if up { 1.0 } else { -1.0 };
+    let new = format!("{:.*}", decimals, value + step);
+    let caret = (at + new.len()).saturating_sub(word.len()).max(start);
+    Some(LineEdit { range: start..end, text: new, sel: caret..caret })
+}
+
+/// Alt+Shift+X (Ace's transposeletters): the letters each side of the caret change places (at a line's end, the two
+/// before it), the caret after them.
+pub fn transpose(text: &str, at: usize) -> Option<LineEdit> {
+    let at_end = at == text.len() || text[at..].starts_with('\n');
+    let mid = if at_end { text[..at].char_indices().next_back()?.0 } else { at };
+    let before = text[..mid].char_indices().next_back()?;
+    let after = text[mid..].chars().next().filter(|c| *c != '\n')?;
+    let end = mid + after.len_utf8();
+    Some(LineEdit { range: before.0..end, text: format!("{after}{}", before.1), sel: end..end })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,5 +304,24 @@ mod tests {
         assert_eq!(find_from(t, "ab", 3, true), Some(0..2));
         assert_eq!(find_from(t, "ab", 0, true), Some(8..10), "wraps to the end");
         assert_eq!(find_from(t, "zz", 0, false), None);
+    }
+
+    /// Ace's block comment, sort, number nudge and transpose keys.
+    #[::core::prelude::v1::test]
+    fn block_comment_sort_numbers_and_transpose() {
+        let apply_edit = |t: &str, e: LineEdit| {
+            let mut t = t.to_string();
+            t.replace_range(e.range.clone(), &e.text);
+            (t, e.sel)
+        };
+        let (t, s) = apply_edit("a bc d", block_comment("a bc d", 2..4));
+        assert_eq!((t.as_str(), s.clone()), ("a /*bc*/ d", 4..6));
+        assert_eq!(apply_edit(&t, block_comment(&t, s)).0, "a bc d", "again: taken away");
+        assert_eq!(run("c\na\nb", 0..5, LineOp::SortLines).0, "a\nb\nc");
+        assert_eq!(apply_edit("x = 41;", modify_number("x = 41;", 5, true).unwrap()).0, "x = 42;");
+        assert_eq!(apply_edit("x = 1.25;", modify_number("x = 1.25;", 7, false).unwrap()).0, "x = 1.15;", "the tenths place");
+        assert_eq!(apply_edit("x = -1;", modify_number("x = -1;", 6, true).unwrap()).0, "x = 0;");
+        assert_eq!(apply_edit("abc", transpose("abc", 1).unwrap()), ("bac".to_string(), 2..2));
+        assert_eq!(apply_edit("abc\nd", transpose("abc\nd", 3).unwrap()).0, "acb\nd", "at a line's end: the two before");
     }
 }

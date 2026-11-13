@@ -28,7 +28,7 @@ const ACE_DRAWN_ROWS: usize = 9;
 /// A popup anchor: the trigger's bounds from the last paint.
 type BoundsCell = Rc<std::cell::Cell<Bounds<Pixels>>>;
 
-actions!(feature_studio, [Commit, CommitAll, SearchStudios, ModuleOutline, BackReference, ForwardReference, ToggleComment, RemoveLine, DuplicateSelection, MoveLinesUp, MoveLinesDown, CopyLinesUp, CopyLinesDown, FindNext, FindPrevious, JumpToMatching, NextError, PreviousError]);
+actions!(feature_studio, [Commit, CommitAll, SearchStudios, ModuleOutline, BackReference, ForwardReference, ToggleComment, RemoveLine, DuplicateSelection, MoveLinesUp, MoveLinesDown, CopyLinesUp, CopyLinesDown, FindNext, FindPrevious, JumpToMatching, NextError, PreviousError, BlockComment, SortLines, NumberUp, NumberDown, TransposeLetters, SelectOrFindNext, SelectOrFindPrevious]);
 
 /// Onshape's Feature Studio shortcuts (live dom/keyboard-shortcuts.txt):
 /// Commit, Commit all, Top level symbols dropdown (the Module outline),
@@ -76,7 +76,27 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new(&ace("ctrl-\\", "cmd-\\"), JumpToMatching, code),
         KeyBinding::new(&ace("alt-e", "f4"), NextError, code),
         KeyBinding::new(&ace("alt-shift-e", "shift-f4"), PreviousError, code),
+        KeyBinding::new(&ace("ctrl-shift-/", "cmd-shift-/"), BlockComment, code),
+        KeyBinding::new(&ace("ctrl-alt-s", "cmd-alt-s"), SortLines, code),
+        KeyBinding::new(&ace("ctrl-shift-up", "alt-shift-up"), NumberUp, code),
+        KeyBinding::new(&ace("ctrl-shift-down", "alt-shift-down"), NumberDown, code),
+        KeyBinding::new(&ace("alt-shift-x", "ctrl-t"), TransposeLetters, code),
+        KeyBinding::new(&ace("alt-k", "ctrl-g"), SelectOrFindNext, code),
+        KeyBinding::new(&ace("alt-shift-k", "ctrl-shift-g"), SelectOrFindPrevious, code),
     ]);
+    // Windows / Linux: Ace's Alt+← / → go to the line's start / end (a Mac keeps Option for words), Alt+Backspace /
+    // Delete remove to them.
+    if !mac {
+        use gpui_kit::component::input::{DeleteToBeginningOfLine, DeleteToEndOfLine, MoveHome, MoveEnd, SelectToStartOfLine, SelectToEndOfLine};
+        cx.bind_keys([
+            KeyBinding::new("alt-left", MoveHome, code),
+            KeyBinding::new("alt-right", MoveEnd, code),
+            KeyBinding::new("alt-shift-left", SelectToStartOfLine, code),
+            KeyBinding::new("alt-shift-right", SelectToEndOfLine, code),
+            KeyBinding::new("alt-backspace", DeleteToBeginningOfLine, code),
+            KeyBinding::new("alt-delete", DeleteToEndOfLine, code),
+        ]);
+    }
     cx.bind_keys(bindings);
 }
 
@@ -696,16 +716,8 @@ impl FeatureStudioView {
 
     /// One of Ace's line commands on the selection, as one undo step.
     fn line_op(&mut self, op: crate::fs_lines::LineOp, window: &mut Window, cx: &mut Context<Self>) {
-        if self.read_only(cx) {
-            return;
-        }
-        self.editor.update(cx, |e, cx| {
-            let text = e.value().to_string();
-            let Some(edit) = crate::fs_lines::apply(&text, e.selected_range(), op) else { return };
-            e.set_selected_range(edit.range, cx);
-            e.replace(edit.text, window, cx);
-            e.set_selected_range(edit.sel, cx);
-        });
+        let (text, sel) = (self.editor.read(cx).value().to_string(), self.editor.read(cx).selected_range());
+        self.apply_edit(crate::fs_lines::apply(&text, sel, op), window, cx);
     }
 
     /// Ace's Find next / previous: the search box's last text (else the selection, else the word at the caret) from
@@ -725,6 +737,35 @@ impl FeatureStudioView {
             e.set_selected_range(found, cx);
         });
         cx.notify();
+    }
+
+    /// An edit of the text as one undo step, then the selection `edit.sel`.
+    fn apply_edit(&mut self, edit: Option<crate::fs_lines::LineEdit>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(edit) = edit.filter(|_| !self.read_only(cx)) else { return };
+        self.editor.update(cx, |e, cx| {
+            e.set_selected_range(edit.range, cx);
+            e.replace(edit.text, window, cx);
+            e.set_selected_range(edit.sel, cx);
+        });
+    }
+
+    /// Alt+K / Alt+Shift+K (Ace's selectOrFindNext): with nothing selected, the word at the caret; else the next /
+    /// previous occurrence of the selection.
+    fn select_or_find(&mut self, back: bool, cx: &mut Context<Self>) {
+        let sel = self.editor.read(cx).selected_range();
+        if !sel.is_empty() {
+            let text = self.editor.read(cx).value().to_string();
+            let found = crate::fs_lines::find_from(&text, &text[sel.clone()], if back { sel.start } else { sel.end }, back);
+            self.editor.update(cx, |e, cx| e.set_selected_range(found.unwrap_or(sel), cx));
+            return;
+        }
+        self.editor.update(cx, |e, cx| {
+            let text = e.value().to_string();
+            let is_w = |c: char| c.is_alphanumeric() || c == '_';
+            let a = text[..sel.start].rfind(|c: char| !is_w(c)).map_or(0, |i| i + 1);
+            let b = text[sel.start..].find(|c: char| !is_w(c)).map_or(text.len(), |i| sel.start + i);
+            e.set_selected_range(a..b, cx);
+        });
     }
 
     /// Ctrl+\\: the caret to the bracket matching the one beside it.
@@ -2046,6 +2087,25 @@ impl Render for FeatureStudioView {
             .on_action(cx.listener(|this, _: &JumpToMatching, _, cx| this.jump_to_matching(cx)))
             .on_action(cx.listener(|this, _: &NextError, window, cx| this.go_to_notice(false, window, cx)))
             .on_action(cx.listener(|this, _: &PreviousError, window, cx| this.go_to_notice(true, window, cx)))
+            .on_action(cx.listener(|this, _: &BlockComment, window, cx| {
+                let (text, sel) = (this.editor.read(cx).value().to_string(), this.editor.read(cx).selected_range());
+                this.apply_edit(Some(crate::fs_lines::block_comment(&text, sel)), window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &SortLines, window, cx| this.line_op(crate::fs_lines::LineOp::SortLines, window, cx)))
+            .on_action(cx.listener(|this, _: &NumberUp, window, cx| {
+                let (text, at) = (this.editor.read(cx).value().to_string(), this.editor.read(cx).selected_range().end);
+                this.apply_edit(crate::fs_lines::modify_number(&text, at, true), window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &NumberDown, window, cx| {
+                let (text, at) = (this.editor.read(cx).value().to_string(), this.editor.read(cx).selected_range().end);
+                this.apply_edit(crate::fs_lines::modify_number(&text, at, false), window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &TransposeLetters, window, cx| {
+                let (text, at) = (this.editor.read(cx).value().to_string(), this.editor.read(cx).selected_range().end);
+                this.apply_edit(crate::fs_lines::transpose(&text, at), window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &SelectOrFindNext, _, cx| this.select_or_find(false, cx)))
+            .on_action(cx.listener(|this, _: &SelectOrFindPrevious, _, cx| this.select_or_find(true, cx)))
             .on_action(cx.listener(|this, _: &ForwardReference, window, cx| this.navigate(1, window, cx)))
             .bg(rgb(0xffffff))
             .child(match self.doc.read(cx).session.viewing_version() {
