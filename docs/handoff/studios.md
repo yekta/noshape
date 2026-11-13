@@ -28,6 +28,17 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-13 04:13 UTC: drawings feel from live2's feel/drawing.json (D1-D6, F3, F4)
+docs/parity/interaction-feel.md "Drawings" has each number, ours and its test. Set: Select's reach (lines 7 px, texts
+9 px outside their box, a leader 11 px, a view 3.6 sheet mm), snap and inference 8 px, drag 5 px (a note 8), a box takes
+every view it meets either way and adds (Shift: nothing). View-to-view alignment snapping removed (F4: live has none).
+Open: whether a box takes a view's attached dimensions with it (live2 re-checking), a centerline over a view edge
+(a click takes the view in live), the box's start distance on an empty sheet (live ≥ 9 px, ours 3), the projected
+view live2 saw move freely, Tab manager drag and drop (F6), fs-ac-fn-std-list's row 9 (live NewBodyOperationType, ours
+BooleanOperationType): live2's full list (REQUESTS 2575) ends SplitOperationKeepType, NewBody, NewSurface, **Boolean**,
+so Boolean ranks under NewSurface (substring at 10, fuzzy 20) though its own match is better (7 / 17): some score of
+Onshape's completer we don't know; neither std's module order nor Ace's penalty explains it.
+
 ### 2026-11-13 03:52 UTC: studios' speed against live (live 2525 part 1, behaviours.md "speed: studios")
 Live: medians of 5, input event to DOM, software-GL Chrome (3D tab switches are upper bounds). Ours: 11-11's table
 (vibe3 under load; first painted frame / idle).
