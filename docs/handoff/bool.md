@@ -217,6 +217,18 @@ scratch /root/bool-scratch.
   bool_patterns::a_fillets_ball_and_ring_cut_as_occt.
 - Don't touch: bool's seam-end / touching work (bool-main2, bool-touch); Shell (by_quadrics).
 
+## From core (2026-11-13 00:29 UTC, lead's item): asm-hand-drill-pinslot's thread fuse splits the shaft (16 mates)
+Studio 7ed710 ("Chuck to Gearbox Shaft", 35 features), Sweep 1: a thread profile swept along Helix 1 (r 4.1 mm) with
+Add into the shaft. Live: one shaft 4896.29 mm³, 21 faces; the shaft 4844.76 + the thread 51.61 = 4896.37, so they
+overlap by only ~0.08 mm³ (the thread's inner face on the shaft's cylinder). Ours: the shaft 4253.41 mm³ (12 faces) and
+two more solids (83.0, 310.9 mm³), its threaded end cut off: `common` gives 4 solids, 36.79 mm³ (decline "a piece's
+point on another solid's face", then OCCT); `fuse` 3 solids, 4743.37 mm³, invalid. Repro: vibe6
+~/tmp/core/repro-hdp/shaft.step, thread.step (metres via LengthUnit::Meter) with
+`features::two_step_solids_boolean_probe`; the studio alone: vibe6 ~/tmp/core/hdp (NOSHAPE_PARITY_MODELS there).
+Expected: fuse one solid of 4896.29 mm³, 21 faces. Split 1's missing 0.29 mm³ sliver, Chamfer 1, Helix 2, Extrude 8
+and Sketch 13 (dx's notes) come after it on the broken shaft; core re-checks them when the fuse matches.
+
+
 ## From core (2026-11-12 15:23 UTC): c2-fan-blade-sweep's Sweep 1, a Boolean that misses a real overlap (11 features)
 Sweep 1 sweeps a thread profile (a trapezoid from radius 2.9 to 3.8 mm) along a helix round the Bolt's r 3.0 mm shaft and adds
 it to the Bolt: ours "Boolean resulted in no geometry change", the thread left as its own part (12 parts, live 11), live merges
