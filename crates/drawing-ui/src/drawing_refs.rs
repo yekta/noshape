@@ -344,18 +344,17 @@ impl DrawingEditor {
         }
         let enabled = n > 0 && (tab == 0 || !m.checked.is_empty());
         let info = format!("Newer versions available for {n} document{}", if n == 1 { "" } else { "s" });
-        // Its texts for the ui-parity runner (live 2303: a flyout of the drawing).
-        // (As live's reader reads it since 11-10: a panel of texts, a selective row's box first.)
-        let mut text: Vec<String> = vec!["Update to latest".into(), "Selective update".into(), info.clone()];
+        // As live's recorder reads it since 11-13 (drw-ref-update-linked-document; the assembly's the same): the tabs,
+        // the line, each document's "current ⇨ chosen" (a checkbox on Selective update), the button's label and state.
+        let mut fields = vec![serde_json::json!({ "label": info, "kind": "text", "text": "" })];
         for (i, d) in m.docs.iter().enumerate() {
             let to = d.choices.get(m.chosen.get(&i).copied().unwrap_or(d.latest)).map(|c| c.0.clone()).unwrap_or_default();
-            if tab == 1 {
-                text.push(if m.checked.contains(&i) { "[x] ".into() } else { "[ ] ".into() });
-            }
-            text.extend([d.name.clone(), d.current.clone(), "⇨".into(), to]);
+            let text = format!("{} ⇨ {to}", d.current);
+            fields.push(if tab == 1 { serde_json::json!({ "label": d.name, "kind": "boolean", "checked": m.checked.contains(&i), "text": text }) } else { serde_json::json!({ "label": d.name, "kind": "string", "text": text }) });
         }
-        text.push(if tab == 0 { "Update all".into() } else { "Update selected".into() });
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "panel", "title": "Reference manager", "text": text }));
+        crate::ui_script::note_dialog_pinned(|| {
+            serde_json::json!({ "title": "Reference manager", "kind": "feature", "tabs": [{ "label": "Update to latest", "selected": tab == 0 }, { "label": "Selective update", "selected": tab == 1 }], "fields": fields, "error": null, "ok": if enabled { "enabled" } else { "disabled" }, "okLabel": if tab == 0 { "Update all" } else { "Update selected" } })
+        });
         Some(
             v_flex()
                 .id("dr-ref-manager")

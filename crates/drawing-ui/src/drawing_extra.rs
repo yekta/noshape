@@ -884,7 +884,12 @@ impl DrawingEditor {
                         _ => Vec::new(),
                     };
                     if self.sheets_ref_hover.as_deref() == Some(key.as_str()) {
-                        text.push(format!("{name} {version}"));
+                        // Live (drw-ref-pin-reference): another document's version reads "Part 1 In progress V1".
+                        let ext = vs.first().and_then(|v| self.reference_pin(s, v.id)).filter(|p| p.id.starts_with("ext:"));
+                        text.push(match ext {
+                            Some(p) => format!("{name} In progress {}", self.ext_info_of(&p).map_or(p.name.clone(), |i| i.0)),
+                            None => format!("{name} {version}"),
+                        });
                         text.extend(config.iter().flat_map(|(k, v)| [k.clone(), v.clone()]));
                     }
                     let pin = vs.first().and_then(|v| self.reference_pin(s, v.id));
@@ -900,7 +905,10 @@ impl DrawingEditor {
                     text.push(self.sheet_table_label(s, t, cx).0);
                 }
             }
-            crate::ui_script::note_dialog_pinned(|| serde_json::json!({ "kind": "drawing-panel", "title": text.first(), "text": text }));
+            // (Not over an open Reference manager: live reads that one then.)
+            if self.ref_manager.is_none() {
+                crate::ui_script::note_dialog_pinned(|| serde_json::json!({ "kind": "drawing-panel", "title": text.first(), "text": text }));
+            }
         }
         let tab = |id: &'static str, label: &'static str, selected: bool, cx: &mut Context<Self>| {
             div()
