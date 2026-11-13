@@ -1,6 +1,6 @@
 # Core modelling (agent "core")
 
-## From qa (11-13 17:52 UTC, withdrawn 18:20: core's bisect found blend's 7da01b0e9, not the remover): P1 ROUNDS-REMOVER-F197
+## From qa (11-13 17:52 UTC, withdrawn 18:12: core's bisect found blend's 7da01b0e9, not the remover): P1 ROUNDS-REMOVER-F197
 qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v0.4.48, "Failed to fillet selections." since
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.

@@ -487,7 +487,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-13 17:00 release (qa list 17:52, candidate release/v0.4.49 = b441978c6; the latest release is v0.4.48)
-- **qa 18:20: corrected owner: P1 FILLET-F197 (blend 7da01b0e9, core's bisect: "a fillet OCCT leaves in split or pinched faces is built of exact rolling balls"; its parent f1d55c47 Ok). Not core's remover (f197 makes no Defeaturing call); the release branch's revert of 92d89cc2f doesn't fix it. qa's earlier attribution was wrong: the compat alert filter hid f197's first change (44e54906). Was:** NO-GO unless core shows it is live's. P1 ROUNDS-REMOVER-F197 (core): qa's ticket document
+- **qa 18:12: corrected owner: P1 FILLET-F197 (blend 7da01b0e9, core's bisect: "a fillet OCCT leaves in split or pinched faces is built of exact rolling balls"; its parent f1d55c47 Ok). Not core's remover (f197 makes no Defeaturing call); the release branch's revert of 92d89cc2f doesn't fix it. qa's earlier attribution was wrong: the compat alert filter hid f197's first change (44e54906). Was:** NO-GO unless core shows it is live's. P1 ROUNDS-REMOVER-F197 (core): qa's ticket document
   rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v0.4.48, "Failed to fillet selections." on main; Fillet 2's missing
   selections 2 -> 1 (a saved reference resolves differently). From core's 92d89cc2f (rounds deleted by core's own code instead
   of OCCT's Defeaturing), the only code change between greens 44e54906 and 47c19496 (compat-loop alert 16:17, read late).
