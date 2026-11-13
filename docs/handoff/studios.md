@@ -28,6 +28,19 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-13 10:24 UTC: the Mac mini as build host (lead's one-day trial): wall times against vibe6
+`NOSHAPE_RB_HOST=mac` (Apple M6, 2 slots of 6 jobs shared with psui; ~/noshape-host). Scenario runs stay on vibe6.
+Wall = rb.sh start to end (sync, build, run), the same tree on both:
+
+| What | vibe6 | Mac |
+|---|---|---|
+| drawing-ui tests, cold target (first build on the Mac) | – | 209 s (build 3 min 07 s) |
+| drawing-ui tests after a comment edit in drawing-ui | 17 s (build 7.3 s) | 10 s (build 3.6 s) |
+| app build after a comment edit in drawing-ui | 19 s (build 10.4 s) | 11 s (build 6.6 s) |
+| app build after a no-change touch | 91 s (1 min 22 s) | 87 s (1 min 22 s) |
+
+(A real code change rebuilds more than a comment; more rows as the day's builds come.)
+
 ### 2026-11-13 07:57 UTC: Export… on tab menus restored; folder drop, double-clicks
 - Export… on Part Studio / Assembly tab menus was never removed in live: Onshape hides it while the account's
   export-formats API is rate-limited (429, known since 10-27, qa 1507; live2's correction). 5acdfb72 and 8d559309
