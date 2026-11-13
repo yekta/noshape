@@ -26,15 +26,16 @@ scratch /root/bool-scratch.
   kernel profile + Shell paths), featgap.py (ours vs live per feature), ~/agents/profile-callers.py.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
-- **asm-hand-drill-pinslot's Sweep 1 (lead 11-13 00:35, 03:30), 11-13 03:50 UTC, gating 55e4b476 (branch bool2-cov):**
+- **asm-hand-drill-pinslot's Sweep 1 (lead 11-13 00:35, 03:30), 11-13 04:35 UTC, gating fd801eaa (branch bool2-cov):**
   the thread's inner face is a B-spline on the shaft's r 4.1 mm cylinder (12 nm inside). Ours can't take it (read as
   that cylinder it winds round three times; our cylinder faces cover one turn); OCCT's plain fuse cuts the shaft in
-  three. A fuse whose argument has a B-spline face on another's cylinder (`as_cylinder`, rust_boolean.cpp) now runs
-  OCCT's checked glue: one valid shaft, 4896.37 mm³ (live 4896.29). The studio: 21 -> 23 of 35 features, first
+  three. A fuse that comes out invalid where an argument's B-spline face lies on another's cylinder (`as_cylinder`,
+  rust_boolean.cpp) facing it from outside runs again with OCCT's GlueShift, kept when valid and the volumes add up (run
+  up front it changed 4 parity56 fuses: glue keeps faces a plain fuse merges): one valid shaft, 4896.37 mm³ (live 4896.29). The studio: 21 -> 23 of 35 features, first
   difference Split 1 (21/29/10 against live's 20/28/10: OCCT splits the thread's exposed band of the cylinder into a
   face a turn, live's is one face). 13.1 s (Sweep 1 11.2 s: OCCT's glued fuse, as slow as main's plain one; live 28 ms).
   T2 bool_patterns::a_thread_on_its_shafts_cylinder_fuses_into_one_solid. Next: the band merge.
-- **To core (11-13 03:50 UTC), two things the hand-drill showed:**
+- **To core (11-13 03:48 UTC), two things the hand-drill showed:**
   - The kernel's `self_intersects()` (common.cpp, used by solid_a.rs's sweep check) now stops after a CPU second
     (run_budgeted) and then finds nothing: Sweep 2's check of a 20-turn helical slot ran for minutes, now 1.06 s (live
     138 ms). solid_a.rs is unchanged.
@@ -157,12 +158,16 @@ scratch /root/bool-scratch.
   - **Recordings (exact) on vibe5 ~/tmp/bool2/:** bydoc/rec/<document> (the 8 above), bydoc-imp (impeller, rings), sos
     (the sheet-of-shells cases); ops-main is main's ops test binary that recorded them. vibe4's (impy, hk, es, bydoc)
     went with it. /root/bool2-scratch/bool-by-doc2.py (DOCS=..., JOBS=...) makes the per-document table.
-- **The knife's 343b971e (1.5 s, not done):** the chamfer tool's B-spline edges lie within 0.5 um of the blade's faces
-  (on_tol 0.2 um, grey band 0.8 um); OCCT takes them as on. Taking them so (X_NEARON in
-  /root/bool2-scratch/knife-nearon-wip.patch: all 7 samples within the grey band -> on) gets to "a non-manifold
-  result". Ours keeps the target's B-spline side face 4 but drops its extruded neighbour face 3, so their shared edge
-  19 is used once. OCCT keeps the extrusion (its f8, bounded by e40 / e41). There the tool's and the target's B-spline
-  faces run 0.03 mm apart and nearly tangent: a classification problem. Recording vibe4 ~/tmp/bool2/hk.
+- **The knife's 343b971e (514 ms on OCCT; 11-13 04:35 UTC, WIP /root/bool2-scratch/knife-fix-debug.patch):** a cut
+  by two chamfer tools meeting end to end at x -50 mm (their caps coincide), their B-spline faces all but tangent to the
+  blade's grind face 4. Two things keep tool 0 from splitting face 4: (1) its edge 52 lies on face 4 within 0.2 um
+  along nearly all of it but runs on past the blade's tip (x -114.6, face 4 ends at -114.3), 0.2 mm off the surface
+  there, and on_free_surface tests that end first and calls the whole edge off (WIP: `past_face`, a sample whose
+  nearest surface point is outside the face counts neither way, and the projection onto the face allows it); (2)
+  OCCT's sections of tool 0's faces with face 4 come in pieces with gaps (x -60.3..-65.2, -81.3..-97.5,
+  -107.4..-109.8 mm; open ends, not taken). With both the near-on rule (X_NEARON: every sample within the grey band) and
+  past_face, edge 52's pieces reach face 4's neighbours but face 4 still isn't split along them: non-manifold at
+  sedges 62-65. Next: why its InFace pieces don't make face 4's segments.
 - **c2-extension-spring's 84884726 (0.23-0.53 s):** "a short section from a corner" is bool's deliberate decline.
   OCCT's builder takes a 10-100 tol stub from a corner to a branch point into the vertex; ours doesn't model that.
   Recording vibe4 ~/tmp/bool2/es.
