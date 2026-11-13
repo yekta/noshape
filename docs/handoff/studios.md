@@ -28,13 +28,13 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
-### 2026-11-13 06:25 UTC: tab drags from live2's feel/documents.json; where things stand
+### 2026-11-13 07:03 UTC: tab drags from live2's feel/documents.json; where things stand
 - 3f9c63fd (to land after doc-tm-* / doc-folder-* pass): tab bar drag from 6 px, auto-scroll from 45 px of an end
   with live's speed ramp, the gap following the tabs scrolling under a still pointer (a synthetic mouse move each tick);
   the Tab manager's dark-blue pill ghost, pressed row selected, folder rows' thirds (above / into / below), the
   ringed insertion line, Esc cancels, folder rows laid out as tab rows. App-checked (feel2/tabs.noshape on vibe6).
 - ver/vs/fs/prefs + documents: 620/633 at 04:58 (uip-all); every miss is live-side or a pending re-record (list in
-  the 04:45 entry and below 03:52). No open P0/P1 ticket names my area (TICKETS.md, 06:00).
+  the 04:45 entry and below 03:52). No open P0/P1 ticket names my area (TICKETS.md).
 - Waiting on live2 (REQUESTS 04:16, 04:50): box takes a view's dimensions?, centerline over a view edge, projected
   view drag, box start on an empty sheet; doc-tab-menu-assembly / doc-dialog-properties-assembly-* re-records and an
   Assembly with instances' Export….
