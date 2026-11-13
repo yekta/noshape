@@ -33,14 +33,24 @@ scratch /root/bool-scratch.
   when both built at once).
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **asm-hand-drill-pinslot's Sweep 1 (lead 11-13 00:35; core's note below), 11-13 02:17 UTC, not landed:** the thread's
+  inner face is a B-spline on the shaft's r 4.1 mm cylinder (12 nm inside it). Our Boolean can't take it: read as that
+  cylinder (`as_cylinder`) the face winds round three times, which our cylinder faces can't (one turn), else "a piece's
+  point on another solid's face". OCCT: fuzzy changes nothing; rebuilt on the exact cylinder it is still wrong; with
+  GlueShift (checked) it is one valid solid of 4896.37 mm³ (live 4896.29), 7.5 s as before. WIP (uncommitted, branch
+  bool2-cov, /root/bool2-scratch/hdp-wip2.patch): a fuse whose argument has a B-spline face on another's cylinder runs
+  the checked glue. In the studio Sweep 1 then matches live (first difference moves to Split 1: 21/29/10 against
+  20/28/10), but Sketch 11 (feature 26) then runs for minutes: not in a Boolean; being timed (its solve / regions /
+  imprint). Not landing until that is found: a hang is worse than the split shaft.
 - **Completion (11-12 23:03 UTC, main 909e48460, all 98 suite documents recorded on vibe5, each distinct Boolean once a
   document; /root/bool2-scratch/tally.py, replay-docs.sh):** 928 Booleans, 656 ours (70.7 %), 44 more on our other
   shortcuts (on_face, through_holes), 228 OCCT; without cf-fill-pattern's 140 empty probes 656 / 788 (83.2 %). 48 of
   the 72 documents with Booleans all ours. 70 of 72 documents' Booleans faster ours than OCCT's (45.9 s against 81.1 s;
   not: cf-setback-fillet, cf-parameter-pattern's single on_face). With bool2-cov landed: +16 (rings 2, setback 5,
   sheet metal 8, knife 1) and the 140 probes (8139e7607, gating): 812 / 928 (87.5 %); setback and fill-pattern all ours.
-- **Landing (11-12 23:35 UTC):** f57af894 (sheets of shells; plane / round sections) in the land queue; 8139e7607
-  (cf-fill-pattern's probes: a common of edges alone, lines and circles not running together, is empty) gating.
+- **Landed (11-13):** 770dac17 (sheets of shells; plane / round sections), 91856886 (cf-fill-pattern's probes),
+  b908c662 (coincident sheets: the sheet metal's 42 coplanar fuses and commons). With them main's 227 OCCT Booleans of
+  the suite are down to 29 by the replay (854 / 928 ours).
   Real documents, main vs branch alternating on vibe5: c2-rings-loft 9.8-15.6 s -> 4.0-4.3 s (live 1.6), same 22/32;
   cf-setback-fillet ~1.0 s both (live 1.09); c2-hunting-knife the same (1.8-2.0 s both).
 - **Next:** the knife's 343b971e (514 ms): the two chamfer tools meet end to end (caps coincident at x -50 mm), their
