@@ -30,6 +30,11 @@
   B-spline's end on the Used line / arc end it meets within 2e-3 rad and turns its next pole along it (a Tangent
   constraint moved the ends off Loft 1's guides instead). Our loft then needs core's smooth-closed-profile loft
   (core-loftsmooth 4f6a20fc5, gating); core checks Loft 1 / Extrude 10 against live once both are on main.
+- Bend relief on a bend that runs out to the sheet's edge (cd11fa080, ui-parity bend-relief-new-edit-reedit): live's
+  evCornerType is NOT_A_CORNER there ("Selection is not a bend relief."); one bend alone is BEND_END only when a free
+  edge at the point carries on along the bend's line (a partial flange's end). T2 sheetmetal_std
+  bend_relief_takes_only_a_bend_end_with_a_relief; all 45 sheetmetal_std T2 pass.
+- bool takes build_part's glued fuse (a touch-only path; 22:5x): don't sew / change that fuse in build_part.
 - Suite pairs on the Mac for every land today: 80/87, 870/947, every document identical to the base.
 - Sheet metal speed. Profiling: macOS `sample` on the Mac (/root/skasm-scratch/bin/sample.sh, run there from
   ~/agents/skasm; sample_incl.py / sample_children.py / sample_parents.py read its call graph), plus NOSHAPE_SMPROF
