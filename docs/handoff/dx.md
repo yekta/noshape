@@ -17,6 +17,19 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-13 15:39 UTC: asm-tvc-mount parked (branch dx-tvc); the box integral gating (branch dx-box)
+- tvc-mount: Studio 7bc9d8's Derived 2 takes 41b795's parts; the suite has 41b795 (an instance's studio) but never
+  gave it to the Derived (`derivedSources` only from derived/). dx-tvc e8a97d330: a studio's Derived from a sibling
+  studio builds from it (with its sketch bodies' refs): occurrences 42 -> 43/43, but mates 4 -> 1/10. 7bc9d8's parts
+  don't fit live's volumes (its sketch cascade: Sketch 3's DISTANCE to Extrude 1's edge JHB refused, Sketch 4 / 7 /
+  11 / 14 / 16 taken back), so they map by name / creator, and the creator fallback gives one of ours to two of live's
+  (ours Part 5 <- "Part 5" and "inner linkage", Part 4 <- "Motor Mount" and "outer linkage"): their mates' connectors
+  then miss. Next there: 7bc9d8's sketches, then the mapping.
+- dx-box c77e89525: a non-periodic B-surface bounded by its (u, v) box integrates over the box, split at every knot,
+  4 Gauss points a piece (8 give the same): live.igs' 12-tooth gear 807.52 mm² (was 806.58), its parts' properties
+  210-280 ms a round (main 290-300); kernel 407/407 unchanged, `a_bsurface_with_dense_knots_integrates_to_its_area`.
+  Model suite base vs box and the exchange suite running on vibe7 (gate5, from 15:00).
+
 ## 11-13 13:45 UTC: a Custom STL at a tiny chord no longer needs 12 GB (lead); min facet width waits on live
 - 31b71bdb landed (the STL hollow fix, the STEP p-curves on cylinders / cones / spheres / tori, handoffs). The hose
   x_t (dx-fan) still waits on live's probe (REQUESTS 11:54).
