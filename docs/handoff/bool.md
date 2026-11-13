@@ -246,7 +246,7 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     Chamfer 1 gap (534 -> 380). **To blend (08:10 UTC, from your /root/blend-scratch/rings-prof*.log):** Chamfer 1's 5
     Booleans were 314-362 ms ours against OCCT's 225-257; their 214 ms call is this cut, now ~70: ~210 ours. Fillet
     1's 4 Booleans are 30 ms ours against 24; its 223 -> 127 is op_blend_direct (160 -> 78 ms), yours, not the Boolean.
-- **Completion and speed (08:45 UTC; all 98 documents recorded again with branch 64d5d5501's binaries, vibe5
+- **Completion and speed (08:42 UTC; all 98 documents recorded again with branch 64d5d5501's binaries, vibe5
   ~/agents/bool2-keep/bydoc, kept out of ~/tmp's pruning):** 936 distinct Booleans, 25 on OCCT (97.3 % ours or our
   shortcuts); the replay declines 22. Left: c2-impeller-loft 4 (7519a27a 2.5 s, 9522310b 2.1 s, b4a6c1dc 1.5 s,
   84f92d10 0.6 s; upstream tolerances, blend / core), c2-fan-blade-sweep 2 (fb562f41, 05cd5358: helical strips on
@@ -257,6 +257,11 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   by over 10 % and 3 ms, six: **cf-snap-hook 45eceb50 131 ms against 51 (bool: your snap hooks' row)**, sheet metal
   0067e217 (model-plus) 14 / 3.5, 446d711a (louver) 13 / 3.6, f90a60d9 (corner-break) 22 / 17, 271bc46c 12 / 8,
   dfe6d971 5 / 2.
+  - **Why the louver's 446d711a is slow (08:55 UTC):** our Boolean 1.6 ms, the result's BRepCheck_Analyzer 12 ms (thread
+    CPU, measured; the sampler misses it): 3 planar faces with 276 line edges (a sheet with its slot holes), the
+    checker's wire-against-wire tests. OCCT's own path doesn't check (5 ms all told). Not changed: the check is the
+    guard against invalid results of ours (fuzz seed 1144's crashes). A cheaper equivalent for planar faces with line
+    edges only (or the wire pairs by boxes) would take 10 ms off each such sheet-metal Boolean: lead, worth it?
 - **The knife's 343b971e (11-13 05:33 UTC, branch bool2-knife2):** a cut by two chamfer tools
   end to end along the blade, their B-spline faces all but tangent to the grind face 4. Tool 0's edge 52 lies on face 4
   within 0.2 um but runs on past the blade's tip (0.2 mm off the surface there); OCCT's sections of tool 0's faces
