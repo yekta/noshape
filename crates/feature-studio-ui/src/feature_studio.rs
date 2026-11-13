@@ -28,7 +28,7 @@ const ACE_DRAWN_ROWS: usize = 9;
 /// A popup anchor: the trigger's bounds from the last paint.
 type BoundsCell = Rc<std::cell::Cell<Bounds<Pixels>>>;
 
-actions!(feature_studio, [Commit, CommitAll, SearchStudios, ModuleOutline, BackReference, ForwardReference]);
+actions!(feature_studio, [Commit, CommitAll, SearchStudios, ModuleOutline, BackReference, ForwardReference, ToggleComment, RemoveLine, DuplicateSelection, MoveLinesUp, MoveLinesDown, CopyLinesUp, CopyLinesDown]);
 
 /// Onshape's Feature Studio shortcuts (live dom/keyboard-shortcuts.txt):
 /// Commit, Commit all, Top level symbols dropdown (the Module outline),
@@ -61,6 +61,17 @@ pub fn bind_keys(cx: &mut App) {
             bindings.push(KeyBinding::new(&k, ForwardReference, ctx));
         }
     }
+    // Ace's line commands, each OS's own key (live2 feel/studios fs0.json: "Ctrl-/ | mac Command-/").
+    let ace = |win: &str, mac_key: &str| if mac { mac_key.to_string() } else { win.to_string() };
+    bindings.extend([
+        KeyBinding::new(&ace("ctrl-/", "cmd-/"), ToggleComment, code),
+        KeyBinding::new(&ace("ctrl-d", "cmd-d"), RemoveLine, code),
+        KeyBinding::new(&ace("ctrl-shift-d", "cmd-shift-d"), DuplicateSelection, code),
+        KeyBinding::new("alt-up", MoveLinesUp, code),
+        KeyBinding::new("alt-down", MoveLinesDown, code),
+        KeyBinding::new(&ace("alt-shift-up", "cmd-alt-up"), CopyLinesUp, code),
+        KeyBinding::new(&ace("alt-shift-down", "cmd-alt-down"), CopyLinesDown, code),
+    ]);
     cx.bind_keys(bindings);
 }
 
@@ -676,6 +687,20 @@ impl FeatureStudioView {
             e.focus(window, cx);
         });
         cx.notify();
+    }
+
+    /// One of Ace's line commands on the selection, as one undo step.
+    fn line_op(&mut self, op: crate::fs_lines::LineOp, window: &mut Window, cx: &mut Context<Self>) {
+        if self.read_only(cx) {
+            return;
+        }
+        self.editor.update(cx, |e, cx| {
+            let text = e.value().to_string();
+            let Some(edit) = crate::fs_lines::apply(&text, e.selected_range(), op) else { return };
+            e.set_selected_range(edit.range, cx);
+            e.replace(edit.text, window, cx);
+            e.set_selected_range(edit.sel, cx);
+        });
     }
 
     /// Undo/redo or history browsing replaced the text.
@@ -1963,6 +1988,13 @@ impl Render for FeatureStudioView {
             .capture_action(cx.listener(|this, _: &gpui_kit::base::input::Undo, window, cx| this.code_undo(true, window, cx)))
             .capture_action(cx.listener(|this, _: &gpui_kit::base::input::Redo, window, cx| this.code_undo(false, window, cx)))
             .on_action(cx.listener(|this, _: &BackReference, window, cx| this.navigate(-1, window, cx)))
+            .on_action(cx.listener(|this, _: &ToggleComment, window, cx| this.line_op(crate::fs_lines::LineOp::ToggleComment, window, cx)))
+            .on_action(cx.listener(|this, _: &RemoveLine, window, cx| this.line_op(crate::fs_lines::LineOp::RemoveLine, window, cx)))
+            .on_action(cx.listener(|this, _: &DuplicateSelection, window, cx| this.line_op(crate::fs_lines::LineOp::Duplicate, window, cx)))
+            .on_action(cx.listener(|this, _: &MoveLinesUp, window, cx| this.line_op(crate::fs_lines::LineOp::MoveUp, window, cx)))
+            .on_action(cx.listener(|this, _: &MoveLinesDown, window, cx| this.line_op(crate::fs_lines::LineOp::MoveDown, window, cx)))
+            .on_action(cx.listener(|this, _: &CopyLinesUp, window, cx| this.line_op(crate::fs_lines::LineOp::CopyUp, window, cx)))
+            .on_action(cx.listener(|this, _: &CopyLinesDown, window, cx| this.line_op(crate::fs_lines::LineOp::CopyDown, window, cx)))
             .on_action(cx.listener(|this, _: &ForwardReference, window, cx| this.navigate(1, window, cx)))
             .bg(rgb(0xffffff))
             .child(match self.doc.read(cx).session.viewing_version() {

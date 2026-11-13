@@ -14,6 +14,7 @@ pub mod feature_studio;
 pub mod feature_studio_hooks;
 mod fs_complete;
 mod fs_import;
+mod fs_lines;
 pub mod fs_notices;
 mod fs_profile;
 pub mod fs_search;

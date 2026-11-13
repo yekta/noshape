@@ -99,3 +99,64 @@ fn a_typed_run_undoes_in_one_step(cx: &mut TestAppContext) {
     assert_eq!(text(cx), format!("{start}x"));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live2 studios.json featureStudioEditor (Ace's keys, fs0.json): Ctrl+/ comments the line with `// ` and takes it
+/// away again, Alt+↑ moves the line up, Ctrl+Shift+D duplicates it, Ctrl+D removes it; each one undo step.
+#[gpui::test]
+fn ace_line_keys_comment_move_duplicate_and_remove(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        super::bind_keys(cx);
+    });
+    let dir = std::env::temp_dir().join(format!("noshape-ui-fs-lines-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))).unwrap().id;
+    let (window, view, doc) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1600.), px(900.)) };
+        let mut view = None;
+        let d = doc.clone();
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| FeatureStudioView::new(d, tab, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap(), doc)
+    });
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
+    let start = cx.update(|cx| text_of(&doc, tab, cx)).unwrap();
+    let lines = |cx: &mut TestAppContext| {
+        pause(cx, window, 2000);
+        let t = cx.update(|cx| text_of(&doc, tab, cx)).unwrap();
+        t.strip_prefix(start.as_str()).map(str::to_string).unwrap_or(t)
+    };
+    for k in ["\n", "a", "\n", "b"] {
+        type_key(cx, window, if k == "\n" { "enter" } else { k });
+    }
+    assert_eq!(lines(cx), "\na\nb");
+    type_key(cx, window, "secondary-/");
+    assert_eq!(lines(cx), "\na\n// b");
+    type_key(cx, window, "secondary-/");
+    assert_eq!(lines(cx), "\na\nb");
+    type_key(cx, window, "alt-up");
+    assert_eq!(lines(cx), "\nb\na");
+    type_key(cx, window, "secondary-shift-d");
+    assert_eq!(lines(cx), "\nb\nb\na");
+    type_key(cx, window, "secondary-d");
+    assert_eq!(lines(cx), "\nb\na");
+    cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
+    assert_eq!(lines(cx), "\nb\nb\na", "Ctrl+D is one undo step");
+    let _ = std::fs::remove_dir_all(&dir);
+}
