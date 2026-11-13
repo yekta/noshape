@@ -3416,8 +3416,10 @@ impl AnimState {
 /// with the agent API's assembly_animate).
 pub(super) use noshape_ops::assembly::anim_dofs;
 
-/// Full turns of the mate dialog's Animate preview (one degree per frame).
+/// The mate dialog's Animate preview: two full turns, 90 frames (live feel mates.json: MATE_PLAY_ROTATION_FACTOR,
+/// MATE_PLAY_NO_OF_FRAMES; ~1.5 s at 60 fps).
 const PREVIEW_TURNS: f64 = 2.0;
+const PREVIEW_FRAMES: f64 = 90.0;
 /// Ascender of the mate value text (px; Onshape dimension text is 16 px, behaviours "Entity colours").
 const VALUE_TEXT_ASC: f64 = 11.5;
 
@@ -3511,10 +3513,10 @@ impl AssemblyView {
         let now = self.result.solved.mate_values.get(&m.id).map(|v| v[dof]).unwrap_or(0.0);
         let (a, b, steps) = if dof == 0 {
             let deg = |v: f64| format!("{} deg", noshape_units::to_fixed(v.to_degrees(), 6));
-            (deg(now), deg(now + PREVIEW_TURNS * std::f64::consts::TAU), PREVIEW_TURNS * 360.0)
+            (deg(now), deg(now + PREVIEW_TURNS * std::f64::consts::TAU), PREVIEW_FRAMES)
         } else {
             let (a, b) = self.anim_defaults(&m, dof, cx);
-            (a, b, 360.0)
+            (a, b, PREVIEW_FRAMES)
         };
         let [start, end] = self.anim_value_inputs(dof == 0, a, b, window, cx);
         let steps = self.anim_steps_input(format!("{steps}"), window, cx);
