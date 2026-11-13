@@ -1259,6 +1259,20 @@ impl<'a> Translator<'a> {
                     }
                 }
             }
+            // A stored B-spline (a Use's) as live re-projected it: its poles (c2-hunting-knife's Sketch 12: the blade's
+            // spline edges moved with the arcs beside them). Live's knot list comes cut to the pole count: the stored
+            // knots kept when they begin the same.
+            "splineSegment" if gt.starts_with("BTCurveGeometrySpline") || gt.starts_with("BTCurveGeometryControlPointSpline") => {
+                let pts: Vec<f64> = g["controlPoints"].as_array()?.iter().map(p2).collect::<Option<Vec<_>>>()?.concat();
+                let stored = e["geometry"]["controlPoints"].as_array()?.len();
+                let knots = |v: &Value| v.as_array().map(|l| l.iter().filter_map(Value::as_f64).collect::<Vec<f64>>()).unwrap_or_default();
+                let (ours, live) = (knots(&e["geometry"]["knots"]), knots(&g["knots"]));
+                let same = live.len() <= ours.len() && live.iter().zip(&ours).all(|(a, b)| (a - b).abs() < 1e-12);
+                if pts.len() != stored || g["degree"] != e["geometry"]["degree"] || !same {
+                    return None;
+                }
+                out["geometry"]["controlPoints"] = json!(pts);
+            }
             "point" if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchPoint")) => {
                 let p = p2(&g["point"])?;
                 out["x"] = json!(p[0]);
@@ -1333,9 +1347,10 @@ impl<'a> Translator<'a> {
     /// drawn where they're stored: where they were when drawn, before the model moved. When every Use of the sketch
     /// that ours made moved by the same step (infento-subs' Multi angle joint, Sketch 4: its hole circle 0.5 mm from
     /// where it's stored, the pocket's two arcs with it), they're drawn moved by it too.
-    fn moved_uses(&mut self, oid: &str, id: &str, model_frame: bool, unnamed: Vec<Use>, moved: &[[f64; 2]], problems: &mut Vec<String>) {
+    fn moved_uses(&mut self, oid: &str, id: &str, model_frame: bool, unnamed: Vec<Use>, moved: &[[f64; 2]], problems: &mut Vec<String>) -> Vec<(String, [[f64; 2]; 2])> {
+        let mut drawn = Vec::new();
         if unnamed.is_empty() {
-            return;
+            return drawn;
         }
         let map = self.sketch_map;
         let step = moved.first().copied().filter(|d| d[0].hypot(d[1]) > 1e-9 && moved.iter().all(|m| (m[0] - d[0]).hypot(m[1] - d[1]) < 1e-7)).unwrap_or([0.0, 0.0]);
@@ -1375,10 +1390,47 @@ impl<'a> Translator<'a> {
                 Ok(r) => {
                     if let Some(c) = r["created"].as_array().and_then(|l| l.iter().find(|c| (c["type"] == "point") == point && c.get("handle_of").is_none())) {
                         self.map_drawn(oid, &eid, c, point, ends);
+                        drawn.extend(ends.map(|e| (eid.clone(), e)));
                     }
                 }
                 Err(e) => problems.push(format!("sketch entity {eid}: not drawn ({e})")),
             }
+        }
+        drawn
+    }
+
+    /// Uses whose model geometry isn't named, drawn from live's stored curves: live projected their ends onto the
+    /// same model vertices, stored up to 0.15 µm apart (c2-hunting-knife's Sketch 12: a spline and a line), so ends
+    /// within 1 µm are made one (else ours has no closed loop there: Loft 1's profile).
+    fn join_use_ends(&mut self, oid: &str, id: &str, ends: &[(String, [[f64; 2]; 2])], f: &Value) {
+        let name = |eid: &str, k: usize| format!("{eid}.{}", ["start", "end"][k]);
+        let point = |eid: &str, k: usize| self.sketch_entities.get(&(oid.to_string(), name(eid, k))).cloned();
+        // (Not those live's own Coincidents join: added with the other constraints.)
+        let live: Vec<[&str; 2]> = f["constraints"].as_array().into_iter().flatten().filter(|c| c["constraintType"] == "COINCIDENT").filter_map(|c| {
+            let par = |n: &str| c["parameters"].as_array()?.iter().find(|p| p["parameterId"] == n)?["value"].as_str();
+            Some([par("localFirst")?, par("localSecond")?])
+        }).collect();
+        let joined = |a: &str, b: &str| live.iter().any(|l| (l[0] == a && l[1] == b) || (l[0] == b && l[1] == a));
+        let mut pairs: Vec<(String, String)> = Vec::new();
+        for (i, (ea, a)) in ends.iter().enumerate() {
+            for (eb, b) in &ends[i + 1..] {
+                for (ka, pa) in a.iter().enumerate() {
+                    for (kb, pb) in b.iter().enumerate() {
+                        if (pa[0] - pb[0]).hypot(pa[1] - pb[1]) > 1e-6 || joined(&name(ea, ka), &name(eb, kb)) {
+                            continue;
+                        }
+                        if let (Some(p), Some(q)) = (point(ea, ka), point(eb, kb))
+                            && p != q
+                            && !pairs.iter().any(|(x, y)| (*x == p && *y == q) || (*x == q && *y == p))
+                        {
+                            pairs.push((p, q));
+                        }
+                    }
+                }
+            }
+        }
+        for (p, q) in pairs {
+            let _ = self.call("sketch_constrain", json!({ "sketch": id, "constraint": "coincident", "entities": [p, q] }));
         }
     }
 
@@ -3528,6 +3580,47 @@ impl<'a> Translator<'a> {
         };
         // A cap edge of overlapping curves (asm-infento-subs' Fillet 2: a short arc on a half circle's circle, one
         // edge) is over the one it came out as.
+        // A cap edge on an arc: by its circle (an edge's midpoint is its centre of mass, off the arc; and a later
+        // fillet may have trimmed it: c2-hunting-knife's Fillet 5 on Extrude 5's guard edge, its top corner rounded
+        // by Fillet 4). The edge's ends within the sketch arc.
+        if pick.is_none()
+            && name == "CAP_EDGE"
+            && let Some((c, r)) = curves.first().and_then(|a| circle_through(a))
+        {
+            let cw = world(c);
+            let off_axis = |q: [f64; 3], p: [f64; 3]| {
+                let d = sub(q, p);
+                let along = dot(d, n);
+                (0..3).map(|i| (d[i] - along * n[i]).powi(2)).sum::<f64>().sqrt()
+            };
+            let (a, m, b) = (curves[0][0], curves[0][curves[0].len() / 2], curves[0][curves[0].len() - 1]);
+            let ang = |q: [f64; 2]| (q[1] - c[1]).atan2(q[0] - c[0]);
+            let tau = std::f64::consts::TAU;
+            let from_a = |q: f64, dir: f64| (dir * (q - ang(a))).rem_euclid(tau);
+            // The arc's direction: the one that passes its middle before its end.
+            let dir = if from_a(ang(m), 1.0) < from_a(ang(b), 1.0) { 1.0 } else { -1.0 };
+            let sweep = from_a(ang(b), dir);
+            let within = |q: [f64; 3]| {
+                let d = sub(q, o);
+                let t = from_a(ang([dot(d, x), dot(d, y)]), dir);
+                t <= sweep + 1e-7 || t >= tau - 1e-7
+            };
+            let on: Vec<(String, f64)> = found[kind]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|e| e["curve"] == "circle" && e["closed"] != true)
+                .filter_map(|e| {
+                    let (center, radius) = (f3(&e["center"])?.map(|v| v * k), e["radius"].as_f64()? * k);
+                    let (s, t) = (f3(&e["start"])?.map(|v| v * k), f3(&e["end"])?.map(|v| v * k));
+                    ((radius - r).abs() < 1e-6 && off_axis(center, cw) < 1e-6 && within(s) && within(t)).then(|| (e["id"].as_str().map(str::to_string), dot(sub(center, o), n).abs())).and_then(|(id, l)| Some((id?, l)))
+                })
+                .collect();
+            let extreme = if is_start { on.iter().map(|c| c.1).fold(f64::INFINITY, f64::min) } else { on.iter().map(|c| c.1).fold(f64::NEG_INFINITY, f64::max) };
+            if let Some((id, _)) = on.iter().find(|c| (c.1 - extreme).abs() < 1e-6) {
+                return Ok(id.clone());
+            }
+        }
         if pick.is_none() && name == "CAP_EDGE" && curves.len() > 1 {
             return self.extrude_entity(name, is_start, crossing, op, sk, &curves[1..]);
         }
@@ -4068,8 +4161,11 @@ impl<'a> Translator<'a> {
                 None => problems.push(format!("sketch entity {eid}: {} not translated", if gt.is_empty() { e["btType"].as_str().unwrap_or("?") } else { gt })),
             }
         }
+        // The ends of Uses whose model geometry isn't named, drawn where live's solve put them (`join_use_ends`).
+        let mut use_ends: Vec<(String, [[f64; 2]; 2])> = Vec::new();
         if uses.is_empty() {
             for u in unnamed_uses.drain(..) {
+                use_ends.extend(u.ends.map(|e| (u.eid.clone(), e)));
                 shapes.push(u.shape);
                 local.push(u.eid);
                 ends.push(u.ends);
@@ -4118,7 +4214,8 @@ impl<'a> Translator<'a> {
                 Err(u) => unnamed_uses.push(*u),
             }
         }
-        self.moved_uses(&oid, &id, frame.is_some(), unnamed_uses, &moved, problems);
+        use_ends.extend(self.moved_uses(&oid, &id, frame.is_some(), unnamed_uses, &moved, problems));
+        self.join_use_ends(&oid, &id, &use_ends, f);
         for t in &texts {
             if let Err(e) = self.sketch_text(&oid, &id, t, map) {
                 problems.push(format!("sketch text {}: {e}", t["entityId"].as_str().unwrap_or("?")));
@@ -5165,6 +5262,21 @@ fn packed_strings(p: &noshape_model::custom::host::packed::Packed, out: &mut Vec
 
 /// An arc's parameters, the end past the start: Onshape's may wrap (an arc
 /// from π to 0 runs through 3π/2).
+/// The circle through a sampled arc's first, middle and last points (sketch metres): centre and radius.
+fn circle_through(poly: &[[f64; 2]]) -> Option<([f64; 2], f64)> {
+    if poly.len() < 3 {
+        return None;
+    }
+    let (a, b, c) = (glam::DVec2::from(poly[0]), glam::DVec2::from(poly[poly.len() / 2]), glam::DVec2::from(poly[poly.len() - 1]));
+    let d = 2.0 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+    if d.abs() < 1e-18 {
+        return None;
+    }
+    let (sa, sb, sc) = (a.length_squared(), b.length_squared(), c.length_squared());
+    let center = glam::DVec2::new((sa * (b.y - c.y) + sb * (c.y - a.y) + sc * (a.y - b.y)) / d, (sa * (c.x - b.x) + sb * (a.x - c.x) + sc * (b.x - a.x)) / d);
+    Some((center.into(), center.distance(a)))
+}
+
 fn arc_span(e: &Value) -> Option<(f64, f64)> {
     let (a, b) = (e["startParam"].as_f64()?, e["endParam"].as_f64()?);
     let tau = std::f64::consts::TAU;
