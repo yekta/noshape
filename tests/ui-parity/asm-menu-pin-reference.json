@@ -1,0 +1,37 @@
+{
+ "name": "asm-menu-pin-reference",
+ "about": "Assembly 1: the linked instance's menu \u203a Pin reference, then its menu again (Unpin reference, no Edit in context), Esc.",
+ "area": "asm",
+ "source": "asm 11-13: assembly menu coverage (live asked for the uncovered items)",
+ "start": "doc-linked",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Pin reference"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

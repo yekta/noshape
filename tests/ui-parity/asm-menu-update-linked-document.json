@@ -1,0 +1,31 @@
+{
+ "name": "asm-menu-update-linked-document",
+ "about": "Assembly 1: the linked instance's menu \u203a Update linked document\u2026 (the Reference manager on uip Source), Esc.",
+ "area": "asm",
+ "source": "asm 11-13: assembly menu coverage (live asked for the uncovered items)",
+ "start": "doc-linked",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Update linked document\u2026"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
