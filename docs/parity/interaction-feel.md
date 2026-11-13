@@ -375,6 +375,24 @@ live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-st
 | Shift+F | the sketch fillet | the same | = |
 | Not yet in the matrix | Search tools' panel (Recently used, the info box, Highlight tool in toolbar), the pattern labels (3x / 1x, spacing, inline boxes), Text's two-click rectangle and dialog (font list, "Default text" selected, n/250 characters: ours has them), Insert image's tabs and aspect-kept rectangle, trim hover / drag-trim, extend hover, the sketch fillet's preview and drag | – | – |
 
+## Editing (matrix)
+
+live2's editing.json (11-13 09:27). part-studio-ui `editing::the_editing_matrix_matches_live` (T1, no GPU; outside a
+dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it there).
+
+**Matched: 7 / 7** (11-13 12:38 UTC; nothing to fix).
+
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| Undo in a sketch | one step per chained segment (3 undos for 3) | the same | = |
+| Undo a rectangle | one step (4 lines and their constraints) | the same | = |
+| After ✓ | one undo removes the whole sketch feature, redo brings it back | the same | = |
+| Ctrl+C / Ctrl+V of a feature | nothing (no feature, dialog or toast) | the same | = |
+| Delete a sketch another feature uses | no warning; the extrude turns red, Parts (0) | the same | = |
+| Delete a part | "Delete part 1" (behaviours 1.12: its dialog opens pre-filled) | the same | = |
+| Y / Shift+Y with nothing selected or under the pointer | nothing (Shift+Y isn't "show all") | the same | = |
+| Not yet in the matrix | the toolbar's Undo tooltip (always "Undo (cmd+z/ctrl+z)": ours the same), undo in a feature dialog (an existing test), sketch copy / paste (at the pointer, selected, with a 2D triad, constraints kept), the assembly rows (asm's), eye icons | – | – |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).

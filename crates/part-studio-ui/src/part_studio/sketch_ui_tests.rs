@@ -4086,6 +4086,8 @@ mod chrome;
 mod sm;
 #[path = "sketchtools_feel_tests.rs"]
 mod sketchtools;
+#[path = "editing_feel_tests.rs"]
+mod editing;
 
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.
