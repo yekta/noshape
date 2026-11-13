@@ -101,6 +101,9 @@ pub type CreatedCache = HashMap<(FsId, Option<query::EType>), (query::CreatedSee
 /// An attribute filter's matches: how many attributes it has looked at, and the positions of those it matched.
 type AttrMatches = (usize, Arc<Vec<usize>>);
 
+/// A body's boxes of its faces, edges or vertices (held, so its address stays its own).
+pub type BodyBoxes = (Arc<crate::regen::context::Body>, query::SubBoxes);
+
 /// A field's index of the attributes: how many it has looked at, and each string value's positions.
 type AttrField = (usize, HashMap<Arc<str>, Vec<usize>>);
 
@@ -149,7 +152,7 @@ pub struct CtxState {
     pub name_index: ByBody<query::NameIndex>,
     pub topo_cache: ByBody<query::Topo>,
     /// Each body's faces', edges' and vertices' boxes ([`query::QueryCx::sub_box`]), by (the body, its entity type).
-    pub sub_boxes: Mutex<HashMap<(usize, u8), (Arc<crate::regen::context::Body>, query::SubBoxes)>>,
+    pub sub_boxes: Mutex<HashMap<(usize, u8), BodyBoxes>>,
     /// Each body's edges' sketch order keys ([`query::live_order`]), with the number of sketches they were found among.
     pub sketch_order_cache: ByBody<query::SketchKeys>,
     pub created_cache: Mutex<CreatedCache>,
