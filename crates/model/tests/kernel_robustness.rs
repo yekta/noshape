@@ -2887,7 +2887,8 @@ fn oversize_fillets_like_onshape() {
 }
 
 /// A round or chamfer far larger than the block it's on fails as live's (psui's 40 × 30 × 10 start block: R100 on a top
-/// edge regenerated "OK" with a body of no faces), the block left as it was; never an empty body.
+/// edge regenerated "OK" with a body of no faces), the block left as it was; never an empty body. Short of that, a
+/// single edge's round rolls over as live's (2986).
 #[test]
 fn an_oversized_blend_fails_as_live_never_an_empty_body() {
     let mut base = T::new();
@@ -2902,6 +2903,27 @@ fn an_oversized_blend_fails_as_live_never_an_empty_body() {
         let (st, msg, v) = status(&mut t, f);
         assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some("Failed to fillet selections.")), "{what}: {v} mm³");
         assert!((v - 12000.0).abs() < 1e-6, "{what}: the block changed ({v} mm³)");
+    }
+    // Live 2986: a single edge's round rolls over while any of the block is left, as ours: the vertical edge to R100, the
+    // y = 0 top edge to R64, the x = 0 one to R78; one more millimetre fails, the block unchanged.
+    let cases: [(&str, &Vec<Reference>, &str, Option<f64>); 8] = [
+        ("vertical R80", &side, "80 mm", Some(2437.211)),
+        ("vertical R100", &side, "100 mm", Some(599.887)),
+        ("y0 R20", &top_long, "20 mm", Some(8913.479)),
+        ("y0 R64", &top_long, "64 mm", Some(1.561)),
+        ("y0 R65", &top_long, "65 mm", None),
+        ("x0 R20", &top_short, "20 mm", Some(9685.109)),
+        ("x0 R78", &top_short, "78 mm", Some(0.371)),
+        ("x0 R79", &top_short, "79 mm", None),
+    ];
+    for (what, edges, r, want) in cases {
+        let mut t = base.fork();
+        let f = t.fillet(edges.clone(), r);
+        let (st, msg, v) = status(&mut t, f);
+        match want {
+            Some(want) => assert!(st == FeatureStatus::Ok && (v - want).abs() < 2e-3, "{what}: {st:?} {msg:?} {v} mm³ (live {want})"),
+            None => assert!(st == FeatureStatus::Error && msg.as_deref() == Some("Failed to fillet selections.") && (v - 12000.0).abs() < 1e-6, "{what}: {st:?} {msg:?} {v} mm³"),
+        }
     }
     let mut t = base.fork();
     let f = t.chamfer(top_long.clone(), "100 mm");
