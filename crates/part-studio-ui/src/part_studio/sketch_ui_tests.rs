@@ -50,7 +50,11 @@ fn part_studio_from(cx: &mut TestAppContext, name: &str, start: Option<serde_jso
         cx.bind_keys(super::entry_key_bindings());
     });
     crate::part_studio_hooks::register_for_tests();
-    let dir = std::env::temp_dir().join(format!("noshape-ui-{name}-{}", std::process::id()));
+    // A file of its own each time (docs/TESTS.md): on Windows an earlier window's session still holds the last one
+    // open, so it can't be removed and the start would refuse to build over it.
+    static OPENED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let n = OPENED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("noshape-ui-{name}-{}-{n}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("ui.noshape");
     let _ = std::fs::remove_file(&path);

@@ -64,7 +64,7 @@ impl Bench {
             v.studio(cx).unwrap().features.iter().filter_map(|f| v.display.feature_state(f.id).filter(|s| s.status != noshape_model::display::FeatureStatus::Ok).map(|s| format!("{}: {:?}", f.name, s.message))).collect::<Vec<_>>()
         });
         assert!(failed.is_empty(), "live's measure document: {failed:?} didn't regenerate");
-        let path = std::env::temp_dir().join(format!("noshape-ui-{name}-{}", std::process::id())).join("ui.noshape");
+        let path = cx.update(|cx| view.read(cx).doc.read(cx).session.path.clone());
         Bench { window, view, path }
     }
 
