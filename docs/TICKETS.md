@@ -127,7 +127,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   on the swept solid. Only change on that path since the good run: dx's 7e7d69f2b (13:20, a profile's arcs of one
   circle become one edge), which changes Sweep 1's profile. Repro: `noshape-cli call feature_list` on the corpus
   document (qa's vibe2 ~/qa-parity/saved/c2-fan-blade-sweep.noshape).
-- [ ] P2 IMPORT-SPLIT-DOCUMENTS: the documents page's Import files… › **Split into multiple documents**. psui 11-09:
+- [x] (studios 11-13: closed. Parts-only STEP, Parasolid and IGES assemblies split as live 2478 / 2511 since 6c0498f1, e2e documents_import_splits_loose_step_parts_into_one_document / _a_parasolid_assembly / _an_iges_assembly. Kept: a second split's " (1)" names (documents are files; live's two same-named documents can't share a folder here) and the IGES top Assembly named after the file, not live's 24-hex id) P2 IMPORT-SPLIT-DOCUMENTS: the documents page's Import files… › **Split into multiple documents**. psui 11-09:
   a STEP assembly with subassemblies now becomes live's folder of linked documents (behaviours "dx 1742 (B)"): a
   folder named after the file, one document per subassembly (its Assembly, one Part Studio per part, CAD Imports, V1),
   the top document named after the file (Assembly 1, its own parts' Part Studios), each assembly using its
