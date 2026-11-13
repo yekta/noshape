@@ -247,6 +247,20 @@ pub fn move_rigid(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> FR
     Ok(())
 }
 
+/// Whether a face in `faces` of `shape` or one sharing an edge with them is a freeform surface (not a plane, cylinder,
+/// cone, sphere or torus).
+fn touches_freeform(shape: &Shape, faces: &[usize]) -> bool {
+    let all = shape.faces();
+    let Ok(ef) = shape.edge_faces() else { return false };
+    let mut near: std::collections::BTreeSet<usize> = faces.iter().copied().collect();
+    for fs in &ef {
+        if fs.iter().any(|f| faces.contains(&(*f as usize))) {
+            near.extend(fs.iter().map(|f| *f as usize));
+        }
+    }
+    near.iter().any(|&f| all.get(f).is_some_and(|x| !matches!(x.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. }))))
+}
+
 pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
     let ty = ev.enum_("moveFaceType").to_string();
     // moveFace.fs: the faces are checked before the direction or axis.
@@ -357,6 +371,12 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                 })?;
                 continue;
             }
+        }
+        // Faces on or beside the moved ones that aren't planes, cylinders, cones, spheres or tori (a flange's walls
+        // extruded from a loft's): OCCT's offset worked on them for ~0.6 s and left an invalid solid the booleans
+        // then made (c2-impeller-loft's Flansch verbreitern): the booleans first, OCCT's offset if they fail.
+        if translate_dir.is_none() && touches_freeform(&body.shape, &faces) && offset_by_booleans(ev, bi, &faces, dist).is_ok() {
+            continue;
         }
         let res = match translate_dir {
             None => match k::offset_faces(&body.shape, &shapes, dist) {
