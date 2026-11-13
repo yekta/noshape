@@ -361,7 +361,7 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   - Spheres (bool's 85 balls, sp-1113 7ecd5a8b): marched curves cut at the sphere's seam (free::seam_crossings) and
     projected onto it, but the cut declines non-manifold (156 open edges): ours aren't trimmed to the faces as
     OCCT's (longer, some where OCCT has none). Off on the branch (march-with-sphere.patch has it).
-  - 17:35 UTC (branch e.g. 41dd3a3+, pushed): clip margin a tenth of the plane face's box: bd8a6b96 747-759 ms against
+  - 23:48 UTC (branch bool2-march, pushed): clip margin a tenth of the plane face's box: bd8a6b96 747-759 ms against
     886-888 (OCCT's sections), but still one vertex more: two vertices 14 um apart at a three-face corner that OCCT's
     sections (tolerance ~1e-5) merge and ours (1e-7) keep. Asked the lead: accept as equivalent / pad our tolerance /
     keep it off.
