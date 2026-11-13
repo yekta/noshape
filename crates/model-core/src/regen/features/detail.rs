@@ -944,8 +944,9 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
                 if super::blend_section::section_blend(ev, bi, &edges, &sections).is_ok() {
                     continue;
                 }
+                // (Its failure isn't the chamfer's: OCCT's error stands, qa's CHAMFER-SAYS-FILLET.)
                 if let k::ChamferSpec::Equal(d) = spec
-                    && super::blend_section::planar_chamfer_cut(ev, bi, &edges, d)?
+                    && matches!(super::blend_section::planar_chamfer_cut(ev, bi, &edges, d), Ok(true))
                 {
                     continue;
                 }
