@@ -116,6 +116,11 @@ and split it; drops take the folder at their spot, 19 px sideways a level: `beha
 (fixed: tooltips fade in 150 ms; one feature dialog place for every tab and session, config feature_dialog_place.json).
 vibe6: the 62 folder, drag and measure scenarios 62 / 62. Open: 4-level nesting (no capture of what live says), the tooltip's fade-out (gpui drops it at once). Extend: live
 hasn't answered REQUESTS 14:07 yet.
+**16:12:** live's answers (2962 multi-part Properties…: ours already as described, the graphics menu has none; 16 view
+takes re-recorded, queued fa79ac86; the drag ghost outside the list). New rows: Shift+1..6's directions / ups (=), a
+click on Extrude's depth arrow flips it (fixed: only direction-only arrows flipped), the drop line staying at its last
+spot off the list (fixed: it followed the pointer's row). parts-multi-properties / view-key-* to run once live's
+bc3dfe59 / fa79ac86 are on main.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's

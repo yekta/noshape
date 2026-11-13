@@ -431,6 +431,18 @@ fn rows() -> Vec<Row> {
             l.drag(cx, from, to, true);
             expect(l.order(cx), names(&FEATURES), "order")
         } },
+        Row { id: "drag / off the list the line stays", live: "the drop line stays at its last spot while the pointer is off the list (drag_ghost_outside_list)", gap: false, check: |l, cx| {
+            let (from, to) = (l.at(cx, "feature:Extrude 3"), l.at_y(cx, "feature:Sketch 2", 6.));
+            l.drag(cx, from, to, false);
+            let on = cx.update(|cx| l.view.read(cx).ui.feature_drop.get());
+            let canvas = l.canvas(cx);
+            l.event(cx, MouseMoveEvent { position: canvas, pressed_button: Some(MouseButton::Left), modifiers: NONE });
+            draw(cx, l.window);
+            let off = cx.update(|cx| l.view.read(cx).ui.feature_drop.get());
+            l.keys(cx, "escape");
+            l.release(cx, canvas);
+            expect((on.is_some(), off == on), (true, true), "a slot over Sketch 2, the same one off the list")
+        } },
         Row { id: "drag / Escape cancels", live: "order unchanged after Escape and a release on Sketch 2", gap: false, check: |l, cx| {
             let (from, to) = (l.at(cx, "feature:Extrude 3"), l.at_y(cx, "feature:Sketch 2", 6.));
             l.drag(cx, from, to, false);

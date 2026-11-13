@@ -213,6 +213,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Folders: dropping on a collapsed folder | top third before it, middle inside at its end, bottom third after it | the same (every drop went inside, first) | = (fixed) |
 | Folders: dropping on an expanded folder | top half before it, bottom half inside as its first child | the same | = |
 | Folders: a drop between its children | inside the folder | the moved feature kept its own folder and the folder lost the children before it; now the folder at the drop (`behaviors::drop_folder`) | = (fixed) |
+| A drag off the list | the drop line stays at its last spot; released over the canvas: nothing | the line went with the pointer's row (drawn by `drag_over`); now from the drop slot | = (fixed) |
 | Folders: sideways | every 19 px sideways in the slot steps a level: a last child's bottom half 19 px left drops after the folder, outside | no levels; now 19 px a level from where the pointer came onto the slot (`LIST_LEVEL_PX`) | = (fixed) |
 | Multi-part Properties… | one "2 selected" dialog, both parts listed, Name "Multiple values", shared fields editable (live 08:18) | the first part's Properties | ≠ (not a row yet) |
 | Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); 4 levels of nesting at most; an empty new folder's caret (live2's new-folder-empty, queued); the insertion line's look | – | – |
@@ -268,6 +269,7 @@ Alt+right drags, view keys, animations, double middle click, acted out with real
 | Arrows / Shift / Ctrl | 15° / 90° / 5° in 250 ms, every key repeat turns (Ctrl stays Control on a Mac) | the same | = |
 | Ctrl+Shift+arrows | pan 150 px in 250 ms | the same | = |
 | Shift+1 / 5 / 7, F | 500 ms, zoom to fit | the same | = |
+| Shift+1..6 named views | direction / up: Front (0,1,0)/+Z, Back (0,−1,0)/+Z, Left (1,0,0)/+Z, Right (−1,0,0)/+Z, Top (0,0,−1)/+Y, Bottom (0,0,1)/−Y | the same | = |
 | N | normal to the selected face in 500 ms; again: 180° | the same | = |
 | Easing | smootherstep t³(6t² − 15t + 10) | the same | = |
 | A new animation while one runs | ignored until it ends | replaced the running one; now ignored | = (fixed) |
@@ -437,11 +439,12 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | A selected entity clicked again | leaves the field (in, out, in) | the same | = |
 | Esc in a value field | the first discards the typed value and leaves the field, the dialog stays; a second cancels | the same | = |
 | Enter with the keyboard outside a field | commits the dialog | the same | = |
+| A click on Extrude's arrow | flips the direction (the field keeps 27 mm) and regenerates | only a direction-only arrow flipped; a length arrow's click focused its field; now it flips (`manipulators`, a release with no move) | = (fixed) |
 | A field's row hovered | its entity lit yellow-green (#f2ff80) while hovered, cleared on leaving (a consumed edge too) | the same | = |
 | A field's row clicked (not its ×) | the field keeps its entities | the same | = |
 | Tab from Fillet's Radius | Radius's ± button, then Asymmetric, Partial, Variable, Allow edge overflow, Smooth fillet corners; selection fields and dropdowns skipped | the same | = |
 | Properties' Enter and Esc | do nothing (no apply, no close) | the same | = |
-| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, an arrow click flipping; preview timing (Enter / Tab / blur, every ~0.4 s while dragging);  the Appearance and Material dialogs' layout and keys; Properties' Tab order | – | – |
+| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, preview timing (Enter / Tab / blur, every ~0.4 s while dragging);  the Appearance and Material dialogs' layout and keys; Properties' Tab order | – | – |
 
 ## Feedback (matrix, Part Studio rows)
 

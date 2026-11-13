@@ -729,8 +729,10 @@ impl PartStudioView {
             ViewportEvent::ToolDrag { position, .. } => {
                 let Some(m) = self.manip_drag else { return false };
                 // A direction-only arrow (Up to …) has nothing to drag (moved: no click).
+                // Moved: not a click (`delta` 1).
+                let m = ManipDrag { delta: 1.0, ..m };
+                self.manip_drag = Some(m);
                 if a.param.is_empty() {
-                    self.manip_drag = Some(ManipDrag { delta: 1.0, ..m });
                     return true;
                 }
                 let (o, d) = ray(self, *position, cx);
@@ -779,10 +781,14 @@ impl PartStudioView {
                 }
                 true
             }
-            // std's flipManipulator (live 11-01, Extrude Through all): a
-            // click on a direction-only arrow flips it.
-            ViewportEvent::ToolUp { .. } if a.param.is_empty() => {
-                let clicked = self.manip_drag.take().is_some_and(|m| m.delta == 0.0);
+            // A click on an arrow flips it: std's flipManipulator (live 11-01, Extrude Through all) and a length
+            // arrow too (live feel/dialogs.json: Extrude's depth arrow, offset 27 -> -27, the field still 27 mm).
+            ViewportEvent::ToolUp { .. } => {
+                let clicked = self.manip_drag.is_some_and(|m| m.delta == 0.0);
+                if !a.param.is_empty() && !(clicked && a.flip.is_some()) {
+                    return self.end_manip_drag(a.param, window, cx);
+                }
+                self.manip_drag = None;
                 if clicked
                     && let (Some(f), Some(e)) = (a.flip, &self.edit)
                 {
@@ -793,7 +799,6 @@ impl PartStudioView {
                 }
                 true
             }
-            ViewportEvent::ToolUp { .. } => self.end_manip_drag(a.param, window, cx),
             _ => false,
         }
     }

@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::viewport::Viewport;
-use glam::DVec2;
+use glam::{DVec2, DVec3};
 use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, ScrollDelta, ScrollWheelEvent, point};
 use noshape_render::Camera;
 
@@ -385,6 +385,26 @@ fn rows() -> Vec<Row> {
                 n.keys(cx, keys);
                 let (_, d) = cx.update(|cx| n.vp.read(cx).animation()).ok_or(format!("{keys}: no animation"))?;
                 near(d.as_millis() as f64, 500., 0.5, &format!("{keys} ms"))?;
+            }
+            Ok(())
+        } },
+        Row { id: "keys / Shift+1..7: the named views", live: "direction / up: Front (0,1,0)/+Z, Back (0,-1,0)/+Z, Left (1,0,0)/+Z, Right (-1,0,0)/+Z, Top (0,0,-1)/+Y, Bottom (0,0,1)/-Y, Shift+7 isometric", gap: false, check: |n, cx| {
+            let want = [
+                ("shift-1", DVec3::Y, DVec3::Z),
+                ("shift-2", -DVec3::Y, DVec3::Z),
+                ("shift-3", DVec3::X, DVec3::Z),
+                ("shift-4", -DVec3::X, DVec3::Z),
+                ("shift-5", -DVec3::Z, DVec3::Y),
+                ("shift-6", DVec3::Z, -DVec3::Y),
+            ];
+            for (keys, dir, up) in want {
+                n.reset(cx);
+                n.keys(cx, keys);
+                n.settle(cx);
+                let c = n.cam(cx);
+                if c.forward().distance(dir) > 1e-6 || c.up().distance(up) > 1e-6 {
+                    return Err(format!("{keys}: ours direction {:?} up {:?}, live {dir:?} / {up:?}", c.forward(), c.up()));
+                }
             }
             Ok(())
         } },

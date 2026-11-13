@@ -5276,6 +5276,10 @@ impl PartStudioView {
                 }
                 let f = f32::from(e.event.position.y - e.bounds.top()) / f32::from(e.bounds.size.height).max(1.);
                 let zone = if collapsed { (f * 3.).floor().clamp(0., 2.) as u8 } else if f < 0.5 { 0 } else { 1 };
+                // Over a folder row its own line shows, not a feature row's last one.
+                if this.ui.feature_drop.take().is_some() {
+                    cx.notify();
+                }
                 if this.ui.folder_drop.get() != Some((id, zone)) {
                     this.ui.folder_drop.set(Some((id, zone)));
                     cx.notify();
@@ -5547,7 +5551,14 @@ impl PartStudioView {
             .group("rollback")
             .tip("Rollback bar", crate::ui::TipSide::Below)
             .child(div().w_full().h(px(7.)).bg(if focused { gpui_kit::rgb(0xa0c7dd) } else { pal.rollback }).group_hover("rollback", |d| d.bg(gpui_kit::rgb(0xc8d9e2))))
-            .on_drag(RollbackDrag, |_, grab, _, cx| cx.new(|_| RollbackDragPill(grab)))
+            .on_drag(RollbackDrag, {
+                let (slot, xs) = (self.ui.feature_drop.clone(), self.ui.feature_drop_x.clone());
+                move |_, grab, _, cx| {
+                    slot.set(None);
+                    xs.set(None);
+                    cx.new(|_| RollbackDragPill(grab))
+                }
+            })
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                 // Selecting the bar lets ↑/↓ step it (Onshape).
                 window.focus(&this.ui.list_focus, cx);
@@ -5725,8 +5736,7 @@ impl PartStudioView {
                         .border_2()
                         .border_color(pal.accent)
                         .bg(gpui_kit::rgb(0xffffff))
-                        .invisible()
-                        .group_drag_over::<FeatureDrag>("feature-row", |s| s.visible()),
+                        .when(self.ui.feature_drop_x.get().is_none() || self.ui.feature_drop.get().is_none_or(|(r, _)| r != i), |d| d.invisible()),
                 )
             })
             .text_color(color)
@@ -5934,9 +5944,10 @@ impl PartStudioView {
                     },
                 },
                 {
-                    let xs = self.ui.feature_drop_x.clone();
+                    let (slot, xs) = (self.ui.feature_drop.clone(), self.ui.feature_drop_x.clone());
                     move |d, grab, window, cx| {
                         let x = f32::from(window.mouse_position().x);
+                        slot.set(None);
                         xs.set(Some((x, x)));
                         cx.new(|_| FeatureDragPill(grab, d.name.clone()))
                     }
@@ -5959,12 +5970,12 @@ impl PartStudioView {
                     cx.notify();
                 }
             }))
-            .drag_over::<FeatureDrag>({
-                let drop = self.ui.feature_drop.clone();
-                move |s, _, _, _| {
-                    let s = s.bg(gpui_kit::rgb(0xe0f0fb)).border_color(p().accent);
-                    if drop.get() == Some((i, true)) { s.border_b_2() } else { s.border_t_2() }
-                }
+            .drag_over::<FeatureDrag>(|s, _, _, _| s.bg(gpui_kit::rgb(0xe0f0fb)))
+            // The drop line stays at its last spot while the pointer is off the list (live featurelist.json
+            // drag_ghost_outside_list), so it follows the drop slot rather than the row under the pointer.
+            .when(cx.has_active_drag() && self.ui.feature_drop_x.get().is_some() && self.ui.feature_drop.get().is_some_and(|(r, _)| r == i), |d| {
+                let d = d.border_color(p().accent);
+                if self.ui.feature_drop.get() == Some((i, true)) { d.border_b_2() } else { d.border_t_2() }
             })
             .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| {
                 let after = this.ui.feature_drop.take().is_some_and(|(r, a)| r == i && a);
