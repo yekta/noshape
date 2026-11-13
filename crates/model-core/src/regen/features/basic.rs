@@ -7,6 +7,9 @@ use noshape_units::Dim;
 /// Onshape's note for a Boolean that changes nothing (live qa5 BOOL1).
 use crate::regen::eval::NO_GEOMETRY_CHANGE;
 
+/// The seconds OCCT's face offset of an offset Subtract's tool may take.
+const OFFSET_DEADLINE_S: f64 = 2.0;
+
 /// Live's info for an Intersect of parts that only touch.
 const TOUCHING_INTERSECT: &str = "The parts either do not intersect or are totally contained.";
 
@@ -67,10 +70,39 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
                 return err("Cannot resolve entities.");
             }
             let tool_ids: Vec<_> = tools_idx.iter().map(|&i| ev.ctx.bodies[i].id.clone()).collect();
-            let tools: Vec<NamedShape> = tools_idx.iter().map(|&i| {
-                let b = &ev.ctx.bodies[i];
-                NamedShape { shape: b.shape.clone(), names: b.shape_names() }
-            }).collect();
+            // Offset (boolean.fs): copies of the tools with their picked faces (every face, Offset all) offset by the
+            // distance as Move face's Offset, subtracted in their place; the tools stay or go as without it. A zero
+            // distance offsets nothing (V1700_BOOLEAN_ZERO_OFFSET).
+            let offset = if op == "SUBTRACTION" && ev.bool("offset") { ev.length("offsetDistance")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 } } else { 0.0 };
+            let picked = (offset.abs() > 1e-12 && !ev.bool("offsetAll")).then(|| ev.resolve_faces(ev.query("entitiesToOffset")));
+            let mut tools: Vec<NamedShape> = Vec::with_capacity(tools_idx.len());
+            for &i in &tools_idx {
+                let b = ev.ctx.bodies[i].clone();
+                let names = b.shape_names();
+                let faces: Vec<usize> = match &picked {
+                    _ if offset.abs() <= 1e-12 => Vec::new(),
+                    None => (0..b.faces.len()).collect(),
+                    Some(p) => p.iter().filter(|f| f.0 == i).map(|f| f.1).collect(),
+                };
+                if faces.is_empty() {
+                    tools.push(NamedShape { shape: b.shape.clone(), names });
+                    continue;
+                }
+                let shapes: Vec<k::Shape> = faces.iter().filter_map(|&f| b.shape.sub_shape(k::ShapeType::Face, f).ok()).collect();
+                // (OCCT's face offset of planes, cylinders, cones, spheres and tori, within a time limit; else the tool
+                // as it is, as before Offset was taken here: a thread's free-form flanks, c2-fan-blade-sweep's Boolean 2,
+                // failed after 32 s, and took 4 s with the limit.)
+                let analytic = shapes.iter().all(|f| matches!(f.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. })));
+                let res = analytic.then(|| k::with_deadline(OFFSET_DEADLINE_S, || k::offset_faces(&b.shape, &shapes, offset)).0);
+                let Some(res) = res.and_then(|r| r.ok()).filter(|r| r.shape.is_valid() && r.shape.count(k::ShapeType::Solid) > 0) else {
+                    log::debug!("boolean: the tools' faces not offset (OCCT's offset failed)");
+                    tools.push(NamedShape { shape: b.shape.clone(), names });
+                    continue;
+                };
+                let role = |n: &crate::naming::Name| crate::reference::Role::Offset(n.clone());
+                let names = ev.name_result(&[&names], &res.history, &res.shape, &std::collections::BTreeMap::new(), Some(&role));
+                tools.push(NamedShape::new(res.shape, names));
+            }
             if op == "INTERSECTION" && targets.is_empty() && tools_idx.len() < 2 {
                 // Live (ui-parity boolean-intersect): one part fails, as Union's (opBoolean's input check).
                 return err("Need at least two parts or surfaces for a Boolean operation.");

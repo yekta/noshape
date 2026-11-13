@@ -3452,6 +3452,40 @@ fn union_of_offset_cylinders_on_one_plane() {
     }
 }
 
+/// Boolean Subtract with Offset (boolean.fs: a copy of each tool with its faces offset, subtracted in its place), a
+/// 10 mm square pin through a 20 x 20 x 10 mm plate, Keep tools: Offset all at 0.2 mm leaves a 10.4 mm square hole
+/// and the pin as it was; at 0 mm, the pin's own hole (V1700_BOOLEAN_ZERO_OFFSET). c2-fan-blade-sweep's Boolean 2
+/// subtracted its tools without their offset before.
+#[test]
+fn subtract_with_offset_leaves_a_gap_round_the_tool() {
+    for (gap, hole) in [("0.2 mm", 10.4), ("0 mm", 10.0)] {
+        let mut t = T::new();
+        let (_, plate) = t.sketch(&[&[(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)]], &[]);
+        let e1 = t.add("extrude", &[("entities", q(plate)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+        let plate_id = t.ok(e1).context.bodies[0].id.clone();
+        let (_, pin) = t.sketch(&[&[(5.0, 5.0), (15.0, 5.0), (15.0, 15.0), (5.0, 15.0)]], &[]);
+        let e2 = t.add("extrude", &[("entities", q(pin)), ("depth", e("20 mm")), ("operationType", en("NEW"))]);
+        let pin_id = t.ok(e2).context.bodies.iter().find(|b| b.id != plate_id).unwrap().id.clone();
+        let b = t.add(
+            "booleanBodies",
+            &[
+                ("operationType", en("SUBTRACTION")),
+                ("tools", q(vec![Reference::Body(pin_id.clone())])),
+                ("targets", q(vec![Reference::Body(plate_id.clone())])),
+                ("offset", ParamValue::Bool(true)),
+                ("offsetAll", ParamValue::Bool(true)),
+                ("offsetDistance", e(gap)),
+                ("keepTools", ParamValue::Bool(true)),
+            ],
+        );
+        let r = t.ok(b);
+        let vol = |id: &noshape_model::reference::BodyId| r.context.bodies.iter().find(|b| &b.id == id).map(|b| b.shape.volume().unwrap() * 1e9).unwrap();
+        assert_eq!(r.context.bodies.len(), 2, "{gap}");
+        assert!((vol(&plate_id) - (4000.0 - hole * hole * 10.0)).abs() < 1e-6, "{gap}: plate {} mm³", vol(&plate_id));
+        assert!((vol(&pin_id) - 2000.0).abs() < 1e-6, "{gap}: pin {} mm³", vol(&pin_id));
+    }
+}
+
 /// qa's HALF-MIRROR-HOLE (halfmir.noshape): a 20 x 20 x 10 half plate with a half Ø10 hole on the Right plane, Part
 /// mirror Add across it: the whole plate with a through hole (8000 - 250π mm³, live's 7 faces, one 314.16 mm² hole
 /// wall), with noshape's Boolean and with OCCT's (where noshape's declines it falls back there; it gave 7738.201 mm³
