@@ -60,8 +60,17 @@ builder's 1.25 px polylines); inactive sketches 1.5 px vs live 1 px. 11:50: edge
 with ink.py / ink2.py). Open: live's start "block" sketch shows its rectangle untied to the origin, ours tied (to
 check). 12:16: chrome's uncovered items (16 / 16): context menus flip round the pointer (vendored gpui
 `anchored().flip_point`), feature / folder row menus at + (10, 12), toolbar dropdowns at the group's left (vendored
-gpui-component `PopupMenu::shift_x`), the list width per tab, Select other 83 px with nothing found. Next: live2's
-batches (sheet metal, sketch tools, editing, dialogs, feedback), then the two known scenario misses.
+gpui-component `PopupMenu::shift_x`), the list width per tab, Select other 83 px with nothing found.
+**13:00: the queue is done.** live2's batches as matrices (interaction-feel.md): sheet metal 9 / 9 (a Bends row click
+selects the row only; Enter edits a selected cell), sketch tools 10 / 10, editing 7 / 7, dialogs 5 / 5 (arrow grab
+reach, zoom-dependent length steps and Shift, angle steps by radius, Properties opening with no field focused),
+feedback 2 / 2 (a warning's tooltip). Known misses: parts-row-dblclick-rename-escape fixed (GPUI's keyboard modality
+dropped the list row's hover, so Y after typing found no part; a row now keeps its hover through keys; left: moving
+from the row to empty list space after typing keeps that hover until another row or the graphics is hovered);
+feature-menu-suppress-unsuppress is live's regeneration latency (re-record asked). Asked live2 (REQUESTS 12:33,
+12:48): the Esc with the mid-chain menu open, the finer angle snap windows. sm-form-tool misses on green too (live's
+Form opens on "Circle emboss"): next to look at. Mac wall times this stretch: part-studio-ui suite 30 s run / 45-90 s
+with a build; a matrix alone 4-17 s incremental; vibe6 app builds 18 s-1 m 14 s, ~20 scenarios 2-6 min.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's

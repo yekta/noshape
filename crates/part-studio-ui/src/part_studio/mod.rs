@@ -4632,7 +4632,12 @@ impl PartStudioView {
                         this.set_part_hidden(&id3, !hidden, cx);
                     })),
             )
-            .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+            .on_hover(cx.listener(move |this, h: &bool, window, cx| {
+                // A key doesn't end the hover (a browser keeps :hover while typing: live parts-row-dblclick-rename-
+                // escape's Y hides the part under the pointer after B, o, d); GPUI's keyboard modality reports a leave.
+                if !*h && window.last_input_was_keyboard() {
+                    return;
+                }
                 let new = if *h { Some(r_hover.clone()) } else { None };
                 // Leaving clears only this row's hover: going row to row the
                 // next row's enter may come first.
