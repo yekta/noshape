@@ -3891,7 +3891,7 @@ impl AssemblyView {
                     ),
                 )
             })
-            .when(!crate::os_menu::is_open(cx), |d| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(row_tip.clone()).build(w, cx)))
+            .when(!crate::os_menu::is_open(cx), |d| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(row_tip.clone()).build(w, cx)).tooltip_show_delay(crate::ui::ROW_TIP_DELAY))
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 // Hovering a row highlights the instance in the graphics area.
                 let new = if *h { Some(top) } else { None };
@@ -4194,7 +4194,7 @@ impl AssemblyView {
                 )
             })
             // No row tooltip while a context menu is open (it would cover the menu).
-            .when_some(tip.filter(|_| !crate::os_menu::is_open(cx)), |d, m| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)))
+            .when_some(tip.filter(|_| !crate::os_menu::is_open(cx)), |d, m| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)).tooltip_show_delay(crate::ui::ROW_TIP_DELAY))
             // Drag a row onto another of the same kind to reorder (Onshape).
             .on_drag(behaviors::MateDrag { id, label: name.clone().into() }, |d, _, _, cx| cx.new(|_| d.clone()))
             .drag_over::<behaviors::MateDrag>(move |st, _, _, _| st.border_t_2().border_color(accent))

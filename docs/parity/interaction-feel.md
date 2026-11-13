@@ -208,7 +208,7 @@ per matrix (17:18 UTC): **mates 23 / 28, views 13 / 15, instance list 16 / 22, 3
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
 | Hovered row | light blue, an eye at the right end | the same | – | = |
-| Row tooltip | ~70 ms | 400 ms (the app's Bootstrap delay, chrome.json) | – | ≠ |
+| Row tooltip | ~70 ms (a 30 fps recording) | 160 ms, as the feature list's rows (`ROW_TIP_DELAY`: live featurelist.json's 160–390 ms) | – | ? (two live numbers) |
 | 3D highlight on hover | ~0.85 s after the pointer arrives | at once | – | ? (live2's software-GL machine, as psui's sketch hover) |
 | Plain click | toggles the row | the same (`list_click`) | ui-parity asm-select-mate-row | = |
 | Ctrl+click | nothing | opens the row's menu (behaviours "skb (10-24)" (3), Linux Chrome) | – | ? (captures disagree; asked) |
