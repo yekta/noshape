@@ -4491,8 +4491,10 @@ static bool solid_inside_out(const TopoDS_Shape& solid)
     if (d <= blo + 3 * tol)
       return true;
   }
+  // (Its volume's sign: integrated to 5 % (OCCT's adaptive integration), not to the last digit: cf-surface-pattern's
+  // B-spline part took 220 ms a check.)
   GProp_GProps g;
-  BRepGProp::VolumeProperties(solid, g, true);
+  BRepGProp::VolumeProperties(solid, g, 0.05, true);
   return g.Mass() < 0;
 }
 
