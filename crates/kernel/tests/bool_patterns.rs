@@ -2361,3 +2361,28 @@ fn a_chamfer_tool_along_a_blades_face_cuts_as_occt() {
     let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
     assert!((v - w).abs() <= 1e-7 * w, "volume {v} against OCCT's {w}");
 }
+
+/// cf-setback-fillet's corner patch fused onto the part: OCCT's section runs 0.46 um from the patch's edge, which lies
+/// on the other face's surface all along there (OCCT's edge on that face, no touching point): no vertex in OCCT's
+/// result, so it isn't "a section touching a face's boundary" but ours, as OCCT's.
+#[test]
+fn a_section_beside_an_edge_lying_on_the_other_face_fused_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "a00aec8a0f783a25").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid(), "noshape's result invalid");
+    let counts = |s: &k::Shape| [k::ShapeType::Solid, k::ShapeType::Shell, k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), counts(&o.shape), "solids, shells, faces, edges, vertices");
+    let volume = |s: &k::Shape| k::volume_properties(s).unwrap().mass;
+    let (vr, vo) = (volume(&r.shape), volume(&o.shape));
+    assert!((vr - vo).abs() <= 1e-9 * vo.abs(), "volume {vr} against OCCT's {vo}");
+}
+

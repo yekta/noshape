@@ -1648,6 +1648,17 @@ impl Ctx<'_> {
         // (The side of the interval before, where it was clear of the boundary: across one crossing the next is the
         // other side, no ray cast (a gear's end face: hundreds of curves a ray).)
         let mut before: Option<bool> = None;
+        // (The face's edge nearest the curve at `t` lying on the other face's surface all along there, within their
+        // tolerances: OCCT's edge on that face, no touching point and no vertex (cf-setback-fillet's fuses, a section
+        // 0.5-4 um from such an edge); an edge only touching it at one point does get one.)
+        let edge_on_other = |t: f64| {
+            let Some(g) = other else { return false };
+            let p = path.at(t);
+            let Some((e, u)) = self.faces[f].edges.iter().map(|&(e, _)| (e, self.seg_param(&self.edge_seg(e), p))).min_by(|x, y| x.1.1.total_cmp(&y.1.1)).map(|(e, (u, _))| (e, u)) else { return false };
+            let (sx, reach) = (self.edge_seg(e), self.edges[e].t + self.faces[g].t);
+            let off = |q: DVec3| (self.faces[g].to3(self.faces[g].to2(q)) - q).length();
+            [-0.1, -0.03, -0.01, 0.0, 0.01, 0.03, 0.1].iter().map(|du| u + du).filter(|w| (0.0..=1.0).contains(w)).all(|w| off(self.seg_at(&sx, w)) <= reach)
+        };
         for k in 0..cuts.len() - 1 {
             let (a, b) = (cuts[k], cuts[k + 1]);
             if apart(a.0, b.0) <= vtol {
@@ -1722,7 +1733,7 @@ impl Ctx<'_> {
                         }
                     }
                     let t = 0.5 * (lo + hi);
-                    if apart(a.0, t) > margin && apart(t, b.0) > margin && d(t) <= GREY * tol && !grazes.iter().any(|g| t >= g.0 - margin / scale && t <= g.1 + margin / scale) {
+                    if apart(a.0, t) > margin && apart(t, b.0) > margin && d(t) <= GREY * tol && !grazes.iter().any(|g| t >= g.0 - margin / scale && t <= g.1 + margin / scale) && !edge_on_other(t) {
                         return Err(Decline("a section touching a face's boundary"));
                     }
                 }
