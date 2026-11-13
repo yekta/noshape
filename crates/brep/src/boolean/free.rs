@@ -475,29 +475,41 @@ pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: 
         return Vec::new();
     }
     const N: usize = 64;
+    // (Its parameter followed a turn at a time from the one before; param_of's own may run on into the face's margin
+    // past the seam before it turns over.)
+    let unwrap = |x: f64, near: f64| x + TAU * ((near - x) / TAU).round();
     let mut out = Vec::new();
-    let mut prev: Option<(f64, DVec2)> = None;
+    let mut prev: Option<(f64, DVec2, DVec2)> = None;
     for k in 0..=N {
         let t = t0 + (t1 - t0) * k as f64 / N as f64;
         let p = at(t).0;
         let (uv, _) = ns.param_of(p, prev.map_or_else(|| g.uv_of(p), |q| q.1), g.uvbox);
-        if let Some((tp, up)) = prev
-            && let Some(&i) = round.iter().find(|&&i| (uv[i] - up[i]).abs() > PI)
-        {
-            // (Bisected: followed from the side before, the point where its parameter turns over.)
-            let (mut lo, mut hi, mut ulo) = (tp, t, up);
-            for _ in 0..60 {
-                let mid = 0.5 * (lo + hi);
-                let (um, _) = ns.param_of(at(mid).0, ulo, g.uvbox);
-                if (um[i] - ulo[i]).abs() > PI {
-                    hi = mid;
-                } else {
-                    (lo, ulo) = (mid, um);
+        let mut w = uv;
+        if let Some((tp, up, pw)) = prev {
+            for &i in &round {
+                w[i] = unwrap(uv[i], pw[i]);
+                let (lo, hi) = uv_span(g, i);
+                for edge in [lo, hi] {
+                    if (pw[i] - edge) * (w[i] - edge) >= 0.0 {
+                        continue;
+                    }
+                    // (Bisected: where its followed parameter passes the seam.)
+                    let (mut a, mut b, mut ua, mut wa) = (tp, t, up, pw[i]);
+                    for _ in 0..60 {
+                        let mid = 0.5 * (a + b);
+                        let (um, _) = ns.param_of(at(mid).0, ua, g.uvbox);
+                        let wm = unwrap(um[i], wa);
+                        if (wa - edge) * (wm - edge) < 0.0 {
+                            b = mid;
+                        } else {
+                            (a, ua, wa) = (mid, um, wm);
+                        }
+                    }
+                    out.push(0.5 * (a + b));
                 }
             }
-            out.push(0.5 * (lo + hi));
         }
-        prev = Some((t, uv));
+        prev = Some((t, uv, w));
     }
     out
 }
@@ -515,7 +527,18 @@ pub(super) fn projected(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, 
         let t = t0 + (t1 - t0) * k as f64 / N as f64;
         let (p, dp) = at(t);
         let seed = qs.last().map_or_else(|| g.uv_of(p), |q| q.0);
-        let (uv, dist) = ns.param_of(p, seed, g.uvbox);
+        let (mut uv, dist) = ns.param_of(p, seed, g.uvbox);
+        // (Ending on the seam of a face going a whole turn round: its last point on the side it came from.)
+        if k == N
+            && let Some(q) = qs.last()
+        {
+            for (i, round) in ns.periodic().into_iter().enumerate() {
+                let (lo, hi) = uv_span(g, i);
+                if round && (hi - lo - TAU).abs() <= 1e-6 {
+                    uv[i] += TAU * ((q.0[i] - uv[i]) / TAU).round();
+                }
+            }
+        }
         if dist > tol {
             if std::env::var("XEOF").is_ok() {
                 eprintln!("XEOF  point {k} of {N} off by {dist:e} (tol {tol:e}) at uv {uv:?} seed {seed:?} box {:?}", g.uvbox);
