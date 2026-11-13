@@ -56,7 +56,6 @@
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
-#include <BRepExtrema_ShapeProximity.hxx>
 #include <BRepExtrema_TriangleSet.hxx>
 #include <BVH_Tools.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
@@ -3444,7 +3443,7 @@ protected:
       }
       myLists(k) = std::move(kept);
     }
-    drop_far_edge_faces();
+    drop_far_pairs();
     // (Each edge / face pair's distance on all threads; a pair kept unless it was found clearly apart.)
     struct EF
     {
@@ -3502,39 +3501,28 @@ protected:
   }
 
 private:
-  // Edge / face pairs whose edge's faces' meshes all stay farther from the face's than the meshes' error (on copies,
-  // at a twentieth of the wall), dropped: those faces' boxes overlap but they are apart (c2-rings-loft's 1275 such of
-  // its 1439 pairs, 1.9 s of OCCT's intersections).
-  void drop_far_edge_faces()
+  // The faces meshed (on copies, at a twentieth of the wall) for drop_far_edges. (A rule on the edge's faces' meshes
+  // before it, a face-to-face proximity, cost more than it saved once the edges' own points are tested.)
+  void drop_far_pairs()
   {
     if (!(apart_ > 0))
       return;
-    std::vector<int>                                    face_ids;
-    NCollection_DataMap<const void*, int>               face_at;
-    NCollection_DataMap<const void*, std::vector<int>>  faces_of_edge;
-    BRep_Builder                                        bb;
-    TopoDS_Compound                                     copies;
+    NCollection_DataMap<const void*, int> face_at;
+    BRep_Builder                          bb;
+    TopoDS_Compound                       copies;
     bb.MakeCompound(copies);
+    int nfaces = 0;
     for (int n = 0; n < myDS->NbSourceShapes(); ++n)
     {
       if (myDS->ShapeInfo(n).ShapeType() != TopAbs_FACE)
         continue;
-      const TopoDS_Shape& f = myDS->Shape(n);
-      face_at.Bind(f.TShape().get(), static_cast<int>(face_ids.size()));
-      for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
-      {
-        if (!faces_of_edge.IsBound(x.Current().TShape().get()))
-          faces_of_edge.Bind(x.Current().TShape().get(), {});
-        faces_of_edge.ChangeFind(x.Current().TShape().get()).push_back(static_cast<int>(face_ids.size()));
-      }
-      face_ids.push_back(n);
-      bb.Add(copies, BRepBuilderAPI_Copy(f, false, false).Shape());
+      face_at.Bind(myDS->Shape(n).TShape().get(), nfaces++);
+      bb.Add(copies, BRepBuilderAPI_Copy(myDS->Shape(n), false, false).Shape());
     }
-    if (face_ids.empty())
+    if (nfaces == 0)
       return;
     // (The wall's thickness is ten times `apart_`.)
-    const double defl = 0.5 * apart_;
-    BRepMesh_IncrementalMesh(copies, defl, false, 0.5, !serial_);
+    BRepMesh_IncrementalMesh(copies, 0.5 * apart_, false, 0.5, !serial_);
     std::vector<TopoDS_Face> meshed;
     for (TopoDS_Iterator it(copies); it.More(); it.Next())
     {
@@ -3542,39 +3530,6 @@ private:
       if (BRep_Tool::Triangulation(TopoDS::Face(it.Value()), l).IsNull())
         return;
       meshed.push_back(TopoDS::Face(it.Value()));
-    }
-    BRepExtrema_ShapeProximity prox(copies, copies, 4 * defl);
-    prox.Perform();
-    std::vector<std::set<int>> close_to(face_ids.size());
-    for (NCollection_DataMap<int, TColStd_PackedMapOfInteger>::Iterator x(prox.OverlapSubShapes1()); x.More(); x.Next())
-      for (TColStd_PackedMapOfInteger::Iterator y(x.Value()); y.More(); y.Next())
-      {
-        close_to[(size_t)x.Key()].insert(y.Key());
-        close_to[(size_t)y.Key()].insert(x.Key());
-      }
-    for (int k = 0; k < myLists.Length(); ++k)
-    {
-      NCollection_DynamicArray<BOPDS_Pair> kept;
-      for (const BOPDS_Pair& p : myLists(k))
-      {
-        int n1, n2;
-        p.Indices(n1, n2);
-        const TopAbs_ShapeEnum t1 = myDS->ShapeInfo(n1).ShapeType(), t2 = myDS->ShapeInfo(n2).ShapeType();
-        bool apart = false;
-        if ((t1 == TopAbs_EDGE && t2 == TopAbs_FACE) || (t1 == TopAbs_FACE && t2 == TopAbs_EDGE))
-        {
-          const TopoDS_Shape& e  = t1 == TopAbs_EDGE ? myDS->Shape(n1) : myDS->Shape(n2);
-          const TopoDS_Shape& f  = t1 == TopAbs_EDGE ? myDS->Shape(n2) : myDS->Shape(n1);
-          const int*          fi = face_at.Seek(f.TShape().get());
-          const auto*         es = faces_of_edge.Seek(e.TShape().get());
-          apart = fi != nullptr && es != nullptr && !es->empty();
-          for (size_t q = 0; apart && q < es->size(); ++q)
-            apart = (*es)[q] != *fi && close_to[(size_t)(*es)[q]].count(*fi) == 0;
-        }
-        if (!apart)
-          kept.Append(p);
-      }
-      myLists(k) = std::move(kept);
     }
     drop_far_edges(face_at, meshed);
   }
