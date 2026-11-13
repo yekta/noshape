@@ -2044,6 +2044,7 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
     let cost = |r: &[f64]| r.iter().map(|v| v * v).sum::<f64>().sqrt();
     let before = cost(&r).max(1e-10);
     let mut trial = poses.to_vec();
+    let mut last = f64::INFINITY;
     // About 10× closer each step (oracle R1: 0.1 rad → 2e-8 after 6); the
     // fine difference step keeps the null space exact enough to go on.
     for _ in 0..12 {
@@ -2087,20 +2088,29 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
         // What's left along the free directions is the null basis's tilt
         // (finite differences) leaking the pull-back's mated part: ~1e-8 of
         // it. Below that, with the mates held, the rounds only chase that
-        // (a1000 regenerate: 11 of 12 rounds at ×0.66 each, 1e-8 → 5e-10).
-        if proj.norm() < 1e-8 * back.norm() && r.iter().all(|v| v.abs() < 1e-12) {
+        // (a1000 regenerate: 11 of 12 rounds at ×0.66 each, 1e-8 → 5e-10). Nor below that noise itself, 1e-8 of the
+        // scale, once the mates hold or stop getting closer (asm-clamp-pattern: 24 parts chasing 2e-8, a tree's part a
+        // residual it can't take, all 12 rounds of every solve).
+        let now = cost(&r);
+        if (proj.norm() < 1e-8 * back.norm() || proj.norm() < 1e-8) && (r.iter().all(|v| v.abs() < 1e-12) || now >= last) {
             break;
         }
+        last = now;
         let mut along = &basis * proj;
         to_anchor(&mut along, -1.0);
         let along = DVector::from_column_slice(along.as_slice());
-        let svd = jac.svd(true, true);
-        // The correction inverts no direction the null space above takes for
-        // free (σ ≤ 1e-4 σmax, as its eigenvalue cut): a 1e-8 residual
-        // read along a free turn undid it by 23° and the rounds diverged
-        // (live asm batch 3 f52: a pin on a Revolute keeps its turn).
-        let tol = 1e-4 * svd.singular_values.iter().fold(0.0f64, |a, v| a.max(*v));
-        let Ok(fix) = svd.solve(&(-DVector::from_column_slice(&r)), tol) else { return };
+        // The correction −J⁺r, through the same eigendecomposition (JᵀJ's eigenvalues are J's singular values
+        // squared; an SVD of its own took two thirds of each round). It inverts no direction the null space above
+        // takes for free (σ ≤ 1e-4 σmax): a 1e-8 residual read along a free turn undid it by 23° and the rounds
+        // diverged (live asm batch 3 f52: a pin on a Revolute keeps its turn).
+        let jtr = jac.transpose() * DVector::from_column_slice(&r);
+        let mut fix = DVector::<f64>::zeros(n);
+        for (i, &l) in eig.eigenvalues.iter().enumerate() {
+            if l > 1e-8 * maxv {
+                let v = eig.eigenvectors.column(i);
+                fix -= v * (v.dot(&jtr) / l);
+            }
+        }
         let delta = along + fix;
         for (k, &bi) in free.iter().enumerate() {
             let d: Vec<f64> = (0..6).map(|j| delta[k * 6 + j] * if j < 3 { scale } else { 1.0 }).collect();
