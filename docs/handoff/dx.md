@@ -17,6 +17,21 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-13 19:47 UTC: corexy's Transform connectors from live's frames; hose as OFFSET_SURF waits on live; tvc parked
+- asm-corexy: live 2632 (2) read the Transforms' in-feature mate connectors (evMateConnector, world, mm). They are in
+  the parity models as studios/<element>.connectors.json (written from live/dx/q2632/frames.json, beside each studio;
+  the suite reads them as `connectorFrames`); a connector whose origin isn't translated is put on the Origin, moved
+  and turned to live's frame (`connector_at_frame`). 4 of 6 Transforms now build (6c3ba7, 93a615 x2, d0d597);
+  occurrences still 26/62: the 3 Derived sources (2632 (1), live 11-14 ~18:30) and the Belts next.
+- Hose x_t (dx-xtoffset): live drops degree-12 periodic walls even C1 (2975). Live's own hose writes the inner walls as
+  OFFSET_SURF over the periodic outer walls, so ours restores them: a closed B-surface face that won't be periodic
+  and is another face's surface offset at the same (u, v) within 1e-7 (the Shell's approximation) becomes that
+  Geom_OffsetSurface (`offsets_restored`), written as OFFSET_SURF (+, U, F, basis, offset, ?). 12 / 12 / 0, 1.5 s
+  for the 8 parts, 1.07 MB; refit's Newton no longer throws off a surface. Probe with live (REQUESTS 19:15).
+  Exchange: nothing worse; the hoses' x_t read back 2e-6 off in volume (approximated vs exact offset walls).
+- tvc-mount (dx-tvc): the fitted face-sketch frames alone change nothing on tvc / scissor-lift / infento; the
+  sibling-studio Derived gives tvc +1 occurrence, -3 mates, scissor-lift +3 occurrences, infento -2 mates: parked.
+
 ## 11-13 17:29 UTC: Export dialog defaults as live2's capture (export_live2_1730): nothing to change
 - Formats (Part Studio 12, assembly without RHINO and with URDF before STL), the common options, each format's
   controls and defaults, the file name (the tab's, never remembered) and the memory (last format and its options, per

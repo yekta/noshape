@@ -133,6 +133,9 @@ pub struct Translator<'a> {
     /// Part Studios Derived features take parts from (features.json `derivedSources`: element id → `{ doc, live }`),
     /// and those built: element id → (our tab id, live's part id → ours).
     derived_sources: Map<String, Value>,
+    /// Live's frames of in-feature mate connectors (`connectorFrames`, an assembly studio's `<element>.connectors.json`,
+    /// read with evMateConnector: live 2632): sub-feature id → `{ origin_mm, x, z }`.
+    connector_frames: Map<String, Value>,
     derived_built: HashMap<String, (String, HashMap<String, String>)>,
     first_move: Option<String>,
     /// Onshape Feature Studio element id → our Feature Studio tab id.
@@ -331,7 +334,7 @@ impl<'a> Translator<'a> {
             // (A boolean configuration's default is a JSON boolean.)
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -734,6 +737,13 @@ impl<'a> Translator<'a> {
                         params.insert("originQuery".into(), json!([e]));
                         problems.retain(|p| !p.starts_with("originQuery"));
                     }
+                    if sub["featureType"] == "mateConnector"
+                        && params.get("originQuery").is_none_or(|v| v.as_array().is_none_or(Vec::is_empty))
+                        && let Some(at) = sub["featureId"].as_str().and_then(|id| self.connector_frames.get(id)).and_then(connector_at_frame)
+                    {
+                        params = at;
+                        problems.retain(|p| !p.starts_with("originQuery"));
+                    }
                     if let Some(oid) = sub["featureId"].as_str() {
                         if sub["featureType"] == "cPoint" {
                             self.sub_points.insert(oid.to_string(), params);
@@ -742,7 +752,16 @@ impl<'a> Translator<'a> {
                         }
                     }
                 }
-                Err(e) => step.problems.push(format!("its in-feature {}: not translated: {e}", sub["featureType"].as_str().unwrap_or("?"))),
+                Err(e) => {
+                    // (Its origin not translated: on live's frame when fetched, asm-corexy's Transforms.)
+                    let id = sub["featureId"].as_str().filter(|_| sub["featureType"] == "mateConnector");
+                    match id.and_then(|id| Some((id, connector_at_frame(self.connector_frames.get(id)?)?))) {
+                        Some((id, at)) => {
+                            self.sub_params.insert(id.to_string(), at);
+                        }
+                        None => step.problems.push(format!("its in-feature {}: not translated: {e}", sub["featureType"].as_str().unwrap_or("?"))),
+                    }
+                }
             }
             step.problems.extend(problems.into_iter().map(|p| format!("its in-feature {}: {p}", sub["featureType"].as_str().unwrap_or("?"))));
         }
@@ -5156,6 +5175,32 @@ fn arc_span(e: &Value) -> Option<(f64, f64)> {
 /// lie in live's sketch bodies (`bodies`: `{ "bodies": [{ "vertices": [{ "point" }] }] }`): the plane through those points,
 /// turned and moved in it (or mirrored) so every one of the sketch's points lands on one of live's. `None` when they
 /// don't all land, or are too few to tell.
+/// A mate connector on live's frame (`{ origin_mm, x, z }`, world): on the Origin, moved there, its Z turned to the
+/// frame's by a flip (−Z) or a quarter turn about X (∓Y). `None` for frames whose x isn't the world's X.
+fn connector_at_frame(frame: &Value) -> Option<Map<String, Value>> {
+    let v = |k: &str| -> Option<[f64; 3]> { Some([frame[k][0].as_f64()?, frame[k][1].as_f64()?, frame[k][2].as_f64()?]) };
+    let (o, x, z) = (v("origin_mm")?, v("x")?, v("z")?);
+    let near = |a: [f64; 3], b: [f64; 3]| (0..3).all(|i| (a[i] - b[i]).abs() < 1e-9);
+    if !near(x, [1.0, 0.0, 0.0]) {
+        return None;
+    }
+    let mut p = Map::new();
+    p.insert("originQuery".into(), json!(["origin"]));
+    p.insert("transform".into(), json!(true));
+    for (k, c) in ["translationX", "translationY", "translationZ"].iter().zip(o) {
+        p.insert((*k).into(), json!(format!("{c} mm")));
+    }
+    if near(z, [0.0, 0.0, -1.0]) {
+        p.insert("flipPrimary".into(), json!(true));
+    } else if near(z, [0.0, -1.0, 0.0]) || near(z, [0.0, 1.0, 0.0]) {
+        p.insert("rotationType".into(), json!("ABOUT_X"));
+        p.insert("rotation".into(), json!(if z[1] < 0.0 { "90 deg" } else { "-90 deg" }));
+    } else if !near(z, [0.0, 0.0, 1.0]) {
+        return None;
+    }
+    Some(p)
+}
+
 fn frame_from_bodies(sketch: &Value, bodies: &Value) -> Option<[[f64; 3]; 3]> {
     use glam::{DVec2, DVec3};
     const TOL: f64 = 1e-6;
@@ -7159,6 +7204,22 @@ fn pattern_alias(sketch: &Value, id: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    /// An in-feature mate connector on live's frame (live 2632, asm-corexy's Transforms): on the Origin, moved to the
+    /// frame's origin, turned to its Z (a flip for −Z, a quarter turn about X for −Y); a frame turned about Z isn't
+    /// taken.
+    #[test]
+    fn an_in_feature_connector_takes_lives_frame() {
+        let at = |o: [f64; 3], x: [f64; 3], z: [f64; 3]| connector_at_frame(&json!({ "origin_mm": o, "x": x, "z": z }));
+        let down = at([0.0, 0.0, 4.6], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0]).unwrap();
+        assert_eq!((&down["originQuery"], &down["translationZ"], &down["flipPrimary"]), (&json!(["origin"]), &json!("4.6 mm"), &json!(true)));
+        let side = at([0.0, -4.0, 0.0], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0]).unwrap();
+        assert_eq!((&side["translationY"], &side["rotationType"], &side["rotation"]), (&json!("-4 mm"), &json!("ABOUT_X"), &json!("90 deg")));
+        assert!(at([0.0; 3], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]).unwrap().get("flipPrimary").is_none());
+        assert!(at([0.0; 3], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]).is_none());
+    }
+
 
     /// An in-context sketch's frame (live's fetch has none) from its curves' ends in live's sketch bodies: an L-shaped
     /// profile and a construction line (not in the bodies) on a plane through (100, -50, 200) mm whose x is world z and

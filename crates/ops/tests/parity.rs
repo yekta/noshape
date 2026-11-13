@@ -2330,6 +2330,10 @@ fn parity_assemblies() {
             if let Some(sk) = read(&dir.join("studios").join(format!("{element}.sketches.json"))) {
                 features["sketchBodies"] = sk;
             }
+            // Live's frames of its in-feature mate connectors (live 2632: `{ "connectors": { sub id: frame } }`).
+            if let Some(c) = read(&dir.join("studios").join(format!("{element}.connectors.json"))) {
+                features["connectorFrames"] = c["connectors"].clone();
+            }
             // Imported files (live's studios/foreign/foreign.json: blob element → file) as the Part Studio corpus'
             // `foreignFiles`.
             if features["foreignFiles"].is_null()
