@@ -148,7 +148,7 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 Live: live/feel/mates.json, asm-views.json, fields.json `assemblyInstanceList`, 3d.json `assembly` (live and live2,
 11-13). The UI is studios'; asm keeps the mate solver and landed the ring snap, the ▶ preview, Insert's Esc / ✓ and the
 drag thresholds (their commits below). Menus leave out "Add comment" (comments are cloud). Counts are matched / total
-per matrix (17:18 UTC): **mates 23 / 28, views 13 / 15, instance list 16 / 22, 3D 7 / 10**.
+per matrix (17:18 UTC): **mates 23 / 28, views 13 / 15, instance list 16 / 22, 3D 9 / 10**.
 
 ### Mate dialog, mate list, Insert (mates.json): 23 / 28
 
@@ -230,13 +230,13 @@ per matrix (17:18 UTC): **mates 23 / 28, views 13 / 15, instance list 16 / 22, 3
 | Failed mate's colour | rgb(170,37,45) | the same (17:18; was #bd3039) | `hidden_mate_rows_are_grey` | = |
 | Failed mate's marks | red "!" on the icon, "Fastened 1 has error: …", red Mate features icon and root overlay, ⚠ on the fixed instances | the same | – | = |
 
-### 3D in an assembly (3d.json `assembly`): 7 / 10
+### 3D in an assembly (3d.json `assembly`): 9 / 10
 
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
-| Explicit connector's reach | 23 px across, 14 px up and down | the 5 px pick square | – | ≠ |
+| Explicit connector's reach | 23 px across, 14 px up and down | the disc picks, in its plane (18 px + the pick square's 5) | `a_picked_glyphs_disc_takes_the_pointer_across_it` | = |
 | Explicit connector's priority | over vertex, edge, face | the same (overlay first) | psui's 3D matrix | = |
-| Explicit connector's look | a 36 px disc, 4 px ring, Z line 20 px, X/Y 12 px | a world-size triad and a 9 px dot | – | ≠ |
+| Explicit connector's look | a 36 px disc, 4 px ring, Z line 20 px, X/Y 12 px | the Part Studio's disc (`ConnectorGlyphs::picked`, screen size) | `connector_glyph_extent_counts_for_the_zoom_limits` | = |
 | Implicit, over a face | the centroid wherever the pointer is; corner dots larger than midpoint dots | the same (17:18; Shift still picks among the points) | `a_faces_connector_is_its_centroid_wherever_the_pointer_is` | = |
 | Implicit, over an edge | the midpoint, Z along the edge | the same (17:18) | – | = |
 | Vertex / edge over the face | takes over within 6 px, not at 8 | the pick square (psui's 3D matrix: 15 / 15) | psui `the_3d_pick_matrix_matches_live` | = |

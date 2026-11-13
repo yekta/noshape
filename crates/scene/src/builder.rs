@@ -1770,6 +1770,17 @@ pub enum ConnectorLook {
 /// red X / green Y ticks outside the ring.
 pub struct ConnectorGlyphs {
     items: Vec<(DVec3, DVec3, DVec3, DVec3, ConnectorLook)>,
+    /// Each glyph's pick id (none: unpickable): the whole disc takes the pointer, in its plane (an assembly's
+    /// connectors: live 3d.json, a reach of 23 px across and 14 up and down at a tilt).
+    picks: Vec<u32>,
+}
+
+impl ConnectorGlyphs {
+    /// Glyphs at frames `(origin, x, z)`, each with its look and pick id.
+    pub fn picked(items: impl IntoIterator<Item = (DVec3, DVec3, DVec3, ConnectorLook, u32)>) -> Arc<Self> {
+        let (items, picks) = items.into_iter().map(|(o, x, z, look, pick)| ((o, x, z.cross(x), z, look), pick)).unzip();
+        Arc::new(Self { items, picks })
+    }
 }
 
 // Onshape's MATE_CONNECTOR_DIAMETER_PX 36 and RING_WIDTH_PX 4 (behaviours "psui (2026-10-27, P2) interaction 3.4").
@@ -1801,7 +1812,7 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
         let mut out = Vec::new();
         let f = |p: DVec3| -> [f32; 3] { p.as_vec3().into() };
-        for &(o, x, y, z, look) in &self.items {
+        for (i, &(o, x, y, z, look)) in self.items.iter().enumerate() {
             let Some(px) = view.world_per_px(o) else { continue };
             let (ri, ro) = (MC_R_IN_PX * px, MC_R_OUT_PX * px);
             let at = |r: f64, a: f64| o + x * (r * a.cos()) + y * (r * a.sin());
@@ -1831,6 +1842,9 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
             };
             let c = theme::lin(u32::from(rgb[0]) << 16 | u32::from(rgb[1]) << 8 | u32::from(rgb[2]));
             out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([c[0], c[1], c[2], alpha]).unlit().unpickable().ignore_clip().on_top().layer(30));
+            if let Some(&pick) = self.picks.get(i).filter(|p| **p != 0) {
+                out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&pick_disc(o, x, y, z, ro, pick)))).pick_only().ignore_clip().on_top().layer(30));
+            }
             // Outline: outer circle, the inner circle outside the wedge, the
             // wedge's two sides.
             let rim = if look == ConnectorLook::Rest { MC_RIM_REST } else { MC_RIM_LIT };
@@ -1852,10 +1866,25 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
     }
 }
 
+/// A glyph's pick area: the whole disc of radius `r` in its XY plane, every vertex with `pick`.
+fn pick_disc(o: DVec3, x: DVec3, y: DVec3, z: DVec3, r: f64, pick: u32) -> MeshData {
+    let n = 48u32;
+    let f = |p: DVec3| -> [f32; 3] { p.as_vec3().into() };
+    let mut d = MeshData { positions: vec![f(o)], normals: Vec::new(), pick_ids: Vec::new(), indices: Vec::new() };
+    for k in 0..n {
+        let a = f64::from(k) / f64::from(n) * std::f64::consts::TAU;
+        d.positions.push(f(o + x * (r * a.cos()) + y * (r * a.sin())));
+        d.indices.extend([0, k + 1, (k + 1) % n + 1]);
+    }
+    d.normals = vec![z.as_vec3().into(); d.positions.len()];
+    d.pick_ids = vec![pick; d.positions.len()];
+    d
+}
+
 /// The mate connectors' glyphs: `lit` gives each one's look.
 pub fn connector_glyphs(display: &StudioDisplay, lit: impl Fn(&Reference) -> ConnectorLook) -> Option<Arc<ConnectorGlyphs>> {
     let items: Vec<_> = display.connectors.iter().map(|c| (c.origin, c.x, c.z.cross(c.x), c.z, lit(&c.reference))).collect();
-    (!items.is_empty()).then(|| Arc::new(ConnectorGlyphs { items }))
+    (!items.is_empty()).then(|| Arc::new(ConnectorGlyphs { items, picks: Vec::new() }))
 }
 
 /// Mate connector inference while hovering (live behaviours 1327, 33725, psui/hole-mc-1851/4): the hovered
@@ -1899,7 +1928,7 @@ impl InferenceMarks {
                 marks.push(m);
             }
         }
-        Arc::new(Self { marks, glyph: ConnectorGlyphs { items } })
+        Arc::new(Self { marks, glyph: ConnectorGlyphs { items, picks: Vec::new() } })
     }
 }
 
@@ -2137,12 +2166,24 @@ mod connector_zoom_tests {
     use glam::{DVec2, DVec3};
     use noshape_render::camera_geometry::{CameraGeometry, View};
 
+    /// Live 3d.json explicit_mate_connector: an assembly connector's pick is its whole 36 px disc (the reach 18 px
+    /// plus the pick square's 5: 23 across), lying in the connector's plane.
+    #[test]
+    fn a_picked_glyphs_disc_takes_the_pointer_across_it() {
+        let o = DVec3::new(0.0, 0.0, 0.01);
+        let d = super::pick_disc(o, DVec3::X, DVec3::Y, DVec3::Z, 18.0, 7);
+        assert!(d.pick_ids.iter().all(|p| *p == 7) && d.positions.len() == 49 && d.indices.len() == 48 * 3);
+        let r = d.positions[1..].iter().map(|p| DVec3::new(f64::from(p[0]), f64::from(p[1]), f64::from(p[2])).distance(o));
+        assert!(r.clone().all(|r| (r - 18.0).abs() < 1e-4), "all on the rim");
+        assert!(d.positions.iter().all(|p| (f64::from(p[2]) - 0.01).abs() < 1e-6), "in the connector's plane");
+    }
+
     /// Live 1701: a mate connector glyph reaches 18 px back along x / y, 33
     /// px out along them and 23 px up z, at the pixel size at its origin.
     #[test]
     fn connector_glyph_extent_counts_for_the_zoom_limits() {
         let o = DVec3::new(0.0, 0.0, 0.01);
-        let glyphs = ConnectorGlyphs { items: vec![(o, DVec3::X, DVec3::Y, DVec3::Z, ConnectorLook::Rest)] };
+        let glyphs = ConnectorGlyphs { items: vec![(o, DVec3::X, DVec3::Y, DVec3::Z, ConnectorLook::Rest)], picks: Vec::new() };
         let view = View { camera: Default::default(), size: DVec2::new(1200.0, 800.0) };
         let px = view.world_per_px(o).unwrap();
         let pts = glyphs.zoom_points(&view);

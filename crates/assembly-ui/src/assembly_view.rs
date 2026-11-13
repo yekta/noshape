@@ -1356,6 +1356,14 @@ impl AssemblyView {
         }
         let geometry_changed = geometry_changed || sig != self.overlay_sig;
         self.overlay_sig = sig;
+        // Live 3d.json explicit_mate_connector: the 36 px disc of the Part Studio's connectors, its pick the disc.
+        let connector_glyphs: Option<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = (!h.connectors.is_empty()).then(|| {
+            let items = h.connectors.iter().enumerate().map(|(i, (f, _, hl, _))| {
+                let look = if *hl { crate::scene_builder::ConnectorLook::Hovered } else { crate::scene_builder::ConnectorLook::Rest };
+                (f.origin, f.x(), f.z(), look, assembly_scene::overlay_id(built, OverlayPick::Connector(i)))
+            });
+            crate::scene_builder::ConnectorGlyphs::picked(items) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
+        });
         let mut scene = assembly_scene::with_highlights(built, &self.result, &h, self.gpu.uploader());
         if let Some(slot) = self.ui.cap_hover.filter(|_| self.ui.section.is_some()).and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
@@ -1376,7 +1384,7 @@ impl AssemblyView {
             } else {
                 snapping.then_some(crate::cursor::AppCursor::SnapMate)
             };
-            vp.set_camera_geometry(marks, cx);
+            vp.set_camera_geometry(marks.into_iter().chain(connector_glyphs).collect(), cx);
             vp.set_scene(Arc::new(scene), geometry_changed, cx)
         });
     }

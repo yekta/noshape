@@ -813,18 +813,10 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         op.points.push(PointSprite { position: [0.0; 3], color: if hl { HANDLE_HL } else { DARK }, pick_id: id, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
         scene.set_state(id, 0);
     }
-    for (i, (f, size, hl, opacity)) in h.connectors.iter().enumerate() {
-        let id = overlay_id(built, OverlayPick::Connector(i));
-        let first = ol.segments.len();
-        push_triad(&mut ol, f, *size, 2.0, id, *hl);
-        let alpha = (opacity.clamp(0.0, 1.0) * 255.0).round() as u8;
-        for seg in &mut ol.segments[first..] {
-            seg.color[3] = alpha;
-        }
-        let mut dot = if *hl { HANDLE_HL } else { DARK };
-        dot[3] = alpha;
-        op.points.push(PointSprite { position: f.origin.as_vec3().into(), color: dot, pick_id: id, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
-        scene.set_state(id, 0);
+    // Assembly mate connectors: Onshape's screen-size disc (`connector_glyphs`), drawn and picked as camera geometry
+    // by the view; their pick ids here.
+    for i in 0..h.connectors.len() {
+        scene.set_state(overlay_id(built, OverlayPick::Connector(i)), 0);
     }
     // Onshape's mate glyph (assembly/41-43): a small square lying in the
     // connector plane, a white piece and a light-blue L inside a dark
