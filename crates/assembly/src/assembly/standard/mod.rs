@@ -194,6 +194,25 @@ pub fn hole_connectors(ctx: &Arc<crate::regen::context::Context>, body: Option<&
     out
 }
 
+/// The apex of a countersunk head's cone below its top (z = 0), as fasteners.fs draws the cone: through the rim (dk at
+/// c below the top) and the shank (d at k), or at 82 degrees from the rim (undercut and filleted forms; ASME socket
+/// countersunk's from c = its rim depth). Live's connector sits there (2906: #10-24 −5.2887 mm, 2979: ISO 10642 M6
+/// −6.72 mm).
+fn countersunk_apex(dim: &dyn Fn(&str) -> Option<f64>, flag: &dyn Fn(&str) -> bool, d_size: f64) -> f64 {
+    let (dk, k, c, d) = (dim("dk").unwrap_or(0.0), dim("k").unwrap_or(0.0), dim("c").unwrap_or(0.0), dim("d").unwrap_or(d_size));
+    let t41 = 41f64.to_radians().tan();
+    let ru = dim("ru").unwrap_or(0.0);
+    if flag("filletAtK") && ru > 1e-9 {
+        let (ca, sa) = (41f64.to_radians().cos(), 41f64.to_radians().sin());
+        let rim = k + (d / 2.0 + ru - dk / 2.0 - ru / ca) * ca / sa;
+        return -rim - dk / 2.0 / t41;
+    }
+    if flag("undercut") || flag("cskFillet") || dk - d <= 1e-12 {
+        return -dk / 2.0 / t41;
+    }
+    -c - dk * (k - c) / (dk - d)
+}
+
 fn mm(v: f64) -> ParamValue {
     ParamValue::Expr(ExprValue::new(format!("{} mm", (v * 1e6).round() / 1e6)))
 }
@@ -267,26 +286,66 @@ pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
         }
     }
     ps.features.push(f);
-    // Explicit mate connectors with the primary axis out of the contact
-    // face (mates oppose the Z axes): under the head pointing down the shank
-    // (countersunk: flush with the top), nuts and washers on both faces.
-    let mut tops = vec![0.0];
-    // Retaining rings (extruded symmetric about z = 0): live's one "Near"
-    // connector, mid-plane.
-    if !c.shape.has_length() && c.shape != Shape::RetainingRing && c.near_only.is_none() {
-        // The chosen option's thickness (a washer's Outside diameter).
-        tops.push(c.shape.height_key().iter().find_map(|k| chosen.get(*k).copied()).unwrap_or(0.0) * u);
+    // Live's frames and mate connectors (2979, 17 families): screws' head top at z = 0 (a hex or square head's
+    // underside), a connector under the head pointing into it (a countersunk head's at its cone's apex); set screws
+    // from z = 0 up, theirs on top; nuts and washers centred, one connector on each face pointing into the part (ours
+    // bottom first, connector_reference 0; a nylon insert nut only its bottom one); straight pins and rings centred,
+    // theirs at the middle. Ours were built from the bearing face (nuts and washers from z = 0 up, pins down): moved
+    // there by one Transform. Other shapes keep theirs (connectors_into_part).
+    let dim = |k: &str| chosen.get(k).map(|v| v * u);
+    let flag = |k: &str| form.get(k).is_some_and(|v| *v == 1.0);
+    // (In mm, as the dimensions.)
+    let len = if c.shape.has_length() { spec.length.as_deref().and_then(|l| c.length_m(l)).map(|m| m * 1e3) } else { None };
+    let height = c.shape.height_key().iter().find_map(|k| dim(k)).unwrap_or(0.0);
+    // (z in our build's frame, Z along +z) of each connector, and the move to live's frame (mm).
+    let (dz, ends): (f64, Vec<(f64, bool)>) = match c.shape {
+        _ if c.near_only.is_some() => (0.0, vec![(0.0, c.near_only == Some(false))]),
+        Shape::Screw => match form.get("head").map(|h| *h as i64) {
+            Some(3) => (-dim("k").unwrap_or(0.0), vec![(0.0, true)]),
+            Some(4 | 5) => (0.0, vec![(countersunk_apex(&dim, &flag, s.d * u), true)]),
+            Some(0) => (len.unwrap_or(0.0), vec![(0.0, true)]),
+            _ => (0.0, vec![(0.0, true)]),
+        },
+        Shape::Nut => {
+            // (A nylon insert nut, form 5: centred on its hex, w; m is its overall height.)
+            let nylon = form.get("form").is_some_and(|f| *f == 5.0);
+            let hex = if nylon { dim("w").unwrap_or(height) } else { height };
+            (-hex / 2.0, if nylon { vec![(0.0, true)] } else { vec![(0.0, true), (height, false)] })
+        }
+        Shape::Washer => (-height / 2.0, vec![(0.0, true), (height, false)]),
+        // Parallel, dowel, slotted and coiled pins (built from z = 0 down): centred, the connector at the middle; a
+        // taper pin is centred already.
+        Shape::Pin if matches!(form.get("form").map(|f| *f as i64), Some(0 | 1 | 3 | 4)) => {
+            let l = len.unwrap_or(0.0);
+            (l / 2.0, vec![(-l / 2.0, true)])
+        }
+        Shape::Pin if form.get("form").is_some_and(|f| *f == 2.0) => (0.0, vec![(0.0, true)]),
+        Shape::RetainingRing => (0.0, vec![(0.0, true)]),
+        Shape::ORing => (0.0, vec![(0.0, false)]),
+        // Not measured in live yet (other pins, shoulder screws, standoffs, PEM parts): as they were, the first
+        // connector into the part from z = 0, a part without length its top one up.
+        _ if c.shape.has_length() => (0.0, vec![(0.0, false)]),
+        _ => (0.0, vec![(0.0, false), (height, true)]),
+    };
+    if dz.abs() > 1e-12 {
+        let mut t = ps.new_feature("transform", &units)?;
+        t.id = FeatureId(PART_FEATURE.0 + 100);
+        t.params.set("entities", ParamValue::Query(vec![crate::reference::Reference::Feature(PART_FEATURE)]));
+        t.params.set("transformType", ParamValue::Enum("TRANSLATION_3D".into()));
+        t.params.set("dz", mm(dz));
+        ps.features.push(t);
     }
-    for (i, z) in tops.into_iter().enumerate() {
+    for (i, (z, up)) in ends.into_iter().enumerate() {
         let mut m = ps.new_feature("mateConnector", &units)?;
         m.id = FeatureId(PART_FEATURE.0 + 1 + i as u64);
         m.params.set("originQuery", ParamValue::Query(vec![crate::reference::Reference::Origin]));
-        if i == 0 && c.near_only != Some(false) {
+        if !up {
             m.params.set("flipPrimary", ParamValue::Bool(true));
         }
-        if z != 0.0 {
+        if (z + dz).abs() > 1e-12 {
             m.params.set("transform", ParamValue::Bool(true));
-            m.params.set("translationZ", mm(z));
+            // (Along the connector's own Z: a flipped one's points down.)
+            m.params.set("translationZ", mm(if up { z + dz } else { -(z + dz) }));
         }
         ps.features.push(m);
     }

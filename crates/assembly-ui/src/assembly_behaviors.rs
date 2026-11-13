@@ -5073,7 +5073,9 @@ impl AssemblyView {
             return false;
         }
         let mut src = sources[self.ui.place_src_ix % sources.len()].clone();
-        src.flip = self.ui.std.flip;
+        // (Standard parts' connectors point into the part since live 2979: flipped back, the snap as before.)
+        let into = self.assembly(cx).and_then(|a| a.instance(id)).and_then(|i| i.source.standard()).is_some_and(noshape_model::assembly::standard::connectors_into_part);
+        src.flip = self.ui.std.flip != into;
         let Some(dst) = self.snap_target(self.pointer, id, cx) else {
             self.ui.place_snap = None;
             return false;

@@ -4445,6 +4445,11 @@ fn standard_content_into_a_hole() {
     let fastened: Vec<&Value> = s["mates"].as_array().unwrap().iter().filter(|m| m["type"] == "fastened").collect();
     assert_eq!(fastened.len(), 1, "{s}");
     assert_eq!(fastened[0]["ok"], true, "{s}");
+    // Upright in the hole: its head (its own +z, live 2979's frame) up.
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let q = list["instances"].as_array().unwrap().iter().find(|i| i["id"] == screw.as_str()).unwrap()["rotation"].clone();
+    let q = glam::DQuat::from_xyzw(q[0].as_f64().unwrap(), q[1].as_f64().unwrap(), q[2].as_f64().unwrap(), q[3].as_f64().unwrap());
+    assert!((q * glam::DVec3::Z).z > 0.999, "the screw upside down: {q:?}");
     // Edit its length.
     let lengths = call(&mut ctx, "assembly_standard_content", json!({ "standard": "ISO", "category": "Bolts & screws", "class": "Socket head screws", "component": "Hex socket head cap screw ISO 4762", "size": "M10" }))["lengths"].clone();
     let l = lengths.as_array().unwrap().last().unwrap().as_str().unwrap().to_string();

@@ -2951,17 +2951,19 @@ fn standard_content_parts_regenerate_with_mate_connectors() {
         if v <= d * d * d * floor {
             failures.push(format!("{name}: volume {v}"));
         }
-        // Bolts: one connector under the head; nuts and washers: both faces;
+        // Bolts: one connector under the head; nuts and washers: both faces (a nylon insert nut only its bottom one);
         // retaining rings: live's one mid-plane connector.
-        let want = if c.shape.has_length() || c.shape == standard::Shape::RetainingRing || c.near_only.is_some() { 1 } else { 2 };
+        let nylon = c.shape == standard::Shape::Nut && c.form.get("form") == Some(&5.0);
+        let want = if c.shape.has_length() || matches!(c.shape, standard::Shape::RetainingRing | standard::Shape::ORing) || c.near_only.is_some() || nylon { 1 } else { 2 };
         if r.context.connectors.len() != want {
             failures.push(format!("{name}: {} connectors", r.context.connectors.len()));
             continue;
         }
-        // At the origin, the primary axis out of the contact face (mates oppose Z axes).
-        let z = if c.near_only == Some(false) { DVec3::Z } else { -DVec3::Z };
-        if r.context.connectors[0].origin.length() > 1e-9 || (r.context.connectors[0].z - z).length() > 1e-9 {
-            failures.push(format!("{name}: first connector misplaced"));
+        // On the axis, along it (where and which way: standard_content_frames_and_connectors_as_live).
+        for m in &r.context.connectors {
+            if m.origin.truncate().length() > 1e-9 || m.z.z.abs() < 1.0 - 1e-9 {
+                failures.push(format!("{name}: a connector at {:?} along {:?}", m.origin, m.z));
+            }
         }
     }
     assert!(failures.is_empty(), "{} of {} components fail:\n{}", failures.len(), CATALOGUE.len(), failures.join("\n"));
@@ -6656,4 +6658,45 @@ fn redundant_mates_are_fine_until_they_disagree() {
     let (res, before) = add(vec![planar(10, 1, 2), planar(20, 2, 3)], fastened);
     assert_eq!(res.solved.placements, before, "nothing moved");
     assert_eq!(status(&res), vec![(10, over()), (20, over()), (40, Some("Mate is not consistent.".to_string()))]);
+}
+
+/// Live 2979: each family's frame (its height range) and mate connectors (height, Z up), in live's order.
+#[test]
+fn standard_content_frames_and_connectors_as_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    // (component, size, length, z range (mm; None: our head or washer shape differs), connectors (z mm, Z up))
+    type Case = (&'static str, &'static str, Option<&'static str>, Option<(f64, f64)>, &'static [(f64, bool)]);
+    let cases: [Case; 11] = [
+        ("Hex head bolt grade A & B ISO 4014", "M6", Some("60"), Some((-60.0, 4.0)), &[(0.0, true)]),
+        ("Hex socket head cap screw ISO 4762", "M6", Some("20"), Some((-26.0, 0.0)), &[(-6.0, true)]),
+        ("Socket button head screw ISO 7380", "M6", Some("20"), Some((-23.3, 0.0)), &[(-3.3, true)]),
+        ("Hex socket countersunk head screw ISO 10642", "M6", Some("20"), Some((-20.0, 0.0)), &[(-6.72, true)]),
+        ("PH Pan head screw ISO 7045", "M6", Some("20"), None, &[(-4.6, true)]),
+        ("Flat point hex socket set screw ISO 4026", "M6", Some("6"), Some((0.0, 6.0)), &[(6.0, true)]),
+        ("Hex nut grade A & B ISO 4032", "M6", None, Some((-2.6, 2.6)), &[(2.6, false), (-2.6, true)]),
+        ("Prevailing torque nut ISO 7040", "M6", None, Some((-2.45, 5.55)), &[(-2.45, true)]),
+        ("Plain washer normal grade A ISO 7089", "M6", None, Some((-0.8, 0.8)), &[(0.8, false), (-0.8, true)]),
+        ("External retaining ring DIN 471", "3", None, Some((-0.2, 0.2)), &[(0.0, true)]),
+        ("Internal retaining ring DIN 472", "21", None, Some((-0.5, 0.5)), &[(0.0, true)]),
+    ];
+    for (name, size, len, range, connectors) in cases {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name}"));
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        if let Some(l) = len {
+            spec.length = Some(l.into());
+        }
+        let r = standard::regenerate(&spec).unwrap();
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let bb = b.shape.bounding_box(true).unwrap();
+        if let Some((lo, hi)) = range {
+            assert!((bb.min.z * 1e3 - lo).abs() < 1e-3 && (bb.max.z * 1e3 - hi).abs() < 2e-3, "{name}: z {} .. {}", bb.min.z * 1e3, bb.max.z * 1e3);
+        }
+        // (Live lists a nut's or washer's top one first; ours keep the bottom as connector 0.)
+        let ours: Vec<(f64, bool)> = r.context.connectors.iter().map(|m| (m.origin.z * 1e3, m.z.z > 0.0)).collect();
+        assert_eq!(ours.len(), connectors.len(), "{name}: {ours:?}");
+        for (want_z, want_up) in connectors {
+            assert!(ours.iter().any(|(z, up)| (z - want_z).abs() < 1e-6 && up == want_up), "{name}: {ours:?}, live {connectors:?}");
+        }
+    }
 }

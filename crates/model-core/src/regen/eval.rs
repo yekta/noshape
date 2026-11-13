@@ -623,6 +623,8 @@ impl<'a> EvalCtx<'a> {
                     }
                 }
                 Reference::QueryVariable(name) => out.extend(self.resolve_bodies(self.query_variable(name))),
+                // A feature: the bodies it made (qCreatedBy(feature, BODY); a standard part's frame move).
+                Reference::Feature(f) => out.extend(self.ctx.bodies.iter().enumerate().filter(|(_, b)| b.id.feature == *f).map(|(i, _)| i)),
                 _ => {}
             }
         }

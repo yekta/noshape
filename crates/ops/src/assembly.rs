@@ -1214,10 +1214,13 @@ pub fn insert_standard(a: &mut Assembly, spec: &noshape_model::assembly::standar
         a.instances.push(Instance::new(id, name, InstanceSource::Standard { spec: spec.clone() }, Placement::default()));
         ids.push(id);
     }
+    // (Connectors into the part, live's sense: flipped back for the Fastened, the part outside the face as before.)
+    let into = standard::connectors_into_part(spec);
     for (id, hole) in ids.iter().zip(holes) {
         let mut src = MateConnectorRef::on(*id, vec![], standard::connector_reference(0));
-        src.flip = flip;
-        let top = MateConnectorRef::on(*id, vec![], standard::connector_reference(1));
+        src.flip = flip != into;
+        let mut top = MateConnectorRef::on(*id, vec![], standard::connector_reference(1));
+        top.flip = into;
         let fastened = |a: &mut Assembly, x: MateConnectorRef, y: MateConnectorRef| {
             let mid = MateId(a.next_id());
             let n = a.next_feature_name("Fastened");

@@ -1646,9 +1646,10 @@ impl AssemblyView {
         (den.abs() > 1e-9).then(|| (o + d * ((DVec3::ZERO - o).dot(n) / den), false))
     }
 
-    /// Standard content placed on empty space goes by its mating point, on its axis (live 2736): a countersunk
-    /// head's cone apex (its top is our z = 0; the apex is the head radius over tan 41° below), else our z = 0 (a
-    /// screw's head underside, a nut's or washer's bottom face). World point, for one instance being placed.
+    /// Standard content placed on empty space goes by its own mate connector's origin (live 2906; of two, a nut's or
+    /// washer's, the one whose Z is the part's +Z), an inch countersunk head by its 82 degree cone's apex from the head
+    /// diameter (live's #10-24: −5.2887 mm; our table's head height draws that bolt's cone flatter). World point, for one
+    /// instance being placed.
     fn std_mating_point(&self, ids: &[InstanceId], on_face: bool, cx: &App) -> Option<DVec3> {
         let [id] = ids else { return None };
         if on_face {
@@ -1656,12 +1657,15 @@ impl AssemblyView {
         }
         let spec = self.assembly(cx)?.instance(*id)?.source.standard()?.clone();
         let o = self.result.occurrences.iter().find(|o| o.path == [*id])?;
+        let inch = noshape_model::assembly::standard::component(&spec).is_some_and(|c| c.inch);
         let countersunk = [&spec.component, &spec.class].iter().any(|t| t.to_lowercase().contains("countersunk"));
-        let z = match (countersunk, o.local_bounds) {
-            (true, Some((lo, hi))) => -(hi.x.max(-lo.x)) / 41f64.to_radians().tan(),
-            _ => 0.0,
-        };
-        Some(o.transform.transform_point3(DVec3::new(0.0, 0.0, z)))
+        if inch && countersunk && let Some((lo, hi)) = o.local_bounds {
+            return Some(o.transform.transform_point3(DVec3::new(0.0, 0.0, -(hi.x.max(-lo.x)) / 41f64.to_radians().tan())));
+        }
+        let up = o.transform.transform_vector3(DVec3::Z);
+        let units = self.units(cx);
+        let own = self.explicit_connectors(*id).iter().filter_map(|c| self.result.connector_world(c, &units)).max_by(|a, b| a.z().dot(up).total_cmp(&b.z().dot(up)));
+        Some(own.map_or_else(|| o.transform.transform_point3(DVec3::ZERO), |f| f.origin))
     }
 
     /// The point of the instances' bounds a placement puts at the cursor point: on a face their bottom centre, in

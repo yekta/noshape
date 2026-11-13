@@ -474,6 +474,18 @@ pub const NO_MATCHING_SIZE: &str = "Unable to find matching size for selection. 
 
 
 
+/// Whether a standard part's mate connectors point into the part, as live's (2979: screws, nuts, washers, rings,
+/// straight and taper pins); the other shapes' keep our earlier sense. A mate made from one to a hole flips it back.
+pub fn connectors_into_part(spec: &StandardSpec) -> bool {
+    let Some(c) = component(spec) else { return false };
+    c.near_only.is_none()
+        && match c.shape {
+            Shape::Screw | Shape::Nut | Shape::Washer | Shape::RetainingRing => true,
+            Shape::Pin => c.form.get("form").is_some_and(|f| (0.0..=4.0).contains(f)),
+            _ => false,
+        }
+}
+
 /// Mate connector of a standard part (index 0: under the head / bottom face;
 /// 1: top face of nuts and washers).
 pub fn connector_reference(index: u64) -> crate::reference::Reference {
