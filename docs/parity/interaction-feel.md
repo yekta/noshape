@@ -398,7 +398,7 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). part-studio-ui
 `dialogs::the_dialogs_matrix_matches_live` (T1, no GPU) on the block start, and `manipulators::snap_tests`.
 
-**Matched: 5 / 5** (11-13 12:48 UTC; 1 / 5 at the first run).
+**Matched: 9 / 9** (11-13 13:23 UTC; 1 / 5 at the first run, then 4 rows added, all matching).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -408,20 +408,26 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | A dragged length's step | 10^(round(log10(100 px in the unit)) − 2) of the unit at the arrow (0.1 mm at 0.25 mm/px, 1 mm from 0.316); Shift: free | always 0.1 mm / 0.01 in, Shift ignored; now live's (`manipulators::linear_step`, our own and std arrows) | = (fixed) |
 | A dragged angle's step | 5° within 2° up to a 573 px radius, 1° up to 2865 px, then 0.1°; free between; Shift: free | always 5° within 2°; now by radius (the finer windows divided by 1 + level / 3: asked, REQUESTS 12:48) | = (fixed) |
 | Properties on opening | no field has the keyboard (live's recordings: a div / ul); typing does nothing | Name focused; now the modal itself (`MetaForm::focus`), document keys still off behind it | = (fixed) |
-| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, an arrow click flipping; preview timing (Enter / Tab / blur, every ~0.4 s while dragging); a selected entity clicked again leaves the field, a row hovered lighting it yellow-green, the field's Tab order, Esc in a value field (discard, then cancel), Enter on the canvas committing; the Appearance and Material dialogs' layout and keys; Properties' Tab order, Enter and Esc doing nothing | – | – |
+| A selected entity clicked again | leaves the field (in, out, in) | the same | = |
+| Esc in a value field | the first discards the typed value and leaves the field, the dialog stays; a second cancels | the same | = |
+| Enter with the keyboard outside a field | commits the dialog | the same | = |
+| Properties' Enter and Esc | do nothing (no apply, no close) | the same | = |
+| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, an arrow click flipping; preview timing (Enter / Tab / blur, every ~0.4 s while dragging); a field row hovered lighting its entity yellow-green, the field's Tab order; the Appearance and Material dialogs' layout and keys; Properties' Tab order | – | – |
 
 ## Feedback (matrix, Part Studio rows)
 
 live2's feedback.json (11-13 09:39, for psui and studios). part-studio-ui `feedback::the_feedback_matrix_matches_live`
 (T1, no GPU; the row's tooltip read 500 ms after the pointer comes onto it).
 
-**Matched: 2 / 2** (11-13 12:51 UTC; 1 / 2 at the first run).
+**Matched: 4 / 4** (11-13 13:23 UTC; 1 / 2 at the first run, then 2 rows added: 1 / 2 matched).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
 | A failing feature's tooltip | "<Feature> did not regenerate properly: <message>", then "1 missing selection" | the same | = |
 | A warning feature's tooltip | "Fillet 1", then "1 missing selection" | "Fillet 1 did not regenerate properly: 1 missing selection"; now live's | = (fixed) |
-| Not yet in the matrix | the error row (rgb(170,37,45) name, the red icon with its warning overlay, the header's failures icon; a warning keeps its name black, only the overlay); the dialog's red title and its tooltip, a "Missing Face ×" entry; a failed preview drawing the edge in the error colour; the commit's working overlay (live first seen 1119 ms after ✓, polled every 40–150 ms; ours 1200 ms: within a frame or two, not changed without a finer measure); toasts (studios: success rgb(221,246,204), top centre, 5.1 s, no stacking, hover doesn't pause); empty states | – | – |
+| A failing feature's row | an error row (rgb(170,37,45) name, red icon, warning overlay; the header's failures icon) | the same (state "error") | = |
+| Its dialog | Sketch 1 deleted under Extrude 1: the title red, the lost region a red "Missing Face" entry, ✓ not disabled (an edge whose feature is only below reads "Edge of Extrude 1": live fillet-chip-edit-healthy-moment) | "Face of deleted feature"; now "Missing Face" | = (fixed) |
+| Not yet in the matrix | a warning keeps its name black, only the overlay; the red title's tooltip; a failed preview drawing the edge in the error colour; the commit's working overlay (live first seen 1119 ms after ✓, polled every 40–150 ms; ours 1200 ms: within a frame or two, not changed without a finer measure); toasts (studios: success rgb(221,246,204), top centre, 5.1 s, no stacking, hover doesn't pause); empty states | – | – |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;

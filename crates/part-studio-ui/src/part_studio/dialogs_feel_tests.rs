@@ -4,6 +4,7 @@
 
 use super::*;
 use crate::part_studio::manipulators::{linear_step, snap_degrees};
+use gpui_kit::component::WindowExt as _;
 
 fn block(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>) {
     let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
@@ -27,6 +28,16 @@ fn manipulator_for(cx: &mut TestAppContext, feature: &str) -> bool {
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     draw(cx, window);
     cx.update(|cx| view.read(cx).current_manip(cx).is_some())
+}
+
+/// Extrude 1 of the block opened for editing; its dialog.
+fn edit_extrude(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>, Entity<crate::feature_dialog::FeatureDialog>) {
+    let (window, view) = block(cx, name);
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    (window, view, dialog)
 }
 
 fn expect<T: PartialEq + std::fmt::Debug>(got: T, want: T, what: &str) -> Result<(), String> {
@@ -86,6 +97,67 @@ fn rows() -> Vec<Row> {
         } },
         Row { id: "drag / the angle step", live: "5° within 2° (radius ≤ 573 px), free in between: 42.4154 stays, 43.5 → 45", gap: false, check: |_| {
             expect((snap_degrees(42.4154, 300.), snap_degrees(43.5, 300.)), (42.4154, 45.0), "angles")
+        } },
+        Row { id: "fields / a selected entity clicked again leaves the field", live: "[Face of Extrude 2] -> [] -> [Face of Extrude 2]", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-toggle");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+            draw(cx, window);
+            let (edge, pick) = cx.update(|cx| {
+                let v = view.read(cx);
+                let e = v.display.bodies.first().and_then(|b| b.edge_refs.first().cloned()).unwrap();
+                let p = v.built.as_ref().and_then(|b| b.picks.ids_for(&e).first().copied());
+                (e, p)
+            });
+            let dialog = cx.update(|cx| view.read(cx).edit.as_ref().unwrap().dialog.clone());
+            let mut counts = Vec::new();
+            for _ in 0..3 {
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                    let vp = v.viewport.clone();
+                    v.on_viewport_event(&vp, &ViewportEvent::Click { pick, position: glam::DVec2::new(500., 300.), modifiers: Modifiers::default() }, w, cx);
+                }))
+                .unwrap();
+                draw(cx, window);
+                counts.push(cx.update(|cx| dialog.read(cx).feature.params.query("entities").iter().filter(|r| **r == edge).count()));
+            }
+            expect(counts, vec![1, 0, 1], "the edge in the field after each click")
+        } },
+        Row { id: "fields / Esc in a value field", live: "the first Esc discards the typed value and leaves the field, the dialog stays; a second Esc cancels", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "dlg-esc");
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+            draw(cx, window);
+            keys(cx, window, &["3", "escape"]);
+            let after_one = (cx.update(|cx| view.read(cx).edit.is_some()), cx.update(|cx| dialog.read(cx).feature.params.expr("depth").map(|e| e.text.clone())));
+            keys(cx, window, &["escape"]);
+            let after_two = cx.update(|cx| view.read(cx).edit.is_some());
+            expect((after_one, after_two), ((true, Some("10 mm".to_string())), false), "(open, depth) after one Esc, open after two")
+        } },
+        Row { id: "fields / Enter with the keyboard outside a field commits", live: "Enter with the focus outside a field commits the dialog", gap: false, check: |cx| {
+            let (window, view, _dialog) = edit_extrude(cx, "dlg-enter");
+            cx.update_window(window, |_, w, cx| {
+                let focus = view.read(cx).focus.clone();
+                w.focus(&focus, cx);
+            })
+            .unwrap();
+            keys(cx, window, &["enter"]);
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            expect(cx.update(|cx| view.read(cx).edit.is_some()), false, "dialog open")
+        } },
+        Row { id: "Properties / Enter and Esc do nothing", live: "Enter in a text field neither applies nor closes; Esc doesn't close (clean or changed)", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-props-keys");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let b = v.display.bodies.first().map(|b| b.id.clone()).unwrap();
+                v.open_part_meta(b, w, cx);
+            }))
+            .unwrap();
+            draw(cx, window);
+            let form = crate::properties_dialog::open_form().ok_or("no modal")?;
+            cx.update_window(window, |_, w, cx| form.update(cx, |f, cx| f.focus_field("Vendor", w, cx))).unwrap();
+            draw(cx, window);
+            keys(cx, window, &["v", "enter"]);
+            let open_after_enter = crate::properties_dialog::open_form().is_some() && cx.update_window(window, |_, w, cx| w.has_active_dialog(cx)).unwrap();
+            keys(cx, window, &["escape"]);
+            let open_after_esc = cx.update_window(window, |_, w, cx| w.has_active_dialog(cx)).unwrap();
+            expect((open_after_enter, open_after_esc), (true, true), "open after Enter, after Esc")
         } },
         Row { id: "Properties / no field has the keyboard on opening", live: "no field focused; typing does nothing until a field is clicked", gap: false, check: |cx| {
             let (window, view) = block(cx, "dlg-props");

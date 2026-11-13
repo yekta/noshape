@@ -1754,7 +1754,8 @@ impl FeatureDialog {
             }
             // An entity whose creating feature is gone reads by its kind (live 1993 (c): "Missing Edge").
             let missing = match r {
-                Reference::Face(_) if self.ref_missing(r) => Some("Missing Face"),
+                // (A region of a deleted sketch too: live feel/feedback.json "inDialog", Sketch 1 deleted under Extrude 1.)
+                Reference::Face(_) | Reference::SketchRegion { .. } if self.ref_missing(r) => Some("Missing Face"),
                 Reference::Edge(_) if self.ref_missing(r) => Some("Missing Edge"),
                 Reference::Vertex(_) if self.ref_missing(r) => Some("Missing Vertex"),
                 _ => None,

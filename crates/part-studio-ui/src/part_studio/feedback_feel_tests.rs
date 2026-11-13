@@ -56,6 +56,27 @@ fn rows() -> Vec<Row> {
             let (first, second) = tip.split_once('\n').ok_or(format!("one line: {tip:?}"))?;
             expect((first.starts_with("Fillet 1 did not regenerate properly: "), second), (true, "1 missing selection"), &tip)
         } },
+        Row { id: "error / the row and the Features header", live: "the row an error (rgb(170,37,45) name, red icon, warning overlay); the header's failures icon", gap: false, check: |cx| {
+            let (window, view) = start(cx, "fb-error-row", starts()["block-broken"].clone());
+            let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+            let row = state["features"]["rows"].as_array().and_then(|r| r.iter().find(|r| r["name"] == "Fillet 1")).cloned().ok_or("no row")?;
+            expect(row["state"].as_str(), Some("error"), "the row's state")
+        } },
+        Row { id: "error / its dialog", live: "Sketch 1 deleted under Extrude 1: the title red, the lost region a red 'Missing Face' entry, ✓ not disabled (an edge whose feature is only below reads 'Edge of Extrude 1': fillet-chip-edit-healthy-moment)", gap: false, check: |cx| {
+            let (window, view) = start(cx, "fb-error-dialog", starts()["block"].clone());
+            let ids: Vec<_> = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().map(|f| (f.name.clone(), f.id)).collect());
+            let id = |n: &str| ids.iter().find(|(m, _)| m == n).unwrap().1;
+            cx.update(|cx| view.update(cx, |v, cx| v.delete_features(vec![id("Sketch 1")], cx)));
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id("Extrude 1"), w, cx))).unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+            let d = &state["dialog"];
+            let query = d["fields"].as_array().and_then(|f| f.iter().find(|f| f["kind"] == "query")).cloned().ok_or("no selection field")?;
+            let items: Vec<String> = query["items"].as_array().into_iter().flatten().filter_map(|i| i.as_str().map(str::to_string)).collect();
+            expect((d["titleState"].as_str(), items, query["state"].as_str(), d["ok"].as_str() == Some("disabled")), (Some("error"), vec!["Missing Face".to_string()], Some("error"), false), "title, items, field, ✓ disabled")
+        } },
         Row { id: "warning / the row's tooltip", live: "'Fillet 1', then '1 missing selection' (no 'did not regenerate properly')", gap: false, check: |cx| {
             let json = serde_json::json!({ "units": "mm", "features": [
                 { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
