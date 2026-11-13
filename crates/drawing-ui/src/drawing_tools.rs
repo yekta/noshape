@@ -1788,7 +1788,11 @@ impl DrawingEditor {
         if self.linestyle_click(cx) || self.hide_edges_click(cx) || self.section_edit_click(cx) || self.replicate_click(cx) {
             return;
         }
-        // A click on the sheet keeps the palette's changes.
+        // A click on the empty sheet leaves the palette open (live2 2578 (4): only Esc closes it); on an item it
+        // closes, keeping its changes.
+        if self.palette.is_some() && pick.is_none() {
+            return;
+        }
         if self.palette.is_some() {
             self.close_palette(true, cx);
             return;

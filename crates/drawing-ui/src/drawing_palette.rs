@@ -226,7 +226,7 @@ impl DrawingEditor {
                     }
                     this.palette_from_inputs(cx);
                 }
-                InputEvent::PressEnter { .. } => this.close_palette(true, cx),
+                InputEvent::PressEnter { .. } => this.commit_palette(cx),
                 _ => {}
             }));
         }
@@ -330,6 +330,33 @@ impl DrawingEditor {
             }
         }
         self.set_preview(Some(dr), cx);
+        cx.notify();
+    }
+
+    /// Enter in one of the palette's boxes: its edits are made, the palette stays open (live2 drw-dimension-tolerance-
+    /// symmetrical step 14).
+    fn commit_palette(&mut self, cx: &mut Context<Self>) {
+        let Some(d) = &self.palette else { return };
+        let targets = d.targets();
+        if !targets.iter().any(|t| std::iter::once(&d.orig).chain(&d.others).any(|o| o.id == t.id && o != t)) {
+            return;
+        }
+        let name = if d.hole { "Edit hole callout" } else { "Edit dimension" };
+        self.set_preview(None, cx);
+        let made = targets.clone();
+        self.edit_sheet(name, cx, |s| {
+            for t in made {
+                if let Some(a) = s.annotations.iter_mut().find(|a| a.id == t.id) {
+                    *a = t;
+                }
+            }
+        });
+        let Some(d) = &mut self.palette else { return };
+        let mut made = targets.into_iter();
+        if let Some(first) = made.next() {
+            d.orig = first;
+        }
+        d.others = made.collect();
         cx.notify();
     }
 

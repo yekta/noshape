@@ -17,6 +17,8 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Value {
 thread_local! {
     /// The next test drawing gets the source's suggested views.
     static SUGGESTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The next test drawing gets a dimension on its first view's longest edge.
+    static DIMENSIONED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// A drawing of a block (Drawing 1) in a test window.
@@ -36,7 +38,17 @@ fn drawing(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Draw
         let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }));
         let region = d["regions"][0]["id"].clone();
         call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
-        call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": SUGGESTED.get() }));
+        let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": SUGGESTED.get() }));
+        if DIMENSIONED.get() {
+            let tab = d["drawing"].clone();
+            let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+            let num = |v: &Value| v.as_f64().unwrap();
+            let len = |e: &Value| (num(&e["b"][0]) - num(&e["a"][0])).hypot(num(&e["b"][1]) - num(&e["a"][1]));
+            let edges = g["views"][0]["edges"].as_array().unwrap();
+            let long = edges.iter().filter(|e| e["type"] == "line").max_by(|a, b| len(a).total_cmp(&len(b))).unwrap();
+            let mid = [(num(&long["a"][0]) + num(&long["b"][0])) / 2.0, (num(&long["a"][1]) + num(&long["b"][1])) / 2.0];
+            call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [mid], "place": [mid[0], mid[1] + 20.0] }));
+        }
     }
     let session = crate::session::Session::open(&path).unwrap();
     let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::Drawing(_))).unwrap().id;
@@ -260,4 +272,85 @@ fn a_box_takes_the_views_it_reaches_and_adds_them(cx: &mut TestAppContext) {
         }));
         assert_eq!(taken, (true, true), "half covered: taken, and the other view still selected ({from:?} -> {to:?})");
     }
+}
+
+/// Waits for the drawing's real sheet (the cached stand-in replaced).
+fn real_sheet(cx: &mut TestAppContext, window: AnyWindowHandle, editor: &Entity<DrawingEditor>) {
+    for _ in 0..1500 {
+        if cx.update(|cx| editor.read(cx).real_sheet_in()) {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, window);
+    }
+}
+
+/// Live2 feel/drawing.json D3: a view's vertex snaps within 7 px on screen, not from 9, at any zoom (ours 8).
+#[gpui::test]
+fn a_views_vertex_snaps_within_8_px_on_screen(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "snap-reach");
+    real_sheet(cx, window, &editor);
+    for zoom_by in [1.0, 2.5] {
+        let (corner, out, zoom) = cx.update(|cx| editor.update(cx, |e, cx| {
+            e.zoom_by(zoom_by, [600.0, 600.0], cx);
+            // A view's lower-left vertex, and the way out of the view from it.
+            let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+            let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+            let corner = g.snaps.iter().map(|s| pl.to_sheet(s.p)).min_by(|a, b| (a[0] + a[1]).total_cmp(&(b[0] + b[1]))).expect("a vertex");
+            (corner, [-std::f64::consts::FRAC_1_SQRT_2, -std::f64::consts::FRAC_1_SQRT_2], e.zoom)
+        }));
+        let at = |px: f64| [corner[0] + out[0] * px / zoom, corner[1] + out[1] * px / zoom];
+        let snapped = |cx: &mut TestAppContext, px: f64| cx.update(|cx| editor.read(cx).snap_at(at(px)).is_some());
+        assert!(snapped(cx, 7.0), "7 px off: snaps (zoom {zoom})");
+        assert!(!snapped(cx, 9.0), "9 px off: free (zoom {zoom})");
+    }
+}
+
+/// Live2 (REQUESTS 2578 (4), drw-dimension-tolerance-symmetrical): Enter in the dimension palette makes the edit and
+/// leaves the palette open; a click on the empty sheet leaves it open too; Esc (`cancel`) closes it, the edit kept.
+#[gpui::test]
+fn the_dimension_palette_stays_open_on_enter_and_on_the_empty_sheet(cx: &mut TestAppContext) {
+    use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent};
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "palette-open");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| a.kind.is_dimension()).map(|a| a.id)).expect("a dimension");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_dim_palette(id, w, cx))).unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_input("R");
+    vcx.simulate_keystrokes("enter");
+    draw(cx, window);
+    let (open, prefix) = cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.palette.is_some(), e.current_sheet().annotations.iter().find(|a| a.id == id).map(|a| a.format.prefix.clone()))
+    });
+    assert!(open, "Enter leaves the palette open");
+    assert_eq!(prefix.as_deref(), Some("R"), "Enter made the edit");
+    // A press and release on the sheet's empty top-left corner.
+    let at = cx.update(|cx| {
+        let e = editor.read(cx);
+        let l = e.sheet_to_local([2.0, 2.0]);
+        e.bounds.origin + Point::new(px(l[0] as f32), px(l[1] as f32))
+    });
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.on_mouse_move(&MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }, w, cx);
+        e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false }, w, cx);
+        e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    assert!(cx.update(|cx| editor.read(cx).palette.is_some()), "a click on the empty sheet leaves it open");
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    draw(cx, window);
+    let (open, prefix) = cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.palette.is_some(), e.current_sheet().annotations.iter().find(|a| a.id == id).map(|a| a.format.prefix.clone()))
+    });
+    assert!(!open, "Esc closes it");
+    assert_eq!(prefix.as_deref(), Some("R"), "the edit made with Enter stays");
 }
