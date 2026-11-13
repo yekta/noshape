@@ -19,8 +19,8 @@ pub struct Entry {
     pub template: String,
     /// The doc tooltip (Markdown): the call, the description, the parameters.
     pub doc: String,
-    /// Ace's completer score: functions over predicates over enums (live "opE": the functions' fuzzy matches
-    /// before the predicate's, the enums last).
+    /// Ace's completer score: functions and predicates over enums (live "opE": surfaceOperationTypePredicate, at
+    /// 7, before lastModifyingOperationId, at 13; the enums after them).
     rank: i32,
 }
 
@@ -335,24 +335,23 @@ fn parse_module(src: &str) -> Vec<Entry> {
                 }
             }
         };
-        let function = |name: String, list: Option<String>, rank: i32, out: &mut Vec<Entry>| {
+        // Live: a predicate's column reads "predicate".
+        let function = |name: String, list: Option<String>, kind: &str, out: &mut Vec<Entry>| {
             let params = params_of(&list.unwrap_or_default());
             let snippet = call_snippet(&name, &params, &doc, false);
             let template = call_snippet(&name, &params, &doc, true);
             let doc = function_doc(&snippet, &params, &doc);
-            // Live: a predicate's column reads "predicate".
-            let kind = if rank == 2 { "predicate" } else { "function" };
-            out.push(Entry { name, kind: kind.into(), snippet, template, doc, rank });
+            out.push(Entry { name, kind: kind.into(), snippet, template, doc, rank: 3 });
         };
         if let Some(r) = rest.strip_prefix("function ") {
-            function(ident(r), list_from(r), 3, &mut out);
+            function(ident(r), list_from(r), "function", &mut out);
         } else if let Some(r) = rest.strip_prefix("predicate ") {
-            function(ident(r), list_from(r), 2, &mut out);
+            function(ident(r), list_from(r), "predicate", &mut out);
         } else if let Some(r) = rest.strip_prefix("const ") {
             let name = ident(r);
             let value = r.split_once('=').map(|(_, v)| v.trim()).unwrap_or("");
             if let Some(f) = value.strip_prefix("function").or_else(|| value.strip_prefix("defineFeature(function")) {
-                function(name, list_from(f), 3, &mut out);
+                function(name, list_from(f), "function", &mut out);
             }
         } else if let Some(r) = rest.strip_prefix("enum ") {
             let name = ident(r);
@@ -455,6 +454,20 @@ fn hump_starts(chars: &[(usize, char)]) -> Vec<bool> {
             }
         })
         .collect()
+}
+
+/// The list's width in characters (live: 33; Ace's popup).
+const ACE_COLUMNS: usize = 33;
+
+/// A row's kind as Ace shows it: cut with "…" when name and kind don't fit the list's width (live "opE":
+/// surfaceOperationTypePredicate's "p…", lastModifyingOperationId's "functi…").
+pub fn ace_meta(caption: &str, meta: &str) -> String {
+    let (c, m) = (caption.chars().count(), meta.chars().count());
+    if m + c <= ACE_COLUMNS - 2 {
+        return meta.to_string();
+    }
+    let keep = ACE_COLUMNS.saturating_sub(c + 3);
+    format!("{}…", meta.chars().take(keep).collect::<String>())
 }
 
 /// A row of the list with the letters to highlight.
@@ -677,7 +690,7 @@ impl gpui_kit::component::input::CompletionProvider for Completions {
                 rows.into_iter()
                     .map(|m| CompletionItem {
                         label: m.entry.name.clone(),
-                        detail: Some(m.entry.kind.clone()),
+                        detail: Some(ace_meta(&m.entry.name, &m.entry.kind)),
                         // A function's call as an Ace snippet (its values selected in turn by Tab).
                         text_edit: Some(CompletionTextEdit::Edit(TextEdit { range, new_text: indented(&m.entry.template, &indent) })),
                         insert_text_format: (m.entry.template != m.entry.snippet).then_some(InsertTextFormat::SNIPPET),
@@ -735,16 +748,20 @@ mod tests {
         rows.iter().map(|m| m.entry.name.clone()).collect()
     }
 
-    /// Live (A): after "opE" the prefix matches in std's order, then the fuzzy ones: the functions, the predicate,
-    /// the enums.
+    /// Live (A, live2 21:00): after "opE" the prefix matches in std's order, then the fuzzy ones by Ace's cost, the
+    /// functions and the predicate alike (surfaceOperationTypePredicate at 7 before lastModifyingOperationId at 13),
+    /// the enums last; the kind column cut to the list's width.
     #[test]
     fn ope_lists_like_live_inside_a_function() {
         let (_, rows) = complete_at("opE", 3).unwrap();
         let got = names(&rows);
-        let want = ["opEnclose", "opExtractWires", "opExtrude", "opSplineThroughEdges", "opSplitEdges", "lastModifyingOperationId", "surfaceOperationTypePredicate", "SplitOperationKeepType", "NewBodyOperationType"];
+        let want = ["opEnclose", "opExtractWires", "opExtrude", "opSplineThroughEdges", "opSplitEdges", "surfaceOperationTypePredicate", "lastModifyingOperationId", "SplitOperationKeepType", "NewBodyOperationType"];
         let pos: Vec<usize> = want.iter().map(|w| got.iter().position(|g| g == w).unwrap_or_else(|| panic!("{w} missing: {got:?}"))).collect();
         assert!(pos.windows(2).all(|w| w[0] < w[1]), "{:?}", &got[..20.min(got.len())]);
         assert_eq!(&got[..3], &want[..3]);
+        assert_eq!(ace_meta("surfaceOperationTypePredicate", "predicate"), "p…");
+        assert_eq!(ace_meta("lastModifyingOperationId", "function"), "functi…");
+        assert_eq!(ace_meta("opExtrude", "function"), "function");
         // @internal functions are left out (live "opExt": only opExtractWires and opExtrude).
         assert_eq!(names(&complete_at("opExt", 5).unwrap().1), ["opExtractWires", "opExtrude"]);
     }

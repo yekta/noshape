@@ -22,6 +22,9 @@ use std::rc::Rc;
 use std::sync::Mutex;
 use std::time::Duration;
 
+/// The autocomplete rows Ace has in its page: the 8 shown and one more.
+const ACE_DRAWN_ROWS: usize = 9;
+
 /// A popup anchor: the trigger's bounds from the last paint.
 type BoundsCell = Rc<std::cell::Cell<Bounds<Pixels>>>;
 
@@ -561,8 +564,9 @@ impl FeatureStudioView {
             unsaved: text != self.synced,
             notices: self.notices.len(),
             notice_lines: self.notices.iter().filter(|n| n.line > 0).map(|n| n.line).collect::<std::collections::BTreeSet<_>>().len(),
-            completion: menu.open.then(|| menu.items.iter().map(|i| i.label.clone()).collect()),
-            completion_kinds: menu.open.then(|| menu.items.iter().map(|i| i.detail.clone().unwrap_or_default()).collect()),
+            // The rows Ace draws: the 8 shown and the next (live fs-ac-fn-std-list reads 9 of 11).
+            completion: menu.open.then(|| menu.items.iter().take(ACE_DRAWN_ROWS).map(|i| i.label.clone()).collect()),
+            completion_kinds: menu.open.then(|| menu.items.iter().take(ACE_DRAWN_ROWS).map(|i| i.detail.clone().unwrap_or_default()).collect()),
         }
     }
 
