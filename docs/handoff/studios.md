@@ -40,6 +40,10 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 - Versions panel: hover #def1fb, graph-column clicks open nothing. Feature Studio: Ace's line keys (Ctrl+/, Ctrl+D,
   Ctrl+Shift+D, Alt+↑/↓, Alt+Shift+↑/↓; Cmd forms on a Mac). Its completion already lists keywords and snippets at the
   top level and std inside a function (fs_complete tests), as live2's and qa's captures each saw.
+- Document open (lead 11-13): the window opens at once and the store is read on a background thread
+  (`files::open_document_window`; it ran on the UI thread before), "Loading document…" then "Loading workspace…"
+  past 0.5 s, then the studio's own steps; callers acting on the workspace go through `with_workspace` (runs when
+  the open finishes). `navigate_in_place` still opens synchronously. The ✓ spinner waits 1.1 s (pending.rs).
 - Dimension palette: just right of the text, vertically centred. Projected view preview: ours snaps at 22.5° both
   ways; live2's coarse sweep put the side/iso boundary at 25-30° (250 px) and 20-25° (400 px), top at 20-25° from
   vertical: left as is until a finer sweep.
