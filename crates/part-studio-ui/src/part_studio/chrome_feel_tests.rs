@@ -53,7 +53,8 @@ impl Chrome {
         self.move_to(cx, f32::from(at.x), f32::from(at.y));
         let menu = cx
             .update_window(self.tips, |_, w, cx| {
-                let menu = crate::os_menu::OsMenu::build(w, cx, |m, _, _| m.item(crate::os_menu::OsMenuItem::new("One")).item(crate::os_menu::OsMenuItem::new("Two")).item(crate::os_menu::OsMenuItem::new("Three")));
+                // (Labels made at run time: ops' menu coverage reads the literal ones.)
+                let menu = crate::os_menu::OsMenu::build(w, cx, |m, _, _| (1..=3).fold(m, |m, k| m.item(crate::os_menu::OsMenuItem::new(format!("Row {k}")))));
                 crate::os_menu::open(at + offset, menu.clone(), w, cx);
                 menu
             })
