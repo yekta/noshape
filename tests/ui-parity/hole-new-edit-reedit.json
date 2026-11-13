@@ -1,6 +1,6 @@
 {
  "name": "hole-new-edit-reedit",
- "about": "Hole at Sketch 2's circle centre, ✓; edit: Through all, ✓; re-edit; Esc",
+ "about": "Hole at Sketch 2's circle centre, ✓; edit: Through all, ✓; re-edit; Esc; then back to Blind, ✓ (an edit's ✓ sets the account's remembered Hole, so this leaves it on Onshape's default Blind 12 mm)",
  "area": "psui",
  "source": "psui coverage audit batch 2, 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
  "start": "hole-sketch",
@@ -83,6 +83,37 @@
   {
    "do": "key",
    "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Ø 6.35 mm THRU"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Through all",
+    "pick": "Blind"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
   },
   {
    "do": "wait",
