@@ -6898,6 +6898,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 // face's point has its outward normal: no such choice; a part inside a subassembly not yet.)
                 ends.push(end.map(|(mut c, inf, live_z, live_o)| {
                     let on_edge = matches!(inf.as_str(), "MID_POINT" | "CENTER") && c["entity"].as_str().is_some_and(|e| e.starts_with("edge:")) && c["instance"].as_str().is_some_and(|i| !i.contains(" > "));
+                    if inf.ends_with("AXIS_POINT") {
+                        trace(&format!("{name}: {inf} on {}: live Z {live_z:?} at {live_o:?}, ours {:?}", c["instance"], placer.connector_frame_local(&l.tab, &c)));
+                    }
                     if (inf.ends_with("AXIS_POINT") || on_edge)
                         && let Some(z) = live_z.map(glam::DVec3::from)
                         && let Some((ours_z, ours_o)) = placer.connector_frame_local(&l.tab, &c)
