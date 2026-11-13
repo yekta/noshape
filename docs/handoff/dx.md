@@ -17,6 +17,36 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-12 21:45 UTC: config-assembly's 4 mates (core's bisect), infento past Boolean 6, keyboard's Derived source
+- config-assembly's scored mates are Fastened 11-14 (washers on the brackets' holes). They "matched" before 6c63ab5a only
+  because ours failed like live's: Flange 1 failed, so the bracket wasn't there. The "its connectors not translated"
+  lines core saw were there before too (Revolute 1 / 2, Fastened 1-8: CAP_EDGE of F2vxupUYBHFLbQP_0 not mapped), not new.
+  With the flange built, ours solved them but put the washers 6.5 mm off. Live's connector is a LOOP_CENTER (the hole's
+  loop on the wall face, by `secondDeterministicId`), which the translator took as the bare face's centroid. Now
+  translated as the loop's centre (`implicit:centroid:<loop edge>` aligned to the face): the washers sit where live has
+  them. The 4 stay "OK, live ERROR". Every live mate on a Standard content washer, retaining ring or socket screw is
+  ERROR (Fastened 5, 6, 11-18), each through that part's own Part Studio mate connector (washer Fd8JR78XCsrPW7f_1,
+  ring FVgdwcr9g7lXgUj_1, screw FUfj6nfP6FW3986_1); the nuts' and the bolt's are OK. So live's failure is on those
+  parts' side, not the bracket's. Asked live for the error text (REQUESTS, dx 21:41) before matching it.
+- Translator (not landed yet; gate run on vibe7 since 21:41): pattern `COPY` names resolved through our pattern's copies
+  (cf-fix-pcb's Fix PCB 1 now gets its components and faces), a cap edge of overlapping curves, SWEPT_BODY per sketch
+  curve (infento's Boolean 6 builds: occurrences 112 -> 117/167), and keyboard-pattern's Derived source from
+  derived/<element>/ (18 -> 19/25 occurrences, 1/1 mate). The source's part id differs from the Derived's pin there, and
+  its one part is taken.
+
+## 11-12 14:45 UTC: 2519 connectors, IGES placed twice, sheet metal flange beside an arc landed
+- Landed 53189709 (with the 2519 rim rule, bjr-config's Extrude 12, config-assembly's Hole 1 connector) and 6c63ab5a.
+  The IGES fix: a subfigure placed twice is split into its solids only by `read_iges_parts` (a single-part import);
+  `read_iges_tree` keeps it whole again, so studios' Split import (`documents_import_splits_an_iges_subassembly_placed_twice`)
+  makes its "Assembly 1" placed twice.
+- edgeChange (std's flange host op, crates/custom/src/custom/host/edge_change.rs): a moved straight edge meeting an
+  unmoved tangent arc steps to the arc as live does (config-assembly's Flange 1: live's flange faces 546 / 78 / 63 / 89.18
+  mm²). Model suite 837 -> 838/947 features, none lower. Assembly suite 1486 occurrences, mates 338 -> 334/505: all four
+  are config-assembly's Fastened 11-14, now OK in ours and ERROR in live. Every live mate on a standard-content washer,
+  retaining ring or socket screw is ERROR (Fastened 5, 6, 11-18; the nuts' and bolt's are OK), so those parts fail in
+  live's copy of the document; ours builds them. Left in config-assembly: Hole 1 / 2 ("None of the holes intersected a
+  part"), sheet face 713.54 vs live 745.88 mm², bend 201.06 vs 163.3 mm².
+
 ## From core (2026-11-12 20:40 UTC, lead): asm-config-assembly's mates 4/4 -> 0/4 since your 6c63ab5a7
 Bisected on vibe3 (a65f5c915..2347771eb, with the rings change applied as both ends need it): a8344e4f1 4/4 mates, 6c63ab5a7
 ("a sheet metal flange on an edge beside a tangent arc moves the edge ...", config-assembly's Flange 1 now builds) 0/4, each

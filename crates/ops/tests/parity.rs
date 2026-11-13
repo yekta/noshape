@@ -357,10 +357,12 @@ pub(crate) fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
     if let Some(sk) = sketches.and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
         features["sketchBodies"] = sk;
     }
-    // Import features' files: imports/<foreign id>.json names the file beside it.
+    // Import features' files: imports/<foreign id>.json names the file beside it (`file`, or `path` in live's later
+    // layout, the id then its own name).
     for e in std::fs::read_dir(dir.join("imports")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")) {
         let Some(meta) = std::fs::read_to_string(&e).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) else { continue };
-        if let (Some(id), Some(file)) = (meta["foreignId"].as_str(), meta["file"].as_str()) {
+        let stem = e.file_stem().map(|s| s.to_string_lossy().to_string());
+        if let (Some(id), Some(file)) = (meta["foreignId"].as_str().or(stem.as_deref()), meta["file"].as_str().or(meta["path"].as_str())) {
             // Live's export of the Part Studio (the upload is gone): already
             // as the Import feature placed it.
             let placed = meta["fetchedBy"].as_str().is_some_and(|f| f.contains("translation of the Part Studio"));
@@ -2280,6 +2282,15 @@ fn parity_assemblies() {
             .filter(|p| p["parameterId"] == "profileSketch")
             .filter_map(|p| p["namespace"].as_str()?.split("::").find_map(|x| x.strip_prefix('e')).map(str::to_string))
             .collect();
+        // The Part Studios its Derived features take parts from (derived/<element id>/, laid out as a Part Studio
+        // corpus document), for every studio's translator.
+        let mut derived = serde_json::Map::new();
+        for d in std::fs::read_dir(dir.join("derived")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.join("features.json").is_file()) {
+            let Some(element) = d.file_name().map(|n| n.to_string_lossy().to_string()) else { continue };
+            if let Some((doc, lines, refs)) = read_model(&d) {
+                derived.insert(element, json!({ "doc": doc, "live": lines, "refs": refs }));
+            }
+        }
         let mut studios = Vec::new();
         for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().filter_map(|e| e.ok()) {
             let file = e.file_name().to_string_lossy().to_string();
@@ -2327,6 +2338,9 @@ fn parity_assemblies() {
                 let foreign = dir.join("studios/foreign");
                 let map: serde_json::Map<String, Value> = files.iter().filter_map(|(k, v)| Some((k.clone(), serde_json::json!({ "path": foreign.join(v["path"].as_str()?).to_string_lossy() })))).collect();
                 features["foreignFiles"] = Value::Object(map);
+            }
+            if features["derivedSources"].is_null() && !derived.is_empty() {
+                features["derivedSources"] = Value::Object(derived.clone());
             }
             studios.push((element.to_string(), features, parts));
         }

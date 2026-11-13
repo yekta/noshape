@@ -660,6 +660,14 @@ impl<'a> Translator<'a> {
         r["faces"][0]["part"].as_str().map(str::to_string)
     }
 
+    /// The edge of `face` centred at `origin` (part coordinates, m): a round hole's circle (or one of its arcs).
+    fn loop_edge_at(&mut self, face: &str, origin: [f64; 3]) -> Option<String> {
+        let r = self.call("query_entities", json!({ "kind": "edges", "of": [face], "limit": 1000 })).ok()?;
+        let k = per_unit(&r["units"]);
+        let near = |p: &Value| (0..3).all(|i| p[i].as_f64().is_some_and(|c| (c * k - origin[i]).abs() <= 1e-6));
+        r["edges"].as_array()?.iter().find(|e| near(&e["center"])).and_then(|e| e["id"].as_str()).map(str::to_string)
+    }
+
     /// (id, part) of each entity whose implicit connector of `inference` lies at `origin`.
     fn connector_candidates(&mut self, inference: &str, origin: [f64; 3]) -> Result<Vec<(String, String)>, String> {
         let (kind, key) = connector_kind(inference);
@@ -1056,7 +1064,7 @@ impl<'a> Translator<'a> {
             let built = self.derived_source(&element, problems)?;
             self.derived_built.insert(element.clone(), built);
         }
-        let (tab, parts) = &self.derived_built[&element];
+        let (tab, parts) = self.derived_built[&element].clone();
         let mut ours = Vec::new();
         let part_query = if studio.is_null() { param("parts") } else { studio["partQuery"].clone() };
         for q in part_query["queries"].as_array().into_iter().flatten() {
@@ -1067,6 +1075,15 @@ impl<'a> Translator<'a> {
                 match parts.get(id) {
                     Some(p) => ours.push(p.clone()),
                     None if everything => {}
+                    // A source of one part, fetched at another state than the Derived's pin (its part ids others):
+                    // that part, once (asm-keyboard-pattern's Derived 1 names 8 ids, live brings in the one part).
+                    None if parts.len() == 1 => {
+                        let only = parts.values().next().cloned().unwrap_or_default();
+                        if !ours.contains(&only) {
+                            self.notes.push(format!("Derived: the source's part {id} taken as its only part"));
+                            ours.push(only);
+                        }
+                    }
                     None => return Err(format!("Derived: the source's part {id} not built")),
                 }
             }
@@ -2966,6 +2983,24 @@ impl<'a> Translator<'a> {
                 }
                 return Some(self.common_edge(&faces[0], &faces[1]));
             }
+            // A pattern instance's copy of a named entity (`COPY` of `….opPattern`, `instanceName` "k":
+            // asm-infento-subs' Fillet 2 on Circular pattern 2's copy of a cap edge): ours of the same pattern.
+            if matches!(get("queryType"), Some(Packed::Str(t)) if t == "COPY")
+                && let Some(Packed::Str(instance)) = get("instanceName")
+                && let Some(seed) = get("derivedFrom")
+            {
+                let mut op = Vec::new();
+                if let Some(v) = get("operationId") {
+                    packed_strings(v, &mut op);
+                }
+                let pattern = op.iter().find_map(|o| o.strip_suffix(".opPattern"))?.to_string();
+                let index: i64 = instance.parse().ok()?;
+                let seed = match self.extrude_name_from_tree(seed)? {
+                    Ok(s) => s,
+                    Err(e) => return Some(Err(format!("COPY: {e}"))),
+                };
+                return Some(self.pattern_copy(&pattern, index, &seed));
+            }
         }
         fn find<'p>(p: &'p Packed, names: &[&str]) -> Option<&'p Vec<(Packed, Packed)>> {
             match p {
@@ -3005,6 +3040,21 @@ impl<'a> Translator<'a> {
             // (A custom feature's own operation, Spur gear's `blank`: the feature's part.)
             let built = self.feature_ids.get(&op).or_else(|| op.split_once('.').and_then(|(f, _)| self.feature_ids.get(f)));
             let Some(ours) = built.cloned() else { return Some(Err(format!("SWEPT_BODY: feature {op} was not built"))) };
+            // One of an Extrude's several parts, told by the sketch curve it was swept from (its ORIGINAL_DEPENDENCY:
+            // asm-infento-subs' Boolean 6 unites two parts of one Extrude, both "its part" before).
+            if let Some(sk) = strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string)
+                && strings.iter().any(|s| s.ends_with(".opExtrude"))
+            {
+                let ids: Vec<String> = strings.windows(2).filter(|w| w[0] == "sketchEntityId").map(|w| w[1].clone()).collect();
+                for id in ids {
+                    let Some(c) = self.curve_of(&sk, &id) else { continue };
+                    if let Ok(face) = self.extrude_entity("SWEPT_FACE", false, None, &op, &sk, &[c])
+                        && let Some(part) = self.part_of_entity(&face)
+                    {
+                        return Some(Ok(part));
+                    }
+                }
+            }
             let r = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 1 }));
             return Some(r.and_then(|f| f["faces"][0]["part"].as_str().map(str::to_string).ok_or_else(|| format!("SWEPT_BODY of {op}: no part of ours"))));
         }
@@ -3119,6 +3169,77 @@ impl<'a> Translator<'a> {
     /// The edge between faces `a` and `b`; else (a cut split one of them,
     /// the name picked the other piece) an edge of one whose other face lies
     /// in the other's plane.
+    /// Ours of a pattern's instance `index` (live's `instanceName`) of our entity `seed`: of what the pattern made, the
+    /// entity whose name, with that instance's copies taken back to what they copy, is the seed's (else shares the
+    /// most faces with it).
+    fn pattern_copy(&mut self, pattern: &str, index: i64, seed: &str) -> Result<String, String> {
+        use noshape_model::reference::{Reference, Role, TopoName};
+        use std::sync::Arc;
+        let ours = self.feature_ids.get(pattern).cloned().ok_or_else(|| format!("COPY: pattern {pattern} was not built"))?;
+        // A part's copy: the part holding the copy of one of its faces (cf-fix-pcb's components).
+        if seed.starts_with("body:") {
+            let faces = self.call("query_entities", json!({ "kind": "faces", "part": seed, "limit": 100000 }))?;
+            let ids: Vec<String> = faces["faces"].as_array().into_iter().flatten().filter_map(|f| f["id"].as_str().map(str::to_string)).collect();
+            for f in ids {
+                if let Ok(copy) = self.pattern_copy(pattern, index, &f)
+                    && let Some(part) = self.part_of_entity(&copy)
+                {
+                    return Ok(part);
+                }
+            }
+            return Err(format!("COPY: no part of pattern {pattern}'s instance {index} copies {seed}"));
+        }
+        let code = if index >= 0 { (2 * index) as u32 } else { (-2 * index - 1) as u32 };
+        fn back(n: &TopoName, code: u32) -> TopoName {
+            match n {
+                TopoName::Face { role: Role::Copy { instance, of }, .. } if *instance == code => (**of).clone(),
+                TopoName::Split { parent, by, ordinal } => TopoName::Split { parent: Arc::new(back(parent, code)), by: *by, ordinal: *ordinal },
+                TopoName::Edge { faces: [a, b], ordinal } => TopoName::edge(Arc::new(back(a, code)), Arc::new(back(b, code)), *ordinal),
+                TopoName::Vertex { faces, ordinal } => TopoName::vertex(faces.iter().map(|f| Arc::new(back(f, code))).collect(), *ordinal),
+                other => other.clone(),
+            }
+        }
+        let name = |r: Reference| match r {
+            Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => Some(n),
+            _ => None,
+        };
+        let seed_name = crate::refs::parse_str(seed).and_then(name).ok_or_else(|| format!("COPY: {seed} is not a face, edge or vertex"))?;
+        let faces = |n: &TopoName| -> Vec<TopoName> {
+            match n {
+                TopoName::Edge { faces, .. } => faces.iter().map(|f| (**f).clone()).collect(),
+                TopoName::Vertex { faces, .. } => faces.iter().map(|f| (**f).clone()).collect(),
+                other => vec![other.clone()],
+            }
+        };
+        let kind = seed.split_once(':').map(|(k, _)| k).unwrap_or("");
+        let plural = match kind {
+            "face" => "faces",
+            "edge" => "edges",
+            "vertex" => "vertices",
+            _ => return Err(format!("COPY: {seed} is not a face, edge or vertex")),
+        };
+        let found = self.call("query_entities", json!({ "kind": plural, "created_by": ours, "limit": 100000 }))?;
+        let wanted = faces(&seed_name);
+        let mut best: Vec<(usize, String)> = Vec::new();
+        for id in found[plural].as_array().into_iter().flatten().filter_map(|e| e["id"].as_str()) {
+            let Some(n) = crate::refs::parse_str(id).and_then(name) else { continue };
+            let n = back(&n, code);
+            if n == seed_name {
+                return Ok(id.to_string());
+            }
+            let shared = faces(&n).iter().filter(|f| wanted.contains(f)).count();
+            if shared > 0 && best.first().is_none_or(|(b, _)| shared >= *b) {
+                best.retain(|(b, _)| *b == shared);
+                best.push((shared, id.to_string()));
+            }
+        }
+        match best.as_slice() {
+            [(_, id)] => Ok(id.clone()),
+            [] => Err(format!("COPY: no {kind} of pattern {pattern}'s instance {index} copies {seed}")),
+            more => Err(format!("COPY: {} {plural} of pattern {pattern}'s instance {index} could copy {seed}", more.len())),
+        }
+    }
+
     fn common_edge(&mut self, a: &str, b: &str) -> Result<String, String> {
         let r = self.call("query_entities", json!({ "kind": "edges", "of": [a, b], "limit": 1 }))?;
         if let Some(e) = r["edges"][0]["id"].as_str() {
@@ -3341,6 +3462,11 @@ impl<'a> Translator<'a> {
                 if name == "CAP_FACE" && level.len() > 1 { level.iter().copied().find(inside).or(level.first().copied()) } else { level.first().copied() }
             }
         };
+        // A cap edge of overlapping curves (asm-infento-subs' Fillet 2: a short arc on a half circle's circle, one
+        // edge) is over the one it came out as.
+        if pick.is_none() && name == "CAP_EDGE" && curves.len() > 1 {
+            return self.extrude_entity(name, is_start, crossing, op, sk, &curves[1..]);
+        }
         pick.map(|c| c.0.clone()).ok_or_else(|| format!("{name} of {op}: no entity of ours matches"))
     }
 
@@ -6144,7 +6270,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             for mc in all.filter(|m| m["btType"].as_str().is_some_and(|t| t.starts_with("BTMMateConnector"))) {
                 let origin = mc["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "originQuery");
                 let Some(q) = origin.and_then(|p| p["queries"].as_array()).and_then(|q| q.first()) else { continue };
-                let query = json!({ "queryString": q["entityQuery"], "deterministicIds": q["deterministicIds"] });
+                let query = json!({ "queryString": q["entityQuery"], "deterministicIds": q["deterministicIds"], "second": q["secondDeterministicId"] });
                 if let Some(id) = mc["featureId"].as_str() {
                     connectors.insert((l.element.clone(), id.to_string()), (ids(&q["path"]), q["inferenceType"].as_str().unwrap_or("").to_string(), query));
                 }
@@ -6173,6 +6299,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     let mut studio_features: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut part_names: HashMap<(String, String), String> = HashMap::new();
     let mut entities: HashMap<Key, String> = HashMap::new();
+    // A LOOP_CENTER connector's loop: an edge of it (the connector's entity is its face).
+    let mut loops: HashMap<Key, String> = HashMap::new();
     // A studio whose sketch another's Frame takes as its profile first.
     let sources: HashSet<String> = studios
         .iter()
@@ -6389,6 +6517,21 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 (found, _) => found,
             };
             trace(&format!("{name}: mate connector {} -> {found:?}", key.1));
+            // A loop's centre on a face (live's LOOP_CENTER: the face, its loop by `secondDeterministicId`, asm-config-
+            // assembly's washers on the brackets' holes): the loop's edge too, else the face's edge centred at live's point.
+            if inference == "LOOP_CENTER"
+                && let Ok(face) = &found
+            {
+                // (Only an edge bounding the face: another can't give the face's loop, asm-infento-subs' Revolute 10.)
+                let bounding: Vec<String> = t.call("query_entities", json!({ "kind": "edges", "of": [face], "limit": 1000 })).ok().map(|r| r["edges"].as_array().into_iter().flatten().filter_map(|e| e["id"].as_str().map(str::to_string)).collect()).unwrap_or_default();
+                let by_id = q["second"].as_str().filter(|s| !s.is_empty()).and_then(|s| t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [s] })).ok()).and_then(|ids| ids.into_iter().find(|i| bounding.contains(i)));
+                match by_id.or_else(|| connector_origins.get(key).and_then(|o| t.loop_edge_at(face, *o))) {
+                    Some(edge) => {
+                        loops.insert(key.clone(), edge);
+                    }
+                    None => res.untranslated.push(format!("mate connector {}: LOOP_CENTER: its loop on {face} not found (the face's centroid taken)", key.1)),
+                }
+            }
             match found {
                 Ok(e) => {
                     entities.insert(key.clone(), e);
@@ -6594,6 +6737,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     }
                     let key = (l.element.clone(), id.to_string());
                     let (path, inf, _) = connectors.get(&key)?;
+                    if let Some(edge) = loops.get(&key) {
+                        return Some((json!({ "instance": path_names(path)?, "reference": format!("implicit:centroid:{edge}"), "align": entities.get(&key)? }), inf.clone(), None));
+                    }
                     let mut c = json!({ "instance": path_names(path)?, "entity": entities.get(&key)? });
                     if let Some(i) = inference(inf) {
                         c["inference"] = json!(i);
