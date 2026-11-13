@@ -3420,8 +3420,8 @@ bool mesh_within(BRepExtrema_TriangleSet& set, const BVH_Vec3d& p, double r2)
 class NewPairsIteratorSI : public BOPDS_IteratorSI
 {
 public:
-  NewPairsIteratorSI(const occ::handle<NCollection_BaseAllocator>& a, const ShapeIMap& old, double apart, const EdgeFace& by_distance)
-      : BOPDS_IteratorSI(a), old_(old), apart_(apart), by_distance_(by_distance)
+  NewPairsIteratorSI(const occ::handle<NCollection_BaseAllocator>& a, const ShapeIMap& old, double apart, const EdgeFace& by_distance, bool serial)
+      : BOPDS_IteratorSI(a), old_(old), apart_(apart), by_distance_(by_distance), serial_(serial)
   {
   }
 
@@ -3492,7 +3492,7 @@ protected:
       {
         efs[(size_t)j].apart = false;
       }
-    });
+    }, serial_);
     std::vector<std::vector<char>> drop((size_t)myLists.Length());
     for (int k = 0; k < myLists.Length(); ++k)
       drop[(size_t)k].assign((size_t)myLists(k).Length(), 0);
@@ -3534,7 +3534,7 @@ private:
       return;
     // (The wall's thickness is ten times `apart_`.)
     const double defl = 0.5 * apart_;
-    BRepMesh_IncrementalMesh(copies, defl, false, 0.5, true);
+    BRepMesh_IncrementalMesh(copies, defl, false, 0.5, !serial_);
     std::vector<TopoDS_Face> meshed;
     for (TopoDS_Iterator it(copies); it.More(); it.Next())
     {
@@ -3681,9 +3681,9 @@ private:
       {
         out.clear();
       }
-    });
+    }, serial_);
     std::vector<occ::handle<BRepExtrema_TriangleSet>> sets(set_face.size());
-    OSD_Parallel::For(0, static_cast<int>(set_face.size()), [&](int j) { sets[(size_t)j] = triangle_set(meshed[(size_t)set_face[(size_t)j]]); });
+    OSD_Parallel::For(0, static_cast<int>(set_face.size()), [&](int j) { sets[(size_t)j] = triangle_set(meshed[(size_t)set_face[(size_t)j]]); }, serial_);
     // (A point stands for its chord within half a step, the chord for the edge within its deflection; the mesh lies
     // within its own, half a tenth, of the face: taken twice.)
     const double r2 = std::pow(apart_ + 0.5 * step + defl + 2 * 0.5 * apart_, 2);
@@ -3697,7 +3697,7 @@ private:
         if (mesh_within(*set, p, r2))
           return;
       l.apart = true;
-    });
+    }, serial_);
     std::vector<std::vector<char>> drop((size_t)myLists.Length());
     for (int k = 0; k < myLists.Length(); ++k)
       drop[(size_t)k].assign((size_t)myLists(k).Length(), 0);
@@ -3709,6 +3709,7 @@ private:
   const ShapeIMap& old_;
   double           apart_;
   const EdgeFace&  by_distance_;
+  bool             serial_;
 };
 
 // OCCT's self-interference check of a shape, over the pairs where a shape not in `old` takes part.
@@ -3724,8 +3725,18 @@ protected:
     myDS = new BOPDS_DS(myAllocator);
     myDS->SetArguments(myArguments);
     myDS->Init(myFuzzyValue);
-    myContext   = new IntTools_Context;
-    auto* it    = new NewPairsIteratorSI(myAllocator, old_, apart_, by_distance_);
+    myContext = new IntTools_Context;
+    // (Planes, cylinders, cones, spheres and tori only, not many: one thread. Their pairs are quick, and a loaded
+    // machine's pool took longer to wake than the work: cf-lighten's hollows 20-180 ms -> 4-7 ms.)
+    bool serial = myDS->NbSourceShapes() < 2000;
+    for (int i = 0; serial && i < myDS->NbSourceShapes(); ++i)
+      if (myDS->ShapeInfo(i).ShapeType() == TopAbs_FACE)
+      {
+        const GeomAbs_SurfaceType k = BRepAdaptor_Surface(TopoDS::Face(myDS->Shape(i)), false).GetType();
+        serial = k == GeomAbs_Plane || k == GeomAbs_Cylinder || k == GeomAbs_Cone || k == GeomAbs_Sphere || k == GeomAbs_Torus;
+      }
+    myRunParallel = !serial;
+    auto* it      = new NewPairsIteratorSI(myAllocator, old_, apart_, by_distance_, serial);
     it->SetDS(myDS);
     it->Prepare(myContext, myUseOBB, myFuzzyValue);
     it->UpdateByLevelOfCheck(myLevelOfCheck);
@@ -4104,8 +4115,10 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
   TopExp::MapShapes(so, TopAbs_VERTEX, verts);
   for (const TopoDS_Shape& f : removed)
     rm.Add(f);
-  if (rm.IsEmpty())
-    return no("no face removed");
+  // (No face removed, inward: a hollow, the part's own shell and its offsets' as a void's.)
+  const bool hollow = rm.IsEmpty();
+  if (hollow && outward)
+    return no("no face removed, outward");
   Bnd_Box bb;
   BRepBndLib::Add(so, bb, false);
   const double size = std::sqrt(bb.SquareExtent());
@@ -5918,13 +5931,16 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
     }
     return nf;
   };
-  TopoDS_Shell shell;
+  TopoDS_Shell shell, void_shell;
   bld.MakeShell(shell);
+  bld.MakeShell(void_shell);
   for (TopoDS_Iterator it(old_shell, false); it.More(); it.Next())
   {
     const TopoDS_Face& f  = TopoDS::Face(it.Value());
     const int          i  = faces.FindIndex(f);
     const TopoDS_Face  ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+    if (hollow && (collapse[(size_t)i] || strip[(size_t)i]))
+      return no("a hollow whose offsets change its faces");
     if (collapse[(size_t)i] || strip[(size_t)i])
       bld.Add(shell, outward ? TopoDS_Shape(f.Reversed()) : TopoDS_Shape(f)); // (no offset: the neighbours' offsets meet where it was)
     else if (kept[(size_t)i])
@@ -6179,7 +6195,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         }
       }
       const TopoDS_Face inner = TopoDS::Face(of.Oriented(outward ? f.Orientation() : TopAbs::Reverse(f.Orientation())));
-      bld.Add(shell, inner);
+      bld.Add(hollow ? void_shell : shell, inner);
       sources.Bind(inner, Source{f, (uint8_t)REL_GENERATED});
     }
     else
@@ -7993,9 +8009,14 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
   TopoDS_Solid outer_wall;
   bld.MakeSolid(outer_wall);
   bld.Add(outer_wall, shell.Oriented(old_shell.Orientation()));
+  if (hollow)
+  {
+    void_shell.Closed(true);
+    bld.Add(outer_wall, void_shell.Oriented(old_shell.Orientation()));
+  }
   TopoDS_Shape wall = outer_wall;
   HHist        h2;
-  if (BRepCheck_Analyzer wan0(wall); !wan0.IsValid() && !outward)
+  if (BRepCheck_Analyzer wan0(wall); !wan0.IsValid() && !outward && !hollow)
   {
     TopoDS_Shell fixed;
     bool         ok = false;

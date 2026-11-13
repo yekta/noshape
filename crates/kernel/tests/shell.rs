@@ -81,6 +81,20 @@ fn round_pocket() -> Shape {
     fillet(&p, &floor, 2.0).unwrap().shape
 }
 
+/// A hollow (no face removed, cf-lighten's Lighten 1): a plate with rounded corners and a hole, shelled 2 mm inward,
+/// built directly (its offsets a void's shell inside the part's own), the same solid as OCCT's offset.
+#[test]
+fn a_hollow_of_planes_and_cylinders_is_built_directly() {
+    let p = cut(&bx([0.0; 3], [60.0, 30.0, 10.0]), &cyl_z(30.0, 15.0, -1.0, 4.0, 12.0)).unwrap().shape;
+    let corners = edges_where(&p, |i| (i.start.z - i.end.z).abs() > 1e-6 && (i.start.x < 1e-6 || i.start.x > 60.0 - 1e-6));
+    let p = fillet(&p, &corners, 5.0).unwrap().shape;
+    let (r, v) = shelled(&p, &[], 2.0, ShellSide::Inside, ShellMethod::Auto).expect("the hollow");
+    assert_ne!(last_shell_path(), "offset");
+    assert_eq!(r.count(ShapeType::Shell), 2, "the part's shell and the void's");
+    let (_, vo) = shelled(&p, &[], 2.0, ShellSide::Inside, ShellMethod::Offset).expect("OCCT's hollow");
+    assert!(close(v, vo), "volume {v} against OCCT's {vo}");
+}
+
 /// Where OCCT's offset works, the slab construction gives the same solid.
 #[test]
 fn offset_and_slabs_agree() {
