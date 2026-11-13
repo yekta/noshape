@@ -8,6 +8,11 @@
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepCheck_Analyzer.hxx>
+#include <BRepTools_ReShape.hxx>
+#include <TopExp.hxx>
+#include <gp_Lin.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_Line.hxx>
@@ -1145,6 +1150,55 @@ void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> 
 } // namespace
 
 // ---------------------------------------------------------------- IGES
+
+// Straight edges as lines (Onshape's Import › IGES postprocessing, "repairs linear edge translation"): an edge whose
+// curve isn't a line but runs straight between its two vertices within `tol` becomes a line edge, its faces' p-curves
+// refitted. The shape unchanged when nothing is straightened or the result doesn't check valid.
+std::unique_ptr<OcShape> straighten_edges(const OcShape& s, double tol)
+{
+  require_non_null(s.shape, "shape");
+  ShapeIMap es;
+  TopExp::MapShapes(s.shape, TopAbs_EDGE, es);
+  NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef;
+  TopExp::MapShapesAndUniqueAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  occ::handle<BRepTools_ReShape> rs(new BRepTools_ReShape);
+  bool                           any = false;
+  for (int i = 1; i <= es.Extent(); ++i)
+  {
+    const TopoDS_Edge e = TopoDS::Edge(es(i).Oriented(TopAbs_FORWARD));
+    if (BRep_Tool::Degenerated(e) || BRepAdaptor_Curve(e).GetType() == GeomAbs_Line)
+      continue;
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    if (v0.IsNull() || v1.IsNull() || v0.IsSame(v1))
+      continue;
+    const gp_Pnt p0 = BRep_Tool::Pnt(v0), p1 = BRep_Tool::Pnt(v1);
+    if (p0.Distance(p1) <= tol)
+      continue;
+    const gp_Lin      chord(p0, gp_Dir(gp_Vec(p0, p1)));
+    BRepAdaptor_Curve c(e);
+    bool              straight = true;
+    for (int k = 1; k < 32 && straight; ++k)
+      straight = chord.Distance(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 32.0)) <= tol;
+    if (!straight)
+      continue;
+    BRepBuilderAPI_MakeEdge mk(TopoDS::Vertex(v0.Oriented(TopAbs_FORWARD)), TopoDS::Vertex(v1.Oriented(TopAbs_FORWARD)));
+    if (!mk.IsDone())
+      continue;
+    TopoDS_Edge  line = mk.Edge();
+    const double dev  = std::max(tol, BRep_Tool::Tolerance(e));
+    if (const NCollection_List<TopoDS_Shape>* fs = ef.Seek(e))
+      for (NCollection_List<TopoDS_Shape>::Iterator f(*fs); f.More(); f.Next())
+        ShapeFix_Edge().FixAddPCurve(line, TopoDS::Face(f.Value()), false, dev);
+    BRep_Builder().UpdateEdge(line, dev);
+    rs->Replace(e, line);
+    any = true;
+  }
+  if (!any)
+    return wrap(s.shape);
+  const TopoDS_Shape out = rs->Apply(s.shape);
+  return wrap(BRepCheck_Analyzer(out).IsValid() ? out : s.shape);
+}
 
 std::unique_ptr<OcShape> read_iges(rust::Str path)
 {

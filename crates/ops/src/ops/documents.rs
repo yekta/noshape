@@ -192,6 +192,7 @@ pub fn ops() -> Vec<Op> {
                 opt("y_up", json!({ "type": "boolean" }), "Orient imported models with Y Axis Up."),
                 opt("composite", json!({ "type": "boolean" }), "Create a composite part (Import to a single document only)."),
                 opt("join", json!({ "type": "boolean" }), "Join adjacent surfaces."),
+                opt("iges_postprocessing", json!({ "type": "boolean" }), "IGES postprocessing (IGES files): their straight edges read as lines."),
             ],
             mutates: true,
             destructive: false,
@@ -216,13 +217,14 @@ fn import_files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(_) => return Err(OpError::param("mode", "single, split or per_part")),
     };
     let flag = |k: &str| a.get(k).and_then(Value::as_bool);
-    let mut choice = crate::import::ImportChoice::defaults(&files, noshape_units::LengthUnit::Millimeter);
+    let mut choice = crate::import::ImportChoice::defaults(&files);
     choice.combine = flag("combine").unwrap_or(false);
     choice.appearances = flag("appearances").unwrap_or(true);
     choice.y_up = flag("y_up").unwrap_or(false);
     // The composite part's box shows on Import to a single document only (live2 2403).
     choice.composite = flag("composite").unwrap_or(false) && !choice.combine && how == PageImport::Single;
     choice.join = flag("join").unwrap_or(false);
+    choice.iges_post = flag("iges_postprocessing").unwrap_or(false) && crate::import::offers_iges_postprocessing(&files);
     if how != PageImport::Single && choice.combine {
         return Err(OpError::param("combine", "Combine to a single Part Studio is its own card: not with split or per_part"));
     }

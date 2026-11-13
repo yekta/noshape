@@ -11,10 +11,12 @@
 //! Import material density after Import appearances (Onshape's list of
 //! types, `noshape_ops::import::MATERIAL_DENSITY_TYPES`: not Inventor).
 //! Mesh files (live G35, G35b): STL has no tiles, no Import appearances and
-//! a Units select defaulting to the document's unit; OBJ keeps the tiles and
-//! Import appearances, its Units default to Meter; 3MF is OBJ without Units.
-//! None of them has Join adjacent surfaces. A native assembly zip (live
-//! G38h): the tiles and the five checkboxes, no Units.
+//! a Units select defaulting to Millimeter; OBJ keeps the tiles and Import
+//! appearances, its Units default to Meter; 3MF is OBJ without Units. None of
+//! them has Join adjacent surfaces. IGES adds ☐ IGES postprocessing after
+//! Join adjacent surfaces. A native assembly zip (live G38h): the tiles and
+//! the five checkboxes, no Units. Every import starts from these defaults:
+//! nothing is remembered (live2 feel/importexport.json).
 
 use crate::doc_model::{DocEvent, DocModel};
 use crate::os_ui as os;
@@ -44,13 +46,15 @@ struct Choice {
     split: bool,
     /// Split's "Create one document per part or assembly".
     per_part: bool,
+    /// IGES files: "IGES postprocessing".
+    iges_post: bool,
 }
 
 impl Choice {
     fn ops(self) -> noshape_ops::import::ImportChoice {
         // The composite part's box shows only on Import to a single document / this document.
         let composite = self.composite && !self.combine && !self.split;
-        noshape_ops::import::ImportChoice { combine: self.combine, appearances: self.appearances, density: self.density, y_up: self.y_up, unit: self.unit, composite, join: self.join }
+        noshape_ops::import::ImportChoice { combine: self.combine, appearances: self.appearances, density: self.density, y_up: self.y_up, unit: self.unit, composite, join: self.join, iges_post: self.iges_post }
     }
 }
 
@@ -59,7 +63,6 @@ impl Choice {
 /// `keep_files`: also keep each file as a file tab in "CAD Imports" (Import;
 /// not when translating an existing file tab).
 pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, keep_files: bool, opened: impl Fn(TabId, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
-    let doc_unit = doc.read(cx).session.doc.settings.units.length;
     let ok_paths = paths.clone();
     let on_ok = move |c: Choice, window: &mut Window, cx: &mut App| {
         if let Some(first) = import(&doc, &ok_paths, c, after, keep_files, cx) {
@@ -67,7 +70,7 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
         }
     };
     // A CAD file tab's own Import… has no Join adjacent surfaces (live2 2403).
-    show(paths, doc_unit, false, keep_files, Rc::new(on_ok), window, cx);
+    show(paths, false, keep_files, Rc::new(on_ok), window, cx);
 }
 
 /// The documents page's Import files… (live dom/dialog-import-to-onshape.txt):
@@ -76,10 +79,8 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
 /// single Part Studio"; Import calls `on_import` with the options and
 /// whether to split. The start window builds the documents (start hooks).
 pub fn open_for_page(paths: Vec<PathBuf>, on_import: noshape_start_ui::start_hooks::ImportCallback, window: &mut Window, cx: &mut App) {
-    let unit = noshape_app_core::user_units::current().units.length;
     show(
         paths,
-        unit,
         true,
         true,
         Rc::new(move |c: Choice, window: &mut Window, cx: &mut App| {
@@ -100,7 +101,7 @@ pub fn open_for_page(paths: Vec<PathBuf>, on_import: noshape_start_ui::start_hoo
 type OnOk = Rc<dyn Fn(Choice, &mut Window, &mut App)>;
 
 /// `join`: offer Join adjacent surfaces (not for a file tab's own Import…).
-fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, join: bool, on_ok: OnOk, window: &mut Window, cx: &mut App) {
+fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut Window, cx: &mut App) {
     // Native part files get Onshape's five-checkbox variant, mesh files
     // theirs (see the module docs).
     let all_of = |kinds: &[&str]| !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| kinds.contains(&e.to_string_lossy().to_lowercase().as_str())));
@@ -111,8 +112,10 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, jo
     // Import material density: Onshape's own file-type list, when any file
     // is one (not STEP, SAT or PVZ; qa4 IMP-DENS).
     let density = noshape_ops::import::offers_material_density(&paths);
-    let default_unit = if obj { noshape_units::LengthUnit::Meter } else { doc_unit };
-    let unit = MESH_UNITS.iter().position(|(_, u)| *u == default_unit).unwrap_or(4);
+    // IGES files: IGES postprocessing (live2 feel/importexport).
+    let iges = noshape_ops::import::offers_iges_postprocessing(&paths);
+    // The same starting choices every time (nothing is remembered: live2 feel/importexport); STL in Millimeter.
+    let unit = noshape_ops::import::ImportChoice::defaults(&paths).unit;
     let choice = Rc::new(Cell::new(Choice { appearances: true, unit, ..Default::default() }));
     window.open_dialog(cx, move |dialog, window, cx| {
         let pal = p();
@@ -241,7 +244,8 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, jo
                     // part's place, Combine to a single Part Studio neither (live G41).
                     .when(c.split, |d| d.child(check("imp-per-part", "Create one document per part or assembly", Some("(not recommended)"), "Each part and assembly is given its own document. For large assemblies, this option can create a large number of documents that can be difficult to manage.", c.per_part, |c, v| c.per_part = v, choice.clone())))
                     .when(!c.combine && !c.split, |d| d.child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", None, "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone())))
-                    .when(!mesh && join, |d| d.child(check("imp-join", "Join adjacent surfaces", None, "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone()))))
+                    .when(!mesh && join, |d| d.child(check("imp-join", "Join adjacent surfaces", None, "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone())))
+                    .when(iges, |d| d.child(check("imp-iges", "IGES postprocessing", None, "Repairs the translation of linear edges (slower).", c.iges_post, |c, v| c.iges_post = v, choice.clone()))))
                     // Live dom/dialog-import-stl.txt: "Units" (14 px / 600) over a 212 px select.
                     .when(units_select, |d| {
                         let ch = choice.clone();

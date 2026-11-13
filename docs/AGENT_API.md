@@ -1039,6 +1039,7 @@ Examples:
 | `y_up` | boolean |  | Orient imported models with Y Axis Up. |
 | `composite` | boolean |  | Create a composite part (Import to a single document only). |
 | `join` | boolean |  | Join adjacent surfaces. |
+| `iges_postprocessing` | boolean |  | IGES postprocessing (IGES files): their straight edges read as lines. |
 
 ### feature
 
@@ -7261,9 +7262,10 @@ Examples:
 | `appearances` | boolean |  | Import appearances. |
 | `density` | boolean |  | Import material density: offered (and used) only when a file is one of Onshape's types for it (Parasolid x_t / x_b, SOLIDWORKS, Solid Edge, NX / Creo prt / asm, CATIA, zip); not STEP. |
 | `y_up` | boolean |  | Orient imported models with Y axis up. |
-| `mesh_unit` | one of `Centimeter`, `Foot`, `Inch`, `Meter`, `Millimeter`, `Yard` |  | STL / OBJ units (default: the workspace unit; OBJ: Meter). |
+| `mesh_unit` | one of `Centimeter`, `Foot`, `Inch`, `Meter`, `Millimeter`, `Yard` |  | STL / OBJ units (default: STL Millimeter, OBJ Meter). |
 | `composite` | boolean |  | Create a composite part. |
 | `join` | boolean |  | Join adjacent surfaces. |
+| `iges_postprocessing` | boolean |  | IGES postprocessing (IGES files): their straight edges read as lines. |
 | `keep_files` | boolean |  | Keep the files as file tabs in "CAD Imports". |
 | `after` | string |  | Tab to put the new tabs after (default: the end). |
 

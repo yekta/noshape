@@ -49,17 +49,24 @@ pub struct ImportChoice {
     pub unit: usize,
     pub composite: bool,
     pub join: bool,
+    /// IGES files: "IGES postprocessing" (their straight edges read as lines).
+    pub iges_post: bool,
 }
 
 impl ImportChoice {
-    /// The dialog's starting choices for `paths` in a document of `doc_unit`
-    /// (Import appearances on; OBJ in meters, other meshes in the document's unit).
-    pub fn defaults(paths: &[PathBuf], doc_unit: LengthUnit) -> Self {
+    /// The dialog's starting choices for `paths`, the same every time (live2 feel/importexport: nothing is
+    /// remembered): Import appearances on, the rest off; OBJ in Meter, STL in Millimeter whatever the document's units.
+    pub fn defaults(paths: &[PathBuf]) -> Self {
         let obj = !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("obj")));
-        let default_unit = if obj { LengthUnit::Meter } else { doc_unit };
+        let default_unit = if obj { LengthUnit::Meter } else { LengthUnit::Millimeter };
         let unit = MESH_UNITS.iter().position(|(_, u)| *u == default_unit).unwrap_or(4);
         ImportChoice { appearances: true, unit, ..Default::default() }
     }
+}
+
+/// Whether the import dialog for `paths` shows "IGES postprocessing" (live2 feel/importexport: IGES files).
+pub fn offers_iges_postprocessing(paths: &[PathBuf]) -> bool {
+    paths.iter().any(|p| p.extension().is_some_and(|e| ["igs", "iges"].contains(&e.to_string_lossy().to_lowercase().as_str())))
 }
 
 /// Tab (and document) name of an imported file: the file name without its
@@ -82,7 +89,12 @@ pub struct Foreign {
 /// Read a CAD or mesh file as BREP text. Mesh files carry no unit: they are
 /// read in `units`' length unit.
 pub fn read_foreign(path: &Path, units: &UnitPrefs) -> anyhow::Result<Foreign> {
-    let (shape, info) = read_shape(path, units)?;
+    read_foreign_with(path, units, false)
+}
+
+/// [`read_foreign`], an IGES file's straight edges read as lines with `iges_post` (Import › IGES postprocessing).
+pub fn read_foreign_with(path: &Path, units: &UnitPrefs, iges_post: bool) -> anyhow::Result<Foreign> {
+    let (shape, info) = read_shape(path, units, iges_post)?;
     let t = std::time::Instant::now();
     let parts = if info.is_empty() { String::new() } else { serde_json::to_string(&info)? };
     let brep = String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string();
@@ -95,7 +107,7 @@ pub fn read_foreign(path: &Path, units: &UnitPrefs) -> anyhow::Result<Foreign> {
 /// A CAD file's parts as its tab's Export… writes them (live document/94): each with its name in the file ("Part
 /// <n>" without one) and colour.
 pub fn file_parts(path: &Path, units: &UnitPrefs) -> anyhow::Result<Vec<(String, noshape_kernel::Shape, [f32; 4])>> {
-    let (shape, info) = read_shape(path, units)?;
+    let (shape, info) = read_shape(path, units, false)?;
     let shapes = if info.is_empty() { vec![shape] } else { shape.children() };
     Ok(shapes
         .into_iter()
@@ -111,7 +123,7 @@ pub fn file_parts(path: &Path, units: &UnitPrefs) -> anyhow::Result<Vec<(String,
 
 /// The file read as the Import reads it: one shape (its named and coloured parts a compound's children, described in
 /// the infos, empty when the file has none).
-fn read_shape(path: &Path, units: &UnitPrefs) -> anyhow::Result<(noshape_kernel::Shape, Vec<noshape_model::features::importing::ImportPartInfo>)> {
+fn read_shape(path: &Path, units: &UnitPrefs, iges_post: bool) -> anyhow::Result<(noshape_kernel::Shape, Vec<noshape_model::features::importing::ImportPartInfo>)> {
     use noshape_kernel as k;
     let mesh_unit = match units.length {
         LengthUnit::Centimeter => k::LengthUnit::Centimeter,
@@ -131,6 +143,9 @@ fn read_shape(path: &Path, units: &UnitPrefs) -> anyhow::Result<(noshape_kernel:
     let shape = match ext.as_str() {
         "step" | "stp" => compound(k::read_step(path, k::LengthUnit::Meter)?),
         // Named and coloured (XDE), each placed instance a part.
+        // IGES postprocessing: straight edges as lines (read in metres: straight within a micrometre; the parts and
+        // their faces keep their order, so `info` still describes them).
+        "iges" | "igs" if iges_post => k::straighten_edges(&compound(k::read_iges_parts(path, k::LengthUnit::Meter)?), 1e-6)?,
         "iges" | "igs" => compound(k::read_iges_parts(path, k::LengthUnit::Meter)?),
         "brep" => k::read_brep(path)?,
         // Onshape imports STL, OBJ and PVZ as mesh parts (PVZ is in metres).
@@ -382,7 +397,7 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
         }
         // Mesh files in the unit chosen in the dialog.
         let units = if MESH_FILES.iter().any(|e| path.extension().is_some_and(|x| x.eq_ignore_ascii_case(e))) { UnitPrefs { length: MESH_UNITS[c.unit.min(MESH_UNITS.len() - 1)].1, ..*units } } else { *units };
-        match read_foreign(path, &units) {
+        match read_foreign_with(path, &units, c.iges_post) {
             Ok(foreign) => {
                 let (name, file) = import_names(path);
                 read.push((name, file, foreign));

@@ -21,9 +21,10 @@ pub fn ops() -> Vec<Op> {
             opt("appearances", json!({ "type": "boolean", "default": true }), "Import appearances."),
             opt("density", json!({ "type": "boolean" }), "Import material density: offered (and used) only when a file is one of Onshape's types for it (Parasolid x_t / x_b, SOLIDWORKS, Solid Edge, NX / Creo prt / asm, CATIA, zip); not STEP."),
             opt("y_up", json!({ "type": "boolean" }), "Orient imported models with Y axis up."),
-            opt("mesh_unit", json!({ "type": "string", "enum": MESH_UNITS.iter().map(|u| u.0).collect::<Vec<_>>() }), "STL / OBJ units (default: the workspace unit; OBJ: Meter)."),
+            opt("mesh_unit", json!({ "type": "string", "enum": MESH_UNITS.iter().map(|u| u.0).collect::<Vec<_>>() }), "STL / OBJ units (default: STL Millimeter, OBJ Meter)."),
             opt("composite", json!({ "type": "boolean" }), "Create a composite part."),
             opt("join", json!({ "type": "boolean" }), "Join adjacent surfaces."),
+            opt("iges_postprocessing", json!({ "type": "boolean" }), "IGES postprocessing (IGES files): their straight edges read as lines."),
             opt("keep_files", json!({ "type": "boolean", "default": true }), "Keep the files as file tabs in \"CAD Imports\"."),
             opt("after", s(), "Tab to put the new tabs after (default: the end)."),
         ],
@@ -65,7 +66,7 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         return Ok(json!({ "tabs": stored, "parts": [], "first": last.map(|t| t.to_string()) }).into());
     }
-    let mut c = ImportChoice::defaults(&paths, units.length);
+    let mut c = ImportChoice::defaults(&paths);
     c.combine = a.bool_or("combine", false)?;
     c.appearances = a.bool_or("appearances", true)?;
     // As the dialog: only offered for Onshape's material density types.
@@ -73,6 +74,8 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     c.y_up = a.bool_or("y_up", false)?;
     c.composite = a.bool_or("composite", false)?;
     c.join = a.bool_or("join", false)?;
+    // As the dialog: only offered for IGES files.
+    c.iges_post = a.bool_or("iges_postprocessing", false)? && import::offers_iges_postprocessing(&paths);
     if let Some(u) = a.opt_str("mesh_unit")? {
         c.unit = MESH_UNITS.iter().position(|x| x.0.eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param("mesh_unit", "one of the listed units"))?;
     }

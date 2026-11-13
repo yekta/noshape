@@ -1789,3 +1789,31 @@ fn step_names_with_windows_1252_bytes_read_as_live() {
     assert!(names.iter().any(|n| n == "Peça"), "{names:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Import › IGES postprocessing ("repairs linear edge translation"): an edge an IGES file carries as a spline that runs
+/// straight becomes a line, a bowed one stays a spline, and the solid is unchanged. A 20 mm square plate, its right side
+/// a cubic B-spline with its poles on the side, its top a cubic bowed 1 mm, extruded 10 mm.
+#[test]
+fn iges_postprocessing_makes_straight_spline_edges_lines() {
+    use glam::DVec2;
+    let cubic = |poles: Vec<DVec2>| Segment2d::BSpline { poles, weights: None, knots: vec![0.0, 1.0], mults: vec![4, 4], degree: 3, periodic: false };
+    let profile = [
+        Segment2d::Line { a: DVec2::new(0.0, 0.0), b: DVec2::new(0.02, 0.0) },
+        cubic(vec![DVec2::new(0.02, 0.0), DVec2::new(0.02, 0.005), DVec2::new(0.02, 0.012), DVec2::new(0.02, 0.02)]),
+        cubic(vec![DVec2::new(0.02, 0.02), DVec2::new(0.013, 0.021333), DVec2::new(0.007, 0.021333), DVec2::new(0.0, 0.02)]),
+        Segment2d::Line { a: DVec2::new(0.0, 0.02), b: DVec2::new(0.0, 0.0) },
+    ];
+    let face = make_face_2d(&Plane::xy(), &profile, &[]).unwrap();
+    let solid = extrude(&face, DVec3::new(0.0, 0.0, 0.01)).unwrap().shape;
+    let kinds = |s: &Shape| {
+        let curves: Vec<Curve> = s.edges().iter().map(|e| e.edge_info().unwrap().curve).collect();
+        (curves.iter().filter(|c| matches!(c, Curve::Line { .. })).count(), curves.iter().filter(|c| matches!(c, Curve::BSpline { .. })).count())
+    };
+    let (lines, splines) = kinds(&solid);
+    assert_eq!(splines, 4, "the two spline sides, top and bottom");
+    let out = straighten_edges(&solid, 1e-6).unwrap();
+    assert!(out.is_valid());
+    assert_eq!(kinds(&out), (lines + 2, 2), "the straight spline side's two edges are lines, the bowed side's stay");
+    let (v0, v1) = (solid.volume().unwrap(), out.volume().unwrap());
+    assert!((v0 - v1).abs() < 1e-12, "{v0} vs {v1}");
+}

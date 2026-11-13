@@ -2579,6 +2579,28 @@ export const {var} = defineFeature(function(context is Context, id is Id, defini
     call(&mut ctx, "ui_toolbar", json!({ "remove_custom_features": [beam] }));
 }
 
+/// The Import dialog's defaults as live's (live2 feel/importexport.json): an STL comes in in Millimeter whatever the
+/// document's units (an inch document here: read in inches it would be 25.4³ times the volume), and IGES
+/// postprocessing (an IGES file's straight edges read as lines) keeps the solid.
+#[test]
+fn import_defaults_are_onshapes() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "import_defaults.noshape");
+    call(&mut ctx, "document_set_units", json!({ "length_unit": "in" }));
+    let v0 = num(&call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"][0]["volume"]);
+    let stl = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STL", "file": scratch("import_defaults.stl").to_str().unwrap(), "units": "Millimeter" }))["file"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "import_files", json!({ "files": [stl], "keep_files": false }));
+    let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["name"].as_str().unwrap().to_string();
+    let v = num(&call(&mut ctx, "query_parts", json!({ "tab": studio }))["parts"][0]["volume"]);
+    assert!((v - v0).abs() < v0 * 1e-3, "the STL read in millimetres: {v} vs {v0} in³");
+    let igs = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "IGES", "file": scratch("import_defaults.igs").to_str().unwrap() }))["file"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "import_files", json!({ "files": [igs], "keep_files": false, "iges_postprocessing": true }));
+    assert!(r["errors"].is_null(), "{r}");
+    let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["name"].as_str().unwrap().to_string();
+    let v = num(&call(&mut ctx, "query_parts", json!({ "tab": studio }))["parts"][0]["volume"]);
+    assert!((v - v0).abs() < v0 * 1e-6, "IGES postprocessing keeps the solid: {v} vs {v0} in³");
+}
+
 /// Every format the Import dialog takes that we can write: the block is
 /// exported in each and imported back. B-rep formats keep the volume;
 /// mesh formats come back as one mesh part.

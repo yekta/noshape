@@ -706,6 +706,13 @@ pub fn read_iges(path: &Path, unit: LengthUnit) -> Result<Shape> {
     scaled(&s, 1.0 / unit.mm_per_unit())
 }
 
+/// Straight edges as lines: Onshape's Import › IGES postprocessing ("repairs linear edge translation"). Each edge whose
+/// curve isn't a line but runs straight between its vertices within `tol` (the shape's length unit) becomes a line, its
+/// faces' p-curves refitted; the shape unchanged when that doesn't check valid.
+pub fn straighten_edges(shape: &Shape, tol: f64) -> Result<Shape> {
+    Shape::from_res(ffi::straighten_edges(shape.raw(), tol))
+}
+
 /// Read an STL (ASCII or binary) or OBJ mesh whose coordinates are in
 /// `file_unit` (mesh files carry no unit) as a shape in meters: one
 /// planar face per triangle in a connected shell (a solid when closed).

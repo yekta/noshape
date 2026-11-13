@@ -38,6 +38,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Gate (vibe7, 07:44-09:09): assemblies 1518/1731 occurrences, 386/573 mates; against main alone infento 142/167,
   107/182 and tvc-mount 4/10 as main, config-assembly 0 -> 4/4, xdev-subs 4/6 -> 6/6, scissor-lift 13 -> 16/16 (earlier
   run), the rest unchanged. Model suite: see the land.
+- Import dialog (lead 09:09, live2 feel/importexport.json): STL now defaults to Millimeter whatever the document's
+  units (OBJ Meter as before), IGES files get "IGES postprocessing" (kernel `straighten_edges`: an edge that is a
+  spline but runs straight becomes a line; op parameter `iges_postprocessing`), every import starts from the defaults.
+  Its tooltip is ours until live2 answers (REQUESTS dx 09:30). Export defaults after live's 17:15 capture.
 - REQUESTS (dx 00:33, 01:08): asm-corexy's 3 Derived sources and its Transform 1s' in-feature connectors (empty in
   the fetch, live OK); asm-robotic-arm's 4 Part Studios from other documents (5 instances not inserted). live: REST
   429 until ~18:30 UTC. keyboard-pattern's Plane 1 needs a vertex of a feature not in live's feature list.
