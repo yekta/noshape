@@ -714,6 +714,176 @@ bool periodic_analytic(const occ::handle<Geom_Surface>& s)
 
 constexpr double kPrecision = 1e-8; // Parasolid linear precision (metres)
 
+// A B-spline surface closed round u, smooth across its seam (G1), that can't be made periodic as it is (cf-hose-
+// routing's hoses: their walls' non-rational degree-12 single-span sections, their seam knot won't come down),
+// refitted as a bicubic B-surface periodic in u (C1 at its seam) over the same (u, v) range: each section through a
+// row of samples, then along v through each row of poles, refined until every point of it between the samples lies
+// within 2 nm of the surface (its edges, on the surface, stay accurate; the volume within a millionth). Null when it
+// doesn't get there.
+occ::handle<Geom_BSplineSurface> periodic_refit_now(const occ::handle<Geom_BSplineSurface>& b)
+{
+  constexpr double kRefit = 2e-9;
+  double           u0, u1, v0, v1;
+  b->Bounds(u0, u1, v0, v1);
+  // Along v: samples in each span of the surface's own knots.
+  std::vector<double> spans;
+  for (int k = 1; k <= b->NbVKnots(); ++k)
+    spans.push_back(b->VKnot(k));
+  // Round u: samples evenly spaced along the section (its parameter may barely move near the seam: the hoses'), from
+  // the chord lengths of the middle section; the refit's u runs evenly through them.
+  constexpr int       kFine = 2048;
+  std::vector<double> along(kFine + 1, 0.0);
+  {
+    const double vm   = (v0 + v1) / 2;
+    gp_Pnt       prev = b->Value(u0, vm);
+    for (int k = 1; k <= kFine; ++k)
+    {
+      const gp_Pnt p = b->Value(u0 + (u1 - u0) * k / kFine, vm);
+      along[k]       = along[k - 1] + p.Distance(prev);
+      prev           = p;
+    }
+  }
+  if (along[kFine] <= 0)
+    return nullptr;
+  auto at_length = [&](double frac) {
+    const double target = frac * along[kFine];
+    const size_t k      = std::min<size_t>(kFine, std::lower_bound(along.begin(), along.end(), target) - along.begin());
+    if (k == 0)
+      return u0;
+    const double a = along[k - 1], c = along[k];
+    return u0 + (u1 - u0) * (k - 1 + (c > a ? (target - a) / (c - a) : 0)) / kFine;
+  };
+  for (int nu = 32, per_span = 16; nu <= 256 && per_span <= 128;)
+  {
+    std::vector<double> vs;
+    for (size_t k = 0; k + 1 < spans.size(); ++k)
+      for (int j = 0; j < per_span; ++j)
+        vs.push_back(spans[k] + (spans[k + 1] - spans[k]) * j / per_span);
+    vs.push_back(v1);
+    const int                                   nv = (int)vs.size();
+    std::vector<occ::handle<Geom_BSplineCurve>> rings;
+    occ::handle<Geom_BSplineCurve>              ring;
+    try
+    {
+      // Each section closed through its samples with the same tangent at both ends (the one across the seam), so
+      // the fit's seam is C1. The samples (fractions of the section's length) closer and closer towards the seam: a
+      // section may bend there a little more than it can smoothly (the hoses' do), which only the steps there settle.
+      std::vector<double> at{0.0};
+      for (int m = 6; m >= 1; --m)
+        at.push_back(1.0 / (nu << m));
+      for (int i = 1; i < nu; ++i)
+        at.push_back(double(i) / nu);
+      for (int m = 1; m <= 6; ++m)
+        at.push_back(1.0 - 1.0 / (nu << m));
+      at.push_back(1.0);
+      const int                                n = (int)at.size();
+      occ::handle<NCollection_HArray1<double>> uparams(new NCollection_HArray1<double>(1, n));
+      for (int i = 0; i < n; ++i)
+        uparams->SetValue(i + 1, u0 + (u1 - u0) * at[i]);
+      constexpr double kAcross = 1e-6;
+      for (int j = 0; j < nv; ++j)
+      {
+        occ::handle<NCollection_HArray1<gp_Pnt>> pts(new NCollection_HArray1<gp_Pnt>(1, n));
+        for (int i = 0; i + 1 < n; ++i)
+          pts->SetValue(i + 1, b->Value(at_length(at[i]), vs[j]));
+        pts->SetValue(n, pts->Value(1));
+        const gp_Vec across(b->Value(at_length(1 - kAcross), vs[j]), b->Value(at_length(kAcross), vs[j]));
+        GeomAPI_Interpolate in(pts, uparams, false, 1e-15);
+        in.Load(across / (2 * kAcross * (u1 - u0)), across / (2 * kAcross * (u1 - u0)), false);
+        in.Perform();
+        // (Every row has the same parameters, so the same knots and number of poles.)
+        if (!in.IsDone() || (!rings.empty() && in.Curve()->NbPoles() != rings[0]->NbPoles()))
+          return nullptr;
+        rings.push_back(in.Curve());
+      }
+      ring          = rings[0];
+      const int np  = ring->NbPoles();
+      occ::handle<NCollection_HArray1<double>> vparams(new NCollection_HArray1<double>(1, nv));
+      for (int j = 0; j < nv; ++j)
+        vparams->SetValue(j + 1, vs[j]);
+      // Along v through each row of poles (the same parameters: the same knots and number of poles each).
+      std::vector<occ::handle<Geom_BSplineCurve>> columns;
+      for (int i = 1; i <= np; ++i)
+      {
+        occ::handle<NCollection_HArray1<gp_Pnt>> pts(new NCollection_HArray1<gp_Pnt>(1, nv));
+        for (int j = 1; j <= nv; ++j)
+          pts->SetValue(j, rings[j - 1]->Pole(i));
+        GeomAPI_Interpolate in(pts, vparams, false, 1e-15);
+        in.Perform();
+        if (!in.IsDone() || (!columns.empty() && in.Curve()->NbPoles() != columns[0]->NbPoles()))
+          return nullptr;
+        columns.push_back(in.Curve());
+      }
+      const occ::handle<Geom_BSplineCurve>& column = columns[0];
+      NCollection_Array2<gp_Pnt>            grid(1, np, 1, column->NbPoles());
+      for (int i = 1; i <= np; ++i)
+        for (int j = 1; j <= column->NbPoles(); ++j)
+          grid.SetValue(i, j, columns[i - 1]->Pole(j));
+      occ::handle<Geom_BSplineSurface> fit(new Geom_BSplineSurface(grid, ring->Knots(), column->Knots(), ring->Multiplicities(), column->Multiplicities(), 3,
+                                                                  column->Degree(), false, false));
+      // Periodic: its seam, C1 by construction, brought down to that.
+      fit->SetUPeriodic();
+      if (!fit->RemoveUKnot(1, fit->UMultiplicity(1) - 1, kPrecision / 10))
+        return nullptr;
+      // Off the surface between the samples: along its normal at the point it stands for (its u by length; a
+      // seam that is only G1 parameterises differently there, so not the same u). Between samples round u, along v,
+      // and both: the first two tell which way to refine.
+      double dev[3] = {0, 0, 0};
+      for (int j = 0; j + 1 < nv; ++j)
+        for (int i = 0; i + 1 < n; ++i)
+          for (int k = 0; k < 3; ++k)
+          {
+            const double f = k == 1 ? at[i] : (at[i] + at[i + 1]) / 2, dv = k == 0 ? 0 : 0.5;
+            const double u = u0 + (u1 - u0) * f, v = vs[j] + (vs[j + 1] - vs[j]) * dv;
+            gp_Pnt       p;
+            gp_Vec       su, sv;
+            b->D1(at_length(f), v, p, su, sv);
+            const gp_Vec n = su.Crossed(sv);
+            if (n.Magnitude() < 1e-20)
+              continue;
+            dev[k] = std::max(dev[k], std::abs(gp_Vec(p, fit->Value(u, v)).Dot(n) / n.Magnitude()));
+          }
+      if (std::max({dev[0], dev[1], dev[2]}) <= kRefit)
+        return fit;
+      // Finer the ways it misses, by as much as it misses (the error falls about as the fourth power of the step
+      // round u, a little slower along v: the third, so as not to fall short); powers of two, at least one step.
+      auto finer = [&](double miss, double order) {
+        int f = 2;
+        while (f < 8 && std::pow(double(f), order) * kRefit < miss)
+          f *= 2;
+        return f;
+      };
+      const bool u_misses = dev[0] > kRefit || (dev[2] > kRefit && dev[0] >= dev[1]);
+      const bool v_misses = dev[1] > kRefit || (dev[2] > kRefit && dev[1] > dev[0]);
+      if (u_misses)
+        nu = nu == 256 ? 512 : std::min(256, nu * finer(dev[0], 4));
+      if (v_misses)
+        per_span = per_span == 128 ? 256 : std::min(128, per_span * finer(dev[1], 3));
+    }
+    catch (const Standard_Failure&)
+    {
+      return nullptr;
+    }
+  }
+  return nullptr;
+}
+
+// [`periodic_refit_now`], remembered for the last few surfaces (the writer asks again for each face's surface; the
+// handles kept, so no other surface takes their place in memory). A copy each time: the writer unclamps what it gets.
+occ::handle<Geom_BSplineSurface> periodic_refit(const occ::handle<Geom_BSplineSurface>& b)
+{
+  thread_local std::vector<std::pair<occ::handle<Geom_BSplineSurface>, occ::handle<Geom_BSplineSurface>>> seen;
+  auto copy = [](const occ::handle<Geom_BSplineSurface>& s) { return s.IsNull() ? s : occ::down_cast<Geom_BSplineSurface>(s->Copy()); };
+  for (const auto& [from, to] : seen)
+    if (from == b)
+      return copy(to);
+  occ::handle<Geom_BSplineSurface> fit = periodic_refit_now(b);
+  if (seen.size() >= 32)
+    seen.erase(seen.begin());
+  seen.emplace_back(b, fit);
+  return copy(fit);
+}
+
 // The face's B-spline surface made periodic where the face goes all the way
 // round it (Parasolid's periodic B-surface: one face, no seam, like live's
 // smooth loft): a periodic direction, or a closed one whose seam is tangent.
@@ -749,7 +919,22 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
     }
     return true;
   };
+  // Closed with its seam tangent in direction only (G1): smooth enough to refit (below).
+  auto g1_seam = [&](bool in_u) {
+    for (int i = 0; i <= 8; ++i)
+    {
+      const double t = in_u ? v0 + (v1 - v0) * i / 8 : u0 + (u1 - u0) * i / 8;
+      gp_Pnt       p0, p1;
+      gp_Vec       a0, b0, a1, b1;
+      in_u ? b->D1(u0, t, p0, a0, b0) : b->D1(t, v0, p0, b0, a0);
+      in_u ? b->D1(u1, t, p1, a1, b1) : b->D1(t, v1, p1, b1, a1);
+      if (p0.Distance(p1) > kPrecision || a0.Magnitude() < 1e-12 || a1.Magnitude() < 1e-12 || a0.Angle(a1) > 1e-6)
+        return false;
+    }
+    return true;
+  };
   occ::handle<Geom_BSplineSurface> ps = occ::down_cast<Geom_BSplineSurface>(b->Copy());
+  const bool refit_u = round_u && !b->IsUPeriodic() && b->IsUClosed() && !tangent_seam(true) && g1_seam(true);
   up = round_u && (b->IsUPeriodic() || (b->IsUClosed() && tangent_seam(true)));
   vp = round_v && (b->IsVPeriodic() || (b->IsVClosed() && tangent_seam(false)));
   // Periodic only when the seam knot comes down (a smooth seam): one left at full multiplicity is no smooth
@@ -762,7 +947,12 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
       ps->SetUPeriodic();
       up = ps->UMultiplicity(1) <= 1 || ps->RemoveUKnot(1, ps->UMultiplicity(1) - 1, kPrecision);
       if (!up)
-        ps = occ::down_cast<Geom_BSplineSurface>(b->Copy());
+      {
+        // Refitted smooth round u instead (not with v made periodic too).
+        occ::handle<Geom_BSplineSurface> fit = vp ? nullptr : periodic_refit(b);
+        up                                   = !fit.IsNull();
+        ps                                   = up ? fit : occ::down_cast<Geom_BSplineSurface>(b->Copy());
+      }
     }
     if (vp && !ps->IsVPeriodic())
     {
@@ -782,6 +972,11 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
   catch (const Standard_Failure&)
   {
     up = vp = false;
+  }
+  if (refit_u && !up && !vp)
+  {
+    ps = periodic_refit(b);
+    up = !ps.IsNull();
   }
   if (!up && !vp)
     return nullptr;

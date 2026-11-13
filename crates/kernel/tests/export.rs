@@ -1817,3 +1817,22 @@ fn iges_postprocessing_makes_straight_spline_edges_lines() {
     let (v0, v1) = (solid.volume().unwrap(), out.volume().unwrap());
     assert!((v0 - v1).abs() < 1e-12, "{v0} vs {v1}");
 }
+
+/// cf-hose-routing's hose (its Part Studio's part, tests/data/xt-parts): the walls' B-surfaces close round the hose,
+/// the inner ones (non-rational degree-12 single-span sections, from the Shell) with a seam that can't be made periodic
+/// as it is. The writer refits them periodic, so Parasolid gets every face whole, as live's own hose reads back (12
+/// faces, 12 edges, no vertices; before, the one stiff seam had every closed face split in two: 22 / 44 / 24), its
+/// volume kept within the refit's few nanometres.
+#[test]
+fn a_hoses_walls_write_whole() {
+    let dir = std::env::temp_dir().join(format!("noshape-xt-hose-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let hose = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts/hose-routing-hose.brep")).unwrap();
+    assert_eq!((hose.count(ShapeType::Face), hose.count(ShapeType::Edge), hose.count(ShapeType::Vertex)), (12, 22, 12), "the model, seams included");
+    let file = dir.join("hose.x_t");
+    write_parasolid(&file, std::slice::from_ref(&hose), LengthUnit::Meter, false).unwrap();
+    let back = read_parasolid(&file, LengthUnit::Meter).unwrap();
+    assert_eq!(back.count(ShapeType::Face), 12, "every face whole");
+    let (v0, v1) = (hose.volume().unwrap(), back.volume().unwrap());
+    assert!((v1 - v0).abs() < 5e-6 * v0, "{v1} vs {v0}");
+}

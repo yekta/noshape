@@ -17,6 +17,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-13 10:47 UTC: cf-hose-routing's Parasolid export keeps the hoses' faces whole (lead 10:20)
+- Our .x_t of each hose read back 22 / 44 / 24 faces / edges / vertices (live 12 / 12 / 0). The hoses' inner walls (the
+  Shell's offset, non-rational degree-12 single-span sections) close round with a seam knot that won't come down, and
+  one such face made `prepared` split every closed face of the body. xt.cpp `periodic_refit`: such a surface refitted
+  as a bicubic B-surface periodic in u (each section through samples graded towards the seam with the same tangent at
+  both ends, C1 there; then along v), within 2 nm of the surface, else split as before. Read back 12 / 12 / 0 (kernel
+  `a_hoses_walls_write_whole`, the hose in tests/data/xt-parts). Exchange suite, ours reads ours.x_t back: topology
+  as live's; three hoses' volumes 1.1e-6 off (the band is 1e-6; main's split export already read back 7e-7 off, the
+  refit adds a few 1e-7). Live's import of ours: at its next capture. Export: 1.8 s a hose (was 0.7 s), file 8x.
+
 ## 11-13 05:53 UTC: in-context sketch frames, live's suppressed instances; the arc cap-edge match dropped
 - Landed f9947add (the 21:45 batch below) and d4a0cf15 (asm.md: clamp-pattern's 14 -> 12 is 6ab30b272's early stop).
 - In-context sketches have no frame in live's fetch (17 cases: keyboard 11, suspension 5, scissor 1). The frame is now
