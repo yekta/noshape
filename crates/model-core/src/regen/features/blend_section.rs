@@ -898,13 +898,20 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             }
             jobs.push((pi, ci, secs, starts, convex));
         }
-        // The lofts in parallel (c2-variable-fillet-faceblend's eight took 425 ms one after another).
+        // The lofts in parallel (c2-variable-fillet-faceblend's eight took 425 ms one after another); a round's bare (a
+        // chamfer's sides as the Loft feature makes them: c2-hunting-knife's Chamfer 1 needs them).
         use rayon::prelude::*;
         let legacy = k::kernel_legacy();
+        let chamfer = spec.reference.is_some();
         let lofts = jobs
             .par_iter()
             // Every section starts at its corner: a curvature section's B-spline wires twisted otherwise.
-            .map(|(_, _, secs, starts, _)| k::with_kernel_legacy(legacy.clone(), || k::loft(secs, &k::LoftOptions { solid: true, closed, start_points: Some(starts.clone()), ..Default::default() })))
+            .map(|(_, _, secs, starts, _)| {
+                k::with_kernel_legacy(legacy.clone(), || match chamfer {
+                    true => k::loft(secs, &k::LoftOptions { solid: true, closed, start_points: Some(starts.clone()), ..Default::default() }),
+                    false => k::loft_tool(secs, closed, starts),
+                })
+            })
             .collect::<Result<Vec<_>, _>>()?;
         for ((pi, ci, secs, _, convex), tool) in jobs.into_iter().zip(lofts) {
             if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
