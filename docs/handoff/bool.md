@@ -4,7 +4,37 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-13 06:01 UTC; restart from here)
+## bool, now (11-13 12:55 UTC; restart from here)
+**Queued 12:50 as b606d85c (branch bool-dock, worktree bool-hat; gate CHECK, knurls only: taken 3026 -> 3026, 0 new
+differences, parity56 clean, crate tests pass; log /root/bool-hat-scratch/gate-ae4aa4e8b.log).** If it fails, fix forward
+on bool-dock (`git checkout crates/kernel/tests/all.rs` first; probe module: /root/bool-scratch/probe-allrs.patch).
+- 8f08d66df: `free::seam_crossings` counts a curve's sample exactly on a whole-turn face's seam as a crossing when the
+  curve passes to the other side (both steps' products were 0, so none). The private dock's tilted stand (E1-30): its
+  Rib Dizisi's 11 rib fuses + one cut declined "an edge on another argument's free-form face" in the real run but not in
+  the text replay (the half-round rib's end arc on a half torus, its middle sample exactly at v = 2pi; text rounding
+  moved it). Replay the dock with NOSHAPE_RECORD_EXACT recordings (.bin) from now on. T1
+  bool_patterns::a_rib_fused_onto_a_rings_end_across_its_seam_as_occt.
+- d6bdcedfd: boolean.cpp `no_interaction` (after every OCCT Boolean of solids, <= 8 tools) first measures the volume
+  of only the faces that differ between the result and the inputs (`volume_change`), against 1e-8 of the inputs' box
+  volumes; the whole volumes only when that is near nothing. The dock's E2 1355-face cut e4db7fcb 1.2-1.9 s -> 0.38 s.
+- ae4aa4e8b: the "vertices to merge first" stop after the crossings removed: groups found there wait for the split
+  stage's, one restart for both. cf-surface-pattern's 85-tool cut: 4 rounds -> 3, 2.12-2.21 -> 1.90-1.99 s.
+- The dock now (vibe5 ~/agents/bool-keep, mode 700; tabrec/recx1..8 = exact recordings per tab, dockcmp.sh A B times
+  all 8 tabs and compares the features): the tilted stand 1656 -> 1540 ms, all tabs 14.30 -> 13.96 s (load 25-40,
+  before d6bdcedfd / ae4aa4e8b). OCCT left: 5 "a face's vertex off its plane" (upstream, blend.md 06:42), e4db7fcb
+  "a point near two vertices" (upstream tolerances), 2de4f3a5 (287 ms, non-manifold, likely the same upstream
+  vertices), 37bb0f93 (C, "a face lost", 127 ms), D1/D2 4 x ~25 ms (3 "a face lost", 1 non-manifold), and A 5670e6af
+  (160 ms) / B ba238f13 (67 ms) "a non-manifold result": there the dome face 75 (free-form, +-14.7 mm) gets the
+  target's own slot edges at (+-5.5, 12.82, 9.8-16.4) mm as dangling inner edges (its own boundary not closing in
+  its UV arrangement?); unbalanced uses on those edges. Not the turned-pieces shortcut (XNOTURN changes nothing).
+- cf-surface-pattern's cut after ae4aa4e8b: round 0 ~550 ms (OCCT ball/B-spline sections ~400 of it, half of that
+  IntTools ComputeTolReached3d's PSO), 1 restart ~150 ms, last round 660-830 ms (pieces 320, states 160). Timers:
+  /root/bool-scratch/xt-timers.patch (XT=1). Next: fewer C2::Mapped evaluations (ray_state inside tests, chords).
+- **Lead's P0 12:00 (asm-infento-subs speed):** release on vibe7, side by side: main f1d55c47e 1253 s, aaef71dfe
+  1669 s, same result: no regression in release (head faster from Studio 1dc32b feature ~220 on). qa's suite is a
+  debug build: debug comparison running on vibe7 since 12:55 (~/agents/bool-keep/p0: run.sh, tdiff.py, *.log).
+
+## bool, earlier (11-13 06:01 UTC)
 Lead's goal (11-13): all 84 suite documents faster than live. qa's baseline: SCORE "Speed window" (9febdf588, vibe7
 02:00, release). Ranking and split posted to the lead 11-13 04:03; core's and blend's rows in core.md / blend.md
 ("From bool (11-13 03:55)" and the 04:03 additions). bool2 has the impeller's and rings-loft's Booleans.
