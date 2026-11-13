@@ -17,6 +17,31 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-13 11:52 UTC: hose x_t whole without the refit; spur gear STL and STEP; sheet metal STEP to core (lead 10:20, 11:00)
+- Hose (cf-hose-routing): 6a311c2b (a periodic refit, 1.8 s, 8x the file) withdrawn from the queue. The inner walls'
+  seams are tangent within 4e-4 rad but not C1, so the seam knot wouldn't come down. xt.cpp `smooth_u_seam`: knots of
+  multiplicity 2 a short span h from each end, the poles beside the seam evened (h shrinks until the surface moves
+  under 1e-9 m), then periodic. Per hose 12 / 12 / 0 as live, 0.53 s (main 0.7), 235 KB (main 449 KB), volume 7e-7
+  off the model (band 1e-6). Kernel `a_hoses_walls_write_whole`. Held in dx's worktree (branch dx-fan, on
+  top) until live imports the new file (REQUESTS 11:54, /root/parity/probe-xt/hose-c1-seam.x_t): live dropped the
+  hoses whose periodic walls kept a full-multiplicity seam knot (2452).
+- Spur gear STL: our reader read ours.stl as 4 parts (live 5). The construction pin crosses the 20-tooth gear's face,
+  and one point of it was inside, so it became the gear's hollow. mesh_body.cpp: a piece is a hollow only when 64
+  points spread over it are inside. Kernel `stl_pieces_are_parts_and_a_piece_inside_is_a_hollow` (a pin through a box).
+- Spur gear STEP / IGES import (ours imports live.step: 32-tooth area 4123.006 for 4123.702): live's file has a
+  2e-5 m uncertainty and OCCT projected the chamfer cones' B-spline edges 7.6 µm off; the mesh was right, the
+  integrals not. io.cpp `refine_freeform_pcurves` now also covers cylinders, cones, spheres and tori, with exact
+  (closed-form) p-curves at the 3D curve's parameters (`elementary_pcurve`); lines and circles on cylinders / cones
+  skipped. 4123.702 / 4761.82 now. Cost within noise (0-10 ms on the exchange files). Kernel
+  `a_loose_step_files_edges_on_a_cone_read_back_tight` (fails on main: 605.11 mm² for 603.41).
+- Sheet metal STEP (61 faces, live 58): not the writer. Our model's walls are tilted (Sheet Metal Up to Part 3e-6
+  rad, Extrude 4 7.5e-5 rad), so the importers' plane merge misses 3 pairs. Handed to core (core.md 11:08).
+- Exchange suite (vibe7, all 13): ours reads ours back 43 -> 44/48, nothing worse; the gear STL and the hose x_t
+  rows match; with the STEP import fix (11:47 run) ours imports live's 46 -> 47/48, reads ours back 45/48. Left:
+  live.igs' 12-tooth gear 806.58 mm² for 807.58: its 24 flanks 9.99 for 10.03 each; their edges' p-curves on
+  B-surfaces of 20 / 155 poles are "off" 0.3-1.9 mm (not same-parameter, IGES), FixAddPCurve keeps them as they are. A Custom STL at 2 µm chord of the imported gear asks for
+  over 8 GB (Medium / Fine: 1.8 s): not looked into.
+
 ## 11-13 05:53 UTC: in-context sketch frames, live's suppressed instances; the arc cap-edge match dropped
 - Landed f9947add (the 21:45 batch below) and d4a0cf15 (asm.md: clamp-pattern's 14 -> 12 is 6ab30b272's early stop).
 - In-context sketches have no frame in live's fetch (17 cases: keyboard 11, suspension 5, scissor 1). The frame is now

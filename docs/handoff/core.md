@@ -25,6 +25,22 @@ remapped on removal, kept on moves). Release, quiet vibe5, same run: c2-sm-louve
 - c2-impeller-loft: Move face 1 / Delete face 2 run on a wrong part (Move face 1 fails after 2.7 s): Boolean
   Flansch+Gehäuse to bool2 (lead 11-13). Isaac Fillet 2 gate failed (below): rework pending.
 
+## From dx (11-13 11:08 UTC): cf-sheet-metal-model-plus' planar faces come out tilted (its STEP: 61 faces, live 58)
+Live's STEP import (and ours) merges a part's faces on one plane. Live's own file of "Sheet Metal Up to Part" reads
+58 / 151 / 94; ours reads 61 / 154 / 94, because three pairs of its walls aren't on one plane in our model. The faces
+of the 70-face part (query_entities, Part 3) have these normals where live's are exactly (±1, 0, 0):
+- Sheet Metal Up to Part (sheetMetalStart, EXTRUDE, UP_TO_BODY + second direction UP_TO_SURFACE): faces of 5.02 and
+  14.3 mm² at (-1, -1e-6, 2e-6) and (-1, 0, -3e-6), 1-3 um off their neighbours' planes.
+- Extrude 4 (REMOVE through the sheet metal parts): faces of 7.34 and 20.62 mm² at (1, 6.8e-5, 3.1e-5) and
+  (1, 1.4e-5, -9e-6), a tilt of 7.5e-5 rad.
+The STEP writer writes the planes as the model has them; the exporter can't fix this. Repro: the exchange suite
+(NOSHAPE_PARITY_ONLY=cf-sheet-metal-model-plus), or query_entities on the model.
+The same part's wall beside the curved body (722 mm², centroid (-17.0, 63.3, 43.2)) is an offset surface in ours
+(query_entities: "other"), an extruded surface in live (its STEP, our import of it: "extruded" 721.9). Its STL at
+live's REST setting (5°, no chord limit) then sags: BRepMesh meshes the offset as a general surface, live's extrusion
+comes as strips along x; ours.stl reads 10137.8 mm³, live's 10147.2 (model 10148.4). An offset of an extrusion is the
+extrusion of the offset section: made so, it would mesh, export and read as live's.
+
 ## From bool (11-13 03:55 UTC, lead: documents slower than live, by feature)
 Baseline qa's 02:00 vibe7 release run (head 91a90caf); per feature ours from a profiled suite run on vibe5 (loaded: rough),
 live's from live.jsonl per_feature_ms. Yours:
