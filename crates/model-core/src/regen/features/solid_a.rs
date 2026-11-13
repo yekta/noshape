@@ -925,6 +925,13 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
                 profiles.push(Profile { shape: f, frame, edge_sources, key: Source::Topo(b.faces[0].clone()), from_face: true });
             }
         }
+        // Faces of one profile that make one face together (a ring's region and the disk in its hole: c2-rings-loft's
+        // Loft 1), as live's: that face.
+        if profiles.len() > 1
+            && let Some(one) = merged_profile(&profiles)
+        {
+            profiles = vec![one];
+        }
         if profiles.len() != 1 {
             return err("Select a single sketch region or face per profile.");
         }
@@ -935,6 +942,30 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
         out.push(Section { shape: p.shape.clone(), profile: Some(p) });
     }
     Ok(out)
+}
+
+/// Coplanar profile faces fused into one face, if they make one: each of its edges keeps the source of the profile edge
+/// it lies on.
+fn merged_profile(profiles: &[Profile]) -> Option<Profile> {
+    let n = profiles[0].frame.normal;
+    let o = profiles[0].frame.origin;
+    if profiles.iter().any(|p| p.frame.normal.cross(n).length() > 1e-9 || (p.frame.origin - o).dot(n).abs() > 1e-9) {
+        return None;
+    }
+    let tools: Vec<Shape> = profiles[1..].iter().map(|p| p.shape.clone()).collect();
+    let fused = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&profiles[0].shape), &tools, &k::BooleanOptions { unify: true, ..Default::default() }).ok()?.shape;
+    let [face] = fused.faces().try_into().ok()?;
+    let sources: Vec<(Shape, Source)> = profiles.iter().flat_map(|p| p.shape.edges().into_iter().zip(p.edge_sources.iter().cloned())).collect();
+    let edge_sources = face
+        .edges()
+        .iter()
+        .map(|e| {
+            let info = e.edge_info().ok()?;
+            let mid = k::make_vertex(e.point_at(0.5 * (info.first_param + info.last_param)).ok()?).ok()?;
+            sources.iter().find(|(x, _)| k::distance(&mid, x).is_ok_and(|d| d.distance < 1e-7)).map(|(_, s)| s.clone())
+        })
+        .collect::<Option<Vec<Source>>>()?;
+    Some(Profile { shape: face, frame: profiles[0].frame, edge_sources, key: profiles[0].key.clone(), from_face: profiles[0].from_face })
 }
 
 /// Two circles in parallel planes whose centres are apart sideways by at least
@@ -1051,6 +1082,10 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     // each profile (point profiles excepted).
     if ev.bool("matchConnections") {
         for c in ev.params.array("connections") {
+            // (A connection with nothing picked matches nothing: live builds the loft, c2-rings-loft's Loft 1.)
+            if c.query("connectionEntities").is_empty() {
+                continue;
+            }
             let pts: Vec<DVec3> = c.query("connectionEntities").iter().filter_map(|r| ev.resolve_vertex_point(r).or_else(|| connection_edge_point(ev, c, r))).collect();
             let on = |s: &Shape| pts.iter().any(|p| k::make_vertex(*p).and_then(|v| k::distance(&v, s)).is_ok_and(|d| d.distance < 1e-6));
             if shapes.iter().any(|s| s.shape_type() != ShapeType::Vertex && !on(s)) {

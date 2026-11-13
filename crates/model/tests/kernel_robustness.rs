@@ -4050,3 +4050,31 @@ fn a_concave_arcs_round_stops_at_the_convex_rounds_and_runs_them_on() {
     assert!(r0.iter().zip(&r1).all(|(a, b)| b > a), "the corner rounds run on down: {r0:?} -> {r1:?}");
     assert!(volume(&after) > volume(&before));
 }
+
+/// c2-rings-loft's Loft 1: a profile of a ring's region and the disk in its hole (one face together), and Match
+/// connections on with a connection that has nothing picked: lofted from the disk, as live (ours said "Select a single
+/// sketch region or face per profile.", then "Select a point on each profile to define a connection.").
+#[test]
+fn a_loft_profile_of_a_ring_and_the_disk_in_its_hole_is_the_disk() {
+    let mut t = T::new();
+    let (_, ring_and_disk) = t.sketch(&[], &[((0.0, 0.0), 10.0), ((0.0, 0.0), 20.0)]);
+    assert_eq!(ring_and_disk.len(), 2);
+    let plane = Reference::FeaturePlane(t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("30 mm"))]));
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, 10e-3);
+    let s2 = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let top: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s2).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s2, key: g.key.clone() }).collect();
+    let item = |rs: Vec<Reference>| {
+        let mut v = noshape_model::params::ParamValues::default();
+        v.set("sheetProfileEntities", q(rs));
+        v
+    };
+    let mut connection = noshape_model::params::ParamValues::default();
+    connection.set("connectionEntities", q(vec![]));
+    let l = t.add("loft", &[("sheetProfilesArray", ParamValue::Array(vec![item(ring_and_disk), item(top)])), ("matchConnections", ParamValue::Bool(true)), ("connections", ParamValue::Array(vec![connection]))]);
+    let res = t.ok(l);
+    // A frustum, r 20 to 10 mm over 30 mm: π h (R² + R r + r²) / 3.
+    let want = std::f64::consts::PI * 30.0 * (400.0 + 200.0 + 100.0) / 3.0;
+    assert!((volume(&res) - want).abs() < 0.5, "{} mm³, want {want}", volume(&res));
+}
