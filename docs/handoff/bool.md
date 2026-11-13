@@ -153,7 +153,10 @@ scratch /root/bool-scratch.
   - **Worktrees:** /root/projects/noshape-wt/bool2 (branch bool2-cov). bool2-gate and bool-gate-base are gate.sh's.
     bool2-nightly is the crons' checkout. bool2-doc is for docs-only lands. Targets on vibe5: bool2, bool2-gate,
     bool-gate-base.
-  - **Session cron, gone with the session; recreate it:** every hour at :17: `git -C
+  - **Host (lead 11-13 05:50 UTC, until further notice): vibe7.** Gates with NOSHAPE_GATE_HOST=vibe7, builds with
+    NOSHAPE_RB_HOST=vibe7 (vibe5 at load 50). vibe7 has the corpora and the gate's caches (copied 05:55 from vibe5's
+    ~/agents/bool-corpora and ~/agents/bool-gate); vibe5 can't reach vibe7 by name, so copies go through this machine.
+  - **Session cron, gone with the session; recreate it (NOSHAPE_GATE_HOST=vibe7 for now):** every hour at :17: `git -C
     /root/projects/noshape-wt/bool2-nightly fetch -q origin && git -C /root/projects/noshape-wt/bool2-nightly checkout
     -q -f --detach origin/main && bash /root/projects/noshape-wt/bool2-nightly/tools/bool/gate.sh --main`, skipped while
     another gate runs. The kall nightly stays off (vibe5 has 29 GB).
