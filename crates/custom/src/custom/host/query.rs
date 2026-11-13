@@ -2165,6 +2165,32 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             if having.is_empty() {
                 return Ok(Vec::new());
             }
+            // No subquery: everything, in all_with's order. Where the matches are all bodies' entities, they alone in
+            // that order (bodies, then faces, edges and vertices by body and index): the whole list was built for each
+            // filter (c2-sm-louver's Extrude 3 / 4: thousands of entities, 215 filters).
+            // (Only where the shortcut below would be taken: the bodies' entities alone outnumber the matches 16 to 1.)
+            let body_ents: usize = q.st.ctx.bodies.iter().map(|b| 1 + b.faces.len() + b.edges.len() + b.vertices.len()).sum();
+            if query.get("subquery").is_undefined() && having.len() * 16 < body_ents {
+                let mut found: Vec<Ent> = Vec::new();
+                let resolved = having.iter().all(|r| {
+                    let es = q.from_ref(r);
+                    let some = !es.is_empty();
+                    found.extend(es);
+                    some
+                });
+                let key = |e: &Ent| match *e {
+                    Ent::Body(b) => Some((0, b, 0)),
+                    Ent::Face(b, f) => Some((1, b, f)),
+                    Ent::Edge(b, x) => Some((2, b, x)),
+                    Ent::Vertex(b, v) => Some((3, b, v)),
+                    _ => None,
+                };
+                if resolved && found.iter().all(|e| key(e).is_some()) {
+                    found.sort_by_key(|e| key(e));
+                    found.dedup();
+                    return Ok(found.into_iter().filter(|e| having.contains(&q.to_ref(e)) && q.shown(e)).collect());
+                }
+            }
             let base = if query.get("subquery").is_undefined() { q.all_with(None, true) } else { sub(i, "subquery")? };
             // A few attributed entities among thousands (a sheet metal model after its patterns: c2-sm-louver's 839
             // filters of ~7 among ~9000 took 3.2 s): those found by their references, not every entity's reference
