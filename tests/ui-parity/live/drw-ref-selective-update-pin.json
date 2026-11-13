@@ -1,0 +1,2868 @@
+{
+ "scenario": "drw-ref-selective-update-pin",
+ "recorded": "2026-11-13T19:07:04.322Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-13.1"
+ },
+ "live": {
+  "document": "ce8e02dad90721017583920e",
+  "workspace": "47bbfafd05bd061280308050",
+  "element": "a64e8d815891d261b1f9a98b",
+  "start": "block-drawing-v1",
+  "startElement": "a64e8d815891d261b1f9a98b",
+  "runner": "live2 .nstate-uip-1.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Part 1 Drawing 1",
+     "kind": "drawing",
+     "active": false
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "doc_tab": "Part 1 Drawing 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    381,
+    1063
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 62815
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 88533
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "doc_tab": "Part 1 Drawing 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    381,
+    1063
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Delete",
+      "Open in new browser tab",
+      "Rename",
+      "Properties…",
+      "Duplicate",
+      "Copy to clipboard",
+      "Change to version…",
+      "Select as document thumbnail",
+      "Move to document…",
+      "Export…",
+      "Release…"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 112969
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Change to version…"
+    }
+   },
+   "ok": true,
+   "at": [
+    385,
+    945
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": true
+      },
+      {
+       "label": "Selective update",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "live2 uip block-drawing-v1 2026-11-13T19:06:18",
+       "kind": "string",
+       "text": "Main ⇨ V1"
+      }
+     ],
+     "error": null,
+     "ok": "enabled",
+     "okLabel": "Update all"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / live2 uip block-drawing-v1 2026-11-13T19:06:18 / Main / ⇨ / V1 / Update all",
+      "inputs": []
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 138193
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": true
+      },
+      {
+       "label": "Selective update",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "live2 uip block-drawing-v1 2026-11-13T19:06:18",
+       "kind": "string",
+       "text": "Main ⇨ V1"
+      }
+     ],
+     "error": null,
+     "ok": "enabled",
+     "okLabel": "Update all"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / live2 uip block-drawing-v1 2026-11-13T19:06:18 / Main / ⇨ / V1 / Update all",
+      "inputs": []
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 163468
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Selective update"
+    }
+   },
+   "ok": true,
+   "at": [
+    494,
+    124
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": false
+      },
+      {
+       "label": "Selective update",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "live2 uip block-drawing-v1 2026-11-13T19:06:18",
+       "kind": "boolean",
+       "checked": false,
+       "text": "Main ⇨ V1"
+      }
+     ],
+     "error": null,
+     "ok": "disabled",
+     "okLabel": "Update selected"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / live2 uip block-drawing-v1 2026-11-13T19:06:18 / Main / ⇨ / V1 / Update selected",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 187193
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Version graph:live2 uip block-drawing-v1 2026-11-13T19:06:18"
+    }
+   },
+   "ok": true,
+   "at": [
+    540,
+    198
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "button",
+     "label": null
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": false
+      },
+      {
+       "label": "Selective update",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "live2 uip block-drawing-v1 2026-11-13T19:06:18",
+       "kind": "boolean",
+       "checked": false,
+       "text": "Main ⇨ V1"
+      },
+      {
+       "label": "live2 uip block-drawing-v1 2026-11-13T19:06:18",
+       "kind": "string",
+       "text": "V1"
+      }
+     ],
+     "error": null,
+     "ok": "disabled",
+     "okLabel": "Update selected"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / live2 uip block-drawing-v1 2026-11-13T19:06:18 / Main / ⇨ / V1 / Update selected / live2 uip block-drawing-v1 2026-11-13T19:06:18 / V1 / Workspace / Version / Main / V1 / Start",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": {
+     "kind": "list",
+     "rows": [
+      "Main",
+      "V1",
+      "Start"
+     ],
+     "highlighted": 1,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 212448
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "V1"
+    }
+   },
+   "ok": true,
+   "at": [
+    411,
+    275
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": false
+      },
+      {
+       "label": "Selective update",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "live2 uip block-drawing-v1 2026-11-13T19:06:18",
+       "kind": "boolean",
+       "checked": true,
+       "text": "Main ⇨ V1"
+      }
+     ],
+     "error": null,
+     "ok": "enabled",
+     "okLabel": "Update selected"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / live2 uip block-drawing-v1 2026-11-13T19:06:18 / Main / ⇨ / V1 / Update selected",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": true
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 238048
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Update selected"
+    }
+   },
+   "ok": true,
+   "at": [
+    509,
+    467
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": false
+      },
+      {
+       "label": "Selective update",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 0 documents",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "live2 uip block-drawing-v1 2026-11-13T19:06:18",
+       "kind": "boolean",
+       "checked": false,
+       "text": "V1 ⇨ V1"
+      }
+     ],
+     "error": null,
+     "ok": "disabled",
+     "okLabel": "Update selected"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 0 documents / live2 uip block-drawing-v1 2026-11-13T19:06:18 / V1 / ⇨ / V1 / Update selected",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 274572
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Reference manager",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Update to latest",
+       "selected": false
+      },
+      {
+       "label": "Selective update",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Newer versions available for 0 documents",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "live2 uip block-drawing-v1 2026-11-13T19:06:18",
+       "kind": "boolean",
+       "checked": false,
+       "text": "V1 ⇨ V1"
+      }
+     ],
+     "error": null,
+     "ok": "disabled",
+     "okLabel": "Update selected"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "external-reference-update-dialog",
+      "title": "Reference manager",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 0 documents / live2 uip block-drawing-v1 2026-11-13T19:06:18 / V1 / ⇨ / V1 / Update selected",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 300965
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     509,
+     466
+    ],
+    "hover": [],
+    "element": "button.btn.btn-primary"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 325859
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 351135
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "key",
+    "key": "ctrl+s"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     509,
+     466
+    ],
+    "hover": [],
+    "element": "iframe.foreign-data-container"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "V1",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 375118
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "V1",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 400428
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "sheet_ref": "Part 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    135,
+    183
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "V1",
+      "Part 1",
+      "Part 1 In progress V1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 425175
+  },
+  {
+   "step": 16,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Pin reference"
+    }
+   },
+   "ok": true,
+   "at": [
+    175,
+    248
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "V1",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 450025
+  },
+  {
+   "step": 17,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "V1",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 474897
+  },
+  {
+   "step": 18,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "sheet_ref": "Part 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    135,
+    183
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "V1",
+      "Part 1",
+      "Part 1 In progress V1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 499488
+  },
+  {
+   "step": 19,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     509,
+     466
+    ],
+    "hover": [],
+    "element": "iframe.foreign-data-container"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "V1",
+      "Part 1",
+      "Part 1 In progress V1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 525769
+  }
+ ]
+}
