@@ -43,6 +43,10 @@ seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs li
 - A rim round's tools and a run-on's face distances in parallel; rim chamfers built directly too (the classification
   cost that kept them on the cut is gone: knife Chamfer 2 ~73 -> ~36 ms, rings Chamfer 1 ~115 -> ~95 ms, Mac dev,
   three alternations).
+- Release, Mac, two alternations against blend-speed on the same main (per feature / whole document): knife Fillet 3
+  136 -> 89 ms, Chamfer 2 86 -> 34, document 710 -> 602 ms (live 408); rings Fillet 1 50 -> 37, Chamfer 1 149 -> 92,
+  document 1248 -> 1156 (live 1557); faceblend Face blend 1 140 -> 89, document 142 -> 94 (live 58); snap-hook Fillet 6
+  32.5 -> 29.7, document 350 -> 344 (live 274); michael unchanged (90; its Fillet 2's 84 ms is the Boolean, bool's).
 - Dev builds, vibe7 loaded: knife Fillet 3 661-698 -> 280-363 ms, rings Fillet 1 232-302 -> 130-189, snap-hook Fillet 6
   226-237 -> 120, Fillet 3 80-89 -> 50-53, faceblend Face blend 1 407-655 -> 368-456. Results identical (model suite
   863 = 863 twice).
