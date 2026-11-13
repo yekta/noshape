@@ -353,6 +353,28 @@ panel open, a fresh document per row; cells carry `sm-cell-<table>-<row>-<column
 | The flat view | its own camera: the wheel zooms it alone | the same | = |
 | Not yet in the matrix | the panel's open time (0.9–1.4 s live on a software GPU), the flat view starting from Top and re-fitting, its bend lines (rgb(47,47,47), dashed centre), a flat bend hovered / clicked lighting both views and selecting its row, the Make joint / Corner / Bend relief picks, Tab filling its fields from the sketch | – | – |
 
+## Sketch tools (matrix)
+
+live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-studio-ui
+`sketchtools::the_sketch_tools_matrix_matches_live` (T1, no GPU); Search tools' ranking through
+`noshape_ops::tool_search::studio_rank` over the toolbar's feature types.
+
+**Matched: 10 / 10** (11-13 12:33 UTC; nothing to fix).
+
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| Search "fil" | Fillet, Fill, Finish flex PCB model, Finish sheet metal model, 3D fit spline, Modify fillet | the same | = |
+| Search fillet / chmf / lin pat / ext / sk / xyz | Fillet, Modify fillet; Chamfer; Linear pattern; Extrude, External thread; Sketch; nothing | the same | = |
+| Line chains | each click after the second continues from the last end | the same | = |
+| Circle stays | two circles without re-picking the tool | the same | = |
+| One Esc mid-chain | exits the tool, the sketch stays open | the same | = |
+| Space mid-chain | nothing; the chain continues | the same | = |
+| Enter mid-chain | the length box becomes a driving dimension on the segment; the chain continues | the same | = |
+| The menu mid-chain | Escape line, Confirm Sketch 1, …; the tool stays | the same | = |
+| Esc with that menu open | sketch/405–408: the first Esc exits the tool, the menu stays, a second closes it (live2's note reads otherwise: asked, REQUESTS 12:33) | the same as sketch/405–408 | = |
+| Shift+F | the sketch fillet | the same | = |
+| Not yet in the matrix | Search tools' panel (Recently used, the info box, Highlight tool in toolbar), the pattern labels (3x / 1x, spacing, inline boxes), Text's two-click rectangle and dialog (font list, "Default text" selected, n/250 characters: ours has them), Insert image's tabs and aspect-kept rectangle, trim hover / drag-trim, extend hover, the sketch fillet's preview and drag | – | – |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
