@@ -6111,7 +6111,7 @@ fn mate_ends_off(ctx: &mut Ctx, live_root: &Value, name: &str) -> Option<String>
     use noshape_model::assembly::eval::matrix_frame;
     let live = values(&live_root["features"]).into_iter().find(|f| f["featureData"]["name"] == name)?;
     let v3 = |v: &Value| f3(v).map(DVec3::from);
-    let ends: Vec<(DVec3, DVec3)> = live["featureData"]["matedEntities"].as_array()?.iter().filter_map(|e| Some((v3(&e["mateConnectorCS"]["origin"])?, v3(&e["mateConnectorCS"]["zAxis"])?))).collect();
+    let ends: Vec<(DVec3, DVec3, DVec3)> = live["featureData"]["matedEntities"].as_array()?.iter().filter_map(|e| Some((v3(&e["mateConnectorCS"]["origin"])?, v3(&e["mateConnectorCS"]["zAxis"])?, v3(&e["mateConnectorCS"]["xAxis"])?))).collect();
     let od = ctx.doc(None).ok()?;
     let tab = od.doc().tabs.iter().find(|t| t.name == "Assembly 1")?.id;
     let asm = match &od.doc().tab(tab)?.content {
@@ -6121,18 +6121,19 @@ fn mate_ends_off(ctx: &mut Ctx, live_root: &Value, name: &str) -> Option<String>
     let m = asm.mates.iter().find(|m| m.name == name)?.clone();
     let units = od.doc().settings.units;
     let r = od.evaluate_assembly(&asm, &Default::default());
-    let local = |c: &MateConnectorRef| -> Option<(DVec3, DVec3)> {
+    let local = |c: &MateConnectorRef| -> Option<(DVec3, DVec3, DVec3)> {
         let path: Vec<_> = std::iter::once(c.instance).chain(c.path.iter().copied()).collect();
         let o = r.occurrences.iter().find(|o| o.path == path)?;
         let f = matrix_frame(&o.transform).inverse().mul(&r.connector_world(c, &units)?);
-        Some((f.origin, f.z()))
+        Some((f.origin, f.z(), f.x()))
     };
     // (Off along live's Z, then within its plane.)
-    let off = |o: Option<(DVec3, DVec3)>, l: Option<&(DVec3, DVec3)>| match (o, l) {
+    // (Then the Z axes' angle, and the X axes' after a slash: a Pin slot's runs along its slot.)
+    let off = |o: Option<(DVec3, DVec3, DVec3)>, l: Option<&(DVec3, DVec3, DVec3)>| match (o, l) {
         (Some(o), Some(l)) => {
             let d = o.0 - l.0;
             let along = d.dot(l.1.normalize_or_zero());
-            format!("{:.3} / {:.3} mm {:.0}°", along * 1e3, (d - l.1.normalize_or_zero() * along).length() * 1e3, o.1.angle_between(l.1).to_degrees())
+            format!("{:.3} / {:.3} mm {:.0}° / {:.0}°", along * 1e3, (d - l.1.normalize_or_zero() * along).length() * 1e3, o.1.angle_between(l.1).to_degrees(), o.2.angle_between(l.2).to_degrees())
         }
         _ => "-".to_string(),
     };
