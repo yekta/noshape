@@ -2488,8 +2488,24 @@ impl<'a> Translator<'a> {
                 None,
             ),
         };
+        // A whole line's side is to the left as live's runs (+1), and ours may run the other way.
+        let live_dir = || -> Option<DVec2> {
+            let (Some([lo, lx, ly]), (Some(o), Some(x), Some(y))) = (self.frames.get(sk), ours_frame) else { return None };
+            let poly = self.curves.get(&(sk.to_string(), q.edge.clone()))?;
+            let to_ours = |p: &[f64; 2]| {
+                let w: [f64; 3] = std::array::from_fn(|i| (lo[i] + p[0] * lx[i] + p[1] * ly[i]) / k - o[i]);
+                DVec2::new((0..3).map(|i| w[i] * x[i]).sum(), (0..3).map(|i| w[i] * y[i]).sum())
+            };
+            Some(to_ours(poly.last()?) - to_ours(poly.first()?))
+        };
+        let side = match (edge, &q.vertex) {
+            (C::Line(a, b), None) if live_dir().is_some_and(|d| d.dot(b - a) < 0.0) => -q.side,
+            (C::Line(..), _) | (_, Some(_)) => q.side,
+            _ if q.whole_line_only => return None,
+            _ => q.side,
+        };
         let off = other.map_or(0.05 * step, |c| (0.5 * distance(c, at)).min(0.05 * step));
-        Some(at + tangent(edge, at).perp() * (off * q.side.signum()))
+        Some(at + tangent(edge, at).perp() * (off * side.signum()))
     }
 
     /// A sketch region query (Onshape's packed form: a FACE whose
@@ -5558,6 +5574,8 @@ struct EdgeSide {
     edge: String,
     vertex: Option<([String; 2], f64)>,
     side: f64,
+    /// Without a vertex: only a line's side is told (by live's direction).
+    whole_line_only: bool,
 }
 
 fn edge_side_query(text: &str) -> Option<EdgeSide> {
@@ -5576,7 +5594,7 @@ fn edge_side_query(text: &str) -> Option<EdgeSide> {
         let (a, b) = pair.split_once(',')?;
         Some(([entity_of(a.trim())?, entity_of(b.trim())?], flag))
     });
-    Some(EdgeSide { edge, vertex, side })
+    Some(EdgeSide { edge, vertex, side, whole_line_only: false })
 }
 
 /// [`edge_side_query`] of a packed region query: its first TOPOLOGY edge that names a vertex of its own (the piece of a
@@ -5630,10 +5648,14 @@ fn packed_edge_side(p: &noshape_model::custom::host::packed::Packed) -> Option<E
         Some(([text(a, "sketchEntityId")?.to_string(), text(b, "sketchEntityId")?.to_string()], flag))
     };
     let edges: Vec<(&Packed, f64)> = pairs(p).into_iter().filter(|(q, _)| text(q, "queryType") == Some("IMPRINT") && text(q, "entityType") == Some("EDGE")).collect();
-    // (A whole curve's side goes by which way the curve runs, which ours may not share with live's: c2-fan-blade-sweep's
-    // Extrude 1 took the region beside its own.)
-    let (q, side) = edges.iter().find(|(q, _)| vertex(q).is_some())?;
-    Some(EdgeSide { edge: entity(q)?, vertex: vertex(q), side: *side })
+    // Else a whole line (asm-clamp-pattern's Trunnion: the lower half of a profile mirrored about one): its side goes by
+    // which way live's line runs. (Not a whole curve of another kind: c2-fan-blade-sweep's Extrude 1 took the region
+    // beside its own.)
+    if let Some((q, side)) = edges.iter().find(|(q, _)| vertex(q).is_some()) {
+        return Some(EdgeSide { edge: entity(q)?, vertex: vertex(q), side: *side, whole_line_only: false });
+    }
+    let [(q, side)] = edges.as_slice() else { return None };
+    Some(EdgeSide { edge: entity(q)?, vertex: None, side: *side, whole_line_only: true })
 }
 
 /// The live sketch entity an IMPRINT edge of a text query is derived from (`"derivedFrom":subQk`, its
