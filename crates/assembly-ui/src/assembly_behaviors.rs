@@ -1101,6 +1101,40 @@ impl AssemblyView {
     /// graphics area (live Onshape, 2026-10-18).
     pub(super) fn instance_menu(&self, top: InstanceId, graphics: bool, cx: &App) -> Vec<MenuEntry> {
         let m = self.full_instance_menu(top, graphics, cx);
+        // Live2 fields.json contextMenus.mixedSelection: instances with a mate selected too get a reduced menu.
+        if !graphics && self.selected_mate.is_some() && !self.selected.is_empty() {
+            const MIXED: [&str; 16] = [
+                "Hide",
+                "Hide other instances",
+                "Hide all instances",
+                "Isolate…",
+                "Make transparent…",
+                "Use best available tessellation",
+                "Check interference…",
+                "Show mates",
+                "Hide mates",
+                "Replace instances…",
+                "Move to new subassembly",
+                "Change to version…",
+                "Release…",
+                "Zoom to selection",
+                "Create empty subassembly",
+                "Clear selection",
+            ];
+            let mut out: Vec<MenuEntry> = m.into_iter().filter(|e| matches!(e, MenuEntry::Sep) || matches!(e, MenuEntry::Item { label, .. } if MIXED.contains(&label.as_str()))).collect();
+            if !out.iter().any(|e| matches!(e, MenuEntry::Item { label, .. } if label == "Clear selection")) {
+                out.push(MenuEntry::Item {
+                    label: "Clear selection".into(),
+                    icon: None,
+                    disabled: false,
+                    act: std::rc::Rc::new(|t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| {
+                        t.clear_selection();
+                        t.refresh_scene(false, cx);
+                    }),
+                });
+            }
+            return out;
+        }
         // Live 1723: a pattern's copy row has a cut-down menu: no center of
         // mass, dynamic suppression, mates, in-context, replace, subassembly,
         // version, folder or Delete items.

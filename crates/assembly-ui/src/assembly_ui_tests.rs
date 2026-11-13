@@ -1088,3 +1088,29 @@ fn a_faces_connector_is_its_centroid_wherever_the_pointer_is(cx: &mut TestAppCon
     })
     .unwrap();
 }
+
+/// Live2 fields.json contextMenus.mixedSelection: instances, the Origin and a mate selected give a reduced menu
+/// (Hide… Isolate… … Clear selection); no Suppress, Fix, Copy, Export… or Delete.
+#[gpui::test]
+fn instances_with_a_mate_selected_have_lives_reduced_menu(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "mixed-menu");
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let (a, b) = (face_connector(v, "Part 1 <1>", true, cx), face_connector(v, "Part 2 <1>", false, cx));
+            v.edit("Insert : mate", cx, |asm| {
+                asm.mates.push(noshape_model::assembly::Mate::new(noshape_model::assembly::MateId(901), "Fastened 1".into(), MateType::Fastened, a, b));
+            });
+            let (p1, p2) = (instance(v, "Part 1 <1>", cx), instance(v, "Part 2 <1>", cx));
+            v.selected = vec![p1, p2];
+            v.selected_mate = Some(noshape_model::assembly::MateId(901));
+            let got: Vec<String> = labels(&v.instance_menu(p1, false, cx)).into_iter().filter(|l| l != "—").collect();
+            let live = [
+                "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Use best available tessellation", "Check interference…",
+                "Show mates", "Hide mates", "Replace instances…", "Move to new subassembly", "Change to version…", "Release…", "Zoom to selection",
+                "Create empty subassembly", "Clear selection",
+            ];
+            assert_eq!(got, live);
+        })
+    })
+    .unwrap();
+}

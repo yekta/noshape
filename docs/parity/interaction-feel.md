@@ -148,9 +148,9 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 Live: live/feel/mates.json, asm-views.json, fields.json `assemblyInstanceList`, 3d.json `assembly` (live and live2,
 11-13). The UI is studios'; asm keeps the mate solver and landed the ring snap, the ▶ preview, Insert's Esc / ✓ and the
 drag thresholds (their commits below). Menus leave out "Add comment" (comments are cloud). Counts are matched / total
-per matrix (17:18 UTC): **mates 23 / 28, views 13 / 15, instance list 16 / 22, 3D 9 / 10**.
+per matrix (17:18 UTC): **mates 24 / 28, views 13 / 15, instance list 17 / 22, 3D 9 / 10**.
 
-### Mate dialog, mate list, Insert (mates.json): 23 / 28
+### Mate dialog, mate list, Insert (mates.json): 24 / 28
 
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
@@ -163,7 +163,7 @@ per matrix (17:18 UTC): **mates 23 / 28, views 13 / 15, instance list 16 / 22, 3
 | Type order | Slider, Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened, Parallel | the same (`MATE_TYPE_ORDER`) | – | = |
 | Which part moves | the first pick's part moves onto the second; a fixed part never | the same (`new_mate_stays`) | `a_mate_gets_its_heads_up_check_after_the_second_pick` | = |
 | After the second pick | the part jumps to its mated place, no animation | the same | – | = |
-| Mate axes | X/Y/Z 50 px at the connector (screen size) | 6 % of the model's size (world size) | – | ≠ |
+| Mate axes | X/Y/Z 50 px at the connector (screen size) | the same (`ScreenTriads`, camera geometry) | `mate_axes_stay_50_px_at_any_zoom` | = |
 | Floating toolbar | grip, type, flip, reorient, Solve, ✓, ✗ | the same (`render_mate_hud`) | ui-parity asm-fastened-two-faces | = |
 | Toolbar's place | beside the connector (live2's shot: ~10 px right, 10 px below it) | centred over the second pick, bottom on it (dom/mate-hud.txt) | – | ? (the shot doesn't show the pick) |
 | Type switch | connectors, Offset, flip and reorient kept; the name follows the type; offset fields follow it | the same (`set_type`, `offset_axes`) | – | = |
@@ -181,7 +181,7 @@ per matrix (17:18 UTC): **mates 23 / 28, views 13 / 15, instance list 16 / 22, 3
 | Insert ✓ | keeps all, the pending one at identity; one undo step | the same (asm e9941770) | asm-insert-ok-pending (live take asked) | = |
 | Ring snap | 5° / 1° / 0.1° by the arc at the pointer's radius ≤ 50 px, within 0.4 × (1 + level/3) of a step | the same (asm 641ab465, `ring_snap`) | asm's tests | = |
 | Snap mode ghost | the source part at 0.3 opacity | the same (17:18) | – | = |
-| Snap mode lines | inference lines rgb(255,194,14) dashed 4-4, 8 px point box | none | – | ≠ |
+| Snap mode lines | mates.json lists the client's INFERENCE_SNAP_* constants (rgb(255,194,14) dashed 4-4, 8 px box) | none | – | ? (client-wide constants, the sketch's qsnap; live's snap-mode capture, behaviours 1211, shows no lines) |
 
 ### Exploded, section and named views (asm-views.json): 13 / 15
 
@@ -203,7 +203,7 @@ per matrix (17:18 UTC): **mates 23 / 28, views 13 / 15, instance list 16 / 22, 3
 | Section Esc | cancels | the same | – | = |
 | Named views | New view name + "+", No views created, Select a view + ⊗ | the same (named_views_dialog.rs) | – | = |
 
-### Instance list (fields.json): 16 / 22
+### Instance list (fields.json): 17 / 22
 
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
@@ -219,7 +219,7 @@ per matrix (17:18 UTC): **mates 23 / 28, views 13 / 15, instance list 16 / 22, 3
 | One instance's menu | Properties… … Delete | the same | `the_instance_and_top_row_menus_are_lives` | = |
 | Two instances' menu | … Dynamic suppression ▸, Check interference… \| Show / Hide mates, Replace instances…, … Clear selection, Delete | the same (17:18) | `two_selected_instances_have_lives_list_menu` | = |
 | Mate menu / folder menu | Rename … Delete; Rename … Unpack folder | the same | ui-parity asm-menu-* | = |
-| Mixed selection menu | the reduced menu | not compared | – | – |
+| Mixed selection menu | instances, the Origin and a mate: Hide … Clear selection (no Suppress, Fix, Copy, Export…, Delete) | the same | `instances_with_a_mate_selected_have_lives_reduced_menu` | = |
 | Right-click an unselected row | acts on that row without selecting it | joins the selection (behaviours "audit 1943" (2): "Copy 2 items") | – | ? (captures disagree; asked) |
 | Add selection to folder… | the folder at once, its name in inline rename | a "Folder name" panel first, as live's asm-menu-add-selection-to-folder take reads it | ui-parity asm-menu-add-selection-to-folder | ? |
 | Folders | collapsed; double-click does nothing; one Ctrl+Z | the same | ui-parity asm-menu-unpack-folder | = |
