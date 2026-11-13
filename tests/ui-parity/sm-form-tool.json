@@ -1,6 +1,6 @@
 {
  "name": "sm-form-tool",
- "about": "plate: Sheet metal model › Form: its dialog, then Escape",
+ "about": "plate: Sheet metal model › Form: its dialog, then Escape (remembered: live's account last used Circle emboss, behaviours 25362)",
  "area": "psui",
  "source": "coverage 11-06 (toolbar, batch 9)",
  "start": "plate",
@@ -16,5 +16,14 @@
    "do": "key",
    "key": "Escape"
   }
- ]
+ ],
+ "remembered": {
+  "sheetMetalFormed": {
+   "": {
+    "formPartStudio": {
+     "text": "library:circle-emboss"
+    }
+   }
+  }
+ }
 }

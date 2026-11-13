@@ -35,8 +35,11 @@ NOT_IN_DRAWINGS = {"selection", "undo", "assembly"}
 def remembered_settings(seed):
     """A scenario's "remembered" (what live's account last committed per feature type, behaviours 1987) as the app's
     feature_settings.json: type → group ("", "length:Millimeter", "angle:Degree") → parameter → value. Plain values:
-    a list is a Lookup path, a bool a Bool, a string in a length / angle group an expression, else an Enum."""
+    a list is a Lookup path, a bool a Bool, a string in a length / angle group an expression, {"text": …} a Text (a
+    reference, e.g. Form's "library:circle-emboss"), else an Enum."""
     def value(group, v):
+        if isinstance(v, dict) and set(v) == {"text"}:
+            return {"t": "Text", "v": v["text"]}
         if isinstance(v, list):
             return {"t": "Lookup", "v": v}
         if isinstance(v, bool):
