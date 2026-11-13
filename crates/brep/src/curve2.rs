@@ -385,6 +385,10 @@ impl C2 {
                 let (mut lo, mut hi, mut flo) = ((k - 1) as f64 / n as f64, t1, prev);
                 for _ in 0..80 {
                     let mid = 0.5 * (lo + hi);
+                    // (Down to two neighbouring numbers: the rest of the halvings change nothing.)
+                    if mid == lo || mid == hi {
+                        break;
+                    }
                     let fm = f(mid);
                     if (fm < 0.0) == (flo < 0.0) {
                         lo = mid;
@@ -471,7 +475,11 @@ impl C2 {
                     let j = c.span_of(t0 + (t1 - t0) * (k as f64 / n as f64));
                     *sides[j].get_or_init(|| side(span_box2(c, j, m)))
                 };
-                for t in self.roots(|t| (self.at(t) - m).perp_dot(d), known) {
+                // (Its sample points kept with its boxes: the same points each ray asks for (a face's boundary under
+                // every piece's rays, cf-surface-pattern's 85-tool cut).)
+                let points = boxes.map(|b| b.points.get_or_init(|| self.sample_points()));
+                let known_or_kept = |k: usize, n: usize| known(k, n).or_else(|| points.filter(|p| p.len() == n + 1).map(|p| (p[k] - m).perp_dot(d)));
+                for t in self.roots(|t| (self.at(t) - m).perp_dot(d), known_or_kept) {
                     let s = (self.at(t) - m).dot(d);
                     if s > 0.0 {
                         out.push(s);
@@ -633,7 +641,7 @@ impl C2 {
 
     /// Its spans' boxes, each made when first needed: for many distances from it ([`Self::distance_by`]).
     pub(crate) fn span_boxes2(&self) -> SpanBoxes {
-        SpanBoxes { boxes: self.spans2().map_or_else(Vec::new, |(c, ..)| (0..c.spans().len()).map(|_| OnceLock::new()).collect()), runs: OnceLock::new(), quick: OnceLock::new() }
+        SpanBoxes { boxes: self.spans2().map_or_else(Vec::new, |(c, ..)| (0..c.spans().len()).map(|_| OnceLock::new()).collect()), runs: OnceLock::new(), quick: OnceLock::new(), points: OnceLock::new() }
     }
 
     /// [`Self::quick_box`], kept in `boxes` (a curve on a cylinder's: an angle a pole each time).
@@ -709,6 +717,8 @@ pub(crate) struct SpanBoxes {
     runs: OnceLock<Vec<(usize, usize, usize)>>,
     /// Its [`C2::quick_box`].
     quick: OnceLock<Option<(DVec2, DVec2)>>,
+    /// Its points at its samples' parameters ([`C2::sample_points`]): for many rays' crossings with it.
+    points: OnceLock<Vec<DVec2>>,
 }
 
 /// A box a 3D NURBS curve's part from `t0` to `t1` seen in a plane's or cylinder's parameter plane lies in: its
