@@ -5,6 +5,35 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 
 
+## Release checks: the app spot-check list (lead 11-13; from docs/parity/interaction-feel.md's "=" rows)
+Run on the released app (Linux tar.gz, vibe3 :63 or vibe7 :481, xdotool) after the documents, at DPR 1; a row fails when the
+app differs from its live column there. The user's cases first (hat15 mode-700 copy with #fan_control_board_depth = 2.4 mm,
+#fan_control_board_wall_length = 12 mm and a dimensioned sketch after them; bin/planes-rclick.sh for the planes).
+- **User cases:** a right-click on Top / Front / Right in the graphics opens the plane menu (v0.4.47); "fancontrol" in a sketch
+  dimension lists both variables, values grey on the right, first row lit; ↓ Enter inserts, the box stays open, Enter commits;
+  "fcb" in Extrude's Depth, Tab inserts (a6a18313); a line's end over a lit model edge lands on it, Coincident to the edge
+  (d90b4f6f8).
+- **3D:** an edge's midpoint target after a short rest (9 px square); a press moves 5 px before it drags.
+- **Sketch, line tool:** an end snaps onto a line at 7 px, not 8; onto a point at 8, a circle's centre gives Coincident (not
+  Concentric); onto a midpoint ±6 px along it; horizontal 7 px / vertical 6 px off the start; alignment with another point
+  only after a 100 ms rest on it (the origin always); perpendicular only when the line starts on a line, never parallel; the
+  17 px yellow-orange square round a point / midpoint, none on a line; the target line not recoloured mid-draw.
+- **Sketch, select:** a hovered point is a 10–11 px orange disc; what lights is what a click takes; click adds, click on a
+  selected one removes, Shift the same, Ctrl+click opens the context menu; a click on empty space clears, Esc doesn't; a
+  double-click on a line selects then deselects; a dragged point lands on a line within 7 px; a press drags from 5 px.
+- **Sketch colours:** a line black, its free end blue, black once dimensioned; an arc held on its circle black with blue ends;
+  a circle with a free radius blue, centre black; a spline blue while any point is free.
+- **Drawings:** Dimension tool / Note leader snap within 12 px at two zooms; the dimension snap mark a filled 10 px disc
+  rgb(216,165,102), the Note's a hollow ~15 px square rgb(255,130,63); midpoints / quadrants only after Shift+Q; of two points
+  in reach the nearer; the placement line pink dotted with a red ✕, gone 4 px off; a click toggles an item, Shift+click the
+  same; a projected view drags along its parent's axis; no alignment snap while dragging a view.
+- **Documents page and tabs:** click / Ctrl toggles / Shift adds the range from the anchor; Ctrl+A all, Esc keeps, a click on
+  empty list clears; the right panel "⌄ N selections" with Trash / Deselect all; the menu for N (Details, Labels…, Move
+  selected (N) to…, Send to trash); Move to… "N items will be moved."; Send to trash for N then the toast's Restore brings all
+  back; a row drags from 5 px, the light-blue pill ghost ("N items"), drops on folder tiles / rows and the left Trash, not on
+  rows or crumbs; row hover #def1fb, selected #b2ddf6; a tab drag's 100 px ghost and tab-wide gap; Ctrl / Shift + click a tab
+  opens it in a new window.
+
 ## 11-13 03:10: the speed window is on vibe7 (lead)
 vibe5 runs the land queue, so the 02:00–04:00 window is on vibe7 (blend, dx, asm keep off it): bin/vibe7-window.sh (one night;
 re-arm it, after prebuilding both binaries on vibe7 through rb.sh from worktrees qa-speed / qa-bisect: release CLI + the
