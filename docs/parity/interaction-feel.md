@@ -451,12 +451,13 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | A selected entity clicked again | leaves the field (in, out, in) | the same | = |
 | Esc in a value field | the first discards the typed value and leaves the field, the dialog stays; a second cancels | the same | = |
 | Enter with the keyboard outside a field | commits the dialog | the same | = |
+| Typing in a value field | no preview while typing (none 3 s on); Enter, Tab or leaving the field sends it | the same | = |
 | A click on Extrude's arrow | flips the direction (the field keeps 27 mm) and regenerates | only a direction-only arrow flipped; a length arrow's click focused its field; now it flips (`manipulators`, a release with no move) | = (fixed) |
 | A field's row hovered | its entity lit yellow-green (#f2ff80) while hovered, cleared on leaving (a consumed edge too) | the same | = |
 | A field's row clicked (not its ×) | the field keeps its entities | the same | = |
 | Tab from Fillet's Radius | Radius's ± button, then Asymmetric, Partial, Variable, Allow edge overflow, Smooth fillet corners; selection fields and dropdowns skipped | the same | = |
 | Properties' Enter and Esc | do nothing (no apply, no close) | the same | = |
-| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, preview timing (Enter / Tab / blur, every ~0.4 s while dragging);  the Appearance and Material dialogs' layout and keys; Properties' Tab order | – | – |
+| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, preview timing while dragging (every ~0.4 s);  the Appearance and Material dialogs' layout and keys; Properties' Tab order | – | – |
 
 ## Feedback (matrix, Part Studio rows)
 

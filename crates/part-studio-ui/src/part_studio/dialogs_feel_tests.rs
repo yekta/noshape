@@ -217,6 +217,27 @@ fn rows() -> Vec<Row> {
             let want = ["tol:radius", "cb:isAsymmetric", "cb:isPartial", "cb:isVariable", "cb:allowEdgeOverflow", "cb:smoothCorners"];
             expect(order, want.map(String::from).to_vec(), "focus after each Tab")
         } },
+        Row { id: "preview / not while typing; Tab sends it", live: "no preview request while typing (none for 3 s a key); Enter, Tab or leaving the field sends it", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "dlg-typing");
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let height = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.bounds().map(|(lo, hi)| ((hi.z - lo.z) * 1000.).round()));
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+            draw(cx, window);
+            keys(cx, window, &["4", "0"]);
+            for _ in 0..150 {
+                cx.executor().advance_clock(std::time::Duration::from_millis(20));
+                draw(cx, window);
+            }
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let typed = height(cx);
+            keys(cx, window, &["tab"]);
+            for _ in 0..25 {
+                cx.executor().advance_clock(std::time::Duration::from_millis(20));
+                draw(cx, window);
+            }
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            expect((typed, height(cx)), (Some(10.), Some(40.)), "the body's height (mm) 3 s after typing 40, after Tab")
+        } },
         Row { id: "fields / Esc in a value field", live: "the first Esc discards the typed value and leaves the field, the dialog stays; a second Esc cancels", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "dlg-esc");
             cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
