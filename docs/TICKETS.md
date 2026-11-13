@@ -1362,6 +1362,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   scenarios that newly differ** (qa-scratch/suites/1108-0034-3950e447/worse.txt; candidates are the range's commits, not bisected):
   - blend: cf-snap-hook Fillet 6 now "Failed to fillet selections." (built before); 9a16bdddb (the boss tori where they meet
     the floor, cf-snap-hook's Fillet 5) is in the range.
+    → blend 11-13: fixed; cf-snap-hook 18/18 on main (Mac and vibe suites 11-13).
   - skasm: c2-sm-corner-break 4.0 → 5.5 s (×1.4); the range has skasm's sheet metal (56603985 c2-sm-louver's flanges).
   - core / bool: cf-fix-pcb 0.9 → 1.5 s (×1.7).
   - dx: drw-hide-inspection-items now differs, alone too on green 8f6f6fd2: step 7 `.drawing.annotations[1].text` live null /
@@ -1496,6 +1497,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
   - blend: learning-center-michael 7/7 → 5/7, Fillet 2 now "Failed to fillet selections.", and 2.4 → 139.7 s (×57).
     core's handoff already names 2e49088a9 (an arc's round run on past tangent edges) for it.
+    → blend 11-13: fixed; learning-center-michael 7/7 on main, Fillet 2 ~0.4 s (the Boolean's share is bool's).
   - core / blend: c2-hunting-knife Fillet 5 "Select edges or faces to fillet.", Fillet 7 "Select vertices on fillet chain."
     (built before). Range's fillet changes: 2e49088a9, ff282daaa, c61acdcab, 35d037cab / 44368ecdd.
   - skasm: c2-sm-louver Extrude 3 "Select face or sketch region to extrude." (built before); 0efa22d0b (a sketch on a
