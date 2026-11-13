@@ -211,12 +211,19 @@ fn excluded(sk: &Sketch, ctx: &InferenceContext, id: EntityId) -> bool {
 pub const POINT_REACH: f64 = 8.5 / 7.5;
 /// A line's midpoint snaps within 5–7 px along the line (live, the same capture); further out the end is on the line.
 pub const MIDPOINT_REACH: f64 = 6.0 / 7.5;
+/// Horizontal (with the line's start or a point) from 7 px, vertical from 6 (live2 "feel (sketch)" (1): 7 and 6 px off
+/// at the pointer, at two zooms and two line lengths; one px tighter vertically).
+pub const HORIZONTAL_REACH: f64 = 7.0 / 7.5;
+pub const VERTICAL_REACH: f64 = 6.0 / 7.5;
 
 /// Computes inference candidates, best first.
 pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inference> {
     let r = ctx.snap_radius.max(1e-15);
     let (r_point, r_mid) = (r * POINT_REACH, r * MIDPOINT_REACH);
-    let ra = ctx.align_radius.unwrap_or(r);
+    let (ra_h, ra_v) = match ctx.align_radius {
+        Some(a) => (a, a),
+        None => (r * HORIZONTAL_REACH, r * VERTICAL_REACH),
+    };
     // Lengths on screen when the view is known: live draws each inference (a point, the horizontal or vertical
     // through one) into a pick pass and picks the pointer's pixel, so its reach is the pointer's distance on screen to
     // what is drawn (ui-parity sketch-horizontal-key / -vertical-key on Top: Horizontal 5.7 px off level, no Vertical
@@ -258,10 +265,10 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                 }
                 let dx = off_x(cursor - *pos);
                 let dy = off_y(cursor - *pos);
-                if dx <= ra && d > r_point && best_v.is_none_or(|b| dx < b.0) {
+                if dx <= ra_v && d > r_point && best_v.is_none_or(|b| dx < b.0) {
                     best_v = Some((dx, e.id, *pos));
                 }
-                if dy <= ra && d > r_point && best_h.is_none_or(|b| dy < b.0) {
+                if dy <= ra_h && d > r_point && best_h.is_none_or(|b| dy < b.0) {
                     best_h = Some((dy, e.id, *pos));
                 }
             }
@@ -327,10 +334,10 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
             push(&mut out, InferenceKind::Endpoint, DVec2::ZERO, Some(ORIGIN), None, vec![AutoConstraint::CoincidentPoint(ORIGIN)], 0);
         } else {
             let (dx, dy) = (off_x(cursor), off_y(cursor));
-            if dx <= ra && best_v.is_none_or(|b| dx < b.0) {
+            if dx <= ra_v && best_v.is_none_or(|b| dx < b.0) {
                 best_v = Some((dx, ORIGIN, DVec2::ZERO));
             }
-            if dy <= ra && best_h.is_none_or(|b| dy < b.0) {
+            if dy <= ra_h && best_h.is_none_or(|b| dy < b.0) {
                 best_h = Some((dy, ORIGIN, DVec2::ZERO));
             }
         }
@@ -370,10 +377,13 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                 let diff = (x - target).rem_euclid(PI);
                 diff.min(PI - diff) <= tol
             };
+            // A woken line the new line starts on (its midpoint or a point inside it): live2 "feel (sketch)" (1)
+            // infers perpendicular only from a line the start is on, never to one elsewhere, and parallel never.
+            let starts_on = |w: EntityId| sk.curve(w).is_some_and(|c| c.closest(a).2 <= 1e-9 * (1.0 + a.length()));
             // Square to a woken line (the pointer passed over it: the line
             // it starts on or crosses; not one joined at the anchor) whose
             // direction a constraint holds: Perpendicular to it instead of
-            // Horizontal / Vertical (live 1866: on a free line, Vertical).
+            // Horizontal / Vertical (live 1866 (e): also one it crosses, both ends clear; on a free line, Vertical).
             let square_to = |horizontal: bool| {
                 ctx.woken.iter().copied().find(|&w| {
                     !excluded(sk, ctx, w)
@@ -390,9 +400,9 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
             // Live (ui-parity sketch-horizontal-key: (0, 0) to (30, 3) snaps level): a line turns horizontal or vertical
             // while the pointer is within the inference reach of the horizontal / vertical through its start, a
             // distance on screen, not an angle.
-            let reach = ctx.align_radius.unwrap_or(ctx.snap_radius);
+            let (reach_h, reach_v) = (ra_h, ra_v);
             let (to_h, to_v) = (off_y(d), off_x(d));
-            let near_axis = |horizontal: bool| if horizontal { to_h <= reach && to_h < to_v } else { to_v <= reach && to_v <= to_h };
+            let near_axis = |horizontal: bool| if horizontal { to_h <= reach_h && to_h < to_v } else { to_v <= reach_v && to_v <= to_h };
             if near_axis(true) {
                 let (kind, on, c) = line_kind(true);
                 push(&mut out, kind, DVec2::new(cursor.x, a.y), on, Some(a), vec![c], 2);
@@ -409,9 +419,10 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                     push(&mut out, InferenceKind::AlignHorizontal, DVec2::new(a.x, hpos.y), Some(hp), Some(hpos), vec![c, AutoConstraint::HorizontalWith(hp)], 1);
                 }
             }
-            // woken lines (not attached to the anchor): parallel / perpendicular
+            // A woken line the start is on (not one joined at the anchor): perpendicular to it (live2: never parallel,
+            // nor square to a line elsewhere).
             for &w in &ctx.woken {
-                if excluded(sk, ctx, w) || sk.kind(w) != Some(EntityKind::Line) {
+                if excluded(sk, ctx, w) || sk.kind(w) != Some(EntityKind::Line) || !starts_on(w) {
                     continue;
                 }
                 if ctx.anchor_point.is_some_and(|ap| sk.entity(w).and_then(|e| e.endpoints()).is_some_and(|(s, e)| s == ap || e == ap)) {
@@ -428,10 +439,7 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                 }
                 let proj_on = |u: DVec2| a + u * d.dot(u);
                 let perp = dir.perp();
-                if near(ang, dir.y.atan2(dir.x)) {
-                    let u = if d.dot(dir) < 0.0 { -dir } else { dir };
-                    push(&mut out, InferenceKind::Parallel, proj_on(u), Some(w), Some(a), vec![AutoConstraint::ParallelTo(w)], 2);
-                } else if near(ang, perp.y.atan2(perp.x)) {
+                if near(ang, perp.y.atan2(perp.x)) {
                     let u = if d.dot(perp) < 0.0 { -perp } else { perp };
                     push(&mut out, InferenceKind::Perpendicular, proj_on(u), Some(w), Some(a), vec![AutoConstraint::PerpendicularTo(w)], 2);
                 }
@@ -455,12 +463,11 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                     }
                     let proj_on = |u: DVec2| a + u * d.dot(u);
                     match e.kind() {
+                        // (Live2: a chain's fold-back or a collinear continuation gives nothing: no parallel.)
                         EntityKind::Line => {
                             let perp = dir.perp();
                             if near(ang, perp.y.atan2(perp.x)) {
                                 push(&mut out, InferenceKind::Perpendicular, proj_on(perp), Some(e.id), Some(a), vec![AutoConstraint::PerpendicularTo(e.id)], 2);
-                            } else if near(ang, dir.y.atan2(dir.x)) {
-                                push(&mut out, InferenceKind::Parallel, proj_on(dir), Some(e.id), Some(a), vec![AutoConstraint::ParallelTo(e.id)], 2);
                             }
                         }
                         k if k.is_circular() || k.is_spline() || k.is_elliptical() => {
@@ -614,22 +621,38 @@ mod tests {
         assert_eq!(r.iter().filter(|x| x.kind == InferenceKind::Endpoint).count(), 1);
     }
 
+    /// Live2 "feel (sketch)" (1): a line turns horizontal from 7 px off level at the pointer (not 8), vertical from 6
+    /// (not 7), whatever its length; a point's alignment the same.
     #[test]
-    fn woken_line_gives_parallel_and_perpendicular() {
+    fn horizontal_reaches_7_px_and_vertical_6() {
+        let sk = Sketch::new();
+        // One unit a pixel: the snap radius is the 7.5 px inference reach.
+        let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(0.0, 0.0)), snap_radius: 7.5, origin: false, ..Default::default() };
+        let kind = |p: DVec2| infer(&sk, p, &ctx).first().map(|i| i.kind);
+        for len in [150.0, 300.0] {
+            assert_eq!(kind(v(len, 7.0)), Some(InferenceKind::Horizontal), "{len}: 7 px off level");
+            assert_eq!(kind(v(len, 8.0)), None, "{len}: 8 px off level");
+            assert_eq!(kind(v(6.0, len)), Some(InferenceKind::Vertical), "{len}: 6 px off plumb");
+            assert_eq!(kind(v(7.0, len)), None, "{len}: 7 px off plumb");
+        }
+    }
+
+    /// Live2 "feel (sketch)" (1): parallel is never inferred, and perpendicular only to a line the new one starts on
+    /// (a woken line elsewhere gives neither).
+    #[test]
+    fn a_woken_line_gives_perpendicular_only_when_started_on_and_never_parallel() {
         let mut sk = Sketch::new();
         let l = sk.add_line(v(0.0, 0.0), v(1.0, 1.0));
-        let base = InferenceContext { tool: SketchTool::Line, anchor: Some(v(5.0, 0.0)), snap_radius: 0.05, ..Default::default() };
-        // not woken: no parallel hint
-        let r = infer(&sk, v(7.0, 2.01), &base);
-        assert!(!r.iter().any(|x| x.kind == InferenceKind::Parallel));
-        let ctx = InferenceContext { woken: vec![l], ..base };
-        let r = infer(&sk, v(7.0, 2.01), &ctx);
-        let par = r.iter().find(|x| x.kind == InferenceKind::Parallel).expect("parallel");
-        assert_eq!(par.constraints, vec![AutoConstraint::ParallelTo(l)]);
-        let q = par.position - v(5.0, 0.0);
-        assert!((q.x - q.y).abs() < 1e-9);
-        let r = infer(&sk, v(3.0, 2.02), &ctx);
+        let elsewhere = InferenceContext { tool: SketchTool::Line, anchor: Some(v(5.0, 0.0)), snap_radius: 0.05, woken: vec![l], ..Default::default() };
+        let r = infer(&sk, v(7.0, 2.01), &elsewhere);
+        assert!(!r.iter().any(|x| x.kind == InferenceKind::Parallel), "{r:?}");
+        let r = infer(&sk, v(3.0, 2.02), &elsewhere);
+        assert!(!r.iter().any(|x| x.kind == InferenceKind::Perpendicular), "{r:?}");
+        // Started on it (at (0.5, 0.5)): perpendicular to it.
+        let on = InferenceContext { anchor: Some(v(0.5, 0.5)), ..elsewhere };
+        let r = infer(&sk, v(-0.5, 1.51), &on);
         let perp = r.iter().find(|x| x.kind == InferenceKind::Perpendicular).expect("perpendicular");
         assert_eq!(perp.constraints, vec![AutoConstraint::PerpendicularTo(l)]);
+        assert!(!infer(&sk, v(1.5, 1.51), &on).iter().any(|x| x.kind == InferenceKind::Parallel));
     }
 }

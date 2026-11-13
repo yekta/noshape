@@ -401,6 +401,11 @@ pub struct GlyphInfo {
 /// vertical. Live draws its inferences 15 px wide (woolsthorpe INFERENCE_POINT_SIZE_PX / INFERENCE_LINE_WIDTH_PX) and
 /// picks the pointer's pixel (INFERENCE_PICK_RADIUS_PX 0).
 const INFERENCE_PX: f64 = 7.5;
+/// How long the pointer rests on a point before it counts for alignment while drawing (live2 "feel (sketch)" (1)).
+const ACQUIRE_REST: std::time::Duration = std::time::Duration::from_millis(100);
+/// How far the pointer moves from a press, on screen, before the press is a drag (live2 "feel (sketch)" (5): a drag
+/// starts at about 5 px on an end point or a line, whatever the time; less is a click).
+const DRAG_START_PX: f64 = 5.0;
 /// The square round a snapped point: its 1 px sides 8 px from the point (live qsnap/za-p2p-d8: 17 px outside), #FFC92A.
 const SNAP_SQUARE_HALF_PX: f64 = 8.0;
 const SNAP_SQUARE_COLOR: [u8; 4] = [0xff, 0xc9, 0x2a, 0xff];
@@ -502,8 +507,8 @@ enum Drop {
 pub enum ExternalSnap {
     /// A model vertex projected onto the sketch plane.
     Vertex { position: DVec2, reference: noshape_model::reference::Reference },
-    /// A point on a model edge projected onto the sketch plane.
-    Edge { position: DVec2, reference: noshape_model::reference::Reference },
+    /// A point on a model edge projected onto the sketch plane, and the edge's direction there.
+    Edge { position: DVec2, tangent: DVec2, reference: noshape_model::reference::Reference },
 }
 
 pub struct SketchEditor {
@@ -546,6 +551,9 @@ pub struct SketchEditor {
     pub box_remove: bool,
     /// Point snapped to while dragging a point (constrained on release).
     drag_snap: Option<(EntityId, DVec2, Drop)>,
+    /// A dragged point's model edge under the pointer (the view finds it; no sketch target in reach): on release the
+    /// view links the edge and the point lands on it ([`Self::drop_onto_external`]).
+    pub drag_external: Option<ExternalSnap>,
     /// Entities picked so far for a constraint/dimension tool.
     picks: Vec<(EntityId, DVec2)>,
     /// Picks of the dimension being placed (click positions decide min/max).
@@ -647,8 +655,10 @@ pub struct SketchEditor {
     pub otf: Option<OnTheFly>,
     /// The user started typing into the active on-the-fly box.
     pub otf_typing: bool,
-    /// Curves the cursor passed over while drawing (wake-up inferences).
+    /// Curves the cursor passed over while drawing, and points it rested on (wake-up inferences).
     pub woken: Vec<EntityId>,
+    /// The point the pointer is near while drawing, and since when: it wakes once rested on for [`ACQUIRE_REST`].
+    acquiring: Option<(EntityId, std::time::Instant)>,
     /// Press position of a drawing tool (press-drag-release placement).
     press: Option<DVec2>,
     /// Line tool temporarily drawing a tangent arc (Shift+A or hovering
@@ -1180,6 +1190,7 @@ impl SketchEditor {
             box_end: None,
             box_remove: false,
             drag_snap: None,
+            drag_external: None,
             picks: Vec::new(),
             picks_placed: Vec::new(),
             dim_edit: None,
@@ -1242,6 +1253,7 @@ impl SketchEditor {
             otf: None,
             otf_typing: false,
             woken: Vec::new(),
+            acquiring: None,
             press: None,
             tangent_mode: false,
             left_chain_end: false,
@@ -1310,6 +1322,7 @@ impl SketchEditor {
         self.otf = None;
         self.otf_typing = false;
         self.woken.clear();
+        self.acquiring = None;
         self.press = None;
         self.tangent_mode = false;
         // Live shows no hint for a sketch tool (behaviours "qa (2026-10-28,
@@ -1467,7 +1480,24 @@ impl SketchEditor {
             woken: self.woken.clone(),
             screen: self.screen_metric(),
         };
-        let mut best = noshape_sketch::infer(sk, p, &ctx).into_iter().next();
+        let all = noshape_sketch::infer(sk, p, &ctx);
+        let mut best = all.first().cloned();
+        // A direction and a line under the pointer: the end where they meet, both constraints (live2 "feel (sketch)"
+        // (1): horizontal + on a line both); if they don't meet near the pointer, the line under it wins.
+        if let Some(b) = &best
+            && matches!(b.kind, InferenceKind::Horizontal | InferenceKind::Vertical | InferenceKind::Perpendicular)
+            && let Some(on) = all.iter().find(|i| i.kind == InferenceKind::OnCurve && i.entity.is_some_and(|e| sk.kind(e) == Some(EntityKind::Line) && Some(e) != b.entity))
+            && let Some(Curve2::Line { a: la, b: lb }) = on.entity.and_then(|e| sk.curve(e))
+        {
+            best = Some(match (lb - la).try_normalize().and_then(|t| self.direction_onto(b, on.position, t)) {
+                Some(mut both) => {
+                    both.entity = on.entity;
+                    both.constraints.extend(on.constraints.iter().copied());
+                    both
+                }
+                None => on.clone(),
+            });
+        }
         // Elliptical arc: the end snaps to the construction ellipse's axis points.
         if self.tool == Tool::EllipticalArc
             && self.clicks.len() == 3
@@ -1495,6 +1525,44 @@ impl SketchEditor {
     /// snap shows by its square and glyph.
     pub fn mid_draw(&self) -> bool {
         self.tool.draws() && (!self.clicks.is_empty() || self.chain_end.is_some())
+    }
+
+    /// `e` wakes its inferences (the most recent first, ten kept).
+    fn wake(&mut self, e: EntityId) {
+        self.woken.retain(|x| *x != e);
+        self.woken.insert(0, e);
+        self.woken.truncate(10);
+    }
+
+    /// A press's motion `d` (in the sketch) is still a click: less than [`DRAG_START_PX`] on screen.
+    fn below_drag_start(&self, d: DVec2) -> bool {
+        let seen = self.screen_metric().map_or(d.length(), |m| m.len(d));
+        seen < self.world_per_px * DRAG_START_PX
+    }
+
+    /// The point being dragged, if a point drag is in progress.
+    pub fn dragged_point(&self) -> Option<EntityId> {
+        match self.drag {
+            Some(DragState::Geometry { handle: DragHandle::Point(id), .. }) => Some(id),
+            _ => None,
+        }
+    }
+
+    /// A model edge `snap` for the dragged point, when no sketch target is in reach and the edge is within a line's
+    /// reach on screen (live2 "feel (sketch)" (2): a dragged end lands on a line from 7 px); `None` clears it.
+    pub fn set_drag_external(&mut self, snap: Option<ExternalSnap>) {
+        let reach = |q: DVec2| self.cursor.is_some_and(|c| self.screen_metric().map_or((q - c).length(), |m| m.len(q - c)) <= self.world_per_px * INFERENCE_PX);
+        self.drag_external = snap.filter(|s| self.drag_snap.is_none() && !self.shift_held && matches!(s, ExternalSnap::Edge { position, .. } if reach(*position)));
+    }
+
+    /// The release of a point dragged onto a model edge: `id` the edge's linked (used) curve; the point lands on it,
+    /// coincident.
+    pub fn drop_onto_external(&mut self, id: EntityId) {
+        if let Some(ExternalSnap::Edge { position, .. }) = self.drag_external.take()
+            && self.drag_snap.is_none()
+        {
+            self.drag_snap = Some((id, position, Drop::OnCurve));
+        }
     }
 
     /// The snap again once the GPU hover the last move asked for arrives (a model edge or vertex it lit snaps too).
@@ -1545,10 +1613,30 @@ impl SketchEditor {
             // inferences (a point: alignment, live "skb (10-25) sketch
             // inference"): what lies within 9 px of it (the GPU hover
             // arrives a move late), else the hover.
-            if let Some(h) = data.sketch.pick_on_screen(p, self.world_per_px * 9.0, self.screen_metric().as_ref()).or(self.hover) {
-                self.woken.retain(|e| *e != h);
-                self.woken.insert(0, h);
-                self.woken.truncate(10);
+            // A point wakes only once rested on (live2 "feel (sketch)" (1): ≥ 100 ms on it acquires it, passing
+            // over in ~25 ms doesn't; it stays acquired after the pointer leaves). Also when this move left it.
+            let now = std::time::Instant::now();
+            if let Some((c, since)) = self.acquiring
+                && now.duration_since(since) >= ACQUIRE_REST
+            {
+                self.wake(c);
+            }
+            // (The hover only while it is still within reach: one left from an earlier place isn't rested on here,
+            // sketch-trim-drag's ends aligned with the previous line's end clicked before the tool was restarted.)
+            let reach = self.world_per_px * 9.0;
+            let metric = self.screen_metric();
+            let near = |e: EntityId| data.sketch.point(e).is_none_or(|q| metric.as_ref().map_or((q - p).length(), |m| m.len(q - p)) <= reach);
+            match data.sketch.pick_on_screen(p, reach, metric.as_ref()).or(self.hover.filter(|h| near(*h))) {
+                Some(h) if is_point(&data.sketch, h) => {
+                    if self.acquiring.is_none_or(|(c, _)| c != h) {
+                        self.acquiring = Some((h, now));
+                    }
+                }
+                Some(h) => {
+                    self.acquiring = None;
+                    self.wake(h);
+                }
+                None => self.acquiring = None,
             }
             // Line chain: moving back onto the chain end switches to a tangent arc.
             if self.tool == Tool::Line
@@ -1686,7 +1774,11 @@ impl SketchEditor {
         }
     }
 
-    /// Apply a snap to model geometry when it beats the sketch inference.
+    /// Apply a snap to model geometry when it beats the sketch inference. A point of the sketch (an end, a midpoint, a
+    /// centre) beats it; a direction inference (horizontal, vertical, perpendicular) is kept where its line meets the
+    /// edge near the pointer, both constraints given; otherwise the edge under the pointer wins (the user's P0 11-13:
+    /// a perpendicular to the line's start segment placed the end short of the lit model edge; live2 "feel (sketch)":
+    /// horizontal and on a line both, the end on the line).
     pub fn apply_external_snap(&mut self, snap: ExternalSnap) {
         if !self.tool.draws() {
             return;
@@ -1695,16 +1787,39 @@ impl SketchEditor {
         if strong {
             return;
         }
+        let distance = |q: DVec2| self.cursor.map(|c| (c - q).length()).unwrap_or(0.0);
+        if let ExternalSnap::Edge { position, tangent, .. } = &snap
+            && let Some(combined) = self.inference.as_ref().and_then(|i| self.direction_onto(i, *position, *tangent))
+        {
+            self.inference = Some(combined);
+            self.external_snap = Some(snap);
+            return;
+        }
         let (position, kind) = match &snap {
             ExternalSnap::Vertex { position, .. } => (*position, InferenceKind::Endpoint),
             ExternalSnap::Edge { position, .. } => (*position, InferenceKind::OnCurve),
         };
-        if self.inference.as_ref().is_some_and(|i| kind == InferenceKind::OnCurve && i.kind != InferenceKind::OnCurve) {
-            return;
-        }
-        let distance = self.cursor.map(|c| (c - position).length()).unwrap_or(0.0);
-        self.inference = Some(Inference { kind, position, entity: None, reference: None, constraints: Vec::new(), distance, priority: 0 });
+        self.inference = Some(Inference { kind, position, entity: None, reference: None, constraints: Vec::new(), distance: distance(position), priority: 0 });
         self.external_snap = Some(snap);
+    }
+
+    /// A direction inference `i` (from the tool's anchor) carried onto the line through `on` along `tangent`: where
+    /// they meet, if that is within reach of the pointer; its constraints kept (the on-curve one is added by whoever
+    /// links the curve).
+    fn direction_onto(&self, i: &Inference, on: DVec2, tangent: DVec2) -> Option<Inference> {
+        if !matches!(i.kind, InferenceKind::Horizontal | InferenceKind::Vertical | InferenceKind::Perpendicular) {
+            return None;
+        }
+        let a = i.reference?;
+        let dir = (i.position - a).try_normalize()?;
+        let den = dir.perp_dot(tangent);
+        if den.abs() < 1e-9 {
+            return None;
+        }
+        let x = a + dir * ((on - a).perp_dot(tangent) / den);
+        let c = self.cursor?;
+        let seen = self.screen_metric().map_or((x - c).length(), |m| m.len(x - c));
+        (seen <= self.world_per_px * INFERENCE_PX * noshape_sketch::inference::POINT_REACH).then(|| Inference { position: x, distance: seen, ..i.clone() })
     }
 
     fn snapped(&self) -> Option<(DVec2, Option<Inference>)> {
@@ -1756,11 +1871,13 @@ impl SketchEditor {
         data.sketch.solve();
     }
 
-    /// Constrain the next click onto an external entity (a snapped model edge).
+    /// Constrain the next click onto an external entity (a snapped model edge), keeping a direction met on it.
     pub fn link_edge_snap(&mut self, id: EntityId) {
         if let Some(inf) = &mut self.inference {
-            inf.kind = InferenceKind::OnCurve;
-            inf.constraints = vec![AutoConstraint::OnCurve(id)];
+            if inf.constraints.is_empty() {
+                inf.kind = InferenceKind::OnCurve;
+            }
+            inf.constraints.push(AutoConstraint::OnCurve(id));
         }
         self.external_snap = None;
     }
@@ -3567,7 +3684,7 @@ impl SketchEditor {
         self.cursor = Some(p);
         match self.drag.clone() {
             Some(DragState::Pending { entity, start, .. }) => {
-                if (p - start).length() < self.world_per_px * 3.0 {
+                if self.below_drag_start(p - start) {
                     return EditOutcome::none();
                 }
                 // (A spline's handle arm drags its handle: the tip follows, the spline's end stays.)
@@ -3613,7 +3730,7 @@ impl SketchEditor {
                 EditOutcome::changed()
             }
             Some(DragState::Label { constraint, start, additive, .. }) => {
-                if (p - start).length() < self.world_per_px * 3.0 {
+                if self.below_drag_start(p - start) {
                     return EditOutcome::none();
                 }
                 self.drag = Some(DragState::Label { constraint, start, moved: true, additive });
@@ -3625,7 +3742,7 @@ impl SketchEditor {
                 EditOutcome::redraw()
             }
             Some(DragState::OffsetArrow { start, moved }) => {
-                if !moved && (p - start).length() < self.world_per_px * 3.0 {
+                if !moved && self.below_drag_start(p - start) {
                     return EditOutcome::none();
                 }
                 self.drag = Some(DragState::OffsetArrow { start, moved: true });
@@ -3755,7 +3872,7 @@ impl SketchEditor {
                 out
             }
             Some(DragState::Glyph { constraint, entity, start, orig, moved, additive }) => {
-                if !moved && (p - start).length() < self.world_per_px * 3.0 {
+                if !moved && self.below_drag_start(p - start) {
                     return EditOutcome::none();
                 }
                 self.drag = Some(DragState::Glyph { constraint, entity, start, orig, moved: true, additive });
@@ -3768,7 +3885,7 @@ impl SketchEditor {
                 EditOutcome::redraw()
             }
             Some(DragState::Text { entity, start, points, moved }) => {
-                if !moved && (p - start).length() < self.world_per_px * 3.0 {
+                if !moved && self.below_drag_start(p - start) {
                     return EditOutcome::none();
                 }
                 let d = p - start;
@@ -3914,6 +4031,7 @@ impl SketchEditor {
                     }
                 }
                 self.drag_snap = None;
+                self.drag_external = None;
                 data.sketch.solve();
                 EditOutcome::changed()
             }
@@ -8325,12 +8443,15 @@ mod tests {
         let l2 = line(&mut ed, &mut d, mm(40.0, 45.0), mm(20.3, 45.3));
         assert_eq!(kinds(&d, l2), ["Horizontal"], "{:?}", at(&d, l2));
         assert!((at(&d, l2).1.x - 20.3).abs() < 0.05, "no snap to the point's x: {:?}", at(&d, l2));
-        // Passing over the point first wakes it: the end snaps to its x
+        // Resting on the point first wakes it (live: 1.5 s; live2 "feel (sketch)": ≥ 100 ms): the end snaps to its x
         // and gets a Vertical with it.
         ed.set_tool(Tool::Line);
         for (p, hv) in [(mm(40.0, 60.0), None), (mm(20.0, 30.0), Some(pt)), (mm(20.3, 60.3), None)] {
             ed.hover = hv;
             ed.pointer_move(&mut d, p, false, false);
+            if hv.is_some() {
+                std::thread::sleep(ACQUIRE_REST + std::time::Duration::from_millis(10));
+            }
             if hv.is_none() {
                 ed.tool_down(&mut d, p, None, false, false);
                 ed.tool_up(&mut d, p);
@@ -9039,6 +9160,41 @@ mod tests {
             ed.pointer_move(&mut d, at, false, false);
             assert_eq!(ed.inference.as_ref().map(|i| i.kind), Some(kind), "at {at:?}");
             assert_eq!(squares(&ed, &d) == 4, square, "{kind:?}: {} square sides", squares(&ed, &d));
+        }
+    }
+
+    /// Live2 "feel (sketch)" (1): a point counts for alignment only once the pointer has rested on it ≥ 100 ms;
+    /// passing over it doesn't (the origin always counts).
+    #[test]
+    fn a_point_aligns_only_after_a_rest_on_it() {
+        for rest in [false, true] {
+            let (mut ed, mut d) = editor(Tool::Line);
+            let pt = d.sketch.add_point(v(200.0 * PX, 300.0 * PX));
+            click(&mut ed, &mut d, v(500.0 * PX, 100.0 * PX));
+            ed.hover = Some(pt);
+            ed.pointer_move(&mut d, v(200.0 * PX, 300.0 * PX), false, false);
+            if rest {
+                std::thread::sleep(ACQUIRE_REST + std::time::Duration::from_millis(10));
+            }
+            ed.hover = None;
+            ed.pointer_move(&mut d, v(203.0 * PX, 120.0 * PX), false, false);
+            let aligned = ed.inference.as_ref().is_some_and(|i| i.constraints.iter().any(|c| matches!(c, AutoConstraint::VerticalWith(p) if *p == pt)));
+            assert_eq!(aligned, rest, "rested on the point: {rest}: {:?}", ed.inference);
+        }
+    }
+
+    /// Live2 "feel (sketch)" (5): a press on an entity becomes a drag only at about 5 px from the press, on screen;
+    /// less is a click (it selects).
+    #[test]
+    fn a_press_drags_from_5_px() {
+        for (moved, drags) in [(4.0, false), (6.0, true)] {
+            let (mut ed, mut d) = editor(Tool::Select);
+            let pt = d.sketch.add_point(v(0.01, 0.01));
+            ed.tool_down(&mut d, v(0.01, 0.01), Some(pt), false, false);
+            ed.tool_drag(&mut d, v(0.01 + moved * PX, 0.01));
+            ed.tool_up(&mut d, v(0.01 + moved * PX, 0.01));
+            let at = d.sketch.point(pt).unwrap();
+            assert_eq!(((at - v(0.01, 0.01)).length() > 1e-9, ed.selection.contains(&pt)), (drags, !drags), "moved {moved} px");
         }
     }
 

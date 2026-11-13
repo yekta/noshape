@@ -736,6 +736,11 @@ impl Viewport {
         self.last_pos
     }
 
+    /// The pointer there, as a move would put it, without picking (a view's tests that send its events themselves).
+    pub fn place_pointer(&mut self, p: DVec2) {
+        self.last_pos = p;
+    }
+
     pub fn pointer_inside(&self) -> bool {
         self.pointer_inside
     }

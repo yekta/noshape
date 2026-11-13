@@ -1061,10 +1061,9 @@ fn analyze(sk: &Sketch, sys: &mut System, out: &Outcome, conflicting: &[Constrai
     let mut redundant: Vec<ConstraintId> = sys.alias_redundant.clone();
     redundant.extend(out.const_redundant.iter().copied());
     let mut collapsed: Option<bool> = None;
-    // Live (behaviours "sketch snapping and hover", 11-12): a line is coloured by its own geometry, the infinite line
-    // (its direction and place), its points apart: one whose free end only slides along it is fully defined. Per
-    // component, the motion of each end across the line (its normal's dot with the end's unknowns) is asked of the
-    // rank analysis; an end unknown no equation holds moves it outright.
+    // Live (behaviours "sketch snapping and hover" and live2's colours, 11-13): a line or an arc is coloured by its own
+    // geometry (the infinite line; the arc's circle), its points apart: one whose free ends only slide along it is fully
+    // defined. Per component, the motions that move it ([`own_motions`]) are asked of the rank analysis.
     let (line_queries, mut line_moves) = line_motion_queries(sk, sys, out);
     for (ci, comp) in out.comps.iter().enumerate() {
         let rows = &out.comp_rows[ci];
@@ -1168,12 +1167,31 @@ fn analyze(sk: &Sketch, sys: &mut System, out: &Outcome, conflicting: &[Constrai
     Analysis { dof, states, redundant: dedup_sorted(redundant) }
 }
 
-/// Per component: (line, a query of its end's motion across it).
+/// Per component: (curve, a query of a motion that moves it).
 type LineQueries = Vec<Vec<(EntityId, SparseRow)>>;
 
-/// Per component, each line's end motions across it as queries of its unknowns ([`crate::dof::analyze_component_with`]),
-/// and every line asked about (true already for one with an end unknown no equation holds). Lines without a length
-/// (no normal) aren't asked: they keep the points' rule.
+/// The motions that move a curve's own geometry, each as point motions dotted with a direction: a line's two ends
+/// across it (sliding along it doesn't move the line); an arc's centre, and its start's radial motion against the
+/// centre (its circle; the ends sliding along it don't move it). Other curves: None (their points' rule).
+fn own_motions(sk: &Sketch, e: &crate::entities::Entity) -> Option<Vec<Vec<(EntityId, DVec2)>>> {
+    match e.geometry {
+        Geometry::Line { start, end } => {
+            let (pa, pb) = (sk.point(start)?, sk.point(end)?);
+            let n = (pb - pa).try_normalize()?.perp();
+            Some(vec![vec![(start, n)], vec![(end, n)]])
+        }
+        Geometry::Arc { center, start, .. } => {
+            let (c, a) = (sk.point(center)?, sk.point(start)?);
+            let u = (a - c).try_normalize()?;
+            Some(vec![vec![(center, DVec2::X)], vec![(center, DVec2::Y)], vec![(start, u), (center, -u)]])
+        }
+        _ => None,
+    }
+}
+
+/// Per component, each line's and arc's own motions ([`own_motions`]) as queries of its unknowns
+/// ([`crate::dof::analyze_component_with`]), and every curve asked about (true already for one with an unknown no
+/// equation holds in such a motion).
 fn line_motion_queries(sk: &Sketch, sys: &mut System, out: &Outcome) -> (LineQueries, std::collections::HashMap<EntityId, bool>) {
     let mut local: std::collections::HashMap<u32, (usize, u32)> = std::collections::HashMap::new();
     for (ci, comp) in out.comps.iter().enumerate() {
@@ -1184,35 +1202,35 @@ fn line_motion_queries(sk: &Sketch, sys: &mut System, out: &Outcome) -> (LineQue
     let mut queries: LineQueries = vec![Vec::new(); out.comps.len()];
     let mut moves = std::collections::HashMap::new();
     for e in sk.entities() {
-        if e.external || e.kind() != EntityKind::Line {
+        if e.external {
             continue;
         }
-        let Some((a, b)) = e.endpoints() else { continue };
-        let (Some(pa), Some(pb)) = (sk.point(a), sk.point(b)) else { continue };
-        let Some(n) = (pb - pa).try_normalize().map(|d| d.perp()) else { continue };
+        let Some(motions) = own_motions(sk, e) else { continue };
         let mut free = false;
-        for p in [a, b] {
-            let base = sys.p.ent_base.get(p.0 as usize).copied().unwrap_or(NONE);
-            if base == NONE {
-                continue;
-            }
-            // This end's motion across the line, split by the components its unknowns fall in.
+        for motion in motions {
+            // This motion, split by the components its unknowns fall in.
             let mut parts: std::collections::BTreeMap<usize, SparseRow> = std::collections::BTreeMap::new();
-            for (i, c) in [n.x, n.y].into_iter().enumerate() {
-                let r = find(&mut sys.uf, base + i as u32) as usize;
-                if sys.p.fixed[r] || c.abs() < 1e-12 {
+            for (p, dir) in motion {
+                let base = sys.p.ent_base.get(p.0 as usize).copied().unwrap_or(NONE);
+                if base == NONE {
                     continue;
                 }
-                match local.get(&(r as u32)) {
-                    Some(&(ci, k)) => {
-                        let row = parts.entry(ci).or_default();
-                        match row.iter_mut().find(|(col, _)| *col == k) {
-                            Some(x) => x.1 += c,
-                            None => row.push((k, c)),
-                        }
+                for (i, c) in [dir.x, dir.y].into_iter().enumerate() {
+                    let r = find(&mut sys.uf, base + i as u32) as usize;
+                    if sys.p.fixed[r] || c.abs() < 1e-12 {
+                        continue;
                     }
-                    None if out.var_of[r] == NONE => free = true,
-                    None => {}
+                    match local.get(&(r as u32)) {
+                        Some(&(ci, k)) => {
+                            let row = parts.entry(ci).or_default();
+                            match row.iter_mut().find(|(col, _)| *col == k) {
+                                Some(x) => x.1 += c,
+                                None => row.push((k, c)),
+                            }
+                        }
+                        None if out.var_of[r] == NONE => free = true,
+                        None => {}
+                    }
                 }
             }
             for (ci, row) in parts {
@@ -1744,6 +1762,21 @@ mod state_tests {
         sk.add_constraint(ConstraintKind::Length { curve: line, value: 0.04 }).unwrap();
         let r = sk.solve();
         assert_eq!(r.state(end), Some(ConstraintState::FullyConstrained), "length dimensioned");
+    }
+
+    /// Live2 (11-13, colours (a)): an arc with its centre held and its radius dimensioned is black, its ends blue
+    /// (free to slide along its circle); with the radius free the arc is blue too.
+    #[test]
+    fn an_arc_held_on_its_circle_is_defined_and_its_sliding_ends_are_not() {
+        let mut sk = Sketch::new();
+        let arc = sk.add_arc(DVec2::ZERO, DVec2::new(0.02, 0.0), DVec2::new(0.0, 0.02));
+        let crate::Geometry::Arc { center, start, end } = sk.entity(arc).unwrap().geometry else { panic!("an arc") };
+        sk.add_constraint(ConstraintKind::Fix { entity: center }).unwrap();
+        let r = sk.solve();
+        assert_eq!((r.state(arc), r.state(center)), (Some(ConstraintState::UnderConstrained), Some(ConstraintState::FullyConstrained)), "radius free");
+        sk.add_constraint(ConstraintKind::Radius { curve: arc, value: 0.02 }).unwrap();
+        let r = sk.solve();
+        assert_eq!((r.state(arc), r.state(start), r.state(end)), (Some(ConstraintState::FullyConstrained), Some(ConstraintState::UnderConstrained), Some(ConstraintState::UnderConstrained)), "radius dimensioned");
     }
 
     /// An end free on a guide that isn't along the line (a fixed vertical line): moving it turns the line, so the

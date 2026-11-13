@@ -1047,6 +1047,7 @@ fn a_line_ends_on_the_hovered_point(cx: &mut TestAppContext, scale: f32) {
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             let vp = v.viewport.clone();
+            vp.update(cx, |vp, _| vp.place_pointer(at));
             for ev in [
                 ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() },
                 // The GPU's hover pick, after the move.
@@ -1110,6 +1111,32 @@ fn a_dragged_point_lands_on_a_line_within_7_px(cx: &mut TestAppContext) {
     }
 }
 
+/// Live2 "feel (sketch)" (3): in a sketch with no tool, Ctrl+click on an entity opens the sketch's context menu (as a
+/// right-click) and doesn't toggle the selection.
+#[gpui::test]
+fn ctrl_click_in_a_sketch_opens_its_context_menu(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "ctrl-click-menu", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (700., 400.));
+    keys(cx, window, &["escape", "escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    draw(cx, window);
+    let at = DVec2::new(600., 400.);
+    let ctrl = Modifiers { control: true, ..Default::default() };
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: ctrl }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: ctrl, click_count: 1 }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: at, modifiers: ctrl }, w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).context_menu.is_some()), "the sketch's context menu opened");
+    assert!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().selection.is_empty()), "the selection didn't toggle");
+}
+
 /// ui-parity sketch-offset under load (vibe6 11-13): the GPU's pick of a line is narrower than live's sketch reach,
 /// so with the pointer near a line but nothing of the sketch in the GPU's pick, nothing lit and a quick click took the
 /// line while a later one didn't. What a click there takes (the line, within reach) lights, and the click selects it.
@@ -1134,6 +1161,7 @@ fn a_line_in_reach_lights_and_is_clicked_when_the_gpu_pick_misses_it(cx: &mut Te
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             let vp = v.viewport.clone();
+            vp.update(cx, |vp, _| vp.place_pointer(at));
             v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
             v.on_viewport_event(&vp, &ViewportEvent::Hover(None), w, cx);
         });
@@ -1188,6 +1216,7 @@ fn a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach(cx: &
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             let vp = v.viewport.clone();
+            vp.update(cx, |vp, _| vp.place_pointer(at));
             v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
             v.on_viewport_event(&vp, &ViewportEvent::Hover(Some(centre_pick)), w, cx);
         });
@@ -3973,3 +4002,131 @@ fn every_kind_of_plane_right_clicked_in_the_graphics_opens_its_menu(cx: &mut Tes
 
 #[path = "feel_tests.rs"]
 mod feel;
+
+/// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
+/// ends in the sketch plane.
+fn sketch_on_top_face(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>, Reference, u32, DVec2, DVec2) {
+    let (window, view, top, _) = block_part(cx, name);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection = vec![top.clone()];
+            v.start_feature("sketch", w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(tool, w, cx))).unwrap();
+    draw(cx, window);
+    let (edge, pick, a, b) = cx.update(|cx| {
+        let v = view.read(cx);
+        let frame = v.sketch.as_ref().unwrap().frame;
+        let body = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let top_z = body.mesh.positions.iter().map(|p| p[2]).fold(f32::MIN, f32::max);
+        let (r, pl) = body.edge_refs.iter().zip(&body.mesh.edges).filter(|(_, pl)| pl.iter().all(|p| (p[2] - top_z).abs() < 1e-7)).max_by(|x, y| {
+            let len = |pl: &Vec<[f32; 3]>| (glam::Vec3::from(pl[0]) - glam::Vec3::from(*pl.last().unwrap())).length();
+            len(x.1).total_cmp(&len(y.1))
+        }).unwrap();
+        let local = |p: &[f32; 3]| frame.to_local(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
+        let pick = v.built.as_ref().unwrap().picks.ids_for(r).first().copied().expect("the edge is pickable");
+        (r.clone(), pick, local(&pl[0]), local(pl.last().unwrap()))
+    });
+    (window, view, edge, pick, a, b)
+}
+
+/// A sketch-plane point on screen (viewport-local).
+fn on_screen(cx: &mut TestAppContext, view: &Entity<PartStudioView>, q: DVec2) -> DVec2 {
+    cx.update(|cx| {
+        let v = view.read(cx);
+        v.viewport.read(cx).project(v.sketch.as_ref().unwrap().frame.to_world(q)).unwrap()
+    })
+}
+
+/// User P0 11-13 (hat15, Sketch 1 on a face): a line from the end of a short segment toward the face's model edge, the
+/// edge lit and the perpendicular glyph shown: the click left the end short of the edge (the perpendicular beat the
+/// edge). The end lands on the edge, coincident with it (its used curve), and keeps the direction inferred (live2: a
+/// direction and on-a-line both).
+#[gpui::test]
+fn a_line_ending_on_a_lit_model_edge_lands_on_it(cx: &mut TestAppContext) {
+    let (window, view, _edge, pick, a, b) = sketch_on_top_face(cx, "line-onto-model-edge", Tool::Line);
+    let along = (b - a).normalize();
+    let inward = {
+        let centre = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().frame.to_local(glam::DVec3::ZERO));
+        let n = along.perp();
+        if (centre - a).dot(n) > 0.0 { n } else { -n }
+    };
+    let mid = (a + b) * 0.5;
+    let wpp = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
+    // A short segment parallel to the edge, 40 px inside it.
+    let (s1, s0) = (mid + inward * 40.0 * wpp - along * 30.0 * wpp, mid + inward * 40.0 * wpp);
+    let (p1, p0) = (on_screen(cx, &view, s1), on_screen(cx, &view, s0));
+    click(cx, window, &view, (p1.x, p1.y));
+    click(cx, window, &view, (p0.x, p0.y));
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    draw(cx, window);
+    // From its end straight toward the edge, the pointer 2 px past it on the edge's far side and 2 px along it.
+    let target = on_screen(cx, &view, s0 - inward * 42.0 * wpp + along * 2.0 * wpp);
+    click(cx, window, &view, (p0.x, p0.y));
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            vp.update(cx, |vp, _| vp.place_pointer(target));
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: target, modifiers: Modifiers::default() }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::Hover(Some(pick)), w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: target, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: target, modifiers: Modifiers::default() }, w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    let (off, on_edge, perpendicular) = cx.update(|cx| {
+        let data = view.read(cx).sketch_data(cx).unwrap();
+        let line = data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line && !e.external && !e.construction).map(|e| e.id).max().unwrap();
+        let (_, end) = data.sketch.endpoints(line).unwrap();
+        let q = data.sketch.point(end).unwrap();
+        let off = (q - a).perp_dot(along).abs();
+        let on_edge = data.sketch.constraints().any(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Coincident { a: x, b: y } if (x == end && data.sketch.entity(y).is_some_and(|e| e.external)) || (y == end && data.sketch.entity(x).is_some_and(|e| e.external))));
+        // (The block's edges lie along the sketch's axes: the direction inferred there is Horizontal / Vertical.)
+        let perpendicular = data.sketch.constraints().any(|c| match c.kind {
+            noshape_sketch::ConstraintKind::Perpendicular { a: x, b: y } => x == line || y == line,
+            noshape_sketch::ConstraintKind::Horizontal { a: x, b: None } | noshape_sketch::ConstraintKind::Vertical { a: x, b: None } => x == line,
+            _ => false,
+        });
+        (off, on_edge, perpendicular)
+    });
+    // (Against the display mesh's f32 edge.)
+    assert!(off < 1e-6, "the end is on the edge: {off} m off");
+    assert!(on_edge, "coincident with the edge's used curve");
+    assert!(perpendicular, "the direction inferred kept");
+}
+
+/// The same user P0: an existing point dragged onto a model edge of the sketch's face, released 3 px off it, lands
+/// on it, coincident with its used curve (live2 "feel (sketch)" (2): onto a line from 7 px).
+#[gpui::test]
+fn a_point_dragged_onto_a_model_edge_lands_on_it(cx: &mut TestAppContext) {
+    let (window, view, _edge, _pick, a, b) = sketch_on_top_face(cx, "drag-onto-model-edge", Tool::Point);
+    let along = (b - a).normalize();
+    let inward = {
+        let centre = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().frame.to_local(glam::DVec3::ZERO));
+        let n = along.perp();
+        if (centre - a).dot(n) > 0.0 { n } else { -n }
+    };
+    let wpp = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
+    let start = (a + b) * 0.5 + inward * 40.0 * wpp;
+    let s = on_screen(cx, &view, start);
+    click(cx, window, &view, (s.x, s.y));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    draw(cx, window);
+    let to = on_screen(cx, &view, start - inward * 37.0 * wpp);
+    drag(cx, window, &view, (s.x, s.y), (to.x, to.y), 8);
+    let (off, on_edge) = cx.update(|cx| {
+        let data = view.read(cx).sketch_data(cx).unwrap();
+        let pt = data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point && !e.external).map(|e| e.id).max().unwrap();
+        let q = data.sketch.point(pt).unwrap();
+        let on_edge = data.sketch.constraints().any(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Coincident { a: x, b: y } if (x == pt && data.sketch.entity(y).is_some_and(|e| e.external)) || (y == pt && data.sketch.entity(x).is_some_and(|e| e.external))));
+        ((q - a).perp_dot(along).abs(), on_edge)
+    });
+    assert!(on_edge, "coincident with the edge's used curve");
+    assert!(off < 1e-6, "on the edge: {off} m off");
+}

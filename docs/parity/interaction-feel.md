@@ -35,27 +35,40 @@ P1 (lead 11-12). Live measures the 3D side (live/feel/3d.json, behaviours.md "fe
 | Double-click | ? | 450 ms window (`is_double_click`); a face's second click deselects, its feature lit | – | ? |
 | Select other | ? | – | – | ? |
 | Box select: left to right / right to left | window / crossing (`BoxSelector`) | window / crossing; Ctrl+drag deselects | – | ? |
-| Click vs drag threshold | ? | 3 px (`navigation::DRAG_THRESHOLD_PX`) | – | ? |
+| Click vs drag threshold | ≈ 5 px from the press, not time-based | 5 px on screen (`DRAG_START_PX`) | scene `a_press_drags_from_5_px` | = |
 
 ## Sketch (editing a sketch)
 
+Live: qsnap (behaviours "sketch snapping and hover", 11-12) and live2's "feel (sketch)" (11-13 00:55, live/feel/sketch.json;
+two zooms, A 0.2754 / B 0.2316 mm/px; where they differ both are given).
+
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
-| A line's end snaps onto a line | ≤ 7 px, not 8 (behaviours "sketch snapping and hover", qsnap) | 7.5 px (`INFERENCE_PX`) | inference tests; GPUI `a_line_ends_on_the_hovered_point_at_scale_1/2` | = |
-| …onto a point | ≤ 8–9 px | 8.5 px (`inference::POINT_REACH`) | same | = |
+| A line's end snaps onto a line | ≤ 7 px, not 8 | 7.5 px (`INFERENCE_PX`) | inference tests; GPUI `a_line_ends_on_the_hovered_point_at_scale_1/2` | = |
+| …onto a point / a centre | 8 px (A), 9 (B); onto a centre: COINCIDENT, not CONCENTRIC | 8.5 px (`inference::POINT_REACH`) | same | = |
 | …onto a midpoint | ±5–7 px along the line | 6 px (`MIDPOINT_REACH`) | scene `a_snapped_point_or_midpoint_gets_the_square_and_a_curve_none` | = |
-| A dragged point onto a line | ≤ 7 px, not 9 | 7.5 px on screen (`point_drop_target`) | GPUI `a_dragged_point_lands_on_a_line_within_7_px` | = |
+| Horizontal / vertical to the line's start | 7 px / 6 px offset at the pointer (not an angle) | 7 / 6 px (`inference::HORIZONTAL_REACH`, `VERTICAL_REACH`) | sketch `horizontal_reaches_7_px_and_vertical_6` | = |
+| Alignment with another point | only a point hovered ≥ 100 ms first (the origin always); vertical 6 px, horizontal 8 (A) / 4 (B) | a point rested on ≥ 100 ms (`ACQUIRE_REST`), the origin always; 6 / 7 px | scene `a_point_aligns_only_after_a_rest_on_it` | = (horizontal reach: ≈) |
+| Perpendicular | only when the line starts on a line (its end, a point on it, the chain's previous segment); 6–7 px; live 1866 (e): also across a line whose direction a constraint holds | the same | sketch `a_woken_line_gives_perpendicular_only_when_started_on_and_never_parallel`, `square_to_a_held_line_is_perpendicular` | = |
+| Parallel | never | never | same | = |
+| Tangent (from an arc's end; ending on a circle) | 6–7 px; ending on a circle within 6 px of the tangent point | 7.5 px | – | – |
+| Two at once | horizontal + on a line both; a point snap beats horizontal; a point beats its line | – | – | – |
 | Snap target look | yellow-orange square, 17 px, round a point / midpoint; none on a line | the same (`SNAP_SQUARE_*`) | scene, same | = |
-| Inference glyph position | ≈ 30 px right, 27–29 px below the snapped point (qsnap crops) | its 20 px box centred 29 right, 31 below | – | – (pixel check pending) |
-| Other inference types (H/V, alignment, tangent, perpendicular, parallel, quadrant): reach and glyph | ? (feel (sketch)) | 7.5 px for each | – | ? |
-| Hover of a sketch entity = what a click takes | live reach: a point 10 px, a curve 6 px (SKETCH-SCREEN-SPACE-REACH; sketch-offset hits a line 3 mm off) | one reach for the hover, the click and the fallback pick: the GPU hover held to it, and lit by it where the GPU's narrower pick misses (`sketch_hover_id`, `sketch_pick_at`, `in_sketch_reach`) | GPUI `a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach`, `a_line_in_reach_lights_and_is_clicked_when_the_gpu_pick_misses_it`; GPU `feel::the_dimension_tool_takes_the_hovered_line` | = |
+| Inference glyph | ≈ 30 px right, 30 below the pointer (28, 28 mid-drag); same frame as the preview (35–60 ms) | its 20 px box centred 29 right, 31 below the snapped point | – | – (pixel check pending) |
+| A dragged end onto an end / a midpoint / a line / a circle's rim | 9 (A) / 7 (B) / 6 / ≤ 7 / 6 (A), 3 (B) px; no H/V during a drag | 8.5 / 6 / 7.5 / 7.5 on screen (`point_drop_target`) | GPUI `a_dragged_point_lands_on_a_line_within_7_px` | = (rim: ≈) |
+| Drags: free line end / body; held lines; dimensioned; rectangle; circle | see behaviours "feel (sketch)" (2) | – | – | – |
+| Click vs drag threshold | ≈ 5 px from the press, not time-based | 5 px on screen (`DRAG_START_PX`) | scene `a_press_drags_from_5_px` | = |
+| Hover of a sketch entity = what a click takes | a line lights within 8 (A) / 7 (B) px; sketch-offset hits a line 3 mm off | one reach for the hover, the click and the fallback pick (`sketch_hover_id`, `sketch_pick_at`, `in_sketch_reach`) | GPUI `a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach`, `a_line_in_reach_lights_and_is_clicked_when_the_gpu_pick_misses_it`; GPU `feel::the_dimension_tool_takes_the_hovered_line` | = (px: –) |
+| Hover timing (no tool) | the highlight ≈ 270–300 ms after the pointer stops; with the Dimension tool ≈ 30 ms | as the GPU pick arrives | – | – |
 | Nothing recoloured under the pointer mid-draw | the target line doesn't recolour | the same (`SketchEditor::mid_draw`) | – | = |
 | Hovered point look | a 10–11 px translucent orange disc, centred | the same; whole on a slanted plane | offscreen `a_hovered_sketch_point_on_a_slanted_face_draws_its_whole_disc`, `a_sketch_point_is_drawn_as_lives_in_each_state` | = |
-| Per-entity colour (a free end point) | the line black, its free end blue; black once dimensioned | the same: a line is under defined only if a free motion moves the infinite line (`line_motion_queries`, `dof::analyze_component_with`); points, arcs, circles by their own unknowns | sketch `a_line_with_a_free_length_is_defined_and_its_free_end_is_not`, `a_line_whose_end_moves_off_it_is_under_defined` | = (arcs / circles: ? live) |
-| Sketch selection: click, Shift, box | ? | – | – | ? |
-| Dimension tool: what a click takes, placement | ? | the hovered entity within reach | GPU `feel::the_dimension_tool_takes_the_hovered_line` | ? |
-| Point and line drags | ? | – | – | ? |
-| Click vs drag threshold | ? | 3 px (sketch drags) | – | ? |
+| Per-entity colour: a line | the line black, its free end blue; black once dimensioned; a construction line through the origin black, ends blue | a line by its own geometry (`line_motion_queries`) | sketch `a_line_with_a_free_length_is_defined_and_its_free_end_is_not`, `a_line_whose_end_moves_off_it_is_under_defined` | = |
+| …an arc | centre and radius held: the arc black, its ends blue | by its own circle (`own_motions`) | sketch `an_arc_held_on_its_circle_is_defined_and_its_sliding_ends_are_not` | = |
+| …a circle, a spline | radius free: blue, centre black; a spline blue while any point is free | the same | – | = |
+| Selection: click / Shift / Ctrl | a click adds, a click on a selected one removes; Shift the same; Ctrl+click opens the context menu | the same (Ctrl+click: `open_sketch_context_menu`) | GPUI `ctrl_click_in_a_sketch_opens_its_context_menu` | = |
+| Clearing; double-click | a click on empty space clears, Escape doesn't; a double-click on a line selects then deselects (no chain) | the same (two toggles) | – | = |
+| Box select | left → right: window, blue fill and border; right → left: crossing, yellow dashed; it adds | window / crossing (`#789ad1` / `#ffdc74` dashed) | – | – |
+| Dimension tool | one line: aligned; two points: H / V / aligned by the pointer against their bounding box; two lines: the angle of the pointer's quadrant; a circle: Ø; the text centred on the pointer; the value box 100 × 26, ~33 px left of and 5 above the click | the hovered entity within reach | GPU `feel::the_dimension_tool_takes_the_hovered_line` | – |
 
 ## Drawings (studios, from 2026-11-13)
 
@@ -101,7 +114,10 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (asked 11-13 00:
 | Ctrl / Shift + click a tab | opens it in a new window (rq 2403) | the same | – | = |
 
 ## Fix queue (biggest feel impact first)
-1. ~~Per-entity colour~~ (psui 11-12: lines by their own geometry). Arcs and circles: ask live2 whether an arc whose
-   ends slide along its circle stays black.
-2. 3D reach, once live's numbers are in (an edge reaches 9 px over the background but 5 over its face today).
-3. Inference glyph position: a pixel check against qsnap (ours 29 / 31 px from the point, live ≈ 30 / 27–29).
+1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
+   Ctrl+click~~ (psui 11-13).
+2. Sketch hover timing: live2's 270–300 ms after the pointer stops (no tool) vs 30 ms with the Dimension tool: asked
+   whether it is Onshape's or the recording Chrome's slow redraws before copying a delay.
+3. 3D reach, once live's numbers are in (an edge reaches 9 px over the background but 5 over its face today).
+4. Inference glyph position against the pointer (live ≈ 30, 30).
+5. Dimension tool placement rules (H / V / aligned by the bounding box, angle quadrant, Ø): a test each.

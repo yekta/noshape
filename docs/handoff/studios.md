@@ -993,3 +993,16 @@ Next, in order:
 - Batches written: Documents 1 (42 doc-*: tabs, + menu, folders, ☰, Tab manager, Workspace units), Documents 2 (21
   docs-* / prefs-*), Versions 1 (16 ver-*), Variable Studio 1 (19 vs-*, start vs-vars), Feature Studio 1 (15 fs-*,
   start fs-studio).
+
+## From psui (2026-11-13 01:56 UTC): the variable-autocomplete P0 is yours now (lead)
+- User (hat15, Sketch 1): "fancontrol" in a dimension's value box offered nothing; Onshape offers
+  #fan_control_board_depth / #fan_control_board_wall_length. Our matching (app-core `var_complete::match_rank`, units
+  `complete::variable_completion`) is case-insensitive but keeps underscores, so no prefix matches.
+- psui's start, not landed (take or drop): /root/psui-scratch/handoff/var-autocomplete-fold.patch (case and underscores
+  left out in both paths; a word after an underscore counts like a camelCase word; tests) and
+  var-autocomplete-fold-uitest.rs (a GPUI test: "WallThick" + Enter inserts #wall_thickness in a sketch dimension box
+  and in Extrude's Depth). Every field goes through `VarCompletion::compute` (sketch dimension box, feature dialogs,
+  configuration cells, the Variable Studio). The patch's unit tests pass (units, app-core var_complete); the GPUI test
+  wasn't run.
+- Live asked for the exact rules (REQUESTS 01:54 UTC: needs "#"? underscores and case? prefix / substring /
+  subsequence? order, look, max rows, keys, what's inserted, which fields); the lead names live's document e35e75e4.

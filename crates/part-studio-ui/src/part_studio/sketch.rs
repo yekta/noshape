@@ -521,7 +521,7 @@ impl PartStudioView {
                 let i = b.edge_refs.iter().position(|x| x == r)?;
                 let pl = b.mesh.edges.get(i)?;
                 let pts: Vec<DVec2> = pl.iter().map(|v| frame.to_local(DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64))).collect();
-                let mut best: Option<(f64, DVec2)> = None;
+                let mut best: Option<(f64, DVec2, DVec2)> = None;
                 for w in pts.windows(2) {
                     let (a, b) = (w[0], w[1]);
                     let d = b - a;
@@ -529,12 +529,14 @@ impl PartStudioView {
                     let q = a + d * t;
                     let dist = (q - cursor).length();
                     if best.is_none_or(|bb| dist < bb.0) {
-                        best = Some((dist, q));
+                        best = Some((dist, q, d));
                     }
                 }
-                let (_, q) = best?;
+                let (_, q, d) = best?;
                 let s = to_screen(frame.to_world(q))?;
-                ((s - cursor_s).length() <= radius_px).then_some(ExternalSnap::Edge { position: q, reference: r.clone() })
+                // (The edge's direction there: a direction inference meets the edge along it.)
+                let tangent = d.try_normalize().unwrap_or(DVec2::X);
+                ((s - cursor_s).length() <= radius_px).then_some(ExternalSnap::Edge { position: q, tangent, reference: r.clone() })
             }
             _ => None,
         }
@@ -588,13 +590,10 @@ impl PartStudioView {
             Some(Reference::SketchEntity { sketch, entity }) if *sketch == ed.feature => Some(noshape_sketch::EntityId(*entity)),
             _ => None,
         };
+        // (Where the viewport's pick was made: the pointer as it knows it, also after a press without a move.)
         let vp = self.viewport.read(cx);
-        let Some(p) = self.ui.pointer.and_then(|pos| {
-            let (o, d) = vp.ray(pos + DVec2::splat(0.5));
-            ed.plane_point(o, d)
-        }) else {
-            return id;
-        };
+        let (o, d) = vp.ray(vp.pointer_position() + DVec2::splat(0.5));
+        let Some(p) = ed.plane_point(o, d) else { return id };
         let pick_of = |e: noshape_sketch::EntityId| built.picks.ids_for(&Reference::SketchEntity { sketch: ed.feature, entity: e.0 }).first().copied();
         // Nothing of the sketch under the GPU's pick (a plane, a region, the background): what a click there takes.
         let Some(e) = id.and_then(own) else { return self.sketch_pick_at(p, cx).and_then(pick_of).or(id) };
@@ -844,6 +843,12 @@ impl PartStudioView {
                 self.close_dim_menu(cx);
                 let tool = self.sketch.as_ref().map(|s| s.tool);
                 let overlay_pressed = self.sketch.as_ref().is_some_and(|s| s.pressed_label.is_some() || s.pressed_glyph.is_some());
+                // Live2 "feel (sketch)" (3): Ctrl+click opens the sketch's context menu, as a right-click, for the
+                // selection and what is lit; it doesn't toggle the selection.
+                if !overlay_pressed && modifiers.control && !modifiers.platform && tool == Some(Tool::Select) {
+                    self.open_sketch_context_menu(window.mouse_position(), None, window, cx);
+                    return true;
+                }
                 if !overlay_pressed && tool == Some(Tool::Use) {
                     // The GPU hover may lag a quick click: the edge under the pointer then.
                     if self.hover.is_none() {
@@ -949,12 +954,27 @@ impl PartStudioView {
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_drag(data, p)) {
                     self.apply_outcome(out, window, cx);
                 }
+                // A dragged point over a model edge lands on it (the GPU's pick under the pointer is the point itself:
+                // the edge by its geometry).
+                if self.sketch.as_ref().is_some_and(|ed| ed.dragged_point().is_some()) {
+                    let snap = self.model_edge_at(*position, cx).and_then(|r| self.model_snap_of(&r, p, self.viewport.read(cx)));
+                    if let Some(ed) = &mut self.sketch {
+                        ed.set_drag_external(snap);
+                    }
+                }
                 true
             }
             ViewportEvent::ToolUp { position, .. } => {
                 let Some(p) = to_plane(self, *position, cx) else { return true };
                 if let Some(ed) = &mut self.sketch {
                     ed.box_remove = window.modifiers().control;
+                }
+                // A point dropped on a model edge: the edge is used in the sketch, the point coincident with it.
+                if let Some(ExternalSnap::Edge { reference, .. }) = self.sketch.as_ref().and_then(|ed| ed.drag_external.clone())
+                    && let Some(id) = self.external_entity(&reference, false, true, cx)
+                    && let Some(ed) = &mut self.sketch
+                {
+                    ed.drop_onto_external(id);
                 }
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_up(data, p)) {
                     self.apply_outcome(out, window, cx);
