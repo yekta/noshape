@@ -29,6 +29,17 @@ weigh against infento's 18 s -> 1.3 s; I haven't touched the solver.
   `fold_solved` writes every child's solved position into `Instance::nested` (sub-instance frame, as dx's op): the
   moved child's entry is the op's. History text differs: app "Move : Sub <2>", op "Move : Sub <2> > Part 1 <1>".
 
+## 11-13 00:32 UTC: connector flips to live's Z (landed / queued)
+- Landed 99017cac: an axis point (TOP / MID / BOTTOM_AXIS_POINT) whose Z runs against live's mateConnectorCS is written
+  flipped (rack-pinion 3 -> 8/8). Queued 6376f794: an edge midpoint on a top-level part too (robotic-arm 22 -> 29/29);
+  NOSHAPE_PARITY_TRACE prints each flip. Suite on vibe7 otherwise as main.
+- Not flipped yet: a circle's CENTER. On scissor-lift, Revolute 12 / 13 (CENTER on Part 5 <5>, Z against live's)
+  then hold, but pull Sub 09e22d <2> > Part 2 <1> 6 mm along their axis (y 65 vs live 71): something along that axis
+  differs (the edge's place, or the nested part's connector). On main they don't hold and Part 5 <5> moves 99.8 mm
+  when freed. Next to look at.
+- Fixed in the suite (9734fdb6): the in-context stand-ins are no parts in our per-feature compare (c2-hunting-knife
+  16 -> 20/52, c2-rings-loft 17 -> 22/32). isaac-ball's 29: core's Fillet 2 (4 mm fails, 3.9 mm holds; core.md).
+
 ## Now (asm, 11-12 19:47 UTC)
 - Landed 81f2a19e (Uses moved by their sketch's step; solver: a conflicting group skips least_change and stops
   LM when it stalls, infento-subs 18 s -> 1.3 s; sketch solves kept when they give live's regions; mate diagnostic).
