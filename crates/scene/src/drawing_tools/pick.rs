@@ -82,10 +82,16 @@ impl<'a> SheetPick<'a> {
         // Tools that take only view edges (or sketch geometry) look for those
         // under whatever else is on top (an annotation, a centerline).
         let edges_only = |also_sketch: bool| self.built.and_then(|b| b.hit_where(self.cursor, tol, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. }) || (also_sketch && matches!(t, PickTarget::SketchEntity(_)))));
+        // Live2 feel/drawing.json (tables_live2_1013 centerlines): Centermark lights a circle (an ellipse in an
+        // isometric view too) from 6 px and never a straight edge; Edge to edge centerline an edge from 6 px.
+        let reach6 = self.tol_mm(6.0);
+        let is_circle = |t: &PickTarget| matches!(t, PickTarget::Edge { view, edge } if matches!(self.edge_geom(*view, *edge), Some(EdgeGeom::Circle { .. })));
         let hover = match self.tool {
+            Tool::Centermark => self.built.and_then(|b| b.hit_where(self.cursor, reach6, &is_circle)).or(hover.filter(|h| self.built.and_then(|b| b.picks.get(*h as usize)).is_some_and(|t| !matches!(t, PickTarget::Edge { .. })))),
+            Tool::EdgeCenterline { .. } => self.built.and_then(|b| b.hit_where(self.cursor, reach6, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. }))).or(hover),
             Tool::Dimension { kind: DimTool::Point2, .. } => hover,
             Tool::Dimension { kind: DimTool::Linear, .. } | Tool::Sketch { .. } | Tool::Constrain { .. } => edges_only(true).or(hover),
-            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note => edges_only(false).or(hover),
+            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note => edges_only(false).or(hover),
             // A surface finish symbol stands on the edge under it (live A45);
             // both it and a geometric tolerance also take a dimension (live
             // request 1624), under whatever else is on top.
@@ -362,6 +368,18 @@ impl<'a> SheetPick<'a> {
         let (a, b) = (pl.to_sheet([0.0, 0.0]), pl.to_sheet([1.0, 0.0]));
         let per_unit = len(sub(b, a)).max(1e-12);
         views::body_under(self.sources.get(&key)?, &frame, p, self.tol_mm(6.0) / per_unit)
+    }
+
+    /// A centermark already marks view `view`'s circle at `center` (live2 tables_live2_1013: clicking it adds nothing).
+    pub fn has_centermark(&self, view: ViewId, center: [f64; 2]) -> bool {
+        self.current_sheet().annotations.iter().any(|a| matches!(&a.kind, AnnotationKind::Centermark { view: v, center: c, .. } if *v == view && (c[0] - center[0]).abs() < 1e-9 && (c[1] - center[1]).abs() < 1e-9))
+    }
+
+    /// The geometry of view `view`'s edge `edge` (None: a silhouette with no model edge).
+    pub fn edge_geom(&self, view: ViewId, edge: u32) -> Option<EdgeGeom> {
+        let g = self.geoms.get(&view)?;
+        let m = g.edges.get(edge as usize)?.model?;
+        Some(g.model_edges.get(m as usize)?.geom.clone())
     }
 
     pub fn hovered_edge(&self) -> Option<(ViewId, views::ModelEdge)> {

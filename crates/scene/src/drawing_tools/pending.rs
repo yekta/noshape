@@ -53,6 +53,14 @@ impl SheetPick<'_> {
         if let Some(a) = self.sketch_dim_preview(v.sketch_dim_pick) {
             return Some(a);
         }
+        // Centermark: the cross previewed at a hovered circle's (or ellipse's) centre, unless it has one (live2
+        // tables_live2_1013).
+        if matches!(self.tool, Tool::Centermark)
+            && let Some(Pick::Circle { view, center, radius, r }) = self.circle_pick(c)
+            && !self.has_centermark(view, center)
+        {
+            return Some(super::centermark(id, &super::CmCircle { view, center, radius, r }, c));
+        }
         match self.tool {
             Tool::Dimension { kind, picks } if kind.linear() => {
                 if *kind != DimTool::Linear && picks.len() < 2 {

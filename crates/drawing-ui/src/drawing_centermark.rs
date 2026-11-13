@@ -51,6 +51,10 @@ impl DrawingEditor {
             return false;
         }
         let Some(Pick::Circle { view, center, radius, r }) = self.circle_pick(self.cursor) else { return true };
+        // A circle with a centermark from before: nothing more, no undo step (live2 tables_live2_1013).
+        if self.pk().has_centermark(view, center) && self.centermark_dlg.as_ref().is_none_or(|d| !d.picks.iter().any(|p| p.view == view && p.center == center)) {
+            return true;
+        }
         // The circles listed under Entities to include; a Single centermark is drawn at once and stays (live2 2442,
         // the click's centermark in the drawing at once), the others on ✓ or Esc.
         let pos = self.cursor;

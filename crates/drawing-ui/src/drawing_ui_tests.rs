@@ -19,6 +19,8 @@ thread_local! {
     static SUGGESTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The next test drawing gets a dimension on its first view's longest edge.
     static DIMENSIONED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The next test drawing's block has a Ø6 hole through it at (20, 10).
+    static HOLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// A drawing of a block (Drawing 1) in a test window.
@@ -38,6 +40,12 @@ fn drawing(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Draw
         let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }));
         let region = d["regions"][0]["id"].clone();
         call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+        if HOLED.get() {
+            let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+            let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[20, 10], [23, 10]] }));
+            let region = d["regions"][0]["id"].clone();
+            call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "endBound": "BLIND", "symmetric": true, "depth": "40 mm", "operationType": "REMOVE" } }));
+        }
         let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": SUGGESTED.get() }));
         if DIMENSIONED.get() {
             let tab = d["drawing"].clone();
@@ -416,4 +424,57 @@ fn an_opening_drawing_says_what_it_is_loading_until_a_view_is_drawn(cx: &mut Tes
     assert_eq!(cx.update(|cx| editor.read(cx).loading_message()), None, "views drawn: nothing");
     cx.update(|cx| editor.update(cx, |e, _| e.opening_for_test()));
     assert_eq!(cx.update(|cx| editor.read(cx).loading_message()), Some("Loading graphics…"), "a second in, nothing drawn, sources in");
+}
+
+/// Live2 feel/drawing.json (tables_live2_1013 centerlines): with Centermark, a circle lights from 6 px outside it and
+/// shows the preview cross; not from further; a circle that has a centermark gets nothing more.
+#[gpui::test]
+fn centermark_lights_a_circle_from_6_px_and_skips_a_marked_one(cx: &mut TestAppContext) {
+    use noshape_model::drawing::AnnotationKind;
+    use noshape_scene::drawing_tools::{Pick, Tool};
+    SUGGESTED.set(true);
+    HOLED.set(true);
+    let (window, editor) = drawing(cx, "centermark-reach");
+    HOLED.set(false);
+    real_sheet(cx, window, &editor);
+    // The hole's circle where a view shows it face on, in sheet mm.
+    let (center, radius, zoom) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        b.placements
+            .iter()
+            .find_map(|pl| {
+                let g = e.geoms.get(&pl.id)?;
+                let (c, r, _) = g.circles().into_iter().next()?;
+                Some((pl.to_sheet(c), pl.len_to_sheet(r), e.zoom))
+            })
+            .expect("a view showing the hole")
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Centermark, cx)));
+    draw(cx, window);
+    let at = |cx: &mut TestAppContext, out_px: f64| {
+        cx.update(|cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = [center[0] + radius + out_px / zoom, center[1]];
+                e.update_hover(cx);
+                (matches!(e.circle_pick(e.cursor), Some(Pick::Circle { .. })), e.pending_annotation().is_some_and(|a| matches!(a.kind, AnnotationKind::Centermark { .. })))
+            })
+        })
+    };
+    assert_eq!(at(cx, 5.5), (true, true), "5.5 px out: the circle and the preview cross");
+    assert!(!at(cx, 7.5).1, "7.5 px out: no preview");
+    let marks = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().filter(|a| matches!(a.kind, AnnotationKind::Centermark { .. })).count());
+    at(cx, 0.0);
+    let before = marks(cx);
+    cx.update(|cx| editor.update(cx, |e, cx| e.centermark_click(cx)));
+    assert_eq!(marks(cx), before + 1, "a centermark on the circle");
+    // The tool again: the marked circle gets nothing more.
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.set_tool(Tool::Select, cx);
+        e.set_tool(Tool::Centermark, cx);
+    }));
+    draw(cx, window);
+    assert!(!at(cx, 0.0).1, "no preview on a marked circle");
+    cx.update(|cx| editor.update(cx, |e, cx| e.centermark_click(cx)));
+    assert_eq!(marks(cx), before + 1, "nothing added");
 }
