@@ -131,6 +131,18 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | Click on a document's name / double-click on a tab | a single click on the name opens the document; a double-click on a tab does nothing (live2 11-13) | the same (`doc-name` click; the tab bar ignores a second click) | – | = |
 | Ctrl / Shift + click a tab | opens it in a new window (rq 2403) | the same | – | = |
 
+## Variable Studio, Versions panel, Feature Studio editor (studios, from 2026-11-13)
+
+| Item | Live | Ours (where) | Test | Status |
+|---|---|---|---|---|
+| VS grid keys | click selects a cell; Enter / typing edits; Backspace clears; arrows move, ↑/↓ wrap; editing: Enter commits and moves down, Tab right (studios.json `variableStudioGrid`) | the same (`grid_key`, `grid_tab_action`, the `VariableGrid` key context) | `arrows_move_a_cell_and_wrap_up_and_down`, `tab_walks_the_rows_and_the_add_row`; ui-parity vs-grid-keys (live take asked) | = |
+| VS row drag | a round blue badge of the first letter, a blue drop line with a dot; one undo step | the same (`VsRowDrag`, `row_drop`) | ui-parity vs-row-drag (live take asked); e2e `variable_studio_table` (`by` > 1) | = |
+| VS column resize | grab 3–6 px inside a header's right edge; min 40 px | the same | ui-parity vs-column-resize | = |
+| Versions rows | 50 px; hover #def1fb; selected #b2ddf6; single click opens; graph column clicks nothing (`versionsPanel`) | the same (`graph_column`) | ui-parity ver-* | = |
+| FS editor line keys | Ctrl+/, Ctrl+D, Ctrl+Shift+D, Alt+↑/↓, Alt+Shift+↑/↓ (Mac: Cmd, Cmd+Option) (fs0.json) | the same (`fs_lines`) | `ace_line_keys_comment_move_duplicate_and_remove` and unit tests | = |
+| FS editor navigation keys | Ctrl+K / Ctrl+Shift+K (Mac Cmd+G), Ctrl+\\, Alt+E / Alt+Shift+E (Mac F4) | the same | `find_next_and_previous_wrap`, `ctrl_backslash_jumps_to_the_matching_bracket`, the keystroke test | = |
+| FS autocomplete | keywords and snippets at the top level, std inside a function; opens 250–500 ms after a letter | the same lists; opens on the keystroke | fs_complete tests | timing asked (REQUESTS 12:58) |
+
 ## Sketch snaps (matrix)
 
 One row per target × inference × tool: live's reach and the constraints its click creates, ours, at a device pixel
