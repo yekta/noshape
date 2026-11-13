@@ -54,6 +54,9 @@ Wall = rb.sh start to end (sync, build, run), the same tree on both:
 | drawing-ui tests after a comment edit in drawing-ui | 17 s (build 7.3 s) | 10 s (build 3.6 s) |
 | app build after a comment edit in drawing-ui | 19 s (build 10.4 s) | 11 s (build 6.6 s) |
 | app build after a no-change touch | 91 s (1 min 22 s) | 87 s (1 min 22 s) |
+| app build after the afternoon's edits (scene, drawing, drawing-ui, VS, FS, history; Mac's last build older) | 108 s (1 min 38 s) | 42 s (37 s) |
+| drawing + drawing-ui tests after an edit in drawing/tables.rs | – | 21 s |
+| ops tests filtered `table` after the same edit | – | 44 s |
 
 (A real code change rebuilds more than a comment; more rows as the day's builds come.)
 
