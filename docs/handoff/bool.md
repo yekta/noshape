@@ -23,8 +23,9 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
   (copies /root/bool-scratch/xprobe-1112.rs, sampler-1112.rs; re-apply with probe-allrs.patch).
 
 **Next, in order:**
-1. **The private dock (the user's own document; lead: first). Gating 06:26 on vibe7: branch bool-seam (pushed,
-   387b4f060)**, one commit on main: an edge across the seam of a free-form face going a whole turn round is cut
+1. **The private dock (the user's own document; lead: first). In the land queue 07:34 as a27c235a: branch bool-seam
+   (pushed; gate CHECK, knurls only, corpora +4 taken, 0 new differences; a clippy fix folded in)**: an edge across the
+   seam of a free-form face going a whole turn round is cut
    there, each part its own curve on the face (`free::seam_crossings`, `edge_in_face`, Pending::InFace with a curve a
    part, `projected` unwrapping a last point on the seam); tori and spheres measured on their whole surface for
    coincident faces (`free::whole_surface_distance` in same_surface / lies_on: two parts of one torus, faces 10 and 21
@@ -35,11 +36,11 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    (`git checkout crates/kernel/tests/all.rs` first). bool-wip-seam is the history of it (no longer needed).
    Data: vibe5 / vibe7 ~/tmp/bool/private (mode 700: dock.noshape, hat8, hat15, rec-dock = the 44 cases; nothing of it
    in the repo or the corpora).
-   **Then fe8859ed4 on bool-seam (06:40, gating on vibe5, log chain-fe8859ed4.out; covers both commits):** a new edge
+   **And on bool-seam's second commit:** a new edge
    on an elementary surface under a trim (torus, sphere, trimmed cylinder / cone; rust_boolean.cpp "a new edge on a
    free-form face") gets OCCT's exact projection: the 4 such dock cases were a plane's ellipse on a
-   Geom_RectangularTrimmedSurface of a cylinder. The dock: 33 of 44 ours, 0 differing, 1 equivalent. If both gates are
-   clean, land bool-seam (both commits) from bool-hat.
+   Geom_RectangularTrimmedSurface of a cylinder. The dock: 33 of 44 ours, 0 differing, 1 equivalent. If a27c235a fails in
+   the queue: fix forward on bool-seam (worktree bool-hat) and land.sh again.
    Next declines there: 2 x "a non-manifold result" (06:45: both "unbalanced" edges, used once, so pieces missing
    beside them: ebd7414e (582 ms) has one at (0, 18, 1.2741) mm, where the 1.2 mm-tolerance vertices are (likely the
    same upstream cause); f83b9884 (141 ms: a cut of 83 faces by 2 tools, likely mirror images) at (±5.5, ±12.82, 9.85) mm and two arcs, not upstream: a classification to
