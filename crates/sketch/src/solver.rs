@@ -1061,9 +1061,20 @@ fn analyze(sk: &Sketch, sys: &mut System, out: &Outcome, conflicting: &[Constrai
     let mut redundant: Vec<ConstraintId> = sys.alias_redundant.clone();
     redundant.extend(out.const_redundant.iter().copied());
     let mut collapsed: Option<bool> = None;
+    // Live (behaviours "sketch snapping and hover", 11-12): a line is coloured by its own geometry, the infinite line
+    // (its direction and place), its points apart: one whose free end only slides along it is fully defined. Per
+    // component, the motion of each end across the line (its normal's dot with the end's unknowns) is asked of the
+    // rank analysis; an end unknown no equation holds moves it outright.
+    let (line_queries, mut line_moves) = line_motion_queries(sk, sys, out);
     for (ci, comp) in out.comps.iter().enumerate() {
         let rows = &out.comp_rows[ci];
-        let a = analyze_component(rows, comp.vars.len());
+        let queries: Vec<SparseRow> = line_queries[ci].iter().map(|(_, q)| q.clone()).collect();
+        let a = crate::dof::analyze_component_with(rows, comp.vars.len(), &queries);
+        for ((line, _), moves) in line_queries[ci].iter().zip(&a.query_free) {
+            if *moves {
+                line_moves.insert(*line, true);
+            }
+        }
         dof += comp.vars.len() - a.rank;
         for (k, &pv) in comp.vars.iter().enumerate() {
             var_free[out.var_of[pv as usize] as usize] = a.free[k];
@@ -1131,6 +1142,8 @@ fn analyze(sk: &Sketch, sys: &mut System, out: &Outcome, conflicting: &[Constrai
             ConstraintState::OverConstrained
         } else if e.external {
             ConstraintState::FullyConstrained
+        } else if let Some(moves) = line_moves.get(&e.id) {
+            if *moves { ConstraintState::UnderConstrained } else { ConstraintState::FullyConstrained }
         } else {
             let mut ids: SmallVec<[EntityId; 8]> = SmallVec::new();
             ids.push(e.id);
@@ -1153,6 +1166,62 @@ fn analyze(sk: &Sketch, sys: &mut System, out: &Outcome, conflicting: &[Constrai
         states.insert(e.id, st);
     }
     Analysis { dof, states, redundant: dedup_sorted(redundant) }
+}
+
+/// Per component: (line, a query of its end's motion across it).
+type LineQueries = Vec<Vec<(EntityId, SparseRow)>>;
+
+/// Per component, each line's end motions across it as queries of its unknowns ([`crate::dof::analyze_component_with`]),
+/// and every line asked about (true already for one with an end unknown no equation holds). Lines without a length
+/// (no normal) aren't asked: they keep the points' rule.
+fn line_motion_queries(sk: &Sketch, sys: &mut System, out: &Outcome) -> (LineQueries, std::collections::HashMap<EntityId, bool>) {
+    let mut local: std::collections::HashMap<u32, (usize, u32)> = std::collections::HashMap::new();
+    for (ci, comp) in out.comps.iter().enumerate() {
+        for (k, &pv) in comp.vars.iter().enumerate() {
+            local.insert(pv, (ci, k as u32));
+        }
+    }
+    let mut queries: LineQueries = vec![Vec::new(); out.comps.len()];
+    let mut moves = std::collections::HashMap::new();
+    for e in sk.entities() {
+        if e.external || e.kind() != EntityKind::Line {
+            continue;
+        }
+        let Some((a, b)) = e.endpoints() else { continue };
+        let (Some(pa), Some(pb)) = (sk.point(a), sk.point(b)) else { continue };
+        let Some(n) = (pb - pa).try_normalize().map(|d| d.perp()) else { continue };
+        let mut free = false;
+        for p in [a, b] {
+            let base = sys.p.ent_base.get(p.0 as usize).copied().unwrap_or(NONE);
+            if base == NONE {
+                continue;
+            }
+            // This end's motion across the line, split by the components its unknowns fall in.
+            let mut parts: std::collections::BTreeMap<usize, SparseRow> = std::collections::BTreeMap::new();
+            for (i, c) in [n.x, n.y].into_iter().enumerate() {
+                let r = find(&mut sys.uf, base + i as u32) as usize;
+                if sys.p.fixed[r] || c.abs() < 1e-12 {
+                    continue;
+                }
+                match local.get(&(r as u32)) {
+                    Some(&(ci, k)) => {
+                        let row = parts.entry(ci).or_default();
+                        match row.iter_mut().find(|(col, _)| *col == k) {
+                            Some(x) => x.1 += c,
+                            None => row.push((k, c)),
+                        }
+                    }
+                    None if out.var_of[r] == NONE => free = true,
+                    None => {}
+                }
+            }
+            for (ci, row) in parts {
+                queries[ci].push((e.id, row));
+            }
+        }
+        moves.insert(e.id, free);
+    }
+    (queries, moves)
 }
 
 impl Sketch {
@@ -1652,5 +1721,44 @@ mod analysis_tests {
         assert!(rep.is_solved());
         assert_eq!(rep.dof, dof, "the analysis after the placement");
         assert!(sk.analysis_current());
+    }
+}
+
+#[cfg(test)]
+mod state_tests {
+    use crate::{ConstraintKind, ConstraintState, Sketch};
+    use glam::DVec2;
+
+    /// Live (behaviours "sketch snapping and hover", 11-12, geometry-full-vs-under): colour goes entity by entity. A
+    /// horizontal line from a fixed point with its length free: the line is black (fully defined: its direction and
+    /// place are held), its free end point blue; with the length dimensioned the end turns black.
+    #[test]
+    fn a_line_with_a_free_length_is_defined_and_its_free_end_is_not() {
+        let mut sk = Sketch::new();
+        let line = sk.add_line(DVec2::ZERO, DVec2::new(0.04, 0.0));
+        let (start, end) = sk.entity(line).and_then(|e| e.endpoints()).unwrap();
+        sk.add_constraint(ConstraintKind::Fix { entity: start }).unwrap();
+        sk.add_constraint(ConstraintKind::Horizontal { a: line, b: None }).unwrap();
+        let r = sk.solve();
+        assert_eq!((r.state(line), r.state(start), r.state(end)), (Some(ConstraintState::FullyConstrained), Some(ConstraintState::FullyConstrained), Some(ConstraintState::UnderConstrained)), "length free");
+        sk.add_constraint(ConstraintKind::Length { curve: line, value: 0.04 }).unwrap();
+        let r = sk.solve();
+        assert_eq!(r.state(end), Some(ConstraintState::FullyConstrained), "length dimensioned");
+    }
+
+    /// An end free on a guide that isn't along the line (a fixed vertical line): moving it turns the line, so the
+    /// line is under defined; an end free only along a guide that lies on the line keeps it defined.
+    #[test]
+    fn a_line_whose_end_moves_off_it_is_under_defined() {
+        let mut sk = Sketch::new();
+        let line = sk.add_line(DVec2::ZERO, DVec2::new(0.04, 0.0));
+        let (start, end) = sk.entity(line).and_then(|e| e.endpoints()).unwrap();
+        let guide = sk.add_line(DVec2::new(0.04, -0.01), DVec2::new(0.04, 0.01));
+        let (g0, g1) = sk.entity(guide).and_then(|e| e.endpoints()).unwrap();
+        for c in [ConstraintKind::Fix { entity: start }, ConstraintKind::Fix { entity: g0 }, ConstraintKind::Fix { entity: g1 }, ConstraintKind::Coincident { a: end, b: guide }] {
+            sk.add_constraint(c).unwrap();
+        }
+        let r = sk.solve();
+        assert_eq!((r.state(line), r.state(end), r.state(guide)), (Some(ConstraintState::UnderConstrained), Some(ConstraintState::UnderConstrained), Some(ConstraintState::FullyConstrained)));
     }
 }

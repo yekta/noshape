@@ -42,13 +42,15 @@ fn rectangle_dof() {
     let a = sk.point(p[0]).unwrap();
     let c = sk.point(p[2]).unwrap();
     assert!(((c - a) - v(3.0, 1.5)).length() < 1e-9, "{a} {c}");
-    // remove the width: DOF 1, right edge + top/bottom under-constrained
+    // remove the width: DOF 1, the right edge moves; the bottom and top lines stay where they are (only their right
+    // ends slide along them: live colours a line by the line itself, behaviours "sketch snapping and hover")
     sk.remove_constraint(w).unwrap();
     let r = sk.solve();
     assert_eq!(r.dof, Some(1));
     assert_eq!(r.state(l[3]), Some(ConstraintState::FullyConstrained));
     assert_eq!(r.state(l[1]), Some(ConstraintState::UnderConstrained));
-    assert_eq!(r.state(l[0]), Some(ConstraintState::UnderConstrained));
+    assert_eq!(r.state(l[0]), Some(ConstraintState::FullyConstrained));
+    assert_eq!(r.state(l[2]), Some(ConstraintState::FullyConstrained));
     assert_eq!(r.state(p[1]), Some(ConstraintState::UnderConstrained));
     assert_eq!(r.state(p[3]), Some(ConstraintState::FullyConstrained));
 }

@@ -21,11 +21,12 @@ fn corner_rectangle_dims_fix_fully_constrained() {
     sk.remove_constraint(h).unwrap();
     let rep = sk.solve();
     assert_eq!(rep.dof, Some(1));
-    // vertical edges keep their x, top edge moves: bottom fully constrained
+    // the top edge moves; the bottom and the vertical edges stay (the vertical ones' top ends only slide along them:
+    // live colours a line by the line itself, behaviours "sketch snapping and hover")
     assert_eq!(rep.state(r.curves[0]), Some(ConstraintState::FullyConstrained));
     assert_eq!(rep.state(r.curves[2]), Some(ConstraintState::UnderConstrained));
-    assert_eq!(rep.state(r.curves[1]), Some(ConstraintState::UnderConstrained));
-    assert_eq!(rep.state(r.curves[3]), Some(ConstraintState::UnderConstrained));
+    assert_eq!(rep.state(r.curves[1]), Some(ConstraintState::FullyConstrained));
+    assert_eq!(rep.state(r.curves[3]), Some(ConstraintState::FullyConstrained));
     // regions
     assert_eq!(sk.regions().len(), 1);
 }

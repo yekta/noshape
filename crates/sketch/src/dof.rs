@@ -16,6 +16,8 @@ pub(crate) struct ComponentAnalysis {
     pub free: Vec<bool>,
     /// Indices of equations that are linearly dependent on the others.
     pub redundant_rows: Vec<usize>,
+    /// Per query (a combination of unknowns, [`analyze_component_with`]): can it change?
+    pub query_free: Vec<bool>,
 }
 
 pub(crate) type SparseRow = SmallVec<[(u32, f64); 8]>;
@@ -27,16 +29,28 @@ const FREE_TOL: f64 = 1e-6;
 const DENSE_LIMIT: usize = 150;
 
 pub(crate) fn analyze_component(rows: &[SparseRow], n: usize) -> ComponentAnalysis {
+    analyze_component_with(rows, n, &[])
+}
+
+/// [`analyze_component`], also telling for each of `queries` (a combination of the unknowns, e.g. a line end's
+/// motion across its line) whether it can change: whether it has a component in the null space of `J`.
+pub(crate) fn analyze_component_with(rows: &[SparseRow], n: usize, queries: &[SparseRow]) -> ComponentAnalysis {
     if n > DENSE_LIMIT {
-        return analyze_sparse(rows, n);
+        return analyze_sparse(rows, n, queries);
     }
-    analyze_dense(rows, n)
+    analyze_dense(rows, n, queries)
+}
+
+/// A query scaled to unit length (None when it is zero).
+fn unit(q: &SparseRow) -> Option<SparseRow> {
+    let norm = q.iter().map(|(_, v)| v * v).sum::<f64>().sqrt();
+    (norm > 1e-14).then(|| q.iter().map(|&(c, v)| (c, v / norm)).collect())
 }
 
 /// Sparse rank analysis: row-sequential Givens QR with threshold pivoting on
 /// an RCM-ordered column set (R stays banded), then null-space vectors by
 /// back substitution for every non-pivot column.
-pub(crate) fn analyze_sparse(rows: &[SparseRow], n: usize) -> ComponentAnalysis {
+pub(crate) fn analyze_sparse(rows: &[SparseRow], n: usize, queries: &[SparseRow]) -> ComponentAnalysis {
     let m = rows.len();
     // column ordering (RCM over the variable adjacency graph)
     let mut edges = Vec::new();
@@ -121,6 +135,8 @@ pub(crate) fn analyze_sparse(rows: &[SparseRow], n: usize) -> ComponentAnalysis 
     let rank = r.iter().filter(|x| x.is_some()).count();
     let mut free_new = vec![false; n];
     let mut x = vec![0.0; n];
+    let queries: Vec<Option<SparseRow>> = queries.iter().map(unit).collect();
+    let mut query_free = vec![false; queries.len()];
     for f in 0..n {
         if r[f].is_some() {
             continue;
@@ -143,19 +159,30 @@ pub(crate) fn analyze_sparse(rows: &[SparseRow], n: usize) -> ComponentAnalysis 
                 free_new[k] = true;
             }
         }
+        // (x is a null-space vector in the new column order: a query moves along it unless orthogonal to it.)
+        let norm = x.iter().map(|v| v * v).sum::<f64>().sqrt();
+        for (qf, q) in query_free.iter_mut().zip(&queries) {
+            if let Some(q) = q
+                && !*qf
+            {
+                let dot: f64 = q.iter().map(|&(c, v)| v * x[newcol[c as usize]]).sum();
+                *qf = dot.abs() > 1e-8 * norm;
+            }
+        }
     }
     let free = (0..n).map(|old| free_new[newcol[old]]).collect();
     let _ = m;
-    ComponentAnalysis { rank, free, redundant_rows }
+    ComponentAnalysis { rank, free, redundant_rows, query_free }
 }
 
-pub(crate) fn analyze_dense(rows: &[SparseRow], n: usize) -> ComponentAnalysis {
+pub(crate) fn analyze_dense(rows: &[SparseRow], n: usize, queries: &[SparseRow]) -> ComponentAnalysis {
     let m = rows.len();
+    let queries: Vec<Option<SparseRow>> = queries.iter().map(unit).collect();
     if n == 0 {
-        return ComponentAnalysis { rank: 0, free: Vec::new(), redundant_rows: (0..m).collect() };
+        return ComponentAnalysis { rank: 0, free: Vec::new(), redundant_rows: (0..m).collect(), query_free: vec![false; queries.len()] };
     }
     if m == 0 {
-        return ComponentAnalysis { rank: 0, free: vec![true; n], redundant_rows: Vec::new() };
+        return ComponentAnalysis { rank: 0, free: vec![true; n], redundant_rows: Vec::new(), query_free: queries.iter().map(Option::is_some).collect() };
     }
     // J^T, rows normalized (row scaling preserves rank and null space).
     let mut jt = DMatrix::<f64>::zeros(n, m);
@@ -191,6 +218,15 @@ pub(crate) fn analyze_dense(rows: &[SparseRow], n: usize) -> ComponentAnalysis {
         }
         *f = 1.0 - s > FREE_TOL;
     }
+    // A unit query lies in the row space (can't change) iff its projection onto it keeps its whole length.
+    let query_free = queries
+        .iter()
+        .map(|u| {
+            let Some(u) = u else { return false };
+            let s: f64 = (0..rank).map(|c| u.iter().map(|&(i, v)| v * q[(i as usize, c)]).sum::<f64>().powi(2)).sum();
+            1.0 - s > FREE_TOL
+        })
+        .collect();
     // pivot order of equations
     let mut idx = DMatrix::<f64>::from_fn(1, m, |_, j| j as f64);
     qr.p().permute_columns(&mut idx);
@@ -201,7 +237,7 @@ pub(crate) fn analyze_dense(rows: &[SparseRow], n: usize) -> ComponentAnalysis {
         }
     }
     redundant_rows.sort_unstable();
-    ComponentAnalysis { rank, free, redundant_rows }
+    ComponentAnalysis { rank, free, redundant_rows, query_free }
 }
 
 #[cfg(test)]
@@ -252,8 +288,8 @@ mod tests {
             smallvec![(0, 1.0)],
         ];
         for n in [5, 6] {
-            let d = analyze_dense(&rows, n);
-            let s = analyze_sparse(&rows, n);
+            let d = analyze_dense(&rows, n, &[]);
+            let s = analyze_sparse(&rows, n, &[]);
             assert_eq!(d.rank, s.rank);
             assert_eq!(d.free, s.free);
             assert_eq!(d.redundant_rows.len(), s.redundant_rows.len());

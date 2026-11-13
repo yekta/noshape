@@ -51,14 +51,14 @@ P1 (lead 11-12). Live measures the 3D side (live/feel/3d.json, behaviours.md "fe
 | Hover of a sketch entity = what a click takes | live reach: a point 10 px, a curve 6 px (SKETCH-SCREEN-SPACE-REACH) | the GPU hover held to it (`sketch_hover_id`) | GPUI `a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach`; GPU `feel::the_dimension_tool_takes_the_hovered_line` | = |
 | Nothing recoloured under the pointer mid-draw | the target line doesn't recolour | the same (`SketchEditor::mid_draw`) | – | = |
 | Hovered point look | a 10–11 px translucent orange disc, centred | the same; whole on a slanted plane | offscreen `a_hovered_sketch_point_on_a_slanted_face_draws_its_whole_disc`, `a_sketch_point_is_drawn_as_lives_in_each_state` | = |
-| Per-entity colour (a free end point) | the line black, its free end blue; black once dimensioned | ours colours the line blue too (any free point of it) | sketch `a_line_with_a_free_length_is_defined_and_its_free_end_is_not` (pending the fix) | ≠ |
+| Per-entity colour (a free end point) | the line black, its free end blue; black once dimensioned | the same: a line is under defined only if a free motion moves the infinite line (`line_motion_queries`, `dof::analyze_component_with`); points, arcs, circles by their own unknowns | sketch `a_line_with_a_free_length_is_defined_and_its_free_end_is_not`, `a_line_whose_end_moves_off_it_is_under_defined` | = (arcs / circles: ? live) |
 | Sketch selection: click, Shift, box | ? | – | – | ? |
 | Dimension tool: what a click takes, placement | ? | the hovered entity within reach | GPU `feel::the_dimension_tool_takes_the_hovered_line` | ? |
 | Point and line drags | ? | – | – | ? |
 | Click vs drag threshold | ? | 3 px (sketch drags) | – | ? |
 
 ## Fix queue (biggest feel impact first)
-1. Per-entity colour: a line whose free end only slides along it is fully defined (Onshape colours a curve by its own
-   geometry: a line's direction and offset; its points apart). The rank analysis keeps free variables, not free
-   motions: it needs the null space to tell a sliding end from a moving line.
+1. ~~Per-entity colour~~ (psui 11-12: lines by their own geometry). Arcs and circles: ask live2 whether an arc whose
+   ends slide along its circle stays black.
 2. 3D reach, once live's numbers are in (an edge reaches 9 px over the background but 5 over its face today).
+3. Inference glyph position: a pixel check against qsnap (ours 29 / 31 px from the point, live ≈ 30 / 27–29).
