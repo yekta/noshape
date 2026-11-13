@@ -746,12 +746,6 @@ pub fn draft_parting_curve(shape: &Shape, faces: &[Shape], edges: &[Shape], pull
 /// Delete faces and heal the gap by extending neighbors
 /// (BRepAlgoAPI_Defeaturing).
 pub fn delete_faces(shape: &Shape, faces: &[Shape]) -> Result<OpResult> {
-    // Rounds between planes (a rounded box): the planes made again where they meet (NOSHAPE_DEFEATURE_OCCT: OCCT's).
-    if std::env::var_os("NOSHAPE_DEFEATURE_OCCT").is_none()
-        && let Some(r) = crate::rounds::delete_planar_rounds(shape, faces)
-    {
-        return Ok(r);
-    }
     let l = vec_to_list(faces);
     op(ffi::op_defeature(shape.raw(), &l))
 }

@@ -51,7 +51,6 @@ pub mod mesh;
 mod mesh_repair;
 pub mod ops;
 pub mod props;
-mod rounds;
 pub mod shape;
 mod step_out;
 pub mod surfacing;
