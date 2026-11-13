@@ -31,6 +31,26 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
 **c2-rings-loft stops at feature 20, Extrude 5 (core's):** the engraving cut's edges are split at the revolved ring's
 seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs live 335/206); Parasolid has no seams.
 
+## 11-13 16:30 UTC: fillet speed rows (branch blend-classify on blend-speed)
+- Tools lofted bare (`k::loft_tool`, features.cpp `loft_impl(.., bare)`): ThruSections' own surfaces, no history, its
+  planar sides as planes and its two end sections' own curves (restored without the whole-solid check); the Loft
+  feature's natural surfaces, merging and history took ~75 % of a ball tool's loft. Rounds' section tools too; a
+  chamfer's keep the full loft (c2-hunting-knife's Chamfer 1 needs its sides as the Loft feature makes them: 24 -> 15).
+- blend_direct: a tool is taken or added by its strip's normal against the part face it lies on (no solid classifier);
+  a part piece beside a tool's strip on its own face is in the tool by a 2D test on the strip (only other faces' pieces
+  go to the tools' classifiers: the knife's Fillet 3 16 -> 4 calls); blend-against-blend sections in parallel; lofted
+  sides' samples off a face's box not projected.
+- A rim round's tools and a run-on's face distances in parallel; rim chamfers built directly too (the classification
+  cost that kept them on the cut is gone: knife Chamfer 2 ~73 -> ~36 ms, rings Chamfer 1 ~115 -> ~95 ms, Mac dev,
+  three alternations).
+- Dev builds, vibe7 loaded: knife Fillet 3 661-698 -> 280-363 ms, rings Fillet 1 232-302 -> 130-189, snap-hook Fillet 6
+  226-237 -> 120, Fillet 3 80-89 -> 50-53, faceblend Face blend 1 407-655 -> 368-456. Results identical (model suite
+  863 = 863 twice).
+- Tried, no win: the knife's Fillet 2 fuse through blend_direct (slower, one face too many; patch parked/runon-direct);
+  snap-hook's empty sections (above). The knife's Chamfer 1 directly (parked/knife-chamfer1-direct): the chamfer's sides
+  only approximate the blade's B-spline faces (0.006 mm), their projected touch curves chain across face 5 but don't
+  close a region with its boundary (one piece, invalid). Next for it: the touch curves made on the faces themselves
+  (the chamfer face's section with each), not projected from the loft's sides.
 ## 11-13 15:20 UTC: cf-snap-hook's empty sections (lead: skip only what boxes and domains prove): not a win, parked
 - The direct build's part-face x blend sections that keep no cut: on snap-hook, knife, rings and faceblend 186 of 226
   pairs; snap-hook's 64 cone x torus pairs alone ~110-160 ms (dev, Mac). Every one of them has tight (AddOptimal) boxes
