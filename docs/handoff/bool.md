@@ -258,6 +258,17 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     Chamfer 1 gap (534 -> 380). **To blend (08:10 UTC, from your /root/blend-scratch/rings-prof*.log):** Chamfer 1's 5
     Booleans were 314-362 ms ours against OCCT's 225-257; their 214 ms call is this cut, now ~70: ~210 ours. Fillet
     1's 4 Booleans are 30 ms ours against 24; its 223 -> 127 is op_blend_direct (160 -> 78 ms), yours, not the Boolean.
+- **c2-hunting-knife (10:52 UTC, gating 1ff449d86): to blend, I changed your blend_section.rs.** The chamfer's
+  section Booleans with lofted tools ran under `with_occt_boolean` (11b4acf22: "noshape's own Boolean takes planes,
+  cylinders and cones only"). Ours takes them since the knife fix (82cfec7d), so the skip is gone (and with it
+  with_occt_boolean, unused). Chamfer 1's two 2-tool cuts: 500-660 ms OCCT -> 180-250 ms ours each; the document
+  1785-1888 -> 1491-1616 ms (live 408), the same 20/52 features (first difference Fillet 3, feature 20). Found with
+  a per-Boolean path print in the document run: "not tried (an earlier path took it)" is what a forced-OCCT Boolean
+  reports.
+  Per document, ours vs live (regeneration ms, recorded on a loaded vibe5): impeller 19117 / 2773 (6.8 s of
+  Booleans on OCCT, upstream), surface-pattern 13683 / 4178 (12.5 s ours, its 85- and 196-tool cuts, bool's),
+  sm-louver 10280 / 4987 (1.2 s ours), rings-loft 6703 / 1557 (the 51-slot cut 0.86 s ours, OCCT 4.5 s),
+  fill-pattern 8458 / 4711 (2.3 s ours, OCCT 11 s), hunting-knife 3741 / 408 (above), snap-hook 1940 / 274.
 - **Completion and speed (08:42 UTC; all 98 documents recorded again with branch 64d5d5501's binaries, vibe5
   ~/agents/bool2-keep/bydoc, kept out of ~/tmp's pruning):** 936 distinct Booleans, 25 on OCCT (97.3 % ours or our
   shortcuts); the replay declines 22. Left: c2-impeller-loft 4 (7519a27a 2.5 s, 9522310b 2.1 s, b4a6c1dc 1.5 s,
