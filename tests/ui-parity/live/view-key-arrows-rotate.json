@@ -1,18 +1,19 @@
 {
  "scenario": "view-key-arrows-rotate",
- "recorded": "2026-11-07T01:44:16.680Z",
+ "recorded": "2026-11-13T10:32:29.880Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-13.1"
  },
  "live": {
-  "document": "ec10b45614d6fd203cecb5bd",
-  "workspace": "c9d6acb584fac8cbb40bad93",
-  "element": "f4050cf46f01d88cd9dbec78",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "ce041bb593a987109710fbea",
   "start": "block",
-  "startElement": "633a37b9892e81fc5b3c1563"
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -20,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -59,7 +61,34 @@
   "message": null,
   "tooltip": null,
   "sketch": null,
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -79,8 +108,8 @@
     "JHK"
    ],
    "at": [
-    1168,
-    484
+    1173,
+    482
    ],
    "state": {
     "focus": {
@@ -88,6 +117,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -133,9 +163,45 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
    },
-   "t": 49197
+   "t": 30264
   },
   {
    "step": 2,
@@ -144,12 +210,23 @@
     "key": "ArrowLeft"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1172,
+     482
+    ],
+    "hover": [
+     "JHK"
+    ],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -195,9 +272,45 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.642402,
+      0.595035,
+      -0.482963
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      100.141,
+      -92.757,
+      75.286
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
    },
-   "t": 51074
+   "t": 33174
   },
   {
    "step": 3,
@@ -206,12 +319,23 @@
     "key": "ArrowUp"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1172,
+     482
+    ],
+    "hover": [
+     "JHK"
+    ],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -257,9 +381,45 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.685217,
+      0.686831,
+      -0.242362
+     ],
+     "up": [
+      -0.075216,
+      0.264252,
+      0.961516
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      106.815,
+      -107.066,
+      37.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
    },
-   "t": 52890
+   "t": 36265
   }
  ]
 }

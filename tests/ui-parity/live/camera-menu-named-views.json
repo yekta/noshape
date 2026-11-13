@@ -1,18 +1,19 @@
 {
  "scenario": "camera-menu-named-views",
- "recorded": "2026-11-07T07:08:54.926Z",
+ "recorded": "2026-11-13T10:30:25.307Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-13.1"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "a556c2305e961c6192e3ec4f",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "eb1a7140156314421d0775ab",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -60,7 +61,34 @@
   "message": null,
   "tooltip": null,
   "sketch": null,
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -179,9 +207,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 20394
+   "t": 29548
   },
   {
    "step": 2,
@@ -208,7 +263,21 @@
      ],
      "all": false
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "panel",
+     "title": "Named views",
+     "text": [
+      "(New view name)",
+      "No views created"
+     ],
+     "fields": [
+      {
+       "label": "New view name",
+       "kind": "input",
+       "value": ""
+      }
+     ]
+    },
     "dialogs": [],
     "panels": [
      {
@@ -262,9 +331,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 22472
+   "t": 33031
   },
   {
    "step": 3,
@@ -273,6 +369,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1792,
+     348
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
@@ -319,9 +423,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 25695
+   "t": 36693
   }
  ]
 }
