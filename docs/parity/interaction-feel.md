@@ -410,6 +410,19 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | Properties on opening | no field has the keyboard (live's recordings: a div / ul); typing does nothing | Name focused; now the modal itself (`MetaForm::focus`), document keys still off behind it | = (fixed) |
 | Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, an arrow click flipping; preview timing (Enter / Tab / blur, every ~0.4 s while dragging); a selected entity clicked again leaves the field, a row hovered lighting it yellow-green, the field's Tab order, Esc in a value field (discard, then cancel), Enter on the canvas committing; the Appearance and Material dialogs' layout and keys; Properties' Tab order, Enter and Esc doing nothing | – | – |
 
+## Feedback (matrix, Part Studio rows)
+
+live2's feedback.json (11-13 09:39, for psui and studios). part-studio-ui `feedback::the_feedback_matrix_matches_live`
+(T1, no GPU; the row's tooltip read 500 ms after the pointer comes onto it).
+
+**Matched: 2 / 2** (11-13 12:51 UTC; 1 / 2 at the first run).
+
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| A failing feature's tooltip | "<Feature> did not regenerate properly: <message>", then "1 missing selection" | the same | = |
+| A warning feature's tooltip | "Fillet 1", then "1 missing selection" | "Fillet 1 did not regenerate properly: 1 missing selection"; now live's | = (fixed) |
+| Not yet in the matrix | the error row (rgb(170,37,45) name, the red icon with its warning overlay, the header's failures icon; a warning keeps its name black, only the overlay); the dialog's red title and its tooltip, a "Missing Face ×" entry; a failed preview drawing the edge in the error colour; the commit's working overlay (live first seen 1119 ms after ✓, polled every 40–150 ms; ours 1200 ms: within a frame or two, not changed without a finer measure); toasts (studios: success rgb(221,246,204), top centre, 5.1 s, no stacking, hover doesn't pause); empty states | – | – |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).

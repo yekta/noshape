@@ -5592,9 +5592,15 @@ impl PartStudioView {
                 let m = s.message.clone()?;
                 match s.status {
                     // Live: unresolved selections add a second line ("1 missing selection").
-                    FeatureStatus::Error | FeatureStatus::Warning => {
+                    FeatureStatus::Error => {
                         let more = noshape_model::regen::missing_text(s.missing);
                         Some(if s.missing > 0 && m != more { format!("{head} did not regenerate properly: {m}\n{more}") } else { format!("{head} did not regenerate properly: {m}") })
+                    }
+                    // A warning (live feel/feedback.json "warnings"): the name, then its message ("Fillet 1\n1 missing
+                    // selection"); it did regenerate.
+                    FeatureStatus::Warning => {
+                        let more = noshape_model::regen::missing_text(s.missing);
+                        Some(if s.missing > 0 && m != more { format!("{head}\n{m}\n{more}") } else { format!("{head}\n{m}") })
                     }
                     FeatureStatus::Info => None,
                     _ => Some(m),

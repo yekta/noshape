@@ -4090,6 +4090,8 @@ mod sketchtools;
 mod editing;
 #[path = "dialogs_feel_tests.rs"]
 mod dialogs;
+#[path = "feedback_feel_tests.rs"]
+mod feedback;
 
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.
