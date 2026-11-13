@@ -1,6 +1,6 @@
 {
  "name": "drw-ref-selective-update-pin",
- "about": "block-drawing-v1: the drawing tab's Change to version… › Selective update › this document's row › V1, Update selected; Esc closes the Reference manager (live2 18:20); the reference row (Part 1 · V1) has Pin reference and Update linked document... (no Unpin view reference): Pin reference",
+ "about": "block-drawing-v1: the drawing tab's Change to version… › Selective update › this document's row › V1, Update selected; Esc closes the Reference manager and Ctrl+S opens the Sheets panel (live2 18:20, 19:00); the reference row (Part 1 · V1) has Pin reference and Update linked document... (no Unpin view reference): Pin reference; then the row's menu reads Unpin reference",
  "area": "studios",
  "source": "coverage (studios 11-13: the drawing menu items no scenario reached; lead 11-13: the cross-document start)",
  "start": "block-drawing-v1",
@@ -72,6 +72,15 @@
    "ms": 500
   },
   {
+   "do": "key",
+   "key": "ctrl+s"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
    "do": "rclick",
    "on": {
     "sheet_ref": "Part 1"
@@ -87,6 +96,16 @@
    "do": "wait",
    "until": "ms",
    "ms": 800
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_ref": "Part 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
   }
  ]
 }
