@@ -4021,7 +4021,27 @@ impl StartView {
                             .pr(px(15.))
                             .gap(px(14.))
                             .child(self.thumbnail(d, 64.0, 36.0, false))
-                            .child(self.inline_rename_field(&d.path, cx).unwrap_or_else(|| div().min_w_0().truncate().text_color(if d.broken { pal.warning } else { pal.text }).child(crate::ui::user_text(d.name.clone())).into_any_element()))
+                            .child(self.inline_rename_field(&d.path, cx).unwrap_or_else(|| {
+                                // A plain click on the name opens the document (live2 11-13); Ctrl / Shift select as on the row.
+                                let d5 = d.clone();
+                                div()
+                                    .id("doc-name")
+                                    .min_w_0()
+                                    .truncate()
+                                    .text_color(if d.broken { pal.warning } else { pal.text })
+                                    .child(crate::ui::user_text(d.name.clone()))
+                                    .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+                                        let m = ev.modifiers();
+                                        if d5.trashed || m.shift || m.secondary() {
+                                            return;
+                                        }
+                                        cx.stop_propagation();
+                                        this.click_row(&d5.path, &m);
+                                        this.open_path(d5.path.clone(), window, cx);
+                                        cx.notify();
+                                    }))
+                                    .into_any_element()
+                            }))
                             // The workspace chip (live documents-list: 14 px workspace icon, 11 px name).
                             .when(!d.workspace.is_empty(), |r| {
                                 r.child(h_flex().flex_none().ml(px(-7.)).gap(px(1.)).text_size(px(11.)).text_color(pal.text).child(os::glyph(os::GLYPH_WORKSPACE, 14., pal.text)).child(crate::ui::user_text(d.workspace.clone())))

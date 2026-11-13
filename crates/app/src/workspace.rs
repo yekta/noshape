@@ -1703,9 +1703,15 @@ impl Workspace {
                     return;
                 }
                 let Some(g) = &mut this.tab_gap else { return };
-                // Over a folder the gap stays put: closing it would slide the folder out from under the pointer, and
-                // the drop goes into the folder.
-                if kind.is_none() {
+                // Over a folder's middle the drop goes into it and the gap stays put (live2 11-13: where the tab is
+                // released decides, not how long it rests); near its ends the folder reorders like a tab.
+                let frac = f32::from(e.event.position.x - e.bounds.left()) / f32::from(e.bounds.size.width).max(1.);
+                let into = (kind.is_none() && drops_into_folder(frac)).then_some(id);
+                if g.into != into {
+                    g.into = into;
+                    cx.notify();
+                }
+                if into.is_some() {
                     return;
                 }
                 let before = if e.event.position.x < e.bounds.center().x { Some(Some(id)) } else { Some(next) };
@@ -2888,8 +2894,12 @@ impl Workspace {
             .child(self.folder_label(id, &name))
             .drag_threshold(TAB_DRAG_PX)
             .on_drag(TabDrag { id, name: name.clone(), icon: None, width: px(0.) }, start_tab_drag(cx.entity().downgrade()))
-            .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
-            .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.drop_into(drag.id, Some(id), cx)))
+            .when(self.tab_gap.as_ref().is_some_and(|g| g.into == Some(id)), |d| d.bg(gpui_kit::rgb(0xdef1fb)))
+            .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| {
+                if this.tab_gap.as_ref().is_some_and(|g| g.into == Some(id)) {
+                    this.drop_into(drag.id, Some(id), cx);
+                }
+            }))
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 this.open_folder = Some(id);
                 cx.notify();
@@ -3256,6 +3266,14 @@ struct TabGap {
     autoscroll: Option<Task<()>>,
     /// When the strip last scrolled under the drag.
     scrolled_at: Option<std::time::Instant>,
+    /// The folder tab the drag is over the middle of: the drop goes into it.
+    into: Option<TabId>,
+}
+
+/// A tab released at `frac` (0 to 1) across a folder tab goes into it in its middle 20–80 %; nearer its ends it
+/// reorders (live2 11-13).
+fn drops_into_folder(frac: f32) -> bool {
+    (0.2..=0.8).contains(&frac)
 }
 
 /// How far a tab moves before it drags (live2 feel/documents.json tabBar.dragStartPx: 5 px is a click, 6 a drag).
@@ -3288,7 +3306,7 @@ fn start_tab_drag(ws: WeakEntity<Workspace>) -> impl Fn(&TabDrag, Point<Pixels>,
         let _ = ws.update(cx, |w, cx| {
             let order = w.doc.read(cx).session.doc.children(w.open_folder);
             let next = order.iter().position(|t| *t == d.id).and_then(|i| order.get(i + 1)).copied();
-            w.tab_gap = Some(TabGap { dragged: d.id, before: Some(next), x, grab: offset.x, icon: d.icon, name: d.name.clone(), width: d.width, scroll: 0., autoscroll: None, scrolled_at: None });
+            w.tab_gap = Some(TabGap { dragged: d.id, before: Some(next), x, grab: offset.x, icon: d.icon, name: d.name.clone(), width: d.width, scroll: 0., autoscroll: None, scrolled_at: None, into: None });
             cx.notify();
         });
         cx.new(|_| d.clone())
@@ -3462,8 +3480,14 @@ fn close_document(_: &ClickEvent, window: &mut Window, cx: &mut App) {
 mod tab_autoscroll_tests {
     use super::{autoscroll_offset, autoscroll_speed, px};
 
-    /// Lead 11-13 (interaction feel): a tab dragged within 30 px of an end of the strip scrolls it that way, 360 px a
-    /// second whatever the frame rate, and stops at the strip's ends.
+    /// Live2 11-13: a tab released over a folder tab's middle 20–80 % goes into it; nearer its ends it reorders.
+    #[test]
+    fn a_tab_goes_into_a_folder_released_over_its_middle() {
+        assert_eq!([0.1, 0.19, 0.2, 0.5, 0.8, 0.81, 0.95].map(super::drops_into_folder), [false, false, true, true, true, false, false]);
+    }
+
+    /// Live2 (feel/documents.json tabBar.autoScroll): a tab dragged near an end of the strip scrolls it that way,
+    /// faster nearer the end, whatever the frame rate, and stops at the strip's ends.
     #[test]
     fn a_tab_dragged_to_an_end_of_the_strip_scrolls_it() {
         // Live2 (feel/documents.json tabBar.autoScroll): none at 60 px from an end, then faster toward it.

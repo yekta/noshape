@@ -497,6 +497,8 @@ pub struct DrawingEditor {
     /// Ctrl+C just copied: the next click on the empty sheet only marks where Ctrl+V pastes, the selection kept (live2
     /// drw-view-copy-paste-keys).
     pub copy_armed: bool,
+    /// The last left press (when, where): a dimension's palette needs a quicker, closer double-click than the OS's.
+    pub last_press: Option<(std::time::Instant, Point<Pixels>)>,
     /// The "±0.1" launcher beside a selected dimension.
     pub launcher: crate::drawing_launcher::Launcher,
     /// The Datum dialog (Datum / Datum target tabs).
@@ -769,6 +771,7 @@ impl DrawingEditor {
             replicate_dlg: None,
             palette: None,
             copy_armed: false,
+            last_press: None,
             launcher: Default::default(),
             datum_dlg: None,
             styles_gap: [None, None, None],

@@ -1154,6 +1154,13 @@ impl DrawingEditor {
 
     pub fn on_mouse_down(&mut self, e: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         self.glyph_selected = None;
+        let quick = match (e.button, self.last_press) {
+            (MouseButton::Left, Some((t, at))) => quick_double_click(t.elapsed(), (e.position - at).magnitude() as f32),
+            _ => false,
+        };
+        if e.button == MouseButton::Left {
+            self.last_press = Some((std::time::Instant::now(), e.position));
+        }
         let lp = self.local(e.position);
         self.cursor = self.to_sheet(lp);
         window.focus(&self.focus, cx);
@@ -1234,7 +1241,8 @@ impl DrawingEditor {
         if e.button == MouseButton::Left && self.hole_dlg.as_ref().is_some_and(|d| (d.x_picking || d.y_picking) && d.table.is_some()) && self.hole_x_dir_click(cx) {
             return;
         }
-        if e.button == MouseButton::Left && e.click_count >= 2 && matches!(self.tool, Tool::Select) {
+        // A dimension's palette opens on a double-click within 200 ms and 3 px (live2 11-13), not the OS's 400 ms.
+        if e.button == MouseButton::Left && e.click_count >= 2 && matches!(self.tool, Tool::Select) && (quick || !self.dimension_under_pointer(cx)) {
             self.double_click(e.click_count >= 3, window, cx);
             return;
         }
@@ -1947,6 +1955,13 @@ impl DrawingEditor {
     /// The annotation `orig` (resolved) dragged from `start` to the cursor.
     fn dragged_annotation(&self, orig: &Annotation, start: [f64; 2]) -> Annotation {
         self.pk().dragged_annotation(orig, start)
+    }
+
+    /// The pointer is over a dimension.
+    fn dimension_under_pointer(&mut self, cx: &mut Context<Self>) -> bool {
+        self.update_hover(cx);
+        let Some(PickTarget::Annotation(id)) = self.hover.and_then(|h| self.built.as_ref().and_then(|b| b.picks.get(h as usize)).cloned()) else { return false };
+        self.current_sheet().annotations.iter().any(|a| a.id == id && a.kind.is_dimension())
     }
 
     /// A double click opens what's under the pointer; a triple click on a
@@ -2693,6 +2708,11 @@ fn note_tool_preview(d: &Drawing, sheet: &Sheet, at: [f64; 2]) -> Annotation {
     Annotation { id: sheet.next_annotation_id(), kind: AnnotationKind::note("NOTE", h), position: at, ..Default::default() }
 }
 
+/// Two presses close enough in time and place to open a dimension's palette (live2 11-13: about 200 ms and 3 px).
+pub fn quick_double_click(gap: std::time::Duration, dist_px: f32) -> bool {
+    gap <= std::time::Duration::from_millis(200) && dist_px <= 3.
+}
+
 /// How far (screen px) placement inference holds the pointer on another item's x or y (live2 feel/drawing.json D4: a
 /// note within 7 px of a dimension text's line snaps, 9 doesn't).
 const INFER_REACH_PX: f64 = 8.0;
@@ -2700,6 +2720,16 @@ const INFER_REACH_PX: f64 = 8.0;
 #[cfg(test)]
 mod note_preview_tests {
     use super::*;
+
+    /// Live2 11-13: a dimension's palette opens on two presses within about 200 ms and 3 px.
+    #[::core::prelude::v1::test]
+    fn a_dimensions_palette_needs_a_quick_close_double_click() {
+        let ms = std::time::Duration::from_millis;
+        assert!(quick_double_click(ms(150), 2.0));
+        assert!(quick_double_click(ms(200), 3.0));
+        assert!(!quick_double_click(ms(300), 0.0), "slower: two clicks");
+        assert!(!quick_double_click(ms(100), 4.0), "further: two clicks");
+    }
 
     /// qa5 P2-D3: the Note tool previews "NOTE" at the pointer in the new
     /// note's height.
