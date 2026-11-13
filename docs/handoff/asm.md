@@ -8,6 +8,24 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
+## Now (asm, 2026-11-13 07:47 UTC)
+- Landed since 00:30: connector flips to live's Z for edge midpoints and circle centres on top-level parts (the centre
+  moved along its axis to live's point: scissor-lift Revolute 12 / 13), robotic-arm 29/29; menu coverage 92/92 (Pin /
+  Unpin reference, Update linked document…); six second takes; feel 3D (drag after 2 px and 50 ms, connector beats
+  vertex in the pick, triad arrow snap follows the zoom); a part on empty space centres its box on the view ray at the
+  origin's depth (2509); standard content by its mating point, its menu and Edit panel as live's (b49ad21c).
+- Queued 4dddb7ca: triad Move to origin / Align with Z / Rotate on an instance its mates hold refuses with live's
+  "Unable to apply transform. Instance(s) may be constrained." and moves nothing.
+- Dropped: a face's CENTER connector taken as its edge's (lost 7 infento mates).
+- A triad ring drag snaps to whole 5° (live 2759: 30 / 55 / 80 px gave 15° / 25° / 35°); explode drags keep 1°.
+- Open: asm-triad-rotate-90-undo re-recorded by live (2795, landing); asm-triad-z-anti-align-with-z is the runner's
+  pixel (step 2's highlighted row); live's REST connector origins for standard content (2766) after ~18:30 UTC.
+- clamp-pattern's 2 mates (dx below): the stall rule moves nothing (every group in its cluster conflicts with or
+  without it, cost 8.07e-3); a shorter compromise only leaves Revolute 6 and Parallel 1 above the bound. Without the
+  rule clamp-pattern's test takes 22 s instead of 14 s: kept. The cluster conflicts because ends sit off live's:
+  Trunnion's circle centres (live z -9 / -15.7 axis -z / +z; ours has circles at z +9, +9.2, +15, +15.2 only),
+  Revolute 7 5.55 mm, 16 22.3 mm in plane, 21 / 22 10.4 mm along. Looking at Trunnion's studio (2d81da) next.
+
 ## From dx (2026-11-13 00:31 UTC): clamp-pattern's 14 -> 12 mates is 6ab30b272, not bbac6bb06
 Your 19:47 note in dx.md: every one of my assembly suite runs after bbac6bb06 (asmall10-15, through main 6c63ab5a7) has
 asm-clamp-pattern at 27/27, **14/32** mates: bbac6bb06 translated 9 more and kept the 14. Main + my eeb00cc9 gives 12/32;

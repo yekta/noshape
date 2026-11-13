@@ -297,6 +297,12 @@ pub struct StepEdit {
     pub _sub: Subscription,
 }
 
+/// A triad ring drag's angle as live snaps it: whole 5° (live 2759: 15°, 25°, 35° for 30, 55, 80 px).
+fn ring_snap(angle: f64) -> f64 {
+    let step = 5f64.to_radians();
+    (angle / step).round() * step
+}
+
 /// [`AssemblyView::arrow_snap_step`] for an arrow that spans `px_per_mm` pixels per millimetre (metres).
 fn arrow_snap_step_for(px_per_mm: f64) -> Option<f64> {
     (px_per_mm > 1e-9).then(|| 10f64.powf((100.0 / px_per_mm / 10.0).log10().floor()) * 1e-3)
@@ -2951,10 +2957,8 @@ impl AssemblyView {
                     Some(ManipHandle::Ring(_)) => {
                         let (center, axis, v0) = (d.plane_point, d.plane_normal, d.ring_v0);
                         let Some(v) = self.ring_vector(*position, center, axis, cx) else { return };
-                        let mut angle = v0.cross(v).dot(axis).atan2(v0.dot(v));
-                        if d.explode {
-                            angle = explode_drag_round(angle, true, &self.units(cx));
-                        }
+                        let angle = v0.cross(v).dot(axis).atan2(v0.dot(v));
+                        let angle = if d.explode { explode_drag_round(angle, true, &self.units(cx)) } else { ring_snap(angle) };
                         let d = self.drag.as_mut().unwrap();
                         d.value = angle;
                         d.pending = Some(DVec3::ZERO);
@@ -6896,6 +6900,15 @@ mod tests {
         assert!((step(0.071) - 1e-4).abs() < 1e-15, "{}", step(0.071));
         assert!((step(0.0071) - 1e-5).abs() < 1e-16, "{}", step(0.0071));
         assert!((step(0.71) - 1e-3).abs() < 1e-14, "{}", step(0.71));
+    }
+
+    /// Live 2759: a ring drag turns by whole 5°.
+    #[test]
+    fn ring_drags_snap_to_five_degrees() {
+        use super::ring_snap;
+        for (raw, want) in [(14.2, 15.0), (26.4, 25.0), (34.9, 35.0), (-2.4, 0.0), (-37.6, -40.0)] {
+            assert!((ring_snap(f64::to_radians(raw)).to_degrees() - want).abs() < 1e-9, "{raw} -> {}", ring_snap(f64::to_radians(raw)).to_degrees());
+        }
     }
 
     /// qa5 A3: new mates are hidden, and hidden rows are listed in grey.
