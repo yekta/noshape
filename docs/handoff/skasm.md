@@ -21,12 +21,21 @@
   - Left in the knife after Loft 3: Fillet 7 "Select vertices on fillet chain." (a variable fillet's vertexSettings:
     blend), Extrude 10 "Failed to extrude selections" (Up to surface, both ways, to the blade's B-spline face RxBG:
     core), Sketch 7's Distances to JTd / JIl (no live geometry; geometry left as live's).
-- Sheet metal speed (Mac, NOSHAPE_SMPROF + NOSHAPE_KERNEL_PROFILE + NOSHAPE_FS_PROFILE): model-plus 437 ms (live 917),
-  corner-break 956 ms (live 1972); vibe5 has them at x1.0-1.1. No duplicate build_part inside a regeneration (the 2x
-  repeats in the logs are the harness's second regeneration). model-plus Extrude 4 (205 ms): std's
-  performSheetMetalBoolean ~104 ms (createOutlineBooleanToolsForFaceNoChecks / trimTool, the Rust Boolean 64 ms over 22
-  calls) and updateSheetMetalGeometry ~98 ms (build_part 58 ms, its final fuse ~28 ms). Next lever to try: the walls'
-  fuse in build_part.
+- Knife Fillet 5 / 7 (461b224c2): blend made Fillet 5's tori. Fillet 7's vertexSettings: our packed-query codec gave
+  a boolean a value-table slot (live doesn't: every `R` after an `isStart` F was one off, packed.rs
+  `a_boolean_takes_no_value_slot`), and an INTERSECT of three faces is now their common vertex (`common_vertex`).
+  Its four vertices land as mirror pairs; the result is still asymmetric (centroid y 0.013): blend's variable fillet.
+- Sheet metal speed. Profiling: macOS `sample` on the Mac (/root/skasm-scratch/bin/sample.sh, run there from
+  ~/agents/skasm; sample_incl.py / sample_children.py / sample_parents.py read its call graph), plus NOSHAPE_SMPROF
+  (core's /root/core-scratch/rmx/smprof.patch), NOSHAPE_KERNEL_PROFILE, NOSHAPE_FS_PROFILE.
+  - 68a078e78: the flat's union check (flat.rs `union_planar`) measured every piece and face with the adaptive Gauss
+    integral: now `planar_area`, exact from lines and arcs (Gauss only for other curves). corner-break 956 -> 834 ms on
+    the Mac (live 1972; vibe5 had it at x1.0).
+  - What's left in corner-break (Mac samples of regeneration): update_sheet_metal_geometry 83 %, of it build_part
+    ~58 % (the glued `fuse_all` of walls and bends through OCCT ~half, relief cuts ~third), flat_of ~1/3 (unfold,
+    flat_from_pieces). model-plus (437 ms, live 917): Extrude 4 = std's performSheetMetalBoolean ~50 % (bool's Rust
+    Boolean) + the rebuild ~50 % (build_part's glued fuse). The glued fuse is the next lever (bool's Boolean; core
+    tried one combined cut: slower on corner-break).
 - Mac runs: /root/skasm-scratch/bin/suite.sh (copy into the worktree as suite-tmp.sh, never commit it), e.g.
   `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh env DOC=c2-hunting-knife bash suite-tmp.sh`; knife on main there 24/52, 496 ms.
 
