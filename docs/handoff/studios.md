@@ -46,10 +46,10 @@ The same 12 selection / position differences on the build before the feel change
 work's. Fixed after the run: the dimension palette stays open on Enter and on the empty sheet (live2 2578 (4)); the
 file picker's search box reads as a field again (my modal rule had turned it to "other": drw-insert-image / -dxf /
 image-properties); a view moved to another sheet is listed alone with no parent (drw-view-move-to-sheet-ok). Left:
-- drw-sheet-properties-scale step 10 (text x 91, ours 81.5): live2's table fits "the text keeps its sheet-mm distance
-  from the dimension's left end; when it no longer fits it goes outside, 16.6 mm past the right end, and stays anchored
-  there" (1:1 81 -> 1:2 91 -> 1:4 102.6 -> 1:1 117.6). Ours keeps a never-dragged text centred (`text_along` None).
-  Needs the text's anchor stored at creation (every creation path) or set on each scale change from the built ends.
+- drw-sheet-properties-scale: fixed 11-13 (272899b9, `views::set_sheet_scale`): a sheet scale change keeps a linear
+  dimension's value at its sheet-mm distance from the low end (1:1 81 -> 1:2 91 as live). Not modelled: live then
+  pushes a value that no longer fits outside (1:4: 102.6, 16.6 mm past the right end) and keeps it anchored there
+  (back at 1:1: 117.6); ours gives 96 and 81. A view's own scale change doesn't move values yet (no live data).
 - drw-insert-view-top-1to1 step 6: live's panel text still holds the scale list (1:1 … 1:16) just after the pick, in
   its only recording of a scale pick: the list read while it closes. Not copied.
 - Known from dx's notes: sheet-properties / sheet-rename, view-align-*, view-replicate-annotations,
