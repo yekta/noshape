@@ -234,7 +234,7 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   clamp-hms 1309375f (a fuse, 13 ms) has its seam line at u -0.078 on one side and 0.1215 on the other (r 31.75 mm,
   one turn apart), so the outline doesn't close; cf-lighten a28978f4 (a 4-tool cut, 40 ms) loses tool face 26 likewise.
   The gap fix doesn't help them. Cases: vibe5 ~/tmp/bool2/lost.
-- **Queued to land 08:05 UTC as 30032d61 (gate CHECK, knurls only; 0 new differences, none declined, suite same): branch bool2-knife2 b0cec4ed7, four commits:**
+- **Landed 09:56 UTC as 82cfec7d (4 commits; first land try 30032d61 failed on bool's new parts_of_one_torus test: a past point must be off the face's whole surface too; regated CHECK, knurls only):**
   - 5c810e4fc the knife (below). Its first gate (2a78dd7f, vibe7) FAILED: 4 new differences, 47 cases declined, 6
     crate tests, clamp-hms worse. Two bugs, fixed: the "section along an edge" test measured distance to the edge's
     infinite line (seg_param), so sections running on straight past an edge's end were dropped; now within its range,
