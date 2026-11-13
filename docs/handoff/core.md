@@ -17,7 +17,7 @@ CLIs' `feature list` on copies.
 - **Ranking, x86 (vibe7):** cf-surface-pattern Surface Pattern 3 2.10 s vs live 537 is bool's (op_boolean 1.59 s of the
   85-sphere cut, shape_inside_out 0.22 s): sent to bool. Next in core's area: c2-valve-config Circular pattern 1 (234 vs
   67), c2-helical-sweep Sweep 1 (144 vs 28), profiling (hb/valve-helix-prof.log).
-- **Ranking done (23:45):** valve Circular pattern 1 (op_boolean ~235 of 245 ms, 7 tools one by one), helical Sweep 1
+- **Ranking done (23:43):** valve Circular pattern 1 (op_boolean ~235 of 245 ms, 7 tools one by one), helical Sweep 1
   (op_boolean 91 of 134; the pipe 6 ms), cf-fix-pcb Fix PCB 2 (bool's split_by_plane_ours, opSplitPart 220 of ~390):
   bool's, sent. cf-lighten Lighten 1 (~190 vs 87) is spread (shell 38, volumes 32 over 22, offset 30, Booleans 26).
   Louver Extrude 3 / 4 (~400 vs 266 / 237; the louver whole 3.56 s vs live 4.99) are many small calls inside std's sheet
