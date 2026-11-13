@@ -4,7 +4,31 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-13 12:55 UTC; restart from here)
+## bool, now (11-13 21:12 UTC; restart from here)
+- **Landed 21:20 as ecd9df2f:** Boolean's Subtract with Offset was
+  ignored by the native evaluator (basic.rs). Now the tools' copies get their faces (all, or Faces to offset) offset as
+  boolean.fs's opOffsetFace, by OCCT's offset_faces for planes / cylinders / cones / spheres / tori within a 2 s
+  deadline, and are subtracted in their place; free-form faces (or a failed offset) keep the tool as it is (before's
+  behaviour). T1 kernel_robustness::subtract_with_offset_leaves_a_gap_round_the_tool. Only suite user:
+  c2-fan-blade-sweep's Boolean 2 (core 20:10: "yours"), 11 picked faces of the bolt incl. the thread's two helical
+  B-spline flanks (u degree 1, v degree 9): OCCT's offset_faces fails after 32 s (4 s with the deadline), thicken fails
+  on the flanks too, and slabs would notch convex edges (live keeps 56 faces). So 48/53 as before; **next for it: our
+  own face offset of free-form faces** (the Shell builder's offsets, by_quadrics's walls, applied to picked faces).
+- **Sections split with bool2 (lead 15:3x):** bool2 owns plane∩B-spline and loft∩B-spline marching and the hook that
+  answers those pairs in Rust (occt_ahead's skip); proposed that its marcher take an implicit surface so sphere∩B-spline
+  (cf-surface-pattern's 85 balls: ~30 % of the cut's CPU in OCCT's IntTools, half of it ComputeTolReached3d's PSO) comes
+  with it. I stay out of occt_ahead / IntTools parameters until that lands.
+- cf-surface-pattern's cut after 82b994ab: pieces stage ~320 ms wall (ball faces' of_face ~10-13 ms each, `deeper` on
+  thin regions that can never reach `enough` ~2.6 % of CPU); not worth more without the marching.
+- c2-valve-config's 7-cone cut (d561e545): per tool ~20-30 ms OCCT sections (cone∩cone, cylinder∩cone analytic
+  ALine->WLine) + one 0.2 mm vertex-group restart; restricting the 2 m cones to the part's height (tried in occt_ahead,
+  reverted) saved nothing.
+- c2-rings-loft's Shell 1 (shell-9 dump, vibe5 ~/agents/bool-cases/rl-dump): 620-880 ms (live 235): OCCT's CheckerSI
+  edge/face pass ~23 %, add_pcurve 15 %, GeomAPI_IntSS of offsets 20 %, ValueOfUV projections 19 %.
+- **infento-subs (lead's P0, 12:00-16:00):** no commit regression; the run's time and swings (1253-2015 s release) are the
+  parity translator's per-step sketch / entity queries (~45 % sampled), asm's (told). vibe7 ~/agents/bool-keep/p0.
+
+## bool, earlier (11-13 12:55 UTC)
 **Queued 12:50 as b606d85c (branch bool-dock, worktree bool-hat; gate CHECK, knurls only: taken 3026 -> 3026, 0 new
 differences, parity56 clean, crate tests pass; log /root/bool-hat-scratch/gate-ae4aa4e8b.log).** If it fails, fix forward
 on bool-dock (`git checkout crates/kernel/tests/all.rs` first; probe module: /root/bool-scratch/probe-allrs.patch).
