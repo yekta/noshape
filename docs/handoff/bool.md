@@ -290,7 +290,12 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     Chamfer 1 gap (534 -> 380). **To blend (08:10 UTC, from your /root/blend-scratch/rings-prof*.log):** Chamfer 1's 5
     Booleans were 314-362 ms ours against OCCT's 225-257; their 214 ms call is this cut, now ~70: ~210 ours. Fillet
     1's 4 Booleans are 30 ms ours against 24; its 223 -> 127 is op_blend_direct (160 -> 78 ms), yours, not the Boolean.
-- **c2-impeller-loft's Boolean Flansch+Gehäuse (user 12:00 UTC; gating 48780e115 on vibe5, 12:29):** the flange's inner
+- **c2-hunting-knife after 8e04e97c (14:05 UTC, vibe6 at load 13, kernel profile):** 3298 ms, live 408. Fillet 3 1306 ms
+  (op_loft 803 x6, blend.direct 407: blend's), Chamfer 1 732 (its cut 349: 225 of it OCCT's IntTools_FaceFace of the
+  lofted tools' faces with the blade's in sections_ahead, bool's; ours 268-380 ms against OCCT's whole Boolean 788-991),
+  Fillet 2 364 (Boolean 87), Mirror 1 349 (op_unify 259: bool's row), Chamfer 2 172 (Booleans 74). Boolean time left
+  ~600 ms, mostly OCCT's sections; the rest of the gap is blend's.
+- **c2-impeller-loft's Boolean Flansch+Gehäuse (user 12:00 UTC; queued to land 13:50 as fe20f69d: the gate's replay and suite clean, its crate tests killed by vibe5's earlyoom, rerun on vibe6: kernel 405, model 456, model-core 107; g++-13 builds):** the flange's inner
   wall is extruded from the shell's inner wall's top edge; where the shell's wall slopes away under it the flange's
   wall stands in the cavity (0.04-0.27 mm proud at x 30-65 mm each side, 3 mm at the far tip). We declined (the
   flange's top edge, the same curve as the shell's own edge e15, is 2.3 um off the wall: that edge is off its own face
