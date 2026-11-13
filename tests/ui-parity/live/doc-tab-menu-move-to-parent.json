@@ -1,19 +1,19 @@
 {
  "scenario": "doc-tab-menu-move-to-parent",
- "recorded": "2026-11-09T04:50:31.288Z",
+ "recorded": "2026-11-13T05:14:50.562Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
  },
  "live": {
-  "document": "684321e4edb49a4f6273d908",
-  "workspace": "0b6f04f39560c2396e5cfff9",
-  "element": "9fce189cb761ebc82096940e",
+  "document": "688f5541a76a32173b780d3c",
+  "workspace": "a9e196ee6c124cabfdc36a80",
+  "element": "b661faa55acb0d8abf3a5fbf",
   "start": "doc-tabs",
-  "startElement": "9fce189cb761ebc82096940e",
-  "runner": "live2 "
+  "startElement": "b661faa55acb0d8abf3a5fbf",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -62,6 +62,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -167,6 +194,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -186,7 +240,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 75161
+   "t": 56522
   },
   {
    "step": 2,
@@ -220,8 +274,7 @@
       "Duplicate",
       "Copy to clipboard",
       "Select as document thumbnail",
-      "Move to document…",
-      "Export…"
+      "Move to document…"
      ],
      "highlighted": null,
      "disabled": []
@@ -265,6 +318,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -284,7 +364,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 77466
+   "t": 59159
   },
   {
    "step": 3,
@@ -297,7 +377,7 @@
    "ok": true,
    "at": [
     326,
-    837
+    859
    ],
    "state": {
     "focus": {
@@ -346,6 +426,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -359,7 +466,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 79760
+   "t": 82748
   }
  ]
 }

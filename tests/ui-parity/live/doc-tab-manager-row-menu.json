@@ -1,18 +1,18 @@
 {
  "scenario": "doc-tab-manager-row-menu",
- "recorded": "2026-11-12T20:30:31.755Z",
+ "recorded": "2026-11-13T05:26:44.286Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
   "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
  },
  "live": {
-  "document": "f3f005ec13e61da2bb7e6359",
-  "workspace": "23b9f0241670c8edca5f0dd5",
-  "element": "126eedcc39abc96cd308c7ba",
+  "document": "39910bd8e8f8e917f53ce53f",
+  "workspace": "f164579ca1ad6e8c8b4187d4",
+  "element": "9751e7786d6f55b9f346a858",
   "start": "doc-tabs",
-  "startElement": "126eedcc39abc96cd308c7ba",
+  "startElement": "9751e7786d6f55b9f346a858",
   "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
@@ -265,7 +265,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 59975
+   "t": 58548
   },
   {
    "step": 2,
@@ -299,8 +299,7 @@
       "Duplicate",
       "Copy to clipboard",
       "Select as document thumbnail",
-      "Move to document…",
-      "Export…"
+      "Move to document…"
      ],
      "highlighted": null,
      "disabled": []
@@ -415,7 +414,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 62734
+   "t": 61225
   },
   {
    "step": 3,
@@ -550,7 +549,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 66537
+   "t": 64915
   }
  ]
 }

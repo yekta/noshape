@@ -1,19 +1,19 @@
 {
  "scenario": "doc-tabmenu-open-in-new-browser-tab",
- "recorded": "2026-11-09T05:02:53.404Z",
+ "recorded": "2026-11-13T05:25:18.888Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
  },
  "live": {
-  "document": "7d3023d65de1414e621d3506",
-  "workspace": "d7317afe3f4f015762a1456c",
-  "element": "c71281d5d6859d2cb0a000d9",
+  "document": "c2dc7be127113043382ee075",
+  "workspace": "f7f1d63cc1c8778a95d6a227",
+  "element": "d5848a1d91f437f0a3db76d7",
   "start": "doc-tabs",
-  "startElement": "c71281d5d6859d2cb0a000d9",
-  "runner": "live2 "
+  "startElement": "d5848a1d91f437f0a3db76d7",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -62,6 +62,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -138,8 +165,7 @@
       "Duplicate",
       "Copy to clipboard",
       "Select as document thumbnail",
-      "Move to document…",
-      "Export…"
+      "Move to document…"
      ],
      "highlighted": null,
      "disabled": []
@@ -183,6 +209,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -227,7 +280,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 79986
+   "t": 58583
   },
   {
    "step": 2,
@@ -240,8 +293,9 @@
    "ok": true,
    "at": [
     587,
-    771
+    793
    ],
+   "closedTab": "https://cad.onshape.com/documents/c2dc7be127113043382ee075/w/f7f1d63cc1c8778a95d6a227/e/7643ef2847c5346d454b8a77",
    "state": {
     "focus": {
      "kind": "none"
@@ -289,6 +343,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -333,7 +414,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 82570
+   "t": 63031
   }
  ]
 }
