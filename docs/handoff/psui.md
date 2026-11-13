@@ -25,6 +25,8 @@ target folder's own mtime doesn't move when files inside it are rebuilt). Wall t
   (after part-studio-ui / app-core edits): 1 m 30 s, then 41 s with a 6-scenario run.
 - 71 feature-list ui-parity scenarios on vibe6, 3 shards: 2 m 44 s.
 
+**08:20 UTC:** matrix 54 / 54 with the hover tooltip (160 ms + fade), the 100 ms geometry debounce and folders; a drop keeps the selection as it was (live 08:18 corrected its catalogue); the tooltip slot is per thread and always noted (UI tests read it). Open: multi-part Properties… (live: one "2 selected" dialog).
+
 **08:04 UTC: the feature list / Parts list matrix** (interaction-feel.md "Feature list and Parts list", part-studio-ui
 `list::the_feature_list_matrix_matches_live`) at 43 / 43, from 20 / 42: Shift deselect-range and from-the-top, one
 anchor across the lists, a part double-click no longer renames, the multi-part list menu, the feature + default plane

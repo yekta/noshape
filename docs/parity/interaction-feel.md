@@ -181,7 +181,7 @@ device pixel ratio of 1 and 2: part-studio-ui `list::the_feature_list_matrix_mat
 canvas click is the viewport's empty pick). Like the snaps matrix it prints matched / total and fails when a row's
 status moves. `LIST_ROW=<part of an id>` runs some rows.
 
-**Matched: 43 / 43** (11-13 08:04 UTC; 20 / 42 at the first run).
+**Matched: 54 / 54** (11-13 08:20 UTC; 20 / 42 at the first run). ui-parity: the 78 list and tooltip scenarios 75 / 78 before the last fixes, the 3 left on green too or fixed since (feature-row-drag-above).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -189,7 +189,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Shift (down, up) | the range from the anchor (the last row clicked, Shift or not), sketches and planes between | the same | = |
 | Shift on a selected row | deselects that range (Ext 1, Shift Ext 3, Shift Ext 2 leaves Ext 1, Sketch 2; Parts 1–3 then Shift Part 1: nothing) | the same (`behaviors::list_shift_click`; was always adding) | = (fixed) |
 | Shift, nothing selected | from the top: Origin, Top, Front, Right, Sketch 1 … | the same (was the row alone) | = (fixed) |
-| Shift on a part, a feature the anchor | nothing | the same: one anchor across both lists (was a plain click) | = (fixed) |
+| Shift on a part, a feature the anchor / no part clicked yet | nothing / nothing (live 08:18) | the same: one anchor across both lists (was a plain click) | = (fixed) |
 | Ctrl+click a feature / a part | its menu, selection kept / adds, no menu | the same | = |
 | Clearing | an empty canvas click clears; Escape and empty list space don't | the same | = |
 | Double-click a feature (name or blank right side) / a sketch | its dialog / sketch mode | the same | = |
@@ -198,16 +198,21 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Y over a part row, nothing selected (after its double-click) | hides that part | the same | = (new) |
 | Menus: one feature; two features; two selected and a third right-clicked (counts 3) | live's rows (Add comment left out: cloud) | the same | = |
 | Menu: two hidden sketches | … Show, Show all sketches … | the same (Show all sketches was missing) | = (fixed) |
-| Menu: a sketch and a feature, on the feature | … Hide other sketches, Hide all sketches … | the same (were left out for a hidden sketch; still left out on the hidden sketch's own row, ui-parity feature-row-rclick-other-selected) | = (fixed) |
+| Menu: a sketch and a feature, on the feature | … Hide other sketches, Hide all sketches … | the same (were left out for hidden sketches; still left out when the right-clicked row isn't selected, ui-parity feature-row-rclick-other-selected / -mod-click-toggle, and on folders) | = (fixed) |
 | Menu: a feature and a part, on the feature / on the part | Clear selection added / the part's menu without Copy Part N | the same (Copy Part N was kept) | = (fixed) |
 | Menu: a feature and a default plane, on the feature | Size to Part Studio, Hide other planes, Hide all planes, Section view…, Clear selection, Add appearance to feature…; no Delete | the same (was the two-feature menu) | = (new) |
 | Menu: two parts; one part; the rollback bar | for N parts…, Boolean, Copy N items, … Delete / the part's / none | the same (several parts had the one-part menu: `several_parts_menu`) | = (new) |
-| Drag a row: top half / bottom half | before / after the row; the moved rows end selected (catalogue; the 11-07 recording feature-row-drag-above has nothing selected after: asked live) | the same (nothing stayed selected) | = (fixed) |
-| Drag with a selection | the selection and the pressed row move, in list order; "N items" | the same (only a selected pressed row carried the selection) | = (fixed) |
+| Drag a row: top half / bottom half | before / after the row; the selection as it was (live 08:18 corrected its catalogue: a drop never selects) | the same | = |
+| Drag with a selection | the selection and the pressed row move, in list order, the selection kept; "N items" | the same (only a selected pressed row carried the selection) | = (fixed) |
 | Undo step of a move | "Move Extrude 3", "Move 2 features" | the same (`noshape_ops::studio::move_description`, also the feature_reorder op; was "Reorder feature(s)") | = (fixed, not a matrix row) |
 | Drag: no refusal; over the canvas; Escape; default geometry; onto default geometry; parts | moves (then fails) / cancelled / cancelled / no drag / nothing / no drag | the same | = |
 | Rollback bar: the whole 26 px row grabs; top / bottom half | before / after the row | the same (its drop ignored the half) | = (fixed) |
-| Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); folders (thirds, sideways steps, nesting); the hover tooltip's 160–390 ms fade and the 100 ms geometry debounce; the insertion line's look | – | – |
+| Hover: the row tooltip | "Extrude 1 <- Sketch 1"; fades in from 160 ms, full by 390 | the text as before; shown at 160 ms with a 230 ms fade (was GPUI's 500 ms, no fade: `ui::ROW_TIP_DELAY`) | = (fixed) |
+| Hover: the geometry | lit 100 ms after the pointer arrives, cleared 100 ms after it leaves; a sweep lights only where it rests | the same (`LIST_HOVER_DEBOUNCE`; was at once) | = (fixed) |
+| Folders: New folder | nothing selected: an empty folder above the rollback bar; features and a part: the features; only default geometry: nothing; Escape: none | the same (default geometry alone opened the popover) | = (fixed) |
+| Folders: dropping on a collapsed folder | top third before it, middle inside at its end, bottom third after it | the same (every drop went inside, first) | = (fixed) |
+| Multi-part Properties… | one "2 selected" dialog, both parts listed, Name "Multiple values", shared fields editable (live 08:18) | the first part's Properties | ≠ (not a row yet) |
+| Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); an expanded folder's halves and sideways steps, nesting; an empty new folder's caret (live2's new-folder-empty, queued); the insertion line's look | – | – |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;

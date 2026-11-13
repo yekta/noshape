@@ -164,6 +164,50 @@ impl List {
         rows.into_iter().filter(|s| s != "———").collect()
     }
 
+    /// The pointer onto a row from the graphics, then `ms` of the clock.
+    fn hover(&self, cx: &mut TestAppContext, row: &str, ms: u64) {
+        let (from, at) = (self.canvas(cx), self.at(cx, row));
+        self.event(cx, MouseMoveEvent { position: from, pressed_button: None, modifiers: NONE });
+        draw(cx, self.window);
+        crate::ui_script::clear_tooltip();
+        self.event(cx, MouseMoveEvent { position: at, pressed_button: None, modifiers: NONE });
+        self.wait(cx, ms);
+    }
+
+    /// `ms` of the clock, drawn every 10 ms.
+    fn wait(&self, cx: &mut TestAppContext, ms: u64) {
+        for _ in 0..ms / 10 {
+            cx.executor().advance_clock(std::time::Duration::from_millis(10));
+            draw(cx, self.window);
+        }
+    }
+
+    fn lit_row(&self, cx: &mut TestAppContext) -> Option<String> {
+        cx.update(|cx| {
+            let v = self.view.read(cx);
+            let id = v.ui.list_hover?;
+            v.studio(cx)?.feature(id).map(|f| f.name.clone())
+        })
+    }
+
+    /// The folders: name, features inside (list order), collapsed.
+    fn folders(&self, cx: &mut TestAppContext) -> Vec<(String, Vec<String>, bool)> {
+        cx.update(|cx| {
+            let v = self.view.read(cx);
+            let Some(s) = v.studio(cx) else { return Vec::new() };
+            s.folders.iter().map(|fd| (fd.name.clone(), s.features.iter().filter(|f| f.folder == Some(fd.id)).map(|f| f.name.clone()).collect(), v.folder_collapsed(fd))).collect()
+        })
+    }
+
+    /// The header's New folder, then Enter in its popover.
+    fn new_folder(&self, cx: &mut TestAppContext, enter: bool) {
+        let at = self.bounds(cx, "button:New folder").expect("no New folder button").center();
+        self.press(cx, at, MouseButton::Left, NONE, 1);
+        if enter {
+            self.keys(cx, "enter");
+        }
+    }
+
     fn dragging(&self, cx: &mut TestAppContext) -> bool {
         cx.update(|cx| cx.has_active_drag())
     }
@@ -360,10 +404,10 @@ fn rows() -> Vec<Row> {
             l.press(cx, at, MouseButton::Right, NONE, 1);
             expect(l.menu(cx), names(&[]), "rows")
         } },
-        Row { id: "drag / a row's top half drops before it", live: "Extrude 3 onto Sketch 2's top half: before Sketch 2, Extrude 3 selected", gap: false, check: |l, cx| {
+        Row { id: "drag / a row's top half drops before it", live: "Extrude 3 onto Sketch 2's top half: before Sketch 2; the selection as before (nothing: live 08:18, feature-row-drag-above)", gap: false, check: |l, cx| {
             let (from, to) = (l.at(cx, "feature:Extrude 3"), l.at_y(cx, "feature:Sketch 2", 6.));
             l.drag(cx, from, to, true);
-            expect((l.order(cx), l.selected(cx)), (names(&["Sketch 1", "Extrude 1", "Extrude 3", "Sketch 2", "Extrude 2", "Plane 1", "Sketch 3"]), names(&["Extrude 3"])), "order, selected")
+            expect((l.order(cx), l.selected(cx)), (names(&["Sketch 1", "Extrude 1", "Extrude 3", "Sketch 2", "Extrude 2", "Plane 1", "Sketch 3"]), names(&[])), "order, selected")
         } },
         Row { id: "drag / a row's bottom half drops after it", live: "Extrude 3 onto Extrude 1's bottom half: after Extrude 1", gap: false, check: |l, cx| {
             let h = f32::from(l.bounds(cx, "feature:Extrude 1").ok_or("no row")?.size.height);
@@ -371,11 +415,11 @@ fn rows() -> Vec<Row> {
             l.drag(cx, from, to, true);
             expect(l.order(cx), names(&["Sketch 1", "Extrude 1", "Extrude 3", "Sketch 2", "Extrude 2", "Plane 1", "Sketch 3"]), "order")
         } },
-        Row { id: "drag / carries the selection, in list order", live: "Plane 1 selected, Extrude 3 dragged before Sketch 2: Plane 1, Extrude 3 move together", gap: false, check: |l, cx| {
+        Row { id: "drag / carries the selection, in list order", live: "Plane 1 selected, Extrude 3 dragged before Sketch 2: Plane 1, Extrude 3 move together; Plane 1 stays selected", gap: false, check: |l, cx| {
             l.click(cx, "feature:Plane 1", NONE);
             let (from, to) = (l.at(cx, "feature:Extrude 3"), l.at_y(cx, "feature:Sketch 2", 6.));
             l.drag(cx, from, to, true);
-            expect(l.order(cx), names(&["Sketch 1", "Extrude 1", "Plane 1", "Extrude 3", "Sketch 2", "Extrude 2", "Sketch 3"]), "order")
+            expect((l.order(cx), l.selected(cx)), (names(&["Sketch 1", "Extrude 1", "Plane 1", "Extrude 3", "Sketch 2", "Extrude 2", "Sketch 3"]), names(&["Plane 1"])), "order, selected")
         } },
         Row { id: "drag / no refusal for dependencies", live: "Extrude 3 dropped above Sketch 3 moves (then fails), no message", gap: false, check: |l, cx| {
             let (from, to) = (l.at(cx, "feature:Extrude 3"), l.at_y(cx, "feature:Sketch 3", 6.));
@@ -424,6 +468,90 @@ fn rows() -> Vec<Row> {
             l.drag(cx, from, to, true);
             expect(l.rolled_to(cx), Some("Sketch 2".to_string()), "rolled to")
         } },
+        Row { id: "hover / the row's tooltip", live: "'<name> <- <consumed features>': 'Extrude 1 <- Sketch 1'", gap: false, check: |l, cx| {
+            l.hover(cx, "feature:Extrude 1", 450);
+            expect(crate::ui_script::shown_tooltip(), Some("Extrude 1 <- Sketch 1".to_string()), "tooltip")
+        } },
+        Row { id: "hover / the tooltip from 160 ms", live: "fades in from about 160 ms, fully shown by about 390 ms (ours: shown at 160 ms, a 230 ms fade)", gap: false, check: |l, cx| {
+            l.hover(cx, "feature:Extrude 1", 120);
+            let early = crate::ui_script::shown_tooltip();
+            l.wait(cx, 80);
+            expect((early, crate::ui_script::shown_tooltip().is_some()), (None, true), "at 120 ms, at 200 ms")
+        } },
+        Row { id: "hover / the geometry lit 100 ms after, cleared 100 ms after leaving", live: "featureHoverIn / featureHoverOut debounced 100 ms", gap: false, check: |l, cx| {
+            l.hover(cx, "feature:Extrude 1", 60);
+            let early = l.lit_row(cx);
+            l.wait(cx, 60);
+            let lit = l.lit_row(cx);
+            let away = l.canvas(cx);
+            l.event(cx, MouseMoveEvent { position: away, pressed_button: None, modifiers: NONE });
+            l.wait(cx, 60);
+            let still = l.lit_row(cx);
+            l.wait(cx, 60);
+            expect((early, lit, still, l.lit_row(cx)), (None, Some("Extrude 1".to_string()), Some("Extrude 1".to_string()), None), "at 60 / 120 ms in, 60 / 120 ms out")
+        } },
+        Row { id: "hover / a sweep across rows lights only where it rests", live: "the debounce: rows crossed in under 100 ms never light", gap: false, check: |l, cx| {
+            let mut seen = Vec::new();
+            l.hover(cx, "feature:Sketch 1", 40);
+            for row in ["feature:Extrude 1", "feature:Sketch 2"] {
+                seen.extend(l.lit_row(cx));
+                let at = l.at(cx, row);
+                l.event(cx, MouseMoveEvent { position: at, pressed_button: None, modifiers: NONE });
+                l.wait(cx, 40);
+            }
+            seen.extend(l.lit_row(cx));
+            l.wait(cx, 100);
+            expect((seen, l.lit_row(cx)), (Vec::new(), Some("Sketch 2".to_string())), "lit while sweeping, at rest")
+        } },
+        Row { id: "folders / New folder with nothing selected", live: "the 'Folder name' popover; Enter makes an empty 'New folder (0)' just above the rollback bar", gap: false, check: |l, cx| {
+            l.new_folder(cx, true);
+            let after = cx.update(|cx| l.view.read(cx).studio(cx).and_then(|s| s.folders.first().and_then(|fd| fd.after).and_then(|a| s.feature(a)).map(|f| f.name.clone())));
+            // (Its caret: live2's queued feature-list-new-folder-empty says whether an empty one opens collapsed.)
+            let folders: Vec<(String, Vec<String>)> = l.folders(cx).into_iter().map(|(n, f, _)| (n, f)).collect();
+            expect((folders, after), (vec![("New folder".to_string(), Vec::new())], Some("Extrude 3".to_string())), "folders, listed after")
+        } },
+        Row { id: "folders / selected features and a part", live: "the features only (Extrude 1 + Part 2: Extrude 1), collapsed", gap: false, check: |l, cx| {
+            l.click(cx, "feature:Extrude 1", NONE);
+            l.click(cx, "part:Part 2", NONE);
+            l.new_folder(cx, true);
+            expect(l.folders(cx), vec![("New folder".to_string(), names(&["Extrude 1"]), true)], "folders")
+        } },
+        Row { id: "folders / only default geometry selected", live: "nothing: no popover, no message", gap: false, check: |l, cx| {
+            l.click(cx, "feature:Top", NONE);
+            l.new_folder(cx, false);
+            expect((cx.update(|cx| l.view.read(cx).folder_prompt.is_some()), l.folders(cx)), (false, Vec::new()), "popover, folders")
+        } },
+        Row { id: "folders / Escape in the popover", live: "no folder", gap: false, check: |l, cx| {
+            l.click(cx, "feature:Extrude 1", NONE);
+            l.new_folder(cx, false);
+            l.keys(cx, "escape");
+            expect((cx.update(|cx| l.view.read(cx).folder_prompt.is_some()), l.folders(cx)), (false, Vec::new()), "popover, folders")
+        } },
+        Row { id: "folders / onto a collapsed folder's middle third", live: "inside, at the folder's end; it stays collapsed", gap: false, check: |l, cx| {
+            folder_of_last_part(l, cx);
+            let h = f32::from(l.bounds(cx, "folder:New folder").ok_or("no folder row")?.size.height);
+            let (from, to) = (l.at(cx, "feature:Extrude 1"), l.at_y(cx, "folder:New folder", h * 0.5));
+            l.drag(cx, from, to, true);
+            expect((l.order(cx), l.folders(cx)), (names(&["Sketch 1", "Sketch 2", "Extrude 2", "Plane 1", "Sketch 3", "Extrude 3", "Extrude 1"]), vec![("New folder".to_string(), names(&["Sketch 3", "Extrude 3", "Extrude 1"]), true)]), "order, folders")
+        } },
+        Row { id: "folders / a collapsed folder's top and bottom thirds", live: "before / after the folder, outside it", gap: false, check: |l, cx| {
+            folder_of_last_part(l, cx);
+            let h = f32::from(l.bounds(cx, "folder:New folder").ok_or("no folder row")?.size.height);
+            let (from, to) = (l.at(cx, "feature:Extrude 1"), l.at_y(cx, "folder:New folder", h * 0.15));
+            l.drag(cx, from, to, true);
+            let before = (l.order(cx), l.folders(cx));
+            let (from, to) = (l.at(cx, "feature:Extrude 2"), l.at_y(cx, "folder:New folder", h * 0.85));
+            l.drag(cx, from, to, true);
+            let inside = names(&["Sketch 3", "Extrude 3"]);
+            expect(
+                (before, (l.order(cx), l.folders(cx))),
+                (
+                    (names(&["Sketch 1", "Sketch 2", "Extrude 2", "Plane 1", "Extrude 1", "Sketch 3", "Extrude 3"]), vec![("New folder".to_string(), inside.clone(), true)]),
+                    (names(&["Sketch 1", "Sketch 2", "Plane 1", "Extrude 1", "Sketch 3", "Extrude 3", "Extrude 2"]), vec![("New folder".to_string(), inside, true)]),
+                ),
+                "top third, then bottom third",
+            )
+        } },
         Row { id: "Parts list / click toggles, Shift range, Ctrl adds", live: "plain click toggles; Shift+click the range from the anchor; Ctrl+click adds like a plain click, no menu", gap: false, check: |l, cx| {
             l.click(cx, "part:Part 1", NONE);
             l.click(cx, "part:Part 3", SHIFT);
@@ -433,6 +561,10 @@ fn rows() -> Vec<Row> {
             l.click(cx, "part:Part 2", CTRL);
             expect((range, toggled, l.selected(cx), l.menu(cx).is_empty()), (names(&["Part 1", "Part 2", "Part 3"]), names(&["Part 1", "Part 3"]), names(&["Part 1", "Part 2", "Part 3"]), true), "range, toggled, Ctrl, no menu")
         } },
+        Row { id: "Parts list / Shift with no part clicked before", live: "selects nothing (a fresh tab; live 08:18); a plain click selects", gap: false, check: |l, cx| {
+            l.click(cx, "part:Part 2", SHIFT);
+            expect(l.selected(cx), names(&[]), "selected")
+        } },
         Row { id: "Parts list / Shift on a selected part deselects the range", live: "Parts 1, 2, 3 then Shift Part 1 leaves nothing", gap: false, check: |l, cx| {
             for p in ["part:Part 1", "part:Part 2", "part:Part 3"] {
                 l.click(cx, p, NONE);
@@ -441,6 +573,21 @@ fn rows() -> Vec<Row> {
             expect(l.selected(cx), names(&[]), "selected")
         } },
     ]
+}
+
+/// Sketch 3 and Extrude 3 in a new folder (collapsed), nothing selected after.
+fn folder_of_last_part(l: &List, cx: &mut TestAppContext) {
+    l.click(cx, "feature:Sketch 3", NONE);
+    l.click(cx, "feature:Extrude 3", NONE);
+    l.new_folder(cx, true);
+    cx.update(|cx| {
+        l.view.update(cx, |v, cx| {
+            v.selected_features.clear();
+            v.ui.anchor = None;
+            cx.notify();
+        })
+    });
+    draw(cx, l.window);
 }
 
 /// Every row at a pixel ratio of 1 and 2, each on a fresh Part Studio. Prints matched / total (`LIST_ROW=<part of an

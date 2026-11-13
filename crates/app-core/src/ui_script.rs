@@ -147,30 +147,23 @@ pub fn open_list() -> Option<serde_json::Value> {
     open_list_slot().lock().ok()?.clone()
 }
 
-fn tooltip_slot() -> &'static Mutex<Option<String>> {
-    static T: OnceLock<Mutex<Option<String>>> = OnceLock::new();
-    T.get_or_init(Default::default)
+thread_local! {
+    /// The tooltip drawn last on this thread (the UI thread: the scenario runner's, each UI test's own).
+    static TOOLTIP: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
 }
 
-/// A tooltip drawn now (`state.tooltip`); the driver clears it and redraws before reading.
+/// A tooltip drawn now (`state.tooltip`; UI tests read it too); the driver clears it and redraws before reading.
 pub fn note_tooltip(text: &str) {
-    if !active() {
-        return;
-    }
-    if let Ok(mut t) = tooltip_slot().lock() {
-        *t = Some(text.to_string());
-    }
+    TOOLTIP.with(|t| *t.borrow_mut() = Some(text.to_string()));
 }
 
 /// The tooltip drawn since the last [`clear_tooltip`], if any.
 pub fn shown_tooltip() -> Option<String> {
-    tooltip_slot().lock().ok()?.clone()
+    TOOLTIP.with(|t| t.borrow().clone())
 }
 
 pub fn clear_tooltip() {
-    if let Ok(mut t) = tooltip_slot().lock() {
-        *t = None;
-    }
+    TOOLTIP.with(|t| *t.borrow_mut() = None);
 }
 
 fn dialog_slot() -> &'static Mutex<Option<serde_json::Value>> {

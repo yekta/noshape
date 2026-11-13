@@ -398,7 +398,14 @@ pub struct PlacedTooltip {
     expanded: Option<(SharedString, bool)>,
     /// The text is user-authored (a list row's name): no translation.
     user: bool,
+    /// Fades in over this long once shown (a feature row's, live feel/featurelist.json: from about 160 ms to 390 ms
+    /// after the pointer arrives).
+    fade: Option<std::time::Duration>,
 }
+
+/// A feature list row's tooltip: shown 160 ms after the pointer arrives, fully by 390 ms (live feel/featurelist.json).
+pub const ROW_TIP_DELAY: std::time::Duration = std::time::Duration::from_millis(160);
+const ROW_TIP_FADE: std::time::Duration = std::time::Duration::from_millis(230);
 
 impl Render for PlacedTooltip {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -460,7 +467,12 @@ impl Render for PlacedTooltip {
             (_, None) => point(px(0.), mid_y),
         };
         let hidden = self.side != TipSide::Right && w.is_none();
-        div().when(!crate::os_menu::is_open(cx) && !self.pressed.get(), |d| d.child(anchored().position(at).snap_to_window().child(content.when(hidden, |c| c.opacity(0.)))))
+        let content = content.when(hidden, |c| c.opacity(0.));
+        let content = match self.fade {
+            Some(fade) => content.with_animation("tooltip-fade", Animation::new(fade), |c, t| c.opacity(t)).into_any_element(),
+            None => content.into_any_element(),
+        };
+        div().when(!crate::os_menu::is_open(cx) && !self.pressed.get(), |d| d.child(anchored().position(at).snap_to_window().child(content)))
     }
 }
 
@@ -503,7 +515,7 @@ fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool) ->
         .on_any_mouse_down(move |_, _, _| p3.set(true))
         .tooltip(move |_, cx| {
             let (text, anchor, pressed) = (text.clone(), anchor.get(), pressed.clone());
-            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None, user }).into()
+            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None, user, fade: None }).into()
         })
 }
 
@@ -540,7 +552,7 @@ pub fn with_side_tooltip_expanded(row: Stateful<Div>, text: impl Into<SharedStri
                     });
                 })
                 .detach();
-                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: Some((extra, false)), user: false }
+                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: Some((extra, false)), user: false, fade: None }
             })
             .into()
         })
@@ -553,8 +565,9 @@ pub fn with_side_tooltip_expanded(row: Stateful<Div>, text: impl Into<SharedStri
 pub fn with_lazy_side_tooltip(row: Stateful<Div>, anchor: impl Fn() -> Bounds<Pixels> + 'static, text: impl Fn(&App) -> SharedString + 'static) -> Stateful<Div> {
     row.tooltip(move |_, cx| {
         let (text, anchor) = (text(cx), anchor());
-        cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: None, user: true }).into()
+        cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: None, user: true, fade: Some(ROW_TIP_FADE) }).into()
     })
+    .tooltip_show_delay(ROW_TIP_DELAY)
 }
 
 /// A square icon button with no fill at rest and `#eaeaea` on hover (§4.1):

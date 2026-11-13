@@ -205,6 +205,9 @@ pub struct UiState {
     pub filter_query: String,
     /// Feature row under the pointer (its geometry is highlighted).
     pub list_hover: Option<FeatureId>,
+    /// The feature row hover coming (`list_hover`'s next value) and its 100 ms timer (live debounces feature hover
+    /// in and out: feel/featurelist.json "geometry_highlight").
+    pub list_hover_next: Option<(Option<FeatureId>, Task<()>)>,
     /// Last clicked feature (anchor of Shift+click ranges).
     pub anchor: Option<FeatureId>,
     /// Last clicked part row (anchor of the Parts list's Shift+click ranges).
@@ -502,6 +505,8 @@ pub struct UiState {
     /// A feature drag's drop slot: the hovered row and whether the cursor is
     /// in its lower half (lands after it; live F33).
     pub feature_drop: std::rc::Rc<std::cell::Cell<Option<(usize, bool)>>>,
+    /// Where a drag over a folder row drops (the folder, and 0 above it, 1 inside, 2 below it).
+    pub folder_drop: std::rc::Rc<std::cell::Cell<Option<(u32, u8)>>>,
     /// The open Hole dialog's parameters last time (its linked depths).
     pub hole_prev: Option<(noshape_model::FeatureId, noshape_model::params::ParamValues)>,
     pub preview_tool_task: Option<Task<()>>,
@@ -701,6 +706,7 @@ impl UiState {
             filter: None,
             filter_query: String::new(),
             list_hover: None,
+            list_hover_next: None,
             anchor: None,
             part_anchor: None,
             last_click: None,
@@ -844,6 +850,7 @@ impl UiState {
             preview_tool_adds: false,
             preview_tone: false,
             feature_drop: Default::default(),
+            folder_drop: Default::default(),
             hole_prev: None,
             preview_tool_task: None,
             preview_tool_cancel: Default::default(),
@@ -3795,13 +3802,16 @@ impl PartStudioView {
     /// become its first children, moved to the folder's place in the list
     /// (an empty folder's: where it is listed). One undo step; the same
     /// order check as a drop between rows.
-    pub(super) fn drop_into_folder(&mut self, dragged: FeatureId, folder: u32, cx: &mut Context<Self>) {
+    pub(super) fn drop_into_folder(&mut self, dragged: FeatureId, folder: u32, at_end: bool, cx: &mut Context<Self>) {
         let Some(studio) = self.studio(cx) else { return };
         let moving = self.dragged_features(dragged, cx);
-        let first = studio.folder_features(folder).into_iter().find(|f| !moving.contains(f));
+        let inside: Vec<FeatureId> = studio.folder_features(folder).into_iter().filter(|f| !moving.contains(f)).collect();
+        // Live (feel/featurelist.json): onto a collapsed folder's middle the features go to its end; below an
+        // expanded folder's middle they become its first.
+        let first = if at_end { inside.last() } else { inside.first() };
         let empty_after = studio.folder(folder).and_then(|f| f.after);
         let (to, after) = match first {
-            Some(f) => (studio.index_of(f), false),
+            Some(f) => (studio.index_of(*f), at_end),
             None => match empty_after {
                 Some(a) => (studio.index_of(a), true),
                 None => (Some(0), false),
@@ -3828,6 +3838,31 @@ impl PartStudioView {
         });
     }
 
+    /// Drop of dragged features above or below a folder row (live: a collapsed folder's top and bottom thirds, an
+    /// expanded one's top half): before its first feature or after its last, in the folder's own parent.
+    pub(super) fn drop_beside_folder(&mut self, dragged: FeatureId, folder: u32, below: bool, cx: &mut Context<Self>) {
+        let Some(studio) = self.studio(cx) else { return };
+        let moving = self.dragged_features(dragged, cx);
+        let inside: Vec<FeatureId> = studio.folder_features(folder).into_iter().filter(|f| !moving.contains(f)).collect();
+        let Some(&edge) = (if below { inside.last() } else { inside.first() }) else {
+            return self.drop_into_folder(dragged, folder, true, cx);
+        };
+        let parent = studio.folder(folder).and_then(|f| f.parent);
+        let Some(to) = studio.index_of(edge) else { return };
+        let Some(order) = interaction::reordered_at(&studio.features, &moving, to, below) else { return };
+        let desc = noshape_ops::studio::move_description(studio, &moving);
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, &desc, cx, |ps| {
+                interaction::apply_order(ps, &order);
+                for id in &moving {
+                    if let Some(f) = ps.feature_mut(*id) {
+                        f.folder = parent;
+                    }
+                }
+            });
+        });
+    }
+
     /// Drop of dragged features onto the row at `to`: moves every selected
     /// feature when the dragged one is selected. Live (qa4 round 5 v3 s8):
     /// a move above a feature's dependencies is done all the same; the
@@ -3840,11 +3875,6 @@ impl PartStudioView {
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, &desc, cx, |ps| interaction::apply_order(ps, &order));
         });
-        // Live: the moved rows are selected.
-        self.selected_features = moving;
-        self.ui.anchor = Some(dragged);
-        self.refresh_scene(false, cx);
-        cx.notify();
     }
 
     /// What a drag of `pressed` carries (live feel/featurelist.json): the selected features and the pressed row, in

@@ -215,6 +215,9 @@ pub fn feature_icon(type_id: &str) -> SharedString {
 }
 
 /// A menu entry's action on the Part Studio view.
+/// Live's feature list hover debounce (feel/featurelist.json "geometry_highlight").
+const LIST_HOVER_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(100);
+
 type ViewAction = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
 
 /// The last finished regeneration of the committed document (no dialog
@@ -4019,7 +4022,7 @@ impl PartStudioView {
                 ListItem::Ellipsis => ellipsis(),
                 ListItem::Folder(x, fd) => {
                     // The parity suite clicks a folder by its name, or as its state lists it with its count ("New folder (2)").
-                    let row = crate::ui_script::wrap(self.render_folder_row(&fd, slot, cx), || format!("feature:{}", fd.name));
+                    let row = crate::ui_script::wrap(test_named(self.render_folder_row(&fd, slot, cx), || format!("folder:{}", fd.name)), || format!("feature:{}", fd.name));
                     let row = crate::ui_script::wrap(row, || format!("feature:{} ({})", fd.name, self.studio(cx).map_or(0, |s| s.folder_count(fd.id))));
                     indent(x, last, row)
                 }
@@ -4324,13 +4327,16 @@ impl PartStudioView {
                     // Live (570): new folder and pause are disabled while a
                     // feature dialog is open.
                     header_btn("new-folder-btn", "new-folder", false, cx)
+                        .debug_selector(|| "button:New folder".into())
                         .when(dialog_open, |d| d.opacity(0.4).cursor_default())
                         // Live (585–590): "New folder", always enabled; the
                         // "Folder name" popup comes first.
                         .tooltip(crate::ui::tooltip("New folder"))
                         .map(|d| crate::ui_script::mark(d, || "button:New folder".into()))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                            if this.edit.is_some() {
+                            // Live (feel/featurelist.json): with only default geometry selected nothing happens.
+                            let only_default = this.selected_features.is_empty() && !this.selection.is_empty() && this.selection.iter().all(|r| matches!(r, Reference::Origin | Reference::Plane(_)));
+                            if this.edit.is_some() || only_default {
                                 return;
                             }
                             let ids = this.selected_features.clone();
@@ -4634,16 +4640,16 @@ impl PartStudioView {
                 }
             }))
             // Live (ui-parity parts-row-dblclick, feel/featurelist.json): a double-click is two clicks, no rename (only the
-            // menu's Rename renames). Shift takes the range from the last part clicked; with a feature last clicked it
-            // does nothing.
+            // menu's Rename renames). Shift takes the range from the last part clicked; without one it does nothing.
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                 // The list has the keyboard, as after a feature row's click (live parts-row-dblclick-rename-escape:
                 // Y then hides the part under the pointer).
                 if this.edit.is_none() {
                     window.focus(&this.ui.list_focus, cx);
                 }
+                // Shift with no part clicked before selects nothing (with a feature last clicked, or none: live).
                 let shift = ev.modifiers().shift && this.edit.is_none();
-                if shift && this.ui.part_anchor.is_none() && this.ui.anchor.is_some() {
+                if shift && this.ui.part_anchor.is_none() {
                     return;
                 }
                 if shift && this.ui.part_anchor.is_some() {
@@ -5105,10 +5111,11 @@ impl PartStudioView {
             if !sketches_shown {
                 m = m.item(item("Show all sketches", Box::new(|this, _, cx| this.show_all_sketches(cx))));
             }
-        } else if let Some(&keep) = sketches.first().filter(|_| sketches_shown || clicked_selected) {
+        } else if let Some(&keep) = sketches.first().filter(|_| sketches_shown || (clicked_selected && folder.is_none())) {
             // Sketches with other features: Hide other / all sketches; for hidden sketches only when the right-clicked
             // row is selected itself (live feel/featurelist.json "sketch_and_feature"; not on an unselected row:
-            // ui-parity feature-row-rclick-other-selected, feature-row-mod-click-toggle).
+            // ui-parity feature-row-rclick-other-selected, feature-row-mod-click-toggle; not on a folder:
+            // folder-rclick-menu).
             m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(Some(keep), cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
         }
         if !sketches.is_empty() || planes {
@@ -5230,8 +5237,35 @@ impl PartStudioView {
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.select_folder(id, cx)))
             // Dropping features on it puts them in as its first children (live
             // qa4 r5 s8 (6)); the row lights up under the dragged feature.
-            .drag_over::<FeatureDrag>(|s, _, _, _| s.bg(gpui_kit::rgb(0xe0f0fb)))
-            .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| this.drop_into_folder(d.id, id, cx)));
+            // Live (feel/featurelist.json): a collapsed folder's middle third drops inside (at its end), its top and
+            // bottom thirds before and after it; an expanded folder's top half before it, its bottom half inside (first).
+            .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<FeatureDrag>, _, cx| {
+                if !e.bounds.contains(&e.event.position) {
+                    return;
+                }
+                let f = f32::from(e.event.position.y - e.bounds.top()) / f32::from(e.bounds.size.height).max(1.);
+                let zone = if collapsed { (f * 3.).floor().clamp(0., 2.) as u8 } else if f < 0.5 { 0 } else { 1 };
+                if this.ui.folder_drop.get() != Some((id, zone)) {
+                    this.ui.folder_drop.set(Some((id, zone)));
+                    cx.notify();
+                }
+            }))
+            .drag_over::<FeatureDrag>({
+                let drop = self.ui.folder_drop.clone();
+                move |s, _, _, _| match drop.get() {
+                    Some((f, 0)) if f == id => s.border_t_2().border_color(p().accent),
+                    Some((f, 2)) if f == id => s.border_b_2().border_color(p().accent),
+                    _ => s.bg(gpui_kit::rgb(0xe0f0fb)).border_1().border_color(p().accent),
+                }
+            })
+            .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| {
+                let zone = this.ui.folder_drop.take().filter(|(f, _)| *f == id).map(|(_, z)| z).unwrap_or(1);
+                match zone {
+                    0 => this.drop_beside_folder(d.id, id, false, cx),
+                    2 => this.drop_beside_folder(d.id, id, true, cx),
+                    _ => this.drop_into_folder(d.id, id, collapsed, cx),
+                }
+            }));
         // Beside the row, as a feature row's (live ui 10-25 b (4)).
         let row = crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), move |_| SharedString::from(tip.clone()));
         let view = cx.entity();
@@ -5769,12 +5803,26 @@ impl PartStudioView {
             })
 
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
-                // Hovering a feature highlights its geometry (Onshape).
+                // Hovering a feature highlights its geometry 100 ms later, and leaving clears it 100 ms later (live
+                // feel/featurelist.json: featureHoverIn / Out debounced): sweeping across rows doesn't flash the model.
+                // Leaving a row only counts while it is the one hovered (going row to row the next row's enter may
+                // come first).
                 let new = if *h { Some(id) } else { None };
-                if this.ui.list_hover != new && (*h || this.ui.list_hover == Some(id)) {
-                    this.ui.list_hover = new;
-                    this.refresh_scene(false, cx);
+                let coming = this.ui.list_hover_next.as_ref().map(|(n, _)| *n).unwrap_or(this.ui.list_hover);
+                if coming == new || (!*h && coming != Some(id)) {
+                    return;
                 }
+                let task = cx.spawn(async move |this, cx| {
+                    cx.background_executor().timer(LIST_HOVER_DEBOUNCE).await;
+                    let _ = this.update(cx, |this, cx| {
+                        this.ui.list_hover_next = None;
+                        if this.ui.list_hover != new {
+                            this.ui.list_hover = new;
+                            this.refresh_scene(false, cx);
+                        }
+                    });
+                });
+                this.ui.list_hover_next = Some((new, task));
             }))
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                 // A click that closed a right-click menu does nothing else (live ui-parity feature-row-mod-click-toggle).
