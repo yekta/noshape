@@ -3526,10 +3526,12 @@ impl Ctx<'_> {
                 }
             }
         }
-        let mut chain = vec![s.v[0]];
+        let mut chain = Vec::with_capacity(on.len() + 2);
+        chain.push(s.v[0]);
         chain.extend(on.iter().map(|x| x.1));
         chain.push(s.v[1]);
-        let mut ts = vec![0.0];
+        let mut ts = Vec::with_capacity(on.len() + 2);
+        ts.push(0.0);
         ts.extend(on.iter().map(|x| x.0));
         ts.push(1.0);
         Ok((chain, ts))
@@ -5956,7 +5958,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let f = pieces[pi].face;
         let s = cx.faces[f].solid;
         let arg = cx.faces[f].arg;
-        let mut states: Vec<(usize, State)> = Vec::new();
+        let mut states: Vec<(usize, State)> = Vec::with_capacity(cx.solids.len());
         for t in 0..cx.solids.len() {
             if cx.solids[t].arg == arg {
                 continue;
