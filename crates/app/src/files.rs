@@ -110,29 +110,36 @@ pub fn open_document_at(path: PathBuf, tab: noshape_model::document::TabId, gpu:
     Ok(())
 }
 
-/// Edit in context on another document's part (live 2464): `path` opened on Main (or its window brought to the
-/// front) on Part Studio `studio`, the assembly's context snapshot stored there and shown around the part.
-pub fn open_in_context(path: PathBuf, studio: noshape_model::document::TabId, ctx: noshape_app_core::assembly_context::AssemblyContext, install: (u32, Option<noshape_model::in_context::AssemblyContext>), gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
-    open_document_window(path.clone(), None, gpu, cx)?;
-    let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(&path)).copied()) else { return Ok(()) };
-    let _ = h.update(cx, |_, window, cx| {
-        let Some(ws) = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<workspace::Workspace>().ok()) else { return };
-        ws.update(cx, |w, cx| w.enter_context_from_other(studio, ctx, install, window, cx));
-    });
+/// Edit in context on another document's part (live 2464): `window` goes to `path` on Main in place (live's tab
+/// navigates) on Part Studio `studio`, the assembly's context snapshot stored there and shown around the part.
+pub fn open_in_context(window: &mut Window, path: PathBuf, studio: noshape_model::document::TabId, ctx: noshape_app_core::assembly_context::AssemblyContext, install: (u32, Option<noshape_model::in_context::AssemblyContext>), gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    let ws = navigate_in_place(window, path, gpu, cx)?;
+    ws.update(cx, |w, cx| w.enter_context_from_other(studio, ctx, install, window, cx));
     Ok(())
 }
 
-/// Create version and update in assembly (live 2464): the assembly of `other` opened (or brought to the front) on
-/// tab `assembly`, its instance of the document at `path` moved to microversion `mv` (version `name`).
-pub fn update_linked_instance(other: noshape_app_core::assembly_context::OtherAssembly, assembly: noshape_model::document::TabId, path: PathBuf, mv: noshape_store::MicroversionId, name: &str, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
-    open_document_at(other.path.clone(), assembly, gpu, cx)?;
-    let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(&other.path)).copied()) else { return Ok(()) };
-    let name = name.to_string();
-    let _ = h.update(cx, |_, window, cx| {
-        let Some(ws) = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<workspace::Workspace>().ok()) else { return };
-        let Some(v) = ws.read(cx).assembly_view(assembly) else { return };
-        v.update(cx, |v, cx| v.move_instance_to_version(other.instance, &path, mv, &name, cx));
-    });
+/// The in-context bar's Go to assembly from another document's part: `window` back to that assembly in place.
+pub fn go_to_other_assembly(window: &mut Window, other: noshape_app_core::assembly_context::OtherAssembly, assembly: noshape_model::document::TabId, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    let ws = navigate_in_place(window, other.path, gpu, cx)?;
+    ws.update(cx, |w, cx| w.activate(assembly, window, cx));
+    Ok(())
+}
+
+/// A new version of a document: its path, microversion and name ("V2").
+pub struct NewVersion {
+    pub path: PathBuf,
+    pub microversion: noshape_store::MicroversionId,
+    pub name: String,
+}
+
+/// Create version and update in assembly (live 2464): `window` back to the assembly of `other` in place, on tab
+/// `assembly`, its instance of `version`'s document moved to that version.
+pub fn update_linked_instance(window: &mut Window, other: noshape_app_core::assembly_context::OtherAssembly, assembly: noshape_model::document::TabId, version: NewVersion, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    let instance = other.instance;
+    let ws = navigate_in_place(window, other.path, gpu, cx)?;
+    ws.update(cx, |w, cx| w.activate(assembly, window, cx));
+    let Some(v) = ws.read(cx).assembly_view(assembly) else { return Ok(()) };
+    v.update(cx, |v, cx| v.move_instance_to_version(instance, &version.path, version.microversion, &version.name, cx));
     Ok(())
 }
 
@@ -207,29 +214,54 @@ fn open_session_window(session: session::Session, gpu: Gpu, cx: &mut App) -> any
     noshape_render::perf::milestone("window: opening");
     let (handle, ws) = crate::os_menu::open_window(options, cx, move |window, cx| {
         noshape_render::perf::milestone("window: created");
-        window.set_window_title(&format!("{} — Noshape", session.name()));
-        let doc = cx.new(|cx| {
-            let mut d = doc_model::DocModel::new(session);
-            d.watch_external(cx);
-            d
-        });
-        noshape_render::perf::milestone("window: document model");
-        // The CLI and MCP server edit this document here while it is open.
-        crate::live_server::serve(&doc, cx);
-        noshape_render::perf::milestone("window: live server");
-        let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));
-        noshape_render::perf::milestone("window: workspace built");
-        let fh = ws.read(cx).focus_handle(cx);
-        // The workspace focuses its active tab view (so Part Studio shortcuts
-        // work right away); only fall back to the workspace itself.
-        window.defer(cx, move |window, cx| {
-            if window.focused(cx).is_none() {
-                fh.focus(window, cx);
-            }
-        });
-        ws
+        build_workspace(session, gpu, window, cx)
     })?;
     Ok((handle, ws))
+}
+
+/// A document's workspace in `window` (its title, the document model, the live server for the CLI and MCP).
+fn build_workspace(session: session::Session, gpu: Gpu, window: &mut Window, cx: &mut App) -> Entity<workspace::Workspace> {
+    window.set_window_title(&format!("{} — Noshape", session.name()));
+    let doc = cx.new(|cx| {
+        let mut d = doc_model::DocModel::new(session);
+        d.watch_external(cx);
+        d
+    });
+    noshape_render::perf::milestone("window: document model");
+    // The CLI and MCP server edit this document here while it is open.
+    crate::live_server::serve(&doc, cx);
+    noshape_render::perf::milestone("window: live server");
+    let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));
+    noshape_render::perf::milestone("window: workspace built");
+    let fh = ws.read(cx).focus_handle(cx);
+    // The workspace focuses its active tab view (so Part Studio shortcuts
+    // work right away); only fall back to the workspace itself.
+    window.defer(cx, move |window, cx| {
+        if window.focused(cx).is_none() {
+            fh.focus(window, cx);
+        }
+    });
+    ws
+}
+
+/// `window` (a document window) goes to the document at `path` in place, as live's browser tab navigates (Edit in
+/// context on another document's part, and the in-context bar back to the assembly): its content becomes that
+/// document's workspace, the document it showed closes here. Also when `path` is open in another window (live: the
+/// tab navigates all the same).
+pub fn navigate_in_place(window: &mut Window, path: PathBuf, gpu: Gpu, cx: &mut App) -> anyhow::Result<Entity<workspace::Workspace>> {
+    let session = session::Session::open(&path)?;
+    add_recent(&path);
+    let ws = build_workspace(session, gpu, window, cx);
+    if !crate::os_menu::replace_content(window, ws.clone().into(), cx) {
+        anyhow::bail!("not a document window");
+    }
+    let me = window.window_handle();
+    if cx.has_global::<OpenDocs>() {
+        let docs = &mut cx.global_mut::<OpenDocs>().0;
+        docs.retain(|_, h| *h != me);
+        docs.insert(canonical(&path), me);
+    }
+    Ok(ws)
 }
 
 /// Ask for a document to open and open it: the native dialog when available,

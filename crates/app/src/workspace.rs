@@ -298,12 +298,16 @@ impl Workspace {
                 // In-context banner › Go to assembly.
                 self._subs.push(cx.subscribe_in(&v, window, |this: &mut Self, _, ev: &crate::part_studio::PartStudioEvent, window, cx| match ev {
                     crate::part_studio::PartStudioEvent::ActivateTab(t) => this.activate(*t, window, cx),
+                    // Back to the other document's assembly in this window (live's tab navigates).
                     crate::part_studio::PartStudioEvent::GoToOtherAssembly(o, t) => {
-                        if let Err(e) = crate::files::open_document_at(o.path.clone(), *t, this.gpu.clone(), cx) {
-                            log::warn!("Go to assembly: {}: {e}", o.path.display());
-                        }
+                        let (o, t, gpu) = (o.clone(), *t, this.gpu.clone());
+                        window.defer(cx, move |window, cx| {
+                            if let Err(e) = crate::files::go_to_other_assembly(window, o.clone(), t, gpu, cx) {
+                                log::warn!("Go to assembly: {}: {e}", o.path.display());
+                            }
+                        });
                     }
-                    crate::part_studio::PartStudioEvent::VersionAndUpdate(o, t) => this.version_and_update(o.clone(), *t, cx),
+                    crate::part_studio::PartStudioEvent::VersionAndUpdate(o, t) => this.version_and_update(o.clone(), *t, window, cx),
                     crate::part_studio::PartStudioEvent::InsertInAssembly { assembly, studio, parts, sketches, at } => {
                         let (assembly, studio, parts, sketches, at) = (*assembly, *studio, parts.clone(), sketches.clone(), *at);
                         this.activate(assembly, window, cx);
@@ -334,10 +338,14 @@ impl Workspace {
                             v.update(cx, |v, cx| v.set_assembly_context(Some(ctx), cx));
                         }
                     }
+                    // The other document in this window (live's tab navigates), after this event.
                     crate::assembly_view::AssemblyViewEvent::EditInContextOther(o) => {
-                        if let Err(e) = crate::files::open_in_context(o.path.clone(), o.studio, o.ctx.clone(), o.install.clone(), this.gpu.clone(), cx) {
-                            log::warn!("Edit in context: {}: {e}", o.path.display());
-                        }
+                        let (path, studio, ctx, install, gpu) = (o.path.clone(), o.studio, o.ctx.clone(), o.install.clone(), this.gpu.clone());
+                        window.defer(cx, move |window, cx| {
+                            if let Err(e) = crate::files::open_in_context(window, path.clone(), studio, ctx, install, gpu, cx) {
+                                log::warn!("Edit in context: {}: {e}", path.display());
+                            }
+                        });
                     }
                 }));
                 TabView::Assembly(v)
@@ -2716,7 +2724,7 @@ impl Workspace {
 
     /// The in-context banner's Create version and update in assembly (live 2464): the next version of this document
     /// ("V<n>"), then the other document's assembly opened on its instance, moved to that version.
-    fn version_and_update(&mut self, other: noshape_app_core::assembly_context::OtherAssembly, assembly: TabId, cx: &mut Context<Self>) {
+    fn version_and_update(&mut self, other: noshape_app_core::assembly_context::OtherAssembly, assembly: TabId, window: &mut Window, cx: &mut Context<Self>) {
         let n = self.doc.read(cx).session.store.graph().ok().map_or(0, |g| g.versions.len()) + 1;
         let name = format!("V{n}");
         let r = self.doc.update(cx, |d, _| {
@@ -2732,10 +2740,14 @@ impl Workspace {
             }
         };
         self.doc.update(cx, |d, cx| d.reloaded(cx));
-        let here = self.doc.read(cx).session.path.clone();
-        if let Err(e) = crate::files::update_linked_instance(other, assembly, here, mv, &name, self.gpu.clone(), cx) {
-            log::warn!("Create version and update in assembly: {e}");
-        }
+        let version = crate::files::NewVersion { path: self.doc.read(cx).session.path.clone(), microversion: mv, name };
+        let gpu = self.gpu.clone();
+        // Back in this window (live's tab navigates), after this event.
+        window.defer(cx, move |window, cx| {
+            if let Err(e) = crate::files::update_linked_instance(window, other, assembly, version, gpu, cx) {
+                log::warn!("Create version and update in assembly: {e}");
+            }
+        });
     }
 
     /// Edit in context from another document's assembly (`files::open_in_context`): the context snapshot stored in

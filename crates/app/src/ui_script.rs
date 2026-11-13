@@ -421,7 +421,10 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
     window.resize(size(px(view_width(&scenario)), px(992.)));
     window.activate_window();
     cx.activate(true);
-    cx.spawn_in(window, async move |ws, cx| {
+    cx.spawn_in(window, async move |_, cx| {
+        // The window's workspace now: Edit in context on another document's part puts that document's in this
+        // window, as live's tab navigates.
+        let ws = CurrentWorkspace;
         let sleep = async |cx: &mut AsyncWindowContext, ms: u64| cx.background_executor().timer(Duration::from_millis(ms)).await;
         let studio = |cx: &mut AsyncWindowContext| -> Studio { ws.update(cx, |w, _| w.active_part_studio()).ok().flatten() };
         // Settled: the regeneration done, and a few frames for picks and menus.
@@ -1206,3 +1209,22 @@ fn utc_now() -> String {
     let rem = secs.rem_euclid(86_400);
     format!("{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z", rem / 3600, rem % 3600 / 60, rem % 60)
 }
+
+/// A scenario window's workspace as it is now (a navigation in place swaps it), for the runner's calls.
+#[derive(Clone, Copy)]
+struct CurrentWorkspace;
+
+impl CurrentWorkspace {
+    fn get(&self, cx: &mut AsyncWindowContext) -> anyhow::Result<WeakEntity<Workspace>> {
+        cx.update(|window, cx| crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<Workspace>().ok()).map(|w| w.downgrade()))?.ok_or_else(|| anyhow::anyhow!("the window shows no document"))
+    }
+
+    fn update<R>(&self, cx: &mut AsyncWindowContext, f: impl FnOnce(&mut Workspace, &mut Context<Workspace>) -> R) -> anyhow::Result<R> {
+        self.get(cx)?.update(cx, f)
+    }
+
+    fn update_in<R>(&self, cx: &mut AsyncWindowContext, f: impl FnOnce(&mut Workspace, &mut Window, &mut Context<Workspace>) -> R) -> anyhow::Result<R> {
+        self.get(cx)?.update_in(cx, f)
+    }
+}
+

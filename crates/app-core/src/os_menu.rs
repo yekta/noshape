@@ -1060,6 +1060,18 @@ pub fn content_view(window: &Window, cx: &App) -> Option<AnyView> {
     }
 }
 
+/// Puts `view` in place of a window's content (opened with [`open_window`]): a document window navigating to another
+/// document as live's tab does. Whether it could.
+pub fn replace_content(window: &mut Window, view: AnyView, cx: &mut App) -> bool {
+    let Some(root) = window.root::<gpui_kit::base::Root>().flatten() else { return false };
+    let Ok(layer) = root.read(cx).view().clone().downcast::<MenuLayer>() else { return false };
+    layer.update(cx, |l, cx| {
+        l.0 = view;
+        cx.notify();
+    });
+    true
+}
+
 /// `gpui_kit::open_window` with the Onshape menus wired in: right-click and
 /// dropdown menus opened in this window draw in it (above its dialogs).
 /// Open every app window with this.
