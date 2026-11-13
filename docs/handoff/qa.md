@@ -5,6 +5,14 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 
 
+## 11-13 10:25: the assembly suite runs one process per assembly (asm)
+The 04:29 run's (redone 06:16) single parity_assemblies process was killed by SIGTERM in asm-infento-subs (1580 s on main
+now, 1108 s at 04:33; sender not found: not rb.sh, no guard, no OOM). bin/suites-rest.sh now runs the built test binary once
+per assembly (a one-entry NOSHAPE_PARITY_ASSEMBLIES folder) under `timeout ${QA_ASM_TIMEOUT:-3600}`, sums the `assemblies:`
+lines for the index, logs each one's time (~/qa-parity/asm-times.log), and counts one that doesn't finish as 0 of its last
+finished run's occurrences and mates (~/qa-parity/asm-totals.txt on vibe6 / vibe7). Local loops are systemd units
+(`systemctl list-units 'qa-*'`).
+
 ## Release checks: the app spot-check list (lead 11-13; from docs/parity/interaction-feel.md's "=" rows)
 Run on the released app (Linux tar.gz, vibe3 :63 or vibe7 :481, xdotool) after the documents, at DPR 1; a row fails when the
 app differs from its live column there. The user's cases first (hat15 mode-700 copy with #fan_control_board_depth = 2.4 mm,
