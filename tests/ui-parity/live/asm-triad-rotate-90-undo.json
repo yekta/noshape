@@ -1,6 +1,6 @@
 {
  "scenario": "asm-triad-rotate-90-undo",
- "recorded": "2026-11-13T05:17:49.071Z",
+ "recorded": "2026-11-13T07:54:00.178Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -10,7 +10,7 @@
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "1477b21805f7306ec80ba436",
+  "element": "55714b3baa4df434681980d2",
   "start": "two-blocks",
   "startElement": "fbd9c2146a18cf5cba6d5b3a",
   "runner": "live2 .nstate-uip-3.json"
@@ -348,7 +348,7 @@
      "panel": null
     }
    },
-   "t": 34952
+   "t": 33974
   },
   {
    "step": 2,
@@ -560,7 +560,7 @@
      "panel": null
     }
    },
-   "t": 38641
+   "t": 37970
   },
   {
    "step": 3,
@@ -738,7 +738,7 @@
      "panel": null
     }
    },
-   "t": 45022
+   "t": 43535
   },
   {
    "step": 4,
@@ -918,7 +918,7 @@
      "panel": null
     }
    },
-   "t": 47806
+   "t": 46062
   }
  ]
 }
