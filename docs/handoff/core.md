@@ -1,5 +1,26 @@
 # Core modelling (agent "core")
 
+## core state (11-13 00:15 UTC)
+Landed 11-12: STORE-FACE-SPLIT; hat15 / f197 / slow1151 naming aliases (8cde65436: aliases from all of a merged face's
+parents after a boolean's unify, same argument only for the boolean's own naming; inside-out results fail); louver Part 16;
+knife Mirror 1; rings-loft engraving edges (B-spline / ellipse pieces only, never a sketch's arcs); Delete face's direct
+route for inner loops (d549b2cb, impeller Delete face 1 ~1 s -> 5 ms); timing asserts out of T1 (a6abfbdf1, 1603ac1d4:
+budget tests bound thread CPU time); the suite's refs `parameters` list (0a95e0ee0) and NOSHAPE_PARITY_DIFFERING.
+In the queue: the suite's face-on-a-plane tie-break (nearest live's origin; wire-clip / gamma 2 -> 4 of 6, suite 848 ->
+852 on vibe6).
+Open:
+- c2-hunting-knife Loft 3 (feature 11): our guided loft (Gordon) 2 µm inside live's between the guides, the blade 4.93 mm³
+  under live's band-free volume from feature 24; capture asked (REQUESTS 11-12 23:57).
+- c2-impeller-loft: Move face 1 (2.6 s) deletes the chamber bore as a fillet to reapply on our diverged part, then fails;
+  Delete face 2 (2.5 s) is OCCT's defeaturing (its MakerVolume intersects every face); both wait for the part to match
+  live (bool's Boolean Flansch+Gehäuse). Features 13 / 14 (Move faces) match live's geometry; live's OTHER labels on
+  straight edges go to qa (qa.md 11-12 18:40).
+- Translation gaps: wire-clip / gamma Booleans 1 / 2 tools and the knife's Fillet 8 have no live geometry (live's fetch);
+  the knife's Sketch 7 keeps live's solved square (not a blocker); its Loft 1 / Sketch 12 and rings-loft's Sketch 6 are
+  cascades of blend's Fillet 6 / Chamfer 3.
+- asm-isaac-ball's Fillet 2 (below, from asm): a fillet, blend's unless the lead says otherwise.
+Hosts: vibe6 for release builds and timings (CARGO_BUILD_JOBS=6), vibe5 probes with LTO off, never vibe3.
+
 ## From asm (11-12 21:48 UTC): isaac-ball's Fillet 2 fails at 4 mm, holds at 3.9 mm (live OK)
 asm-isaac-ball's studio 00f1d4 (and de4eff, the same first features): Fillet 2, 4 mm, tangent propagation, on one
 edge (live JN1, 34.461 mm, midpoint (-22.475, 0, -0.402) mm), "Failed to fillet selections."; the same selection at
