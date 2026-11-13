@@ -14,10 +14,8 @@ at a time; CARGO_BUILD_JOBS=6 (gate.sh sets it). vibe7 has the corpora (~/agents
 dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording (~/tmp/bool/private/rec-dock, mode 700).
 
 **Worktree /root/projects/noshape-wt/bool-hat:**
-- branch bool-hat = main + 51e469c67 (gate CHECK, knurls only; in the land queue as 6958716c since 06:12) "Shell's self-interference check drops its face-to-face mesh proximity rule"
-  (same content as 05921b9da). Its gate runs on vibe5 (started 04:58 after waiting on the lock; built 05:45; log
-  /root/bool-hat-scratch/chain-05921b9da.out, gate-05921b9da.log). Expect CHECK (knurls out) with 0 differences: then
-  land it from bool-hat (`git checkout crates/kernel/tests/all.rs` first, see below; land.sh with the env above).
+- Landed 07:02: 25b06285 (Shell's self-interference check without its face-to-face proximity rule). The branch
+  bool-hat is done with.
 - branch bool-wip-seam (pushed, 900421d04) = that + the dock's seam work, uncommitted before: `free::seam_crossings`
   and `edge_in_face` cutting an edge's parts where it crosses a full-turn free-form face's seam, each part its own
   curve on the face (Pending::InFace now holds a curve per part). XEOF debug prints still in it.
@@ -65,7 +63,7 @@ RB_HOST inside for vibe7); docprof.py / featgap.py (per-document and per-feature
 made with ~/tmp/bool/docprof.sh); ~/agents/profile-in.py, profile-lines.py, profile-callers.py on vibe5 (copy to vibe7).
 The suite's per-feature kernel profiles count its own measuring (props_surface via face_json) against the next feature.
 
-**Landed 11-12 / 11-13:** d93e7f6f, 31d0d8ba, 78ef7ff8, 43e18118, 1766ff34, ca0e4044, 3770108f (extension-spring's
+**Landed 11-12 / 11-13:** d93e7f6f, 31d0d8ba, 78ef7ff8, 43e18118, 1766ff34, ca0e4044, 3770108f, 25b06285 (extension-spring's
 Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
