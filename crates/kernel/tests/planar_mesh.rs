@@ -171,3 +171,27 @@ fn mesh_big_face_bench() {
     ms.sort_by(f64::total_cmp);
     eprintln!("the {}-edge face: median {:.1} ms, best {:.1} ms, triangles' hash {sum:016x}", face.count(ShapeType::Edge), ms[ms.len() / 2], ms[0]);
 }
+
+/// A planar face whose boundary nodes lie almost in line, many of them (a Custom STL at a 0.002 mm chord:
+/// cf-spur-gear's sides in 35,908 nodes round its teeth): its slivers come out a hair flat or inverted in the points
+/// themselves (the triangulation's grid is 2^22 steps across the face), and the face still takes our triangulation,
+/// not BRepMesh's Delaunay (12 GB and 35 s for the gear). A 50 mm plate notched round its sides by R 1-3 mm arcs.
+#[test]
+fn a_notched_plate_at_a_tiny_chord_keeps_the_planar_triangulation() {
+    let mm = 1e-3;
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(50.0, 50.0, 5.0) * mm).unwrap();
+    let mut tools = Vec::new();
+    for k in 0..12 {
+        let t = 2.0 + 4.0 * k as f64;
+        let r = (1.0 + (k % 3) as f64) * mm;
+        for c in [DVec3::new(t * mm, 0.0, -mm), DVec3::new(t * mm, 50.0 * mm, -mm), DVec3::new(0.0, t * mm, -mm), DVec3::new(50.0 * mm, t * mm, -mm)] {
+            tools.push(make_cylinder(&Plane::new(c, DVec3::Z, DVec3::X), r, 7.0 * mm, TAU).unwrap());
+        }
+    }
+    let part = boolean(BooleanOp::Cut, &[plate], &tools, &BooleanOptions::default()).unwrap().shape;
+    let m = tessellate_export(&part, 4e-9, 10f64.to_radians()).unwrap();
+    assert_eq!(m.planar_fallbacks, 0, "a face went to BRepMesh");
+    let a: f64 = m.indices.chunks(3).map(|t| area(m.positions[t[0] as usize], m.positions[t[1] as usize], m.positions[t[2] as usize])).sum();
+    let want = surface_properties(&part).unwrap().mass;
+    assert!((a - want).abs() < 1e-5 * want, "area {a}, the part's {want}");
+}

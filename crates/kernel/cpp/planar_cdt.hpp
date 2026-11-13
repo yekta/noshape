@@ -495,6 +495,11 @@ inline bool triangulate(const std::vector<Pt>& pts, const std::vector<std::vecto
     }
     m.legalize(st);
   }
+  // (A sliver may come out flat or a hair inverted in the points themselves: each moved by half a grid step at most,
+  // its orientation by a step times its perimeter. cf-spur-gear's faces at a 0.002 mm chord: 35,908 nodes along
+  // nearly straight flanks, else BRepMesh's Delaunay took 12 GB.)
+  const double step = 1 / grid;
+  auto len = [&](int x, int y) { return std::hypot(pts[(size_t)x].x - pts[(size_t)y].x, pts[(size_t)x].y - pts[(size_t)y].y); };
   double sum = 0;
   for (size_t t = 0; t < nt; ++t)
     if (in[t])
@@ -503,7 +508,7 @@ inline bool triangulate(const std::vector<Pt>& pts, const std::vector<std::vecto
       if (a >= (int)np || b >= (int)np || c >= (int)np)
         return false;
       const double ar = detail::orient(pts[(size_t)a], pts[(size_t)b], pts[(size_t)c]);
-      if (!(ar > 0))
+      if (!(ar > -2 * step * (len(a, b) + len(b, c) + len(c, a))))
         return false;
       sum += ar / 2;
       tris.insert(tris.end(), {a, b, c});
