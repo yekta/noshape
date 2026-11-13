@@ -4,6 +4,17 @@ qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA)
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 
+
+## 11-13 03:10: the speed window is on vibe7 (lead)
+vibe5 runs the land queue, so the 02:00–04:00 window is on vibe7 (blend, dx, asm keep off it): bin/vibe7-window.sh (one night;
+re-arm it, after prebuilding both binaries on vibe7 through rb.sh from worktrees qa-speed / qa-bisect: release CLI + the
+ops test binary, debug and release), bin/hat-open.sh, bin/speed-at.sh. 11-13 was a new baseline (SCORE, INDEX.md), vibe7
+quiet at 02:00 (load 0.08): v0.4.46 vs head 91a90caf, debug speed 91.2 -> 91.4 % (77 -> 78 of 97), release 91.7 -> 92.0 % (81
+each); hat8 / hat15 "Mac mini hat" cold open 4.4-4.5 s, reopen (result store) 0.27 s, both builds the same; Mac-mini-2024 0.46 /
+0.23 s. Over live (head, release): c2-impeller-loft 12.7 s vs 2.8, c2-rings-loft 2.8 vs 1.6, c2-hunting-knife 1.2 vs 0.4,
+cf-part-draft 1.8 vs 1.2, cf-snap-hook 0.7 vs 0.3. The private hats are on vibe7 ~/lead-private (mode 700, read-only).
+qa-suites.sh keeps assemblies / exchange off vibe7 01:30-04:05. v0.4.47 checked (TICKETS); compat-loop against 0.4.47.
+
 ## From core, 2026-11-12 18:40: edge types compared by shape (lead 11-12)
 The model suite compares edge kinds by live's curve type, but live reports some straight edges as OTHER: Parasolid keeps the
 intersection curves it made when it extended faces (c2-impeller-loft's Flansch verbreitern: the x = 10 plane's two 80.0 mm

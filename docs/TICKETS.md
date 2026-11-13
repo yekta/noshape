@@ -479,6 +479,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - The 149 sketch scenarios on the released app (vibe7, 3 shards, e06b09c83's scenario files): 147/149, the same two as
     the candidate, 2 / 2 again alone: sketch-constraint-refusals (step 59 `.selection.count` live 0 / ours 1) and
     sketch-offset-key (step 10 `.focus.kind` live "other" / ours "none"), psui's.
+- **qa 01:30 (11-13), v0.4.47 checked (the patch: v0.4.46 + 00203ee9f; published 01:26, run 43332230400): no blocker.** Linux
+  assets match SHA256SUMS. User documents, released CLI against v0.4.46's (vibe5): hat15 142, hat15b 143, hat8 139, the dock 499
+  features, every feature and part the same. A right-click on each default plane in the graphics (released Linux app, a new
+  document, vibe3 :63, bin/planes-rclick.sh): v0.4.46 dies at Front ("cannot read PartStudioView while it is already being
+  updated"); v0.4.47 opens the plane's menu on Front, Top and Right and stays up.
 
 ## Release blockers for the 2026-11-12 05:00 release (qa list started 23:10 on 11-11; the latest release is v0.4.44)
 - **P0, the user's hat15 (Mac-mini-hat 15, private: vibe3 ~/lead-private/hat15.noshape, copies in ~/tmp/qa, mode 700): in v0.4.44

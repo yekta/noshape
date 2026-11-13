@@ -62,4 +62,8 @@ live and run in qa's 4-hourly run; coverage then grows as the owner writes more.
   document) of the same run: Speed 91.3 % (81 of 97 at or under live), index 91.4 (under load at 22:15: 90.2 %, 91.4). Built
   with --release instead: 91.6 %, the same 81 cases: the suite's debug build (our crates at opt-level 1, dependencies at 3)
   is kept.
-
+- 2026-11-13 03:10 UTC (lead, qa): **Speed is measured on vibe7** (8 cores; vibe5 runs the land queue and is never quiet), in a
+  02:00–04:00 UTC window other agents keep off. A different machine, so the 11-13 window is a new baseline, with v0.4.46
+  (e06b09c83) and main's head (91a90caf) built there and run side by side (load 0.9–1.9): debug (the suite's build) 91.2 % ->
+  91.4 % (77 -> 78 of 97 at or under live), release 91.7 % -> 92.0 % (81 each). Earlier speed rows are vibe5's EPYC (before 11-10
+  vibe3 / vibe2): compare speed only within a host.
