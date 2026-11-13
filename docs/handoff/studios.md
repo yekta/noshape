@@ -28,6 +28,22 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-13 12:58 UTC: live2's drawing tables batch and the studios feel batches
+- tables_live2_1013: a BOM's inner border drag moves only that border (left widens, right narrows; general tables keep
+  live 1613 (b)'s growing table), a narrowed BOM column wraps its text (`tables::cell_lines`, the row grows); BOM cells
+  open no editor; Tab in a note inserts a tab; "Switch to BOM : <assembly>"; Add leader leaves the new leader
+  selected; Centermark from 6 px on circles only. Cell menu, note keys, GD&T and surface finish panels already matched.
+  Open: Bring to front greyed on a just-placed table (REQUESTS 12:38; ours greys it only for a table alone).
+- Variable Studio grid (variableStudioGrid): arrows (↑/↓ wrap), Tab / Shift+Tab through the rows and the add row,
+  Enter / Backspace edit a selected cell, Enter after an edit moves down; row drag (badge + drop line, one undo step;
+  `variable.move` takes any `by` in a Variable Studio); the column grip 3-6 px inside the edge.
+- Versions panel: hover #def1fb, graph-column clicks open nothing. Feature Studio: Ace's line keys (Ctrl+/, Ctrl+D,
+  Ctrl+Shift+D, Alt+↑/↓, Alt+Shift+↑/↓; Cmd forms on a Mac). Its completion already lists keywords and snippets at the
+  top level and std inside a function (fs_complete tests), as live2's and qa's captures each saw.
+- Dimension palette: just right of the text, vertically centred. Projected view preview: ours snaps at 22.5° both
+  ways; live2's coarse sweep put the side/iso boundary at 25-30° (250 px) and 20-25° (400 px), top at 20-25° from
+  vertical: left as is until a finer sweep.
+
 ### 2026-11-13 10:24 UTC: the Mac mini as build host (lead's one-day trial): wall times against vibe6
 `NOSHAPE_RB_HOST=mac` (Apple M6, 2 slots of 6 jobs shared with psui; ~/noshape-host). Scenario runs stay on vibe6.
 Wall = rb.sh start to end (sync, build, run), the same tree on both:
