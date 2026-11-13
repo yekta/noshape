@@ -5032,14 +5032,13 @@ impl AssemblyView {
             });
         let grab = self.ui.hud_grab.clone();
         let (d2, d3, d4) = (dialog.clone(), dialog.clone(), dialog);
-        // Live (assembly/35, 93; dom/mate-hud.txt): the 310×51 panel is
-        // centred over the second pick with its bottom edge on it, kept
-        // inside the graphics area (pushed in from the right edge in 93).
+        // Live2 (REQUESTS 18:20, mate-toolbar-flip-q.png): the 310×51 panel's top left ~12 px right of and 14 px
+        // below the second pick, kept inside the graphics area (pushed in from the right edge, live 93).
         let (o, size) = { let vp = self.viewport.read(cx); (vp.origin(), vp.size()) };
         let (bx, by) = (f64::from(f32::from(o.x)), f64::from(f32::from(o.y)));
         let (bw, bh) = (size.x, size.y);
-        let x = (at.x - 155.).min(bx + bw - 310. - 10.).max(bx + 4.);
-        let y = (at.y - 51.).min(by + bh - 51. - 4.).max(by + 4.);
+        let x = (at.x + 12.).min(bx + bw - 310. - 10.).max(bx + 4.);
+        let y = (at.y + 14.).min(by + bh - 51. - 4.).max(by + 4.);
         div()
             .id("mate-hud")
             .absolute()

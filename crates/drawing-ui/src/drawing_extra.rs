@@ -304,25 +304,11 @@ impl DrawingEditor {
         }
     }
 
-    /// Pin view reference / Unpin view reference: every base view of the
-    /// source (and part), on every sheet.
     /// Pin reference / Unpin reference: another document's version kept (no update notice, Update all leaves it).
     pub fn lock_reference(&mut self, tab: TabId, part: Option<noshape_model::BodyId>, lock: bool, cx: &mut Context<Self>) {
         self.edit(if lock { "Pin reference" } else { "Unpin reference" }, cx, |d| {
             noshape_ops::workspace_update::pin_drawing_reference(d, tab, part.as_ref(), lock);
         });
-    }
-
-    pub fn pin_reference(&mut self, tab: TabId, part: Option<noshape_model::BodyId>, pin: Option<noshape_model::drawing::PinnedVersion>, cx: &mut Context<Self>) {
-        let name = if pin.is_some() { "Pin view reference" } else { "Unpin view reference" };
-        self.edit(name, cx, |d| {
-            for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()) {
-                if matches!(&v.kind, ViewKind::Base { source, part: p, .. } if *source == tab && *p == part) {
-                    v.pinned = pin.clone();
-                }
-            }
-        });
-        self.ensure_sources(false, cx);
     }
 
     /// Drawing tab › Change to version…: every base view on every sheet shows
@@ -338,10 +324,9 @@ impl DrawingEditor {
 
     /// The reference row's menu (live dom/context-menus-drawing-sheets.txt):
     /// Switch to reference | Replace... (on every sheet; the chooser) |
-    /// Change configuration... (configured sources), then Unpin view
-    /// reference on a pinned one.
+    /// Change configuration... (configured sources), then on a version Pin /
+    /// Unpin reference and Update linked document....
     fn reference_menu(&self, tab: TabId, part: Option<noshape_model::BodyId>, pin: Option<&noshape_model::drawing::PinnedVersion>, cx: &App) -> Vec<MenuEntry> {
-        let pinned = pin.is_some();
         let other = pin.filter(|p| p.id.starts_with("ext:"));
         let replaced = part.clone();
         let shown = part.clone();
@@ -373,21 +358,16 @@ impl DrawingEditor {
             let part = part.clone();
             out.push(MenuEntry::item("Change configuration...", move |t, w, cx| t.open_change_config(tab, part.clone(), w, cx)));
         }
-        // Another document's version (live 2303): Pin reference (Unpin reference once pinned), Update linked
-        // document... (the Reference manager).
-        if let Some(p) = other {
+        // A version, another document's (live 2303) or this one's (live2 drw-ref-unpin-view-reference: after a
+        // Selective update to V1): Pin reference (Unpin reference once pinned), Update linked document... (the
+        // Reference manager).
+        if let Some(p) = pin {
             let part = part.clone();
             out.push(match p.locked {
                 true => MenuEntry::item("Unpin reference", move |t, _, cx| t.lock_reference(tab, part.clone(), false, cx)),
                 false => MenuEntry::item("Pin reference", move |t, _, cx| t.lock_reference(tab, part.clone(), true, cx)),
             });
             out.push(MenuEntry::item("Update linked document...", |t, _, cx| t.open_ref_manager(cx)));
-            return out;
-        }
-        // A pinned one (from before): Unpin view reference. Live (live2 2273) has no Pin view reference for a
-        // reference in this document: pinning is for another document's version.
-        if pinned {
-            out.push(MenuEntry::item("Unpin view reference", move |t, _, cx| t.pin_reference(tab, part.clone(), None, cx)));
         }
         out
     }

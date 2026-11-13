@@ -5249,7 +5249,7 @@ impl AssemblyView {
     }
 
     /// Shift+X / Section view…: open the dialog (from the hovered face or the
-    /// selected mate connector, else the Front plane); with the
+    /// selected mate connector, else empty: live part-studio/70, live2 18:20); with the
     /// dialog open it cancels; with a section on and no dialog it turns it off.
     pub(super) fn toggle_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         match &self.ui.section {
@@ -5282,11 +5282,6 @@ impl AssemblyView {
             && let Some(f) = self.result.connector_frame(id)
         {
             planes.push(AsmSectionPlane::new(f.origin, f.z(), f.x()));
-        }
-        // Nothing to cut along (the camera menu's Section view…): the Front plane (live2 asm-views.json sectionView:
-        // "Section plane 1 (Front)").
-        if planes.is_empty() {
-            planes.push(AsmSectionPlane::new(DVec3::ZERO, DVec3::NEG_Y, DVec3::X));
         }
         let active = planes.len().saturating_sub(1);
         self.ui.section = Some(AsmSection { planes, include: false, items: Vec::new(), dialog: Some(AsmSectionDialog { items_active: false, active, chosen: true, saved, popup: None, popup_plane: None }) });

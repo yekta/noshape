@@ -491,7 +491,6 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Third angle", Op("drawing_properties")),
     ("drawing:This target", Op("drawing_annotation_edit")),
     ("drawing:Unmerge cells", Op("drawing_table_edit")),
-    ("drawing:Unpin view reference", Op("drawing_view_edit")),
     ("drawing:Vertical to...", Op("drawing_view_edit")),
     ("drawing:Vertically", Op("drawing_view_edit")),
     ("drawing:View properties...", Op("drawing_view_properties")),

@@ -139,7 +139,7 @@ pub fn pin_drawing_reference(d: &mut noshape_model::drawing::Drawing, source: Ta
     let mut n = 0;
     for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()) {
         let ours = matches!(&v.kind, ViewKind::Base { source: s, part: p, .. } if *s == source && p.as_ref() == part);
-        if let Some(p) = v.pinned.as_mut().filter(|p| ours && p.locked != pin && p.id.starts_with("ext:")) {
+        if let Some(p) = v.pinned.as_mut().filter(|p| ours && p.locked != pin) {
             p.locked = pin;
             n += 1;
         }
