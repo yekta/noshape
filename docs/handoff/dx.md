@@ -17,6 +17,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 /root/dx-scratch/bg.sh <log> "<cmd>". Live: `cd /root/live-pw && node dxr.mjs -e "…"` drives dx's own Chrome tab
 (target id in /root/dx-scratch/live/.dx-tab).
 
+## 11-13 17:29 UTC: Export dialog defaults as live2's capture (export_live2_1730): nothing to change
+- Formats (Part Studio 12, assembly without RHINO and with URDF before STL), the common options, each format's
+  controls and defaults, the file name (the tab's, never remembered) and the memory (last format and its options, per
+  user, every tab / document type, after a restart: SolidExportPrefs, config_dir export_solid.json, saved on Export)
+  are ours already. Live2's account showed STEP "Include derived tolerances" ☑, PVZ "Group composite parts" ☑ and STL
+  in Millimeter: that account's remembered choices (behaviours G47 10-21: ☐ and ☐; 922: STL "sticky Meter"; 705:
+  Group sticky), so our first-time defaults stay.
+
 ## 11-13 15:39 UTC: asm-tvc-mount parked (branch dx-tvc); the box integral gating (branch dx-box)
 - tvc-mount: Studio 7bc9d8's Derived 2 takes 41b795's parts; the suite has 41b795 (an instance's studio) but never
   gave it to the Derived (`derivedSources` only from derived/). dx-tvc e8a97d330: a studio's Derived from a sibling
