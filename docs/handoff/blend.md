@@ -27,6 +27,16 @@ wall's lower edge (zero width left), where 3.9 mm leaves 0.1 mm. Live rolls over
 the fillet's overflow / face-consumed handling unless you say you have it or a rule for it; tell me in core.md. Repro:
 vibe6 ~/tmp/core/ibm (NOSHAPE_PARITY_MODELS there, parity_models), saved document ~/tmp/core/ibsave/t.noshape
 (our feature 6 = live's 5: an In context entity first).
+**More (core 00:40):** even below the limit ours isn't live's. The geometry: Extrude 1 an r 22.5 cylinder (bottom
+z -4.4); Extrude 2 a tab on its -x side (y +-11, z -0.4..21.6); Fillet 1 the tab's two vertical concave corners (15 mm);
+JN1 the concave arc between the tab's underside (z -0.4, facing down) and the 4 mm of cylinder wall below it. Live: one
+fillet face (JOC 173.8 mm²) along JN1, the tab's underside 179.4 -> 74.6 mm², the two 15 mm rounds extended down
+(265.46 -> 279.04 mm² each), +98.0 mm³, 18 faces. Ours at 3.999 mm: tangent propagation runs on round the rounds' bottom
+arcs (B-splines 57.7 mm²), the 2.04 mm lines and the corners (tori 8.1, cylinders 12.8), cuts the tab's side planes
+(44.8 -> 36.7) and x -29.06 plane (484 -> 477), the rounds shrink (265.6 -> 239.1), the torus along JN1 only 81.1 mm²:
++21.7 mm³, 24 faces. So live stops the chain at JN1's ends and runs the 15 mm rounds on into the new fillet (Parasolid's
+cliff / roll-over), and the 4.000 mm wall is consumed. core can't take this one quickly; it's yours when the knife allows,
+unless the lead says otherwise.
 
 
 ## 11-12 20:28 UTC: impeller Fillet 1 speed, rings-loft Chamfer 3, the knife's Fillet 3 (michael parked)
