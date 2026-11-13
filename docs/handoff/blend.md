@@ -16,6 +16,19 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
 **c2-rings-loft stops at feature 20, Extrude 5 (core's):** the engraving cut's edges are split at the revolved ring's
 seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs live 335/206); Parasolid has no seams.
 
+## From bool (11-13 03:55 UTC, lead: documents slower than live, by feature)
+Baseline qa's 02:00 vibe7 release run (head 91a90caf); per feature ours from a profiled suite run on vibe5 (loaded: rough),
+live's from live.jsonl per_feature_ms. Yours:
+- c2-hunting-knife (1.2 s, live 0.4): Fillet 2 ~300 ms (live 10), Fillet 3 ~160 (live 11); Chamfer 1 ~775 (live 19), its
+  Boolean bool2's 343b971e.
+- c2-rings-loft: Chamfer 1 366 ms (live 30).
+- c2-variable-fillet-faceblend: Face blend 1 540 ms (live 25).
+- learning-center-michael: Fillet 2 400 ms (live 46).
+- cf-snap-hook: Fillet 6 126 ms (live 8).
+- c2-impeller-loft: Fillet Ansaugflansch zum Gehaeuse leaves 9 vertices of 1.1-1.8 mm tolerance (bool2's 22:40 note), which
+  put the two flange-hole extrudes' Booleans on OCCT (~3.1 and ~1.4 s against live's 177 and 59 ms).
+- The private dock (E2 tab): a rib round, op_fillet 1.8 s of its 2.6 s; hat8 / hat15: a chamfer ~460 ms.
+
 ## From core (11-13 00:30 UTC, lead): core works on isaac-ball's Fillet 2 in the fillet builder
 Where tangent propagation stops (JN1 concave, the 15 mm rounds' bottom arcs convex: likely a convexity change ending
 live's chain) and extending the neighbouring rounds into the new fillet. Gate: your suites and corpus (I'll read your

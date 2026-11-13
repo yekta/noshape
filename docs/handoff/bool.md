@@ -4,33 +4,26 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-13 00:34 UTC; lead: the tangent fillet-tool pairs, then tpd's sections, then rings-loft's Shell 1)
-- **Landed 11-12:** d93e7f6f (the knife's Mirror 1: faces apart across a slab, Boolean 242 -> 31 ms), 31d0d8ba
-  (cf-snap-hook's Fillet 5: circle-profile revolutions against coaxial tori in exact circles, 57-69 -> 21-23 ms),
-  78ef7ff8 (c2-tpd-fillet-variable's Fillet 1: `plane_tube_sections`, a plane against a one-span quadratic B-spline
-  round, sections ahead 56-62 -> 34-36 ms). qa's af34f732b pattern-direction P0: fixed and landed in the morning.
-- **c2-rings-loft's Shell 1 (by_quadrics), landed 43e18118 (22:30) and 1766ff34 (00:33):**
-  - the self-interference check tests edge / face pairs that don't touch, and vertex / face pairs, as points against
-    the face's mesh (BVH range query, `quad::mesh_within`): 703 + 726 pairs out, the check 232-266 -> 124-134 ms;
-  - the repair's "no nearer a kept face than the wall" takes the kept face's mesh (made when first asked, a
-    twentieth of the wall) and measures exactly only near the wall: 250 -> 58 exact distances;
-  - `quad::eval` / `eval_grad` ask NextValueOfUV without maxpreci (a point a wall off the surface is never within it,
-    so every call also ran UVFromIso's iso projections): Shell 1 773-850 -> 580-603 ms, Shell Gehäuse 941-980 ->
-    777-812 ms (vibe5 quiet, alternated); last digits only, topology and printed sizes the same on the five dumps;
-  - `normal_at` keeps a projector per surface for the Shell (a thread's, cleared by each Shell): Gehäuse's offsets
-    97-116 -> 30-38 ms, corners 193-204 -> 152-159 ms; byte-identical.
-  - Overall Shell 1 (probe, vibe5): ~950 -> ~580 ms; live 235 ms.
-- **Left in Shell 1 (probe laps under load, ms):** repair ~300-440 (traces 160: Newton in `quad::eval` itself; joins
-  80), edges 150-190 (GeomAPI_IntSS), faces 100-150 (ShapeConstruct_ProjectCurveOnSurface in `add_pcurve`),
-  self-interference ~100 (the 164 edge / face pairs sharing a vertex with the face: OCCT's BeanFaceIntersector, one
-  pair 71 ms), volumes 30-40, thin check 25-45.
-- **Tried, not kept:** `eval_grad_near`'s NextValueOfUV without maxpreci (1e-3 x the part's size, also always below
-  the wall): byte-identical, no clear gain under load 27; to measure again in a quiet 02:00-04:00 window.
-- **Scratch:** dumps and profilers now on vibe5 (~/agents/bool-cases/{rl,imp}-dump, ~/agents/profile*.py:
-  profile-lines.py <log> shell.cpp ranks shell.cpp lines); the probe (crates/kernel/tests/xprobe.rs, sampler.rs) in
-  /root/bool-scratch/xprobe-1112.rs, sampler-1112.rs, hooked by probe-allrs.patch. Gates one at a time:
-  /root/bool-scratch/gate-chain.sh <sha> (main's gate first, then the branch's; vibe5's earlyoom killed the ops link
-  when both built at once).
+## bool, now (11-13 03:55 UTC; lead: documents slower than live, for any reason)
+- **Landed 11-13:** ca0e4044 (Shell's offset edges take the original curve when within tolerance), 3770108f
+  (c2-extension-spring's Mirror 1 ours: OCCT's sections along an edge of both faces dropped, 88 ms vs OCCT 377; Shell
+  builds a hollow (no face removed) and checks walls of planes / cylinders / cones / spheres / tori on one thread:
+  cf-lighten's hollows 20-55 -> 8-16 ms; a NURBS curve's length from a per-span table: cf-surface-pattern's 85-tool cut
+  ~10 % quicker). Before: 43e18118 / 1766ff34 (rings-loft Shell 1 ~950 -> ~580 ms on the probe).
+- **Gating:** 05921b9da, Shell's self-interference check without its face-to-face proximity rule (snap hook's Shell check
+  73-80 -> 42-61 ms, rings-loft's 165-195 -> 136-171; byte-identical).
+- **Ranking (qa's 02:00 vibe7 release run, ours minus live):** impeller +9.9 s, rings-loft +1.2, knife +0.76, part-draft
+  +0.58, snap-hook +0.45, face-blend +0.33, valve-config +0.27. Per feature, hand-offs in core.md / blend.md (11-13 03:55).
+  bool's: rings-loft Shell 1; snap-hook's Shell 1 and Snap Hook Booleans; the knife's Mirror 1.
+- **Private documents (mode-700 copies, vibe5 ~/tmp/bool/private; nothing of them in the repo):** the dock's three biggest
+  tabs record 44 Booleans, 18 ours (all as OCCT); 12 declines "an edge on another argument's free-form face", ~4.9 s of
+  OCCT: a small arc (r 0.4 mm) on a ball-ended face that goes a whole turn round (periodic B-spline), crossing its
+  seam; `free::projected` sees the parameter jump and fails. Needs the edge split at the seam and its curve on the face
+  in two parts (the face's pcurves hold one curve an edge today). Debug prints: /root/bool-scratch/xeof-debug.patch.
+  Next after it: a 1355-face cut "a point near two vertices" (1.24 s), "a new edge on a free-form face" (589 ms), "a
+  non-manifold result" (582 ms). hat8: its biggest Boolean ours 1.44 s (794 Rust, 565 build): speed.
+- **Profiling tools (vibe5):** ~/tmp/bool/docprof.sh + /root/bool-scratch/docprof.py (each suite document alone,
+  kernel profile + Shell paths), featgap.py (ours vs live per feature), ~/agents/profile-callers.py.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
 - **asm-hand-drill-pinslot's Sweep 1 (lead 11-13 00:35, 03:30), 11-13 03:50 UTC, gating 55e4b476 (branch bool2-cov):**

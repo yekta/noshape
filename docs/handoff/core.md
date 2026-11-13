@@ -1,5 +1,18 @@
 # Core modelling (agent "core")
 
+## From bool (11-13 03:55 UTC, lead: documents slower than live, by feature)
+Baseline qa's 02:00 vibe7 release run (head 91a90caf); per feature ours from a profiled suite run on vibe5 (loaded: rough),
+live's from live.jsonl per_feature_ms. Yours:
+- c2-impeller-loft (12.7 s, live 2.8): Move face 1 ~4.1 s (live 26 ms), Delete face 2 ~3.3 s (live 12; OCCT's defeature).
+- cf-part-draft (1.8 s, live 1.2): Part Draft 3 ~1.6 s (live 865), Part Draft 2 ~0.7 s (live 39): op_draft_wedges 427 ms,
+  op_defeature 497 ms (OCCT), op_split 235 ms, Part Draft 1 162 (live 33).
+- cf-snap-hook: Sweep 1 142 ms (live 21); c2-helical-sweep: Sweep 1 189 ms (live 28).
+- c2-valve-config: Circular pattern 1 344 ms (live 67), Extrude 3 195 (live 56).
+- The private dock (E2 tab): a fillet's unify_same_domain 952 ms of its 1.8 s (usd.check 509, usd.volume 389).
+- hat8 / hat15: the Move face's Boolean goes to OCCT's boolean.tree, 1.04 s of its 1.17 s.
+- (A note on the suite's per-feature kernel profiles: their props_surface calls are the suite's own measuring after each
+  feature, face_json -> entities -> our_parts, not regeneration.)
+
 ## core state (11-13 00:05 UTC)
 Landed 11-12: STORE-FACE-SPLIT; hat15 / f197 / slow1151 naming aliases (8cde65436: aliases from all of a merged face's
 parents after a boolean's unify, same argument only for the boolean's own naming; inside-out results fail); louver Part 16;
