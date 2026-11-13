@@ -5438,9 +5438,6 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         Geo::Nurbs { id, .. } if cx.ncurves[id as usize].sec.is_some() => cx.ncurves[id as usize].acc,
         _ => 0.0,
     };
-    if !cx.pool.regroup.lock().expect("the groups").is_empty() {
-        return Err(Decline("vertices to merge first"));
-    }
     // (Each chain's parameters on its curve where split_params found it (not one turned from another period's):
     // pieces_at then skips finding them again, a B-spline's point search each.)
     let section_ts: Vec<std::sync::OnceLock<Vec<f64>>> = (0..cx.sections.len()).map(|_| std::sync::OnceLock::new()).collect();
@@ -5488,8 +5485,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     })?
     .into_iter()
     .zip(own_ts);
-    // (Vertices to merge found splitting the curves: done again from the start before the pieces are classified
-    // (cf-surface-pattern's 85 tools: two rounds of 0.85 s each, 240 and 18 groups).)
+    // (Vertices to merge found at the crossings or splitting the curves: done again from the start before the pieces
+    // are classified, both kinds found in one round (cf-surface-pattern's 85 tools: 16 groups at the crossings, then
+    // 379 splitting, each a round of its own before).)
     if !cx.pool.regroup.lock().expect("the groups").is_empty() {
         return Err(Decline("vertices to merge first"));
     }
