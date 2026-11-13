@@ -3756,7 +3756,23 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
     const GeomAbs_SurfaceType kind = GeomAdaptor_Surface(sn).GetType();
     // (Also a surface of extrusion or revolution: GeomProjLib's curve on one fell short of the edge's ends,
     // c2-rings-loft's top.)
-    if (kind == GeomAbs_BSplineSurface || kind == GeomAbs_OffsetSurface || kind == GeomAbs_SurfaceOfExtrusion || kind == GeomAbs_SurfaceOfRevolution || kind == GeomAbs_BezierSurface)
+    // An offset edge traced on the offset of the original's surface keeps the original's curve there (the same
+    // parameters on both): taken where it lies closer to the edge than the projection.
+    const bool keeps_original = !co.IsNull() && kind == GeomAbs_OffsetSurface && a >= f0 - 1e-9 && b <= f1 + 1e-9;
+    auto       worst          = [&](const occ::handle<Geom2d_Curve>& p2) {
+      double w = 0;
+      for (int k = 0; k <= 16; ++k)
+      {
+        const double   s  = a + (b - a) * k / 16;
+        const gp_Pnt2d uv = p2->Value(s);
+        w                 = std::max(w, sn->Value(uv.X(), uv.Y()).Distance(c3->Value(s)));
+      }
+      return w;
+    };
+    // (Within the tolerance it is taken whatever the projection: no projection then.)
+    if (keeps_original && worst(co) <= tol)
+      cn = occ::down_cast<Geom2d_Curve>(co->Copy());
+    else if (kind == GeomAbs_BSplineSurface || kind == GeomAbs_OffsetSurface || kind == GeomAbs_SurfaceOfExtrusion || kind == GeomAbs_SurfaceOfRevolution || kind == GeomAbs_BezierSurface)
     {
       ShapeConstruct_ProjectCurveOnSurface pcs;
       pcs.Init(sn, Precision::Confusion());
@@ -3781,20 +3797,8 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
         }
       }
 
-      // An offset edge traced on the offset of the original's surface keeps the original's curve there (the same
-      // parameters on both): taken where it lies closer to the edge than the projection.
-      if (!co.IsNull() && GeomAdaptor_Surface(sn).GetType() == GeomAbs_OffsetSurface && a >= f0 - 1e-9 && b <= f1 + 1e-9)
+      if (keeps_original)
       {
-        auto worst = [&](const occ::handle<Geom2d_Curve>& p2) {
-          double w = 0;
-          for (int k = 0; k <= 16; ++k)
-          {
-            const double   s  = a + (b - a) * k / 16;
-            const gp_Pnt2d uv = p2->Value(s);
-            w                 = std::max(w, sn->Value(uv.X(), uv.Y()).Distance(c3->Value(s)));
-          }
-          return w;
-        };
         // (On a closed surface the original's (a seam's two each on its own side, an edge to the seam's corner on the
         // side it comes to it from): the projection can put a point of the seam on either.)
         // (And wherever the original's lies on it within the tolerance: an offset surface's extension can come back
