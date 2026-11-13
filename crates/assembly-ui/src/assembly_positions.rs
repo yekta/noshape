@@ -544,6 +544,19 @@ impl AssemblyView {
                     .overflow_y_scroll()
                     .pt(px(2.))
                     .child(table)
+                    // Live2 mates.json named_positions_panel: with none yet, what they are for and the help link.
+                    .when(asm.named_positions.is_empty(), |d| {
+                        d.child(
+                            v_flex()
+                                .mt(px(24.))
+                                .px(px(40.))
+                                .items_center()
+                                .text_size(px(13.33))
+                                .text_color(pal.text_muted)
+                                .child(div().text_center().child("Add named positions to precisely locate parts and subassemblies. Create multiple positional variations of an assembly to capture mate positions and subassembly positions."))
+                                .child(div().id("np-learn").mt(px(4.)).font_weight(FontWeight::BOLD).text_color(rgb(0x094174)).underline().cursor_pointer().child("Learn more about assembly named positions.").on_click(|_, _, cx| noshape_app_core::help::open("Named positions", cx))),
+                        )
+                    })
                     .when(drivers.is_empty() && asm.position_subs.is_empty() && !asm.named_positions.is_empty(), |d| {
                         d.child(
                             // Live 150: flush with the table's left edge, 6 px from the right.

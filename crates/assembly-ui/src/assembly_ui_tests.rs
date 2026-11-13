@@ -1037,3 +1037,54 @@ fn an_opening_assembly_says_it_is_loading(cx: &mut TestAppContext) {
     });
     assert_eq!(cx.update(|cx| view.read(cx).loading_message()), Some("Loading studio data…"));
 }
+
+/// Live2 fields.json contextMenus.twoInstances (rules dropped; "Add comment" is cloud): Dynamic suppression ▸,
+/// Check interference… before the mate items, "Replace instances…", Clear selection before Delete.
+#[gpui::test]
+fn two_selected_instances_have_lives_list_menu(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "two-menu");
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let (p1, p2) = (instance(v, "Part 1 <1>", cx), instance(v, "Part 2 <1>", cx));
+            v.selected = vec![p1, p2];
+            let got: Vec<String> = labels(&v.instance_menu(p1, false, cx)).into_iter().filter(|l| l != "—").collect();
+            let live = [
+                "Hide", "Hide other instances", "Hide all instances", "Show center of mass", "Isolate…", "Make transparent…", "Suppress", "Dynamic suppression ▸", "Fix",
+                "Use best available tessellation", "Check interference…", "Replace instances…", "Copy 2 items", "Move to new subassembly", "Change to version…", "Export…",
+                "Release…", "Zoom to selection", "Add selection to folder…", "Create empty subassembly", "Clear selection", "Delete",
+            ];
+            assert_eq!(got, live);
+        })
+    })
+    .unwrap();
+}
+
+/// Live 3d.json implicit_mate_connectors_in_a_mate_dialog: over a planar face the preview connector is the face's
+/// centroid wherever the pointer is on the face (here right by a corner's dot); with Shift locking the face's points
+/// the nearest one is taken.
+#[gpui::test]
+fn a_faces_connector_is_its_centroid_wherever_the_pointer_is(cx: &mut TestAppContext) {
+    use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
+    let (window, view) = pattern_assembly(cx, "face-centroid");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Fastened, w, cx);
+            let top = face_connector(v, "Part 1 <1>", true, cx);
+            let Reference::Implicit { on, .. } = &top.reference else { panic!("an implicit connector") };
+            let id = instance(v, "Part 1 <1>", cx);
+            let occ = v.result.occurrences.iter().position(|o| o.top() == id).unwrap();
+            v.hover = Some(AsmPickTarget { path: vec![id], reference: (**on).clone(), kind: PickKind::Face, occ, anchor: None });
+            v.update_inference(cx);
+            let (_, _, cands) = v.infer.clone().expect("the face's points");
+            let corner = cands.iter().find(|c| matches!(c.reference, Reference::Implicit { inference: Inference::Vertex, .. })).expect("a corner").frame.origin;
+            let o = &v.result.occurrences[occ];
+            v.pointer = v.viewport.read(cx).project(o.transform.transform_point3(corner)).unwrap() + glam::DVec2::new(3.0, 3.0);
+            v.update_inference(cx);
+            assert_eq!(v.infer_choice, Some(0), "the centroid");
+            v.infer_locked = true;
+            v.update_inference(cx);
+            assert_ne!(v.infer_choice, Some(0), "Shift: the corner by the pointer");
+        })
+    })
+    .unwrap();
+}

@@ -289,7 +289,16 @@ impl AssemblyView {
 
     /// Set (or remove, `None`) the "Unsuppressed if" expression.
     pub(super) fn set_dynamic_suppression(&mut self, target: DynTarget, text: Option<String>, cx: &mut Context<Self>) {
-        self.edit(noshape_ops::assembly::DYNAMIC_SUPPRESSION_DESCRIPTION, cx, |a| noshape_ops::assembly::set_unsuppressed_if(a, target, text));
+        // An instance in a multi-selection: all of the selection's (live2 fields.json, two instances' menu).
+        let targets: Vec<DynTarget> = match target {
+            DynTarget::Instance(id) if self.selected.len() > 1 && self.selected.contains(&id) => self.selected.iter().map(|i| DynTarget::Instance(*i)).collect(),
+            t => vec![t],
+        };
+        self.edit(noshape_ops::assembly::DYNAMIC_SUPPRESSION_DESCRIPTION, cx, |a| {
+            for t in targets {
+                noshape_ops::assembly::set_unsuppressed_if(a, t, text.clone());
+            }
+        });
         self.refresh_scene(true, cx);
         cx.notify();
     }
@@ -535,9 +544,23 @@ impl AssemblyView {
     /// Edit in context of the occurrence at `path` (a part inside a
     /// subassembly too, live 1723).
     pub(super) fn edit_in_context_at(&mut self, path: Vec<InstanceId>, existing: Option<u32>, cx: &mut Context<Self>) {
+        self.open_in_context(path, Some(existing), cx);
+    }
+
+    /// A double-click on an instance row (live2 fields.json doubleClickInstance): its Part Studio with the part
+    /// selected and the assembly shown round it under "<assembly> displayed", no context made.
+    pub(super) fn show_in_context(&mut self, path: Vec<InstanceId>, cx: &mut Context<Self>) {
+        self.open_in_context(path, None, cx);
+    }
+
+    /// The Part Studio of the occurrence at `path` with the assembly round it; `context`: `Some(existing)` makes (or
+    /// reuses) an assembly context there (Edit in context), `None` only displays the assembly.
+    fn open_in_context(&mut self, path: Vec<InstanceId>, context: Option<Option<u32>>, cx: &mut Context<Self>) {
         let Some(inst) = self.occurrence_instance(&path, cx) else { return };
         if matches!(inst.source, InstanceSource::External { body: Some(_), .. }) {
-            self.edit_in_context_other(path, cx);
+            if context.is_some() {
+                self.edit_in_context_other(path, cx);
+            }
             return;
         }
         let Some(studio) = inst.source.studio() else { return };
@@ -562,7 +585,7 @@ impl AssemblyView {
             _ => None,
         };
         let camera = Some(self.camera_in(to_studio, cx));
-        let context = self.add_assembly_context(studio, Some(path), existing, to_studio, None, cx);
+        let context = context.and_then(|existing| self.add_assembly_context(studio, Some(path), existing, to_studio, None, cx));
         cx.emit(AssemblyViewEvent::EditInContext(studio, Box::new(crate::assembly_context::AssemblyContext { assembly: self.tab, assembly_name, part, occurrences, insert_at: None, camera, context, other: None })));
     }
 

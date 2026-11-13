@@ -257,6 +257,8 @@ pub struct AsmUi {
     pub filter_focused: bool,
     /// Instance row under the cursor in the list (highlighted in the viewport).
     pub list_hover: Option<InstanceId>,
+    /// The instances of the explode step row under the pointer (outlined orange, live2 asm-views.json activate).
+    pub step_hover: Vec<InstanceId>,
     /// Last clicked instance row: the anchor of Shift+click ranges.
     pub list_anchor: Option<InstanceId>,
     /// Pattern rows a Shift+click range ran over (selected with the
@@ -1179,8 +1181,8 @@ impl AssemblyView {
         } else {
             let sup = if suppressed { "Unsuppress" } else { "Suppress" };
             m.push(item(if graphics { format!("{sup} {name}") } else { sup.to_string() }, move |t, _, cx| t.set_suppressed(tg.clone(), !suppressed, cx)));
-            // Dynamic suppression ▸ Add expression…
-            if !graphics && !multi {
+            // Dynamic suppression ▸ Add expression… (live2 fields.json: for two instances too, all of them).
+            if !graphics {
                 m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Instance(top), false));
             }
         }
@@ -1197,17 +1199,19 @@ impl AssemblyView {
         // locales/de-menu-long-asm-instance-*): with mates, "Show mates" and
         // "Hide mates" follow Use best available tessellation in both menus
         // (they show / hide the selected instances' mates).
-        let mates: Vec<MateId> = asm.mates.iter().filter(|mt| mt.instances().iter().any(|i| targets.contains(i))).map(|mt| mt.id).collect();
-        if !mates.is_empty() {
-            let ids = mates.clone();
-            m.push(item("Show mates", move |t, _, cx| t.set_mates_hidden(ids.clone(), false, cx)));
-            m.push(item("Hide mates", move |t, _, cx| t.set_mates_hidden(mates.clone(), true, cx)));
-        }
-        // (With mates too: their order against Check interference… is
-        // UNCONFIRMED.)
+        // Live2 fields.json (two instances): Check interference… then, past a rule, Show mates / Hide mates.
         if is_asm || multi {
             let tg = targets.clone();
             m.push(item("Check interference…", move |t, _, cx| t.open_interference_with(tg.clone(), cx)));
+        }
+        let mates: Vec<MateId> = asm.mates.iter().filter(|mt| mt.instances().iter().any(|i| targets.contains(i))).map(|mt| mt.id).collect();
+        if !mates.is_empty() {
+            if multi {
+                m.push(MenuEntry::Sep);
+            }
+            let ids = mates.clone();
+            m.push(item("Show mates", move |t, _, cx| t.set_mates_hidden(ids.clone(), false, cx)));
+            m.push(item("Hide mates", move |t, _, cx| t.set_mates_hidden(mates.clone(), true, cx)));
         }
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
@@ -1285,7 +1289,9 @@ impl AssemblyView {
         if !suppressed {
             edit.push(item(
                 match (graphics, multi) {
-                    (_, true) => format!("Replace {} instances…", targets.len()),
+                    (true, true) => format!("Replace {} instances…", targets.len()),
+                    // Live2 fields.json: the list's two-instance menu says "Replace instances…".
+                    (false, true) => "Replace instances…".to_string(),
                     (true, false) => format!("Replace {name}…"),
                     (false, false) => "Replace instances…".to_string(),
                 },
@@ -1444,6 +1450,13 @@ impl AssemblyView {
             });
         }
         m.push(item("Create empty subassembly", |t, _, cx| t.create_empty_subassembly(cx)));
+        // Live2 fields.json (two instances): Clear selection before Delete.
+        if multi {
+            m.push(item("Clear selection", |t, _, cx| {
+                t.clear_selection();
+                t.refresh_scene(false, cx);
+            }));
+        }
         m.push(MenuEntry::Sep);
         let tg = targets;
         m.push(icon_item("Delete", "delete", move |t, _, cx| t.delete_instances(tg.clone(), cx)));
@@ -5188,7 +5201,7 @@ impl AssemblyView {
     }
 
     /// Shift+X / Section view…: open the dialog (from the hovered face or the
-    /// selected mate connector, else empty: live part-studio/70); with the
+    /// selected mate connector, else the Front plane); with the
     /// dialog open it cancels; with a section on and no dialog it turns it off.
     pub(super) fn toggle_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         match &self.ui.section {
@@ -5221,6 +5234,11 @@ impl AssemblyView {
             && let Some(f) = self.result.connector_frame(id)
         {
             planes.push(AsmSectionPlane::new(f.origin, f.z(), f.x()));
+        }
+        // Nothing to cut along (the camera menu's Section view…): the Front plane (live2 asm-views.json sectionView:
+        // "Section plane 1 (Front)").
+        if planes.is_empty() {
+            planes.push(AsmSectionPlane::new(DVec3::ZERO, DVec3::NEG_Y, DVec3::X));
         }
         let active = planes.len().saturating_sub(1);
         self.ui.section = Some(AsmSection { planes, include: false, items: Vec::new(), dialog: Some(AsmSectionDialog { items_active: false, active, chosen: true, saved, popup: None, popup_plane: None }) });

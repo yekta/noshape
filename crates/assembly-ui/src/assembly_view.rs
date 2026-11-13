@@ -312,14 +312,12 @@ fn arrow_snap_step_for(px_per_mm: f64) -> Option<f64> {
     (px_per_mm > 1e-9).then(|| 10f64.powf((100.0 / px_per_mm / 10.0).log10().floor()) * 1e-3)
 }
 
-/// An explode drag's value as live rounds it (qa5 EXV5, live 805/810:
-/// "Distance 18.9 mm", "Rotation angle 55 deg"): whole degrees, 0.1 mm
-/// (0.01 in in imperial workspaces).
-pub fn explode_drag_round(v: f64, rotation: bool, units: &noshape_units::UnitPrefs) -> f64 {
+/// An explode drag's distance as live rounds it (qa5 EXV5, live 805: "Distance 18.9 mm"): 0.1 mm (0.01 in in
+/// imperial workspaces). A ring's angle snaps as the triad's (`ring_snap`: 5° steps at a usual radius, live2
+/// asm-views.json dragRing; live 810's "55 deg").
+pub fn explode_drag_round(v: f64, units: &noshape_units::UnitPrefs) -> f64 {
     use noshape_units::LengthUnit as L;
-    let step = if rotation {
-        1f64.to_radians()
-    } else if matches!(units.length, L::Inch | L::Foot | L::Yard) {
+    let step = if matches!(units.length, L::Inch | L::Foot | L::Yard) {
         0.000254
     } else {
         0.0001
@@ -1121,6 +1119,7 @@ impl AssemblyView {
         if let Some(top) = self.ui.list_hover {
             h.accent_tops.push(top);
         }
+        h.selected_tops.extend(self.ui.step_hover.iter().copied());
         if let Some(m) = &self.ui.measure {
             h.selected_entities.extend(m.iter().cloned());
         }
@@ -1258,7 +1257,7 @@ impl AssemblyView {
             }
         }
         // Inference points to draw (origin, X, Z) and the one under the pointer.
-        let mut marks: Vec<(DVec3, DVec3, DVec3)> = Vec::new();
+        let mut marks: Vec<crate::scene_builder::InferenceMark> = Vec::new();
         let mut chosen = None;
         if picking
             && self.pick_mode(cx) == Some(PickMode::Inference)
@@ -1275,7 +1274,15 @@ impl AssemblyView {
                 _ => h.hover_entity = Some((o.path.clone(), entity.clone())),
             }
             let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
-            marks = cands.iter().map(|p| t.mul(&p.frame)).map(|w| (w.origin, w.x(), w.z())).collect();
+            // Live (3d.json): a vertex's dot larger than an edge midpoint's.
+            marks = cands
+                .iter()
+                .map(|p| {
+                    let w = t.mul(&p.frame);
+                    let corner = matches!(&p.reference, Reference::Implicit { inference: Inference::Vertex, .. });
+                    crate::scene_builder::InferenceMark { origin: w.origin, x: w.x(), z: w.z(), corner }
+                })
+                .collect();
             chosen = self.infer_choice;
         }
         // A dragged section base on geometry: the snapped entity in orange
@@ -1289,7 +1296,7 @@ impl AssemblyView {
                 _ => h.hover_entity = Some((s.path.clone(), s.entity.clone())),
             }
             let (z, x) = (d.plane0.dir(), d.plane0.x);
-            marks = s.dots.iter().map(|p| (*p, x, z)).chain([(s.point, x, z)]).collect();
+            marks = s.dots.iter().map(|p| (*p, x, z)).chain([(s.point, x, z)]).map(Into::into).collect();
             chosen = Some(s.dots.len());
         }
         // Live 1851 / qa5 asm-041: white dots and the hovered connector's
@@ -1298,7 +1305,7 @@ impl AssemblyView {
             self.ui.inference_marks = None;
             Vec::new()
         } else {
-            let key: Vec<u64> = marks.iter().flat_map(|(o, x, z)| [o.x, o.y, o.z, x.x, x.y, x.z, z.x, z.y, z.z]).map(f64::to_bits).chain([chosen.map_or(u64::MAX, |c| c as u64)]).collect();
+            let key: Vec<u64> = marks.iter().flat_map(|m| [m.origin.x, m.origin.y, m.origin.z, m.x.x, m.x.y, m.x.z, m.z.x, m.z.y, m.z.z, f64::from(u8::from(m.corner))]).map(f64::to_bits).chain([chosen.map_or(u64::MAX, |c| c as u64)]).collect();
             let fresh = self.ui.inference_marks.as_ref().filter(|(k, _)| *k == key).map(|(_, m)| m.clone());
             let m = fresh.unwrap_or_else(|| {
                 let m = crate::scene_builder::InferenceMarks::new(marks.iter().copied(), chosen);
@@ -2456,7 +2463,19 @@ impl AssemblyView {
                 self.infer_choice = None;
             }
         }
-        let Some((_, occ, cands)) = &self.infer else { return false };
+        let Some((key, occ, cands)) = &self.infer else { return false };
+        // Live (3d.json implicit_mate_connectors_in_a_mate_dialog): over a planar face the connector sits at its
+        // centroid, over an edge at its midpoint (a circle's centre), wherever the pointer is on it; the other points
+        // are dots until the pointer reaches their own vertex or edge (or Shift locks the entity's points).
+        let primary = |r: &Reference| match r {
+            Reference::Implicit { inference: Inference::Centroid, on } => matches!(**on, Reference::Face(_)),
+            Reference::Implicit { inference: Inference::Midpoint | Inference::CenterRim, on } => matches!(**on, Reference::Edge(_)),
+            _ => false,
+        };
+        if !locked && matches!(key.1, Reference::Face(_) | Reference::Edge(_)) && cands.first().is_some_and(|c| primary(&c.reference)) {
+            self.infer_choice = Some(0);
+            return old != self.infer_choice;
+        }
         let Some(o) = self.result.occurrences.get(*occ) else { return false };
         let vp = self.viewport.read(cx);
         let mut best: Option<(usize, f64)> = None;
@@ -2979,7 +2998,7 @@ impl AssemblyView {
                         let Some(v) = self.ring_vector(*position, center, axis, cx) else { return };
                         let angle = v0.cross(v).dot(axis).atan2(v0.dot(v));
                         let radius_px = self.viewport.read(cx).project(center).map_or(0.0, |c| c.distance(*position));
-                        let angle = if d.explode { explode_drag_round(angle, true, &self.units(cx)) } else { ring_snap(angle, radius_px) };
+                        let angle = ring_snap(angle, radius_px);
                         let d = self.drag.as_mut().unwrap();
                         d.value = angle;
                         d.pending = Some(DVec3::ZERO);
@@ -2996,7 +3015,7 @@ impl AssemblyView {
                         }
                         let mut s = (b * e - c * dd) / den;
                         if d.explode {
-                            s = explode_drag_round(s, false, &self.units(cx));
+                            s = explode_drag_round(s, &self.units(cx));
                         } else if let Some(step) = self.arrow_snap_step(d.plane_point, axis, cx) {
                             s = (s / step).round() * step;
                         }
@@ -3896,6 +3915,14 @@ impl AssemblyView {
                     return;
                 }
                 let top = p3[0];
+                // Live2 fields.json doubleClickInstance: the instance's Part Studio, the assembly displayed round it.
+                if ev.click_count() >= 2 && !ev.modifiers().shift && !ev.modifiers().control {
+                    if !this.selected.contains(&top) {
+                        this.selected.push(top);
+                    }
+                    this.show_in_context(vec![top], cx);
+                    return;
+                }
                 // Live (behaviours "skb (10-24) section base snap + move to
                 // origin" (3)): Ctrl+click opens the row's menu for the
                 // selection, which stays as it is.
@@ -3915,11 +3942,12 @@ impl AssemblyView {
                 // adds the visible rows from the last clicked one.
                 let order = this.visible_list_order(cx);
                 let current: Vec<ListItem> = this.selected.iter().copied().map(ListItem::Instance).chain(this.ui.range_patterns.iter().copied().map(ListItem::Pattern)).collect();
-                let anchor = this.ui.list_anchor.map(ListItem::Instance);
+                // Live2 fields.json: after a click that took a row off, a Shift range starts at the top row.
+                let anchor = this.ui.list_anchor.map(ListItem::Instance).or_else(|| order.first().cloned());
                 let picked = noshape_model::interaction::list_click(&order, &current, anchor.as_ref(), &ListItem::Instance(top), ev.modifiers().shift);
                 this.selected = picked.iter().filter_map(|i| if let ListItem::Instance(id) = i { Some(*id) } else { None }).collect();
                 this.ui.range_patterns = picked.iter().filter_map(|i| if let ListItem::Pattern(id) = i { Some(*id) } else { None }).collect();
-                this.ui.list_anchor = Some(top);
+                this.ui.list_anchor = this.selected.contains(&top).then_some(top);
                 this.refresh_scene(false, cx);
                 cx.notify();
             }));
@@ -4331,6 +4359,10 @@ impl AssemblyView {
             Some((false, e)) => format!("{} has error: {e}", m.name),
             None => m.name.clone(),
         };
+        // Live2 fields.json mateList.suppressed: "Fastened 1 (Suppressed)".
+        if m.suppressed {
+            head.push_str(" (Suppressed)");
+        }
         if m.hidden || !self.show_mates {
             head.push_str(" (Hidden)");
         }
@@ -6910,15 +6942,16 @@ mod tests {
         assert!((mate_angle_sweep(-0.5f64.to_radians()) - 359.5f64.to_radians()).abs() < 1e-12);
     }
 
-    /// qa5 EXV5: explode drags round like live (whole degrees, 0.1 mm).
+    /// qa5 EXV5: explode distances round to 0.1 mm like live; a ring's angle in 5° steps at a usual radius (live2
+    /// asm-views.json dragRing).
     #[test]
     fn explode_drag_values_round() {
         use super::explode_drag_round;
+        assert!((super::ring_snap(36.4f64.to_radians(), 100.0).to_degrees() - 35.0).abs() < 1e-9);
         let mm = noshape_units::UnitPrefs::default();
-        assert!((explode_drag_round(0.012436, false, &mm) - 0.0124).abs() < 1e-12);
-        assert!((explode_drag_round((-37.565f64).to_radians(), true, &mm).to_degrees() + 38.0).abs() < 1e-9);
+        assert!((explode_drag_round(0.012436, &mm) - 0.0124).abs() < 1e-12);
         let inch = noshape_units::UnitPrefs { length: noshape_units::LengthUnit::Inch, ..Default::default() };
-        assert!((explode_drag_round(0.0254 * 0.7432, false, &inch) / 0.0254 - 0.74).abs() < 1e-9);
+        assert!((explode_drag_round(0.0254 * 0.7432, &inch) / 0.0254 - 0.74).abs() < 1e-9);
     }
 
     /// Live feel (3D) assembly: a triad arrow drag at 0.071 mm/px snaps to 0.1 mm; the step follows the zoom.

@@ -261,7 +261,8 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         let ghost = opts.ghost_tops.contains(&o.top()) || noshape_model::assembly::occurrence_in(&opts.ghost_paths, &o.path);
         let dimmed = opts.isolate.as_ref().is_some_and(|s| !noshape_model::assembly::occurrence_in(s, &o.path)) || ghost;
         if ghost {
-            color[3] = opts.dim_alpha.unwrap_or(0.35);
+            // Live's client SNAP_SOURCE_OCCURRENCE_OPACITY (mates.json snap_mode).
+            color[3] = opts.dim_alpha.unwrap_or(0.3);
         } else if dimmed {
             color[3] = opts.dim_alpha.unwrap_or(0.12);
         } else if o.kind == BodyKind::Surface {

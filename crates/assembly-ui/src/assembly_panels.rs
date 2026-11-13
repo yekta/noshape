@@ -2621,6 +2621,8 @@ impl AssemblyView {
                         )
                         .child(div().w(px(23.)).flex_none().opacity(0.8).child(crate::assets::icon("explode", 17., cx)))
                         .child(name_el)
+                        // Live2 asm-views.json rowClick: the row's name as its tooltip.
+                        .tooltip(crate::ui::tooltip(name.clone()))
                         .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
                             this.ui.explode_sel = Some((i, None));
                             if ev.click_count() >= 2 {
@@ -2742,6 +2744,16 @@ impl AssemblyView {
                             .when(step_sel, |d| d.bg(pal.accent_soft))
                             .when(!step_sel, |d| d.hover(|d| d.bg(pal.row_hover)))
                             .tooltip(crate::ui::tooltip(label.clone()))
+                            .on_hover({
+                                let ids = ids.clone();
+                                cx.listener(move |this, h: &bool, _, cx| {
+                                    let new = if *h { ids.clone() } else { Vec::new() };
+                                    if this.ui.step_hover != new {
+                                        this.ui.step_hover = new;
+                                        this.refresh_scene(false, cx);
+                                    }
+                                })
+                            })
                             .child(div().w(px(23.)).flex_none().child(crate::assets::icon(if rotation { "explode-step-rotation" } else { "explode-step-translation" }, 17., cx)))
                             .child(step_el)
                             // Live 812–813: a click selects the step (its
