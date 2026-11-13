@@ -6187,9 +6187,9 @@ Examples:
 
 #### part_set_properties
 
-Set a part's properties (the Properties dialog) (edits the document (one undoable history entry)).
+Set a part's properties, or several parts' at once (the Properties dialog) (edits the document (one undoable history entry)).
 
-Name, description, part number, revision, vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and a mass override (kg); State is set by releases. Fields not given keep their value; an empty text clears it. Fields configured for the active configuration keep the part's own value, as in the dialog.
+Name, description, part number, revision, vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and a mass override (kg); State is set by releases. Fields not given keep their value; an empty text clears it. Fields configured for the active configuration keep the part's own value, as in the dialog. With `parts` (the Parts list's Properties… on several parts) the given fields go to each part and the others keep each part's own value.
 
 Examples:
 
@@ -6201,7 +6201,8 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
-| `part` | string | required | Part id (`body:…`) or name. |
+| `part` | string |  | Part id (`body:…`) or name. |
+| `parts` | array of string |  | Several parts' ids or names (instead of `part`). |
 | `name` | string |  | Name. |
 | `description` | string |  | Description. |
 | `part_number` | string |  | Part number. |

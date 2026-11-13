@@ -31,6 +31,28 @@ pub async fn tab_thumbnail(
     decode(&png)
 }
 
+/// Each part's picture alone at the thumbnail size (several parts' Properties list), in `parts`' order.
+pub async fn part_thumbnails(display: &noshape_model::display::StudioDisplay, parts: &[noshape_model::reference::BodyId], gpu: &crate::gpu::Gpu) -> Vec<Option<std::sync::Arc<RenderImage>>> {
+    let mut out = Vec::with_capacity(parts.len());
+    for p in parts {
+        let mut d = display.clone();
+        for b in &mut d.bodies {
+            b.hidden = &b.id != p;
+        }
+        let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: false, show_origin: false, ..Default::default() };
+        let scene = crate::scene_builder::build(&d, &opts, &mut Default::default(), gpu.uploader()).scene;
+        let Some((lo, hi)) = scene.bounds() else {
+            out.push(None);
+            continue;
+        };
+        let (w, h) = crate::gpu::THUMBNAIL_SIZE;
+        let camera = crate::start_thumbnail::fit_camera(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64);
+        let png = gpu.render_thumbnail(std::sync::Arc::new(scene), camera, crate::start_thumbnail::thumbnail_style()).await.ok();
+        out.push(png.as_deref().and_then(decode));
+    }
+    out
+}
+
 /// PNG -> GPUI image (BGRA); the white background becomes transparent so the
 /// pictures sit on selected rows and the gray preview.
 pub fn decode(png: &[u8]) -> Option<std::sync::Arc<RenderImage>> {

@@ -625,3 +625,63 @@ fn the_feature_list_matrix_matches_live(cx: &mut TestAppContext) {
     eprintln!("feature list matrix: {matched} / {} rows match live\n{}", report.len(), report.join("\n"));
     assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md and the row's gap): {moved:?}");
 }
+
+/// Parts list › Properties… on two parts (live q2962): one modal for both, "2 selected", the differing fields empty
+/// ("Multiple values") and the common ones shown; a Description typed and saved goes to both and nothing else changes
+/// (each keeps its name, part number and Exclude from all BOMs); a row clicked shows that part alone, Ctrl+click brings
+/// the other back.
+#[gpui::test]
+fn several_parts_share_one_properties_dialog(cx: &mut TestAppContext) {
+    let l = studio(cx, "multi-props", 1.0);
+    let parts: Vec<noshape_model::reference::BodyId> = cx.update(|cx| l.view.read(cx).display.bodies.iter().map(|b| b.id.clone()).collect());
+    let doc = cx.update(|cx| l.view.read(cx).doc.clone());
+    let tab = cx.update(|cx| l.view.read(cx).tab);
+    cx.update(|cx| {
+        doc.update(cx, |d, cx| {
+            d.edit_studio(tab, "setup", cx, |ps| {
+                for (b, desc, pn, exclude) in [(&parts[0], "A", "PN-1", true), (&parts[1], "B", "PN-2", false)] {
+                    let p = ps.part_properties.entry(b.clone()).or_default();
+                    p.description = Some(desc.into());
+                    p.part_number = Some(pn.into());
+                    p.meta.vendor = Some("V".into());
+                    p.meta.exclude_from_bom = exclude;
+                }
+            })
+        })
+    });
+    draw(cx, l.window);
+    l.click(cx, "part:Part 1", NONE);
+    l.click(cx, "part:Part 2", Modifiers::secondary_key());
+    assert_eq!(l.selected(cx), ["Part 1", "Part 2"]);
+    l.right_click(cx, "part:Part 2");
+    let at = l.bounds(cx, "menu:Properties…").expect("Properties… in the menu").center();
+    l.press(cx, at, MouseButton::Left, NONE, 1);
+    let form = crate::properties_dialog::open_form().expect("the Properties modal");
+    let read = |cx: &mut TestAppContext| cx.update(|cx| (form.read(cx).header(), form.read(cx).mixed_fields(), form.read(cx).list_rows()));
+    let (header, mixed, rows) = read(cx);
+    assert_eq!(header, "2 selected");
+    assert_eq!(mixed, ["Name", "Description", "Part number", "Exclude from all BOMs"], "the differing fields (Vendor V is common)");
+    assert_eq!(rows, [("Part 1".to_string(), true), ("Part 2".to_string(), true)]);
+    cx.update_window(l.window, |_, w, cx| form.update(cx, |f, cx| f.focus_field("Description", w, cx))).unwrap();
+    l.keys(cx, "D");
+    cx.update_window(l.window, |_, w, cx| form.update(cx, |f, cx| f.press_save(true, w, cx))).unwrap();
+    draw(cx, l.window);
+    let props = |cx: &mut TestAppContext, i: usize| cx.update(|cx| l.view.read(cx).studio(cx).and_then(|s| s.part_properties.get(&parts[i]).cloned()).unwrap_or_default());
+    for (i, pn, exclude) in [(0, "PN-1", true), (1, "PN-2", false)] {
+        let p = props(cx, i);
+        assert_eq!((p.description.as_deref(), p.part_number.as_deref(), p.meta.vendor.as_deref(), p.meta.exclude_from_bom), (Some("D"), Some(pn), Some("V"), exclude), "part {}", i + 1);
+    }
+    let names: Vec<String> = cx.update(|cx| l.view.read(cx).display.bodies.iter().map(|b| b.name.clone()).collect());
+    assert_eq!(names, ["Part 1", "Part 2", "Part 3"], "the names stay");
+    // Again: a row alone, then both.
+    l.right_click(cx, "part:Part 2");
+    let at = l.bounds(cx, "menu:Properties…").expect("Properties… in the menu").center();
+    l.press(cx, at, MouseButton::Left, NONE, 1);
+    let form = crate::properties_dialog::open_form().expect("the Properties modal");
+    cx.update_window(l.window, |_, w, cx| form.update(cx, |f, cx| f.press_row(0, NONE, w, cx))).unwrap();
+    let (header, mixed, rows) = cx.update(|cx| (form.read(cx).header(), form.read(cx).mixed_fields(), form.read(cx).list_rows()));
+    assert_eq!((header.as_str(), mixed.len()), ("Part 1", 0));
+    assert_eq!(rows, [("Part 1".to_string(), true), ("Part 2".to_string(), false)], "the list still shows both");
+    cx.update_window(l.window, |_, w, cx| form.update(cx, |f, cx| f.press_row(1, Modifiers::secondary_key(), w, cx))).unwrap();
+    assert_eq!(cx.update(|cx| form.read(cx).header()), "2 selected");
+}

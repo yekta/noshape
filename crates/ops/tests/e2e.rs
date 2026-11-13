@@ -7920,6 +7920,33 @@ fn part_properties_reach_the_bom() {
     assert_eq!(rows[0]["cells"]["Not revision managed"], "true", "{bom}");
 }
 
+/// The Parts list's Properties… on several parts (live q2962): the given fields go to every part, the others keep each
+/// part's own value.
+#[test]
+fn several_parts_properties_at_once() {
+    let mut ctx = Ctx::new();
+    let path = scratch("multi-part-props.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }, { "tool": "circle", "points": [[70, 10], [75, 10]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "part_set_properties", json!({ "part": "Part 1", "part_number": "PN-1", "vendor": "V" }));
+    call(&mut ctx, "part_set_properties", json!({ "part": "Part 2", "part_number": "PN-2", "vendor": "V" }));
+    let out = call(&mut ctx, "part_set_properties", json!({ "parts": ["Part 1", "Part 2"], "description": "D" }));
+    assert_eq!(out["parts"].as_array().map(|p| p.len()), Some(2), "{out}");
+    let e = try_call(&mut ctx, "part_set_properties", json!({ "part": "Part 1", "parts": ["Part 2"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("parts"));
+    let e = try_call(&mut ctx, "part_set_properties", json!({ "parts": ["Part 1", "Part 9"], "description": "E" })).unwrap_err();
+    assert!(e.param.is_some(), "a part that isn't there is named: {e:?}");
+    for p in ["Part 1", "Part 2"] {
+        call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": p }));
+    }
+    let bom = call(&mut ctx, "assembly_bom", json!({ "tab": "Assembly 1", "type": "flattened", "columns": ["Name", "Description", "Part number", "Vendor"] }));
+    let rows: Vec<(Value, Value, Value, Value)> = bom["rows"].as_array().unwrap().iter().map(|r| (r["cells"]["Name"].clone(), r["cells"]["Description"].clone(), r["cells"]["Part number"].clone(), r["cells"]["Vendor"].clone())).collect();
+    assert_eq!(rows, [(json!("Part 1"), json!("D"), json!("PN-1"), json!("V")), (json!("Part 2"), json!("D"), json!("PN-2"), json!("V"))], "{bom}");
+}
+
 /// ASM-API-GAPS: an assembly's Properties… (its name, part number, Subassembly BOM behavior, Exclude from all BOMs),
 /// as the parent's BOM reads them.
 #[test]

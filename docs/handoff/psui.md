@@ -24,6 +24,30 @@ target folder's own mtime doesn't move when files inside it are rebuilt). Wall t
 - app build `cargo build -p noshape`: Mac 56 s (06:3x) vs vibe6 182 s; an incremental one for the scenarios on vibe6
   (after part-studio-ui / app-core edits): 1 m 30 s, then 41 s with a 6-scenario run.
 - 71 feature-list ui-parity scenarios on vibe6, 3 shards: 2 m 44 s.
+- (psui, new account, 11-13 10:08–11:05) part-studio-ui suite (176 tests) on the Mac: 30 s run, 45–70 s with an
+  incremental build; one test after an edit 18–33 s; the navigation matrix alone 25–36 s; noshape-ops e2e test 40 s;
+  clippy app-core + part-studio-ui 35–65 s. App build on vibe6 for scenarios: 2 m 59 s after app-core edits, 18–49 s
+  after part-studio-ui / app-core touch-ups; 38 Properties scenarios on vibe6, one shard: 5 m 35 s.
+- A background `( rb.sh … ) &` dies with its tool call's shell but leaves the Mac's test process running: run Mac jobs
+  in the foreground (or systemd-run), and kill only the PIDs it started.
+
+**2026-11-13 11:05 UTC (fresh restart on a new account):** lands queued, in order: 504b8e83 (the 7 earlier commits:
+feature-list matrix e65d4b4a, measure matrix a1e43b01, select_other_row, ops coverage's Boolean, plus `block_part`
+waiting for the extrude's commit: the land server's box-select failure was the preview's sketch still shown),
+a45eed51 (lead's P0: CI 43400881789's `presses_orbit_box_and_open_the_menu_as_live` timed presses on the wall clock;
+the viewport's press rules and camera animations now read `Viewport::set_clock`, which the test drives), 61aa5204
+(the navigation matrix 19 / 19: interaction-feel.md "Navigation"; fixed a new animation replacing a running one,
+the double middle click on our own 500 ms timer, a rotate drag's held moves lost when released before its depth
+sample). Local, next to land: **multi-part Properties…** (queue item 1): `MetaForm::multi` (left list with part
+pictures `tab_thumbnail::part_thumbnails`, "2 selected", "Multiple values", indeterminate checkboxes, row click /
+Ctrl / Shift, Save writes only the edited fields to every shown part, Reset all), ops `part_set_properties` `parts`,
+the runner's reading of live's 11-13.1 Properties recorder (Mass group first; placeholder / disabled / indeterminate /
+disabledButtons emitted by ours). parts-multi-properties 7 / 8: live's Save leaves Undo off; ours stays an undo step on
+purpose: a non-undoable tab edit is wiped by undoing an earlier feature (whole-tab undo snapshots; tried and reverted,
+needs properties outside the tab's undo: a store change, not filed yet). Not done: the orange "dirty" triangles on
+edited fields and rows (the single-part dialog lacks them too), an 8 px strip above the list (the dialog body clips a
+negative margin). Next: queue item 3, chrome (chrome.json, chrome-shortcuts.json: shortcut map diff for Part Studio,
+sketch, assembly), then look.json.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's

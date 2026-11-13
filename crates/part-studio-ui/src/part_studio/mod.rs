@@ -7818,8 +7818,7 @@ fn several_parts_menu(menu: crate::os_menu::OsMenu, view: &Entity<PartStudioView
             f(this, w, cx)
         }) as ViewAction
     };
-    let first = parts[0].clone();
-    menu.item(item("Properties…".into(), Box::new(move |this, w, cx| this.open_part_meta(first.clone(), w, cx))))
+    menu.item(item("Properties…".into(), all(|this, t, w, cx| this.open_parts_meta(t, w, cx))))
         .item(item(format!("Assign material for {n} parts…"), all(|this, t, w, cx| this.open_material_panel(t, w, cx))))
         .item(item(format!("Edit appearance for {n} parts…"), all(|this, t, w, cx| {
             this.selection = t.iter().cloned().map(Reference::Body).collect();

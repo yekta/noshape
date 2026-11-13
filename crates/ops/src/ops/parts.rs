@@ -22,12 +22,13 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "part",
             verb: "set_properties",
-            summary: "Set a part's properties (the Properties dialog)",
-            description: "Name, description, part number, revision, vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and a mass override (kg); State is set by releases. Fields not given keep their value; an empty text clears it. Fields configured for the active configuration keep the part's own value, as in the dialog.",
+            summary: "Set a part's properties, or several parts' at once (the Properties dialog)",
+            description: "Name, description, part number, revision, vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and a mass override (kg); State is set by releases. Fields not given keep their value; an empty text clears it. Fields configured for the active configuration keep the part's own value, as in the dialog. With `parts` (the Parts list's Properties… on several parts) the given fields go to each part and the others keep each part's own value.",
             fields: vec![
                 doc_field(),
                 tab_field(),
-                req("part", s(), "Part id (`body:…`) or name."),
+                opt("part", s(), "Part id (`body:…`) or name."),
+                opt("parts", json!({ "type": "array", "items": { "type": "string" } }), "Several parts' ids or names (instead of `part`)."),
                 opt("name", s(), "Name."),
                 opt("description", s(), "Description."),
                 opt("part_number", s(), "Part number."),
@@ -87,7 +88,10 @@ pub fn ops() -> Vec<Op> {
 
 /// The `part` argument: a `body:…` id or the name the parts list shows.
 fn part_arg(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, a: &Args) -> Result<BodyId, OpError> {
-    let key = a.str("part")?;
+    part_by_key(od, tab, a.str("part")?)
+}
+
+fn part_by_key(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, key: &str) -> Result<BodyId, OpError> {
     if let Some(Reference::Body(b)) = refs::parse_str(key) {
         return Ok(b);
     }
@@ -114,51 +118,80 @@ fn rename(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
-    let body = part_arg(od, tab, a)?;
+    let bodies = match (a.opt_str("part")?, a.opt_array("parts")?) {
+        (Some(_), Some(_)) => return Err(OpError::param("parts", "give `part` or `parts`, not both")),
+        (Some(_), None) => vec![part_arg(od, tab, a)?],
+        (None, Some(list)) => {
+            let keys: Vec<&str> = list.iter().map(|v| v.as_str().ok_or_else(|| OpError::param("parts", "each part is an id or a name"))).collect::<Result<_, _>>()?;
+            if keys.is_empty() {
+                return Err(OpError::param("parts", "at least one part"));
+            }
+            keys.into_iter().map(|k| part_by_key(od, tab, k)).collect::<Result<Vec<_>, _>>()?
+        }
+        (None, None) => return Err(OpError::param("part", "required string")),
+    };
     let r = od.regenerate(tab, None)?;
-    let shown = r.display.bodies.iter().find(|b| b.id == body).map(|b| b.name.clone()).ok_or_else(|| OpError::param("part", "no such part in the Part Studio"))?;
     let config = od.current_config(tab)?;
     let ps = crate::doc::studio(od.doc(), tab)?;
-    let p = ps.part_properties.get(&body).cloned().unwrap_or_default();
-    // The dialog opens with the part's values (configured fields shown as configured).
-    const FIELDS: [&str; 10] = ["Name", "Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3"];
-    let configured: Vec<&str> = FIELDS.into_iter().filter(|f| noshape_model::configured_properties::configured_value(ps, &body, f, &config).is_some()).collect();
-    let mut v = studio::PartPropertyValues {
-        name: p.name.clone().unwrap_or(shown),
-        description: p.description.clone().unwrap_or_default(),
-        part_number: p.part_number.clone().unwrap_or_default(),
-        revision: p.revision.clone().unwrap_or_default(),
-        meta: p.meta.clone(),
-        mass_override: p.mass_override,
-    };
     let text = |k: &str| -> Result<Option<String>, OpError> { Ok(a.opt_str(k)?.map(|x| x.trim().to_string())) };
-    if let Some(x) = text("name")? {
-        if x.is_empty() {
-            return Err(OpError::param("name", "a part needs a name"));
+    if text("name")?.is_some_and(|x| x.is_empty()) {
+        return Err(OpError::param("name", "a part needs a name"));
+    }
+    // Each part's values as its dialog opens (configured fields shown as configured), the given fields on top.
+    const FIELDS: [&str; 10] = ["Name", "Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3"];
+    let mut edits = Vec::new();
+    for body in &bodies {
+        let shown = r.display.bodies.iter().find(|b| b.id == *body).map(|b| b.name.clone()).ok_or_else(|| OpError::param(if a.get("parts").is_some() { "parts" } else { "part" }, "no such part in the Part Studio"))?;
+        let p = ps.part_properties.get(body).cloned().unwrap_or_default();
+        let configured: Vec<&str> = FIELDS.into_iter().filter(|f| noshape_model::configured_properties::configured_value(ps, body, f, &config).is_some()).collect();
+        let mut v = studio::PartPropertyValues {
+            name: p.name.clone().unwrap_or(shown),
+            description: p.description.clone().unwrap_or_default(),
+            part_number: p.part_number.clone().unwrap_or_default(),
+            revision: p.revision.clone().unwrap_or_default(),
+            meta: p.meta.clone(),
+            mass_override: p.mass_override,
+        };
+        if let Some(x) = text("name")? {
+            v.name = x;
         }
-        v.name = x;
-    }
-    for (k, f) in [("description", &mut v.description), ("part_number", &mut v.part_number), ("revision", &mut v.revision)] {
-        if let Some(x) = text(k)? {
-            *f = x;
+        for (k, f) in [("description", &mut v.description), ("part_number", &mut v.part_number), ("revision", &mut v.revision)] {
+            if let Some(x) = text(k)? {
+                *f = x;
+            }
         }
+        apply_meta(a, &mut v.meta)?;
+        match a.get("mass_override") {
+            None => {}
+            Some(serde_json::Value::Null) => v.mass_override = None,
+            Some(x) => v.mass_override = Some(x.as_f64().filter(|m| *m > 0.0).ok_or_else(|| OpError::param("mass_override", "a mass in kg greater than zero, or null"))?),
+        }
+        edits.push((body.clone(), v, configured));
     }
-    apply_meta(a, &mut v.meta)?;
-    match a.get("mass_override") {
-        None => {}
-        Some(serde_json::Value::Null) => v.mass_override = None,
-        Some(x) => v.mass_override = Some(x.as_f64().filter(|m| *m > 0.0).ok_or_else(|| OpError::param("mass_override", "a mass in kg greater than zero, or null"))?),
-    }
-    let desc = studio::properties_description(&v.name);
+    let desc = match &edits[..] {
+        [(_, v, _)] => studio::properties_description(&v.name),
+        _ => studio::properties_description(&format!("{} parts", edits.len())),
+    };
     edit_studio(od, tab, &desc, |ps| {
-        studio::set_part_properties(ps, &body, &v, &configured);
+        for (body, v, configured) in &edits {
+            studio::set_part_properties(ps, body, v, configured);
+        }
         Ok(())
     })?;
-    let mut out = json!({ "part": refs::body_id(&body), "name": v.name });
-    if !configured.is_empty() {
-        out["configured_fields_kept"] = json!(configured);
+    let out: Vec<serde_json::Value> = edits
+        .iter()
+        .map(|(body, v, configured)| {
+            let mut o = json!({ "part": refs::body_id(body), "name": v.name });
+            if !configured.is_empty() {
+                o["configured_fields_kept"] = json!(configured);
+            }
+            o
+        })
+        .collect();
+    match &out[..] {
+        [one] if a.get("parts").is_none() => Ok(one.clone().into()),
+        _ => Ok(json!({ "parts": out }).into()),
     }
-    Ok(out.into())
 }
 
 /// The Properties dialog's item fields of a part or an assembly: vendor, project, product line, titles, Not revision

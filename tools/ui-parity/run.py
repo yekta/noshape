@@ -302,9 +302,15 @@ def normalize_live(state):
         for x in f:
             if isinstance(x, dict) and str(x.get("label", "")).startswith("Onshape "):
                 x["label"], x["value"] = "Category", ""
+        # Live's recorder from 2026-11-13.1 reads a part's Mass group first (its Override checkbox and the greyed
+        # computed value, parts-multi-properties); ours' "Mass Override" checkbox comes last.
+        o = [x for x in f[:2] if isinstance(x, dict) and x.get("label") == "Override"]
+        if len(o) == 2 and o[0].get("kind") == "checkbox" and o[1].get("kind") == "input":
+            f = f[2:] + [dict(o[0], label="Mass Override")]
         d["fields"] = f
-        if isinstance(d.get("buttons"), list):
-            d["buttons"] = ["" if b in ("Undo", "Redo") else b for b in d["buttons"]]
+        for k in ("buttons", "disabledButtons"):
+            if isinstance(d.get(k), list):
+                d[k] = ["" if b in ("Undo", "Redo") else b for b in d[k]]
     # Live's Free plan makes public documents: "Create public document" (New document, Copy workspace / version) is a
     # paid plan's and ours' "Create document".
     if isinstance(d, dict) and isinstance(d.get("buttons"), list):

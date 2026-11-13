@@ -68,6 +68,8 @@ const DRAWING_INFO: [&str; 3] = ["Last changed date", "Last changed by", "Inspec
 
 /// A new item's unit of measure.
 pub const DEFAULT_UNIT: &str = "Each";
+/// A field whose values differ among the parts shown (live q2962: italic grey, the field empty).
+const MULTIPLE_VALUES: &str = "Multiple values";
 
 /// The values the Properties modal edits.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -101,6 +103,121 @@ pub struct MetaSpec {
 
 type SaveFn = Rc<dyn Fn(MetaValues, &mut Window, &mut App)>;
 
+thread_local! {
+    /// The Properties form last opened (tests drive it).
+    static OPEN_FORM: std::cell::RefCell<WeakEntity<MetaForm>> = std::cell::RefCell::new(WeakEntity::new_invalid());
+}
+
+/// The open Properties modal's form.
+pub fn open_form() -> Option<Entity<MetaForm>> {
+    OPEN_FORM.with(|f| f.borrow().upgrade())
+}
+/// Several parts' Save: each written part (its index in the list) with its new values.
+type SaveManyFn = Rc<dyn Fn(Vec<(usize, MetaValues)>, &mut Window, &mut App)>;
+
+/// Several parts in one modal (Parts list › Properties… on 2 or more, live q2962): a left list of the parts, the form
+/// showing the common values of the rows selected in it ("Multiple values" where they differ), Save writing only the
+/// edited fields to each of them.
+struct Multi {
+    names: Vec<String>,
+    thumbs: Vec<Option<std::sync::Arc<RenderImage>>>,
+    values: Vec<MetaValues>,
+    /// What Reset all restores, per part.
+    reset_to: Vec<MetaValues>,
+    /// The list's selected rows (the form's parts) and the Shift+click anchor.
+    shown: Vec<usize>,
+    anchor: usize,
+    /// Fields whose values differ among the shown parts when the form was filled, and those still differing (a
+    /// mixed checkbox clicked stops being mixed).
+    mixed_at_fill: Vec<String>,
+    mixed: Vec<String>,
+    /// Reset all was clicked: Save writes each part's reset values before the edits.
+    reset: bool,
+    on_save: SaveManyFn,
+}
+
+/// The modal's fields as text, by label (checkboxes "true" / "false", Override "" when off), for comparing parts.
+const MULTI_FIELDS: [&str; 14] = ["Name", "Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3", "Not revision managed", "Exclude from all BOMs", "Unit of measure", "Override"];
+
+fn field_of(v: &MetaValues, f: &str) -> Option<String> {
+    let o = |x: &Option<String>| x.clone().unwrap_or_default();
+    let m = &v.meta;
+    Some(match f {
+        "Name" => v.name.clone(),
+        "Description" => v.description.clone(),
+        "Part number" => v.part_number.clone(),
+        "Revision" => v.revision.clone(),
+        "Vendor" => o(&m.vendor),
+        "Project" => o(&m.project),
+        "Product line" => o(&m.product_line),
+        "Title 1" => o(&m.title1),
+        "Title 2" => o(&m.title2),
+        "Title 3" => o(&m.title3),
+        "Not revision managed" => m.not_revision_managed.to_string(),
+        "Exclude from all BOMs" => m.exclude_from_bom.to_string(),
+        "Unit of measure" => o(&m.unit_of_measure),
+        "Override" => o(&v.mass_override),
+        _ => m.custom.get(f.strip_prefix("custom:")?).cloned().unwrap_or_default(),
+    })
+}
+
+fn set_field(v: &mut MetaValues, f: &str, x: String) {
+    let some = |x: String| Some(x).filter(|s| !s.is_empty());
+    let m = &mut v.meta;
+    match f {
+        "Name" => v.name = x,
+        "Description" => v.description = x,
+        "Part number" => v.part_number = x,
+        "Revision" => v.revision = x,
+        "Vendor" => m.vendor = some(x),
+        "Project" => m.project = some(x),
+        "Product line" => m.product_line = some(x),
+        "Title 1" => m.title1 = some(x),
+        "Title 2" => m.title2 = some(x),
+        "Title 3" => m.title3 = some(x),
+        "Not revision managed" => m.not_revision_managed = x == "true",
+        "Exclude from all BOMs" => m.exclude_from_bom = x == "true",
+        "Unit of measure" => m.unit_of_measure = some(x),
+        "Override" => v.mass_override = some(x),
+        _ => {
+            let Some(k) = f.strip_prefix("custom:") else { return };
+            match some(x) {
+                Some(x) => m.custom.insert(k.to_string(), x),
+                None => m.custom.remove(k),
+            };
+        }
+    }
+}
+
+/// Every field of these values (the custom ones as "custom:<name>").
+fn fields_of<'a>(vs: impl Iterator<Item = &'a MetaValues>) -> Vec<String> {
+    let mut out: Vec<String> = MULTI_FIELDS.iter().map(|f| f.to_string()).collect();
+    for v in vs {
+        for k in v.meta.custom.keys() {
+            let f = format!("custom:{k}");
+            if !out.contains(&f) {
+                out.push(f);
+            }
+        }
+    }
+    out
+}
+
+/// The values the form shows for `parts`: each field's common value, empty (off) where they differ; and those fields.
+fn common_values(parts: &[&MetaValues]) -> (MetaValues, Vec<String>) {
+    let Some(first) = parts.first() else { return (MetaValues::default(), Vec::new()) };
+    let mut v = (*first).clone();
+    let mut mixed = Vec::new();
+    for f in fields_of(parts.iter().copied()) {
+        let x = field_of(first, &f);
+        if parts.iter().any(|p| field_of(p, &f) != x) {
+            set_field(&mut v, &f, String::new());
+            mixed.push(f);
+        }
+    }
+    (v, mixed)
+}
+
 /// A custom property's field: text (String, numbers, dates), a checkbox
 /// (Boolean) or a select (Enum).
 enum CustomInput {
@@ -123,6 +240,8 @@ pub struct ItemCard {
 pub struct MetaForm {
     /// The left tree's card (Part Studio tabs).
     card: Option<ItemCard>,
+    /// Several parts at once.
+    multi: Option<Multi>,
     /// Release management: the release-create icon at the top left
     /// (Release__typical_release_workflow, "From any Properties dialog").
     on_release: Option<ReleaseFn>,
@@ -180,6 +299,8 @@ pub struct MetaForm {
 
 impl MetaForm {
     fn new(spec: MetaSpec, on_save: SaveFn, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let me = cx.entity().downgrade();
+        OPEN_FORM.with(|f| *f.borrow_mut() = me);
         let v = spec.values.clone();
         let text = |s: &str, window: &mut Window, cx: &mut Context<Self>| {
             let s = s.to_string();
@@ -247,6 +368,7 @@ impl MetaForm {
             read_only: Vec::new(),
             spec_category: spec.category,
             card: None,
+            multi: None,
             material: spec.material,
             computed_mass: spec.computed_mass,
             bom_options: spec.bom_options,
@@ -385,12 +507,177 @@ impl MetaForm {
 
     fn dirty(&self, cx: &App) -> bool {
         let v = self.values(cx);
+        if let Some(m) = &self.multi {
+            return (m.reset || v != self.saved || m.mixed != m.mixed_at_fill) && (!v.name.is_empty() || m.mixed.iter().any(|f| f == "Name"));
+        }
         v != self.saved && !v.name.is_empty()
+    }
+
+    /// The fields edited since the form was filled (a field left at "Multiple values" isn't).
+    fn multi_edits(&self, cx: &App) -> Vec<(String, String)> {
+        let Some(m) = &self.multi else { return Vec::new() };
+        let v = self.values(cx);
+        fields_of([&v, &self.saved].into_iter())
+            .into_iter()
+            .filter(|f| field_of(&v, f) != field_of(&self.saved, f) || (m.mixed_at_fill.contains(f) && !m.mixed.contains(f)))
+            .filter_map(|f| Some((f.clone(), field_of(&v, &f)?)))
+            .collect()
+    }
+
+    /// Fills the form with the common values of the list's selected rows (one row: that part's own).
+    fn fill_multi(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(m) = &mut self.multi else { return };
+        let parts: Vec<&MetaValues> = m.shown.iter().filter_map(|i| m.values.get(*i)).collect();
+        let (v, mixed) = common_values(&parts);
+        m.mixed_at_fill = mixed.clone();
+        m.mixed = mixed;
+        m.reset = false;
+        self.saved = v.clone();
+        self.history = vec![v.clone()];
+        self.at = 0;
+        self.restore(v, window, cx);
+        self.set_hints(window, cx);
+    }
+
+    /// "Multiple values" in the empty fields whose values differ.
+    fn set_hints(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let mixed = self.multi.as_ref().map(|m| m.mixed.clone()).unwrap_or_default();
+        let hint = |f: &str| if mixed.iter().any(|x| x == f) { MULTIPLE_VALUES } else { "" };
+        for (f, st) in [("Name", &self.name), ("Part number", &self.part_number), ("Revision", &self.revision), ("Vendor", &self.vendor), ("Project", &self.project), ("Product line", &self.product_line), ("Title 1", &self.titles[0]), ("Title 2", &self.titles[1]), ("Title 3", &self.titles[2])] {
+            st.update(cx, |s, cx| s.set_placeholder(hint(f), window, cx));
+        }
+        self.description.update(cx, |s, cx| s.set_placeholder(hint("Description"), window, cx));
+        for (d, input) in &self.custom {
+            if let CustomInput::Text(st) = input {
+                let h = hint(&format!("custom:{}", d.name));
+                st.update(cx, |s, cx| s.set_placeholder(h, window, cx));
+            }
+        }
+        cx.notify();
+    }
+
+    /// A click on a row of the left list: that part alone; Ctrl (Cmd) toggles it, Shift selects the range from the
+    /// last clicked row (live q2962 (d)). The Parts list's selection stays.
+    fn click_row(&mut self, i: usize, modifiers: Modifiers, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(m) = &mut self.multi else { return };
+        if modifiers.shift {
+            let (a, b) = (m.anchor.min(i), m.anchor.max(i));
+            m.shown = (a..=b).collect();
+        } else if modifiers.secondary() {
+            if let Some(k) = m.shown.iter().position(|x| *x == i) {
+                if m.shown.len() > 1 {
+                    m.shown.remove(k);
+                }
+            } else {
+                m.shown.push(i);
+                m.shown.sort_unstable();
+            }
+            m.anchor = i;
+        } else {
+            m.shown = vec![i];
+            m.anchor = i;
+        }
+        self.fill_multi(window, cx);
+    }
+
+    /// Several parts' Reset all: the form shows the shown parts' reset values; Save writes them.
+    fn reset_multi(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(m) = &mut self.multi else { return };
+        let parts: Vec<&MetaValues> = m.shown.iter().filter_map(|i| m.reset_to.get(*i)).collect();
+        let (v, mixed) = common_values(&parts);
+        m.mixed = mixed;
+        m.reset = true;
+        self.restore(v, window, cx);
+        self.set_hints(window, cx);
+        self.changed(cx);
+    }
+
+    /// Reset all is enabled: some value isn't the one it would restore (live dk-999, part-studio/1840; several parts: a
+    /// part has an edited property, q2962).
+    fn can_reset(&self, cx: &App) -> bool {
+        match &self.multi {
+            Some(m) => m.reset || m.shown.iter().any(|&i| m.values.get(i) != m.reset_to.get(i)),
+            None => self.reset_to.as_ref().is_some_and(|r| *r != self.values(cx)),
+        }
+    }
+
+    /// Fields whose parts differ, shown "Multiple values" (several parts).
+    pub fn mixed_fields(&self) -> Vec<String> {
+        self.multi.as_ref().map(|m| m.mixed.clone()).unwrap_or_default()
+    }
+
+    /// The left list's rows and whether each is selected (several parts).
+    pub fn list_rows(&self) -> Vec<(String, bool)> {
+        self.multi.as_ref().map(|m| m.names.iter().enumerate().map(|(i, n)| (n.clone(), m.shown.contains(&i))).collect()).unwrap_or_default()
+    }
+
+    /// Puts the keyboard in a text field by its label ("Description", "Vendor").
+    pub fn focus_field(&self, label: &str, window: &mut Window, cx: &mut App) {
+        if label == "Description" {
+            self.description.update(cx, |s, cx| s.focus(window, cx));
+            return;
+        }
+        let st = match label {
+            "Name" => &self.name,
+            "Part number" => &self.part_number,
+            "Revision" => &self.revision,
+            "Vendor" => &self.vendor,
+            "Project" => &self.project,
+            "Product line" => &self.product_line,
+            _ => return,
+        };
+        st.update(cx, |s, cx| s.focus(window, cx));
+    }
+
+    /// The footer's Apply (`close` false) or Save.
+    pub fn press_save(&mut self, close: bool, window: &mut Window, cx: &mut Context<Self>) {
+        self.save(close, window, cx);
+    }
+
+    /// A click on the left list's row `i` with `modifiers`.
+    pub fn press_row(&mut self, i: usize, modifiers: Modifiers, window: &mut Window, cx: &mut Context<Self>) {
+        self.click_row(i, modifiers, window, cx);
+    }
+
+    /// The header over the form: the part's name, or "2 selected".
+    pub fn header(&self) -> String {
+        match &self.multi {
+            Some(m) if m.shown.len() > 1 => format!("{} selected", m.shown.len()),
+            _ => self.saved.name.clone(),
+        }
+    }
+
+    /// Several parts' Apply / Save: the edited fields onto each shown part's values (after its reset values when
+    /// Reset all was clicked).
+    fn save_multi(&mut self, close: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let edits = self.multi_edits(cx);
+        let Some(m) = &mut self.multi else { return };
+        let mut out = Vec::new();
+        for &i in &m.shown {
+            let (Some(old), Some(reset)) = (m.values.get(i), m.reset_to.get(i)) else { continue };
+            let mut v = if m.reset { reset.clone() } else { old.clone() };
+            for (f, x) in &edits {
+                set_field(&mut v, f, x.clone());
+            }
+            m.values[i] = v.clone();
+            out.push((i, v));
+        }
+        let on_save = m.on_save.clone();
+        on_save(out, window, cx);
+        if close {
+            window.close_dialog(cx);
+            return;
+        }
+        self.fill_multi(window, cx);
     }
 
     /// Apply (keep the modal open) or Save (close it).
     fn save(&mut self, close: bool, window: &mut Window, cx: &mut Context<Self>) {
         if !self.dirty(cx) {
+            return;
+        }
+        if self.multi.is_some() {
+            self.save_multi(close, window, cx);
             return;
         }
         let v = self.values(cx);
@@ -493,21 +780,40 @@ impl MetaForm {
     fn note_ui_state(&self, numbered: bool, sourced: bool, titled: bool, item: bool, cx: &App) {
         crate::ui_script::note_dialog(|| {
             let text = |st: &Entity<InputState>| st.read(cx).value().to_string();
+            // Live's recorder (2026-11-13.1): a field's placeholder while it is empty ("Multiple values"), greyed fields
+            // `disabled`, a mixed checkbox `indeterminate`.
             let input = |label: &str, value: String| serde_json::json!({ "label": label, "kind": "input", "value": value });
-            let check = |label: &str, on: bool| serde_json::json!({ "label": label, "kind": "checkbox", "value": on });
-            let mut fields = vec![input("Name *", text(&self.name)), input("Category", String::new())];
+            let typed = |label: &str, f: &str, st: &Entity<InputState>| {
+                let mut v = input(label, text(st));
+                if text(st).is_empty() && self.mixed(f) {
+                    v["placeholder"] = MULTIPLE_VALUES.into();
+                }
+                v
+            };
+            let greyed = |mut v: serde_json::Value| {
+                v["disabled"] = true.into();
+                v
+            };
+            let check = |label: &str, on: bool| {
+                let mut v = serde_json::json!({ "label": label, "kind": "checkbox", "value": on });
+                if self.mixed(label) {
+                    v["indeterminate"] = true.into();
+                }
+                v
+            };
+            let mut fields = vec![typed("Name *", "Name", &self.name), greyed(input("Category", String::new()))];
             if numbered {
                 let state = self.state.clone().unwrap_or_else(|| RELEASE_STATES[0].to_string());
-                fields.extend([input("Part number", text(&self.part_number)), input("Revision", text(&self.revision)), serde_json::json!({ "label": "State *", "kind": "select", "value": state })]);
+                fields.extend([typed("Part number", "Part number", &self.part_number), typed("Revision", "Revision", &self.revision), greyed(serde_json::json!({ "label": "State *", "kind": "select", "value": state }))]);
             }
             if sourced {
-                fields.extend([input("Vendor", text(&self.vendor)), input("Project", text(&self.project)), input("Product line", text(&self.product_line))]);
+                fields.extend([typed("Vendor", "Vendor", &self.vendor), typed("Project", "Project", &self.project), typed("Product line", "Product line", &self.product_line)]);
             }
             if let Some(m) = &self.material {
-                fields.push(input("Material", m.clone()));
+                fields.push(greyed(input("Material", m.clone())));
             }
             if titled {
-                fields.extend([input("Title 1", text(&self.titles[0])), input("Title 2", text(&self.titles[1])), input("Title 3", text(&self.titles[2]))]);
+                fields.extend([typed("Title 1", "Title 1", &self.titles[0]), typed("Title 2", "Title 2", &self.titles[1]), typed("Title 3", "Title 3", &self.titles[2])]);
                 if let Some(d) = &self.drawing {
                     fields.extend(DRAWING_FIELDS.iter().zip(d.iter()).map(|(l, st)| input(l, text(st))));
                 }
@@ -526,33 +832,67 @@ impl MetaForm {
                     fields.push(input("Mass", if self.mass_on { text(&self.mass) } else { String::new() }));
                     fields.push(serde_json::json!({ "label": "Subassembly BOM behavior *", "kind": "select", "value": options.get(self.bom).cloned().unwrap_or_default() }));
                 } else if self.material.is_some() || self.computed_mass.is_some() {
-                    fields.push(check("Mass Override", self.mass_on));
+                    let mut v = check("Mass Override", self.mass_on);
+                    if self.mixed("Override") {
+                        v["indeterminate"] = true.into();
+                    }
+                    fields.push(v);
                 }
             }
             // Undo and Redo are icon buttons (no text).
             let mut buttons = vec!["", ""];
+            let mut disabled: Vec<&str> = [(self.at == 0, ""), (self.at + 1 >= self.history.len(), "")].into_iter().filter(|(off, _)| *off).map(|(_, b)| b).collect();
             if self.reset_to.is_some() {
                 buttons.push("Reset all");
+                if !self.can_reset(cx) {
+                    disabled.push("Reset all");
+                }
             }
             buttons.extend(["Apply", "Save", "Close"]);
-            serde_json::json!({ "kind": "modal", "title": "Properties", "fields": fields, "buttons": buttons })
+            if !self.dirty(cx) {
+                disabled.extend(["Apply", "Save"]);
+            }
+            serde_json::json!({ "kind": "modal", "title": "Properties", "fields": fields, "buttons": buttons, "disabledButtons": disabled })
         });
     }
 
     /// A text field, or its configured box.
+    /// Whether a checkbox's parts differ (shown indeterminate).
+    fn mixed(&self, f: &str) -> bool {
+        self.multi.as_ref().is_some_and(|m| m.mixed.iter().any(|x| x == f))
+    }
+
+    /// A checkbox clicked: a mixed one turns on for every part, otherwise it toggles.
+    fn toggle_check(&mut self, f: &str, on: bool) -> bool {
+        match self.multi.as_mut().and_then(|m| m.mixed.iter().position(|x| x == f).map(|k| (m, k))) {
+            Some((m, k)) => {
+                m.mixed.remove(k);
+                true
+            }
+            None => !on,
+        }
+    }
+
     fn field(&self, name: &'static str, st: &Entity<InputState>, cx: &App) -> AnyElement {
         if self.configured.contains(&name) {
-            configured_box(name, st.read(cx).value().to_string())
-        } else if self.read_only.contains(&name) {
-            gray_box(st.read(cx).value().to_string(), false).into_any_element()
-        } else {
-            text_field(st)
+            return configured_box(name, st.read(cx).value().to_string());
         }
+        if self.read_only.contains(&name) {
+            return gray_box(st.read(cx).value().to_string(), false).into_any_element();
+        }
+        // The scenario runner's `{"field": "<label>"}`.
+        div().w_full().map(|d| crate::ui_script::mark(d, || format!("field:{name}"))).child(text_field(st)).into_any_element()
     }
 }
 
 /// A Bootstrap checkbox row ("☐ Not revision managed").
 fn check_row(id: impl Into<ElementId>, text: impl Into<SharedString>, on: bool) -> Stateful<Div> {
+    check_row_mixed(id, text, on, false)
+}
+
+/// [`check_row`], indeterminate (a blue box with a white dash) when `mixed`.
+fn check_row_mixed(id: impl Into<ElementId>, text: impl Into<SharedString>, on: bool, mixed: bool) -> Stateful<Div> {
+    let on = on || mixed;
     let text: SharedString = text.into();
     h_flex()
         .id(id)
@@ -571,7 +911,8 @@ fn check_row(id: impl Into<ElementId>, text: impl Into<SharedString>, on: bool) 
                 .border_1()
                 .border_color(if on { rgb(0x1651b0) } else { rgb(0xaaaaaa) })
                 .bg(if on { rgb(0x1651b0) } else { rgb(0xffffff) })
-                .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))),
+                .when(mixed, |d| d.child(div().w(px(8.)).h(px(2.)).bg(rgb(0xffffff))))
+                .when(on && !mixed, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))),
         )
         .child(text)
 }
@@ -644,7 +985,7 @@ impl Render for MetaForm {
                 } else if self.read_only.contains(&"Description") {
                     gray_box(self.description.read(cx).value().to_string(), false).h(px(56.)).into_any_element()
                 } else {
-                    Textarea::new(&self.description).h(px(56.)).text_size(px(14.)).into_any_element()
+                    div().w_full().map(|d| crate::ui_script::mark(d, || "field:Description".into())).child(Textarea::new(&self.description).h(px(56.)).text_size(px(14.))).into_any_element()
                 },
             ))
             .child(group(label("Category", false), gray_box(self.spec_category.to_string(), true).into_any_element()));
@@ -677,9 +1018,9 @@ impl Render for MetaForm {
             form = form.child(if self.read_only.contains(&"Not revision managed") {
                 readonly_check("Not revision managed", self.not_revision_managed)
             } else {
-                check_row("meta-nrm", "Not revision managed", self.not_revision_managed)
+                check_row_mixed("meta-nrm", "Not revision managed", self.not_revision_managed, self.mixed("Not revision managed"))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.not_revision_managed = !this.not_revision_managed;
+                        this.not_revision_managed = this.toggle_check("Not revision managed", this.not_revision_managed);
                         this.changed(cx);
                     }))
                     .into_any_element()
@@ -692,8 +1033,8 @@ impl Render for MetaForm {
         }
         if item {
         form = form
-            .child(check_row("meta-bom", "Exclude from all BOMs", self.exclude_from_bom).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.exclude_from_bom = !this.exclude_from_bom;
+            .child(check_row_mixed("meta-bom", "Exclude from all BOMs", self.exclude_from_bom, self.mixed("Exclude from all BOMs")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.exclude_from_bom = this.toggle_check("Exclude from all BOMs", this.exclude_from_bom);
                 this.changed(cx);
             })))
             .child(group(
@@ -727,10 +1068,10 @@ impl Render for MetaForm {
                             .child(if self.read_only.contains(&"Override") {
                                 readonly_check("Override", mass_on)
                             } else {
-                                check_row("meta-mass", "Override", mass_on)
+                                check_row_mixed("meta-mass", "Override", mass_on, self.mixed("Override"))
                                     .font_weight(FontWeight::NORMAL)
                                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                        this.mass_on = !this.mass_on;
+                                        this.mass_on = this.toggle_check("Override", this.mass_on);
                                         let on = this.mass_on;
                                         this.mass.update(cx, |s, cx| s.set_disabled(!on, cx));
                                         this.changed(cx);
@@ -854,26 +1195,30 @@ impl Render for MetaForm {
                 .tooltip(crate::ui::tooltip(tip))
                 .child(svg().path(crate::assets::icon_path(icon)).size(px(20.)).text_color(rgb(0x333333)))
         };
+        let title = self.header();
+        let header_row = move || {
+            div()
+                .mt(px(10.))
+                .h(px(31.))
+                .px(px(15.))
+                .border_b_1()
+                .border_color(rgb(0xcccccc))
+                .child(div().pl(px(4.)).text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).truncate().child(title.clone()))
+        };
+        let (header, form_header) = (header_row(), header_row());
         v_flex()
             .w_full()
             // The kit dialog puts 8 px between title and body.
             .mt(px(-8.))
             .text_color(pal.text)
-            // The item's name under the title, over a #ccc rule.
-            .child(
-                div()
-                    .mt(px(10.))
-                    .h(px(31.))
-                    .px(px(15.))
-                    .border_b_1()
-                    .border_color(rgb(0xcccccc))
-                    .child(div().pl(px(4.)).text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).truncate().child(self.saved.name.clone())),
-            )
+            // The item's name under the title, over a #ccc rule (several parts: over the form, beside their list).
+            .when(self.multi.is_none(), |d| d.child(header))
             .child({
                 let scroll = div().id("meta-scroll").h(px(381. + props_size().1 - PROPS_MIN.1)).overflow_y_scroll().track_scroll(&self.scroll).p(px(15.)).child(form);
-                match &self.card {
-                    None => scroll.into_any_element(),
-                    Some(card) => {
+                match (&self.multi, &self.card) {
+                    (Some(m), _) => parts_list(m, v_flex().w_full().child(form_header).child(scroll), cx),
+                    (None, None) => scroll.into_any_element(),
+                    (None, Some(card)) => {
                         let picture = match &card.thumb {
                             Some(image) => img(ImageSource::Render(image.clone())).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
                             None => crate::assets::icon("part-studio", 30., cx),
@@ -920,11 +1265,15 @@ impl Render for MetaForm {
                             .when(self.reset_to.is_some(), |d| {
                                 // Live (dk-999, part-studio/1840): disabled while
                                 // every value is the one it would restore.
-                                let can_reset = self.reset_to.as_ref().is_some_and(|r| *r != self.values(cx));
+                                let can_reset = self.can_reset(cx);
                                 d.child(
                                     footer_button("meta-reset", "Reset all", true, can_reset)
                                         .tooltip(crate::ui::tooltip("Reset all properties"))
                                         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                            if can_reset && this.multi.is_some() {
+                                                this.reset_multi(window, cx);
+                                                return;
+                                            }
                                             if let Some(v) = this.reset_to.clone().filter(|_| can_reset) {
                                                 this.restore(v, window, cx);
                                                 cx.notify();
@@ -944,6 +1293,48 @@ impl Render for MetaForm {
                     ),
             )
     }
+}
+
+/// Several parts' left list (live q2962): 300 px, a 55 px row per part with its picture, its name and "Part" in
+/// italics; the form's rows highlighted.
+fn parts_list(m: &Multi, form: impl IntoElement, cx: &mut Context<MetaForm>) -> AnyElement {
+    // The form's height and its 41 px header.
+    let h = px(381. + props_size().1 - PROPS_MIN.1 + 41.);
+    let rows = m.names.iter().enumerate().map(|(i, name)| {
+        let picture = match m.thumbs.get(i).cloned().flatten() {
+            Some(image) => img(ImageSource::Render(image)).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
+            None => crate::assets::icon("part", 30., cx),
+        };
+        let on = m.shown.contains(&i);
+        h_flex()
+            .id(("meta-part-row", i))
+            .map(|d| crate::ui_script::mark(d, || format!("row:{name}")))
+            .w_full()
+            .h(px(55.))
+            .pl(px(24.))
+            .pr(px(8.))
+            .border_b_1()
+            .border_color(rgb(0xdddddd))
+            .cursor_pointer()
+            .when(on, |d| d.bg(rgb(0xb2ddf6)))
+            .when(!on, |d| d.hover(|d| d.bg(rgb(0xdef1fb))))
+            .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(picture))
+            .child(
+                v_flex()
+                    .pl(px(4.))
+                    .min_w_0()
+                    .flex_1()
+                    .child(div().text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).truncate().child(name.clone()))
+                    .child(div().text_size(px(12.)).italic().text_color(rgb(0x666666)).child("Part")),
+            )
+            .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| this.click_row(i, e.modifiers(), window, cx)))
+    });
+    h_flex()
+        .w_full()
+        .items_start()
+        .child(div().id("meta-parts").w(px(300.)).h(h).flex_none().overflow_y_scroll().bg(rgb(0xf5f5f5)).border_r_1().border_color(rgb(0xcccccc)).children(rows))
+        .child(div().flex_1().min_w_0().child(form))
+        .into_any_element()
 }
 
 /// The 57 px Bootstrap modal header with a 24 px / 500 title.
@@ -1080,6 +1471,42 @@ pub fn open_part_properties_configured(spec: MetaSpec, part: PartExtras, on_save
     let name = form.read(cx).name.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
     // Live: the first field (Name) has the focus when the modal opens.
+    name.update(cx, |s, cx| s.focus(window, cx));
+}
+
+/// Several parts' Properties: each part's name, values and what Reset all restores (in the list's order), and their
+/// pictures when they come.
+pub struct PartsProperties {
+    pub names: Vec<String>,
+    pub values: Vec<MetaValues>,
+    pub reset_to: Vec<MetaValues>,
+    pub thumbs: Task<Vec<Option<std::sync::Arc<RenderImage>>>>,
+}
+
+/// Parts list › Properties… on several parts (live q2962): one modal for all of them; `on_save` gets the parts written.
+pub fn open_parts_properties(spec: MetaSpec, parts: PartsProperties, on_save: impl Fn(Vec<(usize, MetaValues)>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    let PartsProperties { names, values, reset_to, thumbs } = parts;
+    let n = names.len();
+    let form = cx.new(|cx| {
+        let mut f = MetaForm::new(spec, Rc::new(|_, _, _| {}), window, cx);
+        f.reset_to = Some(MetaValues::default());
+        f.multi = Some(Multi { names, thumbs: vec![None; n], values, reset_to, shown: (0..n).collect(), anchor: 0, mixed_at_fill: Vec::new(), mixed: Vec::new(), reset: false, on_save: Rc::new(on_save) });
+        f.fill_multi(window, cx);
+        f
+    });
+    let weak = form.downgrade();
+    cx.spawn(async move |cx| {
+        let made = thumbs.await;
+        let _ = weak.update(cx, |f, cx| {
+            if let Some(m) = &mut f.multi {
+                m.thumbs = made;
+                cx.notify();
+            }
+        });
+    })
+    .detach();
+    let name = form.read(cx).name.clone();
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
     name.update(cx, |s, cx| s.focus(window, cx));
 }
 

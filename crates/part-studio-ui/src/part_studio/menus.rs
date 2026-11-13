@@ -872,6 +872,80 @@ impl PartStudioView {
         );
     }
 
+    /// Parts list › Properties… on several parts (live q2962): one modal for all of them, each part's own values in
+    /// it, Save writing the edited fields to every part shown in one step.
+    pub(super) fn open_parts_meta(&mut self, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::properties_dialog::{MetaSpec, MetaValues};
+        if bodies.len() < 2 {
+            if let Some(b) = bodies.into_iter().next() {
+                self.open_part_meta(b, window, cx);
+            }
+            return;
+        }
+        let (msym, mfac) = crate::properties_dialog::mass_unit(&self.doc.read(cx).session.doc.settings.units);
+        let mass_text = |kg: f64| format!("{} {msym}", crate::properties_dialog::mass_number(kg * mfac));
+        let mut names = Vec::new();
+        let mut values = Vec::new();
+        let mut reset_to = Vec::new();
+        let mut materials = Vec::new();
+        for body in &bodies {
+            let props = self.studio(cx).and_then(|s| s.part_properties.get(body).cloned()).unwrap_or_default();
+            let name = self.display.body(body).map(|b| b.name.clone()).unwrap_or_default();
+            let default_name = self.context.as_ref().and_then(|c| c.bodies.iter().find(|x| &x.id == body).map(|x| x.name.clone())).unwrap_or_else(|| name.clone());
+            values.push(MetaValues {
+                name: name.clone(),
+                description: props.description.clone().unwrap_or_default(),
+                part_number: props.part_number.clone().unwrap_or_default(),
+                revision: props.revision.clone().unwrap_or_default(),
+                meta: props.meta.clone(),
+                mass_override: props.mass_override.map(mass_text),
+                bom: 0,
+                drawing: None,
+            });
+            reset_to.push(MetaValues { name: default_name, ..MetaValues::default() });
+            materials.push(props.material.clone().unwrap_or_else(|| "Unassigned".into()));
+            names.push(name);
+        }
+        let material = if materials.iter().all(|m| *m == materials[0]) { materials[0].clone() } else { String::new() };
+        let spec = MetaSpec { category: "Onshape Part", material: Some(material), computed_mass: None, bom_options: None, drawing_info: None, values: values[0].clone() };
+        let (display, gpu, parts) = (self.display.clone(), self.gpu.clone(), bodies.clone());
+        let thumbs = cx.background_spawn(async move { crate::tab_thumbnail::part_thumbnails(&display, &parts, &gpu).await });
+        let (doc, view, tab, config) = (self.doc.clone(), cx.entity(), self.tab, self.config_values.clone());
+        crate::properties_dialog::open_parts_properties(
+            spec,
+            crate::properties_dialog::PartsProperties { names, values, reset_to, thumbs },
+            move |written, _, cx| {
+                const FIELDS: [&str; 10] = ["Name", "Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3"];
+                let edits: Vec<(BodyId, noshape_ops::studio::PartPropertyValues)> = written
+                    .into_iter()
+                    .filter_map(|(i, v)| {
+                        let values = noshape_ops::studio::PartPropertyValues {
+                            name: v.name.clone(),
+                            description: v.description.clone(),
+                            part_number: v.part_number.clone(),
+                            revision: v.revision.clone(),
+                            meta: v.meta.clone(),
+                            mass_override: v.mass_override.as_deref().and_then(crate::properties_dialog::parse_mass),
+                        };
+                        Some((bodies.get(i)?.clone(), values))
+                    })
+                    .collect();
+                let desc = noshape_ops::studio::properties_description(&format!("{} parts", edits.len()));
+                doc.update(cx, |d, cx| {
+                    d.edit_studio(tab, &desc, cx, |ps| {
+                        for (body, values) in &edits {
+                            let configured: Vec<&str> = FIELDS.into_iter().filter(|f| noshape_model::configured_properties::configured_value(ps, body, f, &config).is_some()).collect();
+                            noshape_ops::studio::set_part_properties(ps, body, values, &configured);
+                        }
+                    });
+                });
+                view.update(cx, |this, cx| this.refresh_scene(true, cx));
+            },
+            window,
+            cx,
+        );
+    }
+
     /// Onshape "Export…" on parts: the Export modal (see `export.rs`).
     pub(super) fn open_export_dialog(&mut self, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
         self.open_part_export(bodies, window, cx);
