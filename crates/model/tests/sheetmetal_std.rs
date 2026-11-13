@@ -2132,3 +2132,46 @@ fn the_flat_lies_where_its_first_wall_puts_it() {
     let (lo, hi) = probe_flat_box(DatumPlane::Top, [(340.0, 30.0), (340.0, 0.0), (300.0, 0.0)]);
     assert_eq!((lo[0], lo[2], hi[0], hi[2]), (-30.0, -2.0, 40.555, 0.0), "SM Top wall-first: {lo:?} {hi:?}");
 }
+
+/// The lowest vertex of the part's bend faces at x (mm): a bend's end.
+fn bend_end_at(r: &RegenResult, x: f64) -> Reference {
+    let b = &r.context.bodies[part(r)];
+    let mut ends: Vec<DVec3> = b.shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).flat_map(|f| f.vertices()).filter_map(|v| v.vertex_point().ok()).map(|p| p * 1e3).filter(|p| (p.x - x).abs() < 1e-6).collect();
+    ends.sort_by(|a, b| a.z.total_cmp(&b.z).then(a.y.total_cmp(&b.y)));
+    vertex_at(r, *ends.first().unwrap_or_else(|| panic!("no bend end at x = {x}")))
+}
+
+/// Bend relief only edits a relief there is (live, behaviours psui sm-060…066 and the bend-relief-new-edit-reedit
+/// recording): a flange along the plate's whole edge runs its bend out to the sheet's side, no corner there, so
+/// "Selection is not a bend relief."; a partial flange's bend ends inside the plate's edge, a relief's corner.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn bend_relief_takes_only_a_bend_end_with_a_relief() {
+    for (partial, x, ok) in [(false, 60.0, false), (true, 50.0, true)] {
+        let mut s = plate("2 mm");
+        let r = s.ok();
+        let edge = edge_at(&r, DVec3::new(30.0, 40.0, 2.0));
+        s.add("sheetMetalFlange", |p| {
+            p.set("edges", ParamValue::Query(vec![edge]));
+            p.set("distance", expr("20 mm"));
+            if partial {
+                p.set("isPartialFlange", ParamValue::Bool(true));
+                p.set("firstBoundType", en("BLIND"));
+                p.set("firstBoundOffset", expr("10 mm"));
+                p.set("hasSecondBound", ParamValue::Bool(true));
+                p.set("secondBoundType", en("BLIND"));
+                p.set("secondBoundOffset", expr("10 mm"));
+            }
+        });
+        let r = s.ok();
+        let corner = bend_end_at(&r, x);
+        s.add("sheetMetalBendRelief", |p| p.set("bendRelief", ParamValue::Query(vec![corner])));
+        let r = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions::default());
+        let last = r.display.features.last().expect("Bend relief's status");
+        if ok {
+            assert!(matches!(last.status, FeatureStatus::Ok), "partial flange's end: {:?} {:?}", last.status, last.message);
+        } else {
+            assert!(matches!(last.status, FeatureStatus::Error) && last.message.as_deref() == Some("Selection is not a bend relief."), "whole-edge flange's end: {:?} {:?}", last.status, last.message);
+        }
+    }
+}

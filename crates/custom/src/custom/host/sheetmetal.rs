@@ -3170,19 +3170,37 @@ fn ev_corner_type(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let verts: Vec<usize> = shape.vertices().iter().enumerate().filter(|(_, x)| x.vertex_point().is_ok_and(|p| p.distance(at) < TOL)).map(|(n, _)| n).collect();
         let ve = shape.vertex_edges().unwrap_or_default();
         let edges: std::collections::BTreeSet<u32> = verts.iter().flat_map(|n| ve.get(*n).cloned().unwrap_or_default()).collect();
-        let (mut bends, mut rips) = (0, 0);
+        let (mut bends, mut rips) = (Vec::new(), 0);
+        let mut free = Vec::new();
         for e in edges {
-            let Some(j) = sm_attribute(q.st, &q.to_ref(&Ent::Edge(*b, e as usize)), "JOINT") else { continue };
+            let Some(j) = sm_attribute(q.st, &q.to_ref(&Ent::Edge(*b, e as usize)), "JOINT") else {
+                free.push(e);
+                continue;
+            };
             match j.get("jointType").get("value").as_str().as_deref() {
-                Some("BEND") => bends += 1,
+                Some("BEND") => bends.push(e),
                 Some("RIP") => rips += 1,
                 _ => {}
             }
         }
-        let kind = match (bends, rips) {
-            (0, _) => "NOT_A_CORNER",
-            (1, 0) => "BEND_END",
-            (2.., 1..) => "CLOSED_CORNER",
+        // Each edge's direction leaving `at`.
+        let away = |e: u32| -> Option<DVec3> {
+            let edge = shape.sub_shape(k::ShapeType::Edge, e as usize).ok()?;
+            let info = edge.edge_info().ok()?;
+            let span = info.last_param - info.first_param;
+            let (a, z) = (edge.point_at(info.first_param + span * 1e-3).ok()?, edge.point_at(info.last_param - span * 1e-3).ok()?);
+            let p = if a.distance(at) <= z.distance(at) { a } else { z };
+            Some((p - at).normalize_or_zero())
+        };
+        // A bend alone ends at a corner when the sheet's edge carries on past it (a partial flange's end, its relief);
+        // a bend running out to the sheet's edge ends at no corner (live: sm-box's Flange 1, "Selection is not a bend
+        // relief.").
+        let carries_on = |bend: u32| away(bend).is_some_and(|d| free.iter().filter_map(|e| away(*e)).any(|f| f.dot(d) < -1.0 + 1e-6));
+        let kind = match (bends.as_slice(), rips) {
+            ([], _) => "NOT_A_CORNER",
+            ([bend], 0) if carries_on(*bend) => "BEND_END",
+            ([_], 0) => "NOT_A_CORNER",
+            ([_, _, ..], 1..) => "CLOSED_CORNER",
             _ => "OPEN_CORNER",
         };
         Ok((kind, verts.iter().map(|n| q.to_ref(&Ent::Vertex(*b, *n))).collect::<Vec<Reference>>()))
