@@ -2336,3 +2336,28 @@ fn a_thread_on_its_shafts_cylinder_fuses_into_one_solid() {
     let v = r.shape.volume().unwrap() * 1e9;
     assert!((v - 4896.29).abs() <= 0.2, "volume {v} mm³ against live's 4896.29");
 }
+
+/// c2-hunting-knife's Chamfer 1 cut (recorded): two chamfer tools along the blade's edge, end to end, their B-spline
+/// faces all but tangent to the blade's grind face. Tool 0's edge lies on that face within 0.4 um but runs on past the
+/// blade's tip (0.2 mm off the surface there); OCCT's sections of the tool's faces with it come in pieces with gaps.
+/// Ours takes the edge as on the face up to where it leaves it, and the sections along it as that edge: the same faces
+/// and volume as OCCT's, two vertices fewer (OCCT's ends of its section pieces; the feature matches live either way).
+#[test]
+fn a_chamfer_tool_along_a_blades_face_cuts_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "343b971ef15af720").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid(), "valid");
+    assert_eq!(r.shape.count(k::ShapeType::Face), o.shape.count(k::ShapeType::Face), "faces");
+    assert_eq!(r.shape.count(k::ShapeType::Vertex) + 2, o.shape.count(k::ShapeType::Vertex), "vertices");
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-7 * w, "volume {v} against OCCT's {w}");
+}

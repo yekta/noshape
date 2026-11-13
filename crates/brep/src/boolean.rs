@@ -1921,6 +1921,28 @@ impl Ctx<'_> {
                 if lo >= hi || near(lo, hi) {
                     continue;
                 }
+                // (Along an edge of one of the two faces that lies on the other (edge_in_face): that edge, OCCT's
+                // common block, not a section of its own (the knife's chamfer tool along the blade's grind face:
+                // OCCT's section there in pieces with gaps, each ending on the edge).)
+                let along = |a: usize, b: usize| {
+                    self.faces[a].edges.iter().any(|&(x, _)| {
+                        self.in_face_done.contains(&(x, b)) && {
+                            let sx = self.edge_seg(x);
+                            // (Two faces all but tangent there: their section strays off the edge between its ends,
+                            // up to 40 um on the knife's chamfer tool, as OCCT's section tolerance allows.)
+                            let reach = (GREY * self.pool.pair(self.edges[x].t, self.faces[b].t)).max((1e3 * self.tol).min(1e-4));
+                            // (Within the edge's own range: a section going straight on past its end is a section.)
+                            let slack = reach / self.seg_length(&sx).max(1e-300);
+                            (0..=4).all(|k| {
+                                let (u, d) = self.seg_param(&sx, path.at(lo + (hi - lo) * k as f64 / 4.0));
+                                d <= reach && (-slack..=1.0 + slack).contains(&u)
+                            })
+                        }
+                    })
+                };
+                if matches!(path, Path::Nurbs { .. }) && (along(fs, ft) || along(ft, fs)) {
+                    continue;
+                }
                 let vlo = pick(self, x[0], y[0], true)?;
                 let vhi = pick(self, x[1], y[1], false)?;
                 let (Some(vlo), Some(vhi)) = (vlo, vhi) else { return Err(Decline("a section without ends")) };
@@ -1961,18 +1983,56 @@ impl Ctx<'_> {
             Geo::Nurbs { id, t0, t1 } => (Path::Nurbs { id, c: self.ncurves[id as usize].c.clone() }, t0, t1),
             Geo::Apex { .. } => return Ok(()),
         };
+        let point = |t: f64| match &path {
+            Path::Line { p, d } => *p + *d * t,
+            Path::Circle(k) => k.at(t),
+            Path::Ellipse(el) => el.at(t),
+            Path::Nurbs { c, .. } => c.at(t),
+        };
+        // (Running on past a free-form face's own edge (on_free_surface's `past_face`): only its part over the face, from
+        // where it leaves the surface, a new point there, as OCCT's pave on the face's edge.)
+        let (mut t0, mut t1, mut e0, mut e1) = (t0, t1, End::Vertex(s.v[0]), End::Vertex(s.v[1]));
+        let gap = GREY * self.pool.pair(self.edges[e].t, self.faces[f].t);
+        for end in 0..2 {
+            let (from, to) = if end == 0 { (t0, t1) } else { (t1, t0) };
+            if !self.past_face(f, point(from), gap) || self.past_face(f, point(0.5 * (t0 + t1)), gap) {
+                continue;
+            }
+            let (mut a, mut b) = (from, 0.5 * (from + to));
+            for _ in 0..60 {
+                let m = 0.5 * (a + b);
+                if self.past_face(f, point(m), gap) {
+                    a = m;
+                } else {
+                    b = m;
+                }
+            }
+            // (On the face's edge it crosses there: a vertex of that edge, its tolerance reaching the edge's point.)
+            let p = point(b);
+            let near = self.faces[f].edges.iter().map(|&(x, _)| {
+                let sx = self.edge_seg(x);
+                let (u, d) = self.seg_param(&sx, p);
+                (d, self.seg_at(&sx, u.clamp(0.0, 1.0)))
+            }).fold((f64::INFINITY, p), |m, x| if x.0 < m.0 { x } else { m });
+            let at = if near.0 <= 1e3 * gap { End::Vertex(self.pool.add_tol(near.1, (1.5 * near.0).max(self.tol))?) } else { End::Point(p) };
+            if end == 0 {
+                (t0, e0) = (b, at);
+            } else {
+                (t1, e1) = (b, at);
+            }
+        }
         // An arc across a round face's seam: in two parts, a vertex where it crosses.
-        let mut parts = vec![(t0, End::Vertex(s.v[0]), t1, End::Vertex(s.v[1]))];
+        let mut parts = vec![(t0, e0, t1, e1)];
         if let Path::Nurbs { c, .. } = &path {
             // A B-spline across a round face's seam (a helix round a rod): in parts, a vertex at each crossing.
-            let mut at = vec![(t0, End::Vertex(s.v[0]))];
+            let mut at = vec![(t0, e0)];
             for t in free::seam_cuts(self, [f, usize::MAX], c, t0.min(t1), t0.max(t1)) {
                 if path.length(t0.min(t), t0.max(t)) > self.tol && path.length(t1.min(t), t1.max(t)) > self.tol {
                     at.push((t, End::Point(c.at(t))));
                 }
             }
             at.sort_by(|a, b| if t0 <= t1 { a.0.total_cmp(&b.0) } else { b.0.total_cmp(&a.0) });
-            at.push((t1, End::Vertex(s.v[1])));
+            at.push((t1, e1));
             parts = at.windows(2).map(|w| (w[0].0, w[0].1, w[1].0, w[1].1)).collect();
         }
         if let (Path::Circle(k), Some(seam)) = (path.clone(), self.seam_at(f, &path)) {
@@ -2167,6 +2227,19 @@ impl Ctx<'_> {
         !matches!(self.edges[e].g, Geo::Apex { .. }) && (matches!(self.faces[f].s, Surf::Nurbs { .. }) || matches!(self.edges[e].g, Geo::Nurbs { .. } | Geo::Ell { .. }))
     }
 
+    /// Whether `p`, off free-form face `f`'s surface by more than `gap`, is past the face's own edge: the surface's point
+    /// nearest it outside the face or on its boundary. (Off its whole surface too: a torus's face's edge running on
+    /// along the same torus past it (bool_patterns::parts_of_one_torus_fused_as_occt) is another face's.)
+    fn past_face(&self, f: usize, p: DVec3, gap: f64) -> bool {
+        matches!(self.faces[f].s, Surf::Nurbs { .. })
+            && free::surface_distance(&self.faces[f], p) > gap
+            && free::whole_surface_distance(&self.faces[f], p) > gap
+            && self.bound(f).is_ok_and(|b| {
+                let q = self.faces[f].to2(p);
+                !inside2(q, b) || distance2(q, b) <= gap
+            })
+    }
+
     /// [`Self::edge_on_surface`] by points along the edge.
     fn on_free_surface(&self, e: usize, f: usize) -> R<bool> {
         // (On within the edge's and the face's own tolerances, OCCT's rule; the grey band past that by theirs too.)
@@ -2174,23 +2247,36 @@ impl Ctx<'_> {
         // Points along it: all on the surface, it lies on it (not yet taken); within the grey band
         // without being clearly off, ambiguous.
         let s = self.edge_seg(e);
-        let (mut on, mut near) = (0, 0);
-        // (The middle first: one point clearly off, it isn't on it.)
+        let (mut on, mut near, mut past) = (0, 0, 0);
+        // (The middle first: one point clearly off, it isn't on it. A point past the face's own edge, the surface's
+        // point nearest it outside the face (a chamfer tool's edge running on past a blade's tip: 0.2 mm off the
+        // surface there, 0.2 um along the face), counts neither way.)
+        // (Past it only at its ends, and on it for three points or more: an edge leaving the face and coming back (a
+        // circle on a torus across two of its faces), or crossing it at one point, isn't running on past it.)
+        // (Only a point clearly off can be past it: asked only there.)
+        let mut past_at = [false; 7];
         for k in [3, 0, 6, 1, 2, 4, 5] {
             let p = self.seg_at(&s, k as f64 / 6.0);
-            if free::clearly_off(&self.faces[f], p, GREY * on_tol) {
-                return Ok(false);
-            }
-            let d = free::surface_distance(&self.faces[f], p);
+            let d = if free::clearly_off(&self.faces[f], p, GREY * on_tol) { f64::INFINITY } else { free::surface_distance(&self.faces[f], p) };
             if d <= on_tol {
                 on += 1;
             } else if d <= GREY * on_tol {
                 near += 1;
+            } else if k != 3 && self.past_face(f, p, GREY * on_tol) {
+                past_at[k] = true;
+                past += 1;
             } else {
                 return Ok(false);
             }
         }
-        if on == 7 {
+        if past > 0 {
+            let first = past_at.iter().position(|&x| !x).unwrap_or(0);
+            let last = past_at.iter().rposition(|&x| !x).unwrap_or(6);
+            if past_at[first..=last].iter().any(|&x| x) || last - first < 2 {
+                return Ok(false);
+            }
+        }
+        if on + past == 7 {
             // (On a plane, cylinder or cone: its pieces there go into the face, as a straight or round
             // edge's.)
             if let (Geo::Nurbs { .. }, Surf::Plane { .. } | Surf::Cyl { .. }) = (self.edges[e].g, &self.faces[f].s) {
@@ -2231,10 +2317,15 @@ impl Ctx<'_> {
         }
         // (Touching it at one end and leaving it: from on it there to past the tolerance at the other end, steadily
         // (a straight edge tangent to a revolved face at its end, c2-housing-draft's Rotieren 1): off it.)
-        if near > 0 && on + near == 7 {
-            let ds: Vec<f64> = (0..=6).map(|k| free::surface_distance(&self.faces[f], self.seg_at(&s, k as f64 / 6.0))).collect();
+        if near > 0 && on + near + past == 7 {
+            let ds: Vec<f64> = (0..=6).filter(|&k| past == 0 || !past_at[k]).map(|k| free::surface_distance(&self.faces[f], self.seg_at(&s, k as f64 / 6.0))).collect();
             let rising = ds.windows(2).all(|w| w[1] >= w[0]) || ds.windows(2).all(|w| w[1] <= w[0]);
-            if rising && ds[0].min(ds[6]) <= 0.01 * on_tol && ds[0].max(ds[6]) > on_tol {
+            if past == 0 && rising && ds[0].min(ds[6]) <= 0.01 * on_tol && ds[0].max(ds[6]) > on_tol {
+                return Ok(true);
+            }
+            // (Within the grey band all along: on it, as OCCT's (the knife's chamfer tool's B-spline edge on the blade's
+            // grind face, 0.4 um off between its ends).)
+            if ds.iter().all(|&d| d <= GREY * on_tol) {
                 return Ok(true);
             }
             return Err(Decline("an edge nearly on another argument's face"));
