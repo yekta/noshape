@@ -532,7 +532,17 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             ev.replace_body(bi, r2.shape, names2);
             continue;
         }
-        let res = match k::fillet_checked(&body.shape, &shapes, &radii) {
+        // Straight edges with overflow on have sections to fall back on: OCCT tried once without its slower retries
+        // first (c2-hunting-knife's Fillet 2: the scaled retry 105 of OCCT's 118 ms, building a bad solid again).
+        let lines_overflow = !width && ev.bool("allowEdgeOverflow") && all_lines(&shapes);
+        let first = if lines_overflow { k::without_blend_retries(|| k::fillet_checked(&body.shape, &shapes, &radii)) } else { k::fillet_checked(&body.shape, &shapes, &radii) };
+        let first = match first {
+            Err(_) if lines_overflow && !propagate && edges.len() == 1 && super::blend_section::section_blend(ev, bi, &edges, &unpropagated(radius)).is_ok() => continue,
+            Err(_) if lines_overflow && super::blend_section::section_blend(ev, bi, &edges, &super::blend_section::BlendSpec { overflow: true, ..unpropagated(radius) }).is_ok() => continue,
+            Err(_) if lines_overflow => k::fillet_checked(&body.shape, &shapes, &radii),
+            other => other,
+        };
+        let res = match first {
             Ok(r) => r,
             // Without propagation a single straight edge whose ball fits its faces
             // can still be filleted by booleans (F3: R4 after R2/R3 stopped at their edges).
