@@ -186,10 +186,9 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   - **Worktrees:** /root/projects/noshape-wt/bool2 (branch bool2-cov). bool2-gate and bool-gate-base are gate.sh's.
     bool2-nightly is the crons' checkout. bool2-doc is for docs-only lands. Targets on vibe5: bool2, bool2-gate,
     bool-gate-base.
-  - **Host (lead 11-13 05:50 UTC, until further notice): vibe7.** Gates with NOSHAPE_GATE_HOST=vibe7, builds with
-    NOSHAPE_RB_HOST=vibe7 (vibe5 at load 50). vibe7 has the corpora and the gate's caches (copied 05:55 from vibe5's
+  - **Host: vibe5 again (lead 11-13 06:30 UTC; vibe7 for a while from 05:50).** One knife gate ran on vibe7. vibe7 has the corpora and the gate's caches (copied 05:55 from vibe5's
     ~/agents/bool-corpora and ~/agents/bool-gate); vibe5 can't reach vibe7 by name, so copies go through this machine.
-  - **Session cron, gone with the session; recreate it (NOSHAPE_GATE_HOST=vibe7 for now):** every hour at :17: `git -C
+  - **Session cron, gone with the session; recreate it:** every hour at :17: `git -C
     /root/projects/noshape-wt/bool2-nightly fetch -q origin && git -C /root/projects/noshape-wt/bool2-nightly checkout
     -q -f --detach origin/main && bash /root/projects/noshape-wt/bool2-nightly/tools/bool/gate.sh --main`, skipped while
     another gate runs. The kall nightly stays off (vibe5 has 29 GB).
@@ -202,6 +201,10 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   `gap` returning None under 1e-9 rad (/root/bool2-scratch/fan-gap-fix.patch, one line, not landed: it takes nothing
   alone) the faces go round as threads should and the cut stops at "an arc across a cylinder's seam" (your
   motor-mount one). Recording: vibe5 ~/tmp/bool2/bydoc-all/rec/c2-fan-blade-sweep.
+  The suite's two other "a face lost" (11-13 06:34 UTC) are the same family, cylinder faces going exactly once round:
+  clamp-hms 1309375f (a fuse, 13 ms) has its seam line at u -0.078 on one side and 0.1215 on the other (r 31.75 mm,
+  one turn apart), so the outline doesn't close; cf-lighten a28978f4 (a 4-tool cut, 40 ms) loses tool face 26 likewise.
+  The gap fix doesn't help them. Cases: vibe5 ~/tmp/bool2/lost.
 - **The knife's 343b971e (11-13 05:33 UTC, gating 2a78dd7f, branch bool2-knife2):** a cut by two chamfer tools
   end to end along the blade, their B-spline faces all but tangent to the grind face 4. Tool 0's edge 52 lies on face 4
   within 0.2 um but runs on past the blade's tip (0.2 mm off the surface there); OCCT's sections of tool 0's faces
