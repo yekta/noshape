@@ -10,6 +10,11 @@ live's from live.jsonl per_feature_ms. Yours:
 - c2-valve-config: Circular pattern 1 344 ms (live 67), Extrude 3 195 (live 56).
 - The private dock (E2 tab): a fillet's unify_same_domain 952 ms of its 1.8 s (usd.check 509, usd.volume 389).
 - hat8 / hat15: the Move face's Boolean goes to OCCT's boolean.tree, 1.04 s of its 1.17 s.
+- (11-13 04:10, qa's ranking list, 9febdf588) c2-sm-louver (5.33 s vs 4.99): Extrude 3 2.6 s (live 266) and Flange 9 1.9 s
+  (live 222), Extrude 4 1.1 s, Flange 7 1.1 s, Linear pattern 3 0.7 s: the kernel's share is small (717k edge_point_at, 246k
+  curve_info, 466k shape_is_same calls a feature, ~0.3 s): the sheet-metal model's own Rust work after each feature.
+  c2-sm-corner-break (2.26 vs 1.97): Corner break 1 2.0 s (live 750) has 34 Booleans (461 ms, bool's speed) plus 352k
+  edge_point_at; Extrude 2 0.8 s (live 328), Flange 1 1.0 s (live 580).
 - (A note on the suite's per-feature kernel profiles: their props_surface calls are the suite's own measuring after each
   feature, face_json -> entities -> our_parts, not regeneration.)
 

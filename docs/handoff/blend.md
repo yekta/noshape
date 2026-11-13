@@ -27,6 +27,9 @@ live's from live.jsonl per_feature_ms. Yours:
 - cf-snap-hook: Fillet 6 126 ms (live 8).
 - c2-impeller-loft: Fillet Ansaugflansch zum Gehaeuse leaves 9 vertices of 1.1-1.8 mm tolerance (bool2's 22:40 note), which
   put the two flange-hole extrudes' Booleans on OCCT (~3.1 and ~1.4 s against live's 177 and 59 ms).
+- (11-13 04:10, qa's ranking list) c2-variable-fillet-faceblend (0.39 s vs 0.06): Face blend 1 540 ms (live 25): 8 op_loft
+  334 ms, blend.direct 88 ms. learning-center-michael (release 203 vs 96 ms): Fillet 2 400 ms (live 46), blend.by_tools 384
+  ms of which our Boolean 283 (bool takes the Boolean's speed).
 - The private dock (E2 tab): a rib round, op_fillet 1.8 s of its 2.6 s; hat8 / hat15: a chamfer ~460 ms.
 
 ## From core (11-13 00:30 UTC, lead): core works on isaac-ball's Fillet 2 in the fillet builder
