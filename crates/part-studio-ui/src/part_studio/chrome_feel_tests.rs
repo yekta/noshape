@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::part_studio::behaviors;
-use gpui_kit::{Context, MouseMoveEvent, StatefulInteractiveElement as _, point, size};
+use gpui_kit::{Context, MouseMoveEvent, Pixels, Point, StatefulInteractiveElement as _, point, size};
 
 const NONE: Modifiers = Modifiers { shift: false, control: false, alt: false, platform: false, function: false };
 
@@ -26,8 +26,10 @@ struct Chrome {
 impl Chrome {
     fn open(cx: &mut TestAppContext, scale: f32) -> Self {
         let _ = part_studio_from(cx, &format!("chrome-{scale}"), None);
-        let tips = cx.add_window(|_, _| Tips);
-        let tips: AnyWindowHandle = tips.into();
+        // (An app window: it draws the open menu over its content.)
+        let bounds = gpui_kit::Bounds { origin: point(px(0.), px(0.)), size: size(px(1920.), px(1080.)) };
+        let options = gpui_kit::WindowOptions { window_bounds: Some(gpui_kit::WindowBounds::Windowed(bounds)), ..Default::default() };
+        let (tips, _) = cx.update(|cx| crate::os_menu::open_window(options, cx, |_, cx| cx.new(|_| Tips))).unwrap();
         cx.update_window(tips, |_, w, _| w.set_scale_factor(scale)).unwrap();
         Chrome { tips }
     }
@@ -44,6 +46,25 @@ impl Chrome {
             draw(cx, self.tips);
         }
         crate::ui_script::shown_tooltip()
+    }
+
+    /// A three-row context menu opened for a right press at `at` (its rows' place `offset` from it); its bounds.
+    fn menu_at(&self, cx: &mut TestAppContext, at: Point<Pixels>, offset: Point<Pixels>) -> Option<gpui_kit::Bounds<Pixels>> {
+        self.move_to(cx, f32::from(at.x), f32::from(at.y));
+        let menu = cx
+            .update_window(self.tips, |_, w, cx| {
+                let menu = crate::os_menu::OsMenu::build(w, cx, |m, _, _| m.item(crate::os_menu::OsMenuItem::new("One")).item(crate::os_menu::OsMenuItem::new("Two")).item(crate::os_menu::OsMenuItem::new("Three")));
+                crate::os_menu::open(at + offset, menu.clone(), w, cx);
+                menu
+            })
+            .unwrap();
+        draw(cx, self.tips);
+        draw(cx, self.tips);
+        // (The menu's box: its drawn bounds are inside its 1 px border.)
+        let b = cx.update(|cx| crate::os_menu::open_bounds(cx)).map(|b| b.dilate(px(1.)));
+        cx.update(|cx| menu.update(cx, |_, cx| cx.emit(gpui_kit::DismissEvent)));
+        draw(cx, self.tips);
+        b
     }
 
     /// The pointer from empty space onto the first button.
@@ -126,6 +147,33 @@ fn rows() -> Vec<Row> {
             near(x, 780., "x")?;
             near(y, 398., "y")?;
             near(dropped(-50., 200.).0, 0., "x left")
+        } },
+        Row { id: "context menu / at the pointer + (0, 2)", live: "its top left at the pointer + (0, 2) in the graphics", gap: false, check: |c, cx| {
+            let b = c.menu_at(cx, point(px(300.), px(200.)), crate::os_menu::MENU_AT_POINTER).ok_or("no menu")?;
+            near(f32::from(b.left()), 300., "left")?;
+            near(f32::from(b.top()), 202., "top")
+        } },
+        Row { id: "context menu / flips at the window's right and bottom", live: "its right edge 1 px left of the pointer, its bottom 4 px below it (1860, 925: menu at 1738, 837, 121 x 92)", gap: false, check: |c, cx| {
+            let size = cx.update_window(c.tips, |_, w, _| w.viewport_size()).unwrap();
+            let at = point(size.width - px(20.), size.height - px(20.));
+            let b = c.menu_at(cx, at, crate::os_menu::MENU_AT_POINTER).ok_or("no menu")?;
+            near(f32::from(b.right()), f32::from(at.x) - 1., "right")?;
+            near(f32::from(b.bottom()), f32::from(at.y) + 4., "bottom")
+        } },
+        Row { id: "context menu / a feature-list row's at + (10, 12)", live: "+ (10, 12) on feature-list rows", gap: false, check: |c, cx| {
+            let b = c.menu_at(cx, point(px(300.), px(200.)), crate::os_menu::MENU_AT_ROW).ok_or("no menu")?;
+            near(f32::from(b.left()), 310., "left")?;
+            near(f32::from(b.top()), 212., "top")
+        } },
+        Row { id: "feature list / its width per tab", live: "remembered per tab (left-content-pane<elementId>PanelLength); a tab not resized has the default 205", gap: false, check: |_, _| {
+            let (a, b) = (noshape_model::document::TabId::new_random(), noshape_model::document::TabId::new_random());
+            crate::ui::remember_left_panel_w(a, 320.);
+            near(crate::ui::left_panel_w(a), 320., "the widened tab")?;
+            near(crate::ui::left_panel_w(b), crate::ui::LEFT_PANEL_W, "another tab")
+        } },
+        Row { id: "select other / its size", live: "220 px wide, 24 px rows in a 90 px list (~3.75 rows); with nothing found 83 px tall", gap: false, check: |_, _| {
+            near(behaviors::SELECT_OTHER_SIZE.0, 220., "width")?;
+            near(behaviors::SELECT_OTHER_EMPTY_H, 83., "height with nothing found")
         } },
         Row { id: "select other / its place", live: "the dialog's top left at the pointer + (100, 51)", gap: false, check: |_, _| {
             near(behaviors::SELECT_OTHER_OFFSET.0, 100., "x")?;

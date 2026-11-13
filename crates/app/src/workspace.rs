@@ -2528,7 +2528,7 @@ impl Render for Workspace {
                                 .children(self.render_toast(cx))
                                 .children(self.render_switcher(cx))
                                 // Onshape: at the feature dialog's place (below the toolbar, right of the list).
-                                .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(crate::ui::left_panel_w())).child(p.clone()))),
+                                .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(self.active.map_or(crate::ui::LEFT_PANEL_W, crate::ui::left_panel_w))).child(p.clone()))),
                         )
                         .child(div().w_full().flex_none().track_focus(&self.chrome_focus[1]).child(tabs))
                         // Live document/75: the notices panel sits under the tab bar,

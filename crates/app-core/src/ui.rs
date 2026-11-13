@@ -33,16 +33,30 @@ pub const LIST_ICON: f32 = 17.;
 pub const LEFT_PANEL_W: f32 = 206.;
 
 thread_local! {
-    static LEFT_W: std::cell::Cell<f32> = std::cell::Cell::new(
-        std::fs::read_to_string(crate::paths::config_dir().join("left_panel_width.txt")).ok().and_then(|t| t.trim().parse::<f32>().ok()).filter(|w| w.is_finite()).unwrap_or(LEFT_PANEL_W).max(LEFT_PANEL_W),
+    /// Each tab's list width (live: `left-content-pane<elementId>PanelLength` per user and per tab, feel/chrome.json
+    /// "panels"); a tab not resized has the default.
+    static LEFT_W: std::cell::RefCell<std::collections::HashMap<u64, f32>> = std::cell::RefCell::new(
+        std::fs::read_to_string(left_widths_path())
+            .ok()
+            .and_then(|t| serde_json::from_str::<std::collections::HashMap<String, f32>>(&t).ok())
+            .map(|m| m.into_iter().filter_map(|(k, w)| Some((k.parse().ok()?, w))).filter(|(_, w): &(u64, f32)| w.is_finite()).collect())
+            .unwrap_or_default(),
     );
 }
 
-/// The Features / instance list's width. Onshape's splitter between it and
-/// the graphics (`div.os-splitter`, live dom/cursor-rows.json) widens it
-/// from the default; it never gets narrower, and the width persists.
-pub fn left_panel_w() -> f32 {
-    LEFT_W.with(|w| w.get())
+fn left_widths_path() -> std::path::PathBuf {
+    crate::paths::config_dir().join("left_panel_widths.json")
+}
+
+/// Tab `tab`'s Features / instance list width. Onshape's splitter between it and the graphics (`div.os-splitter`, live
+/// dom/cursor-rows.json) widens it from the default; it never gets narrower, and each tab keeps its own.
+pub fn left_panel_w(tab: noshape_model::document::TabId) -> f32 {
+    LEFT_W.with(|m| m.borrow().get(&tab.0).copied()).unwrap_or(LEFT_PANEL_W).max(LEFT_PANEL_W)
+}
+
+/// Tab `tab`'s list is `w` px wide from now on (not saved: [`drag_left_panel`] saves).
+pub fn remember_left_panel_w(tab: noshape_model::document::TabId, w: f32) {
+    LEFT_W.with(|m| m.borrow_mut().insert(tab.0, w));
 }
 
 /// Dragging the left panel's splitter.
@@ -72,21 +86,22 @@ pub fn left_splitter() -> Stateful<Div> {
 }
 
 /// Follows a splitter drag over `e.bounds` (the panel and the graphics,
-/// starting at the panel's left edge): at least the default width, at most
+/// starting at the panel's left edge) for tab `tab`: at least the default width, at most
 /// all but 160 px of the graphics (live max x 1760 of 1920). True when the
 /// width changed.
-pub fn drag_left_panel(e: &DragMoveEvent<LeftSplitDrag>) -> bool {
+pub fn drag_left_panel(e: &DragMoveEvent<LeftSplitDrag>, tab: noshape_model::document::TabId) -> bool {
     let max = (f32::from(e.bounds.size.width) - 160.).max(LEFT_PANEL_W);
     let w = f32::from(e.event.position.x - e.bounds.left()).round().clamp(LEFT_PANEL_W, max);
-    if w == left_panel_w() {
+    if w == left_panel_w(tab) {
         return false;
     }
-    LEFT_W.with(|c| c.set(w));
-    let p = crate::paths::config_dir().join("left_panel_width.txt");
+    remember_left_panel_w(tab, w);
+    let all: std::collections::HashMap<String, f32> = LEFT_W.with(|m| m.borrow().iter().map(|(k, w)| (k.to_string(), *w)).collect());
+    let p = left_widths_path();
     if let Some(dir) = p.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    let _ = std::fs::write(p, w.to_string());
+    let _ = std::fs::write(p, serde_json::to_string(&all).unwrap_or_default());
     true
 }
 

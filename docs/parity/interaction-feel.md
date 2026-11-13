@@ -279,7 +279,7 @@ debugging rows, left out. Ours binds besides live's map, in those scopes: the de
 Close window, Quit (secondary-n / o / w / q) and the dialog Tab / Enter / Shift+Enter keys live's client handles
 outside its map (its "client side entries").
 
-**Chrome: 11 / 11** (11-13 11:30 UTC; 7 / 11 at the first run).
+**Chrome: 16 / 16** (11-13 12:16 UTC; 7 / 11 at the first run, then 5 rows added: 1 / 5 matched).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -290,7 +290,12 @@ outside its map (its "client side entries").
 | Feature dialog place | graphics area's top left, 3 px down | the same | = |
 | Feature dialog drag | clamped inside the graphics area; within ~10 px of the top / right / bottom it snaps (3 / 0 / 2 px); the left doesn't | could leave the area by all but 80 × 40 px, no snap; now live's (`behaviors::place_feature_dialog`) | = (fixed) |
 | Select other place | pointer + (100, 51) | the same | = |
-| Not yet in the matrix | tooltip fade-in / fade-out; tooltips closing on click, wheel, drag; toolbar dropdowns (click only, below the toolbar at the group's left, stay open, Esc); context menus (pointer + (0, 2) in the graphics, + (10, 12) on list rows, flip at the right / bottom edge, submenus on hover); the list's width remembered per tab (ours: one for all); feature dialogs sharing one stored layout; Select other's 220 px dialog, 24 px rows, "(No selections found)" 83 px | – | – |
+| Select other size | 220 px, 24 px rows in a 90 px list; nothing found: 83 px tall | the same, but the empty dialog kept the 92 px list (149 px); now one row (`SELECT_OTHER_EMPTY_H`) | = (fixed) |
+| Context menu place | pointer + (0, 2) in the graphics; + (10, 12) on a feature-list row | (0, 2) everywhere; now (10, 12) on feature and folder rows (`os_menu::MENU_AT_ROW`) | = (fixed) |
+| Context menu flip | at the right edge its right side 1 px left of the pointer; at the bottom its bottom 4 px below it | flipped round where it opened (pointer + (0, 2)); now round the pointer (vendored gpui `anchored().flip_point`) | = (fixed) |
+| Feature list width | remembered per tab, the default 205 elsewhere | one width for every tab; now per tab (`ui::left_panel_w(tab)`, config left_panel_widths.json) | = (fixed) |
+| Toolbar dropdowns | on click only, under the toolbar at the tool group's left edge, staying open | under the caret (31 px right of the group's left); now at the group's left (vendored gpui-component `PopupMenu::shift_x`); 4 px under the buttons as live | = (fixed; checked on a runner screenshot and by a row click, no T1 test) |
+| Not yet in the matrix | tooltip fade-in / fade-out; tooltips closing on click, wheel, drag; submenus opening on hover with no delay; feature dialogs sharing one stored layout | – | – |
 
 ## Look
 

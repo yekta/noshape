@@ -55,8 +55,13 @@ part's #ffc04c in linear). First difference, measured (`/root/psui-scratch/chrom
 column, corrected for its slope): live's part edges (1 px) carry ~0.84 px of ink at DPR 1 and never reach black (darkest
 L ~60, live/feel/look/part-studio-iso.png); ours ~1.2 px, solid black (`EDGE_WIDTH` 1.25 in shaders.wgsl and the
 builder's 1.25 px polylines); inactive sketches 1.5 px vs live 1 px. 11:50: edges at live's 1 px
-(`PART_EDGE_WIDTH`, silhouettes 1.2 ×, inactive sketches 1 px; interaction-feel.md "Look"). Next: the look matrix (scene / render T1 rows: colours, widths, glyph 20 px tiles,
-dimension arrows 16 × 8, value 18 px, mate connector 36 px).
+(`PART_EDGE_WIDTH`, silhouettes 1.2 ×, inactive sketches 1 px; interaction-feel.md "Look"). 11:57: look compared, 16 / 16 (interaction-feel.md
+"Look"; screenshots of ours with /root/psui-scratch/chrome/shot.sh on vibe6 (~/tmp/psui/shot.sh <scenario> <png>), ink
+with ink.py / ink2.py). Open: live's start "block" sketch shows its rectangle untied to the origin, ours tied (to
+check). 12:16: chrome's uncovered items (16 / 16): context menus flip round the pointer (vendored gpui
+`anchored().flip_point`), feature / folder row menus at + (10, 12), toolbar dropdowns at the group's left (vendored
+gpui-component `PopupMenu::shift_x`), the list width per tab, Select other 83 px with nothing found. Next: live2's
+batches (sheet metal, sketch tools, editing, dialogs, feedback), then the two known scenario misses.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's

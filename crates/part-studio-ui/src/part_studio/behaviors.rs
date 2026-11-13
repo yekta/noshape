@@ -164,6 +164,8 @@ const ZOOM_WINDOW_PROMPT: &str = "Drag to create zoom bounding box.";
 const SELECT_OTHER_PICK_PX: f64 = 8.;
 const SELECT_OTHER_MAX: usize = 20;
 pub(super) const SELECT_OTHER_SIZE: (f32, f32) = (220., 149.);
+/// Select other's height with nothing found ("(No selections found)", live 83 px).
+pub(super) const SELECT_OTHER_EMPTY_H: f32 = 83.;
 
 /// Consumed dialog picks: (picks, accent picks, before-model, lines).
 pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, Vec<Reference>, usize, Vec<noshape_render::Instance>);
@@ -3195,8 +3197,11 @@ impl PartStudioView {
         let pal = p();
         let labeler = self.labeler(cx);
         let size = self.viewport.read(cx).size();
+        // Nothing found: the list is one row and the dialog 83 px tall (live feel/chrome.json "select_other").
+        let empty = so.hits.is_empty();
+        let (list_h, height) = if empty { (26., SELECT_OTHER_EMPTY_H) } else { (92., SELECT_OTHER_SIZE.1) };
         let left = (so.at.x as f32 + SELECT_OTHER_OFFSET.0).min(size.x as f32 - SELECT_OTHER_SIZE.0).max(0.);
-        let top = (so.at.y as f32 + SELECT_OTHER_OFFSET.1).min(size.y as f32 - SELECT_OTHER_SIZE.1).max(0.);
+        let top = (so.at.y as f32 + SELECT_OTHER_OFFSET.1).min(size.y as f32 - height).max(0.);
         // The runner's `{"select_other_row": text, "index": n}`: the nth row with that text (live 08:01).
         let mut seen: std::collections::HashMap<String, usize> = Default::default();
         let mut rows: Vec<AnyElement> = so
@@ -3289,7 +3294,7 @@ impl PartStudioView {
                         .id("so-list")
                         .group("so-list")
                         .relative()
-                        .h(px(92.))
+                        .h(px(list_h))
                         .flex_none()
                         .border_1()
                         .border_color(pal.border)

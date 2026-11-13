@@ -192,6 +192,9 @@ pub struct OsMenu {
     /// Where keyboard focus was before the menu opened (root menu only); it
     /// goes back there when the menu closes, so shortcuts keep working.
     return_focus: Option<FocusHandle>,
+    /// A context menu that doesn't fit flips round the pointer, not where it was opened (live feel/chrome.json
+    /// "context_menus": its right edge 1 px left of the pointer, its bottom 4 px below it).
+    flip: Option<Point<Pixels>>,
     /// Onshape's icon-less list menus (documents page, Bootstrap
     /// `list-no-icons`): 13 px text 17 px from the edge.
     plain: bool,
@@ -256,7 +259,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, sep_margin: 0., text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, flip: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, sep_margin: 0., text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -878,6 +881,11 @@ impl Global for OsMenuHost {}
 
 /// Show `menu` at `position` (window coordinates) until it is dismissed.
 pub fn open(position: Point<Pixels>, menu: Entity<OsMenu>, window: &mut Window, cx: &mut App) {
+    // (Opened at the pointer: a right-click's menu, at + (0, 2) in the graphics, + (10, 12) on list rows.)
+    let pointer = window.mouse_position();
+    let d = position - pointer;
+    let flip = (d.x.abs() <= px(16.) && d.y.abs() <= px(16.)).then(|| pointer + point(px(-1.), px(4.)));
+    menu.update(cx, |m, _| m.flip = flip);
     open_anchored(position, Anchor::TopLeft, menu, window, cx);
 }
 
@@ -905,6 +913,11 @@ pub fn open_anchored(position: Point<Pixels>, anchor: Anchor, menu: Entity<OsMen
 /// `menu` is the open menu (a dropdown button shows its pressed state).
 pub fn is_open_menu(menu: &WeakEntity<OsMenu>, cx: &App) -> bool {
     cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).is_some_and(|(_, _, _, m, _)| m.downgrade() == *menu)
+}
+
+/// The open menu's bounds as last drawn (window coordinates).
+pub fn open_bounds(cx: &App) -> Option<Bounds<Pixels>> {
+    cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).map(|(_, _, _, m, _)| m.read(cx).bounds.get())
 }
 
 /// Where the open menu was opened (window coordinates).
@@ -1032,7 +1045,11 @@ fn render_host(window: &Window, cx: &App) -> Vec<AnyElement> {
     }
     // Live: a menu that doesn't fit below the pointer opens above it when
     // there is more room there, its top clamped to the window (dk-974, dk-975).
-    out.push(deferred(anchored().anchor(*anchor).position(*pos).switch_anchor_or_snap().child(menu.clone())).with_priority(POPUP_PRIORITY).into_any_element());
+    let mut placed = anchored().anchor(*anchor).position(*pos).switch_anchor_or_snap();
+    if let Some(f) = menu.read(cx).flip {
+        placed = placed.flip_point(f);
+    }
+    out.push(deferred(placed.child(menu.clone())).with_priority(POPUP_PRIORITY).into_any_element());
     out
 }
 
@@ -1091,16 +1108,26 @@ pub fn open_window<V: Render>(options: WindowOptions, cx: &mut App, build: impl 
     Ok((handle, built.expect("open_window ran its build closure")))
 }
 
+/// Where a context menu's top left goes from the pointer (live feel/chrome.json "context_menus"): (0, 2) in the
+/// graphics and most places, (10, 12) on a feature-list row.
+pub const MENU_AT_POINTER: Point<Pixels> = Point { x: px(0.), y: px(2.) };
+pub const MENU_AT_ROW: Point<Pixels> = Point { x: px(10.), y: px(12.) };
+
 /// Right-click opens an Onshape menu built by `f` at the pointer.
 pub trait OsContextMenuExt: InteractiveElement + Sized {
     fn os_context_menu(self, f: impl Fn(OsMenu, &mut Window, &mut Context<OsMenu>) -> OsMenu + 'static) -> Self {
+        self.os_context_menu_offset(MENU_AT_POINTER, f)
+    }
+
+    /// [`os_context_menu`](Self::os_context_menu) opening at the pointer + `offset` (a feature-list row's: [`MENU_AT_ROW`]).
+    fn os_context_menu_offset(self, offset: Point<Pixels>, f: impl Fn(OsMenu, &mut Window, &mut Context<OsMenu>) -> OsMenu + 'static) -> Self {
         let f = Rc::new(f);
         self.on_mouse_down(MouseButton::Right, move |e, window, cx| {
             cx.stop_propagation();
             let f = f.clone();
             let menu = OsMenu::build(window, cx, move |m, window, cx| f(m, window, cx));
             if !menu.read(cx).is_empty() {
-                open(e.position + point(px(0.), px(2.)), menu, window, cx);
+                open(e.position + offset, menu, window, cx);
             }
         })
     }
@@ -1132,6 +1159,11 @@ pub trait OsContextMenuExt: InteractiveElement + Sized {
     /// [`os_context_menu`](Self::os_context_menu) that a Ctrl+click opens too (live: a feature-list row's Ctrl+click
     /// opens its menu on Linux as on macOS, behaviours "ui-parity runner (2026-11-03, P1 request 1844)").
     fn os_context_menu_ctrl_click(self, f: impl Fn(OsMenu, &mut Window, &mut Context<OsMenu>) -> OsMenu + 'static) -> Self {
+        self.os_context_menu_ctrl_click_offset(MENU_AT_POINTER, f)
+    }
+
+    /// [`os_context_menu_ctrl_click`](Self::os_context_menu_ctrl_click) opening at the pointer + `offset`.
+    fn os_context_menu_ctrl_click_offset(self, offset: Point<Pixels>, f: impl Fn(OsMenu, &mut Window, &mut Context<OsMenu>) -> OsMenu + 'static) -> Self {
         let f = Rc::new(f);
         let g = f.clone();
         self.capture_any_mouse_down(move |e, window, cx| {
@@ -1146,10 +1178,10 @@ pub trait OsContextMenuExt: InteractiveElement + Sized {
             let g = g.clone();
             let menu = OsMenu::build(window, cx, move |m, window, cx| g(m, window, cx));
             if !menu.read(cx).is_empty() {
-                open(e.position + point(px(0.), px(2.)), menu, window, cx);
+                open(e.position + offset, menu, window, cx);
             }
         })
-        .os_context_menu(move |m, window, cx| f(m, window, cx))
+        .os_context_menu_offset(offset, move |m, window, cx| f(m, window, cx))
     }
 
     /// [`os_context_menu`](Self::os_context_menu) taken in the capture phase,

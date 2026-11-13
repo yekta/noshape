@@ -3498,8 +3498,9 @@ impl PartStudioView {
             crate::ui::tool_caret(SharedString::from(format!("tbm-{id}")), cx)
                     .dropdown_menu(move |mut menu, window, _| {
                         // Onshape: the dropdown lists every tool of the group
-                        // (the face included), 180 px wide, with shortcut chips.
-                        menu = crate::ui::fit_tool_menu(menu.min_w(px(180.)), window);
+                        // (the face included), 180 px wide, with shortcut chips; under the group's left edge, not
+                        // the caret's (live feel/chrome.json "toolbar_dropdowns").
+                        menu = crate::ui::fit_tool_menu(menu.min_w(px(180.)), window).shift_x(px(-crate::ui::TOOL_CELL));
                         for other in group.iter() {
                             let Some(t) = features::get(other) else { continue };
                             let v = view.clone();
@@ -4317,7 +4318,7 @@ impl PartStudioView {
                 .child(div().min_w_0().truncate().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(match &filtered_count {
                     // (Other languages: the translated title, truncated where it
                     // meets the icons, live "フィーチ…".)
-                    _ if errors > 0 && crate::ui::left_panel_w() < crate::ui::LEFT_PANEL_W + 10. && crate::i18n::current() == crate::i18n::DEFAULT => "Features …".to_string(),
+                    _ if errors > 0 && crate::ui::left_panel_w(self.tab) < crate::ui::LEFT_PANEL_W + 10. && crate::i18n::current() == crate::i18n::DEFAULT => "Features …".to_string(),
                     Some(k) => format!("Features ({k} of {n_features})"),
                     None => format!("Features ({n_features})"),
                 }))
@@ -5272,7 +5273,7 @@ impl PartStudioView {
         // Beside the row, as a feature row's (live ui 10-25 b (4)).
         let row = crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), move |_| SharedString::from(tip.clone()));
         let view = cx.entity();
-        row.os_context_menu(move |menu, window, cx| {
+        row.os_context_menu_offset(crate::os_menu::MENU_AT_ROW, move |menu, window, cx| {
             // A new folder still holding its selected features: the selection's menu (live ui-parity
             // folder-rclick-menu), the selection kept.
             let held = {
@@ -5947,7 +5948,7 @@ impl PartStudioView {
                 self.doc.read(cx).session.doc.tabs.iter().find(|t| t.id.to_string() == key).map(|t| (t.id, t.name.clone()))
             })
             .flatten();
-        row.os_context_menu_ctrl_click(move |menu, window, cx| {
+        row.os_context_menu_ctrl_click_offset(crate::os_menu::MENU_AT_ROW, move |menu, window, cx| {
             view.update(cx, |this, cx| {
                 // A right press on a row takes the keyboard out of a panel's field (live feature-menu-configure-suppression:
                 // the page's body); a dialog keeps its own.
@@ -7253,8 +7254,8 @@ impl Render for PartStudioView {
                 h_flex()
                     .flex_1()
                     .min_h_0()
-                    .on_drag_move(cx.listener(|_, e: &DragMoveEvent<crate::ui::LeftSplitDrag>, _, cx| {
-                        if crate::ui::drag_left_panel(e) {
+                    .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::ui::LeftSplitDrag>, _, cx| {
+                        if crate::ui::drag_left_panel(e, this.tab) {
                             cx.notify();
                         }
                     }))
@@ -7269,7 +7270,7 @@ impl Render for PartStudioView {
                     } else {
                         div()
                             .id("list-panel")
-                            .w(px(crate::ui::left_panel_w()))
+                            .w(px(crate::ui::left_panel_w(self.tab)))
                             .h_full()
                             .flex_none()
                             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<SeparatorDrag>, _, cx| {

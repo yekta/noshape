@@ -20,6 +20,7 @@ pub struct Anchored {
     anchor_position: Option<Point<Pixels>>,
     position_mode: AnchoredPositionMode,
     offset: Option<Point<Pixels>>,
+    flip_point: Option<Point<Pixels>>,
 }
 
 /// anchored gives you an element that will avoid overflowing the window bounds.
@@ -32,6 +33,7 @@ pub fn anchored() -> Anchored {
         anchor_position: None,
         position_mode: AnchoredPositionMode::Window,
         offset: None,
+        flip_point: None,
     }
 }
 
@@ -81,6 +83,13 @@ impl Anchored {
     /// below the pointer opens above it, its top clamped to the window).
     pub fn switch_anchor_or_snap(mut self) -> Self {
         self.fit_mode = AnchoredFitMode::SwitchAnchorOrSnap;
+        self
+    }
+
+    /// NOSHAPE PATCH: with [`Self::switch_anchor_or_snap`], the point a switched side sits at (a web context menu
+    /// flipped left ends 1 px left of the pointer, flipped up 4 px below it), not the anchor position.
+    pub fn flip_point(mut self, point: Point<Pixels>) -> Self {
+        self.flip_point = Some(point);
         self
     }
 }
@@ -163,16 +172,20 @@ impl Element for Anchored {
         if self.fit_mode == AnchoredFitMode::SwitchAnchorOrSnap {
             // The side with more room, along each axis (no partial fit test).
             let mut anchor = self.anchor;
+            let mut at = origin;
             if desired.right() > limits.right() || desired.left() < limits.left() {
-                let switched = Bounds::from_anchor_and_size(anchor.other_side_along(Axis::Horizontal), origin, children_bounds.size);
+                let flip_at = self.flip_point.map_or(origin, |f| point(f.x, origin.y));
+                let switched = Bounds::from_anchor_and_size(anchor.other_side_along(Axis::Horizontal), flip_at, children_bounds.size);
                 let over = |b: &Bounds<Pixels>| (b.right() - limits.right()).max(px(0.)) + (limits.left() - b.left()).max(px(0.));
                 if over(&switched) < over(&desired) {
                     anchor = anchor.other_side_along(Axis::Horizontal);
                     desired = switched;
+                    at = flip_at;
                 }
             }
             if desired.bottom() > limits.bottom() || desired.top() < limits.top() {
-                let switched = Bounds::from_anchor_and_size(anchor.other_side_along(Axis::Vertical), origin, children_bounds.size);
+                let flip_at = self.flip_point.map_or(at, |f| point(at.x, f.y));
+                let switched = Bounds::from_anchor_and_size(anchor.other_side_along(Axis::Vertical), flip_at, children_bounds.size);
                 let over = |b: &Bounds<Pixels>| (b.bottom() - limits.bottom()).max(px(0.)) + (limits.top() - b.top()).max(px(0.));
                 if over(&switched) < over(&desired) {
                     desired = switched;

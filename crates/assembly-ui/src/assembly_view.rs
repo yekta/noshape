@@ -5983,7 +5983,7 @@ impl AssemblyView {
                     .left_0()
                     .right_0()
                     // Centered on the window (live), not the graphics area.
-                    .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w() }))
+                    .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w(self.tab) }))
                     .flex()
                     .justify_center()
                     .child({
@@ -6021,7 +6021,7 @@ impl AssemblyView {
                     .top(px(9.))
                     .left_0()
                     .right_0()
-                    .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w() }))
+                    .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w(self.tab) }))
                     .flex()
                     .justify_center()
                     .child(col)
@@ -6431,7 +6431,7 @@ impl AssemblyView {
     /// the assembly's key context, actions and click-to-focus.
     fn render_front_host(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let slices = self.slices(cx);
-        let list_w = if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w() };
+        let list_w = if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w(self.tab) };
         let tb_panel = self.render_tb_custom_panel(window, cx);
         let graphics = div()
             .absolute()
@@ -6821,14 +6821,14 @@ impl Render for AssemblyView {
                     .flex_1()
                     .min_h_0()
                     .relative()
-                    .on_drag_move(cx.listener(|_, e: &DragMoveEvent<crate::ui::LeftSplitDrag>, _, cx| {
-                        if crate::ui::drag_left_panel(e) {
+                    .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::ui::LeftSplitDrag>, _, cx| {
+                        if crate::ui::drag_left_panel(e, this.tab) {
                             cx.notify();
                         }
                     }))
                     .when(!self.ui.list_collapsed, |d| {
                         d.child(
-                            div().w(px(crate::ui::left_panel_w())).h_full().flex_none().child(
+                            div().w(px(crate::ui::left_panel_w(self.tab))).h_full().flex_none().child(
                                 v_flex()
                                     .size_full()
                                     .bg(pal.panel)

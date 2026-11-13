@@ -308,6 +308,7 @@ pub struct PopupMenu {
     native_scrollbar: bool,
     /// NOSHAPE PATCH: Onshape's toolbar dropdown spacing (see `tool_list`).
     tool_list: bool,
+    shift_x: Pixels,
     /// Whether the list overflowed at the last layout (the native scrollbar
     /// shows from then on): it is laid out at its height cap.
     native_overflow: bool,
@@ -357,6 +358,7 @@ impl PopupMenu {
             scrollable: false,
             native_scrollbar: false,
             tool_list: false,
+            shift_x: px(0.),
             native_overflow: false,
             native_cap: Pixels::ZERO,
             scroll_handle: ScrollHandle::default(),
@@ -478,6 +480,13 @@ impl PopupMenu {
     /// (32 px rows: 33 px pitch, 2 + 33 n + 1 px tall).
     pub fn tool_list(mut self, on: bool) -> Self {
         self.tool_list = on;
+        self
+    }
+
+    /// NOSHAPE PATCH: the menu drawn `dx` px off where its popover places it (a toolbar group's dropdown under the
+    /// group's left edge, its trigger being the caret on the group's right).
+    pub fn shift_x(mut self, dx: impl Into<Pixels>) -> Self {
+        self.shift_x = dx.into();
         self
     }
 
@@ -1532,6 +1541,7 @@ impl Render for PopupMenu {
             .popover_style(cx)
             .text_color(cx.theme().popover_foreground)
             .relative()
+            .when(self.shift_x != px(0.), |this| this.left(self.shift_x))
             .occlude()
             .child(
                 v_flex()
