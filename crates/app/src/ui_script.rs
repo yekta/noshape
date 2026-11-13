@@ -455,7 +455,9 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             if s.is_object() {
                 s["tooltip"] = json!(noshape_app_core::ui_script::shown_tooltip());
                 // A modal of the window's (Create Drawing, Export Drawing) holds the focus (live 2063: "other").
-                if s["dialog"]["kind"] == "modal" && s["focus"]["kind"] == "none" {
+                let modal = s["dialog"]["kind"] == "modal";
+                let released = noshape_app_core::ui_script::page_focus(modal);
+                if modal && s["focus"]["kind"] == "none" && !released {
                     s["focus"] = json!({ "kind": "other" });
                 }
                 with_input_focus(&mut s, cx);
@@ -857,7 +859,9 @@ pub fn start_page(cx: &mut App) {
             let mut s = w.update(cx, |_, window, cx| noshape_app_core::ui_script::page_state(window, cx)).ok().flatten().unwrap_or_else(|| json!({ "error": "a window without a ui-parity state" }));
             if s.is_object() {
                 s["tooltip"] = json!(noshape_app_core::ui_script::shown_tooltip());
-                if s["dialog"]["kind"] == "modal" && s["focus"]["kind"] == "none" {
+                let modal = s["dialog"]["kind"] == "modal";
+                let released = noshape_app_core::ui_script::page_focus(modal);
+                if modal && s["focus"]["kind"] == "none" && !released {
                     s["focus"] = json!({ "kind": "other" });
                 }
                 let _ = w.update(cx, |_, window, cx| with_input_focus_in(&mut s, window, cx));
@@ -1104,6 +1108,11 @@ fn with_input_focus(s: &mut Value, cx: &mut AsyncWindowContext) {
 fn with_input_focus_in(s: &mut Value, window: &mut Window, cx: &mut App) {
     use gpui_kit::component::WindowExt as _;
     use gpui_kit::component::input::AnyInputState;
+    // A window modal over a panel that names its own field (Create version… over a drawing's Insert view chooser):
+    // the keyboard is the modal's (live ver-insert-create-version-esc: "other" with the Name's text).
+    if s["focus"]["kind"] == "field" && s["focus"]["text"].is_null() && window.has_active_dialog(cx) {
+        s["focus"] = serde_json::json!({ "kind": "other" });
+    }
     let named = s["focus"]["text"].is_string() || !matches!(s["focus"]["kind"].as_str(), Some("none" | "other"));
     if named {
         return;

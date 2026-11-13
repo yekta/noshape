@@ -558,8 +558,12 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
         let notice = if plan.protected_with_changes {
             // Live wp-937.
             Some(div().mx(px(10.)).mt(px(10.)).px(px(14.)).py(px(15.)).rounded(px(3.)).bg(rgb(0xfff8e6)).border_1().border_color(rgb(0xf5df9e)).text_size(px(14.)).text_color(pal.text).child(PROTECTED_NOTICE).map(|d| crate::ui_script::mark_message(d, || PROTECTED_NOTICE.into())))
-        } else if plan.up_to_date {
-            Some(os::info_box(format!("{} is already up to date with {}.", plan.target, plan.source)).mx(px(10.)).mt(px(10.)))
+        // A restore whose strategies change nothing says so too (live ver-restore-keep-cards: Keep Main; a merge with
+        // Keep says nothing, ver-merge-keep).
+        } else if plan.up_to_date || (plan.restore && !updates) {
+            // Live reads it as the page's alert (ver-restore-keep-cards).
+            let text = format!("{} is already up to date with {}.", plan.target, plan.source);
+            Some(os::info_box(text.clone()).mx(px(10.)).mt(px(10.)).map(move |d| crate::ui_script::mark_message(d, || text)))
         } else {
             None
         };

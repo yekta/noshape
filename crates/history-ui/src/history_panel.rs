@@ -952,6 +952,9 @@ fn stale_drawings_warning(doc: &Entity<DocModel>, stale: &Rc<std::cell::RefCell<
                 });
             });
             *stale.borrow_mut() = stale_drawings(&doc.read(cx).session);
+            // Live: the button goes with its box and the focus falls to the page (the Name field is left).
+            window.blur(cx);
+            crate::ui_script::release_focus_to_page();
             window.refresh();
         });
     Some(

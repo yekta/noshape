@@ -63,6 +63,9 @@ pub struct ChooserState {
     /// Expanded studios.
     pub open: Vec<TabId>,
     pub search: Option<Entity<InputState>>,
+    /// Create version… left the keyboard on the drawing (the state reads the drawing, not the chooser's field, until
+    /// the chooser is used again).
+    pub keyboard_left: bool,
     /// Pictures per (document, studio, what), the hash they were made for,
     /// busy. Document 0 is this one, else [`OtherDoc::tag`].
     pub thumbs: HashMap<(u64, TabId, ThumbOf), Arc<RenderImage>>,
@@ -215,6 +218,7 @@ impl DrawingEditor {
                 self.chooser.search = Some(cx.new(|cx| InputState::new(window, cx).placeholder(placeholder)));
                 self.chooser.url = Some(cx.new(|cx| InputState::new(window, cx).placeholder("Search or paste URL")));
                 // Live 2063: the search box takes the focus as the chooser opens.
+                self.chooser.keyboard_left = false;
                 if let Some(search) = self.chooser.search.clone() {
                     window.defer(cx, move |window, cx| search.update(cx, |s, cx| s.focus(window, cx)));
                 }
@@ -974,6 +978,8 @@ impl DrawingEditor {
         }
         let panel = v_flex()
             .id("dr-chooser")
+            // The chooser in use again: the keyboard is its (Create version… sets it off after this).
+            .on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, _, _| this.chooser.keyboard_left = false))
             // Replace...'s chooser: Esc closes it, even from its search box (live2 drw-sheet-ref-replace).
             .capture_action(cx.listener(|this, _: &gpui_kit::component::input::Escape, window, cx| {
                 if this.chooser.composite {
@@ -1094,7 +1100,13 @@ impl DrawingEditor {
                 .py(px(4.))
                 .gap(px(4.))
                 .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(doc_name))).child(h_flex().gap(px(4.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("branch", 12., cx)).child(place)))
-                .child(chooser_square("dr-ch-version", "version", "Create version…", false, cx).on_click(move |_, window, cx| crate::drawing_hooks::create_version(doc.clone(), window, cx)))
+                // The drawing holds the keyboard under the modal: Esc gives it back to the drawing, not the search box (live
+                // ver-insert-create-version-esc).
+                .child(chooser_square("dr-ch-version", "version", "Create version…", false, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    window.focus(&this.focus, cx);
+                    this.chooser.keyboard_left = true;
+                    crate::drawing_hooks::create_version(doc.clone(), window, cx);
+                })))
                 .child(chooser_square("dr-ch-graph", "version-graph", "Version graph", self.chooser.graph, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.chooser.graph = !this.chooser.graph;
                     cx.notify();

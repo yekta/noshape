@@ -192,6 +192,22 @@ pub fn note_dialog(dialog: impl FnOnce() -> serde_json::Value) {
 
 static DIALOG_PINNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// A click in a modal left the focus on the page (live: the clicked button went away with its box, the browser's
+/// focus fell to the body): the state reads "none", not a modal's "other", until the modal closes.
+static PAGE_FOCUS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn release_focus_to_page() {
+    PAGE_FOCUS.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the focus was left on the page; `modal_open` false clears it.
+pub fn page_focus(modal_open: bool) -> bool {
+    if !modal_open {
+        PAGE_FOCUS.store(false, std::sync::atomic::Ordering::Relaxed);
+    }
+    PAGE_FOCUS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// A panel that stays `state.dialog` whatever else the frame notes (a drawing's Sheets panel: live's recorder reads
 /// the first panel of the page, live2 drw-sheet-properties).
 pub fn note_dialog_pinned(dialog: impl FnOnce() -> serde_json::Value) {

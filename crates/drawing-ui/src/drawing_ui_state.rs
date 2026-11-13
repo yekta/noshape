@@ -451,7 +451,7 @@ impl DrawingEditor {
         if self.ui_list(cx).is_some() {
             return json!({ "kind": "none" });
         }
-        if self.insert.chooser.is_some() {
+        if self.insert.chooser.is_some() && !self.chooser.keyboard_left {
             return json!({ "kind": "field", "label": null });
         }
         // The custom table picker: once its list was opened, live's searchable select keeps the focus (live2
