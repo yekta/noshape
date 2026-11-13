@@ -158,16 +158,16 @@ scratch /root/bool-scratch.
   - **Recordings (exact) on vibe5 ~/tmp/bool2/:** bydoc/rec/<document> (the 8 above), bydoc-imp (impeller, rings), sos
     (the sheet-of-shells cases); ops-main is main's ops test binary that recorded them. vibe4's (impy, hk, es, bydoc)
     went with it. /root/bool2-scratch/bool-by-doc2.py (DOCS=..., JOBS=...) makes the per-document table.
-- **The knife's 343b971e (514 ms on OCCT; 11-13 04:35 UTC, WIP /root/bool2-scratch/knife-fix-debug.patch):** a cut
+- **The knife's 343b971e (514 ms on OCCT; 11-13 04:47 UTC, WIP /root/bool2-scratch/knife-fix-debug2.patch):** a cut
   by two chamfer tools meeting end to end at x -50 mm (their caps coincide), their B-spline faces all but tangent to the
-  blade's grind face 4. Two things keep tool 0 from splitting face 4: (1) its edge 52 lies on face 4 within 0.2 um
-  along nearly all of it but runs on past the blade's tip (x -114.6, face 4 ends at -114.3), 0.2 mm off the surface
-  there, and on_free_surface tests that end first and calls the whole edge off (WIP: `past_face`, a sample whose
-  nearest surface point is outside the face counts neither way, and the projection onto the face allows it); (2)
-  OCCT's sections of tool 0's faces with face 4 come in pieces with gaps (x -60.3..-65.2, -81.3..-97.5,
-  -107.4..-109.8 mm; open ends, not taken). With both the near-on rule (X_NEARON: every sample within the grey band) and
-  past_face, edge 52's pieces reach face 4's neighbours but face 4 still isn't split along them: non-manifold at
-  sedges 62-65. Next: why its InFace pieces don't make face 4's segments.
+  blade's grind face 4. Tool 0's edge 52 lies on face 4 within 0.2 um except past the blade's tip (0.2 mm off there),
+  and OCCT's sections of tool 0's faces with face 4 come in pieces with gaps (open ends, not taken), so face 4 isn't
+  split along tool 0: non-manifold. The WIP: `past_face` (a point off the surface whose nearest surface point is outside
+  the face or on its boundary counts neither way in on_free_surface), edge_in_face cutting such an edge where it leaves
+  the face (bisection, a new point), and the near-on rule (X_NEARON: every sample within the grey band). Now edge 52's
+  pieces are face 4's segments, from (-113.80, -0.28, 3.07) mm, a point a section (sedge 81) also ends at; face 4's
+  strip under tool 0 still doesn't close there (that point may not be on face 4's boundary). Next: the tip's
+  topology there.
 - **c2-extension-spring's 84884726 (0.23-0.53 s):** "a short section from a corner" is bool's deliberate decline.
   OCCT's builder takes a 10-100 tol stub from a corner to a branch point into the vertex; ours doesn't model that.
   Recording vibe4 ~/tmp/bool2/es.
