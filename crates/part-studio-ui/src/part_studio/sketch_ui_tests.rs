@@ -4336,5 +4336,5 @@ fn a_flipped_remove_extrude_points_away_from_the_block(cx: &mut TestAppContext) 
     use noshape_model::params::ParamValue;
     let remove = ("operationType", ParamValue::Enum("REMOVE".into()));
     let flip = ("oppositeDirection", ParamValue::Bool(false));
-    assert_eq!(remove_extrude_faces(cx, "rm-flip", true, &[remove, flip]).0, false, "the user's flip after Remove's");
+    assert!(!remove_extrude_faces(cx, "rm-flip", true, &[remove, flip]).0, "the user's flip after Remove's");
 }
