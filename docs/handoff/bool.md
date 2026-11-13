@@ -15,7 +15,7 @@ at a time; CARGO_BUILD_JOBS=6 (gate.sh sets it). vibe7 has the corpora (~/agents
 dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording (~/tmp/bool/private/rec-dock, mode 700).
 
 **Worktree /root/projects/noshape-wt/bool-hat:**
-- branch bool-hat = main + 51e469c67 "Shell's self-interference check drops its face-to-face mesh proximity rule"
+- branch bool-hat = main + 51e469c67 (gate CHECK, knurls only; queued 06:12 as 6958716c) "Shell's self-interference check drops its face-to-face mesh proximity rule"
   (same content as 05921b9da). Its gate runs on vibe5 (started 04:58 after waiting on the lock; built 05:45; log
   /root/bool-hat-scratch/chain-05921b9da.out, gate-05921b9da.log). Expect CHECK (knurls out) with 0 differences: then
   land it from bool-hat (`git checkout crates/kernel/tests/all.rs` first, see below; land.sh with the env above).
@@ -42,7 +42,14 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    step further, to "a piece's point on another solid's face" (ray_state: a piece's point within the tolerance of the
    other argument's face). The arc's torus face and the other argument's seem to coincide (a rib's round end fused
    onto a body with the same torus): next, look at which piece and face (XEOF prints are in the branch), likely the
-   same-surface (coincident faces) handling for tori. Then: replay the
+   same-surface (coincident faces) handling for tori. **06:15:** in 5e1d4d0a the piece is on face 10 (arg 0, free-form)
+   and its point lies on face 21 (arg 1, the torus) within the tolerance at (0, 10.517, 62.883) mm; same_surface(10, 21)
+   and lies_on both ways are false; the boxes nearly match (x ±23.5, y 9.9-12.1 / 9.9-11.7, z 34-63 mm). So either two
+   tori that differ a little (major / minor radius, centre) or tangent along a circle with the piece's sample point
+   near it. Uncommitted XON prints in bool-hat (branch bool-wip-seam) print both surfaces' torus parameters: run
+   XEOF=1 NOSHAPE_BREP_ONLY=5e1d4d0a77371efc NOSHAPE_BOOL_CORPUS=~/tmp/bool/private/rec-dock (kernel tests, vibe7). If
+   tangent: tangent_side (planes only today, the Rotieren rule) or the piece's point taken off the tangent line; if
+   the same torus: same_surface's samples. Then: replay the
    whole rec-dock (0 differences), the gate, a T1 test that doesn't use the private data (a synthetic: a box with a
    torus-ended rib, an arc over the torus's seam).
    Next declines there: a 1355-face cut "a point near two vertices" (1.24 s), "a new edge on a free-form face" (589 ms),
