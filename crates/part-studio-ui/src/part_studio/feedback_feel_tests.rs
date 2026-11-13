@@ -144,6 +144,20 @@ fn rows() -> Vec<Row> {
             let tip = hover_tooltip(cx, window, "dialog-title").ok_or("no tooltip")?;
             expect(tip.starts_with("Extrude 1 did not regenerate properly: "), true, &tip)
         } },
+        Row { id: "fillet / R100 on a vertical edge builds", live: "behaviours 'blend (2986)': the block's vertical-edge fillet builds at every radius up to R100 (599.887 mm³ less, 5 faces), no error", gap: false, check: |cx| {
+            let json = serde_json::json!({ "units": "mm", "features": [
+                { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+                { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
+                { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [0, 0, 5]"], "radius": "100 mm" } }
+            ] });
+            let (_window, view) = start(cx, "fb-vertical-r100", json);
+            let id = feature_id(cx, &view, "Fillet 1");
+            let (status, faces) = cx.update(|cx| {
+                let v = view.read(cx);
+                (v.display.feature_state(id).map(|s| s.status), v.display.bodies.iter().map(|b| b.face_refs.len()).collect::<Vec<_>>())
+            });
+            expect((status, faces), (Some(noshape_model::display::FeatureStatus::Ok), vec![5]), "Fillet 1's status, the faces")
+        } },
         Row { id: "error / a failed preview", live: "Fillet 100 mm on a block edge: no preview body, the title red, the field's entry 'Edge of Extrude 1' red (the field not marked); tooltip '… did not regenerate properly: Failed to fillet selections.'", gap: false, check: |cx| {
             let json = serde_json::json!({ "units": "mm", "features": [
                 { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },

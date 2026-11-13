@@ -566,7 +566,7 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 live2's feedback.json (11-13 09:39, for psui and studios). part-studio-ui `feedback::the_feedback_matrix_matches_live`
 (T1, no GPU; the row's tooltip read 500 ms after the pointer comes onto it).
 
-**Matched: 8 / 8** (11-13 17:09 UTC; 1 / 2 at the first run, then 6 rows added: 4 / 6 matched).
+**Matched: 9 / 9** (11-13 19:05 UTC, 8 / 8 at 17:09 UTC; 1 / 2 at the first run, then 6 rows added: 4 / 6 matched).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -576,6 +576,7 @@ live2's feedback.json (11-13 09:39, for psui and studios). part-studio-ui `feedb
 | A warning's row | only lost selections: the name stays rgb(51,51,51), the icon's overlay only; no failures icon (one with a message of its own reads red, live L27) | red like an error; now black (`only_missing_selections`) | = (fixed) |
 | A warning's dialog | the title black with no tooltip, no bubble or toast; the lost entry a grey italic "Edge of Chamfer 1" | the title red with "… did not regenerate properly: 1 missing selection" and a yellow bubble; now live's (`status_reads_red`) | = (fixed) |
 | The red title's tooltip | "<Feature> did not regenerate properly: <message>" | the same | = |
+| Fillet R100 on the block's vertical edge | builds (5 faces), no error (behaviours "blend (2986)": every radius up to R100) | the same | = |
 | A failed preview | Fillet 100 mm on the block's top edge: the title red, the entry red (the field not marked), "… Failed to fillet selections." | regenerated "Ok" into a body with no faces: blend fixed it 11-13; the entry wasn't red, now it is for an error naming no field (`FeatureDialog::entry_failing`) | = (fixed) |
 | Its dialog | Sketch 1 deleted under Extrude 1: the title red, the lost region a red "Missing Face" entry, ✓ not disabled (an edge whose feature is only below reads "Edge of Extrude 1": live fillet-chip-edit-healthy-moment) | "Face of deleted feature"; now "Missing Face" | = (fixed) |
 | Not yet in the matrix | a failed preview drawing the edge in the error colour; the commit's working overlay (live first seen 1119 ms after ✓, polled every 40–150 ms; ours 1200 ms: within a frame or two, not changed without a finer measure); toasts (studios: success rgb(221,246,204), top centre, 5.1 s, no stacking, hover doesn't pause); empty states | – | – |
