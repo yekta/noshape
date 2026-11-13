@@ -899,10 +899,57 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   const TopoDS_Shape longPrism = prism.Shape();
   merge_into(hist, history_of({base}, prism));
 
-  // Split the long prism by the target and keep the pieces touching the start cap.
+  // Split the long prism by the target and keep the pieces touching the start cap. Only the target's faces over the
+  // profile's footprint can cut it: a part as the target (Up to next / part) gives those alone (c2-fan-blade-sweep's
+  // Extrude 8, up to the next of a fan's blades: 106 ms of split by every face).
+  TopoDS_Shape tool = until.shape;
+  {
+    ShapeIMap tf;
+    TopExp::MapShapes(until.shape, TopAbs_FACE, tf);
+    if (tf.Extent() > 8)
+    {
+      // Across the direction (a frame with z along it): the profile's footprint, and each face box's corners there.
+      gp_Trsf to;
+      to.SetTransformation(gp_Ax3(gp::Origin(), dir));
+      auto across = [&](const Bnd_Box& b, double& x0, double& y0, double& x1, double& y1) {
+        double a0, b0, c0, a1, b1, c1;
+        b.Get(a0, b0, c0, a1, b1, c1);
+        x0 = y0 = 1e300;
+        x1 = y1 = -1e300;
+        for (const double x : {a0, a1})
+          for (const double y : {b0, b1})
+            for (const double z : {c0, c1})
+            {
+              const gp_Pnt q = gp_Pnt(x, y, z).Transformed(to);
+              x0 = std::min(x0, q.X());
+              y0 = std::min(y0, q.Y());
+              x1 = std::max(x1, q.X());
+              y1 = std::max(y1, q.Y());
+            }
+      };
+      Bnd_Box pb;
+      BRepBndLib::Add(base, pb, true);
+      double px0, py0, px1, py1;
+      across(pb, px0, py0, px1, py1);
+      std::vector<TopoDS_Shape> meeting;
+      for (int i = 1; i <= tf.Extent(); ++i)
+      {
+        // (Its mesh's box where it has one: a B-spline's poles reach far past it.)
+        Bnd_Box fb;
+        BRepBndLib::Add(tf(i), fb, true);
+        fb.Enlarge(Precision::Confusion());
+        double fx0, fy0, fx1, fy1;
+        across(fb, fx0, fy0, fx1, fy1);
+        if (fx1 >= px0 && fx0 <= px1 && fy1 >= py0 && fy0 <= py1)
+          meeting.push_back(tf(i));
+      }
+      if (!meeting.empty() && (int)meeting.size() < tf.Extent())
+        tool = compound_of(meeting);
+    }
+  }
   BRepAlgoAPI_Splitter sp;
   sp.SetArguments(single(longPrism));
-  sp.SetTools(single(until.shape));
+  sp.SetTools(single(tool));
   sp.SetRunParallel(bop_parallel());
   sp.SetNonDestructive(true);
   {
