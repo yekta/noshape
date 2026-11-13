@@ -349,6 +349,30 @@ impl SectionSource for Occt {
         Ok(out)
     }
 
+    fn own(&self, a: (u32, u32), b: (u32, u32), s: &noshape_brep::OwnSection) -> Option<u32> {
+        let (curve, uv) = (s.curve, s.uv);
+        if curve.degree != 3 || !curve.weights.is_empty() || uv.poles.len() != curve.poles.len() {
+            return None;
+        }
+        let mut data = vec![s.tol, if s.free_is_a { 0.0 } else { 1.0 }, curve.knots.len() as f64];
+        data.extend(&curve.knots);
+        data.push(curve.poles.len() as f64);
+        data.extend(curve.poles.iter().flat_map(|p| p.to_array()));
+        data.extend(uv.poles.iter().flat_map(|p| [p.x, p.y]));
+        // (The other face's curve where it isn't a plane: its degree, knots, poles (u v each).)
+        if let Some(o) = s.other {
+            if !o.weights.is_empty() {
+                return None;
+            }
+            data.extend([o.degree as f64, o.knots.len() as f64]);
+            data.extend(&o.knots);
+            data.push(o.poles.len() as f64);
+            data.extend(o.poles.iter().flat_map(|p| [p.x, p.y]));
+        }
+        let id = raw::brep_own_section(a.0, a.1, b.0, b.1, &data);
+        (id != u32::MAX).then_some(id)
+    }
+
     fn ahead(&self, pairs: &[noshape_brep::FacePair]) {
         let flat: Vec<u32> = pairs.iter().flat_map(|&(a, b)| [a.0, a.1, b.0, b.1]).collect();
         raw::brep_occt_ahead(&flat);

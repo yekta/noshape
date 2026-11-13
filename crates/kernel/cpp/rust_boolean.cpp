@@ -4422,6 +4422,95 @@ rust::Vec<uint32_t> brep_occt_moved(rust::Slice<const uint32_t> ids, uint32_t a_
   }
 }
 
+// A section the Boolean marched itself (brep's boolean/march.rs: a plane or a sphere with a free-form face), kept
+// with OCCT's for building its edges as OCCT's: its cubic in space and on the free-form face from Rust, its curve on
+// a plane the cubic's poles in the plane's parameters (exact: the poles lie in it), on a sphere Rust's projection.
+uint32_t brep_own_section(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> data)
+{
+  if (t_free == nullptr || t_free->srcs == nullptr || data.size() < 3)
+    return UINT32_MAX;
+  const bool        swap = std::make_pair(b_arg, b_face) < std::make_pair(a_arg, a_face);
+  const TopoDS_Face fa   = TopoDS::Face(input(*t_free->srcs, swap ? b_arg : a_arg, TopAbs_FACE, swap ? b_face : a_face));
+  const TopoDS_Face fb   = TopoDS::Face(input(*t_free->srcs, swap ? a_arg : b_arg, TopAbs_FACE, swap ? a_face : b_face));
+  size_t            k    = 0;
+  const double      tol  = data[k++];
+  // (Which of fa, fb is the free-form face.)
+  const bool free_first = (data[k++] == 0) != swap;
+  const size_t nk       = static_cast<size_t>(data[k++]);
+  if (k + nk > data.size())
+    return UINT32_MAX;
+  NCollection_Array1<double> flat(1, static_cast<int>(nk));
+  for (size_t i = 0; i < nk; ++i)
+    flat(static_cast<int>(i + 1)) = data[k++];
+  const size_t np = static_cast<size_t>(data[k++]);
+  if (k + 5 * np > data.size() || np < 4)
+    return UINT32_MAX;
+  NCollection_Array1<gp_Pnt>   poles(1, static_cast<int>(np));
+  NCollection_Array1<gp_Pnt2d> uv(1, static_cast<int>(np));
+  for (size_t i = 0; i < np; ++i, k += 3)
+    poles(static_cast<int>(i + 1)) = gp_Pnt(data[k], data[k + 1], data[k + 2]);
+  for (size_t i = 0; i < np; ++i, k += 2)
+    uv(static_cast<int>(i + 1)) = gp_Pnt2d(data[k], data[k + 1]);
+  const int                  nu = BSplCLib::KnotsLength(flat);
+  NCollection_Array1<double> knots(1, nu);
+  NCollection_Array1<int>    mults(1, nu);
+  BSplCLib::Knots(flat, knots, mults);
+  try
+  {
+    const occ::handle<Geom_BSplineCurve>   c3   = new Geom_BSplineCurve(poles, knots, mults, 3);
+    const occ::handle<Geom2d_BSplineCurve> onf  = new Geom2d_BSplineCurve(uv, knots, mults, 3);
+    const TopoDS_Face&                     other = free_first ? fb : fa;
+    TopLoc_Location                        loc;
+    const occ::handle<Geom_Surface>        surf = BRep_Tool::Surface(other, loc);
+    occ::handle<Geom2d_Curve>              ono;
+    if (const occ::handle<Geom_Plane> pl = occ::down_cast<Geom_Plane>(surf); !pl.IsNull())
+    {
+      const gp_Pln                 p = pl->Pln().Transformed(loc.Transformation());
+      NCollection_Array1<gp_Pnt2d> q(1, static_cast<int>(np));
+      for (int i = 1; i <= static_cast<int>(np); ++i)
+      {
+        double u = 0, v = 0;
+        ElSLib::Parameters(p, poles(i), u, v);
+        q(i) = gp_Pnt2d(u, v);
+      }
+      ono = new Geom2d_BSplineCurve(q, knots, mults, 3);
+    }
+    else
+    {
+      // (Its curve there from Rust (a sphere's projection): degree, knots, poles.)
+      if (k + 2 > data.size())
+        return UINT32_MAX;
+      const int    deg = static_cast<int>(data[k++]);
+      const size_t ok  = static_cast<size_t>(data[k++]);
+      if (k + ok + 1 > data.size())
+        return UINT32_MAX;
+      NCollection_Array1<double> oflat(1, static_cast<int>(ok));
+      for (size_t i = 0; i < ok; ++i)
+        oflat(static_cast<int>(i + 1)) = data[k++];
+      const size_t op = static_cast<size_t>(data[k++]);
+      if (k + 2 * op > data.size())
+        return UINT32_MAX;
+      NCollection_Array1<gp_Pnt2d> oq(1, static_cast<int>(op));
+      for (size_t i = 0; i < op; ++i, k += 2)
+        oq(static_cast<int>(i + 1)) = gp_Pnt2d(data[k], data[k + 1]);
+      const int                  onu = BSplCLib::KnotsLength(oflat);
+      NCollection_Array1<double> oknots(1, onu);
+      NCollection_Array1<int>    omults(1, onu);
+      BSplCLib::Knots(oflat, oknots, omults);
+      ono = new Geom2d_BSplineCurve(oq, oknots, omults, deg);
+    }
+    const IntTools_Curve ic(c3, free_first ? onf : ono, free_first ? ono : onf, tol, tol);
+    const uint32_t       id = static_cast<uint32_t>(t_free->curves.size());
+    t_free->curves.push_back({{fa, fb}, ic});
+    t_free->moved.emplace_back();
+    return id;
+  }
+  catch (const Standard_Failure&)
+  {
+    return UINT32_MAX;
+  }
+}
+
 void brep_occt_ahead(rust::Slice<const uint32_t> pairs)
 {
   try

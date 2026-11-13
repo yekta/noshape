@@ -310,6 +310,22 @@ pub trait SectionSource: Sync {
     fn seeded(&self, _a: (u32, u32), _b: (u32, u32), _ends: &[DVec3]) -> Result<Vec<SectionCurve>, Decline> {
         Ok(Vec::new())
     }
+    /// A section of faces `a` and `b` the Boolean made itself, kept for building its edges: its id. None by default
+    /// (the source can't: OCCT's sections asked instead).
+    fn own(&self, _a: (u32, u32), _b: (u32, u32), _s: &OwnSection) -> Option<u32> {
+        None
+    }
+}
+
+/// A section the Boolean made itself (brep's march): `curve` in space and `uv` on the free-form face (`a` if
+/// `free_is_a`), both with the same parameters; `other` on the other face where it isn't a plane (a sphere's), with
+/// the same parameter range; within `tol`.
+pub struct OwnSection<'a> {
+    pub free_is_a: bool,
+    pub curve: &'a nurbs::NurbsCurve,
+    pub uv: &'a nurbs::NurbsCurve,
+    pub other: Option<&'a nurbs::NurbsCurve>,
+    pub tol: f64,
 }
 
 /// Why a Boolean declined.

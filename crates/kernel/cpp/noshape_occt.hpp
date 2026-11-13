@@ -1011,6 +1011,7 @@ rust::String brep_body_of(const OcShape& s, BrepBody& out);
 struct BrepSections;
 rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> ends, BrepSections& out);
 void brep_occt_ahead(rust::Slice<const uint32_t> pairs);
+uint32_t brep_own_section(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> data);
 rust::Vec<uint32_t> brep_occt_moved(rust::Slice<const uint32_t> ids, uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> moved);
 OpOut op_enclose(const OcShapeList& shapes);
 OpOut op_transform(const OcShape& s, rust::Slice<const double> m, bool copy);
