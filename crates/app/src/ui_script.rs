@@ -403,6 +403,12 @@ fn take_timing(idle: Option<Instant>) -> Option<Value> {
 
 /// Run the scenario in `window` (the document window of `ws`).
 pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
+    // Once, in the scenario's own window: a document another opens (Edit in context on a linked part) gets no second
+    // runner replaying the steps there.
+    static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if STARTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
     let scenario = read_json(&scenario_path()).unwrap_or_else(|e| fail(&e));
     std::thread::spawn(|| {
         std::thread::sleep(WATCHDOG);

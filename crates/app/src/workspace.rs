@@ -176,9 +176,14 @@ impl Workspace {
         noshape_render::perf::milestone("workspace: behind refreshed");
         this.sync_tabs(window, cx);
         noshape_render::perf::milestone("workspace: tabs synced");
-        // Focus the active tab view so its shortcuts work immediately.
-        if let Some(a) = this.active {
-            cx.defer_in(window, move |this: &mut Self, window, cx| this.activate(a, window, cx));
+        // Focus the active tab view so its shortcuts work immediately: the one active by then (Edit in context from
+        // another document activates its Part Studio as the window opens).
+        if this.active.is_some() {
+            cx.defer_in(window, move |this: &mut Self, window, cx| {
+                if let Some(a) = this.active {
+                    this.activate(a, window, cx);
+                }
+            });
         }
         if crate::smoke::enabled() {
             crate::smoke::start(window, cx);
