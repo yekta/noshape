@@ -25,7 +25,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-actions!(noshape_start, [OpenSelected, RenameSelected, TrashSelected, FocusSearch, SelectNext, SelectPrev, SelectAllRows]);
+actions!(noshape_start, [OpenSelected, FocusSearch, SelectNext, SelectPrev, SelectAllRows]);
 
 const CONTEXT: &str = "StartWindow";
 
@@ -34,19 +34,22 @@ fn icon(data: &'static [u8]) -> Icon {
 }
 
 pub fn init(cx: &mut App) {
+    cx.bind_keys(key_bindings());
+}
+
+/// The documents page's keys: only its list's and search box's (live chrome.json: no Onshape shortcuts there; Shift+/,
+/// Alt+C, Ctrl+Space, Alt+T, Ctrl+Z do nothing; live2 feel/documents.json: Ctrl+A selects every row).
+fn key_bindings() -> Vec<KeyBinding> {
     let ctx = Some("StartWindow && !Input");
-    cx.bind_keys([
+    vec![
         KeyBinding::new("enter", OpenSelected, ctx),
-        KeyBinding::new("f2", RenameSelected, ctx),
-        KeyBinding::new("delete", TrashSelected, ctx),
         KeyBinding::new("secondary-a", SelectAllRows, ctx),
         KeyBinding::new("right", SelectNext, ctx),
         KeyBinding::new("down", SelectNext, ctx),
         KeyBinding::new("left", SelectPrev, ctx),
         KeyBinding::new("up", SelectPrev, ctx),
         KeyBinding::new("secondary-f", FocusSearch, Some(CONTEXT)),
-        KeyBinding::new("/", FocusSearch, ctx),
-    ]);
+    ]
 }
 
 // ----------------------------------------------------------------- window
@@ -4323,23 +4326,6 @@ impl Render for StartView {
                     this.open_path(d.path, window, cx);
                 }
             }))
-            .on_action(cx.listener(|this, _: &RenameSelected, window, cx| {
-                if let Some(d) = this.selected_entry() {
-                    this.rename(d, window, cx);
-                }
-            }))
-            .on_action(cx.listener(|this, _: &TrashSelected, window, cx| {
-                if this.selection().len() > 1 && this.source != Source::Trash {
-                    this.trash_selected(window, cx);
-                } else if let Some(d) = this.selected_entry() {
-                    this.trash(d, window, cx);
-                } else if let Some(f) = this.selected.clone().filter(|f| this.folder_tiles().iter().any(|(t, _)| t == f)) {
-                    match this.trash.item_of(&f).map(|i| i.id.clone()) {
-                        Some(id) => this.confirm_delete_forever(id, window, cx),
-                        None => this.confirm_trash(vec![(f.clone(), folder_label(&f), true)], window, cx),
-                    }
-                }
-            }))
             .on_action(cx.listener(|this, _: &SelectAllRows, _, cx| this.select_all_rows(cx)))
             .on_action(cx.listener(|this, _: &SelectNext, _, cx| this.move_selection(1, cx)))
             .on_action(cx.listener(|this, _: &SelectPrev, _, cx| this.move_selection(-1, cx)))
@@ -5202,8 +5188,24 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
 
 #[cfg(test)]
 mod tests {
-    use super::{click_rows, history_change_matches, lib, move_rows, rows_to_move};
+    use super::{SelectAllRows, click_rows, history_change_matches, key_bindings, lib, move_rows, rows_to_move};
     use std::path::PathBuf;
+
+    /// Live chrome.json (07:33): no Onshape shortcut works on the documents page, only its list's keys.
+    #[test]
+    fn the_documents_page_has_no_onshape_shortcuts() {
+        use gpui_kit::{Action, KeyContext, Keymap, Keystroke};
+        let mut all = key_bindings();
+        all.extend(noshape_app_core::actions::default_key_bindings());
+        let keymap = Keymap::new(all);
+        let page = [KeyContext::parse("StartWindow").unwrap()];
+        let action = |key: &str| keymap.bindings_for_input(&[Keystroke::parse(key).unwrap()], &page).0.first().map(|b| b.action().name());
+        for key in ["shift-?", "alt-c", "ctrl-space", "alt-t", "secondary-z", "secondary-y", "delete", "f2", "/", "s", "f", "space"] {
+            assert_eq!(action(key), None, "{key}");
+        }
+        // The list's own keys (live2 feel/documents.json: Ctrl+A selects every row).
+        assert_eq!(action("secondary-a"), Some(SelectAllRows.name()));
+    }
 
     /// Lead 11-13 (interaction feel): rows dragged onto a folder move into it, documents and folders with what's in
     /// them; a drop on the folder itself or where they already are moves nothing; a folder can't go into itself.

@@ -247,7 +247,6 @@ fn key_bindings_for(mac: bool) -> Vec<KeyBinding> {
         KeyBinding::new("secondary-shift-s", SaveCopyAs, doc_mod),
         KeyBinding::new("secondary-w", CloseWindow, None),
         KeyBinding::new("secondary-q", Quit, None),
-        KeyBinding::new("alt-h", ToggleVersionGraph, doc_mod),
         // Part Studio
         KeyBinding::new("shift-s", NewSketch, ps),
         // Enter edits the selected feature (or picks the Select other entry).
@@ -455,6 +454,36 @@ mod mac_key_tests {
             assert_eq!(action_for(mac, "alt-t"), Some(TabManager.name()));
         }
         assert_eq!(action_for(true, "cmd-m"), None, "Control-only on a Mac");
+    }
+}
+
+#[cfg(test)]
+mod all_scope_key_tests {
+    use super::*;
+    use gpui_kit::{Action, KeyContext, Keymap, Keystroke};
+
+    /// Live chrome-shortcuts.json's "all" scope: a Variable Studio or Feature Studio tab (outside its fields and code
+    /// editor) has Undo, Redo, FeatureScript search, Search tools, Tab manager, Quick tab switching and the Keyboard
+    /// shortcuts sheet, and no Alt+H.
+    #[test]
+    fn studios_without_a_scope_take_lives_all_keys() {
+        let keymap = Keymap::new(default_key_bindings());
+        for studio in ["VariableStudio", "FeatureStudio"] {
+            let stack: Vec<KeyContext> = ["Workspace", studio].iter().map(|n| KeyContext::parse(n).unwrap()).collect();
+            let action = |key: &str| keymap.bindings_for_input(&[Keystroke::parse(key).unwrap()], &stack).0.first().map(|b| b.action().name());
+            for (key, want) in [
+                ("secondary-z", Undo.name()),
+                ("ctrl-y", Redo.name()),
+                ("secondary-shift-f", SearchFeatureStudios.name()),
+                ("alt-c", SearchTools.name()),
+                ("alt-t", TabManager.name()),
+                ("ctrl-space", SwitchRecentTab.name()),
+                ("shift-?", ToggleShortcutHelp.name()),
+            ] {
+                assert_eq!(action(key), Some(want), "{studio}: {key}");
+            }
+            assert_eq!(action("alt-h"), None, "{studio}: no Alt+H in live");
+        }
     }
 }
 

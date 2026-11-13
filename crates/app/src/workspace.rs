@@ -87,6 +87,9 @@ pub struct Workspace {
     renaming_doc: Option<(Entity<gpui_kit::component::input::InputState>, Subscription, std::time::Instant)>,
     /// A tab being dragged along the bar (live qa5 TABS1).
     tab_gap: Option<TabGap>,
+    /// The Keyboard shortcuts sheet (Shift+/) opened over a tab that has none of its own (Variable Studio, Feature
+    /// Studio): live's "all" scope has it everywhere in a document.
+    shortcut_sheet: Option<(Entity<noshape_app_core::shortcut_sheet::ShortcutSheet>, Subscription)>,
     /// ☰ › Workspace units… panel.
     units_panel: Option<(Entity<crate::doc_dialogs::WorkspaceUnits>, Subscription)>,
     /// The tab-bar folder being shown (None: all tabs at the root).
@@ -164,7 +167,7 @@ impl Workspace {
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
         noshape_render::perf::milestone("workspace: thumbnailers");
-        let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, renaming_doc: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, notifications_open: false, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, renaming_doc: None, tab_gap: None, shortcut_sheet: None, units_panel: None, open_folder: None, fs_notices: None, notifications_open: false, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
         // Another document may have a new version when the window comes back.
         this._subs.push(cx.observe_window_activation(window, |this: &mut Self, window, cx| {
@@ -469,6 +472,21 @@ impl Workspace {
     }
 
     /// The active tab's Feature Studio, if it is one (ui-parity driver).
+    /// Shift+/ over a tab that doesn't open the Keyboard shortcuts sheet itself: the sheet on its General tab, a Feature
+    /// Studio's on its Feature Studio tab (live chrome-shortcuts.json: "all" scope, every tab of a document).
+    fn toggle_shortcut_sheet(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        use noshape_app_core::shortcut_sheet::ShortcutSheet;
+        if self.shortcut_sheet.take().is_some() {
+            window.focus(&self.focus, cx);
+        } else {
+            let tab = if self.active_feature_studio().is_some() { noshape_app_core::shortcuts::Tab::FeatureStudio } else { noshape_app_core::shortcuts::Tab::General };
+            let sheet = ShortcutSheet::open(tab, window, cx);
+            let sub = cx.subscribe_in(&sheet, window, |this: &mut Self, _, _: &DismissEvent, window, cx| this.toggle_shortcut_sheet(window, cx));
+            self.shortcut_sheet = Some((sheet, sub));
+        }
+        cx.notify();
+    }
+
     pub(crate) fn active_feature_studio(&self) -> Option<Entity<crate::feature_studio::FeatureStudioView>> {
         match self.active.and_then(|t| self.views.get(&t)) {
             Some(TabView::FeatureStudio(v)) => Some(v.clone()),
@@ -2415,6 +2433,8 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &Undo, _, cx| this.doc.update(cx, |d, cx| d.undo(cx))))
             .on_action(cx.listener(|this, _: &Redo, _, cx| this.doc.update(cx, |d, cx| d.redo(cx))))
             .on_action(cx.listener(|this, _: &ToggleVersionGraph, window, cx| this.toggle_history(window, cx)))
+            .on_action(cx.listener(|this, _: &ToggleShortcutHelp, window, cx| this.toggle_shortcut_sheet(window, cx)))
+            .children(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone()))
             .on_action(cx.listener(|this, _: &SearchFeatureStudios, window, cx| this.open_fs_search(window, cx)))
             .on_action(cx.listener(|this, _: &ToggleReleaseDrafts, _, cx| this.toggle_release_drafts(cx)))
             .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
