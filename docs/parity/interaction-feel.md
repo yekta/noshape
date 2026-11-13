@@ -540,7 +540,7 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). part-studio-ui
 `dialogs::the_dialogs_matrix_matches_live` (T1, no GPU) on the block start, and `manipulators::snap_tests`.
 
-**Matched: 12 / 12** (11-13 14:00 UTC; 1 / 5 at the first run, then 7 rows added, all matching).
+**Matched: 16 / 16** (11-13 19:26 UTC; 1 / 5 at the first run, then 11 rows added: 8 matching, 3 fixed).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -559,7 +559,9 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | A field's row clicked (not its ×) | the field keeps its entities | the same | = |
 | Tab from Fillet's Radius | Radius's ± button, then Asymmetric, Partial, Variable, Allow edge overflow, Smooth fillet corners; selection fields and dropdowns skipped | the same | = |
 | Properties' Enter and Esc | do nothing (no apply, no close) | the same | = |
-| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, preview timing while dragging (every ~0.4 s);  the Appearance and Material dialogs' layout and keys; Properties' Tab order | – | – |
+| Properties' Tab order | Name, Description, Part number, Revision, Vendor, Project, Product line, Title 1–3, Not revision managed, Exclude from all BOMs | Tab stayed in Description (indented it) and the checkboxes took no Tab; now live's order (Description passes Tab on, the two checkboxes are Tab stops) | = (fixed) |
+| Material's search and Esc | filters as you type ("steel": 38 rows; live's read counted its highlighted first row twice), the first highlighted; Esc closes the list only, a second Esc the dialog | the second Esc did nothing (the keyboard was left on the closed list's search); now it cancels | = (fixed) |
+| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, preview timing while dragging (every ~0.4 s);  the Appearance and Material dialogs' layout (their keys: Appearance's in `sketch_ui_tests` escape / Tab / Enter tests) | – | – |
 
 ## Feedback (matrix, Part Studio rows)
 

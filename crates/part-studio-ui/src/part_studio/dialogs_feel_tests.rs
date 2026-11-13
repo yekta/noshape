@@ -276,6 +276,45 @@ fn rows() -> Vec<Row> {
             let open_after_esc = cx.update_window(window, |_, w, cx| w.has_active_dialog(cx)).unwrap();
             expect((open_after_enter, open_after_esc), (true, true), "open after Enter, after Esc")
         } },
+        Row { id: "Properties / Tab order", live: "Name, Description, Part number, Revision, Vendor, Project, Product line, Title 1-3, Not revision managed, Exclude from all BOMs (selects and read-only fields skipped)", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-props-tab");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let b = v.display.bodies.first().map(|b| b.id.clone()).unwrap();
+                v.open_part_meta(b, w, cx);
+            }))
+            .unwrap();
+            draw(cx, window);
+            let form = crate::properties_dialog::open_form().ok_or("no modal")?;
+            cx.update_window(window, |_, w, cx| form.update(cx, |f, cx| f.focus_field("Name", w, cx))).unwrap();
+            draw(cx, window);
+            let mut order = Vec::new();
+            for _ in 0..11 {
+                keys(cx, window, &["tab"]);
+                order.push(cx.update_window(window, |_, w, cx| form.read(cx).focused_field(w, cx)).unwrap().unwrap_or("?"));
+            }
+            cx.update_window(window, |_, w, cx| w.close_dialog(cx)).unwrap();
+            expect(order, vec!["Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3", "Not revision managed", "Exclude from all BOMs"], "the field after each Tab from Name")
+        } },
+        Row { id: "Material / the search and Esc", live: "the list filters as you type ('steel' left 38 rows: live's read counted the highlighted first row twice), the first highlighted; Esc closes the list only, a second Esc the dialog", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-material");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let b = v.display.bodies.first().map(|b| b.id.clone()).unwrap();
+                v.open_material_panel(vec![b], w, cx);
+            }))
+            .unwrap();
+            draw(cx, window);
+            let at = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("mat-picker").ok_or("no picker")?.center();
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at, Modifiers::default());
+            draw(cx, window);
+            keys(cx, window, &["s", "t", "e", "e", "l"]);
+            let (names, active) = cx.update(|cx| (view.read(cx).material_row_names(cx), view.read(cx).ui.material_panel.as_ref().map(|m| m.active)));
+            let rows = names.len();
+            keys(cx, window, &["escape"]);
+            let after_one = cx.update(|cx| view.read(cx).ui.material_panel.as_ref().map(|m| m.is_list_open()));
+            keys(cx, window, &["escape"]);
+            let after_two = cx.update(|cx| view.read(cx).ui.material_panel.is_some());
+            expect((rows, active, after_one, after_two), (38, Some(0), Some(false), false), "rows for 'steel', the active row, the list after one Esc (panel open), the panel after two")
+        } },
         Row { id: "Properties / no field has the keyboard on opening", live: "no field focused; typing does nothing until a field is clicked", gap: false, check: |cx| {
             let (window, view) = block(cx, "dlg-props");
             cx.update_window(window, |_, w, cx| {

@@ -45,7 +45,7 @@ pub struct MaterialPanel {
     list_open: bool,
     /// The picker's active row (ui-select activeIndex: the current material
     /// on opening, the first match after typing; hover and ↑/↓ move it).
-    active: usize,
+    pub(super) active: usize,
     /// The library list is open.
     lib_open: bool,
     search: Entity<InputState>,
@@ -133,6 +133,12 @@ impl PartStudioView {
 
     /// The picker's rows for the search: "- None -" (when it matches too)
     /// and the library's materials matching by name or category.
+    /// The picker's rows for its search, by name ("- None -" for none; tests).
+    #[cfg(test)]
+    pub(super) fn material_row_names(&self, cx: &App) -> Vec<String> {
+        self.material_rows(cx).into_iter().map(|e| e.map_or_else(|| "- None -".to_string(), |e| e.name)).collect()
+    }
+
     fn material_rows(&self, cx: &App) -> Vec<Option<Entry>> {
         let Some(m) = self.ui.material_panel.as_ref() else { return Vec::new() };
         let query = m.search.read(cx).value().trim().to_lowercase();
@@ -334,7 +340,7 @@ impl PartStudioView {
                     .border_1()
                     .border_color(pal.accent)
                     .text_size(px(14.))
-                    .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, _, cx| {
+                    .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                         let rows = this.material_rows(cx);
                         let Some(m) = &mut this.ui.material_panel else { return };
                         match ev.keystroke.key.as_str() {
@@ -345,7 +351,11 @@ impl PartStudioView {
                                     this.pick_material_row(e, cx);
                                 }
                             }
-                            "escape" => m.list_open = false,
+                            // The list only; the keyboard back to the studio, so the next Esc cancels the dialog (live).
+                            "escape" => {
+                                m.list_open = false;
+                                window.focus(&this.focus, cx);
+                            }
                             _ => return,
                         }
                         cx.stop_propagation();
@@ -368,6 +378,7 @@ impl PartStudioView {
             } else {
                     h_flex()
                         .id("mat-picker")
+                        .debug_selector(|| "mat-picker".into())
                         .h(px(34.))
                         .pl(px(11.))
                         .pr(px(10.))

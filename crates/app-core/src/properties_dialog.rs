@@ -11,7 +11,7 @@
 
 use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
-use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
+use gpui_kit::component::input::{IndentInline, Input, InputEvent, InputState, OutdentInline, Textarea, TextareaState};
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -245,6 +245,8 @@ pub struct MetaForm {
     /// The modal's own focus: it opens with no field focused (live feel/dialogs.json "propertiesDialog": typing does
     /// nothing until a field is clicked; the document's shortcuts are off behind it).
     focus: FocusHandle,
+    /// Not revision managed's and Exclude from all BOMs' Tab stops (live: after Title 3, in that order).
+    check_focus: [FocusHandle; 2],
     /// The fields edited since the form was filled or saved (by label), worked out once per frame.
     edited: Vec<String>,
     /// Release management: the release-create icon at the top left
@@ -375,6 +377,7 @@ impl MetaForm {
             card: None,
             multi: None,
             focus: cx.focus_handle(),
+            check_focus: [cx.focus_handle().tab_stop(true), cx.focus_handle().tab_stop(true)],
             edited: Vec::new(),
             material: spec.material,
             computed_mass: spec.computed_mass,
@@ -628,6 +631,18 @@ impl MetaForm {
     pub fn a_field_has_focus(&self, window: &Window, cx: &App) -> bool {
         let fields = [&self.name, &self.part_number, &self.revision, &self.vendor, &self.project, &self.product_line, &self.titles[0], &self.titles[1], &self.titles[2]];
         fields.iter().any(|f| f.read(cx).focus_handle(cx).is_focused(window)) || self.description.read(cx).focus_handle(cx).is_focused(window)
+    }
+
+    /// The text field with the keyboard, by its label (tests: the Tab order).
+    pub fn focused_field(&self, window: &Window, cx: &App) -> Option<&'static str> {
+        let fields = [("Name", &self.name), ("Part number", &self.part_number), ("Revision", &self.revision), ("Vendor", &self.vendor), ("Project", &self.project), ("Product line", &self.product_line), ("Title 1", &self.titles[0]), ("Title 2", &self.titles[1]), ("Title 3", &self.titles[2])];
+        if self.description.read(cx).focus_handle(cx).is_focused(window) {
+            return Some("Description");
+        }
+        if let Some(i) = self.check_focus.iter().position(|h| h.is_focused(window)) {
+            return Some(["Not revision managed", "Exclude from all BOMs"][i]);
+        }
+        fields.iter().find(|(_, f)| f.read(cx).focus_handle(cx).is_focused(window)).map(|(l, _)| *l)
     }
 
     /// Whether the modal itself has the keyboard.
@@ -1029,7 +1044,18 @@ impl Render for MetaForm {
                 } else if self.read_only.contains(&"Description") {
                     gray_box(self.description.read(cx).value().to_string(), false).h(px(56.)).into_any_element()
                 } else {
-                    edited_corner(Textarea::new(&self.description).h(px(56.)).text_size(px(14.)), self.is_edited("Description")).map(|d| crate::ui_script::mark(d, || "field:Description".into())).into_any_element()
+                    // Tab moves on as from a browser's textarea (live: Name, Description, Part number …), not indents.
+                    div()
+                        .capture_action(|_: &IndentInline, window, cx| {
+                            window.focus_next(cx);
+                            cx.stop_propagation();
+                        })
+                        .capture_action(|_: &OutdentInline, window, cx| {
+                            window.focus_prev(cx);
+                            cx.stop_propagation();
+                        })
+                        .child(edited_corner(Textarea::new(&self.description).h(px(56.)).text_size(px(14.)), self.is_edited("Description")).map(|d| crate::ui_script::mark(d, || "field:Description".into())))
+                        .into_any_element()
                 },
             ))
             .child(group(label("Category", false), gray_box(self.spec_category.to_string(), true).into_any_element()));
@@ -1063,7 +1089,7 @@ impl Render for MetaForm {
                 readonly_check("Not revision managed", self.not_revision_managed)
             } else {
                 edited_corner(
-                    check_row_mixed("meta-nrm", "Not revision managed", self.not_revision_managed, self.mixed("Not revision managed")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    check_row_mixed("meta-nrm", "Not revision managed", self.not_revision_managed, self.mixed("Not revision managed")).track_focus(&self.check_focus[0]).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.not_revision_managed = this.toggle_check("Not revision managed", this.not_revision_managed);
                         this.changed(cx);
                     })),
@@ -1080,7 +1106,7 @@ impl Render for MetaForm {
         if item {
         form = form
             .child(edited_corner(
-                check_row_mixed("meta-bom", "Exclude from all BOMs", self.exclude_from_bom, self.mixed("Exclude from all BOMs")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                check_row_mixed("meta-bom", "Exclude from all BOMs", self.exclude_from_bom, self.mixed("Exclude from all BOMs")).track_focus(&self.check_focus[1]).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.exclude_from_bom = this.toggle_check("Exclude from all BOMs", this.exclude_from_bom);
                     this.changed(cx);
                 })),
