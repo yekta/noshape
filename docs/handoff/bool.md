@@ -32,8 +32,12 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    (r 0.4 mm, a half circle) on a torus face (periodic both ways, a whole turn in v) crossing its v seam; projected sees
    v jump 0 -> 2π and fails. With bool-wip-seam the case 5e1d4d0a77371efc still declines: the last probe (XEOF=1
    NOSHAPE_BREP_ONLY=5e1d4d0a77371efc NOSHAPE_BOOL_CORPUS=~/tmp/bool/private/rec-dock, kernel tests on vibe7) was to
-   show whether seam_crossings finds the crossing, a part's projection fails (one starting on the seam: projected's
-   k == 0 turn-over needs uv_span == TAU), or the decline comes from the edge_on site (line ~2195). Then: replay the
+   show which. **Answer (06:05):** seam_crossings finds it (edge 15 on face 21, range π..2π, crossing 4.775) but late:
+   param_of seeded from the point before follows v past 0 into the face box's margin (to -0.06, uvbox -0.0628) and only
+   flips to 2π beyond it, so the bisection lands past the seam and part 1's last point flips (projected: "point 64
+   jumps -0.037 -> 6.22"). Fix: (a) in seam_crossings, bisect on the unwrapped v (param_of's v shifted by a turn to the
+   side it came from) against the face's own seam value (uv_span's lo / hi, 0 = 2π), not on param_of's flip; (b) in
+   projected, a part ending on the seam unwraps its last point by a turn (as k == 0 does at the start). Then: replay the
    whole rec-dock (0 differences), the gate, a T1 test that doesn't use the private data (a synthetic: a box with a
    torus-ended rib, an arc over the torus's seam).
    Next declines there: a 1355-face cut "a point near two vertices" (1.24 s), "a new edge on a free-form face" (589 ms),
