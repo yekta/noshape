@@ -1,6 +1,11 @@
 // Shapes, lists, topology exploration, validation and history building.
 #include <Geom2d_Line.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
+#include <Geom_BSplineSurface.hxx>
+#include <Geom_ConicalSurface.hxx>
+#include <Geom_CylindricalSurface.hxx>
+#include <Geom_SphericalSurface.hxx>
+#include <Geom_ToroidalSurface.hxx>
 #include <numeric>
 #include "internal.hpp"
 #include <BRepBuilderAPI_MakeVertex.hxx>
@@ -925,6 +930,61 @@ bool same_bspline(const occ::handle<Geom_Curve>& a, const occ::handle<Geom_Curve
       return false;
   return true;
 }
+
+// Whether two faces' surfaces are one: the same object, or equal copies, parameters and all (a mirror copies each face's
+// surface: c2-fan-blade-sweep's Mirror 3, the Bolt's helical strip pieces each on its own copy of one cylinder).
+bool one_surface(const occ::handle<Geom_Surface>& a, const occ::handle<Geom_Surface>& b, double tol)
+{
+  if (a == b)
+    return true;
+  if (a.IsNull() || b.IsNull() || a->DynamicType() != b->DynamicType())
+    return false;
+  auto same_frame = [&](const gp_Ax3& p, const gp_Ax3& q) {
+    return p.Location().Distance(q.Location()) <= tol && p.Direction().IsEqual(q.Direction(), 1e-12) && p.XDirection().IsEqual(q.XDirection(), 1e-12) &&
+           p.Direct() == q.Direct();
+  };
+  auto equal = [&](double x, double y) { return std::abs(x - y) <= tol; };
+  if (const auto p = occ::down_cast<Geom_CylindricalSurface>(a))
+  {
+    const auto q = occ::down_cast<Geom_CylindricalSurface>(b);
+    return same_frame(p->Position(), q->Position()) && equal(p->Radius(), q->Radius());
+  }
+  if (const auto p = occ::down_cast<Geom_ConicalSurface>(a))
+  {
+    const auto q = occ::down_cast<Geom_ConicalSurface>(b);
+    return same_frame(p->Position(), q->Position()) && equal(p->RefRadius(), q->RefRadius()) && std::abs(p->SemiAngle() - q->SemiAngle()) <= 1e-12;
+  }
+  if (const auto p = occ::down_cast<Geom_SphericalSurface>(a))
+  {
+    const auto q = occ::down_cast<Geom_SphericalSurface>(b);
+    return same_frame(p->Position(), q->Position()) && equal(p->Radius(), q->Radius());
+  }
+  if (const auto p = occ::down_cast<Geom_ToroidalSurface>(a))
+  {
+    const auto q = occ::down_cast<Geom_ToroidalSurface>(b);
+    return same_frame(p->Position(), q->Position()) && equal(p->MajorRadius(), q->MajorRadius()) && equal(p->MinorRadius(), q->MinorRadius());
+  }
+  if (const auto p = occ::down_cast<Geom_BSplineSurface>(a))
+  {
+    const auto q = occ::down_cast<Geom_BSplineSurface>(b);
+    if (p->UDegree() != q->UDegree() || p->VDegree() != q->VDegree() || p->NbUPoles() != q->NbUPoles() || p->NbVPoles() != q->NbVPoles() ||
+        p->NbUKnots() != q->NbUKnots() || p->NbVKnots() != q->NbVKnots() || p->IsURational() != q->IsURational() || p->IsVRational() != q->IsVRational() ||
+        p->IsUPeriodic() != q->IsUPeriodic() || p->IsVPeriodic() != q->IsVPeriodic())
+      return false;
+    for (int i = 1; i <= p->NbUKnots(); ++i)
+      if (std::abs(p->UKnot(i) - q->UKnot(i)) > 1e-12 || p->UMultiplicity(i) != q->UMultiplicity(i))
+        return false;
+    for (int i = 1; i <= p->NbVKnots(); ++i)
+      if (std::abs(p->VKnot(i) - q->VKnot(i)) > 1e-12 || p->VMultiplicity(i) != q->VMultiplicity(i))
+        return false;
+    for (int i = 1; i <= p->NbUPoles(); ++i)
+      for (int j = 1; j <= p->NbVPoles(); ++j)
+        if (p->Pole(i, j).Distance(q->Pole(i, j)) > tol || std::abs(p->Weight(i, j) - q->Weight(i, j)) > 1e-12)
+          return false;
+    return true;
+  }
+  return false;
+}
 } // namespace
 
 rust::Vec<uint8_t> shown_topology(const OcShape& s)
@@ -963,7 +1023,7 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       const TopoDS_Face& fb = TopoDS::Face(fm((int)two[1] + 1));
       TopLoc_Location    la, lb;
       const occ::handle<Geom_Surface> sa = BRep_Tool::Surface(fa, la), sb = BRep_Tool::Surface(fb, lb);
-      if (sa.IsNull() || sa != sb || !la.IsEqual(lb))
+      if (sa.IsNull() || !la.IsEqual(lb) || !one_surface(sa, sb, 1e-9 * std::max(1.0, BRep_Tool::Tolerance(e))))
         continue;
       // On the seam: an iso line of the periodic parameter at its period's start.
       double f, l;
@@ -1064,7 +1124,10 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       if (seams == 0 && !loop)
       {
         const GeomAbs_CurveType ta = BRepAdaptor_Curve(TopoDS::Edge(em(two[0]))).GetType(), tb = BRepAdaptor_Curve(TopoDS::Edge(em(two[1]))).GetType();
-        if (ta != tb || (ta != GeomAbs_BSplineCurve && ta != GeomAbs_Ellipse))
+        // (Or a line and a B-spline on it: a blend's straight tangent edge OCCT left a B-spline, run on by a line
+        // below it, asm-isaac-ball's Fillet 2 rounds run on.)
+        const bool line_and_spline = (ta == GeomAbs_Line && tb == GeomAbs_BSplineCurve) || (ta == GeomAbs_BSplineCurve && tb == GeomAbs_Line);
+        if (!line_and_spline && (ta != tb || (ta != GeomAbs_BSplineCurve && ta != GeomAbs_Ellipse)))
           continue;
       }
       // Going on from each other: their directions away from the vertex opposite.
@@ -1114,6 +1177,17 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
           {
             const gp_Lin p = xa.Line(), q = xb.Line();
             one = p.Direction().IsParallel(q.Direction(), 1e-9) && p.Distance(q.Location()) <= 1e-9 * std::max(1.0, gp_Vec(p.Location().XYZ()).Magnitude());
+          }
+          // A line and a B-spline whose poles all lie on it.
+          if (!one && (xa.GetType() == GeomAbs_Line) != (xb.GetType() == GeomAbs_Line) &&
+              (xa.GetType() == GeomAbs_BSplineCurve || xb.GetType() == GeomAbs_BSplineCurve))
+          {
+            const gp_Lin                         line = xa.GetType() == GeomAbs_Line ? xa.Line() : xb.Line();
+            const occ::handle<Geom_BSplineCurve> sp   = xa.GetType() == GeomAbs_Line ? xb.BSpline() : xa.BSpline();
+            const double                         tol  = 1e-9 * std::max(1.0, gp_Vec(line.Location().XYZ()).Magnitude());
+            one = !sp.IsNull();
+            for (int k = 1; one && k <= sp->NbPoles(); ++k)
+              one = line.Distance(sp->Pole(k)) <= tol;
           }
           // A section OCCT approximates on each side of the seam (two B-splines, one curve in live: Parasolid's
           // periodic faces have no seam; c2-rings-loft's slots through its rounds): their curvatures agree there, unlike

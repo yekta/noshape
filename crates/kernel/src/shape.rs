@@ -378,6 +378,12 @@ impl Shape {
         Shape::from_res(ffi::fix_shape(self.raw(), tolerance))
     }
 
+    /// Its swept faces (surfaces of linear extrusion, of revolution) that are planes, cylinders, cones, spheres or tori
+    /// as those: a face swept from a neighbour's edge then unifies with it.
+    pub fn with_elementary_surfaces(&self) -> Result<Shape> {
+        Shape::from_res(ffi::elementary_surfaces(self.raw()))
+    }
+
     /// The faces as shells whose faces agree in orientation with their neighbours (ShapeFix_Shell), one shell per
     /// connected piece; which side each shell faces is left to the caller.
     pub fn faces_oriented_consistently(&self) -> Result<Shape> {

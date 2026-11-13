@@ -1853,6 +1853,103 @@ pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], siz
     Ok(())
 }
 
+/// Rounds of concave arcs where a plane meets a cylinder square to it, whose ends run on tangentially into convex edges
+/// left out (the tangent chain stops where the convexity changes): as live's (asm-isaac-ball's Fillet 2, a tab's
+/// underside rounded into the cylinder below it, the tab's corner rounds' bottom edges convex), the round runs along the
+/// arc and the faces round the plane face run on along its normal to trim it (the corner rounds extended down to it).
+/// Built as the region between the round and the corner, its section revolved about the cylinder's axis, within the
+/// plane face swept along its normal, added to the body. `Ok(false)` (nothing done) unless every edge is such an arc and
+/// the plane face's other neighbours run along its normal (planes along it, cylinders about it), so the sweep's sides are
+/// them run on.
+pub fn stopped_concave_arc_round(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) -> FResult<bool> {
+    use super::sheetmetal_util::{body_named, bool_named};
+    let body = ev.ctx.bodies[bi].clone();
+    let shape = &body.shape;
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let tol = scale * 1e-9;
+    let faces = shape.faces();
+    let ef = shape.edge_faces()?;
+    let feature = ev.feature;
+    let mut adds = Vec::new();
+    for &e in edges {
+        let Some(fs) = ef.get(e).filter(|f| f.len() == 2) else { return Ok(false) };
+        let (pi, ci) = match (faces[fs[0] as usize].face_surface()?, faces[fs[1] as usize].face_surface()?) {
+            (k::Surface::Plane(_), k::Surface::Cylinder { .. }) => (fs[0] as usize, fs[1] as usize),
+            (k::Surface::Cylinder { .. }, k::Surface::Plane(_)) => (fs[1] as usize, fs[0] as usize),
+            _ => return Ok(false),
+        };
+        let (plane, wall) = (&faces[pi], &faces[ci]);
+        let k::Surface::Cylinder { origin, axis, radius: rc, .. } = wall.face_surface()? else { return Ok(false) };
+        let a = axis.normalize();
+        let edge = shape.sub_shape(ShapeType::Edge, e)?;
+        let info = edge.edge_info()?;
+        if info.closed || !matches!(info.curve, k::Curve::Circle { .. }) {
+            return Ok(false);
+        }
+        let mid = edge.point_at(0.5 * (info.first_param + info.last_param))?;
+        // The plane's outward normal along the axis.
+        let np = plane.normal_at_point(mid)?.normalize();
+        if np.dot(a).abs() < 1.0 - 1e-9 {
+            return Ok(false);
+        }
+        // The cylinder's outward normal there: away from the axis (a boss) or towards it (a hole).
+        let foot = origin + a * (mid - origin).dot(a);
+        let radial = (mid - foot).normalize();
+        let s = if wall.normal_at_point(mid)?.dot(radial) > 0.0 { 1.0 } else { -1.0 };
+        // Concave: just off the edge on both faces' outer sides is outside the body.
+        let probe = mid + radial * (s * r * 0.25) + np * (r * 0.25);
+        if !matches!(shape.classify_point(probe, tol * 1e3), Ok(k::PointClass::Outside)) {
+            return Ok(false);
+        }
+        // The plane face's other neighbours run along its normal.
+        for oe in plane.edges() {
+            let Some(oi) = shape.index_of(&oe, ShapeType::Edge) else { return Ok(false) };
+            if edges.contains(&oi) {
+                continue;
+            }
+            let Some(of) = ef.get(oi).and_then(|f| f.iter().map(|&x| x as usize).find(|&x| x != pi)) else { return Ok(false) };
+            let along = match faces[of].face_surface()? {
+                k::Surface::Plane(_) => faces[of].normal_at_point(oe.point_at(0.5 * (oe.edge_info()?.first_param + oe.edge_info()?.last_param))?)?.normalize().dot(np).abs() < 1e-9,
+                k::Surface::Cylinder { axis: ax, .. } => ax.normalize().cross(np).length() < 1e-9,
+                _ => false,
+            };
+            if !along {
+                return Ok(false);
+            }
+        }
+        // The section in the half-plane through the axis and the edge's middle: from the corner along the plane by r,
+        // the round back to the wall, the wall back to the corner; revolved all round.
+        let corner = foot + radial * rc + a * (mid - foot).dot(a);
+        let corner = corner + np * (mid - corner).dot(np);
+        let q = |rho: f64, h: f64| corner + radial * (s * rho) + np * h;
+        let d = std::f64::consts::FRAC_1_SQRT_2;
+        let wire = k::make_wire(&[k::make_line(q(0.0, 0.0), q(r, 0.0))?, k::make_arc_3pts(q(r, 0.0), q(r - r * d, r - r * d), q(0.0, r))?, k::make_line(q(0.0, r), q(0.0, 0.0))?])?;
+        let ring = k::revolve(&k::make_face_from_wire(&wire, true)?, origin, a, std::f64::consts::TAU)?.shape;
+        // (Swept back from the far side, its sides cylinders and planes as the faces they run on (axes the same way),
+        // not swept surfaces: they unify with those faces.)
+        let far = k::transform(plane, &k::Transform::Translate(np * (2.0 * r)), true)?.shape;
+        let sweep = k::extrude(&far, -np * (2.0 * r))?.shape.with_elementary_surfaces()?;
+        let tool = k::common(&ring, &sweep)?.shape;
+        if !tool.is_valid() || tool.count(ShapeType::Solid) != 1 || tool.volume().unwrap_or(0.0) <= 0.0 {
+            return Err(fail("the stopped arc's round left no one solid to add"));
+        }
+        let ename = body.edges[e].clone();
+        let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
+        let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
+        let names: Vec<Name> = tool.faces().iter().map(|f| if matches!(f.face_surface(), Ok(k::Surface::Torus { .. })) { blend.clone() } else { generated.clone() }).collect();
+        adds.push(NamedShape::new(tool, names));
+    }
+    let (fused, names) = bool_named(ev, k::BooleanOp::Fuse, &body_named(&body), &adds)?;
+    let fused = NamedShape::new(fused, names);
+    let un = k::unify_same_domain(&fused.shape)?;
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+        return Err(fail("the result is not one valid solid"));
+    }
+    let names = ev.name_result(&[&fused.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
+    Ok(true)
+}
+
 /// Rounds of arcs where a plane meets a cylinder whose ends run on tangentially into edges left out (a picked face's
 /// edge, or tangent propagation off): as live's (cf-surface-pattern's Fillet 1, live 2227), the ball rolls between the
 /// plane and the cylinder along the arc, then runs straight on past each end between the plane and the cylinder's

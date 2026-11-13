@@ -22,30 +22,85 @@ fn by_body(items: Vec<(usize, usize)>) -> BTreeMap<usize, Vec<usize>> {
 /// (within ~1 degree) are added transitively. Shared by fillet, chamfer and
 /// face blend.
 pub fn propagate_tangent(shape: &k::Shape, edges: &[usize]) -> Vec<usize> {
-    let Some(links) = TangentLinks::new(shape) else { return edges.to_vec() };
+    propagate(shape, edges, true)
+}
+
+/// A fillet's chain: [`propagate_tangent`] stopping where the convexity changes, over edges between two faces only
+/// (asm-isaac-ball's Fillet 2, as live; chamfers keep running on: c2-rings-loft's Chamfer 3).
+fn fillet_chain(shape: &k::Shape, edges: &[usize]) -> Vec<usize> {
+    propagate(shape, edges, false)
+}
+
+fn propagate(shape: &k::Shape, edges: &[usize], any_convexity: bool) -> Vec<usize> {
+    let Some(mut links) = TangentLinks::new(shape) else { return edges.to_vec() };
+    links.any_convexity = any_convexity;
     let mut set: BTreeSet<usize> = edges.iter().copied().collect();
-    let mut stack = edges.to_vec();
-    while let Some(ei) = stack.pop() {
+    // Each edge with the chain's convexity so far (a smooth edge's 0 takes its neighbour's: it can't bridge a concave
+    // run to a convex one).
+    let mut stack: Vec<(usize, i32)> = edges.iter().map(|&e| (e, links.convexity(e))).collect();
+    while let Some((ei, c)) = stack.pop() {
         for o in links.neighbours(ei) {
+            let co = links.convexity(o);
+            if !links.any_convexity && c * co < 0 {
+                continue;
+            }
             if set.insert(o) {
-                stack.push(o);
+                stack.push((o, if co != 0 { co } else { c }));
             }
         }
     }
     set.into_iter().collect()
 }
 
-/// Edges meeting at a shared vertex with parallel tangents (within ~1 degree).
+/// Edges meeting at a shared vertex with parallel tangents (within ~1 degree), of one convexity: a chain stops where a
+/// concave edge runs on into a convex one (asm-isaac-ball's Fillet 2: a tab's underside rounded into the cylinder below
+/// it, the tab's corner rounds' convex bottom edges left out, as live).
 struct TangentLinks {
     edges: Vec<k::Shape>,
     vertices: Vec<k::Shape>,
     vertex_edges: Vec<Vec<u32>>,
     shape: k::Shape,
+    edge_faces: Vec<Vec<u32>>,
+    faces: Vec<k::Shape>,
+    convexity: std::cell::RefCell<BTreeMap<usize, i32>>,
+    /// Tangent neighbours whatever their convexity and faces ([`propagate_tangent`]); off for a fillet's chain.
+    any_convexity: bool,
 }
 
 impl TangentLinks {
     fn new(shape: &k::Shape) -> Option<Self> {
-        Some(TangentLinks { edges: shape.edges(), vertices: shape.vertices(), vertex_edges: shape.vertex_edges().ok()?, shape: shape.clone() })
+        Some(TangentLinks {
+            edges: shape.edges(),
+            vertices: shape.vertices(),
+            vertex_edges: shape.vertex_edges().ok()?,
+            shape: shape.clone(),
+            edge_faces: shape.edge_faces().ok()?,
+            faces: shape.faces(),
+            convexity: Default::default(),
+            any_convexity: false,
+        })
+    }
+
+    /// +1 convex, -1 concave, 0 smooth or unknown: the sign of (n_a × n_b) · t at the edge's middle, t its tangent as
+    /// its first face runs it.
+    fn convexity(&self, ei: usize) -> i32 {
+        if let Some(&c) = self.convexity.borrow().get(&ei) {
+            return c;
+        }
+        let c = (|| {
+            let fs = self.edge_faces.get(ei)?;
+            let (a, b) = (self.faces.get(*fs.first()? as usize)?, self.faces.get(*fs.get(1)? as usize)?);
+            let edge = self.edges.get(ei)?;
+            let ea = edge.oriented(a.edge_orientation_in(edge).ok()?).ok()?;
+            let info = ea.edge_info().ok()?;
+            let t = (info.first_param + info.last_param) * 0.5;
+            let (p, tan) = (ea.point_at(t).ok()?, ea.tangent_at(t).ok()?);
+            let c = a.normal_at_point(p).ok()?.normalize_or_zero().cross(b.normal_at_point(p).ok()?.normalize_or_zero()).dot(tan.normalize_or_zero());
+            Some(if c > 1e-6 { 1 } else if c < -1e-6 { -1 } else { 0 })
+        })()
+        .unwrap_or(0);
+        self.convexity.borrow_mut().insert(ei, c);
+        c
     }
 
     fn neighbours(&self, ei: usize) -> Vec<usize> {
@@ -64,10 +119,13 @@ impl TangentLinks {
             let Ok(p) = self.vertices[vi].vertex_point() else { continue };
             for &o in self.vertex_edges.get(vi).map(|x| x.as_slice()).unwrap_or(&[]) {
                 let o = o as usize;
+                // (A fillet's chain: only edges between two faces, not one a face runs on both sides of.)
                 if o != ei
                     && !out.contains(&o)
+                    && (self.any_convexity || self.edge_faces.get(o).is_some_and(|f| f.len() >= 2))
                     && let (Some(t1), Some(t2)) = (tangent_at(e, p), self.edges.get(o).and_then(|x| tangent_at(x, p)))
                     && t1.dot(t2).abs() > 0.9998
+                    && (self.any_convexity || self.convexity(ei) * self.convexity(o) >= 0)
                 {
                     out.push(o);
                 }
@@ -354,7 +412,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         let propagate = ev.bool("tangentPropagation");
         // Live 2202 / 2227: picked faces alone, their edges aren't propagated (the result doesn't depend on propagation).
         // With edges picked too, all are (learning-center-michael's Fillet 2: seven edges and a cap face, as live).
-        let mut chain = if propagate && !faces_only { propagate_tangent(&body.shape, &edges) } else { edges.clone() };
+        let mut chain = if propagate && !faces_only { fillet_chain(&body.shape, &edges) } else { edges.clone() };
         chain.extend(edges.iter().filter(|&&e| !chain.contains(&e)).copied().collect::<Vec<_>>());
         chain.sort_unstable();
         // The selection stops where its edges run on tangentially into edges left out.
@@ -385,7 +443,11 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         }
         if stops {
             // OCCT always runs a fillet on along tangent edges; Onshape stops at the
-            // selection (the blend runs straight on into the tangent neighbour).
+            // selection (the blend runs straight on into the tangent neighbour), or, where the chain stops at a change
+            // of convexity, the faces round its ends run on to trim it.
+            if !width && super::blend_section::stopped_concave_arc_round(ev, bi, &chain, radius)? {
+                continue;
+            }
             if !width && super::blend_section::run_on_rim_blend(ev, bi, &chain, radius)? {
                 continue;
             }
