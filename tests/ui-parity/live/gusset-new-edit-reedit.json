@@ -1,0 +1,4524 @@
+{
+ "scenario": "gusset-new-edit-reedit",
+ "recorded": "2026-11-13T00:17:01.007Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+ },
+ "live": {
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "7852a842840e401298d41181",
+  "start": "frame-l",
+  "startElement": "7d64a832cc847ff5304ddb43",
+  "runner": "live2 .nstate-uip-3.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Frame 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Frame 1"
+  },
+  "parts": [
+   "Part 1",
+   "Part 2"
+  ],
+  "partsHeading": "Parts (2)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    10.156,
+    4.059,
+    -2.706
+   ],
+   "eye_mm": [
+    83.947,
+    -123.75,
+    82.5
+   ],
+   "width_mm": 473.078,
+   "height_mm": 250.536,
+   "mmPerPixel": 0.282772,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Gusset"
+    }
+   },
+   "ok": true,
+   "at": [
+    1475,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Edges",
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Gusset 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 58972
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Edges",
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Gusset 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 64977
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "edge": [
+      12.7,
+      -12.7,
+      5
+     ]
+    }
+   },
+   "ok": true,
+   "hover": [
+    "KSNE"
+   ],
+   "at": [
+    1061,
+    523
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 76410
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Length"
+    }
+   },
+   "ok": true,
+   "at": [
+    366,
+    201
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Length",
+     "text": "25 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 79933
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "type",
+    "text": "20"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Length",
+     "text": "20",
+     "selection": [
+      2,
+      2
+     ],
+     "all": false,
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 82698
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     366,
+     201
+    ],
+    "hover": [],
+    "element": "input.os-param-number.dropdown-source"
+   },
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Length",
+     "text": "20 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 88965
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Length",
+     "text": "20 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 95576
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Length",
+     "text": "20 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 100637
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "at": [
+    424,
+    93
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 106898
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 111956
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "dblclick",
+    "on": {
+     "feature": "Gusset 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    70,
+    339
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Edges",
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 118556
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Edges",
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 123851
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Thickness"
+    }
+   },
+   "ok": true,
+   "at": [
+    375,
+    227
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Thickness",
+     "text": "25 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 126858
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "type",
+    "text": "10"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Thickness",
+     "text": "10",
+     "selection": [
+      2,
+      2
+     ],
+     "all": false,
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "10",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "10",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 129626
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     374,
+     227
+    ],
+    "hover": [
+     "FWwXA6gn8oVdvJC_1"
+    ],
+    "element": "input.os-param-number.dropdown-source"
+   },
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Thickness",
+     "text": "10 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "10 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "10 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 135688
+  },
+  {
+   "step": 16,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Thickness",
+     "text": "10 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "10 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "10 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 143472
+  },
+  {
+   "step": 17,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Thickness",
+     "text": "10 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "10 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "10 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 148466
+  },
+  {
+   "step": 18,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "at": [
+    424,
+    93
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 154534
+  },
+  {
+   "step": 19,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 159531
+  },
+  {
+   "step": 20,
+   "do": {
+    "do": "dblclick",
+    "on": {
+     "feature": "Gusset 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    70,
+    339
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Edges",
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "10 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "10 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 168611
+  },
+  {
+   "step": 21,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Edges",
+     "dialog": "Gusset 1"
+    },
+    "dialog": {
+     "title": "Gusset 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Edges",
+       "kind": "query",
+       "items": [
+        "Edge of Frame 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset type",
+       "kind": "enum",
+       "text": "Triangle",
+       "state": "ok"
+      },
+      {
+       "label": "Length",
+       "kind": "number",
+       "text": "20 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "10 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Gusset position",
+       "kind": "enum",
+       "text": "Centered",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Gusset 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Edges",
+        "kind": "query",
+        "items": [
+         "Edge of Frame 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset type",
+        "kind": "enum",
+        "text": "Triangle",
+        "state": "ok"
+       },
+       {
+        "label": "Length",
+        "kind": "number",
+        "text": "20 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "10 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Gusset position",
+        "kind": "enum",
+        "text": "Centered",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "KSNE"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 174518
+  },
+  {
+   "step": 22,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     70,
+     339
+    ],
+    "hover": [
+     "FWwXA6gn8oVdvJC_1"
+    ],
+    "element": "span.os-list-item-name"
+   },
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 180319
+  },
+  {
+   "step": 23,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Frame 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Gusset 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Gusset 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      10.156,
+      4.059,
+      -2.706
+     ],
+     "eye_mm": [
+      83.947,
+      -123.75,
+      82.5
+     ],
+     "width_mm": 473.078,
+     "height_mm": 250.536,
+     "mmPerPixel": 0.282772,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 185450
+  }
+ ]
+}
