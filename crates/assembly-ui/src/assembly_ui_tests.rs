@@ -1018,3 +1018,22 @@ fn enter_in_a_configured_value_moves_down_a_row(cx: &mut TestAppContext) {
     assert!(matches!(&value, Some(ParamValue::Expr(e)) if e.text == "5 mm"), "{value:?}");
     assert_eq!(framed, Some(format!("cv-0-{}", rows[1])), "the cell below framed");
 }
+
+/// Live2 feedback.json (documentLoad): an opening assembly says "Loading studio data…" until its first evaluation is
+/// in (after a moment), and nothing once it is.
+#[gpui::test]
+fn an_opening_assembly_says_it_is_loading(cx: &mut TestAppContext) {
+    let path = pattern_document(cx, "loading");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    let t = std::time::Instant::now();
+    while !cx.update(|cx| view.read(cx).ui.real_result_in) && t.elapsed() < std::time::Duration::from_secs(30) {
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        draw(cx, window);
+    }
+    assert_eq!(cx.update(|cx| view.read(cx).loading_message()), None, "evaluated: nothing");
+    view.update(cx, |v, _| {
+        v.ui.real_result_in = false;
+        v.ui.opened_at = Some(std::time::Instant::now() - std::time::Duration::from_secs(1));
+    });
+    assert_eq!(cx.update(|cx| view.read(cx).loading_message()), Some("Loading studio data…"));
+}

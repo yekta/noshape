@@ -776,6 +776,13 @@ impl AssemblyView {
         self.sync_implicit_mc(cx);
         let Some((asm, opts)) = self.effective(cx) else { return };
         self.load_cached_result(&asm, window, cx);
+        if self.ui.opened_at.is_none() {
+            self.ui.opened_at = Some(std::time::Instant::now());
+            self.ui.loading_timer = Some(cx.spawn_in(window, async move |this, cx| {
+                cx.background_executor().timer(crate::display_cache::LOADING_DELAY).await;
+                let _ = this.update(cx, |_, cx| cx.notify());
+            }));
+        }
         let doc = self.doc.read(cx).session.doc.clone();
         let evaluator = self.evaluator.clone();
         let explode = self.explode;
@@ -837,6 +844,15 @@ impl AssemblyView {
             });
         }));
         cx.notify();
+    }
+
+    /// The opening assembly's loading message (live2 feedback.json documentLoad, as a Part Studio's): "Loading studio
+    /// data…" until its first evaluation (or its cached result) is in, after a moment.
+    pub(crate) fn loading_message(&self) -> Option<&'static str> {
+        if self.ui.real_result_in || self.ui.cached_view || self.ui.opened_at.is_none_or(|t| t.elapsed() < crate::display_cache::LOADING_DELAY) {
+            return None;
+        }
+        Some("Loading studio data…")
     }
 
     fn apply_result(&mut self, result: Arc<AssemblyResult>, _window: &mut Window, cx: &mut Context<Self>) {
@@ -5927,6 +5943,9 @@ impl AssemblyView {
     fn render_overlay(&mut self, window: &Window, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
         let mut out = Vec::new();
+        if let Some(m) = self.loading_message() {
+            out.push(crate::display_cache::loading_overlay(m));
+        }
         if self.panel == Some(SidePanel::Variables) {
             out.push(self.render_variables_panel(cx));
         } else if self.panel == Some(SidePanel::Configurations) {

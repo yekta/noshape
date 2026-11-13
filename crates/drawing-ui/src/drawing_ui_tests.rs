@@ -405,3 +405,15 @@ fn the_first_click_on_the_empty_sheet_after_a_copy_keeps_the_selection(cx: &mut 
     click_sheet(cx, window, &editor, empty);
     assert!(selected(cx).is_empty(), "the next one clears");
 }
+
+/// Live2 feedback.json (documentLoad), the drawing as a Part Studio: no loading state in the first moment of a quick
+/// open, nor once a view is drawn.
+#[gpui::test]
+fn an_opening_drawing_says_what_it_is_loading_until_a_view_is_drawn(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "loading");
+    real_sheet(cx, window, &editor);
+    assert_eq!(cx.update(|cx| editor.read(cx).loading_message()), None, "views drawn: nothing");
+    cx.update(|cx| editor.update(cx, |e, _| e.opening_for_test()));
+    assert_eq!(cx.update(|cx| editor.read(cx).loading_message()), Some("Loading graphics…"), "a second in, nothing drawn, sources in");
+}

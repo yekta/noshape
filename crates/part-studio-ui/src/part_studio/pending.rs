@@ -2,7 +2,7 @@
 //! Linear pattern):
 //! - while a preview computes, the dialog, feature list and cursor don't
 //!   change and the previous result stays shown as it is;
-//! - after 1.2 s Onshape puts its working overlay over the graphics: a spinner
+//! - after 1.1 s Onshape puts its working overlay over the graphics: a spinner
 //!   at the bottom centre ("Opening <feature>…" under it while a dialog
 //!   opens), until the final geometry is in;
 //! - ✓ closes the dialog at once and the final regeneration runs under that
@@ -17,8 +17,8 @@ use super::PartStudioView;
 use gpui_kit::*;
 use std::time::{Duration, Instant};
 
-/// Live: the working overlay appears 1.2 s after the edit.
-pub(super) const OVERLAY_DELAY: Duration = Duration::from_millis(1200);
+/// Live: the working overlay appears 1.1 s after the edit (live2 feedback.json progress.commit: at 1119 ms after ✓).
+pub(super) const OVERLAY_DELAY: Duration = Duration::from_millis(1100);
 
 /// A regeneration whose result isn't shown yet.
 pub(super) struct Pending {

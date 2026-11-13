@@ -32,6 +32,11 @@ pub(crate) struct CachedOpen {
     /// The key of what was last cached or shown from the cache.
     key: Option<String>,
     after_real: Option<Deferred>,
+    /// Opening (live2 feedback.json documentLoad): when, whether a view was drawn yet, and the timer that shows the
+    /// loading state after `cache::LOADING_DELAY`.
+    opened_at: Option<std::time::Instant>,
+    loaded: bool,
+    loading_timer: Option<Task<()>>,
 }
 
 fn key(doc: &noshape_model::Document, tab: TabId, sheet: usize) -> Option<String> {
@@ -84,6 +89,9 @@ impl DrawingEditor {
     /// computed: the build to show (the cached one while it stands in), the real one cached once complete.
     pub(crate) fn sheet_to_show(&mut self, si: usize, built: BuiltSheet, complete: bool, cx: &mut Context<Self>) -> BuiltSheet {
         self.load_cached_sheet(cx);
+        if !built.placements.is_empty() {
+            self.cached_open.loaded = true;
+        }
         if !complete {
             return match &self.cached_open.shown {
                 Some((s, cached)) if *s == si => (**cached).clone(),
@@ -104,6 +112,13 @@ impl DrawingEditor {
             self.schedule_sheet_save(si, built.clone(), cx);
         }
         built
+    }
+
+    /// Tests: opened a second ago, nothing drawn yet.
+    #[cfg(test)]
+    pub(crate) fn opening_for_test(&mut self) {
+        self.cached_open.loaded = false;
+        self.cached_open.opened_at = Some(std::time::Instant::now() - std::time::Duration::from_secs(1));
     }
 
     /// Tests: the opened sheet's build `built` stands in as if read from the cache.
@@ -161,6 +176,26 @@ impl DrawingEditor {
     }
 
     /// Over the sheet's top left while the cached sheet stands in: Onshape's spinner and "Regenerating…".
+    /// The editor opened: the loading state shows if no view is drawn after a moment.
+    pub(crate) fn start_loading_timer(&mut self, cx: &mut Context<Self>) {
+        self.cached_open.opened_at = Some(std::time::Instant::now());
+        self.cached_open.loading_timer = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(cache::LOADING_DELAY).await;
+            let _ = this.update(cx, |_, cx| cx.notify());
+        }));
+    }
+
+    /// The opening drawing's loading message (live2 feedback.json documentLoad, as a Part Studio's): "Loading studio
+    /// data…" while a view's source regenerates, "Loading graphics…" while the views compute; none once a view (or
+    /// the cached sheet) is drawn, on a sheet with no views, or in the first moment of a quick open.
+    pub(crate) fn loading_message(&self) -> Option<&'static str> {
+        if self.cached_open.loaded || self.cached_view() || self.cached_open.opened_at.is_none_or(|t| t.elapsed() < cache::LOADING_DELAY) {
+            return None;
+        }
+        self.current_sheet().real_views().next()?;
+        Some(if self.regenerating.is_empty() { "Loading graphics…" } else { "Loading studio data…" })
+    }
+
     pub(crate) fn render_regenerating(&self) -> Option<AnyElement> {
         self.cached_view().then(|| div().absolute().top(px(8.)).left(px(8.)).bg(crate::theme::p().panel).rounded(px(3.)).pr(px(8.)).child(cache::regenerating_row()).into_any_element())
     }

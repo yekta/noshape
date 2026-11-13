@@ -125,6 +125,31 @@ pub fn spinner(size: f32) -> impl IntoElement {
     })
 }
 
+/// Onshape's document-load state over a studio's graphics (live behaviours "speed: psui open a document",
+/// hose-run2-spinner-stages.png; live2 feedback.json progress.documentLoad): the large spinner (a ~100 px ring) in the
+/// middle over a translucent white, one message line under it ("Loading studio data…", "Loading graphics…").
+pub fn loading_overlay(message: &'static str) -> AnyElement {
+    let pal = crate::theme::p();
+    div()
+        .id("loading-overlay")
+        .occlude()
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
+        .bg(gpui_kit::rgba(0xffffffb3))
+        .flex()
+        .flex_col()
+        .items_center()
+        .justify_center()
+        .child(spinner(136.))
+        .child(div().mt(px(-6.)).text_size(px(13.)).text_color(pal.text_muted).child(message))
+        .into_any_element()
+}
+
+/// How long a studio opens before its loading state shows (a quick open shows none).
+pub const LOADING_DELAY: Duration = Duration::from_millis(500);
+
 /// The list's top row while a cached display stands in (the feature list, the instance list): Onshape's spinner and
 /// "Regenerating…".
 pub fn regenerating_row() -> AnyElement {

@@ -729,8 +729,16 @@ impl PartStudioView {
     #[track_caller]
     pub fn schedule_regen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let caller = std::panic::Location::caller();
-        // The opened studio: its cached display while this first regeneration runs.
+        // The opened studio: its cached display while this first regeneration runs, and the loading state if
+        // neither is in after a moment.
         self.load_cached_display(window, cx);
+        if !self.ui.loaded && self.ui.loading_timer.is_none() {
+            let wait = noshape_app_core::display_cache::LOADING_DELAY.saturating_sub(self.ui.opened_at.elapsed());
+            self.ui.loading_timer = Some(cx.spawn_in(window, async move |this, cx| {
+                cx.background_executor().timer(wait).await;
+                let _ = this.update(cx, |_, cx| cx.notify());
+            }));
+        }
         self.perf_script_note("regen scheduled");
         // A new feature's preview waits for std's editing logic's first run (std_edit_logic runs it then).
         if self.edit.is_some()
@@ -1059,6 +1067,17 @@ impl PartStudioView {
         let (geometry_changed, job) = self.apply_display_begin(display, window, cx);
         let scene = job.build(&self.cache, self.gpu.uploader());
         self.apply_display_end(geometry_changed, Some(scene), cx);
+        self.ui.loaded = true;
+    }
+
+    /// The opening studio's loading message (live2 feedback.json documentLoad, behaviours "speed: psui open a
+    /// document"): "Loading studio data…" until a result is in, "Loading graphics…" while its scene builds; none once a
+    /// display (cached or real) is drawn, nor in the first moment of a quick open.
+    pub(super) fn loading_message(&self) -> Option<&'static str> {
+        if self.ui.loaded || self.ui.opened_at.elapsed() < noshape_app_core::display_cache::LOADING_DELAY {
+            return None;
+        }
+        Some(if self.ui.scene_task.is_some() { "Loading graphics…" } else { "Loading studio data…" })
     }
 
     /// [`Self::apply_display`] with the scene built on a background thread (a dialog's preview and close: ~30 ms each
@@ -1077,6 +1096,8 @@ impl PartStudioView {
                     return;
                 }
                 this.apply_display_end(geometry_changed, (this.scene_gen == generation).then_some(scene), cx);
+                this.ui.loaded = true;
+                cx.notify();
             });
         }));
     }
@@ -7377,7 +7398,9 @@ impl Render for PartStudioView {
                             .children(appearance_editor)
                             .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full()))
                             // Slow regeneration: the working overlay (pending.rs).
-                            .children(self.render_pending_overlay(cx))
+                            // Opening: the loading state alone (live shows no working spinner under it).
+                            .children(if self.loading_message().is_some() { None } else { self.render_pending_overlay(cx) })
+                            .children(self.loading_message().map(noshape_app_core::display_cache::loading_overlay))
                             // Compare mode: the Main ○—— V3 blend slider, top centre (live 953).
                             .children(crate::part_studio_hooks::compare_slider(&self.doc, cx).map(|slider| div().absolute().top(px(4.)).left_0().right_0().flex().justify_center().child(slider)))
                             // Add custom features, right-aligned under the toolbar (live 2213).

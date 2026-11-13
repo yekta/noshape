@@ -290,7 +290,7 @@ pub struct DrawingEditor {
     /// Part Studio takes the part's scale).
     pub insert_scale_was_auto: bool,
     assemblies: Arc<Mutex<AssemblyEvaluator>>,
-    regenerating: HashSet<SourceKey>,
+    pub(crate) regenerating: HashSet<SourceKey>,
     /// Sources that couldn't be resolved (a deleted display state): retried
     /// only on Update.
     failed_sources: HashSet<SourceKey>,
@@ -836,6 +836,7 @@ impl DrawingEditor {
         // The document's and the tab's names, the user: properties read them
         // from the start, not after the first edit.
         this.update_info(cx);
+        this.start_loading_timer(cx);
         this.ensure_sources(false, cx);
         this.refresh(cx);
         // Another document may get a newer version meanwhile (live 2303: the update icon comes without a reload).
@@ -2006,6 +2007,7 @@ impl DrawingEditor {
             .children(self.render_sheet_props(cx))
             .children(self.render_drawing_props(cx))
             .children(self.render_regenerating())
+            .children(self.loading_message().map(crate::display_cache::loading_overlay))
             .children(self.render_toast(cx))
             .children(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone()))
             .children(self.render_section_dlg(cx))

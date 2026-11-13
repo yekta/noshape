@@ -360,6 +360,11 @@ pub struct UiState {
     pub open_frames: u8,
     /// The opened studio's first full display was applied (until then its scenes build off the UI thread).
     pub first_full_shown: bool,
+    /// Opening: when, the first display (cached or real) drawn, and the timer that shows the loading state after
+    /// `display_cache::LOADING_DELAY` (live2 feedback.json documentLoad).
+    pub opened_at: std::time::Instant,
+    pub loaded: bool,
+    pub loading_timer: Option<Task<()>>,
     /// The display cache (cached_open.rs): looked up once; its display standing in (view-only) until a real one
     /// is in; the lookup and the save; the key of what is cached; an action waiting for the real model.
     pub cache_checked: bool,
@@ -798,6 +803,9 @@ impl UiState {
             show_code_task: None,
             open_frames: 0,
             first_full_shown: false,
+            opened_at: std::time::Instant::now(),
+            loaded: false,
+            loading_timer: None,
             cache_checked: false,
             cached_view: false,
             real_display_in: false,

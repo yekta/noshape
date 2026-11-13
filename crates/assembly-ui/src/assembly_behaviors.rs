@@ -572,6 +572,10 @@ pub struct AsmUi {
     pub cache_checked: bool,
     pub cached_view: bool,
     pub real_result_in: bool,
+    /// Opening (live2 feedback.json documentLoad): when the first evaluation started, and the timer that shows the
+    /// loading state after `display_cache::LOADING_DELAY`.
+    pub opened_at: Option<std::time::Instant>,
+    pub loading_timer: Option<Task<()>>,
     pub cache_task: Option<Task<()>>,
     pub cache_save_task: Option<Task<()>>,
     /// The key the shown result is cached under.

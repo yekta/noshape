@@ -4360,3 +4360,19 @@ fn a_flipped_remove_extrude_points_away_from_the_block(cx: &mut TestAppContext) 
     let flip = ("oppositeDirection", ParamValue::Bool(false));
     assert!(!remove_extrude_faces(cx, "rm-flip", true, &[remove, flip]).0, "the user's flip after Remove's");
 }
+
+/// Live2 feedback.json (documentLoad): an opening studio shows "Loading studio data…" until a result is in and
+/// "Loading graphics…" while its scene builds; nothing in the first moment of a quick open, nor once it is drawn.
+#[gpui::test]
+fn an_opening_studio_says_what_it_is_loading(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "loading");
+    wait_until(cx, window, |cx| view.read(cx).ui.loaded);
+    assert_eq!(cx.update(|cx| view.read(cx).loading_message()), None, "drawn: nothing");
+    view.update(cx, |v, _| {
+        v.ui.loaded = false;
+        v.ui.opened_at = std::time::Instant::now();
+    });
+    assert_eq!(cx.update(|cx| view.read(cx).loading_message()), None, "a quick open shows nothing at first");
+    view.update(cx, |v, _| v.ui.opened_at = std::time::Instant::now() - std::time::Duration::from_secs(1));
+    assert_eq!(cx.update(|cx| view.read(cx).loading_message()), Some("Loading studio data…"));
+}
