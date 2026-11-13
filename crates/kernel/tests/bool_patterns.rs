@@ -2461,3 +2461,25 @@ fn a_rings_wedge_cut_through_its_tori_as_occt() {
     assert!((vr - vo).abs() <= 1e-8 * vo.abs(), "volume {vr} against OCCT's {vo}");
 }
 
+/// c2-impeller-loft's Boolean Flansch+Gehäuse (recorded): the flange, its inner wall extruded from the shell's inner
+/// wall's top edge, fused with the shell. Where the shell's wall slopes away under that edge, the flange's wall stands
+/// in the cavity, a strip 0.04-0.27 mm proud; live keeps it (its wall pieces and two 6.8 mm² slivers at the bottom,
+/// 59,137.89 mm³). OCCT's fuse lost them (26.6 mm³ short). Ours: the flange's edge on the shell's wall is the wall's
+/// own edge (2.3 um off the wall), OCCT's sections along it cut where they turn off down the walls' crossing.
+#[test]
+fn a_flange_drawn_from_a_shells_wall_fused_as_live() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "7519a27ac8f397d0").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})")).shape;
+    assert!(r.is_valid());
+    let v = r.volume().unwrap() * 1e9;
+    assert!((v - 59_137.89).abs() <= 1.0, "volume {v} mm³, live 59,137.89");
+    let slivers = r.faces().iter().filter(|f| (6.0..7.5).contains(&(f.area().unwrap() * 1e6))).count();
+    assert_eq!(slivers, 2, "live's two 6.8 mm² slivers");
+}
+

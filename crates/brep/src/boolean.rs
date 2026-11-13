@@ -1295,6 +1295,27 @@ impl Ctx<'_> {
         })
     }
 
+    /// The curve on free-form face `f` of the face's own edge that is edge `e`'s curve (point for point at the same
+    /// parameters, `t0` to `t1`, within their tolerances), where `e`'s doesn't project onto the surface: c2-impeller-loft's
+    /// flange profile taken from the shell's inner wall's top edge, which lies 2.3 um off its own face (live: one
+    /// edge).
+    fn twin_pcurve(&self, e: usize, f: usize, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, t1: f64) -> Option<Arc<NurbsCurve>> {
+        let g = &self.faces[f];
+        let reach = |x: usize| self.pool.pair(self.edges[e].t, self.edges[x].t);
+        g.edges.iter().map(|x| x.0).filter(|&x| self.edges[x].arg == g.arg).find_map(|x| {
+            let Geo::Nurbs { id, .. } = self.edges[x].g else { return None };
+            let (pc, a, b) = g.pcurves.get(&(x, false))?;
+            let c = &self.ncurves[id as usize].c;
+            let (lo, hi) = (t0.min(t1), t0.max(t1));
+            let inside = *a <= lo + 1e-9 * (1.0 + lo.abs()) && hi <= *b + 1e-9 * (1.0 + hi.abs());
+            (inside && (0..=32).all(|k| {
+                let t = t0 + (t1 - t0) * k as f64 / 32.0;
+                (at(t).0 - c.at(t)).length() <= reach(x)
+            }))
+            .then(|| pc.clone())
+        })
+    }
+
     /// Face `f`'s boundary in its parameter plane.
     fn bound(&self, f: usize) -> R<&[C2]> {
         let make = || -> R<Vec<C2>> {
@@ -1903,7 +1924,22 @@ impl Ctx<'_> {
                 End::Vertex(v) => v,
                 End::Point(p) => match corner(cx, p) {
                     Some(w) => w,
-                    None => cx.pool.add(p)?,
+                    None => {
+                        // (On an edge of one face lying on the other, only within the section's own tolerance (the
+                        // impeller's flange wall leaving the shell's edge it was drawn from, OCCT's curve 2 um off it
+                        // there): a vertex on the edge reaching the curve's end, as OCCT's pave on it.)
+                        let c: &Ctx = cx;
+                        let (d, q) = [(fs, ft), (ft, fs)]
+                            .into_iter()
+                            .flat_map(|(f, g)| c.faces[f].edges.iter().filter(move |x| c.in_face_done.contains(&(x.0, g))))
+                            .map(|&(e, _)| {
+                                let s = c.edge_seg(e);
+                                let (u, d) = c.seg_param(&s, p);
+                                if (-0.01..=1.01).contains(&u) { (d, c.seg_at(&s, u.clamp(0.0, 1.0))) } else { (f64::INFINITY, p) }
+                            })
+                            .fold((f64::INFINITY, p), |m, x| if x.0 < m.0 { x } else { m });
+                        if d > cx.pool.pair(0.0, 0.0) && d <= stol { cx.pool.add_tol(q, 1.5 * d)? } else { cx.pool.add(p)? }
+                    }
                 },
             };
             // Both faces end there: the same vertex (a point within the two's tolerances is that end).
@@ -2070,7 +2106,9 @@ impl Ctx<'_> {
             let mut cuts: Vec<f64> = free::seam_crossings(&self.faces[f], &at, t0, t1).into_iter().filter(|&t| path.length(t0.min(t), t0.max(t)) > self.tol && path.length(t1.min(t), t1.max(t)) > self.tol).collect();
             cuts.retain(|&t| parts.iter().any(|&(a0, _, a1, _)| (t - a0) * (t - a1) < 0.0));
             if cuts.is_empty() {
-                let Some(c) = free::projected(&self.faces[f], &at, t0, t1, GREY * self.tol) else { return Err(Decline("an edge on another argument's free-form face")) };
+                let Some(c) = free::projected(&self.faces[f], &at, t0, t1, GREY * self.tol).or_else(|| self.twin_pcurve(e, f, &at, t0, t1)) else {
+                    return Err(Decline("an edge on another argument's free-form face"));
+                };
                 self.faces[f].pcurves.insert((e, false), (c.clone(), t0, t1));
                 on_free = vec![Some((f, c)); parts.len()];
             } else {

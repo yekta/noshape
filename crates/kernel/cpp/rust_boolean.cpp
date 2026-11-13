@@ -4128,6 +4128,145 @@ static std::vector<IntTools_Curve> seeded_sections(const TopoDS_Face& fa, const 
   return out;
 }
 
+// Two faces sharing an edge, one argument's on the other's (the same curve: c2-impeller-loft's flange profile taken
+// from the shell's inner wall's top edge, 2.3 um off that wall in places): OCCT's walking lines run along it and turn
+// off it down the faces' real crossing. The stretch along it is the edges' own (their pieces come from the edges);
+// each part that turns off is a section from where it leaves (its back-extrapolated meeting with the edge, a point of
+// the line there), its tolerance reaching the edge (OCCT's pave on it).
+static std::vector<IntTools_Curve> off_shared_edges(const TopoDS_Face& fa, const TopoDS_Face& fb, const std::vector<IntTools_Curve>& lines)
+{
+  struct Shared
+  {
+    occ::handle<Geom_Curve> c;
+    double                  t0, t1;
+  };
+  std::vector<Shared> shared;
+  for (TopExp_Explorer xa(fa, TopAbs_EDGE); xa.More(); xa.Next())
+  {
+    const TopoDS_Edge& ea = TopoDS::Edge(xa.Current());
+    double             a0 = 0, a1 = 0;
+    const occ::handle<Geom_Curve> ca = BRep_Tool::Degenerated(ea) ? occ::handle<Geom_Curve>() : BRep_Tool::Curve(ea, a0, a1);
+    if (ca.IsNull())
+      continue;
+    for (TopExp_Explorer xb(fb, TopAbs_EDGE); xb.More(); xb.Next())
+    {
+      const TopoDS_Edge& eb = TopoDS::Edge(xb.Current());
+      double             b0 = 0, b1 = 0;
+      const occ::handle<Geom_Curve> cb = BRep_Tool::Degenerated(eb) || eb.IsSame(ea) ? occ::handle<Geom_Curve>() : BRep_Tool::Curve(eb, b0, b1);
+      if (cb.IsNull())
+        continue;
+      const double reach = BRep_Tool::Tolerance(ea) + BRep_Tool::Tolerance(eb) + Precision::Confusion();
+      bool         on    = true;
+      for (int k = 1; k < 8 && on; ++k)
+      {
+        GeomAPI_ProjectPointOnCurve pr(ca->Value(a0 + (a1 - a0) * k / 8), cb, b0, b1);
+        on = pr.NbPoints() > 0 && pr.LowerDistance() <= reach;
+      }
+      if (on)
+      {
+        shared.push_back({ca, a0, a1});
+        break;
+      }
+    }
+  }
+  if (shared.empty())
+    return lines;
+  const auto off = [&](const gp_Pnt& p) {
+    double d = RealLast();
+    for (const Shared& e : shared)
+    {
+      GeomAPI_ProjectPointOnCurve pr(p, e.c, e.t0, e.t1);
+      if (pr.NbPoints() > 0)
+        d = std::min(d, pr.LowerDistance());
+      d = std::min({d, p.Distance(e.c->Value(e.t0)), p.Distance(e.c->Value(e.t1))});
+    }
+    return d;
+  };
+  // (Along it: within 10 um (the impeller's lines stray up to 2.3 um off the edge, as its wall does).)
+  const double             reach = 1e-5;
+  std::vector<IntTools_Curve> out;
+  for (const IntTools_Curve& ic : lines)
+  {
+    const occ::handle<Geom_Curve> c = ic.Curve();
+    if (c.IsNull())
+    {
+      out.push_back(ic);
+      continue;
+    }
+    const double      f = c->FirstParameter(), l = c->LastParameter();
+    const int         n = 128;
+    const auto        at = [&](int k) { return f + (l - f) * k / n; };
+    std::vector<char> along(n + 1);
+    int               count = 0;
+    for (int k = 0; k <= n; ++k)
+      count += along[k] = off(c->Value(at(k))) <= reach ? 1 : 0;
+    if (count == 0)
+    {
+      out.push_back(ic);
+      continue;
+    }
+    if (count == n + 1)
+      continue;
+    // Where it turns off, from the sample along it (`in`) toward the one off it (`out_`).
+    const auto leaves = [&](double in, double out_) {
+      double a = in, b = out_;
+      for (int i = 0; i < 50; ++i)
+      {
+        const double m = 0.5 * (a + b);
+        if (off(c->Value(m)) <= reach)
+          a = m;
+        else
+          b = m;
+      }
+      // (Its meeting with the edge: the line off it extrapolated back, its point nearest the edge, the line's point
+      // nearest that.)
+      const double step = (out_ - in) / 8;
+      const gp_Pnt p    = c->Value(b), q = c->Value(b + step);
+      gp_Vec       u(q, p);
+      if (u.Magnitude() <= gp::Resolution())
+        return b;
+      u.Normalize();
+      double best = RealLast(), s_best = 0;
+      for (int j = 0; j <= 200; ++j)
+      {
+        const double s = 4 * reach * j / 200;
+        const double d = off(p.Translated(u * s));
+        if (d < best)
+        {
+          best   = d;
+          s_best = s;
+        }
+      }
+      GeomAPI_ProjectPointOnCurve pr(p.Translated(u * s_best), c, std::min(in, b), std::max(in, b));
+      return pr.NbPoints() > 0 ? pr.LowerDistanceParameter() : b;
+    };
+    for (int i0 = 0; i0 <= n;)
+    {
+      if (along[i0])
+      {
+        ++i0;
+        continue;
+      }
+      int i1 = i0;
+      while (i1 < n && !along[i1 + 1])
+        ++i1;
+      const double t0 = i0 > 0 ? leaves(at(i0 - 1), at(i0)) : f;
+      const double t1 = i1 < n ? leaves(at(i1 + 1), at(i1)) : l;
+      i0              = i1 + 1;
+      if (t1 - t0 <= Precision::PConfusion())
+        continue;
+      double tol = ic.Tolerance();
+      for (const double t : {t0, t1})
+        if (t != f && t != l)
+          tol = std::max(tol, 1.5 * off(c->Value(t)));
+      const occ::handle<Geom2d_Curve> p0 = ic.FirstCurve2d(), p1 = ic.SecondCurve2d();
+      out.emplace_back(new Geom_TrimmedCurve(c, t0, t1), p0.IsNull() ? p0 : occ::handle<Geom2d_Curve>(new Geom2d_TrimmedCurve(p0, t0, t1)),
+                       p1.IsNull() ? p1 : occ::handle<Geom2d_Curve>(new Geom2d_TrimmedCurve(p1, t0, t1)), tol, ic.TangentialTolerance());
+    }
+  }
+  return out;
+}
+
 static rust::String occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> ends, BrepSections& out)
 {
   if (t_free == nullptr || t_free->srcs == nullptr)
@@ -4185,6 +4324,7 @@ static rust::String occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_ar
     }
     t_free->ahead.emplace(swap ? std::array<uint32_t, 4>{b_arg, b_face, a_arg, a_face} : std::array<uint32_t, 4>{a_arg, a_face, b_arg, b_face}, lines);
   }
+  lines = off_shared_edges(fa, fb, lines);
   for (const IntTools_Curve& ic : lines)
   {
     const occ::handle<Geom_Curve> c = ic.Curve();
