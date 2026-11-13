@@ -574,7 +574,6 @@ pub(super) fn projected(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, 
         let duv = DVec2::new((c * e - b * f) / det, (a * f - b * e) / det);
         // (Starting on the seam of a face going a whole turn round and heading out of it there: from the seam's other
         // side, a boss's round edge on a revolved face.)
-        let mut uv = uv;
         if k == 0 {
             for (i, round) in ns.periodic().into_iter().enumerate() {
                 let (lo, hi) = uv_span(g, i);

@@ -1927,7 +1927,11 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         }
         if (r.edge_origin[3 * k] != 1)
         {
-          if (!as_flat)
+          // (On an elementary surface under its trim (a torus, a sphere, a trimmed cylinder or cone) OCCT's projection is
+          // exact (ProjLib's): there too, as OCCT's builder makes it; an arc's parts across a torus's seam and a
+          // plane's ellipse on a trimmed cylinder, the private dock's.)
+          const bool analytic = !occ::down_cast<Geom_ToroidalSurface>(base).IsNull() || !occ::down_cast<Geom_SphericalSurface>(base).IsNull() || !occ::down_cast<Geom_CylindricalSurface>(base).IsNull() || !occ::down_cast<Geom_ConicalSurface>(base).IsNull() || !occ::down_cast<Geom_Plane>(base).IsNull();
+          if (!as_flat && !analytic)
             return "a new edge on a free-form face";
           BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace(es[k], TopoDS::Face(src.Oriented(TopAbs_FORWARD)));
           continue;
