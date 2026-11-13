@@ -7697,10 +7697,82 @@ bool non_manifold(const TopoDS_Shape& s)
   return false;
 }
 
+// `r`'s volume less `a`'s and `t`'s, from the faces they don't share only (a face in both, its place and side the
+// same, adds as much to each): those faces close up, so they are measured about one point (BRepGProp's own sum).
+double volume_change(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_Shape>& t, const TopoDS_Shape& r)
+{
+  NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> fwd, rvs;
+  auto count = [&](const TopoDS_Shape& s, int by) {
+    for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+    {
+      const TopAbs_Orientation o = x.Current().Orientation();
+      if (o != TopAbs_FORWARD && o != TopAbs_REVERSED)
+        continue;
+      auto& m = o == TopAbs_FORWARD ? fwd : rvs;
+      if (int* n = m.ChangeSeek(x.Current()))
+        *n += by;
+      else
+        m.Bind(x.Current(), by);
+    }
+  };
+  for (const TopoDS_Shape& x : a)
+    count(x, -1);
+  for (const TopoDS_Shape& x : t)
+    count(x, -1);
+  count(r, 1);
+  // (In the shapes' own order, each face as often as it is in one and not the other: the inputs' turned over.)
+  TopoDS_Compound c;
+  BRep_Builder    bb;
+  bb.MakeCompound(c);
+  auto add = [&](const TopoDS_Shape& s, bool input) {
+    for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+    {
+      const TopAbs_Orientation o = x.Current().Orientation();
+      if (o != TopAbs_FORWARD && o != TopAbs_REVERSED)
+        continue;
+      int* n = (o == TopAbs_FORWARD ? fwd : rvs).ChangeSeek(x.Current());
+      if (n == nullptr || (input ? *n >= 0 : *n <= 0))
+        continue;
+      *n += input ? 1 : -1;
+      bb.Add(c, input ? x.Current().Reversed() : x.Current());
+    }
+  };
+  add(r, false);
+  for (const TopoDS_Shape& x : a)
+    add(x, true);
+  for (const TopoDS_Shape& x : t)
+    add(x, true);
+  GProp_GProps g;
+  BRepGProp::VolumeProperties(c, g);
+  return g.Mass();
+}
+
+// The sum of `xs`' box volumes: no more than their volumes'.
+double box_volumes(const std::vector<TopoDS_Shape>& xs)
+{
+  double v = 0;
+  for (const TopoDS_Shape& x : xs)
+  {
+    Bnd_Box b;
+    BRepBndLib::Add(x, b);
+    if (b.IsVoid())
+      continue;
+    double x0 = 0, y0 = 0, z0 = 0, x1 = 0, y1 = 0, z1 = 0;
+    b.Get(x0, y0, z0, x1, y1, z1);
+    v += (x1 - x0) * (y1 - y0) * (z1 - z0);
+  }
+  return v;
+}
+
 // Whether `r` is what the Boolean gives for solids that don't overlap: a
 // union of their volume together, a cut of the target's, an empty common.
 bool no_interaction(uint8_t op, const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_Shape>& t, const TopoDS_Shape& r)
 {
+  // (First the volume the faces that changed make, against ten times the tolerance below at the inputs' boxes: a
+  // 1355-face part's whole volume took 0.7 s after its 0.3 s cut, a private document's.)
+  const double most = 1e-8 * std::max(box_volumes(a) + box_volumes(t), 1e-12);
+  if (std::abs(op == 2 ? volume_of(r) : volume_change(a, op == 0 ? t : std::vector<TopoDS_Shape>(), r)) > most)
+    return false;
   // (Volumes of big parts take seconds: a cancel is looked at between them.)
   double va = 0, vt = 0;
   for (const TopoDS_Shape& x : a)
