@@ -80,6 +80,14 @@ on release, `SketchEditor::corner_pressed`), editing 8 / 8 (sketch paste), sheet
 chrome 17 / 17 (a click or the wheel closes a tooltip); navigation's inertia stays out of T1 (real time and frame rate).
 Queued: acd249eb + 1ee72a04, 512bc5f3, 5a907f62. Next uncovered rows: eye icons, Search tools, Text's two clicks,
 drag-trim / extend hover, flat bend click cross-selection, submenus on hover, field rows' hover, Tab order.
+**14:04:** landed b9268dcd (block start as live's runner, sm-form-tool), 82a88125 (Missing Face); 5a907f62 checking,
+d889fc19 queued: dialogs 12 / 12 (a field row's hover lights its entity, a row click keeps the field, Fillet's Tab order),
+chrome 18 / 18 (submenus on hover), feedback 7 / 8: a warning that only lost selections now keeps its row and title
+black with no bubble (`only_missing_selections`, `status_reads_red`; one with its own message stays red, live L27). The
+gap: Fillet 100 mm on the block's top edge regenerates Ok into a body with no faces (20 mm fails as live): core's, in
+their handoff. UI tests now bind keys once per App (`KeysBound`): bound per window, a matrix's 8th window ran one Enter
+8 times. edge-menu-chamfer-ok seeded with live's remembered Two distances (42 related scenarios on vibe6: 40 / 42, the
+2 fs-* misses known). Mac: suite 37-43 s, clippy 44 s; vibe6 app build + 42 scenarios in 2 shards 6 m 21 s.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's
