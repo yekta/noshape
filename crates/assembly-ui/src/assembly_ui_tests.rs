@@ -730,6 +730,32 @@ fn placing_off_a_snap_turns_the_instance_back(cx: &mut TestAppContext) {
     draw(cx, window);
 }
 
+/// Live 2509: an inserted part placed on empty space keeps its rotation and has its bounding-box centre on the
+/// pointer's view ray, at the assembly origin's depth (the plane through the origin across the view).
+#[gpui::test]
+fn placing_on_empty_space_puts_the_box_centre_on_the_ray_at_the_origins_depth(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "empty-place");
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            v.start_placing(vec![pin], cx);
+            let start = v.result.solved.placement(pin).unwrap().rotation;
+            v.ui.place_moved = true;
+            v.hover = None;
+            v.pointer = glam::DVec2::new(40.0, 50.0);
+            assert!(v.update_placing(cx), "placed at the pointer");
+            assert_eq!(v.result.solved.placement(pin).unwrap().rotation, start, "its rotation kept");
+            let (lo, hi) = v.result.instance_bounds(pin).unwrap();
+            let c = (lo + hi) * 0.5;
+            let vp = v.viewport.read(cx);
+            let (o, d) = vp.ray(v.pointer);
+            assert!((c - o).cross(d.normalize()).length() < 1e-9, "the box centre on the ray: {c:?}");
+            assert!(c.dot(vp.camera.forward()).abs() < 1e-9, "at the origin's depth: {c:?}");
+        })
+    });
+    draw(cx, window);
+}
+
 /// Live asm-menu-dynamic-suppression-edit- / -remove-expression: Undo is off while the Dynamic suppression panel is
 /// open, Escape closes it with nothing selected, and Remove expression says "Dynamic suppression removed.".
 #[gpui::test]

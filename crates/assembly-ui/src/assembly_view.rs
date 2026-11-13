@@ -1556,9 +1556,9 @@ impl AssemblyView {
         }
     }
 
-    /// World point under the cursor for placement: on the hovered planar
-    /// face, else on the Top plane, else on the camera plane through the origin.
-    fn cursor_world_point(&self, cx: &App) -> Option<DVec3> {
+    /// World point under the cursor for placement: on the hovered planar face (true), else on the view ray at the
+    /// assembly origin's depth (live 2509: the plane through the origin across the view).
+    fn cursor_world_point(&self, cx: &App) -> Option<(DVec3, bool)> {
         let vp = self.viewport.read(cx);
         let (o, d) = vp.ray(self.pointer);
         let hit = |p: DVec3, n: DVec3| -> Option<DVec3> {
@@ -1579,14 +1579,24 @@ impl AssemblyView {
             if let Some(f) = noshape_model::assembly::eval::resolve_connector_in(&occ.context, Some(&occ.body), &r, &units) {
                 let w = noshape_model::assembly::eval::matrix_frame(&occ.transform).mul(&f);
                 if let Some(p) = hit(w.origin, w.z()) {
-                    return Some(p);
+                    return Some((p, true));
                 }
             }
         }
-        hit(DVec3::ZERO, DVec3::Z).or_else(|| hit(DVec3::ZERO, vp.camera.forward()))
+        // (Not only in front of the eye: the origin can be behind a close view's eye.)
+        let n = vp.camera.forward();
+        let den = d.dot(n);
+        (den.abs() > 1e-9).then(|| (o + d * ((DVec3::ZERO - o).dot(n) / den), false))
     }
 
-    /// Move the instances being placed so their bounds' bottom center sits at the cursor point.
+    /// The point of the instances' bounds a placement puts at the cursor point: on a face their bottom centre, in
+    /// empty space their centre (live 2509: a Part Studio part's bounding-box centre on the view ray).
+    fn place_anchor(lo: DVec3, hi: DVec3, on_face: bool) -> DVec3 {
+        let c = (lo + hi) * 0.5;
+        if on_face { DVec3::new(c.x, c.y, lo.z) } else { c }
+    }
+
+    /// Move the instances being placed to the cursor point ([`Self::place_anchor`]).
     fn update_placing(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(ids) = self.placing.clone() else { return false };
         // Until the cursor moves over the graphics area the instance stays
@@ -1600,7 +1610,7 @@ impl AssemblyView {
             return true;
         }
         self.ui.place_snap = None;
-        let Some(p) = self.cursor_world_point(cx) else { return false };
+        let Some((p, on_face)) = self.cursor_world_point(cx) else { return false };
         self.placing_point = Some(p);
         let mut bb: Option<(DVec3, DVec3)> = None;
         for id in &ids {
@@ -1609,8 +1619,7 @@ impl AssemblyView {
             }
         }
         let Some((lo, hi)) = bb else { return false };
-        let anchor = DVec3::new((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, lo.z);
-        let delta = p - anchor;
+        let delta = p - Self::place_anchor(lo, hi, on_face);
         let unturn = ids.iter().any(|id| self.ui.place_rotations.iter().any(|(i, r)| i == id && self.result.solved.placement(*id).is_some_and(|p| p.rotation != *r)));
         if delta.length() < 1e-12 && !unturn {
             return false;
@@ -1627,16 +1636,16 @@ impl AssemblyView {
             }
         }
         if unturn {
-            // The bounds moved with the rotation: put their bottom centre back under the cursor.
+            // The bounds moved with the rotation: put their anchor back under the cursor.
             self.apply_solved(solved, cx);
-            return self.update_placing_after_unturn(&ids, p, cx);
+            return self.update_placing_after_unturn(&ids, p, on_face, cx);
         }
         self.apply_solved(solved, cx);
         true
     }
 
-    /// [`update_placing`](Self::update_placing) after turning the instances back: their bounds' bottom centre to `p`.
-    fn update_placing_after_unturn(&mut self, ids: &[InstanceId], p: DVec3, cx: &mut Context<Self>) -> bool {
+    /// [`update_placing`](Self::update_placing) after turning the instances back: their anchor to `p`.
+    fn update_placing_after_unturn(&mut self, ids: &[InstanceId], p: DVec3, on_face: bool, cx: &mut Context<Self>) -> bool {
         let mut bb: Option<(DVec3, DVec3)> = None;
         for id in ids {
             if let Some((a, b)) = self.result.instance_bounds(*id) {
@@ -1644,7 +1653,7 @@ impl AssemblyView {
             }
         }
         let Some((lo, hi)) = bb else { return true };
-        let delta = p - DVec3::new((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, lo.z);
+        let delta = p - Self::place_anchor(lo, hi, on_face);
         let mut solved = self.result.solved.clone();
         for (id, pl) in &mut solved.placements {
             if ids.contains(id) {
