@@ -5,6 +5,21 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-13 20:30 UTC)
+- **Landed since 18:13:** 1cecae62 Move face near freeform faces by booleans first (impeller's two flange offsets ~0.6 s
+  of invalid OCCT offset each); 80cd8de6 up-to extrude splits by the target's faces over the profile only (fan-blade
+  Extrude 8 119 -> ~65 ms); 598a81a4 loft profile of faces making one face, empty connections ignored (rings-loft 29 ->
+  32/32 to the end). Queued: mirrored copies share their original's surfaces (fan-blade 44 -> 48/53; Boolean 2 next,
+  sent to bool). Mac pairs clean for each; suite 867/947 with them.
+- **x86 per-feature ranking vs live** (/root/core-scratch/bin/rank.py, hb/rank-x86.log, per-document runs: the suite
+  prints feature times only with NOSHAPE_PARITY_ONLY): the rest of the top gaps are bool's Booleans / Shells, blend's
+  fillets, the impeller downstream of its wrong part.
+- **Knife (24/52):** the blade is 2.8 mm³ under live right after Loft 3 (ours 4983.62 vs exact 4986.43, doubled by Mirror
+  1: feature 24's 5 mm³). Loft 3's face IS live's (hermite_coons; area 2516.897 = live's exact; JTC / JTG equal too);
+  another face differs. Asked live for every face at rollback 12 (REQUESTS 20:27). live.jsonl's areas run ~0.1 % low:
+  don't compare faces against them.
+- qa's f197 P0 was blend's 7da01b0e9 (told blend, qa); the rounds remover is back on the release.
+
 ## core state (11-13 18:13 UTC)
 - **Landed:** 456ae051 isaac-ball's Fillet 2 (Fillet 2 18/42/26 as live, studio 5 -> 15/103, assembly mates 63 -> 90/96;
   convexity-stopped chain only through stopped_concave_arc_round; straighten_edges ShapeFix-repaired); 2cb34c6c attribute
