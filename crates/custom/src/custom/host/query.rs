@@ -861,6 +861,31 @@ impl<'a> QueryCx<'a> {
         p
     }
 
+    /// A body's face, edge or vertex box (as [`Self::shape_box`]) without making its shape: each body's boxes of a
+    /// type at once, kept for the body itself. `None`: not a body's face, edge or vertex.
+    pub fn sub_box(&self, e: &Ent) -> Option<Option<k::BoundingBox>> {
+        let (b, i, t) = match *e {
+            Ent::Face(b, i) => (b, i, ShapeType::Face),
+            Ent::Edge(b, i) => (b, i, ShapeType::Edge),
+            Ent::Vertex(b, i) => (b, i, ShapeType::Vertex),
+            _ => return None,
+        };
+        let body = self.st.ctx.bodies.untracked().get(b)?;
+        let key = (Arc::as_ptr(body) as usize, t as u8);
+        if let Some((_, boxes)) = self.st.sub_boxes.lock().get(&key) {
+            return boxes.get(i).copied();
+        }
+        let boxes: SubBoxes = Arc::new(body.shape.sub_shapes(t).iter().map(|s| s.bounding_box(false).ok()).collect());
+        let found = boxes.get(i).copied();
+        // (A scan over more bodies than it holds would make them all again each time: room for a pattern's thousands.)
+        let mut cache = self.st.sub_boxes.lock();
+        if cache.len() >= 8192 {
+            cache.clear();
+        }
+        cache.insert(key, (body.clone(), boxes));
+        found
+    }
+
     /// A shape's box ([`k::Shape::bounding_box`]), once a shape.
     pub fn shape_box(&self, s: &k::Shape) -> Option<k::BoundingBox> {
         if let Some(b) = self.st.shape_boxes.lock().get(s) {
@@ -975,9 +1000,25 @@ impl<'a> QueryCx<'a> {
             let slack = DVec3::splat(TOL + 0.01 * o.diagonal());
             (o.min - slack).cmple(b.min).all() && b.max.cmple(o.max + slack).all()
         };
+        // What its box must reach to pass one of the tests below: hold one of `wheres`, lie by the old face, or meet
+        // the old straight edge.
+        let segment = (snap.etype == EType::Edge && snap.points.len() == 3).then(|| (snap.points[0].min(snap.points[2]), snap.points[0].max(snap.points[2])));
+        let may_match = |e: &Ent| {
+            let Some(Some(b)) = self.sub_box(e) else { return true };
+            let (lo, hi) = (b.min - DVec3::splat(TOL), b.max + DVec3::splat(TOL));
+            wheres.iter().any(|w| w.iter().all(|p| lo.cmple(*p).all() && p.cmple(hi).all()))
+                || snap.face.is_some() && old_box.is_none_or(|o| {
+                    let slack = DVec3::splat(TOL + 0.01 * o.diagonal());
+                    (o.min - slack).cmple(b.min).all() && b.max.cmple(o.max + slack).all()
+                })
+                || segment.is_some_and(|(a, z)| lo.cmple(z).all() && a.cmple(hi).all())
+        };
         // Hidden bodies too: std sheet metal tracks its (hidden) definition.
         self.all_with(Some(snap.etype), true)
             .into_iter()
+            // Its body's box of it first: making each entity's shape cost more than the test (c2-sm-louver's
+            // Extrude 3 tracks over thousands of faces, 172 times).
+            .filter(|e| may_match(e))
             // Solids only to solids; sheets, wires and sketches among
             // themselves (std follows a sketch line onto a sheet's edge).
             .filter(|e| {
@@ -1621,6 +1662,9 @@ impl CreatedSeen {
     }
 }
 
+/// A body's boxes of its faces, edges or vertices, by index.
+pub type SubBoxes = Arc<Vec<Option<k::BoundingBox>>>;
+
 pub(super) fn uniq(v: Vec<Ent>) -> Vec<Ent> {
     let mut seen = std::collections::HashSet::new();
     v.into_iter().filter(|e| seen.insert(e.clone())).collect()
@@ -2109,8 +2153,13 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             let pattern = query.get("attributePattern").clone();
             let exact = query.get("valueToMatchExactly").clone();
             // The entities with a matching attribute, once (thousands of entities and attributes after a pattern).
-            let key = format!("{name:?}\u{1}{pattern:?}\u{1}{exact:?}");
-            let matching = q.st.attributes_matching(key, |v| (name.is_undefined() || *v.get("name") == name) && (exact.is_undefined() || *v.get("attribute") == exact) && attr_matches(v.get("attribute"), &pattern));
+            let matches = |v: &Value| (name.is_undefined() || *v.get("name") == name) && (exact.is_undefined() || *v.get("attribute") == exact) && attr_matches(v.get("attribute"), &pattern);
+            // A value or pattern with a string field (std's sheet metal attributes' ids, a filter each): only the
+            // attributes with that field's value are looked at.
+            let matching = match [&exact, &pattern].into_iter().find_map(string_field) {
+                Some((field, value)) => Arc::new(q.st.attributes_with_field(&field, &value, matches)),
+                None => q.st.attributes_matching(format!("{name:?}\u{1}{pattern:?}\u{1}{exact:?}"), matches),
+            };
             let attrs = q.st.attributes();
             let having: std::collections::HashSet<&Reference> = matching.iter().map(|&k| &attrs[k].0).collect();
             if having.is_empty() {
@@ -2300,6 +2349,18 @@ fn historical(q: &QueryCx, query: &Value) -> Vec<Ent> {
         }
         _ => Vec::new(),
     }
+}
+
+/// A map's string field and its value, `attributeId` first: what an attribute matching it must hold too.
+fn string_field(v: &Value) -> Option<(Arc<str>, Arc<str>)> {
+    let Value::Map(m, _) = v else { return None };
+    if let Some(id) = v.get("attributeId").as_str() {
+        return Some(("attributeId".into(), id));
+    }
+    m.iter().find_map(|(k, x)| match (k, x) {
+        (Value::Str(k, _), Value::Str(x, _)) => Some((k.clone(), x.clone())),
+        _ => None,
+    })
 }
 
 fn attr_matches(attribute: &Value, pattern: &Value) -> bool {

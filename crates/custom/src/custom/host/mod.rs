@@ -101,6 +101,9 @@ pub type CreatedCache = HashMap<(FsId, Option<query::EType>), (query::CreatedSee
 /// An attribute filter's matches: how many attributes it has looked at, and the positions of those it matched.
 type AttrMatches = (usize, Arc<Vec<usize>>);
 
+/// A field's index of the attributes: how many it has looked at, and each string value's positions.
+type AttrField = (usize, HashMap<Arc<str>, Vec<usize>>);
+
 /// A sketch piece's points that are only curves' ends.
 pub type CurveEnds = Arc<std::collections::HashSet<u32>>;
 
@@ -145,6 +148,8 @@ pub struct CtxState {
     /// Each body's name hashes (QueryCx::from_ref's prefilter), by the body (held).
     pub name_index: ByBody<query::NameIndex>,
     pub topo_cache: ByBody<query::Topo>,
+    /// Each body's faces', edges' and vertices' boxes ([`query::QueryCx::sub_box`]), by (the body, its entity type).
+    pub sub_boxes: Mutex<HashMap<(usize, u8), (Arc<crate::regen::context::Body>, query::SubBoxes)>>,
     /// Each body's edges' sketch order keys ([`query::live_order`]), with the number of sketches they were found among.
     pub sketch_order_cache: ByBody<query::SketchKeys>,
     pub created_cache: Mutex<CreatedCache>,
@@ -183,6 +188,9 @@ pub struct CtxState {
     /// `attrs`' positions an attribute filter matches, by the filter, and how many of `attrs` it has looked at
     /// (appended ones are looked at when next asked: [`Self::attributes_matching`]).
     attr_filters: Mutex<HashMap<String, AttrMatches>>,
+    /// The attributes by the string value of one of their fields, by field (std's sheet metal attributes by
+    /// `attributeId`): how many attributes it has looked at, and each value's positions.
+    attr_fields: Mutex<HashMap<Arc<str>, AttrField>>,
     /// `debug()` entities as they were when debugged (std debugs points,
     /// lines and arrows of sub-features it then aborts) and their colours
     /// (sRGB), shown while the feature is edited.
@@ -319,6 +327,7 @@ impl FsContext {
                 region_pieces: Mutex::new(HashMap::new()),
                 curve_ends: Mutex::new(HashMap::new()),
                 topo_cache: Mutex::new(HashMap::new()),
+                sub_boxes: Mutex::new(HashMap::new()),
                 sketch_order_cache: Mutex::new(HashMap::new()),
                 name_index: Mutex::new(HashMap::new()),
                 plane_ops: HashMap::new(),
@@ -333,6 +342,7 @@ impl FsContext {
                 attrs: attributes,
                 attr_index: Mutex::new(None),
                 attr_filters: Mutex::new(HashMap::new()),
+                attr_fields: Mutex::new(HashMap::new()),
                 debug_entities: Vec::new(),
                 computed: Vec::new(),
                 manipulators: Vec::new(),
@@ -414,6 +424,7 @@ impl CtxState {
     pub fn attributes_mut(&mut self) -> &mut Vec<(Reference, Value)> {
         *self.attr_index.get_mut() = None;
         self.attr_filters.get_mut().clear();
+        self.attr_fields.get_mut().clear();
         &mut self.attrs
     }
 
@@ -430,15 +441,60 @@ impl CtxState {
         found.clone()
     }
 
+    /// The positions of the attributes whose attribute's `field` is the string `value` and that `matches`, from an
+    /// index of that field kept while attributes are added (std looks its sheet metal attributes up by id: each a
+    /// filter of its own, c2-sm-louver's Extrude 3 215 of them among ~7600 attributes).
+    pub fn attributes_with_field(&self, field: &Arc<str>, value: &str, matches: impl Fn(&Value) -> bool) -> Vec<usize> {
+        let mut fields = self.attr_fields.lock();
+        let (seen, index) = fields.entry(field.clone()).or_default();
+        for (k, (_, v)) in self.attrs.iter().enumerate().skip(*seen) {
+            if let Some(s) = v.get("attribute").get(field).as_str() {
+                index.entry(s).or_default().push(k);
+            }
+        }
+        *seen = self.attrs.len();
+        index.get(value).map(|ks| ks.iter().copied().filter(|&k| matches(&self.attrs[k].1)).collect()).unwrap_or_default()
+    }
+
     /// Keep the attributes `keep` says to; the indexes only when one goes (setAttribute's replace of an
     /// entity's same-named one, which there usually isn't).
-    pub fn retain_attributes(&mut self, keep: impl FnMut(&(Reference, Value)) -> bool) {
-        let before = self.attrs.len();
-        self.attrs.retain(keep);
-        if self.attrs.len() != before {
-            *self.attr_index.get_mut() = None;
-            self.attr_filters.get_mut().clear();
+    pub fn retain_attributes(&mut self, mut keep: impl FnMut(&(Reference, Value)) -> bool) {
+        let kept: Vec<bool> = self.attrs.iter().map(&mut keep).collect();
+        if kept.iter().all(|k| *k) {
+            return;
         }
+        let mut flags = kept.iter();
+        self.attrs.retain(|_| flags.next().copied().unwrap_or(true));
+        *self.attr_index.get_mut() = None;
+        // The filters' matches move with the attributes kept (std removes attributes between thousands of filters).
+        let mut at = Vec::with_capacity(kept.len());
+        let mut n = 0;
+        for k in &kept {
+            at.push(k.then_some(n));
+            n += usize::from(*k);
+        }
+        for (seen, found) in self.attr_filters.get_mut().values_mut() {
+            *found = Arc::new(found.iter().filter_map(|&k| at.get(k).copied().flatten()).collect());
+            *seen = kept[..(*seen).min(kept.len())].iter().filter(|k| **k).count();
+        }
+        for (seen, index) in self.attr_fields.get_mut().values_mut() {
+            for ks in index.values_mut() {
+                *ks = ks.iter().filter_map(|&k| at.get(k).copied().flatten()).collect();
+            }
+            *seen = kept[..(*seen).min(kept.len())].iter().filter(|k| **k).count();
+        }
+    }
+
+    /// The attributes' entities to move, with their values (which stay: the filters' matches hold).
+    pub fn attribute_entities_mut(&mut self) -> impl Iterator<Item = (&mut Reference, &Value)> {
+        *self.attr_index.get_mut() = None;
+        self.attrs.iter_mut().map(|(r, v)| (r, &*v))
+    }
+
+    /// Attributes added at the end (the filters take them up when next asked).
+    pub fn extend_attributes(&mut self, more: Vec<(Reference, Value)>) {
+        *self.attr_index.get_mut() = None;
+        self.attrs.extend(more);
     }
 
     /// The attributes of entity `r` (`{ name, attribute }`), in order: from an index of them all (std asks this of
@@ -501,7 +557,7 @@ impl CtxState {
         };
         // Gone entities' attributes first (by their old names: one renamed onto such a name keeps its own).
         if !gone.is_empty() {
-            self.attributes_mut().retain(|(r, _)| !gone.contains(r));
+            self.retain_attributes(|(r, _)| !gone.contains(r));
             self.attr_snapshots.retain(|r, _| !gone.contains(r));
         }
         if moves.is_empty() {
@@ -510,13 +566,13 @@ impl CtxState {
         // All at once: one entity's new name may be another's old one.
         let map: HashMap<Reference, Vec<Reference>> = moves.iter().map(|(o, to)| (o.clone(), to.iter().map(|(n, _)| n.clone()).collect())).collect();
         let mut copies = Vec::new();
-        for (r, v) in self.attributes_mut().iter_mut() {
+        for (r, v) in self.attribute_entities_mut() {
             if let Some(to) = map.get(r) {
                 copies.extend(to[1..].iter().map(|n| (n.clone(), v.clone())));
                 *r = to[0].clone();
             }
         }
-        self.attributes_mut().extend(copies);
+        self.extend_attributes(copies);
         for (old, _) in &moves {
             self.attr_snapshots.remove(old);
         }
