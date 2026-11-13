@@ -1,19 +1,19 @@
 {
  "scenario": "doc-plus-create-drawing",
- "recorded": "2026-11-08T06:19:34.757Z",
+ "recorded": "2026-11-13T04:33:27.927Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
  },
  "live": {
-  "document": "d763270bca032e0499536bc5",
-  "workspace": "8c531e035a25a99b494640f5",
-  "element": "b072959d793701a7c586a6a3",
+  "document": "7e67d98ff680b4305c965de6",
+  "workspace": "187540f7f382b00e6942282f",
+  "element": "fc95a6b817682ab042be94fb",
   "start": "doc-tabs",
-  "startElement": "b072959d793701a7c586a6a3",
-  "runner": "live2 "
+  "startElement": "fc95a6b817682ab042be94fb",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -62,6 +62,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -131,7 +158,6 @@
      "kind": "menu",
      "rows": [
       "Applications",
-      "Create tutorial…",
       "Create Material Library",
       "Create Feature Studio",
       "Create CAM Studio",
@@ -142,7 +168,6 @@
       "Create Variable Studio",
       "Create Drawing…",
       "Create folder",
-      "Create table",
       "Import…",
       "Paste tab"
      ],
@@ -188,6 +213,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -232,7 +284,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 95676
+   "t": 58120
   },
   {
    "step": 2,
@@ -257,7 +309,7 @@
      "title": "Create Drawing: New drawing name",
      "fields": [
       {
-       "label": "New drawing name",
+       "label": null,
        "kind": "input",
        "value": "Drawing 1"
       }
@@ -310,6 +362,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -354,7 +433,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 101930
+   "t": 62334
   }
  ]
 }
