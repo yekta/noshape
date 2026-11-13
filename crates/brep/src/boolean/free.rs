@@ -457,6 +457,51 @@ pub(super) fn surface_distance(g: &GFace, p: DVec3) -> f64 {
     }
 }
 
+/// Where a curve lying on free-form face `g` (its point at `t` from `at`) crosses the seam of a face going a whole turn
+/// round: its parameters (its parameters on the face jump by a turn there), in its own order.
+pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, t1: f64) -> Vec<f64> {
+    let Some(ns) = g.ns.as_ref() else { return Vec::new() };
+    let round: Vec<usize> = ns
+        .periodic()
+        .into_iter()
+        .enumerate()
+        .filter(|&(i, p)| {
+            let (lo, hi) = uv_span(g, i);
+            p && (hi - lo - TAU).abs() <= 1e-6
+        })
+        .map(|x| x.0)
+        .collect();
+    if round.is_empty() {
+        return Vec::new();
+    }
+    const N: usize = 64;
+    let mut out = Vec::new();
+    let mut prev: Option<(f64, DVec2)> = None;
+    for k in 0..=N {
+        let t = t0 + (t1 - t0) * k as f64 / N as f64;
+        let p = at(t).0;
+        let (uv, _) = ns.param_of(p, prev.map_or_else(|| g.uv_of(p), |q| q.1), g.uvbox);
+        if let Some((tp, up)) = prev
+            && let Some(&i) = round.iter().find(|&&i| (uv[i] - up[i]).abs() > PI)
+        {
+            // (Bisected: followed from the side before, the point where its parameter turns over.)
+            let (mut lo, mut hi, mut ulo) = (tp, t, up);
+            for _ in 0..60 {
+                let mid = 0.5 * (lo + hi);
+                let (um, _) = ns.param_of(at(mid).0, ulo, g.uvbox);
+                if (um[i] - ulo[i]).abs() > PI {
+                    hi = mid;
+                } else {
+                    (lo, ulo) = (mid, um);
+                }
+            }
+            out.push(0.5 * (lo + hi));
+        }
+        prev = Some((t, uv));
+    }
+    out
+}
+
 /// A straight or round edge lying on free-form face `g` (its point and derivative at `t` from `at`): its curve on the
 /// face, in the face's own parameters and the edge's parameter, `t0` to `t1`: its points' parameters there (Newton
 /// from the one before), cubic between them with the surface's own tangents. None where a point is off the face's
@@ -472,11 +517,17 @@ pub(super) fn projected(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, 
         let seed = qs.last().map_or_else(|| g.uv_of(p), |q| q.0);
         let (uv, dist) = ns.param_of(p, seed, g.uvbox);
         if dist > tol {
+            if std::env::var("XEOF").is_ok() {
+                eprintln!("XEOF  point {k} of {N} off by {dist:e} (tol {tol:e}) at uv {uv:?} seed {seed:?} box {:?}", g.uvbox);
+            }
             return None;
         }
         if let Some(q) = qs.last()
             && ((uv.x - q.0.x).abs() > 0.25 * (u1 - u0) || (uv.y - q.0.y).abs() > 0.25 * (v1 - v0))
         {
+            if std::env::var("XEOF").is_ok() {
+                eprintln!("XEOF  point {k} jumps {:?} -> {uv:?} box {:?}", q.0, g.uvbox);
+            }
             return None;
         }
         // Its tangent there: [Su Sv] (u', v') = P' (least squares).

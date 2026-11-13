@@ -296,8 +296,8 @@ fn loops_in_one_turn(fs: &FreeSurface, edges: &[(usize, bool)], loop_lens: &[usi
 enum Pending {
     /// The two faces, the path, its range and ends.
     Section(usize, usize, Path, f64, f64, [End; 2]),
-    /// The face, the edge's path, its parts (ends), its curve on a free-form face, the edge.
-    InFace(usize, Path, Vec<(f64, End, f64, End)>, Option<(usize, Arc<NurbsCurve>)>, usize),
+    /// The face, the edge's path, its parts (ends), each part's curve on a free-form face, the edge.
+    InFace(usize, Path, Vec<(f64, End, f64, End)>, Vec<Option<(usize, Arc<NurbsCurve>)>>, usize),
 }
 
 struct GFace {
@@ -1981,7 +1981,7 @@ impl Ctx<'_> {
                 parts = vec![(t0, End::Vertex(s.v[0]), ts, End::Point(seam)), (ts, End::Point(seam), t1, End::Vertex(s.v[1]))];
             }
         }
-        let mut on_free = None;
+        let mut on_free = vec![None; parts.len()];
         // On a free-form face: its curve there, by projection (as the face's own edges' curves are used).
         if matches!(self.faces[f].s, Surf::Nurbs { .. }) {
             let at = |t: f64| match &path {
@@ -1993,9 +1993,40 @@ impl Ctx<'_> {
                     (d[0], d[1])
                 }
             };
-            let Some(c) = free::projected(&self.faces[f], &at, t0, t1, GREY * self.tol) else { return Err(Decline("an edge on another argument's free-form face")) };
-            self.faces[f].pcurves.insert((e, false), (c.clone(), t0, t1));
-            on_free = Some((f, c));
+            // (Across the seam of a face going a whole turn round (a small arc over a torus's seam, a rib's round end on
+            // the private dock): in parts, a vertex where it crosses, each part's curve on the face its own; its
+            // pieces there projected one by one, none of the whole edge kept.)
+            let mut cuts: Vec<f64> = free::seam_crossings(&self.faces[f], &at, t0, t1).into_iter().filter(|&t| path.length(t0.min(t), t0.max(t)) > self.tol && path.length(t1.min(t), t1.max(t)) > self.tol).collect();
+            cuts.retain(|&t| parts.iter().any(|&(a0, _, a1, _)| (t - a0) * (t - a1) < 0.0));
+            if std::env::var("XEOF").is_ok() {
+                eprintln!("XEOF edge {e} face {f}: range {t0}..{t1}, crossings {:?} kept {:?}, parts {}", free::seam_crossings(&self.faces[f], &at, t0, t1), cuts, parts.len());
+            }
+            if cuts.is_empty() {
+                let Some(c) = free::projected(&self.faces[f], &at, t0, t1, GREY * self.tol) else { return Err(Decline("an edge on another argument's free-form face")) };
+                self.faces[f].pcurves.insert((e, false), (c.clone(), t0, t1));
+                on_free = vec![Some((f, c)); parts.len()];
+            } else {
+                let mut split = Vec::new();
+                for (a0, e0, a1, e1) in parts {
+                    let mut at_ = vec![(a0, e0)];
+                    let mut inner: Vec<f64> = cuts.iter().copied().filter(|&t| (t - a0) * (t - a1) < 0.0).collect();
+                    inner.sort_by(|x, y| if a0 <= a1 { x.total_cmp(y) } else { y.total_cmp(x) });
+                    at_.extend(inner.into_iter().map(|t| (t, End::Point(path.at(t)))));
+                    at_.push((a1, e1));
+                    split.extend(at_.windows(2).map(|w| (w[0].0, w[0].1, w[1].0, w[1].1)));
+                }
+                parts = split;
+                on_free = Vec::with_capacity(parts.len());
+                for &(a0, _, a1, _) in &parts {
+                    let Some(c) = free::projected(&self.faces[f], &at, a0, a1, GREY * self.tol) else {
+                        if std::env::var("XEOF").is_ok() {
+                            eprintln!("XEOF  part {a0}..{a1} not projected");
+                        }
+                        return Err(Decline("an edge on another argument's free-form face"));
+                    };
+                    on_free.push(Some((f, c)));
+                }
+            }
         }
         self.pending.push(Pending::InFace(f, path, parts, on_free, e));
         Ok(())
@@ -2191,6 +2222,9 @@ impl Ctx<'_> {
             // edge_in_face.)
             if matches!(self.edges[e].g, Geo::Line | Geo::Arc { .. } | Geo::Nurbs { .. }) && self.src.is_some() {
                 return Ok(true);
+            }
+            if std::env::var("XEOF").is_ok() {
+                eprintln!("XEOF edge_on: edge {e} face {f}");
             }
             return Err(Decline("an edge on another argument's free-form face"));
         }
@@ -4558,8 +4592,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             }
             Pending::InFace(f, ref path, ref parts, ref on_free, _) => {
                 let mut ivs = Vec::new();
-                for &(a0, e0, a1, e1) in parts {
-                    ivs.extend(cx.intervals_on(f, path, (a0, a1), [e0, e1], true, on_free.as_ref())?);
+                for (&(a0, e0, a1, e1), of) in parts.iter().zip(on_free) {
+                    ivs.extend(cx.intervals_on(f, path, (a0, a1), [e0, e1], true, of.as_ref())?);
                 }
                 Ok((ivs, Vec::new()))
             }
