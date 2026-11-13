@@ -950,7 +950,7 @@ impl StartView {
             Self::notify(window, cx, AlertKind::Warning, format!("{name}: Close the document's window before moving it"));
             return;
         }
-        let mut location = Location::new(first.parent().map(Path::to_path_buf).unwrap_or_else(crate::file_dialogs::documents_dir));
+        let mut location = Location::new(first.parent().map(Path::to_path_buf).unwrap_or_else(crate::file_dialogs::documents_dir)).with_new_folder();
         location.exclude = items.iter().find(|i| i.2).map(|i| i.0.clone());
         let location = Rc::new(location);
         let view = cx.entity();
@@ -973,9 +973,14 @@ impl StartView {
                     window.refresh();
                 }));
             os::modal_doc_page(dialog, "Move documents and folders to", 460.)
-                .child(os::modal_body().child(os::field_label("Location")).child(location.render(cx)).child(count).when(shown.get(), |d| d.child(Self::selection_box(&items))))
-                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+                // Live (docs-move-dialog): the folder browser (Home, Back, the place, New folder, Sort) under the title.
+                .child(os::modal_body().child(location.render(cx)).child(count).when(shown.get(), |d| d.child(Self::selection_box(&items))))
+                .footer(move_footer(&loc, items.iter().all(|i| already_in(&i.0, &loc.chosen.borrow())), cx))
                 .on_ok(move |_, window, cx| {
+                    if loc.open_picked(cx) {
+                        window.refresh();
+                        return false;
+                    }
                     let dir = loc.chosen.borrow().clone();
                     view.update(cx, |this, cx| this.move_items(&items, &dir, window, cx));
                     true
@@ -1775,16 +1780,21 @@ impl StartView {
 
     /// Folder menu › Move to…: the folder browser (not into itself).
     fn move_folder(&mut self, f: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
-        let mut location = Location::new(f.parent().map(Path::to_path_buf).unwrap_or_else(crate::file_dialogs::documents_dir));
+        let mut location = Location::new(f.parent().map(Path::to_path_buf).unwrap_or_else(crate::file_dialogs::documents_dir)).with_new_folder();
         location.exclude = Some(f.clone());
         let location = Rc::new(location);
         let view = cx.entity();
         window.open_dialog(cx, move |dialog, _, cx| {
             let (loc, view, f) = (location.clone(), view.clone(), f.clone());
+            let here = already_in(&f, &loc.chosen.borrow());
             os::modal_doc_page(dialog, "Move documents and folders to", 460.)
-                .child(os::modal_body().child(os::field_label("Location")).child(location.render(cx)))
-                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+                .child(os::modal_body().child(location.render(cx)))
+                .footer(move_footer(&loc, here, cx))
                 .on_ok(move |_, window, cx| {
+                    if loc.open_picked(cx) {
+                        window.refresh();
+                        return false;
+                    }
                     let dir = loc.chosen.borrow().clone();
                     let old = canon(&f);
                     let dest = match lib::move_folder(&f, &dir) {
@@ -2719,14 +2729,19 @@ impl StartView {
             Self::notify(window, cx, AlertKind::Warning, format!("{}: Close the document's window before moving it", d.name));
             return;
         }
-        let location = Rc::new(Location::new(d.folder().to_path_buf()));
+        let location = Rc::new(Location::new(d.folder().to_path_buf()).with_new_folder());
         let view = cx.entity();
         window.open_dialog(cx, move |dialog, _, cx| {
             let (loc, view, d) = (location.clone(), view.clone(), d.clone());
+            let here = already_in(&d.path, &loc.chosen.borrow());
             os::modal_doc_page(dialog, "Move documents and folders to", 460.)
-                .child(os::modal_body().child(os::field_label("Location")).child(location.render(cx)))
-                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+                .child(os::modal_body().child(location.render(cx)))
+                .footer(move_footer(&loc, here, cx))
                 .on_ok(move |_, window, cx| {
+                    if loc.open_picked(cx) {
+                        window.refresh();
+                        return false;
+                    }
                     let dir = loc.chosen.borrow().clone();
                     match lib::move_doc(&d.path, &dir) {
                         Ok(dest) => {
@@ -4598,6 +4613,18 @@ fn library_texts(key: &str) -> (&'static str, &'static str, &'static str) {
         "images" => (" images", "Image library", "image"),
         _ => (" standard content", "Standard content library", "standard-content"),
     }
+}
+
+/// Whether `path` is in folder `dir` already (Move here has nothing to do there).
+fn already_in(path: &Path, dir: &Path) -> bool {
+    path.parent().is_some_and(|p| canon(p) == canon(dir))
+}
+
+/// Move to…'s footer: Move here (Open while a folder row is picked or a new one named), off while the folder shown
+/// is where the rows already are (live docs-move-dialog), and Cancel.
+fn move_footer(loc: &Location, here: bool, cx: &App) -> Div {
+    let label = loc.ok_label("Move here");
+    os::modal_footer().child(os::modal_ok(os::primary_button("ok", label).disabled(here && label == "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx)))
 }
 
 /// The dragged rows a drop on folder `dir` moves: not the folder itself, nor the rows already in it.
