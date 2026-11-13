@@ -5,7 +5,7 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
-## Knife Loft 3, parked (11-13 21:5x UTC)
+## Knife Loft 3, parked (11-13 21:16 UTC)
 - Live's exact faces at rollback 12 (q2620b): all 14 areas equal ours to < 0.005 mm², planes in place; the part 2.8 mm³
   under (ours 4983.62, a mesh integration agrees; live 4986.43). The loft face is the source: normal deviations up to 6 µm
   (q2620 7×7 grid vs ours, STEP-parsed), tangential up to 1.1 mm along guide 1: the guides pair differently.
