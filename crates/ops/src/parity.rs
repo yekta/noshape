@@ -4053,11 +4053,11 @@ impl<'a> Translator<'a> {
             .collect();
         let mut uses: Vec<Use> = Vec::new();
         let mut unnamed_uses: Vec<Use> = Vec::new();
-        for e in f["entities"].as_array().into_iter().flatten() {
-            // Where live's solve put it (`sketches` geomEntities): stored
-            // geometry can lag its variables (cf-parameter-pattern).
-            let solved = self.solved_entity(&oid, e);
-            let e = solved.as_ref().unwrap_or(e);
+        // Where live's solve put them (`sketches` geomEntities): stored geometry can lag its variables
+        // (cf-parameter-pattern).
+        let mut entities: Vec<Value> = f["entities"].as_array().into_iter().flatten().map(|e| self.solved_entity(&oid, e).unwrap_or_else(|| e.clone())).collect();
+        smooth_use_splines(&mut entities, &projected);
+        for e in &entities {
             let eid = e["entityId"].as_str().unwrap_or("").to_string();
             let g = &e["geometry"];
             let construction = e["isConstruction"].as_bool() == Some(true);
@@ -5307,6 +5307,56 @@ fn circle_through(poly: &[[f64; 2]]) -> Option<([f64; 2], f64)> {
     let (sa, sb, sc) = (a.length_squared(), b.length_squared(), c.length_squared());
     let center = glam::DVec2::new((sa * (b.y - c.y) + sb * (c.y - a.y) + sc * (a.y - b.y)) / d, (sa * (c.x - b.x) + sb * (a.x - c.x) + sc * (b.x - a.x)) / d);
     Some((center.into(), center.distance(a)))
+}
+
+/// Uses' B-splines whose ends meet a Used line or arc within 2e-3 rad of tangent made tangent to it: the end on the
+/// neighbour's end, the pole next to it along the neighbour's direction. Live's model edges are tangent there (a fillet's edge
+/// beside the faces it rounds), its stored curves 1e-5 to 4e-4 rad off, and a loft through them reads corners
+/// (c2-hunting-knife's Loft 1: 5 side faces for live's 1).
+fn smooth_use_splines(entities: &mut [Value], projected: &HashMap<String, Value>) {
+    let used = |e: &Value| e["entityId"].as_str().is_some_and(|id| projected.contains_key(id));
+    // Each Used line's and arc's ends with their directions there.
+    let mut tangents: Vec<(glam::DVec2, glam::DVec2)> = Vec::new();
+    for e in entities.iter().filter(|e| used(e)) {
+        let g = &e["geometry"];
+        let Some(poly) = sampled(e).filter(|p| p.len() >= 2) else { continue };
+        let ends = [glam::DVec2::from(poly[0]), glam::DVec2::from(poly[poly.len() - 1])];
+        match g["btType"].as_str().and_then(|t| t.split('-').next()) {
+            Some("BTCurveGeometryLine") => tangents.extend(ends.map(|p| (p, ends[1] - ends[0]))),
+            Some("BTCurveGeometryCircle") if !e["startParam"].is_null() => {
+                let c = glam::DVec2::new(g["xCenter"].as_f64().unwrap_or(0.0), g["yCenter"].as_f64().unwrap_or(0.0));
+                tangents.extend(ends.map(|p| (p, (p - c).perp())));
+            }
+            _ => {}
+        }
+    }
+    for e in entities.iter_mut().filter(|e| used(e)) {
+        if !e["geometry"]["btType"].as_str().is_some_and(|t| t.starts_with("BTCurveGeometrySpline")) {
+            continue;
+        }
+        let Some(mut cp) = e["geometry"]["controlPoints"].as_array().map(|l| l.iter().filter_map(Value::as_f64).collect::<Vec<f64>>()) else { continue };
+        let n = cp.len() / 2;
+        if n < 3 {
+            continue;
+        }
+        let pole = |cp: &[f64], i: usize| glam::DVec2::new(cp[2 * i], cp[2 * i + 1]);
+        for (end, next) in [(0, 1), (n - 1, n - 2)] {
+            let (p, q) = (pole(&cp, end), pole(&cp, next));
+            let Some(&(at, t)) = tangents.iter().find(|(at, _)| at.distance(p) <= 1e-6) else { continue };
+            let (d, t) = (q - at, t.normalize_or_zero());
+            if d.normalize_or_zero().perp_dot(t).abs().asin() >= 2e-3 {
+                continue;
+            }
+            // The end on the neighbour's end (a join after would move it, turning the end ~4e-4 rad over a short
+            // first span), the next pole along the neighbour.
+            let moved = at + t * d.dot(t).signum() * d.length();
+            cp[2 * end] = at.x;
+            cp[2 * end + 1] = at.y;
+            cp[2 * next] = moved.x;
+            cp[2 * next + 1] = moved.y;
+        }
+        e["geometry"]["controlPoints"] = json!(cp);
+    }
 }
 
 fn arc_span(e: &Value) -> Option<(f64, f64)> {
