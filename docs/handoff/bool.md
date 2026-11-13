@@ -23,8 +23,8 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
   (copies /root/bool-scratch/xprobe-1112.rs, sampler-1112.rs; re-apply with probe-allrs.patch).
 
 **Next, in order:**
-1. **The private dock (the user's own document; lead: first). In the land queue 07:34 as a27c235a: branch bool-seam
-   (pushed; gate CHECK, knurls only, corpora +4 taken, 0 new differences; a clippy fix folded in)**: an edge across the
+1. **The private dock (the user's own document; lead: first). Landed 07:54 as 88c706cf (branch bool-seam, two
+   commits; gate CHECK, knurls only, corpora +4 taken, 0 new differences)**: an edge across the
    seam of a free-form face going a whole turn round is cut
    there, each part its own curve on the face (`free::seam_crossings`, `edge_in_face`, Pending::InFace with a curve a
    part, `projected` unwrapping a last point on the seam); tori and spheres measured on their whole surface for
@@ -39,8 +39,7 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    **And on bool-seam's second commit:** a new edge
    on an elementary surface under a trim (torus, sphere, trimmed cylinder / cone; rust_boolean.cpp "a new edge on a
    free-form face") gets OCCT's exact projection: the 4 such dock cases were a plane's ellipse on a
-   Geom_RectangularTrimmedSurface of a cylinder. The dock: 33 of 44 ours, 0 differing, 1 equivalent. If a27c235a fails in
-   the queue: fix forward on bool-seam (worktree bool-hat) and land.sh again.
+   Geom_RectangularTrimmedSurface of a cylinder. The dock: 33 of 44 ours, 0 differing, 1 equivalent.
    Next declines there: 2 x "a non-manifold result" (06:45: both "unbalanced" edges, used once, so pieces missing
    beside them: ebd7414e (582 ms) has one at (0, 18, 1.2741) mm, where the 1.2 mm-tolerance vertices are (likely the
    same upstream cause); f83b9884 (141 ms: a cut of 83 faces by 2 tools, likely mirror images) at (±5.5, ±12.82, 9.85) mm and two arcs, not upstream: a classification to
@@ -73,7 +72,7 @@ RB_HOST inside for vibe7); docprof.py / featgap.py (per-document and per-feature
 made with ~/tmp/bool/docprof.sh); ~/agents/profile-in.py, profile-lines.py, profile-callers.py on vibe5 (copy to vibe7).
 The suite's per-feature kernel profiles count its own measuring (props_surface via face_json) against the next feature.
 
-**Landed 11-12 / 11-13:** d93e7f6f, 31d0d8ba, 78ef7ff8, 43e18118, 1766ff34, ca0e4044, 3770108f, 25b06285 (extension-spring's
+**Landed 11-12 / 11-13:** d93e7f6f, 31d0d8ba, 78ef7ff8, 43e18118, 1766ff34, ca0e4044, 3770108f, 25b06285, 88c706cf (extension-spring's
 Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
