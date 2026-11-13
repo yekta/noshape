@@ -360,6 +360,13 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   `{"button": "Update to latest"}` / `"Selective update"`, a document's checkbox `{"checkbox": "uip Source"}` and
   ⎇ `{"button": "Version graph:uip Source"}` (its rows by version name), `{"button": "Update all"}` / `"Update
   selected"`; the tab's badge `{"button": "Newer versions of linked documents available"}`.
+- `"linked"`'s `"insert": {"source", "part", "version", "view": {"orientation": "front", "position": [x, y]}}` (studios,
+  11-13): instead of an assembly, a view of it at that version goes on the start's drawing (made with `"views": "none"`):
+  Insert view › Other documents › the document › its version › the part, placed with its centre at `position` (sheet
+  mm). Start `drawing-linked`: the Sheets panel's only reference row (`{"sheet_ref": "Part 1"}`) is another
+  document's version (Pin reference, Unpin reference, Update linked document...). Start `block-drawing-v1`: block-drawing
+  then V1. In the drawing's Reference manager the runner's own document is `<document>` whatever each runner names it:
+  `{"button": "Version graph:<document>"}`, `{"checkbox": "<document>"}`; another's by its name (`"uip Source"`).
 
 ### Feature Studio (studios, 11-07)
 - Start `fs-studio`: a whole document with a new "Feature Studio 1" (its own new-studio text).

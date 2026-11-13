@@ -1,0 +1,51 @@
+{
+  "name": "drw-ref-update-linked-document",
+  "about": "The reference row's Update linked document... (the Reference manager), then Update all: the view moves to uip Source's V2",
+  "area": "studios",
+  "source": "coverage (studios 11-13: the drawing menu items no scenario reached; lead 11-13: the cross-document start)",
+  "start": "drawing-linked",
+  "steps": [
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "ctrl+s"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 500
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_ref": "Part 1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Update linked document..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Update all"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    }
+  ]
+}

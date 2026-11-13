@@ -1,0 +1,40 @@
+{
+  "name": "drw-ref-pin-reference",
+  "about": "A view of another document's version (uip Source V1, its newer V2): the Sheets panel's reference row \u203a Pin reference",
+  "area": "studios",
+  "source": "coverage (studios 11-13: the drawing menu items no scenario reached; lead 11-13: the cross-document start)",
+  "start": "drawing-linked",
+  "steps": [
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "ctrl+s"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 500
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_ref": "Part 1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Pin reference"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}

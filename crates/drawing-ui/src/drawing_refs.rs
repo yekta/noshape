@@ -65,6 +65,13 @@ fn other_path(pin: Option<&PinnedVersion>) -> Option<std::path::PathBuf> {
     pin.and_then(|p| crate::derived::ExternalRef::parse(&p.id)).map(|r| r.path)
 }
 
+/// A Reference manager row's control named for the ui-parity runner by its document, and this document's also as
+/// "<document>" (the runners' documents have different names: live2's "noshape ui parity …", ours the start's).
+fn runner_marks<E: ParentElement>(e: E, kind: &str, name: &str, own: bool) -> E {
+    let e = crate::ui_script::mark(e, || format!("{kind}{name}"));
+    if own { crate::ui_script::mark(e, || format!("{kind}<document>")) } else { e }
+}
+
 /// [`DrawingEditor::ext_info`]'s key of another document at a microversion.
 pub fn ext_info_key(r: &crate::derived::ExternalRef) -> String {
     format!("{}|{}", r.microversion, r.path.display())
@@ -247,6 +254,7 @@ impl DrawingEditor {
             let on = tab == ix;
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("button:{label}")))
                 .flex_1()
                 .h(px(32.))
                 .flex()
@@ -265,12 +273,13 @@ impl DrawingEditor {
             let to = d.choices.get(chosen).map(|c| c.0.clone()).unwrap_or_default();
             let checked = m.checked.contains(&i);
             let labels: Vec<String> = d.choices.iter().map(|c| c.0.clone()).collect();
+            let own = d.path.is_none();
             list = list.child(
                 h_flex()
                     .h(px(40.))
                     .my(px(2.))
                     .when(tab == 1, |r| {
-                        r.child(div().w(px(19.)).pl(px(4.)).child(crate::drawing_chrome::DrCheckbox::new(("rm-check", i)).native().checked(checked).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                        r.child(div().w(px(19.)).pl(px(4.)).map(|e| runner_marks(e, "checkbox:", &d.name, own)).child(crate::drawing_chrome::DrCheckbox::new(("rm-check", i)).native().checked(checked).on_click(cx.listener(move |this, v: &bool, _, cx| {
                             if let Some(m) = &mut this.ref_manager {
                                 if *v {
                                     m.checked.insert(i);
@@ -297,6 +306,7 @@ impl DrawingEditor {
                         r.child(
                             div()
                                 .id(SharedString::from(format!("rm-graph-{i}")))
+                                .map(|e| runner_marks(e, "button:Version graph:", &d.name, own))
                                 .mr(px(21.))
                                 .size(px(30.))
                                 .flex()
@@ -422,6 +432,7 @@ impl DrawingEditor {
                     h_flex().h(px(46.)).px(px(5.)).justify_end().border_t_1().border_color(gpui_kit::rgb(0xeaeaea)).bg(gpui_kit::rgb(0xffffff)).child(
                         div()
                             .id("rm-update")
+                            .map(|d| crate::ui_script::mark(d, move || format!("button:{}", if tab == 0 { "Update all" } else { "Update selected" })))
                             .h(px(34.))
                             .px(px(10.5))
                             .flex()

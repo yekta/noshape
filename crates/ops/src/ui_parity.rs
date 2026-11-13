@@ -122,10 +122,20 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
     }
     // A linked document (README "Variable Studio and Versions" `linked`): built from its own start beside this one, its
     // tab inserted into this document's assembly at one of its versions (a reference to another document's version).
+    let mut linked_view = None;
     if let Some(l) = start.get("linked") {
         let name = l["name"].as_str().ok_or("linked: its name")?;
         let source = path.with_file_name(format!("{name}.noshape"));
         build_start(&mut Ctx::new(), &source, &l["start"]).map_err(|e| format!("linked {name}: {e}"))?;
+        let ins = &l["insert"];
+        // Into the start's drawing (made below): a view of it at that version (Insert view › Other documents).
+        if ins.get("view").is_some() {
+            linked_view = Some((name.to_string(), source.clone(), ins.clone()));
+        }
+    }
+    if let Some(l) = start.get("linked").filter(|_| linked_view.is_none()) {
+        let name = l["name"].as_str().ok_or("linked: its name")?;
+        let source = path.with_file_name(format!("{name}.noshape"));
         let ins = &l["insert"];
         let mut args = json!({ "tab": ins["assembly"].as_str().unwrap_or("Assembly 1"), "source": ins["source"].as_str().unwrap_or("Part Studio 1"), "document": source.to_str().ok_or("path")?, "version": ins["version"].as_str().ok_or("linked: insert's version")? });
         // One part of it (live2's start: "Part 1 <1>"), else the whole Part Studio.
@@ -169,6 +179,19 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
     }
     if !start["drawing"]["first"].as_bool().unwrap_or(false) {
         build_drawing(ctx, start, &asm_tab)?;
+    }
+    if let Some((name, source, ins)) = linked_view {
+        let v = &ins["view"];
+        let args = json!({
+            "drawing": drawing_name(start),
+            "source": ins["source"].as_str().unwrap_or("Part Studio 1"),
+            "document": source.to_str().ok_or("path")?,
+            "version": ins["version"].as_str().ok_or("linked: insert's version")?,
+            "part": ins["part"].as_str().unwrap_or("Part 1"),
+            "orientation": v["orientation"].as_str().unwrap_or("front"),
+            "position": v["position"].clone(),
+        });
+        call(ctx, "drawing_insert_view", args).map_err(|e| format!("linked {name}: {e}"))?;
     }
     Ok(())
 }
@@ -511,6 +534,26 @@ mod tests {
         let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" })).unwrap();
         assert_eq!(list["instances"].as_array().map(Vec::len), Some(1), "{list}");
         assert_eq!(list["instances"][0]["name"], "Part 1 <1>", "{list}");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// Start drawing-linked: the drawing's only view is uip Source's Part 1 at V1 (another document's version); start
+    /// block-drawing-v1: the drawing, then V1.
+    #[test]
+    fn the_linked_drawing_starts_build() {
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/ui-parity");
+        let starts: Value = serde_json::from_str(&std::fs::read_to_string(format!("{root}/starts.json")).unwrap()).unwrap();
+        let dir = std::env::temp_dir().join(format!("noshape-uip-linked-drawing-{}", std::process::id()));
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &dir.join("drawing-linked.noshape"), &starts["drawing-linked"]).unwrap();
+        let g = call(&mut ctx, "drawing_get", json!({ "drawing": "Part 1 Drawing 1" })).unwrap();
+        let views = g["views"].as_array().cloned().unwrap_or_default();
+        assert_eq!(views.len(), 1, "{g}");
+        assert!(views[0].to_string().contains("V1"), "uip Source at V1: {}", views[0]);
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &dir.join("block-drawing-v1.noshape"), &starts["block-drawing-v1"]).unwrap();
+        let h = call(&mut ctx, "history_list", json!({})).unwrap();
+        assert!(h.to_string().contains("\"V1\""), "{h}");
         let _ = std::fs::remove_dir_all(dir);
     }
 }
