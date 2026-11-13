@@ -40,6 +40,32 @@ fn edit_extrude(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity
     (window, view, dialog)
 }
 
+/// Fillet opened on the block with one edge picked into its field; the edge's pick id.
+fn fillet_on_an_edge(cx: &mut TestAppContext, name: &str) -> Result<(AnyWindowHandle, Entity<PartStudioView>, Entity<crate::feature_dialog::FeatureDialog>, u32), String> {
+    let (window, view) = block(cx, name);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    draw(cx, window);
+    let (edge, pick) = cx.update(|cx| {
+        let v = view.read(cx);
+        let e = v.display.bodies.first().and_then(|b| b.edge_refs.first().cloned());
+        let p = e.as_ref().and_then(|e| v.built.as_ref().and_then(|b| b.picks.ids_for(e).first().copied()));
+        (e, p)
+    });
+    let (edge, pick) = (edge.ok_or("no edge")?, pick.ok_or("no pick")?);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).ok_or("no dialog")?;
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let vp = v.viewport.clone();
+        v.on_viewport_event(&vp, &ViewportEvent::Click { pick: Some(pick), position: glam::DVec2::new(500., 300.), modifiers: Modifiers::default() }, w, cx);
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    if !cx.update(|cx| dialog.read(cx).feature.params.query("entities").contains(&edge)) {
+        return Err("the edge didn't go into the field".into());
+    }
+    Ok((window, view, dialog, pick))
+}
+
 fn expect<T: PartialEq + std::fmt::Debug>(got: T, want: T, what: &str) -> Result<(), String> {
     if got == want { Ok(()) } else { Err(format!("{what}: ours {got:?}, live {want:?}")) }
 }
@@ -120,6 +146,49 @@ fn rows() -> Vec<Row> {
                 counts.push(cx.update(|cx| dialog.read(cx).feature.params.query("entities").iter().filter(|r| **r == edge).count()));
             }
             expect(counts, vec![1, 0, 1], "the edge in the field after each click")
+        } },
+        Row { id: "fields / a row hovered lights its entity", live: "the selected orange outline turns light yellow-green (#f2ff80) while the row is hovered; clears when the pointer leaves", gap: false, check: |cx| {
+            let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-row-hover")?;
+            let edge = cx.update(|cx| dialog.read(cx).feature.params.query("entities").first().cloned()).ok_or("no edge")?;
+            // The preview consumes the edge: it is drawn by the overlay of consumed picks, else by its pick's flag.
+            let lit = |cx: &mut TestAppContext| cx.update(|cx| {
+                let v = view.read(cx);
+                let flagged = v.built.as_ref().is_some_and(|b| b.picks.ids_for(&edge).iter().any(|&id| v.viewport.read(cx).scene().states.get(id as usize).is_some_and(|s| s & noshape_render::scene::state::QUERY != 0)));
+                flagged || v.ui.consumed_lines.as_ref().is_some_and(|c| c.2.contains(&edge))
+            });
+            let path = cx.update(|cx| dialog.read(cx).active_query.clone()).ok_or("no active field")?;
+            let row = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("chip-{path}-0").into_boxed_str())).ok_or("no row")?;
+            let before = lit(cx);
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_event(gpui_kit::MouseMoveEvent { position: row.center(), pressed_button: None, modifiers: Modifiers::default() });
+            draw(cx, window);
+            let on = lit(cx);
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_event(gpui_kit::MouseMoveEvent { position: row.center() + gpui_kit::point(px(0.), px(200.)), pressed_button: None, modifiers: Modifiers::default() });
+            draw(cx, window);
+            expect((before, on, lit(cx)), (false, true, false), "lit before, on the row, after leaving")
+        } },
+        Row { id: "fields / a row click leaves the selection as is", live: "clicking a row (not its x) keeps the field's entities", gap: false, check: |cx| {
+            let (window, _view, dialog, _) = fillet_on_an_edge(cx, "dlg-row-click")?;
+            let path = cx.update(|cx| dialog.read(cx).active_query.clone()).ok_or("no active field")?;
+            let row = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("chip-{path}-0").into_boxed_str())).ok_or("no row")?;
+            let at = row.origin + gpui_kit::point(px(20.), row.size.height / 2.);
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_click(at, Modifiers::default());
+            draw(cx, window);
+            expect(cx.update(|cx| dialog.read(cx).feature.params.query("entities").len()), 1, "entities after the click")
+        } },
+        Row { id: "fields / Tab from Radius", live: "Radius's ± button, then the checkboxes in order; Tab skips the selection fields and the dropdowns", gap: false, check: |cx| {
+            let (window, _view, dialog, _) = fillet_on_an_edge(cx, "dlg-tab")?;
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("radius", w, cx))).unwrap();
+            draw(cx, window);
+            let mut order = Vec::new();
+            for _ in 0..6 {
+                keys(cx, window, &["tab"]);
+                order.push(cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap().unwrap_or_default());
+            }
+            let want = ["tol:radius", "cb:isAsymmetric", "cb:isPartial", "cb:isVariable", "cb:allowEdgeOverflow", "cb:smoothCorners"];
+            expect(order, want.map(String::from).to_vec(), "focus after each Tab")
         } },
         Row { id: "fields / Esc in a value field", live: "the first Esc discards the typed value and leaves the field, the dialog stays; a second Esc cancels", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "dlg-esc");

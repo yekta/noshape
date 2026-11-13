@@ -279,7 +279,7 @@ debugging rows, left out. Ours binds besides live's map, in those scopes: the de
 Close window, Quit (secondary-n / o / w / q) and the dialog Tab / Enter / Shift+Enter keys live's client handles
 outside its map (its "client side entries").
 
-**Chrome: 17 / 17** (11-13 13:33 UTC; 7 / 11 at the first run, then 5 rows added: 1 / 5 matched).
+**Chrome: 18 / 18** (11-13 14:01 UTC, was 17 / 17 at 13:33 UTC; 7 / 11 at the first run, then 5 rows added: 1 / 5 matched).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -291,12 +291,13 @@ outside its map (its "client side entries").
 | Feature dialog drag | clamped inside the graphics area; within ~10 px of the top / right / bottom it snaps (3 / 0 / 2 px); the left doesn't | could leave the area by all but 80 × 40 px, no snap; now live's (`behaviors::place_feature_dialog`) | = (fixed) |
 | Select other place | pointer + (100, 51) | the same | = |
 | A tooltip on a click or the wheel | closes | the same | = |
+| A submenu (▸ row) | opens on hover with no delay (one 10 ms poll); closes ~30 ms after the pointer moves to another row | opens in the frame the row is hovered, closes in the next | = |
 | Select other size | 220 px, 24 px rows in a 90 px list; nothing found: 83 px tall | the same, but the empty dialog kept the 92 px list (149 px); now one row (`SELECT_OTHER_EMPTY_H`) | = (fixed) |
 | Context menu place | pointer + (0, 2) in the graphics; + (10, 12) on a feature-list row | (0, 2) everywhere; now (10, 12) on feature and folder rows (`os_menu::MENU_AT_ROW`) | = (fixed) |
 | Context menu flip | at the right edge its right side 1 px left of the pointer; at the bottom its bottom 4 px below it | flipped round where it opened (pointer + (0, 2)); now round the pointer (vendored gpui `anchored().flip_point`) | = (fixed) |
 | Feature list width | remembered per tab, the default 205 elsewhere | one width for every tab; now per tab (`ui::left_panel_w(tab)`, config left_panel_widths.json) | = (fixed) |
 | Toolbar dropdowns | on click only, under the toolbar at the tool group's left edge, staying open | under the caret (31 px right of the group's left); now at the group's left (vendored gpui-component `PopupMenu::shift_x`); 4 px under the buttons as live | = (fixed; checked on a runner screenshot and by a row click, no T1 test) |
-| Not yet in the matrix | tooltip fade-in / fade-out, closing on a drag's start; submenus opening on hover with no delay; feature dialogs sharing one stored layout | – | – |
+| Not yet in the matrix | tooltip fade-in / fade-out, closing on a drag's start; feature dialogs sharing one stored layout | – | – |
 
 ## Look
 
@@ -404,7 +405,7 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). part-studio-ui
 `dialogs::the_dialogs_matrix_matches_live` (T1, no GPU) on the block start, and `manipulators::snap_tests`.
 
-**Matched: 9 / 9** (11-13 13:23 UTC; 1 / 5 at the first run, then 4 rows added, all matching).
+**Matched: 12 / 12** (11-13 14:00 UTC; 1 / 5 at the first run, then 7 rows added, all matching).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -417,23 +418,30 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | A selected entity clicked again | leaves the field (in, out, in) | the same | = |
 | Esc in a value field | the first discards the typed value and leaves the field, the dialog stays; a second cancels | the same | = |
 | Enter with the keyboard outside a field | commits the dialog | the same | = |
+| A field's row hovered | its entity lit yellow-green (#f2ff80) while hovered, cleared on leaving (a consumed edge too) | the same | = |
+| A field's row clicked (not its ×) | the field keeps its entities | the same | = |
+| Tab from Fillet's Radius | Radius's ± button, then Asymmetric, Partial, Variable, Allow edge overflow, Smooth fillet corners; selection fields and dropdowns skipped | the same | = |
 | Properties' Enter and Esc | do nothing (no apply, no close) | the same | = |
-| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, an arrow click flipping; preview timing (Enter / Tab / blur, every ~0.4 s while dragging); a field row hovered lighting its entity yellow-green, the field's Tab order; the Appearance and Material dialogs' layout and keys; Properties' Tab order | – | – |
+| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, an arrow click flipping; preview timing (Enter / Tab / blur, every ~0.4 s while dragging);  the Appearance and Material dialogs' layout and keys; Properties' Tab order | – | – |
 
 ## Feedback (matrix, Part Studio rows)
 
 live2's feedback.json (11-13 09:39, for psui and studios). part-studio-ui `feedback::the_feedback_matrix_matches_live`
 (T1, no GPU; the row's tooltip read 500 ms after the pointer comes onto it).
 
-**Matched: 4 / 4** (11-13 13:23 UTC; 1 / 2 at the first run, then 2 rows added: 1 / 2 matched).
+**Matched: 7 / 8** (11-13 14:00 UTC; 1 / 2 at the first run, then 6 rows added: 4 / 6 matched).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
 | A failing feature's tooltip | "<Feature> did not regenerate properly: <message>", then "1 missing selection" | the same | = |
 | A warning feature's tooltip | "Fillet 1", then "1 missing selection" | "Fillet 1 did not regenerate properly: 1 missing selection"; now live's | = (fixed) |
 | A failing feature's row | an error row (rgb(170,37,45) name, red icon, warning overlay; the header's failures icon) | the same (state "error") | = |
+| A warning's row | only lost selections: the name stays rgb(51,51,51), the icon's overlay only; no failures icon (one with a message of its own reads red, live L27) | red like an error; now black (`only_missing_selections`) | = (fixed) |
+| A warning's dialog | the title black with no tooltip, no bubble or toast; the lost entry a grey italic "Edge of Chamfer 1" | the title red with "… did not regenerate properly: 1 missing selection" and a yellow bubble; now live's (`status_reads_red`) | = (fixed) |
+| The red title's tooltip | "<Feature> did not regenerate properly: <message>" | the same | = |
+| A failed preview | Fillet 100 mm on the block's top edge: the title red, the entry red, "… Failed to fillet selections." | regenerates "Ok" into a body with no faces (20 mm fails as live, fillet-too-big): core's fillet, reported | ≠ |
 | Its dialog | Sketch 1 deleted under Extrude 1: the title red, the lost region a red "Missing Face" entry, ✓ not disabled (an edge whose feature is only below reads "Edge of Extrude 1": live fillet-chip-edit-healthy-moment) | "Face of deleted feature"; now "Missing Face" | = (fixed) |
-| Not yet in the matrix | a warning keeps its name black, only the overlay; the red title's tooltip; a failed preview drawing the edge in the error colour; the commit's working overlay (live first seen 1119 ms after ✓, polled every 40–150 ms; ours 1200 ms: within a frame or two, not changed without a finer measure); toasts (studios: success rgb(221,246,204), top centre, 5.1 s, no stacking, hover doesn't pause); empty states | – | – |
+| Not yet in the matrix | a failed preview drawing the edge in the error colour; the commit's working overlay (live first seen 1119 ms after ✓, polled every 40–150 ms; ours 1200 ms: within a frame or two, not changed without a finer measure); toasts (studios: success rgb(221,246,204), top centre, 5.1 s, no stacking, hover doesn't pause); empty states | – | – |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;

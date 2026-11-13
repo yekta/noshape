@@ -194,6 +194,33 @@ fn rows() -> Vec<Row> {
             near(crate::ui::left_panel_w(a), 320., "the widened tab")?;
             near(crate::ui::left_panel_w(b), crate::ui::LEFT_PANEL_W, "another tab")
         } },
+        Row { id: "menus / a submenu opens on hover", live: "a ▸ row's submenu opens with no delay (one 10 ms poll) and closes ~30 ms after the pointer moves to another row", gap: false, check: |c, cx| {
+            let (one, two, three) = ("Row 1".to_string(), "Row 2".to_string(), "Row 3".to_string());
+            let menu = cx
+                .update_window(c.tips, |_, w, cx| {
+                    let (two, three) = (two.clone(), three.clone());
+                    let menu = crate::os_menu::OsMenu::build(w, cx, |m, w, cx| m.item(crate::os_menu::OsMenuItem::new(one.clone())).submenu(two, w, cx, |sm, _, _| sm.item(crate::os_menu::OsMenuItem::new(three))));
+                    crate::os_menu::open(point(px(400.), px(300.)), menu.clone(), w, cx);
+                    menu
+                })
+                .unwrap();
+            draw(cx, c.tips);
+            let at = |cx: &mut TestAppContext, sel: &str| {
+                draw(cx, c.tips);
+                gpui_kit::VisualTestContext::from_window(c.tips, cx).debug_bounds(Box::leak(format!("menu:{sel}").into_boxed_str())).map(|b| b.center())
+            };
+            let row2 = at(cx, "Row 2").ok_or("no submenu row")?;
+            c.move_to(cx, f32::from(row2.x), f32::from(row2.y));
+            let _ = c.wait(cx, 10);
+            let opened = at(cx, "Row 3").is_some();
+            let row1 = at(cx, "Row 1").ok_or("no first row")?;
+            c.move_to(cx, f32::from(row1.x), f32::from(row1.y));
+            let _ = c.wait(cx, 30);
+            let closed = at(cx, "Row 3").is_none();
+            cx.update(|cx| menu.update(cx, |_, cx| cx.emit(gpui_kit::DismissEvent)));
+            draw(cx, c.tips);
+            expect((opened, closed), (true, true), "open within 10 ms, closed 30 ms after leaving its row")
+        } },
         Row { id: "select other / its size", live: "220 px wide, 24 px rows in a 90 px list (~3.75 rows); with nothing found 83 px tall", gap: false, check: |_, _| {
             near(behaviors::SELECT_OTHER_SIZE.0, 220., "width")?;
             near(behaviors::SELECT_OTHER_EMPTY_H, 83., "height with nothing found")

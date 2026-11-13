@@ -725,6 +725,11 @@ impl Viewport {
     }
 
     /// Replace the scene (geometry or highlight state changed).
+    /// The scene being drawn.
+    pub fn scene(&self) -> &Scene {
+        &self.scene
+    }
+
     pub fn set_scene(&mut self, scene: Arc<Scene>, geometry_changed: bool, cx: &mut Context<Self>) {
         let _t = noshape_render::perf::scope("v.set_scene");
         if !geometry_changed && (Arc::ptr_eq(&scene, &self.scene) || scene.same_as(&self.scene)) {

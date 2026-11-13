@@ -2542,6 +2542,13 @@ impl FeatureDialog {
         self.tab_stops.get(key).cloned()
     }
 
+    /// The control with the keyboard: a Tab stop's key, or `in:<path>` for a text field.
+    #[cfg(test)]
+    pub(crate) fn focused_control(&self, window: &Window, cx: &App) -> Option<String> {
+        let stop = self.tab_stops.iter().find(|(_, h)| h.is_focused(window)).map(|(k, _)| k.clone());
+        stop.or_else(|| self.inputs.iter().find(|(_, st)| st.read(cx).focus_handle(cx).is_focused(window)).map(|(p, _)| format!("in:{p}")))
+    }
+
     /// Make `d` a Tab stop. Space activates it through `d`'s click handler
     /// (GPUI turns Space / Enter on the focused element into a keyboard
     /// click; a key handler of its own toggled a checkbox twice,
@@ -3089,6 +3096,7 @@ impl FeatureDialog {
                         // no hover background).
                         h_flex()
                             .id(SharedString::from(format!("chip-{path}-{row}")))
+                            .debug_selector(|| format!("chip-{path}-{row}"))
                             // The ui-parity driver's `{"chip": row, "field": label}` (a right-click on a pick).
                             .map(|d| crate::ui_script::mark(d, || format!("chip:{}:{row}", crate::i18n::spec(s.label))))
                             .on_hover(cx.listener(move |_, h: &bool, _, cx| cx.emit(DialogEvent::HoverRef(h.then(|| hover_ref.clone())))))
@@ -4217,7 +4225,7 @@ impl Render for FeatureDialog {
         } else {
             status
         };
-        let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error | FeatureStatus::Warning));
+        let invalid = status.as_ref().is_some_and(status_reads_red);
         // Live (`canSubmit`, woolsthorpe): ✓ waits for the dialog to be
         // dirty (an edit, or a regeneration without an error) and for every
         // applied value to be valid; regeneration errors and empty
@@ -4234,7 +4242,7 @@ impl Render for FeatureDialog {
         // by the feature type in brackets.
         let tip_name = if name == self.feature.name { crate::part_studio::typed_name(&self.feature) } else { format!("{name} [{}]", self.ty.name) };
         // The sketch's red title has no tooltip: the bubble asks for a plane.
-        let error_tip: Option<String> = status.as_ref().filter(|s| matches!(s.0, FeatureStatus::Error | FeatureStatus::Warning) && !sketch).map(|s| format!("{tip_name} did not regenerate properly: {}", s.1));
+        let error_tip: Option<String> = status.as_ref().filter(|_| invalid && !sketch).map(|s| format!("{tip_name} did not regenerate properly: {}", s.1));
         let ref_panel = self.render_reference_panel(window, cx);
         v_flex()
             .id("feature-dialog")
@@ -4311,6 +4319,7 @@ impl Render for FeatureDialog {
                     .child(
                         div()
                             .id("dialog-title")
+                            .debug_selector(|| "dialog-title".into())
                             // Drag the title to move the dialog (Onshape; its
                             // drag area shows `grab`, docs/parity/cursors.md).
                             .cursor(CursorStyle::OpenHand)
@@ -4480,6 +4489,12 @@ impl Render for FeatureDialog {
             })
             .children(ref_panel)
     }
+}
+
+/// A regeneration status that turns the title red: an error, or a warning with a message of its own (one that only
+/// lost selections keeps it black: live feel/feedback.json "warnings").
+pub(crate) fn status_reads_red(s: &(FeatureStatus, String)) -> bool {
+    matches!(s.0, FeatureStatus::Error | FeatureStatus::Warning) && !crate::part_studio::only_missing_selections(s.0, &s.1)
 }
 
 /// How a Tab stop shows its focus ([`FeatureDialog::tab_stop_element`]).

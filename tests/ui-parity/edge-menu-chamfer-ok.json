@@ -1,9 +1,16 @@
 {
  "name": "edge-menu-chamfer-ok",
- "about": "block: right-click the top front edge a quarter along, Chamfer…: the dialog with the edge in, ✓",
+ "about": "block: right-click the top front edge a quarter along, Chamfer…: the dialog with the edge in, ✓ (live's account remembered Chamfer type Two distances)",
  "area": "psui",
  "source": "live 2026-11-13 (lead: menus with one scenario or none; Part Studio's most used first)",
  "start": "block",
+ "remembered": {
+  "chamfer": {
+   "": {
+    "chamferType": "TWO_OFFSETS"
+   }
+  }
+ },
  "steps": [
   {
    "do": "rclick",

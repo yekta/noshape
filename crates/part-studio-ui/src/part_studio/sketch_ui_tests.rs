@@ -31,14 +31,24 @@ fn part_studio(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<
     part_studio_from(cx, name, None)
 }
 
+struct KeysBound;
+impl gpui_kit::Global for KeysBound {}
+
 /// A Part Studio built from a ui-parity start (tests/ui-parity/starts.json's form), or a fresh one.
 fn part_studio_from(cx: &mut TestAppContext, name: &str, start: Option<serde_json::Value>) -> (AnyWindowHandle, Entity<PartStudioView>) {
-    cx.update(gpui_kit::init);
-    // The app's default key bindings (Esc → Cancel, tool keys), without the
-    // user's customizations.
-    cx.update(|cx| cx.bind_keys(crate::actions::default_key_bindings()));
-    // The value box's own keys (the app binds them once per process).
-    cx.update(|cx| cx.bind_keys(super::entry_key_bindings()));
+    // Once per App, as the app does: bound again, a key's action ran once per window opened (a matrix's Enter in a
+    // field applied, then accepted).
+    cx.update(|cx| {
+        if cx.has_global::<KeysBound>() {
+            return;
+        }
+        cx.set_global(KeysBound);
+        gpui_kit::init(cx);
+        // The app's default key bindings (Esc → Cancel, tool keys), without the user's customizations.
+        cx.bind_keys(crate::actions::default_key_bindings());
+        // The value box's own keys (the app binds them once per process).
+        cx.bind_keys(super::entry_key_bindings());
+    });
     crate::part_studio_hooks::register_for_tests();
     let dir = std::env::temp_dir().join(format!("noshape-ui-{name}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();

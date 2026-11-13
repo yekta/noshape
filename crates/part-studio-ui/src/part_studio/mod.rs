@@ -1198,8 +1198,8 @@ impl PartStudioView {
             // geometry change…") is a blue bubble at the top centre of the
             // graphics while the dialog is open; the dialog shows nothing.
             // A warning (live L27, Fill) is a yellow bubble there, with the
-            // title red.
-            let bubble = st.as_ref().filter(|(k, _)| matches!(k, FeatureStatus::Info | FeatureStatus::Warning)).cloned();
+            // title red; one that only lost selections shows none (live feel/feedback.json "warnings").
+            let bubble = st.as_ref().filter(|(k, m)| matches!(k, FeatureStatus::Info | FeatureStatus::Warning) && !only_missing_selections(*k, m)).cloned();
             let info = bubble.as_ref().map(|(_, m)| m.clone());
             let st = st.filter(|(k, _)| *k != FeatureStatus::Info);
             if no_plane {
@@ -4296,6 +4296,7 @@ impl PartStudioView {
                         // regenerate"; a click filters ":errors ".
                         div()
                             .id("feature-errors")
+                            .debug_selector(|| "feature-errors".into())
                             .size(px(17.))
                             .ml(px(1.))
                             .mr(px(9.))
@@ -5569,11 +5570,8 @@ impl PartStudioView {
         } else if suppressed || (f.hidden && !failing && !(editing || self.edit_uses(f.id, cx) || self.rolled_to(f.id, cx))) {
             pal.text_faint
         } else {
-            // Live L27: a warning's row is red like an error's.
-            match status {
-                FeatureStatus::Error | FeatureStatus::Warning => pal.text_invalid,
-                _ => pal.text,
-            }
+            // Live L27: a warning's row is red like an error's, unless it only lost selections.
+            if row_reads_red(status, state.and_then(|s| s.message.as_deref())) { pal.text_invalid } else { pal.text }
         };
         let underdefined = !rolled_back && state.is_some_and(|s| s.underdefined);
         let id = f.id;
@@ -5601,11 +5599,12 @@ impl PartStudioView {
                         let more = noshape_model::regen::missing_text(s.missing);
                         Some(if s.missing > 0 && m != more { format!("{head} did not regenerate properly: {m}\n{more}") } else { format!("{head} did not regenerate properly: {m}") })
                     }
-                    // A warning (live feel/feedback.json "warnings"): the name, then its message ("Fillet 1\n1 missing
-                    // selection"); it did regenerate.
+                    // A warning that only lost selections: the name, then "1 missing selection" (live feel/feedback.json
+                    // "warnings"); one with its own message reads as an error's (live L27).
+                    FeatureStatus::Warning if only_missing_selections(s.status, &m) => Some(format!("{head}\n{m}")),
                     FeatureStatus::Warning => {
                         let more = noshape_model::regen::missing_text(s.missing);
-                        Some(if s.missing > 0 && m != more { format!("{head}\n{m}\n{more}") } else { format!("{head}\n{m}") })
+                        Some(if s.missing > 0 && m != more { format!("{head} did not regenerate properly: {m}\n{more}") } else { format!("{head} did not regenerate properly: {m}") })
                     }
                     FeatureStatus::Info => None,
                     _ => Some(m),
@@ -7503,6 +7502,17 @@ fn count_picks(p: &noshape_model::params::ParamValues) -> usize {
             _ => 0,
         })
         .sum()
+}
+
+/// A warning that only lost selections ("1 missing selection"): live keeps its row and its dialog's title black, the
+/// icon's overlay only (feel/feedback.json "warnings"); a warning with a message of its own reads red (live L27).
+/// A failing feature's row name in the error colour ([`only_missing_selections`] keeps it black).
+pub(crate) fn row_reads_red(status: FeatureStatus, message: Option<&str>) -> bool {
+    matches!(status, FeatureStatus::Error | FeatureStatus::Warning) && !message.is_some_and(|m| only_missing_selections(status, m))
+}
+
+pub(crate) fn only_missing_selections(status: FeatureStatus, message: &str) -> bool {
+    status == FeatureStatus::Warning && message.split_once(' ').and_then(|(n, _)| n.parse::<usize>().ok()).is_some_and(|n| n > 0 && message == noshape_model::regen::missing_text(n))
 }
 
 /// A feature's name as Onshape shows it in tooltips and menus: with its
