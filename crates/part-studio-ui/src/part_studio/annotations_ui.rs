@@ -294,6 +294,15 @@ impl PartStudioView {
         out
     }
 
+    /// The middle of datum `letter`'s box on screen (viewport pixels): a scenario's `{"annotation": "A"}`.
+    pub(super) fn annotation_point(&self, letter: &str, cx: &App) -> Option<DVec2> {
+        let a = self.studio(cx)?.annotations.iter().find(|a| matches!(&a.kind, AnnotationKind::Datum { letter: l } if l == letter))?;
+        let shape = self.datum_geometry(a, cx)?;
+        let vp = self.viewport.read(cx);
+        let q: Vec<DVec2> = shape.boxp.iter().filter_map(|p| vp.project(*p)).collect();
+        (q.len() == 4).then(|| q.iter().copied().sum::<DVec2>() / 4.0)
+    }
+
     /// The annotation whose box is under `position` (viewport pixels).
     pub(super) fn annotation_at(&self, position: DVec2, cx: &App) -> Option<u32> {
         let studio = self.studio(cx)?;

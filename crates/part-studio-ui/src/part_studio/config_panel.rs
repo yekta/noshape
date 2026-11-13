@@ -2879,6 +2879,8 @@ impl PartStudioView {
         let tool = |id: &'static str, icon: &'static str, tip: &'static str, cx: &mut Context<Self>| {
             div()
                 .id(id)
+                // The ui-parity driver's `{"button": tooltip}`.
+                .map(|d| crate::ui_script::mark(d, move || format!("button:{tip}")))
                 .size(px(30.))
                 .flex()
                 .items_center()

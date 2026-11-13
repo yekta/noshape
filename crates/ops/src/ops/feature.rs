@@ -254,6 +254,17 @@ fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> boo
             feature.params.set("unitsSystem", ParamValue::Enum("INCH".into()));
         }
     }
+    // Another Units tab keeps the hole type (live: Tapped stays Tapped, at the tab's default size).
+    let (pid, _) = ht::hole_table_param(&feature.params);
+    if set("unitsSystem") && !set(pid) {
+        let mut before = feature.params.clone();
+        before.set("unitsSystem", ParamValue::Enum(if feature.params.is("unitsSystem", "INCH") { "METRIC" } else { "INCH" }.into()));
+        let mut now = feature.params.clone();
+        ht::switch_hole_units(&before, &mut now);
+        if let Some(path) = now.get(pid).cloned() {
+            feature.params.set(pid, path);
+        }
+    }
     // Its default size when none is chosen (an ISO M6 tapped hole drills
     // 5 mm, not the new hole's 1/4 in).
     if ["ansiHoleTableEx", "ansiHoleTable", "isoHoleTableEx", "isoHoleTable", "unitsSystem", "styleV2"].iter().any(|k| set(k)) {

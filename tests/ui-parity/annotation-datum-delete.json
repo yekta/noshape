@@ -1,0 +1,53 @@
+{
+ "name": "annotation-datum-delete",
+ "about": "Model definitions (the Inspection table): Datum on the top face, placed in space (datum A), Escape; right-click the A label: Delete annotation",
+ "area": "psui",
+ "source": "live 2026-11-13 (REQUESTS 03:41 answers): the two Part Studio menu items no scenario covered",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Inspection table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Datum"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "annotation": "A"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Delete annotation"
+   }
+  }
+ ]
+}

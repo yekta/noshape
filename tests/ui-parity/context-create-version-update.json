@@ -1,0 +1,41 @@
+{
+ "name": "context-create-version-update",
+ "about": "Assembly 1: Part 1 <1>'s menu, Edit in context; in the bar, Create version and update in assembly (back in the assembly, Part 1 <1> at V2)",
+ "area": "psui",
+ "source": "live 2026-11-13 (REQUESTS 03:41 answers): the two Part Studio menu items no scenario covered",
+ "start": "doc-linked",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit in context"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version and update in assembly"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -625,6 +625,10 @@ impl PartStudioView {
         if let Some(name) = t.get("view_cube").and_then(Value::as_str) {
             return super::view_cube::ui_cell_point(name, self.ui.cube_origin, vp.camera.rotation);
         }
+        if let Some(letter) = t.get("annotation").and_then(Value::as_str) {
+            let at = self.annotation_point(letter, cx).ok_or_else(|| format!("no annotation {letter} shown"))?;
+            return Ok(vp.origin() + point(px(at.x as f32), px(at.y as f32)));
+        }
         let world = if let Some(name) = t.get("plane").and_then(Value::as_str) {
             let p = self.display.planes.iter().find(|p| p.name == name && !p.hidden).ok_or_else(|| format!("no shown plane {name}"))?;
             self.visible_plane_point(p, cx).ok_or_else(|| format!("plane {name} is covered everywhere"))?
