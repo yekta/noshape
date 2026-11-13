@@ -1364,6 +1364,12 @@ impl AssemblyView {
             });
             crate::scene_builder::ConnectorGlyphs::picked(items) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
         });
+        // Live (mates.json after_second_pick): a mate's axes 50 px long at any zoom; the triads' relative sizes kept.
+        let base = self.triad_size();
+        let screen_triads: Option<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = (!h.triads.is_empty()).then(|| {
+            let items = std::mem::take(&mut h.triads).into_iter().map(|t| (t.frame, assembly_scene::MATE_AXIS_PX * t.size / base, t.strong)).collect();
+            std::sync::Arc::new(assembly_scene::ScreenTriads { items }) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
+        });
         let mut scene = assembly_scene::with_highlights(built, &self.result, &h, self.gpu.uploader());
         if let Some(slot) = self.ui.cap_hover.filter(|_| self.ui.section.is_some()).and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
@@ -1384,7 +1390,7 @@ impl AssemblyView {
             } else {
                 snapping.then_some(crate::cursor::AppCursor::SnapMate)
             };
-            vp.set_camera_geometry(marks.into_iter().chain(connector_glyphs).collect(), cx);
+            vp.set_camera_geometry(marks.into_iter().chain(connector_glyphs).chain(screen_triads).collect(), cx);
             vp.set_scene(Arc::new(scene), geometry_changed, cx)
         });
     }

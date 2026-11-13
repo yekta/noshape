@@ -666,6 +666,41 @@ const HANDLE_HL: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
 /// Dark points and lines on the white viewport.
 const DARK: [u8; 4] = [0x33, 0x33, 0x33, 255];
 
+/// Mate coordinate systems at screen size: each (frame, axis length in px, strong). Live's client draws a mate's axes
+/// MATE_COORDINATE_SYSTEM_AXIS_LINE_LENGTH_PX 50 long whatever the zoom (mates.json after_second_pick).
+pub struct ScreenTriads {
+    pub items: Vec<(Frame, f64, bool)>,
+}
+
+/// [`ScreenTriads`]' full axis length (px).
+pub const MATE_AXIS_PX: f64 = 50.0;
+
+impl ScreenTriads {
+    /// The axes and origin dots for `view`.
+    fn geometry(&self, view: &noshape_render::camera_geometry::View) -> (LineData, PointData) {
+        let (mut lines, mut pts) = (LineData::default(), PointData::default());
+        for (f, len, strong) in &self.items {
+            let Some(px) = view.world_per_px(f.origin) else { continue };
+            push_triad(&mut lines, f, len * px, if *strong { 2.5 } else { 1.5 }, 0, false);
+            pts.points.push(PointSprite { position: f.origin.as_vec3().into(), color: DARK, pick_id: 0, size: if *strong { 7.0 } else { 5.0 }, style: LineSegment::ON_TOP, _pad: 0 });
+        }
+        (lines, pts)
+    }
+}
+
+impl noshape_render::camera_geometry::CameraGeometry for ScreenTriads {
+    fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
+        let (lines, pts) = self.geometry(view);
+        if lines.segments.is_empty() {
+            return Vec::new();
+        }
+        vec![
+            Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(20),
+            Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(21),
+        ]
+    }
+}
+
 fn push_triad(lines: &mut LineData, f: &Frame, size: f64, width: f32, pick: u32, highlight: bool) {
     let o: [f32; 3] = f.origin.as_vec3().into();
     for (k, axis) in [f.x(), f.y(), f.z()].into_iter().enumerate() {
@@ -1092,6 +1127,29 @@ fn push_section_glyph(ol: &mut LineData, built: &AsmBuilt, g: &SectionGlyph, d: 
         } else {
             mark(s - side * 15.0 * w, s + side * 15.0 * w);
             mark(s, g.base);
+        }
+    }
+}
+
+#[cfg(test)]
+mod screen_triad_tests {
+    use super::*;
+    use noshape_render::camera_geometry::View;
+
+    /// Live mates.json: a mate's axes are 50 px long at the pixel size where they stand, whatever the zoom (shorter on
+    /// screen only as they turn away, as the connector glyph's).
+    #[test]
+    fn mate_axes_stay_50_px_at_any_zoom() {
+        let t = ScreenTriads { items: vec![(Frame::default(), MATE_AXIS_PX, false)] };
+        for distance in [0.1, 2.0] {
+            let camera = noshape_render::Camera { distance, ..Default::default() };
+            let view = View { camera, size: glam::DVec2::new(1200.0, 800.0) };
+            let (lines, _) = t.geometry(&view);
+            let px = view.world_per_px(DVec3::ZERO).unwrap();
+            for seg in &lines.segments {
+                let len = glam::Vec3::from(seg.a).distance(glam::Vec3::from(seg.b)) as f64;
+                assert!((len / px - 50.0).abs() < 0.01, "{} px at distance {distance}", len / px);
+            }
         }
     }
 }
