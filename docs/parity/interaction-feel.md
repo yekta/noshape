@@ -222,7 +222,7 @@ live2's measure.json (11-13 06:50–06:56) on live's own document, rebuilt (Part
 gives, at a device pixel ratio of 1 and 2. part-studio-ui `measure::the_measure_matrix_matches_live` (T1, no GPU,
 entities found with `query_entities` by a point on them); `MEASURE_ROW=<part of an id>` runs some rows.
 
-**Matched: 18 / 18** (11-13 08:51 UTC; 15 / 17 at the first run). ui-parity: the 12 measure scenarios 12 / 12.
+**Matched: 18 / 18** (11-13 08:31 UTC; 15 / 17 at the first run). ui-parity: the 12 measure scenarios 12 / 12.
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
