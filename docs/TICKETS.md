@@ -449,6 +449,25 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-13 05:00 release (qa list 04:18, candidate 6932701dc, watcher green 03:44; the latest release is v0.4.47)
+- **qa 04:18: GO on 6932701dc: no blocker.** It holds studios' a6a18313 (variable autocomplete) and psui's d90b4f6f8 (a sketch
+  point lands on a lit model edge). CI 43358766456 green on Linux, Windows and macOS. Checked on the green binary 0c5c10a6b (the
+  same code plus one handoff doc); hat15 work on a mode-700 copy (vibe7 ~/tmp/qa/rc) with #fan_control_board_depth = 2.4 mm,
+  #fan_control_board_wall_length = 12 mm and a sketch with a dimension added after them.
+  - User documents against v0.4.47: hat15, hat15b, hat8, the dock: every feature and part the same. hat15 against v0.4.43: only
+    the accepted Fan Riser (+5.72 mm³).
+  - Variable autocomplete (by hand, app): "fancontrol" in the sketch dimension lists both variables, values grey on the right,
+    the first row lit; ↓ Enter inserts #fan_control_board_wall_length and the box stays open, the next Enter commits 12; "fcb"
+    in Extrude's Depth lists the same two, Tab inserts #fan_control_board_depth.
+  - Sketch point on a lit model edge (by hand, app): a sketch on the Voltage converter's top face, the line tool's end over the
+    face's edge lights it orange and lands on it (x = 28.775 mm), saved as Coincident(point, the model edge).
+  - qa's authored documents = v0.4.47. Ticket documents: no saved reference changes; three chamfers differ (blend 8ed9c15e4,
+    the only chamfer change since v0.4.46): cli-draft-hang Chamfer 2 and cli-suppress-segv Chamfer 2 Error -> Ok;
+    crash957-after-del-sk4 Chamfer 1 Error "Failed to chamfer selections." -> Warning "1 missing selection" (the same one
+    selection missing in v0.4.47; the chamfer now runs on the rest). P3 CHAMFER-SAYS-FILLET (blend): cli-draft-hang Chamfer 3
+    now fails with "Failed to fillet selections." (was "Distance of chamfer on face too large."); a chamfer's message should
+    name chamfer.
+
 ## Release blockers for the off-slot release of 2026-11-12 (the user's sketch problems; qa list 19:33, candidate main e06b09c83, qa's app built from it on vibe4; the latest release is v0.4.45)
 - **qa 19:33: no blocker in the documents; two sketch interaction regressions for the lead's call.**
   - User documents against v0.4.45: hat15 (142 features), hat15b (143), hat8 (139), the dock (499): every feature and every

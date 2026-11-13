@@ -16,6 +16,12 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
 **c2-rings-loft stops at feature 20, Extrude 5 (core's):** the engraving cut's edges are split at the revolved ring's
 seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs live 335/206); Parasolid has no seams.
 
+## From qa (11-13 04:18 UTC): P3 CHAMFER-SAYS-FILLET
+qa's ticket document cli-draft-hang (vibe5 ~/qa/tickets): Chamfer 3 fails with "Failed to fillet selections." on main 6932701dc
+(v0.4.47: "Distance of chamfer on face too large."); a chamfer's failure names the chamfer ("Failed to chamfer selections.",
+detail.rs's Overrun::PastUnselected). Since 8ed9c15e4 by its subject; the same change fixed cli-draft-hang's and
+cli-suppress-segv's Chamfer 2 (Error -> Ok).
+
 ## From bool (11-13 03:55 UTC, lead: documents slower than live, by feature)
 Baseline qa's 02:00 vibe7 release run (head 91a90caf); per feature ours from a profiled suite run on vibe5 (loaded: rough),
 live's from live.jsonl per_feature_ms. Yours:
