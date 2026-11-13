@@ -1,19 +1,19 @@
 {
  "scenario": "doc-dialog-properties-assembly-name-description-category-par",
- "recorded": "2026-11-08T02:05:11.637Z",
+ "recorded": "2026-11-13T04:57:05.125Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
  },
  "live": {
-  "document": "a06a0983c34a57455a377492",
-  "workspace": "2755b2d724e476f44244ab90",
-  "element": "799dc7f149fecd2d3ffbd09c",
+  "document": "666149258f9a7c18a171f2ef",
+  "workspace": "724cdd6846a45d0a5aa62303",
+  "element": "400fe55f4447412754b47946",
   "start": "doc-tabs",
-  "startElement": "799dc7f149fecd2d3ffbd09c",
-  "runner": "live2 "
+  "startElement": "400fe55f4447412754b47946",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -62,6 +62,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -139,7 +166,6 @@
       "Create Drawing of Assembly 1…",
       "Select as document thumbnail",
       "Move to document…",
-      "Export…",
       "Release…"
      ],
      "highlighted": null,
@@ -184,6 +210,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -228,7 +281,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 68706
+   "t": 60352
   },
   {
    "step": 2,
@@ -241,7 +294,7 @@
    "ok": true,
    "at": [
     388,
-    791
+    813
    ],
    "state": {
     "focus": {
@@ -394,6 +447,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -438,7 +518,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 70919
+   "t": 68143
   }
  ]
 }
