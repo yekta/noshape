@@ -967,3 +967,54 @@ fn another_documents_part_pins_its_reference(cx: &mut TestAppContext) {
     cx.update(|cx| view.update(cx, |v, cx| v.open_reference_manager(None, cx)));
     cx.update(|cx| assert!(view.read(cx).ui.ref_manager.as_ref().unwrap().docs.is_empty(), "a pinned reference isn't offered an update"));
 }
+
+/// Live2 config.json (tableKeys), the assembly's Configurations table as the Part Studio's: a framed value cell edits
+/// on Enter, and Enter after typing commits it and frames the cell below.
+#[gpui::test]
+fn enter_in_a_configured_value_moves_down_a_row(cx: &mut TestAppContext) {
+    use noshape_model::assembly::config::ConfigTarget;
+    use noshape_model::ParamValue;
+    let path = pattern_document(cx, "cfg-enter");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    let (input, rows) = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let pattern = v.assembly(cx).unwrap().patterns[0].id;
+            let mut out = (String::new(), Vec::new());
+            v.edit("Configure", cx, |a| {
+                let input = noshape_ops::asm_config::add_input(a, "List", Some("Configuration"));
+                noshape_ops::asm_config::add_option(a, &input, "A");
+                let rows: Vec<String> = match &a.configuration.inputs.iter().find(|i| i.id == input).unwrap().kind {
+                    noshape_model::configuration::ConfigInputKind::List { options, .. } => options.iter().map(|o| o.id.clone()).collect(),
+                    _ => Vec::new(),
+                };
+                assert!(noshape_ops::asm_config::configure(a, &input, ConfigTarget::Pattern(pattern), noshape_model::assembly::config::param::DISTANCE));
+                out = (input, rows);
+            });
+            v.panel = Some(super::SidePanel::Configurations);
+            cx.notify();
+            out
+        })
+    });
+    assert_eq!(rows.len(), 2, "Default and A in {input}");
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.frame_cfg_cell(format!("cv-0-{}", rows[0]), w, cx))).unwrap();
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).ui.cfg_framed.is_some()), "framed");
+    assert!(cx.update(|cx| !view.read(cx).ui.cfg_enter_next.is_empty()), "the value cells drawn");
+    let focused = cx.update_window(window, |_, w, cx| view.read(cx).ui.cfg_framed.as_ref().is_some_and(|(_, f, _)| f.is_focused(w))).unwrap();
+    assert!(focused, "the framed cell has the keyboard");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_keystrokes("enter");
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).ui.cfg_edit.is_some()), "Enter edits the framed cell");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_keystrokes("5 space m m enter");
+    draw(cx, window);
+    let (value, framed) = cx.update(|cx| {
+        let v = view.read(cx);
+        let value = v.assembly(cx).unwrap().configuration.configured[0].values.get(&rows[0]).cloned();
+        (value, v.ui.cfg_framed.as_ref().map(|(k, ..)| k.clone()))
+    });
+    assert!(matches!(&value, Some(ParamValue::Expr(e)) if e.text == "5 mm"), "{value:?}");
+    assert_eq!(framed, Some(format!("cv-0-{}", rows[1])), "the cell below framed");
+}

@@ -463,6 +463,11 @@ pub struct AsmUi {
     pub cfg_mode: Option<super::config_panel::CfgMode>,
     pub cfg_toast: Option<String>,
     pub cfg_edit: Option<super::config_panel::CfgEdit>,
+    /// The configured value cell framed by a click (live `os-table-cell-selected`; typing or Enter edits it) with the
+    /// subscription that unframes it when it loses the keyboard, and each value cell's cell below (Enter after an edit
+    /// frames it: live2 config.json tableKeys).
+    pub cfg_framed: Option<(String, FocusHandle, Subscription)>,
+    pub cfg_enter_next: HashMap<String, String>,
     pub cfg_folded: HashSet<String>,
     /// Configurations panel: the "Filter inputs" field, the kind toggles
     /// (List, Checkbox, Configuration variable: show only those) and whether

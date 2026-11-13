@@ -103,7 +103,7 @@ pub struct MateDialog {
     /// Animate preview running.
     pub animating: bool,
     /// Configure assembly features mode (live 194–196): clicking a
-    /// parameter configures it; the configured ones (listed) get a dashed
+    /// parameter configures it; the configured ones (listed) get a dotted
     /// amber frame and an "Unsuppressed" checkbox is shown.
     pub configuring: Option<Vec<String>>,
     use_offset: bool,
@@ -180,16 +180,17 @@ fn text_of(e: &Option<ExprValue>) -> String {
 impl MateDialog {
     /// In "Select parameters to configure" mode a parameter row is a pick
     /// target (click: configure it); configured rows get a dashed amber
-    /// frame (live 195–196).
+    /// dotted frame (live 195–196, live2 config.json).
     fn cfg_param(&self, param: &'static str, el: impl IntoElement, cx: &mut Context<Self>) -> AnyElement {
         let Some(list) = &self.configuring else { return el.into_any_element() };
         let on = list.iter().any(|p| p == param);
         div()
             .relative()
             .border_1()
-            .when(on, |d| d.border_dashed().border_color(gpui_kit::rgb(0xfab601)))
-            .when(!on, |d| d.border_color(gpui_kit::transparent_white()))
+            .border_color(gpui_kit::transparent_white())
             .child(el)
+            // Live2 config.json (configured-field.png): 2 px #fab601 dots, 2 px apart.
+            .when(on, |d| d.child(noshape_app_core::dotted::dotted_outline(gpui_kit::rgb(0xfab601), 2.)))
             .child(
                 div()
                     .id(SharedString::from(format!("mate-cfg-{param}")))

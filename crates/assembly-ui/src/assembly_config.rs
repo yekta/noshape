@@ -260,7 +260,17 @@ impl AssemblyView {
         let sub = cx.subscribe_in(&input, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
             let done = match ev {
                 InputEvent::PressEnter { .. } => {
-                    window.focus(&this.focus, cx);
+                    match this.ui.cfg_enter_next.get(&k).cloned() {
+                        // A configured value: commit and frame the cell below (live2 config.json tableKeys).
+                        Some(next) if this.ui.cfg_edit.as_ref().is_some_and(|e| e.key == k) => {
+                            let text = st.read(cx).value().to_string();
+                            this.ui.cfg_edit = None;
+                            commit(this, text, cx);
+                            this.frame_cfg_cell(next, window, cx);
+                            return;
+                        }
+                        _ => window.focus(&this.focus, cx),
+                    }
                     true
                 }
                 InputEvent::Blur => true,
@@ -697,7 +707,8 @@ impl AssemblyView {
                         });
                     for (k, (ci, c)) in columns.iter().enumerate() {
                         let el = self.cfg_value_cell(*ci, c, rk, cx);
-                        row = row.child(cell(col_ws[k]).child(el));
+                        // The active configuration's values are bold (live2 config.json cellColours).
+                        row = row.child(cell(col_ws[k]).when(active, |d| d.font_weight(FontWeight::BOLD)).child(el));
                     }
                     section = section.child(row);
                 }
@@ -800,7 +811,82 @@ impl AssemblyView {
             let kk = kk.clone();
             this.edit(noshape_ops::config::EDIT_CONFIGURED_VALUE, cx, |a| noshape_ops::asm_config::set_cell(a, ci, &kk, ParamValue::Expr(ExprValue::new(v.trim()))));
         });
-        self.cfg_cell_text(format!("cv-{ci}-{key}"), text, (px(13.33), FontWeight::NORMAL), false, commit, cx)
+        let cell = format!("cv-{ci}-{key}");
+        let rows: Vec<String> = match self.asm_configuration(cx).inputs.iter().find(|i| i.id == c.input).map(|i| i.kind.clone()) {
+            Some(ConfigInputKind::List { options, .. }) => options.into_iter().map(|o| o.id).collect(),
+            _ => Vec::new(),
+        };
+        if let Some(below) = rows.iter().position(|r| r == key).and_then(|i| rows.get(i + 1)) {
+            self.ui.cfg_enter_next.insert(cell.clone(), format!("cv-{ci}-{below}"));
+        }
+        self.cfg_value_text(cell, text, commit, cx)
+    }
+
+    /// A configured value (live 10-27, CONFIG-CELL-EDIT, as the Part Studio's): a click frames the cell (blue 2 px),
+    /// typing on it replaces the value, Enter edits it, Esc unframes; a double-click edits with the value selected.
+    fn cfg_value_text(&mut self, key: String, text: String, commit: CfgCommit, cx: &mut Context<Self>) -> AnyElement {
+        if self.ui.cfg_edit.as_ref().is_some_and(|e| e.key == key) {
+            return self.cfg_cell_text(key, text, (px(13.33), FontWeight::NORMAL), false, commit, cx);
+        }
+        let framed = self.ui.cfg_framed.as_ref().filter(|(k, ..)| *k == key).map(|(_, f, _)| f.clone());
+        let (k1, k2, t1, t2, c1, c2) = (key.clone(), key.clone(), text.clone(), text.clone(), commit.clone(), commit);
+        div()
+            .id(SharedString::from(format!("acfg-{key}")))
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .flex()
+            .items_center()
+            .border_2()
+            .border_color(if framed.is_some() { rgb(0x1651b0) } else { gpui_kit::rgba(0x00000000) })
+            .when_some(framed, |d, f| {
+                // An "Input" context: the assembly's single-key shortcuts stay quiet while typing here.
+                d.key_context("Input").track_focus(&f).on_key_down(cx.listener(move |this, e: &KeyDownEvent, window, cx| {
+                    let k = &e.keystroke;
+                    let plain = !(k.modifiers.control || k.modifiers.alt || k.modifiers.platform);
+                    if k.key == "escape" {
+                        this.ui.cfg_framed = None;
+                    } else if k.key == "enter" {
+                        this.edit_cfg_cell(k1.clone(), t1.clone(), c1.clone(), window, cx);
+                    } else if let Some(ch) = k.key_char.clone().filter(|_| plain) {
+                        this.edit_cfg_cell(k1.clone(), t1.clone(), c1.clone(), window, cx);
+                        if let Some(e) = &this.ui.cfg_edit {
+                            e.input.update(cx, |s, cx| s.set_value(ch, window, cx));
+                        }
+                    } else {
+                        return;
+                    }
+                    cx.stop_propagation();
+                    cx.notify();
+                }))
+            })
+            .child(div().min_w_0().truncate().pl(px(3.)).text_size(px(13.33)).child(text))
+            .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                cx.stop_propagation();
+                if e.click_count() >= 2 {
+                    this.ui.cfg_framed = None;
+                    this.edit_cfg_cell(k2.clone(), t2.clone(), c2.clone(), window, cx);
+                } else {
+                    this.frame_cfg_cell(k2.clone(), window, cx);
+                }
+                cx.notify();
+            }))
+            .into_any_element()
+    }
+
+    /// Frame configured value cell `key`: it takes the keyboard, and losing it unframes it.
+    pub(super) fn frame_cfg_cell(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
+        let f = cx.focus_handle();
+        window.focus(&f, cx);
+        let k = key.clone();
+        let sub = cx.on_blur(&f, window, move |this, _, cx| {
+            if this.ui.cfg_framed.as_ref().is_some_and(|(x, ..)| *x == k) {
+                this.ui.cfg_framed = None;
+                cx.notify();
+            }
+        });
+        self.ui.cfg_framed = Some((key, f, sub));
+        cx.notify();
     }
 
     fn copy_config_table(&mut self, input: &str, cx: &mut Context<Self>) {
@@ -1019,6 +1105,7 @@ impl AssemblyView {
             );
             let mut col = v_flex().child(row);
             let only = self.ui.cfg_only_kinds;
+            let mut shown = 0;
             for input in cfg.inputs.clone() {
                 let kind_ix = match input.kind {
                     ConfigInputKind::List { .. } => 0,
@@ -1028,7 +1115,12 @@ impl AssemblyView {
                 if (only.iter().any(|o| *o) && !only[kind_ix]) || (!query.is_empty() && !input.name.to_lowercase().contains(&query)) {
                     continue;
                 }
+                shown += 1;
                 col = col.child(self.render_asm_config_input(&cfg, &input, cx));
+            }
+            // Live2 config.json: a kind toggle (or the filter) leaving no input shows "No results found".
+            if shown == 0 {
+                col = col.child(div().px(px(10.)).py(px(12.)).text_size(px(14.)).text_color(pal.text_muted).child("No results found"));
             }
             col.into_any_element()
         };
