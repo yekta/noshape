@@ -912,3 +912,22 @@ fn a_shelled_rounded_boxs_half_loses_its_rounds() {
         assert!(close(r.shape.volume().unwrap(), (24000.0 - 36.0 * 26.0 * 18.0) / 2.0, 1e-6), "{}", r.shape.volume().unwrap());
     }
 }
+
+/// A mirrored copy shows the faces its original shows: pieces of one periodic surface OCCT split at its seam read as
+/// one face in the copy too (each face's surface was copied apart, so the copy's pieces no longer shared it:
+/// c2-fan-blade-sweep's Mirror 3, 25 faces for live's 16).
+#[test]
+fn a_mirrored_copy_shows_its_originals_faces() {
+    let shown = |s: &Shape| {
+        let t = s.shown_topology().unwrap();
+        t.faces_joined.iter().enumerate().filter(|(i, j)| *i == **j).count()
+    };
+    let cyl = make_cylinder(&Plane::xy(), 10.0, 20.0, 2.0 * PI).unwrap();
+    let cutter = make_box_corners(DVec3::new(-20.0, -20.0, -1.0), DVec3::new(-5.0, 20.0, 21.0)).unwrap();
+    let part = boolean(BooleanOp::Cut, &[cyl], &[cutter], &BooleanOptions::default()).unwrap().shape;
+    let raw = part.faces().len();
+    let original = shown(&part);
+    assert!(original < raw, "the cut wall across the seam: {raw} faces, {original} shown");
+    let m = transform(&part, &Transform::Mirror(Plane::from_normal(DVec3::new(30.0, 0.0, 0.0), DVec3::X)), false).unwrap().shape;
+    assert_eq!(shown(&m), original, "raw faces {raw}, shown in the original {original}");
+}

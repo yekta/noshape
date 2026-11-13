@@ -38,6 +38,9 @@
 #include <Message_ProgressScope.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
+#include <unordered_map>
+#include <BRepBuilderAPI_ModifyShape.hxx>
+#include <BRepTools_TrsfModification.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
@@ -9873,6 +9876,52 @@ bool same_trsf(const gp_Trsf& a, const gp_Trsf& b)
   return true;
 }
 
+// A transformed copy that makes each surface the original's faces share once (OCCT's makes one per face: a mirrored
+// copy's seam pieces of one surface no longer read as one face, c2-fan-blade-sweep's Mirror 3).
+class SharedSurfaceTrsf : public BRepTools_TrsfModification
+{
+public:
+  explicit SharedSurfaceTrsf(const gp_Trsf& t)
+      : BRepTools_TrsfModification(t)
+  {
+  }
+
+  bool NewSurface(const TopoDS_Face& F, occ::handle<Geom_Surface>& S, TopLoc_Location& L, double& Tol, bool& RevWires, bool& RevFace) override
+  {
+    if (!BRepTools_TrsfModification::NewSurface(F, S, L, Tol, RevWires, RevFace))
+      return false;
+    TopLoc_Location                  fl;
+    const occ::handle<Geom_Surface>& orig = BRep_Tool::Surface(F, fl);
+    for (const Made& x : myMade[orig.get()])
+      if (x.loc.IsEqual(fl))
+      {
+        S = x.surface;
+        return true;
+      }
+    myMade[orig.get()].push_back({fl, S, orig});
+    return true;
+  }
+
+private:
+  struct Made
+  {
+    TopLoc_Location           loc;
+    occ::handle<Geom_Surface> surface;
+    occ::handle<Geom_Surface> orig; // (kept alive: its address is the key)
+  };
+  std::unordered_map<const Geom_Surface*, std::vector<Made>> myMade;
+};
+
+class SharedSurfaceTransform : public BRepBuilderAPI_ModifyShape
+{
+public:
+  SharedSurfaceTransform(const TopoDS_Shape& s, const gp_Trsf& t)
+  {
+    myModification = new SharedSurfaceTrsf(t);
+    DoModif(s);
+  }
+};
+
 std::shared_ptr<const MirrorCopy> mirror_copy(const TopoDS_Shape& base, const gp_Trsf& m)
 {
   static std::mutex                                     mu;
@@ -9884,7 +9933,7 @@ std::shared_ptr<const MirrorCopy> mirror_copy(const TopoDS_Shape& base, const gp
       if (c->base.IsEqual(base) && same_trsf(c->m, m))
         return c;
   }
-  BRepBuilderAPI_Transform tr(base, m, true);
+  SharedSurfaceTransform tr(base, m);
   if (!tr.IsDone())
     fail_op("transform failed");
   auto c  = std::make_shared<MirrorCopy>();
