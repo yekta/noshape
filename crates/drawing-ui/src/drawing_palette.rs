@@ -378,23 +378,34 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// Where the palette sits: beside the annotation text's upper right
-    /// (editor px).
-    fn palette_at(&self, id: u64) -> [f32; 2] {
+    /// Where the palette sits (editor px): its left edge just right of the annotation's text, vertically centred on
+    /// it (live2 feel/drawing.json dimensionPalette: a 407 x 133 popup).
+    pub(crate) fn palette_at(&self, id: u64) -> [f32; 2] {
+        const PALETTE_H: f64 = 133.;
         let Some(b) = &self.built else { return [200., 120.] };
         let picks = self.picks_of(Sel::Annotation(id));
-        let (mut x, mut y) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
+        let (mut x, mut lo, mut hi) = (f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY);
         for t in b.geometry.texts.iter().filter(|t| picks.contains(&t.pick)) {
-            x = x.max(t.pos[0] + noshape_model::drawing::font::text_width(&t.text, t.height));
-            y = y.max(t.pos[1] + t.height);
+            use noshape_model::drawing::sheet::Anchor;
+            let w = noshape_model::drawing::font::text_width(&t.text, t.height);
+            let (dx, dy) = match t.anchor {
+                Anchor::BottomLeft => (w, 0.),
+                Anchor::BottomCenter => (w / 2., 0.),
+                Anchor::Center => (w / 2., -t.height / 2.),
+                Anchor::TopLeft => (w, -t.height),
+                Anchor::TopCenter => (w / 2., -t.height),
+            };
+            x = x.max(t.pos[0] + dx);
+            lo = lo.min(t.pos[1] + dy);
+            hi = hi.max(t.pos[1] + dy + t.height);
         }
         if !x.is_finite() {
             return [200., 120.];
         }
         let s = self.size_px();
         let px_x = (x - self.center[0]) * self.zoom + s[0] / 2.0;
-        let px_y = (self.center[1] - y) * self.zoom + s[1] / 2.0;
-        [(px_x as f32).clamp(0., (s[0] as f32 - 500.).max(0.)), (px_y as f32 - 30.).clamp(0., (s[1] as f32 - 200.).max(0.))]
+        let px_mid = (self.center[1] - (lo + hi) / 2.0) * self.zoom + s[1] / 2.0;
+        [(px_x as f32).clamp(0., (s[0] as f32 - 500.).max(0.)), ((px_mid - PALETTE_H / 2.0) as f32).clamp(0., (s[1] as f32 - 200.).max(0.))]
     }
 
     pub fn render_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {

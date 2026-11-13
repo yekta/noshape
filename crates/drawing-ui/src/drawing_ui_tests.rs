@@ -337,6 +337,15 @@ fn the_dimension_palette_stays_open_on_enter_and_on_the_empty_sheet(cx: &mut Tes
         (e.palette.is_some(), e.current_sheet().annotations.iter().find(|a| a.id == id).map(|a| a.format.prefix.clone()))
     });
     assert!(open, "Enter leaves the palette open");
+    // Live2 dimensionPalette: its left edge just right of the dimension's text, vertically centred on it (133 px).
+    let (at, x_px, y_px) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let (b, picks, s) = (e.built.clone().unwrap(), e.picks_of(crate::drawing_view::Sel::Annotation(id)), e.size_px());
+        let t = b.geometry.texts.iter().find(|t| picks.contains(&t.pick)).expect("the dimension's text").clone();
+        (e.palette_at(id), ((t.pos[0] - e.center[0]) * e.zoom + s[0] / 2.0) as f32, ((e.center[1] - t.pos[1]) * e.zoom + s[1] / 2.0) as f32)
+    });
+    assert!(at[0] > x_px, "right of the text: {at:?} vs x {x_px}");
+    assert!((at[1] + 66.5 - y_px).abs() < 12., "centred on the text: top {} vs text y {y_px}", at[1]);
     assert_eq!(prefix.as_deref(), Some("R"), "Enter made the edit");
     let empty = empty_sheet_point(cx, window, &editor);
     click_sheet(cx, window, &editor, empty);
