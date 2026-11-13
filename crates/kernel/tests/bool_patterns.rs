@@ -2229,6 +2229,34 @@ fn parts_of_one_torus_fused_as_occt() {
     }
 }
 
+/// A straight half-round rib fused onto the end of a half ring (a private document's rib pattern): the rib's end arc
+/// lies on the ring's torus face, across that face's seam, its middle point exactly on it ("an edge on another
+/// argument's free-form face" before: the seam's crossing missed): ours, as OCCT's.
+#[test]
+fn a_rib_fused_onto_a_rings_end_across_its_seam_as_occt() {
+    let o = DVec3::new(0.0, 0.0084, 0.04);
+    let ring = k::make_torus(&k::Plane::new(o, DVec3::NEG_Y, DVec3::X), 0.0226, 0.0004, std::f64::consts::PI).unwrap();
+    let c = DVec3::new(-0.0226, 0.0084, 0.04);
+    let arc = k::make_arc(c, DVec3::Z, DVec3::NEG_X, 0.0004, -std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2).unwrap();
+    let line = k::make_line(c - DVec3::Y * 0.0004, c + DVec3::Y * 0.0004).unwrap();
+    let face = k::make_face_from_wire(&k::make_wire(&[arc, line]).unwrap(), true).unwrap();
+    let rib = k::extrude(&face, DVec3::new(0.0, 0.0, -0.005)).unwrap().shape;
+    let opts = k::BooleanOptions::default();
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&rib), std::slice::from_ref(&ring), &opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let occt = k::boolean(k::BooleanOp::Fuse, &[rib], &[ring], &opts).unwrap();
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid());
+    let counts = |s: &k::Shape| (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge), s.count(k::ShapeType::Vertex));
+    assert_eq!(counts(&r.shape), counts(&occt.shape));
+    let (v, vo) = (r.shape.volume().unwrap(), occt.shape.volume().unwrap());
+    assert!((v - vo).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {vo}");
+}
+
 /// A spring's wire fused with its mirror image (c2-extension-spring's Mirror 1, recorded): their swept faces meet
 /// tangent across the 1 mm edge on the mirror plane, where OCCT's sections are seven lines 2-4 um apart along it (each
 /// 100 tolerances long, corner to corner: "a short section from a corner" before). Sections along an edge of both faces
