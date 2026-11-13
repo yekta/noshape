@@ -9,6 +9,9 @@ use glam::DVec3;
 
 const TOL: f64 = 1e-7;
 
+/// The plane a polygon's side lies on: the face it comes from, a point of it and its unit normal.
+type Side = (usize, (DVec3, DVec3));
+
 /// `del` (faces of `solid`) taken away as [`crate::delete_faces`] does, when each is a cylinder, sphere or torus and
 /// every kept face beside one is a plane whose new outline the planes round it give; `None` otherwise.
 pub fn delete_planar_rounds(solid: &Shape, del: &[Shape]) -> Option<OpResult> {
@@ -138,7 +141,7 @@ pub fn delete_planar_rounds(solid: &Shape, del: &[Shape]) -> Option<OpResult> {
 /// A planar face's wire (`ids`, edges of the solid) as a polygon: its edges in order, each giving the plane its new
 /// side lies on (`side_of`: `None` to give up, `Some(None)` for none), the corners where consecutive planes meet.
 /// `None` where the planes don't meet in a point or a side would run backwards (a neighbour cut back).
-fn new_outline(ids: &[usize], edges: &[Shape], origin: DVec3, normal: DVec3, side_of: &dyn Fn(usize) -> Option<Option<(usize, (DVec3, DVec3))>>) -> Option<Vec<DVec3>> {
+fn new_outline(ids: &[usize], edges: &[Shape], origin: DVec3, normal: DVec3, side_of: &dyn Fn(usize) -> Option<Option<Side>>) -> Option<Vec<DVec3>> {
     // The edges chained end to end.
     let mut ends: Vec<(usize, DVec3, DVec3)> = ids.iter().map(|&ei| edges[ei].endpoints().ok().map(|(a, b)| (ei, a, b))).collect::<Option<_>>()?;
     let scale = ends.iter().map(|e| e.1.length().max(e.2.length())).fold(1.0, f64::max);
