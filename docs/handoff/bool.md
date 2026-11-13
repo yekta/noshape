@@ -9,8 +9,7 @@ Lead's goal (11-13): all 84 suite documents faster than live. qa's baseline: SCO
 02:00, release). Ranking and split posted to the lead 11-13 04:03; core's and blend's rows in core.md / blend.md
 ("From bool (11-13 03:55)" and the 04:03 additions). bool2 has the impeller's and rings-loft's Booleans.
 
-**Hosts (lead 11-13 05:50):** gates and probes on vibe7 (NOSHAPE_GATE_HOST=vibe7, NOSHAPE_RB_HOST=vibe7; knurls left out
-there too); the land queue on vibe5 (NOSHAPE_LAND_QUEUE_HOST=vibe5 NOSHAPE_LAND_HOSTS="vibe5 vibe3" for land.sh). One gate
+**Hosts (lead 11-13 06:30: back to vibe5):** gates and probes on vibe5 (gate-chain.sh's default; vibe7 too loaded); the land queue on vibe5 (NOSHAPE_LAND_QUEUE_HOST=vibe5 NOSHAPE_LAND_HOSTS="vibe5 vibe3" for land.sh). One gate
 at a time; CARGO_BUILD_JOBS=6 (gate.sh sets it). vibe7 has the corpora (~/agents/bool-corpora, copied 05:55), the Shell
 dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording (~/tmp/bool/private/rec-dock, mode 700).
 
@@ -38,8 +37,13 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    (`git checkout crates/kernel/tests/all.rs` first). bool-wip-seam is the history of it (no longer needed).
    Data: vibe5 / vibe7 ~/tmp/bool/private (mode 700: dock.noshape, hat8, hat15, rec-dock = the 44 cases; nothing of it
    in the repo or the corpora).
-   Next declines there: 5 x "a face's vertex off its plane", 4 x "a new edge on a free-form face" (one of the 12 seam
-   cases now), 2 x "a non-manifold result" (582 ms), "a point near two vertices" (a 1355-face cut, 1.24 s). hat8: its
+   **Then fe8859ed4 on bool-seam (06:40, gating on vibe5, log chain-fe8859ed4.out; covers both commits):** a new edge
+   on an elementary surface under a trim (torus, sphere, trimmed cylinder / cone; rust_boolean.cpp "a new edge on a
+   free-form face") gets OCCT's exact projection: the 4 such dock cases were a plane's ellipse on a
+   Geom_RectangularTrimmedSurface of a cylinder. The dock: 33 of 44 ours, 0 differing, 1 equivalent. If both gates are
+   clean, land bool-seam (both commits) from bool-hat.
+   Next declines there: 5 x "a face's vertex off its plane", 2 x "a non-manifold result" (582 ms), "a point near two
+   vertices" (a 1355-face cut, 1.24 s). hat8: its
    biggest Boolean is ours, 1.44 s (794 Rust, 565 build): speed.
 2. **cf-surface-pattern's Surface Pattern 3 (+4.3 s):** our 85-tool cut 1.6-3.6 s (case sp-1113/7ecd5a8b6e7c4f6b,
    vibe5 ~/agents/bool-corpora/sp-1113). Profile (xprobe::probe_case_sample, release, LTO off): C2::at 29 %,
