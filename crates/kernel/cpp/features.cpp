@@ -3594,7 +3594,7 @@ static bool planar_sides(const TopoDS_Shape& loft, TopoDS_Shape& result, HHist& 
 // edges all splines, live's 4 circles, 3 lines, 3 splines). Each edge whose ends and middle are a piece's takes its
 // curve, its curves on its faces fitted to it again. On a copy first: the shape changed only if that comes out valid
 // with its volume.
-static void restore_section_curves(TopoDS_Shape& out, const std::vector<TopoDS_Wire>& wires)
+static void restore_section_curves(TopoDS_Shape& out, const std::vector<TopoDS_Wire>& wires, bool light = false)
 {
   struct Piece
   {
@@ -3651,6 +3651,7 @@ static void restore_section_curves(TopoDS_Shape& out, const std::vector<TopoDS_W
   };
   auto apply = [](const std::vector<std::tuple<TopoDS_Edge, occ::handle<Geom_Curve>, double, double>>& found) {
     BRep_Builder B;
+    bool         same = true;
     for (const auto& [e, c, f, l] : found)
     {
       TopoDS_Edge E = e;
@@ -3659,7 +3660,9 @@ static void restore_section_curves(TopoDS_Shape& out, const std::vector<TopoDS_W
       B.SameRange(E, false);
       B.SameParameter(E, false);
       BRepLib::SameParameter(E, BRep_Tool::Tolerance(E));
+      same = same && BRep_Tool::SameParameter(E);
     }
+    return same;
   };
   if (pieces.empty())
     return;
@@ -3667,7 +3670,14 @@ static void restore_section_curves(TopoDS_Shape& out, const std::vector<TopoDS_W
   const auto          trial = matches(cp.Shape());
   if (trial.empty())
     return;
-  apply(trial);
+  // (Light: each edge's curves on its faces fitted to it within its tolerance is enough.)
+  if (apply(trial) && light)
+  {
+    out = cp.Shape();
+    return;
+  }
+  if (light)
+    return;
   GProp_GProps g0, g1;
   BRepGProp::VolumeProperties(out, g0);
   BRepGProp::VolumeProperties(cp.Shape(), g1);
@@ -3678,7 +3688,7 @@ static void restore_section_curves(TopoDS_Shape& out, const std::vector<TopoDS_W
 
 static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool closed,
                        rust::Slice<const double> start_points, const LoftEnds& ends, bool allow_natural,
-                       const TopoDS_Shape& path = TopoDS_Shape(), int path_count = 0)
+                       const TopoDS_Shape& path = TopoDS_Shape(), int path_count = 0, bool bare = false)
 {
   const size_t n = sections.items.size();
   if (n < 2)
@@ -3819,6 +3829,17 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
     fail_op("loft failed (incompatible sections?)");
   if (natural && (!natural_loft(ts.Shape(), smooth, ends, drop) || !BRepCheck_Analyzer(ts.Shape()).IsValid()))
     return loft_impl(sections, solid, ruled, closed, start_points, ends, false, path, path_count);
+  // A bare loft (a blend's tool): its shape only, as ThruSections makes it, its sides' planes and its ends' curves.
+  if (bare)
+  {
+    TopoDS_Shape out = ts.Shape(), m;
+    HHist        mh;
+    if (planar_sides(out, m, mh))
+      out = m;
+    if (!closed && !wires.empty())
+      restore_section_curves(out, {wires.front(), wires.back()}, true);
+    return HistoryBuilder({}, out).finish();
+  }
   HHist h = history_of(args, ts);
   if (matched)
   {
@@ -3889,6 +3910,11 @@ OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
     ends = {(int)c[0], c[1], gp_Vec(c[2], c[3], c[4]), (int)c[5], c[6], gp_Vec(c[7], c[8], c[9]), conditions.size() > 10 && c[10] != 0};
   }
   return loft_impl(sections, solid, ruled, closed, start_points, ends, true, path.shape, path_count);
+}
+
+OpOut op_loft_tool(const OcShapeList& sections, bool closed, rust::Slice<const double> start_points)
+{
+  return loft_impl(sections, true, false, closed, start_points, LoftEnds{}, false, TopoDS_Shape(), 0, true);
 }
 
 // ---------------------------------------------------------------- thicken / shell

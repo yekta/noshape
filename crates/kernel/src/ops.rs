@@ -321,6 +321,16 @@ pub fn loft(sections: &[Shape], opts: &LoftOptions) -> Result<OpResult> {
     op(ffi::op_loft(&l, opts.solid, opts.ruled, opts.closed, &pts, &conditions, path.raw(), count))
 }
 
+/// A solid lofted through closed sections for a blend's tool: ThruSections' own surfaces (not the Loft feature's), its
+/// planar sides as planes and its end sections' own curves; no history.
+pub fn loft_tool(sections: &[Shape], closed: bool, start_points: &[DVec3]) -> Result<OpResult> {
+    if start_points.len() != sections.len() {
+        return Err(KernelError::invalid("one start point per loft section is required"));
+    }
+    let pts: Vec<f64> = start_points.iter().flat_map(|v| [v.x, v.y, v.z]).collect();
+    op(ffi::op_loft_tool(&vec_to_list(sections), closed, &pts))
+}
+
 // ---------------------------------------------------------------- thicken / shell
 
 /// Thicken a face or shell into a solid: `t1` along the face normal and `t2`

@@ -148,8 +148,9 @@ bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, double tol)
 // Whether free-form face `t` (a lofted tool's side) lies on part face `g` where it covers it: of its sample points over
 // `g` near its surface (within 50 atol: farther ones are other parts of `t`), at least three and every one within `atol`,
 // normals within 0.02 rad (a loft's side spans a wall's planes and cylinders, each only approximately:
-// c2-variable-fillet-faceblend's held face blend, ~0.005 mm and ~0.009 rad off). Its largest distance in `dev`.
-bool lies_on(const TopoDS_Face& t, const TopoDS_Face& g, double atol, double& dev)
+// c2-variable-fillet-faceblend's held face blend, ~0.005 mm and ~0.009 rad off). Its largest distance in `dev`. (`gbox`:
+// `g`'s box; points off it are not projected.)
+bool lies_on(const TopoDS_Face& t, const TopoDS_Face& g, const Bnd_Box& gbox, double atol, double& dev)
 {
   const GeomAbs_SurfaceType k = BRepAdaptor_Surface(t, false).GetType();
   if (k != GeomAbs_BSplineSurface && k != GeomAbs_BezierSurface)
@@ -157,8 +158,11 @@ bool lies_on(const TopoDS_Face& t, const TopoDS_Face& g, double atol, double& de
   const TopoDS_Face               tf = TopoDS::Face(t.Oriented(TopAbs_FORWARD)), gf = TopoDS::Face(g.Oriented(TopAbs_FORWARD));
   double                          u0, u1, v0, v1;
   BRepTools::UVBounds(tf, u0, u1, v0, v1);
-  BRepTopAdaptor_FClass2d         in_t(tf, 1e-9), in_g(gf, 1e-9);
+  BRepTopAdaptor_FClass2d         in_t(tf, 1e-9);
+  std::optional<BRepTopAdaptor_FClass2d> in_g;
   const occ::handle<Geom_Surface> st = BRep_Tool::Surface(tf), sg = BRep_Tool::Surface(gf);
+  Bnd_Box                         near_g = gbox;
+  near_g.Enlarge(50 * atol);
   constexpr int                   N    = 12;
   int                             over = 0;
   dev                                  = 0;
@@ -171,12 +175,16 @@ bool lies_on(const TopoDS_Face& t, const TopoDS_Face& g, double atol, double& de
       gp_Pnt q;
       gp_Vec du, dv;
       st->D1(uv.X(), uv.Y(), q, du, dv);
+      if (near_g.IsOut(q))
+        continue;
       GeomAPI_ProjectPointOnSurf pr(q, sg);
       if (pr.NbPoints() == 0 || pr.LowerDistance() > 50 * atol)
         continue;
       double ug, vg;
       pr.LowerDistanceParameters(ug, vg);
-      if (in_g.Perform(gp_Pnt2d(ug, vg), false) != TopAbs_IN)
+      if (!in_g)
+        in_g.emplace(gf, 1e-9);
+      if (in_g->Perform(gp_Pnt2d(ug, vg), false) != TopAbs_IN)
         continue;
       gp_Pnt qg;
       gp_Vec dug, dvg;
@@ -794,19 +802,20 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
   for (size_t i = 0; i < tools.size(); ++i)
   {
     ShapeIMap strips;
-    Bnd_Box   tb;
-    BRepBndLib::Add(tools[i], tb);
     for (TopExp_Explorer x(tools[i], TopAbs_FACE); x.More(); x.Next())
     {
       const TopoDS_Face t = TopoDS::Face(x.Current());
       if (internal.Contains(t))
         continue;
       bool              on = false;
+      Bnd_Box           fb;
+      BRepBndLib::Add(t, fb);
+      fb.Enlarge(5e-3 * size);
       for (int j = 1; j <= pfaces.Extent(); ++j)
       {
         double dev = 0;
         bool   here = same_surface(t, TopoDS::Face(pfaces(j)), 10 * tol);
-        if (!here && !tb.IsOut(pboxes[j]) && lies_on(t, TopoDS::Face(pfaces(j)), 1e-4 * size, dev))
+        if (!here && !fb.IsOut(pboxes[j]) && lies_on(t, TopoDS::Face(pfaces(j)), pboxes[j], 1e-4 * size, dev))
         {
           here = true;
           approx.emplace_back(t, j, dev);
@@ -907,13 +916,48 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
   BRepClass3d_SolidClassifier in_part(P);
   const double                eps = 1e-5 * size;
   auto in_p = [&](const gp_Pnt& q) {
-    const KernelTimer t1("blend.direct.classify");
+    const KernelTimer t1("blend.direct.classify.part");
     in_part.Perform(q, tol);
     return in_part.State() == TopAbs_IN;
   };
   // Each tool taken away (it lies in the part: a convex edge's round) or added (outside it: a concave edge's): by a
   // point just inside it beside a face it shares with the part.
   std::vector<bool> added(tools.size(), false);
+  // By a part face the strip lies on, at a point inside it: the tool's outward normal there along the part's (a taken
+  // tool's) or against it (an added one's). None when unsure.
+  std::map<int, std::unique_ptr<BRepTopAdaptor_FClass2d>> part_cls;
+  auto added_by_face = [&](size_t i, const TopoDS_Face& t, const gp_Pnt& q, const gp_Vec& n) -> std::optional<bool> {
+    for (int j : coincident[i])
+    {
+      double slack = 0;
+      if (!on_face(t, j, slack))
+        continue;
+      const TopoDS_Face          g = TopoDS::Face(pfaces(j));
+      GeomAPI_ProjectPointOnSurf pr(q, BRep_Tool::Surface(g));
+      if (pr.NbPoints() == 0 || pr.LowerDistance() > 10 * tol + slack)
+        continue;
+      double u, v;
+      pr.LowerDistanceParameters(u, v);
+      std::unique_ptr<BRepTopAdaptor_FClass2d>& cls = part_cls[j];
+      if (!cls)
+        cls = std::make_unique<BRepTopAdaptor_FClass2d>(g, 1e-9);
+      if (cls->Perform(gp_Pnt2d(u, v), false) != TopAbs_IN)
+        continue;
+      gp_Pnt o;
+      gp_Vec du, dv;
+      BRep_Tool::Surface(g)->D1(u, v, o, du, dv);
+      gp_Vec ng = du.Crossed(dv);
+      if (ng.Magnitude() < 1e-300)
+        continue;
+      ng.Normalize();
+      if (g.Orientation() == TopAbs_REVERSED)
+        ng.Reverse();
+      const double c = n.Dot(ng);
+      if (std::abs(c) > 0.9)
+        return c < 0;
+    }
+    return std::nullopt;
+  };
   for (size_t i = 0; i < tools.size(); ++i)
   {
     // (Where the strip lies on the part: inside it on one side and out on the other; past the part's face both are out.)
@@ -942,6 +986,12 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
         n.Normalize();
         if (t.Orientation() == TopAbs_REVERSED)
           n.Reverse();
+        if (const std::optional<bool> by_face = added_by_face(i, t, q, n))
+        {
+          added[i] = *by_face;
+          known    = true;
+          break;
+        }
         const bool in_inner = in_p(q.Translated(n * -eps)), in_outer = in_p(q.Translated(n * eps));
         if (in_inner == in_outer)
           continue;
@@ -1275,11 +1325,40 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
   // (OCCT's IN checked by rays: its classifier puts a family of points inside a lofted tool now and then, its ray through
   // one of the tool's edges (c2-variable-fillet-faceblend's pocket walls); a clean ray's OUT wins.)
   std::vector<std::unique_ptr<RayClassifier>> rays_in(tools.size());
-  auto inside_kind = [&](const gp_Pnt& p, size_t skip, bool add) {
+  // Whether `p`, just off part face `j`, is beside one of tool `i`'s strips on that face (where the tool meets the face:
+  // its blends cross only the part's other faces).
+  std::map<const TopoDS_TShape*, std::unique_ptr<BRepTopAdaptor_FClass2d>> strip_cls;
+  auto beside_strip = [&](const gp_Pnt& p, size_t i, int j) {
+    for (const TopoDS_Face& t : strip_faces[i])
+    {
+      double slack = 0;
+      if (!on_face(t, j, slack))
+        continue;
+      const TopoDS_Face          fw = TopoDS::Face(t.Oriented(TopAbs_FORWARD));
+      GeomAPI_ProjectPointOnSurf pr(p, BRep_Tool::Surface(fw));
+      if (pr.NbPoints() == 0 || pr.LowerDistance() > 2 * eps + slack)
+        continue;
+      double u, v;
+      pr.LowerDistanceParameters(u, v);
+      std::unique_ptr<BRepTopAdaptor_FClass2d>& cls = strip_cls[t.TShape().get()];
+      if (!cls)
+        cls = std::make_unique<BRepTopAdaptor_FClass2d>(fw, 1e-9);
+      if (cls->Perform(gp_Pnt2d(u, v), false) == TopAbs_IN)
+        return true;
+    }
+    return false;
+  };
+  auto inside_kind = [&](const gp_Pnt& p, size_t skip, bool add, int j = 0) {
     for (size_t i = 0; i < tools.size(); ++i)
       if (i != skip && added[i] == add && !tool_boxes[i].IsOut(p))
       {
-        const KernelTimer t1("blend.direct.classify");
+        if (j > 0 && std::find(coincident[i].begin(), coincident[i].end(), j) != coincident[i].end())
+        {
+          if (beside_strip(p, i, j))
+            return true;
+          continue;
+        }
+        const KernelTimer t1("blend.direct.classify.tool");
         in_tool[i]->Perform(p, tol);
         if (in_tool[i]->State() != TopAbs_IN)
           continue;
@@ -1335,7 +1414,7 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
         no("a piece with no point inside");
       // (A piece on a taken tool's face goes with it (just inside the material); one an added tool covers, too (just
       // outside).)
-      if (inside_kind(p.Translated(n * -eps), tools.size(), false) || inside_kind(p.Translated(n * eps), tools.size(), true))
+      if (inside_kind(p.Translated(n * -eps), tools.size(), false, j) || inside_kind(p.Translated(n * eps), tools.size(), true, j))
       {
         if (dbg)
           std::fprintf(stderr, "    dropped: its point (%.3f %.3f %.3f) is in a tool\n", p.X() * 1e3, p.Y() * 1e3, p.Z() * 1e3);
@@ -1349,33 +1428,56 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     if (kept == 0)
       h->Remove(g);
   }
-  // Blends against each other (after the part's faces: their touch curves' crossings are known).
-  for (size_t k = 0; k < all_blends.size(); ++k)
+  // Blends against each other (after the part's faces: their touch curves' crossings are known), each pair on its own as
+  // the part's.
+  std::vector<Pair> blend_pairs;
   {
-    Bnd_Box bb;
-    BRepBndLib::Add(all_blends[k], bb);
-    for (size_t m = k + 1; m < all_blends.size(); ++m)
-    {
-      if (blend_tool[m] == blend_tool[k])
-        continue;
-      Bnd_Box mb;
-      BRepBndLib::Add(all_blends[m], mb);
-      if (bb.IsOut(mb))
-        continue;
-      const KernelTimer t_bb("blend.direct.section.blends");
-      // (Two pieces of a held blend, end to end: they meet along their shared section, its slope there each loft's own.)
-      const bool ends_meet = meet.count(std::minmax(blend_tool[k], blend_tool[m])) > 0;
-      if (ends_meet ? tangent_along_shared_circle(all_blends[k], all_blends[m], 100 * tol, M_PI / 2) : tangent_along_shared_circle(all_blends[k], all_blends[m], tol))
+    std::vector<Bnd_Box> bboxes(all_blends.size());
+    for (size_t k = 0; k < all_blends.size(); ++k)
+      BRepBndLib::Add(all_blends[k], bboxes[k]);
+    for (size_t k = 0; k < all_blends.size(); ++k)
+      for (size_t m = k + 1; m < all_blends.size(); ++m)
       {
-        if (dbg)
-          std::fprintf(stderr, "  section of blends %zu and %zu: tangent along their shared circle\n", k, m);
-        continue;
+        if (blend_tool[m] == blend_tool[k] || bboxes[k].IsOut(bboxes[m]))
+          continue;
+        domain_of(all_blends[k]);
+        domain_of(all_blends[m]);
+        blend_pairs.push_back(Pair{(int)m, k});
       }
-      if (!section(all_blends[k], all_blends[m], on_blend[k], on_blend[m], &vertices))
+  }
+  {
+    const KernelTimer t_bb("blend.direct.section.blends");
+    frozen = true;
+    OSD_Parallel::For(0, (int)blend_pairs.size(), [&](int n) {
+      Pair&        pr = blend_pairs[(size_t)n];
+      const size_t k = pr.k, m = (size_t)pr.j;
+      try
       {
-        no("two blends' section");
+        // (Two pieces of a held blend, end to end: they meet along their shared section, its slope there each loft's
+        // own.)
+        const bool ends_meet = meet.count(std::minmax(blend_tool[k], blend_tool[m])) > 0;
+        if (ends_meet ? tangent_along_shared_circle(all_blends[k], all_blends[m], 100 * tol, M_PI / 2) : tangent_along_shared_circle(all_blends[k], all_blends[m], tol))
+        {
+          if (dbg)
+            std::fprintf(stderr, "  section of blends %zu and %zu: tangent along their shared circle\n", k, m);
+          pr.ok = true;
+          return;
+        }
+        pr.ok = section(all_blends[k], all_blends[m], pr.on_a, pr.on_b, &vertices);
       }
-    }
+      catch (...)
+      {
+        pr.ok = false;
+      }
+    });
+    frozen = false;
+  }
+  for (const Pair& pr : blend_pairs)
+  {
+    if (!pr.ok)
+      no("two blends' section");
+    on_blend[pr.k].insert(on_blend[pr.k].end(), pr.on_a.begin(), pr.on_a.end());
+    on_blend[(size_t)pr.j].insert(on_blend[(size_t)pr.j].end(), pr.on_b.begin(), pr.on_b.end());
   }
   for (size_t k = 0; k < all_blends.size(); ++k)
   {

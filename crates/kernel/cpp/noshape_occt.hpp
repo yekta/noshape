@@ -935,6 +935,7 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
 OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
               rust::Slice<const double> start_points, rust::Slice<const double> conditions, const OcShape& path,
               int32_t path_count);
+OpOut op_loft_tool(const OcShapeList& sections, bool closed, rust::Slice<const double> start_points);
 void  set_working_scale(double k);
 // This thread's checked blends retry an invalid result with slightly smaller sizes (on by default).
 void  set_blend_retries(bool on);

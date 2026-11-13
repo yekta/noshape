@@ -1074,7 +1074,8 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
         let tools: Vec<Shape> = cuts.iter().map(|t| t.shape.clone()).collect();
         let rims = cut_edges.iter().map(|&e| shape.sub_shape(ShapeType::Edge, e)).collect::<Result<Vec<_>, _>>()?;
         match k::blend_direct(shape, &tools, &rims) {
-            Ok(res) if res.shape.is_valid() && res.shape.count(ShapeType::Solid) == 1 => {
+            // (Checked valid by the build.)
+            Ok(res) if res.shape.count(ShapeType::Solid) == 1 => {
                 let names = body.shape_names();
                 let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&|n: &Name| Role::Blend(n.clone())));
                 let (shape, face_names) = if ball { conic_contacts(ev, shape, &chain.iter().map(|c| c.shape.clone()).collect::<Vec<_>>(), &conics, res.shape, face_names, spec.r1)? } else { (res.shape, face_names) };
@@ -1383,8 +1384,9 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
         Ok(Some(rolling_ball(q, tangent_dir(&chain[i], is_start)?, &edges[i].sup, r, q + edges[i].inward * r)?))
     };
     // A section off the part: its corners and their middle outside.
+    let pbox = shape.bounding_box(false)?;
     let off = |wire: &Shape| -> FResult<bool> {
-        let out = |p: DVec3| shape.classify_point(p, scale * 1e-9).is_ok_and(|k| k == k::PointClass::Outside);
+        let out = |p: DVec3| !(pbox.min.cmple(p).all() && p.cmple(pbox.max).all()) || shape.classify_point(p, scale * 1e-9).is_ok_and(|k| k == k::PointClass::Outside);
         let corners: Vec<DVec3> = wire.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect();
         Ok(!corners.is_empty() && corners.iter().all(|p| out(*p)) && out(corners.iter().sum::<DVec3>() / corners.len() as f64))
     };
@@ -1491,7 +1493,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
                 starts.extend(more_starts);
             }
         }
-        let tool = k::loft(&secs, &k::LoftOptions { solid: true, closed, start_points: Some(starts), ..Default::default() })?;
+        let tool = k::loft_tool(&secs, closed, &starts)?;
         if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
             eprintln!("ball loft: {} sections ({n} on the edge, turning {turn:.3}): valid {} volume {:?}", secs.len(), tool.shape.is_valid(), tool.shape.volume());
         }
@@ -2417,7 +2419,6 @@ pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], siz
     if kind == RimBlend::Round
         && let Ok(res) = k::blend_direct(shape, &tools, &rim_edges)
         && res.shape.count(ShapeType::Solid) == 1
-        && res.shape.is_valid()
     {
         let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), Some(&super::detail::blend_role));
         let un = k::unify_same_domain(&res.shape)?;

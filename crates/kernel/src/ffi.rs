@@ -659,6 +659,7 @@ pub(crate) mod ffi {
             path: &OcShape,
             path_count: i32,
         ) -> Result<OpOut>;
+        fn op_loft_tool(sections: &OcShapeList, closed: bool, start_points: &[f64]) -> Result<OpOut>;
         fn set_working_scale(k: f64) -> Result<()>;
         fn working_scale() -> f64;
         fn set_blend_retries(on: bool);
