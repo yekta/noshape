@@ -482,28 +482,36 @@ impl Render for WorkspaceUnits {
         let mut groups: [Vec<AnyElement>; 3] = [Vec::new(), Vec::new(), Vec::new()];
         // Each group's row labels, for the ui-parity state (live records the panel's texts).
         let mut labels: [Vec<String>; 3] = [Vec::new(), Vec::new(), Vec::new()];
-        // Length and angle (the units expressions use), in Onshape's lists.
-        let lu = LENGTH_UNITS_SHOWN.iter().position(|u| *u == d.length).unwrap_or(0);
-        let (dl, dc) = dec(d.length_precision, 6);
-        let unit = self.select("Length default unit".into(), 210., LENGTH_UNITS_SHOWN.iter().map(|u| u.name().to_string()).collect(), lu, |p, i| p.length = LENGTH_UNITS_SHOWN[i], cx);
-        let decimals = self.select("Length display decimals".into(), 100., dl, dc, |p, i| p.length_precision = i as u8, cx);
-        groups[0].push(self.row("wu-row-length", "Length default unit".into(), unit, decimals));
-        labels[0].push("Length default unit".into());
-        let au = AngleUnit::ALL.iter().position(|u| *u == d.angle).unwrap_or(0);
-        let (al, ac) = dec(d.angle_precision, 7);
-        let unit = self.select("Angle default unit".into(), 210., AngleUnit::ALL.iter().map(|u| u.name().to_string()).collect(), au, |p, i| p.angle = AngleUnit::ALL[i], cx);
-        let decimals = self.select("Angle display decimals".into(), 100., al, ac, |p, i| p.angle_precision = i as u8, cx);
-        groups[1].push(self.row("wu-row-angle", "Angle default unit".into(), unit, decimals));
-        labels[1].push("Angle default unit".into());
-        for (k, (label, group, names, _, _)) in OTHER_UNITS.iter().enumerate() {
-            let (dl, dc) = dec(d.other[k].1, OTHER_DECIMALS[k]);
-            let shown = OTHER_UNITS_SHOWN[k];
-            let at = shown.iter().position(|&i| i == d.other[k].0).unwrap_or(0);
-            let unit = self.select(format!("{label} default unit"), 210., shown.iter().map(|&i| names[i as usize].to_string()).collect(), at, move |p, i| p.other[k].0 = shown[i], cx);
-            let decimals = self.select(format!("{label} display decimals"), 100., dl, dc, move |p, i| p.other[k].1 = i as u8, cx);
-            let key: &'static str = ["wu-r0", "wu-r1", "wu-r2", "wu-r3", "wu-r4", "wu-r5", "wu-r6", "wu-r7", "wu-r8"][k];
-            groups[*group as usize].push(self.row(key, format!("{label} default unit"), unit, decimals));
-            labels[*group as usize].push(format!("{label} default unit"));
+        // Built group by group, in the panel's order, so the fields read as live lists them (Length, Linear
+        // acceleration, Angle, Angular velocity, Mass…).
+        for g in 0..3usize {
+            // Length and angle (the units expressions use) first in their groups, in Onshape's lists.
+            if g == 0 {
+                let lu = LENGTH_UNITS_SHOWN.iter().position(|u| *u == d.length).unwrap_or(0);
+                let (dl, dc) = dec(d.length_precision, 6);
+                let unit = self.select("Length default unit".into(), 210., LENGTH_UNITS_SHOWN.iter().map(|u| u.name().to_string()).collect(), lu, |p, i| p.length = LENGTH_UNITS_SHOWN[i], cx);
+                let decimals = self.select("Length display decimals".into(), 100., dl, dc, |p, i| p.length_precision = i as u8, cx);
+                groups[0].push(self.row("wu-row-length", "Length default unit".into(), unit, decimals));
+                labels[0].push("Length default unit".into());
+            }
+            if g == 1 {
+                let au = AngleUnit::ALL.iter().position(|u| *u == d.angle).unwrap_or(0);
+                let (al, ac) = dec(d.angle_precision, 7);
+                let unit = self.select("Angle default unit".into(), 210., AngleUnit::ALL.iter().map(|u| u.name().to_string()).collect(), au, |p, i| p.angle = AngleUnit::ALL[i], cx);
+                let decimals = self.select("Angle display decimals".into(), 100., al, ac, |p, i| p.angle_precision = i as u8, cx);
+                groups[1].push(self.row("wu-row-angle", "Angle default unit".into(), unit, decimals));
+                labels[1].push("Angle default unit".into());
+            }
+            for (k, (label, group, names, _, _)) in OTHER_UNITS.iter().enumerate().filter(|(_, o)| o.1 as usize == g) {
+                let (dl, dc) = dec(d.other[k].1, OTHER_DECIMALS[k]);
+                let shown = OTHER_UNITS_SHOWN[k];
+                let at = shown.iter().position(|&i| i == d.other[k].0).unwrap_or(0);
+                let unit = self.select(format!("{label} default unit"), 210., shown.iter().map(|&i| names[i as usize].to_string()).collect(), at, move |p, i| p.other[k].0 = shown[i], cx);
+                let decimals = self.select(format!("{label} display decimals"), 100., dl, dc, move |p, i| p.other[k].1 = i as u8, cx);
+                let key: &'static str = ["wu-r0", "wu-r1", "wu-r2", "wu-r3", "wu-r4", "wu-r5", "wu-r6", "wu-r7", "wu-r8"][k];
+                groups[*group as usize].push(self.row(key, format!("{label} default unit"), unit, decimals));
+                labels[*group as usize].push(format!("{label} default unit"));
+            }
         }
         // Onshape's order inside a group: the base quantity first.
         let titles = ["Length", "Angle", "Mechanical"];

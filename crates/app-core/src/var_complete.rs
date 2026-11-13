@@ -135,7 +135,7 @@ pub fn word_entries(text: &str, cursor: usize, variables: &[&str], dim: Option<D
     // Variables by Onshape's word-prefix rule, alphabetical (live: "fancontrol" finds #fan_control_board_depth);
     // then the functions, units and constants: at the start, then at a camelCase word, each alphabetical.
     let mut vars: Vec<&str> = variables.iter().copied().filter(|v| words_match(v, &needle)).collect();
-    vars.sort_by_key(|v| (v.to_ascii_lowercase(), v.to_string()));
+    vars.sort_by_key(|v| (v.to_ascii_uppercase(), v.to_string()));
     let mut all: Vec<Entry> = FUNCTIONS.iter().map(|(n, a)| Entry::Function(n, a)).collect();
     all.extend(units_for(dim).iter().map(|u| Entry::Unit(u)));
     all.extend(CONSTANTS.iter().map(|c| Entry::Constant(c)));

@@ -13,7 +13,7 @@ pub struct Completion {
     pub range: Range<usize>,
     /// What was typed after `#` (up to the cursor).
     pub prefix: String,
-    /// Matching variable names ([`words_match`]), alphabetical, case-insensitive.
+    /// Matching variable names ([`words_match`]), alphabetical upper-cased (live: `_` after the letters).
     pub matches: Vec<String>,
 }
 
@@ -80,7 +80,8 @@ pub fn variable_completion<'a>(text: &str, cursor: usize, names: impl IntoIterat
     let end = cursor + text[cursor..].chars().take_while(|&c| is_ident(c)).map(char::len_utf8).sum::<usize>();
     let prefix = text[frag_start..cursor].to_string();
     let mut matches: Vec<String> = names.into_iter().filter(|n| words_match(n, &prefix)).map(str::to_string).collect();
-    matches.sort_by_key(|n| (n.to_ascii_lowercase(), n.clone()));
+    // Live sorts the names upper-cased: `_` after the letters (#fanControlBoardHeight before #fan_control_…).
+    matches.sort_by_key(|n| (n.to_ascii_uppercase(), n.clone()));
     matches.dedup();
     if matches.is_empty() {
         return None;
@@ -173,7 +174,12 @@ mod tests {
         assert_eq!(list("FAN"), fan);
         assert_eq!(list("").len(), 17, "`#` alone: every variable");
         assert!(list("xyz").is_empty());
-        // camelCase words too (our own variables, std's names).
+        // camelCase words too (live batch 2: #fanControlBoardHeight for "fcbh" and "control"), sorted upper-cased.
         assert!(words_match("boardWallLength", "bwl") && !words_match("boardwalllength", "bwl"));
+        let names = ["fan_control_board_depth", "fanControlBoardHeight"];
+        let c = variable_completion("#control", 8, names).unwrap();
+        assert_eq!(c.matches, ["fanControlBoardHeight", "fan_control_board_depth"]);
+        assert_eq!(variable_completion("#fcbh", 5, names).unwrap().matches, ["fanControlBoardHeight"]);
+        assert_eq!(variable_completion("#boardwall", 10, LIVE).unwrap().matches, variable_completion("#board_wall", 11, LIVE).unwrap().matches);
     }
 }

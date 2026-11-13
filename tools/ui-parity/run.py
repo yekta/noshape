@@ -334,7 +334,7 @@ def normalize_live(state):
         # An assembly start's names in menu rows: live's Part Studio is "start <name>" (ours "Part Studio 1") and its
         # runner works in a copy of the assembly ("start <name> asm Copy 2").
         lst["rows"] = [re.sub(r" asm Copy \d+…$", " asm…", re.sub(r"^Switch to start \S+$", "Switch to Part Studio 1", r)) if isinstance(r, str) else r for r in lst["rows"]]
-        lst["highlighted"] = lst["rows"].index(hl_row) if hl_row in lst["rows"] else None
+        lst["highlighted"] = kept_index(rows, hl, CLOUD_ONLY | LIVE_TRANSIENT_ROWS, lst["rows"], hl_row)
         # A row fewer, the menu sits elsewhere when it has to move to fit (live's flipped up under the still pointer,
         # ours fitted below it: face-rclick-menu): which row the pointer is over isn't compared then.
         if len(lst["rows"]) != len(rows):
@@ -489,8 +489,16 @@ def drop_rows(state, drop):
     hl = lst.get("highlighted")
     hl_row = rows[hl] if isinstance(hl, int) and 0 <= hl < len(rows) else None
     lst["rows"] = [r for r in rows if r not in drop]
-    lst["highlighted"] = lst["rows"].index(hl_row) if hl_row in lst["rows"] else None
+    lst["highlighted"] = kept_index(rows, hl, drop, lst["rows"], hl_row)
     return state
+
+
+def kept_index(rows, hl, dropped, kept, hl_row):
+    """The highlighted row's index once `dropped` rows are gone: by position (rows can repeat: a function's overloads,
+    fs-ac-fn-overloads), else by its text after a renaming; None when it was dropped."""
+    if isinstance(hl, int) and 0 <= hl < len(rows) and rows[hl] not in dropped and len(kept) == sum(1 for r in rows if r not in dropped):
+        return sum(1 for r in rows[:hl] if r not in dropped)
+    return kept.index(hl_row) if hl_row in kept else None
 
 
 # The Insert dialog's fixed text (live reads its rows too, but its lane document holds other runs' studios).
