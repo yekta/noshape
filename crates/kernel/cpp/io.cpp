@@ -12,6 +12,7 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <ShapeFix_Shape.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <TopExp.hxx>
 #include <gp_Lin.hxx>
@@ -1273,7 +1274,20 @@ std::unique_ptr<OcShape> straighten_edges(const OcShape& s, double tol)
   if (!any)
     return wrap(s.shape);
   const TopoDS_Shape out = rs->Apply(s.shape);
-  return wrap(BRepCheck_Analyzer(out).IsValid() ? out : s.shape);
+  if (BRepCheck_Analyzer(out).IsValid())
+    return wrap(out);
+  // A line's curve on a periodic face found a period off its neighbours' (a round's straight edge on its cylinder):
+  // the wires' curves made to meet again, the topology as it was.
+  ShapeFix_Shape fix(out);
+  fix.Perform();
+  const TopoDS_Shape fixed = fix.Shape();
+  auto count = [](const TopoDS_Shape& x, TopAbs_ShapeEnum t) {
+    ShapeIMap m;
+    TopExp::MapShapes(x, t, m);
+    return m.Extent();
+  };
+  const bool same = count(fixed, TopAbs_FACE) == count(out, TopAbs_FACE) && count(fixed, TopAbs_EDGE) == count(out, TopAbs_EDGE);
+  return wrap(same && BRepCheck_Analyzer(fixed).IsValid() ? fixed : s.shape);
 }
 
 std::unique_ptr<OcShape> read_iges(rust::Str path)

@@ -1453,5 +1453,55 @@ fn two_step_solids_boolean_probe() {
     match fuse(&a, &b) {
         Ok(r) => println!("fuse: solids {} faces {} volume {:.6} mm³ valid {}", r.shape.count(ShapeType::Solid), r.shape.faces().len(), r.shape.volume().unwrap_or(0.0) * 1e9, r.shape.is_valid()),
         Err(e) => println!("fuse: {e}"),
+    }    // Their faces: surface kind, exact area (mm²), centroid (mm), to match up (NOSHAPE_PROBE_FACES).
+    if std::env::var_os("NOSHAPE_PROBE_FACES").is_some() {
+        for (n, sh) in [("a", &a), ("b", &b)] {
+            let mut rows: Vec<String> = sh.faces().iter().map(|f| format!("{n} face {:<12} area {:>12.6} at {:.3?}", format!("{:?}", f.face_surface().map(|s| std::mem::discriminant(&s))).chars().skip(16).take(12).collect::<String>(), f.area().unwrap_or(0.0) * 1e6, f.centroid().unwrap_or_default() * 1e3)).collect();
+            rows.sort();
+            rows.iter().for_each(|r| println!("{r}"));
+        }
+    }
+    // Their largest B-spline faces (NOSHAPE_PROBE_BSPLINE): degrees, poles, knots; a's surface sampled on a grid and
+    // projected onto b's face (distances, mm).
+    if std::env::var_os("NOSHAPE_PROBE_BSPLINE").is_some() {
+        let big = |sh: &Shape| sh.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::BSpline { .. }))).max_by(|x, y| x.area().unwrap_or(0.0).total_cmp(&y.area().unwrap_or(0.0)));
+        if let (Some(fa), Some(fb)) = (big(&a), big(&b)) {
+            for (n, f) in [("a", &fa), ("b", &fb)] {
+                if let Ok(d) = f.face_bspline() {
+                    println!("{n} bspline: degrees {} x {}, poles {} x {}, rational {}, u knots {:?}, v knots {:?}", d.u_degree, d.v_degree, d.nu, d.nv, d.weights.is_some(), d.u_knots, d.v_knots.iter().map(|k| (k * 1e5).round() / 1e5).collect::<Vec<_>>());
+                }
+            }
+            if let (Ok(da), Ok(db)) = (fa.face_bspline(), fb.face_bspline())
+                && da.poles.len() == db.poles.len()
+            {
+                let worst = da.poles.iter().zip(&db.poles).map(|(p, q)| (*p - *q).length()).fold(0.0, f64::max);
+                println!("same layout: largest pole difference {:.6} mm", worst * 1e3);
+            }
+            let [u0, u1, v0, v1] = fa.uv_bounds().unwrap();
+            let mut ds = Vec::new();
+            for i in 0..=8 {
+                for j in 0..=8 {
+                    let (u, v) = (u0 + (u1 - u0) * i as f64 / 8.0, v0 + (v1 - v0) * j as f64 / 8.0);
+                    let Ok(p) = fa.point_at_uv(u, v) else { continue };
+                    let Ok(q) = fb.project_point(p) else { continue };
+                    ds.push(q.distance * 1e3);
+                }
+            }
+            ds.sort_by(f64::total_cmp);
+            println!("a's grid to b: {} points, distance min {:.6} median {:.6} max {:.6} mm", ds.len(), ds.first().unwrap_or(&0.0), ds.get(ds.len() / 2).unwrap_or(&0.0), ds.last().unwrap_or(&0.0));
+        }
+    }
+    // Each one less the other: where they differ (their pieces' volumes and boxes, mm).
+    for (n, x, y) in [("a - b", &a, &b), ("b - a", &b, &a)] {
+        match cut(x, y) {
+            Ok(r) => {
+                println!("{n}: volume {:.6} mm³", r.shape.volume().unwrap_or(0.0) * 1e9);
+                for s in r.shape.solids().iter().take(12) {
+                    let bb = s.bounding_box(false).unwrap();
+                    println!("  piece {:.6} mm³ box {:.3?} {:.3?}", s.volume().unwrap_or(0.0) * 1e9, bb.min * 1e3, bb.max * 1e3);
+                }
+            }
+            Err(e) => println!("{n}: {e}"),
+        }
     }
 }

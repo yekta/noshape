@@ -2530,4 +2530,12 @@ StepImport read_jt_parts_ffi(rust::Str path)
   return import_of(read_jt_parts(std::string(path)));
 }
 
+// Surfaces of linear extrusion and of revolution that are planes, cylinders, cones, spheres or tori, as those (a swept
+// face that runs a neighbour on unifies with it).
+std::unique_ptr<OcShape> elementary_surfaces(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  return wrap(swept_to_elementary(s.shape));
+}
+
 } // namespace noshape

@@ -887,6 +887,7 @@ fn propagation_off_next_to_corner_fillets() {
     assert!((volume(&t.regen()) - 7922.743338823081).abs() < 1e-6);
     let top = |i: &noshape_kernel::EdgeInfo| i.start.z > 0.00999 && i.end.z > 0.00999;
     let front = t.edges_where(|i| top(i) && i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9);
+    // The arc under the tab, between the rounds (~62.6° of the circle, 21.9 mm; not the rest of the circle's edges).
     let arc = t.edges_where(|i| top(i) && matches!(i.curve, noshape_kernel::Curve::Circle { .. }) && i.start.x.min(i.end.x) < 1e-9 && i.start.y.min(i.end.y) < 1e-9);
     assert_eq!((front.len(), arc.len()), (1, 1));
     let base = t.fork();
@@ -3991,4 +3992,39 @@ fn part_mirror_of_a_half_counterbored_hole_merges_across_the_plane() {
         assert!((volume(&r) - 5566.4602).abs() < 1e-3, "rust {rust}: {} mm³", volume(&r));
         assert!(b.is_valid(), "rust {rust}");
     }
+}
+
+/// asm-isaac-ball's Fillet 2: a tab on a cylinder's side, its two vertical concave corners rounded, its underside 4 mm
+/// above the cylinder's bottom, the concave arc under it filleted 4 mm with tangent propagation. The chain stops where
+/// the rounds' convex bottom edges run on (as live): one round along the arc, taking the whole 4 mm of wall below it,
+/// its ends trimmed by the corner rounds run on down (they grow, live 265.46 -> 279.04 mm² each), one face more.
+#[test]
+fn a_concave_arcs_round_stops_at_the_convex_rounds_and_runs_them_on() {
+    let mut t = T::new();
+    let (_, cyl) = t.sketch(&[], &[((0.0, 0.0), 20.0)]);
+    t.add("extrude", &[("entities", q(cyl)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    // The tab from 4 mm above the cylinder's bottom to its top.
+    let (_, tab) = t.sketch(&[&[(-30.0, -8.0), (-15.0, -8.0), (-15.0, 8.0), (-30.0, 8.0)]], &[]);
+    t.add("extrude", &[("entities", q(tab)), ("startOffset", ParamValue::Bool(true)), ("startOffsetDistance", e("4 mm")), ("depth", e("6 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+    // (The tab's: from its underside up, not the cylinder's edge below it.)
+    let corners = t.edges_where(|i| vertical(i) && (i.start.y.abs() - 8e-3).abs() < 1e-9 && i.start.x > -20.0e-3 && i.start.x < -15.0e-3 && i.start.z.min(i.end.z) > 3.9e-3);
+    assert_eq!(corners.len(), 2);
+    let f1 = t.fillet(corners, "5 mm");
+    let before = t.ok(f1);
+    let faces_before = before.context.bodies[0].shape.faces().len();
+    let rounds = |r: &RegenResult| -> Vec<f64> {
+        let mut a: Vec<f64> = r.context.bodies[0].shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if (radius - 5e-3).abs() < 1e-9)).map(|f| f.area().unwrap() / 1e-6).collect();
+        a.sort_by(f64::total_cmp);
+        a
+    };
+    let arc = t.edges_where(|i| matches!(i.curve, noshape_kernel::Curve::Circle { radius, .. } if (radius - 20e-3).abs() < 1e-9) && (i.start.z - 4e-3).abs() < 1e-9 && !i.closed && i.start.x < 0.0 && (15e-3..30e-3).contains(&i.length));
+    assert_eq!(arc.len(), 1);
+    let f2 = t.fillet(arc, "4 mm");
+    let after = t.ok(f2);
+    assert!(after.context.bodies[0].shape.is_valid());
+    assert_eq!(after.context.bodies[0].shape.faces().len(), faces_before + 1);
+    let (r0, r1) = (rounds(&before), rounds(&after));
+    assert_eq!(r1.len(), 2);
+    assert!(r0.iter().zip(&r1).all(|(a, b)| b > a), "the corner rounds run on down: {r0:?} -> {r1:?}");
+    assert!(volume(&after) > volume(&before));
 }

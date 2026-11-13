@@ -830,6 +830,7 @@ std::unique_ptr<OcShape>     list_get(const OcShapeList& l, size_t i);
 bool                         is_valid(const OcShape& s);
 bool                         self_intersects(const OcShape& s);
 std::unique_ptr<OcShape>     fix_shape(const OcShape& s, double tolerance);
+std::unique_ptr<OcShape>     elementary_surfaces(const OcShape& s);
 std::unique_ptr<OcShape>     orient_faces_consistently(const OcShape& s);
 rust::String                 dump_shape(const OcShape& s);
 
