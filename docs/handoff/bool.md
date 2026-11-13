@@ -50,7 +50,16 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    (e4db7fcb, 1.24 s: a point at (1.21, 15.2, 0.405) mm 0.42-0.44 mm from two vertices of 0.38 mm tolerance, their
    group 0.8 mm across, past find_tol's 0.5 mm). hat8: its
    biggest Boolean is ours, 1.44 s (794 Rust, 565 build): speed.
-2. **cf-surface-pattern's Surface Pattern 3 (+4.3 s):** our 85-tool cut 1.6-3.6 s (case sp-1113/7ecd5a8b6e7c4f6b,
+2. **cf-surface-pattern's Surface Pattern 3 (+4.3 s). Gating 07:46 on vibe5: branch bool-speed (pushed, 2d51dbefb,
+   one commit on main, log /root/bool-hat-scratch/chain-2d51dbefb.out):** curve2.rs: a 2D curve's sample points kept
+   in its SpanBoxes for every ray's crossings (inside_with's roots asked the same points each time), and roots'
+   bisection stopped when the midpoint is one of its ends (the rest changed nothing): the 85-tool cut 2.51-2.72 ->
+   2.26-2.42 s (alternated, load 24); bit-identical by construction. Clean -> land bool-speed (it is checked out in
+   worktree bool-hat; `git checkout crates/kernel/tests/all.rs` first). Profile after it (release, LTO off,
+   xprobe::probe_case_sample): C2::Mapped's at (curve2.rs:132, a 3D NURBS mapped to the face's parameters) 17 %, most
+   of it chords' sample points and bulges for intersections_with (~500 samples) and ray roots (~150). Next ideas:
+   cheaper Mapped evaluation, fewer samples per span for chords, ray_state's inside tests.
+   Before: our 85-tool cut 1.6-3.6 s (case sp-1113/7ecd5a8b6e7c4f6b,
    vibe5 ~/agents/bool-corpora/sp-1113). Profile (xprobe::probe_case_sample, release, LTO off): C2::at 29 %,
    intervals_on 25 %, ray_state 22 %, chords 15 %; the length table landed (3770108f). Ideas: fewer samples per C2,
    ray_state's inside tests.
