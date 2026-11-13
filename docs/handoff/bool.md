@@ -42,7 +42,10 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    free-form face") gets OCCT's exact projection: the 4 such dock cases were a plane's ellipse on a
    Geom_RectangularTrimmedSurface of a cylinder. The dock: 33 of 44 ours, 0 differing, 1 equivalent. If both gates are
    clean, land bool-seam (both commits) from bool-hat.
-   Next declines there: 2 x "a non-manifold result" (582 and 141 ms; not looked at). Upstream, noted for blend
+   Next declines there: 2 x "a non-manifold result" (06:50: both "unbalanced" edges, used once, so pieces missing
+   beside them: ebd7414e (582 ms) has one at (0, 18, 1.2741) mm, where the 1.2 mm-tolerance vertices are (likely the
+   same upstream cause); f83b9884 (141 ms) at (±5.5, ±12.82, 9.85) mm and two arcs, not upstream: a classification to
+   look at (an XNM print of uses / users at the three non-manifold sites gives these). Upstream, noted for blend
    (blend.md 11-13 06:42): the 5 x "a face's vertex off its plane" (two vertices at (±21, 18, 1.274) mm, 1.195 mm
    tolerance, 0.4-1.1 mm off their planes, past the 1 mm cap) and the 1355-face cut's "a point near two vertices"
    (e4db7fcb, 1.24 s: a point at (1.21, 15.2, 0.405) mm 0.42-0.44 mm from two vertices of 0.38 mm tolerance, their
