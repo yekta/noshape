@@ -64,6 +64,40 @@ fn feature_index(ctx: &mut Ctx, name: &str) -> Result<usize, String> {
 }
 
 /// Build start `start` (a `starts.json` value) into a new document at `path`.
+/// A start sketch's constraints as live's runner posts them over REST (live-pw uip/starts.js): a rectangle's corners
+/// coincident (ours: shared points) and its sides horizontal / vertical, a line or circle with none, nothing tied to
+/// the Origin. The drawing tools' own (perpendicular, parallel, a corner or centre at (0, 0) on the Origin) go.
+fn live_start_constraints(ctx: &mut Ctx, sketch: &Value, shapes: &[Value]) -> Result<(), String> {
+    let got = call(ctx, "sketch_get", json!({ "sketch": sketch }))?;
+    let all: Vec<Value> = got["constraints"].as_array().into_iter().flatten().filter(|c| !c["id"].as_str().unwrap_or_default().starts_with("dim:")).map(|c| c["id"].clone()).collect();
+    if !all.is_empty() {
+        call(ctx, "sketch_delete", json!({ "sketch": sketch, "constraints": all }))?;
+    }
+    let lines: Vec<(&Value, [f64; 2], [f64; 2])> = got["entities"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|e| e["type"] == "line")
+        .filter_map(|e| {
+            let p = |k: &str| Some([e[k].get(0)?.as_f64()?, e[k].get(1)?.as_f64()?]);
+            Some((&e["id"], p("start")?, p("end")?))
+        })
+        .collect();
+    for shape in shapes.iter().filter(|s| s["tool"] == "corner_rectangle") {
+        let c = |i: usize| -> Option<[f64; 2]> { Some([shape["points"][i].get(0)?.as_f64()?, shape["points"][i].get(1)?.as_f64()?]) };
+        let (Some(a), Some(b)) = (c(0), c(1)) else { continue };
+        let corners = [[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]]];
+        let same = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).abs() < 1e-6 && (p[1] - q[1]).abs() < 1e-6;
+        for i in 0..4 {
+            let (p, q) = (corners[i], corners[(i + 1) % 4]);
+            let Some((id, _, _)) = lines.iter().find(|(_, s, e)| (same(*s, p) && same(*e, q)) || (same(*s, q) && same(*e, p))) else { continue };
+            let kind = if i % 2 == 0 { "horizontal" } else { "vertical" };
+            call(ctx, "sketch_constrain", json!({ "sketch": sketch, "constraint": kind, "entities": [id] }))?;
+        }
+    }
+    Ok(())
+}
+
 pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), String> {
     let _ = std::fs::remove_file(path);
     call(ctx, "document_create", json!({ "path": path.to_str().ok_or("path")?, "length_unit": start["units"].as_str().unwrap_or("mm") }))?;
@@ -288,6 +322,7 @@ fn add_features(ctx: &mut Ctx, features: &Value) -> Result<(), String> {
                 .collect();
             if !shapes.is_empty() {
                 call(ctx, "sketch_draw", json!({ "sketch": id, "shapes": shapes })).map_err(what)?;
+                live_start_constraints(ctx, &id, &shapes).map_err(what)?;
             }
         } else {
             let mut params = serde_json::Map::new();

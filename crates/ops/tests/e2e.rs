@@ -8304,3 +8304,23 @@ fn a_studio_created_from_a_part_studios_table_is_undone_there() {
     assert!(!titles(&t["studio_tables"]).contains(&"Variable Studio 2".to_string()), "taken back: {t}");
     assert!(call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().any(|t| t["name"] == "Variable Studio 2"), "the tab stays");
 }
+
+/// The ui-parity starts' sketches as live's runner builds them over REST (live-pw uip/starts.js): the block's rectangle
+/// has its 4 corners coincident (ours: shared points) and its sides horizontal / vertical, and nothing ties it to the
+/// Origin (a drawn corner at (0, 0) would be: live's start sketches show every line blue), still 4 degrees free.
+#[test]
+fn a_start_sketch_is_not_tied_to_the_origin() {
+    let starts: Value = serde_json::from_str(include_str!("../../../tests/ui-parity/starts.json")).unwrap();
+    let mut ctx = Ctx::new();
+    let path = scratch("start-block.noshape");
+    noshape_ops::ui_parity::build_start(&mut ctx, &path, &starts["block"]).unwrap();
+    call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+    let got = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" }));
+    let mut kinds: Vec<String> = got["constraints"].as_array().unwrap().iter().map(|c| c["type"].as_str().unwrap_or_default().to_string()).collect();
+    kinds.sort();
+    let outside = got["constraints"].as_array().unwrap().iter().filter(|c| c["entities"].as_array().unwrap().iter().any(|e| !e.as_str().unwrap_or_default().starts_with("entity:"))).count();
+    assert_eq!(outside, 0, "{got}");
+    // (Ours keeps the corners as shared points: live's 4 corner coincidents.)
+    assert_eq!(kinds, ["Horizontal", "Horizontal", "Vertical", "Vertical"], "{got}");
+    assert_eq!((got["status"].as_str(), got["dof"].as_u64()), (Some("under defined"), Some(4)), "{got}");
+}
