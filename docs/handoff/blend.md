@@ -23,6 +23,21 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
 **c2-rings-loft stops at feature 20, Extrude 5 (core's):** the engraving cut's edges are split at the revolved ring's
 seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs live 335/206); Parasolid has no seams.
 
+## 11-13 15:20 UTC: cf-snap-hook's empty sections (lead: skip only what boxes and domains prove): not a win, parked
+- The direct build's part-face x blend sections that keep no cut: on snap-hook, knife, rings and faceblend 186 of 226
+  pairs; snap-hook's 64 cone x torus pairs alone ~110-160 ms (dev, Mac). Every one of them has tight (AddOptimal) boxes
+  that overlap by mm (snap 0.023 mm): the torus meets the next cone near-tangentially where its end and the cone's base
+  meet the plane (IntSS lines 0.01-0.4 mm there, all off one face). Boxes alone prove only 8 cylinder x free-form pairs
+  empty (~2 ms).
+- Tried (patch /root/blend-scratch/parked/sections-box-domains-wip.patch): each surface's parameters clipped to what can
+  reach the two faces' common box (+3e-3 size): planes' and axial coordinates linear, an angle about an axis extreme at
+  the box's corners when its shadow misses the axis; an empty range skips the pair. Cuts identical on all 226 pairs
+  (endpoints within 1e-6 size), but no faster: IntSS samples a fixed grid whatever the domain, and the near-tangent walk
+  stays. Same-run timing on the Mac, both orders: whole 294 / 435 ms, clipped 365 / 386 ms (the second run of a pair
+  ~20 % faster either way).
+- Mac mini (lead 11-13): `NOSHAPE_RB_HOST=mac`, models in ~/noshape-host/parity/models (copied 11-13). A fresh dev build
+  of noshape-ops' tests 4 min 37 s there (vibe5 at 3 jobs: 5-7.5 min incremental); the 4-document probe ~1.5 min.
+
 ## 11-13 14:30 UTC: oversized fillets fail as live (psui's 40 x 30 x 10 start block)
 - A fillet of R100 on the block's top edge (and R1000 on a vertical edge) regenerated "OK" with a body of no faces: the
   checked blend's `valid_changed` passed a result with no new face, and an empty solid has none. Now `valid_changed` and
