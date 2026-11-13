@@ -71,6 +71,15 @@ feature-menu-suppress-unsuppress is live's regeneration latency (re-record asked
 12:48): the Esc with the mid-chain menu open, the finer angle snap windows. sm-form-tool misses on green too (live's
 Form opens on "Circle emboss"): next to look at. Mac wall times this stretch: part-studio-ui suite 30 s run / 45-90 s
 with a build; a matrix alone 4-17 s incremental; vibe6 app builds 18 s-1 m 14 s, ~20 scenarios 2-6 min.
+**13:34 (lead 13:0x: block start, sm-form-tool, uncovered rows):** the start "block" now as live's runner builds it
+(ops `live_start_constraints`: the tools' constraints dropped, horizontal / vertical on the sides, nothing tied to the
+origin; e2e `a_start_sketch_is_not_tied_to_the_origin`; the 42 scenarios starting from it 42 / 42, no capture needed),
+sm-form-tool 3 / 3 (seeded with live's remembered Circle emboss), a deleted sketch's region in a field reads "Missing
+Face". Uncovered rows: sketch tools 13 / 13 (fixed: a sketch fillet / chamfer pressed on its corner and dragged is made
+on release, `SketchEditor::corner_pressed`), editing 8 / 8 (sketch paste), sheet metal 10 / 10 (flat view from Top),
+chrome 17 / 17 (a click or the wheel closes a tooltip); navigation's inertia stays out of T1 (real time and frame rate).
+Queued: acd249eb + 1ee72a04, 512bc5f3, 5a907f62. Next uncovered rows: eye icons, Search tools, Text's two clicks,
+drag-trim / extend hover, flat bend click cross-selection, submenus on hover, field rows' hover, Tab order.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's
