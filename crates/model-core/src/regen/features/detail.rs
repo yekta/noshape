@@ -349,6 +349,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     if groups.is_empty() {
         return crate::regen::eval::err_at(&["entities"], "Select edges or faces to fillet.");
     }
+    let touched: Vec<usize> = groups.keys().copied().collect();
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
@@ -497,6 +498,10 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         let t2 = std::time::Instant::now();
         ev.replace_body(bi, shape, face_names);
         log::debug!("fillet: kernel {:?}, naming {:?}, body {:?} (history records {})", t1 - t0, t2 - t1, t2.elapsed(), res.history.records.len());
+    }
+    // Never an empty body: a round far larger than its part can take every face, which live fails.
+    if touched.iter().any(|&bi| ev.ctx.bodies.get(bi).is_some_and(|b| b.shape.count(ShapeType::Solid) == 0 || b.shape.count(ShapeType::Face) == 0)) {
+        return err("Failed to fillet selections.");
     }
     Ok(())
 }
@@ -840,6 +845,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(&["entities"], "Select edges or faces to chamfer.");
     }
     let picked_faces = ev.resolve_faces(refs);
+    let touched: Vec<usize> = groups.keys().copied().collect();
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
@@ -966,6 +972,10 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
             None => (res.shape, face_names),
         };
         ev.replace_body(bi, shape, face_names);
+    }
+    // Never an empty body: a chamfer far larger than its part can take every face, which live fails.
+    if touched.iter().any(|&bi| ev.ctx.bodies.get(bi).is_some_and(|b| b.shape.count(ShapeType::Solid) == 0 || b.shape.count(ShapeType::Face) == 0)) {
+        return err("Failed to chamfer selections.");
     }
     Ok(())
 }

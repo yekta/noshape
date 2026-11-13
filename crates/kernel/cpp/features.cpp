@@ -4109,7 +4109,8 @@ bool closed_and_oriented(const TopoDS_Shape& r)
 // closure and orientation. An input face kept as it is was the input's.
 bool valid_changed(const TopoDS_Shape& input, const TopoDS_Shape& r)
 {
-  if (r.IsNull())
+  // (No face left: a round larger than the part took them all, live's "Failed to fillet selections.".)
+  if (r.IsNull() || !TopExp_Explorer(r, TopAbs_FACE).More())
     return false;
   ShapeIMap old;
   TopExp::MapShapes(input, TopAbs_FACE, old);
@@ -4139,7 +4140,7 @@ using BlendBuild = std::function<bool(double scale, TopoDS_Shape& out, HHist& h)
 
 bool valid_shape(const TopoDS_Shape& s)
 {
-  if (s.IsNull())
+  if (s.IsNull() || !TopExp_Explorer(s, TopAbs_FACE).More())
     return false;
   // An edge or vertex as loose as a hundredth of the part is a blend gone wrong, not one to check: BRepCheck's
   // classification of its face segfaults on the pool's threads (CRASH-3388: a 4.8 mm edge on a 60 mm part).

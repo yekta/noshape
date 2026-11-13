@@ -2885,6 +2885,29 @@ fn oversize_fillets_like_onshape() {
     }
 }
 
+/// A round or chamfer far larger than the block it's on fails as live's (psui's 40 × 30 × 10 start block: R100 on a top
+/// edge regenerated "OK" with a body of no faces), the block left as it was; never an empty body.
+#[test]
+fn an_oversized_blend_fails_as_live_never_an_empty_body() {
+    let mut base = T::new();
+    base.block(40.0, 30.0, 10.0);
+    let top_long = base.edges_where(|i| !vertical(i) && (i.start.z - 0.01).abs() < 1e-9 && (i.start.y - i.end.y).abs() < 1e-9 && i.start.y.abs() < 1e-9);
+    let top_short = base.edges_where(|i| !vertical(i) && (i.start.z - 0.01).abs() < 1e-9 && (i.start.x - i.end.x).abs() < 1e-9 && i.start.x.abs() < 1e-9);
+    let side = base.edges_where(|i| vertical(i) && i.start.x.abs() < 1e-9 && i.start.y.abs() < 1e-9);
+    assert_eq!((top_long.len(), top_short.len(), side.len()), (1, 1, 1));
+    for (what, edges, r) in [("top long R100", &top_long, "100 mm"), ("top short R100", &top_short, "100 mm"), ("vertical R1000", &side, "1000 mm")] {
+        let mut t = base.fork();
+        let f = t.fillet(edges.clone(), r);
+        let (st, msg, v) = status(&mut t, f);
+        assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some("Failed to fillet selections.")), "{what}: {v} mm³");
+        assert!((v - 12000.0).abs() < 1e-6, "{what}: the block changed ({v} mm³)");
+    }
+    let mut t = base.fork();
+    let f = t.chamfer(top_long.clone(), "100 mm");
+    let (st, _, v) = status(&mut t, f);
+    assert!(st == FeatureStatus::Error && (v - 12000.0).abs() < 1e-6, "top long chamfer 100: {st:?} {v} mm³");
+}
+
 /// Chamfers (Equal distance) on the same 40 × 20 × 10 block as live (behaviours
 /// "spec: kernel FILLET-OVERSIZE-OK chamfer cases and fillet thresholds"):
 /// two or three vertical edges fail past the 20-wide end face ("End boundary
