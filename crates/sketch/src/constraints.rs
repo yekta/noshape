@@ -707,6 +707,8 @@ impl Sketch {
                             let d = (c2 - c1).length();
                             h.internal = *mode == DistanceMode::Minimum && d < r1 + r2 && d < (r1 - r2).abs();
                             h.sign2 = sgn(r1 - r2);
+                            // Overlapping circles: the overlap along the centre line.
+                            h.sign = sgn(d - r1 - r2);
                         }
                     }
                     _ => {}
@@ -818,7 +820,7 @@ impl Sketch {
                         Some(match mode {
                             DistanceMode::Center | DistanceMode::Centerline => d,
                             DistanceMode::Minimum => {
-                                if h.internal { (r1 - r2).abs() - d } else { d - r1 - r2 }
+                                if h.internal { (r1 - r2).abs() - d } else { h.sign * (d - r1 - r2) }
                             }
                             DistanceMode::Maximum => d + r1 + r2,
                         })

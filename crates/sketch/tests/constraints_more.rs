@@ -383,3 +383,29 @@ fn a_dimension_the_tangencies_already_fix_over_defines() {
         }
     }
 }
+
+#[test]
+fn a_minimum_distance_between_overlapping_circles_is_their_overlap() {
+    // c2-hunting-knife's Sketch 8 (live): two mirrored R60.65 arcs 108.8 mm apart, a 12.5 mm Distance between them
+    // measured on the centre line where they overlap.
+    let mut sk = Sketch::new();
+    let (r, x) = (0.0606532, 0.0544032);
+    let a = sk.add_circle(v(x, 0.0), r);
+    let b = sk.add_circle(v(-x, 0.0), r);
+    sk.add_constraint(ConstraintKind::Radius { curve: a, value: r }).unwrap();
+    sk.add_constraint(ConstraintKind::Radius { curve: b, value: r }).unwrap();
+    let d = sk.add_constraint(ConstraintKind::Distance { a, b, value: 0.0125, mode: DistanceMode::Minimum }).unwrap();
+    solved(&mut sk);
+    assert!((sk.measure(d).unwrap() - 0.0125).abs() < 1e-9);
+    sk.set_dimension_value(d, 0.014).unwrap();
+    solved(&mut sk);
+    let ca = sk.measure_new(&ConstraintKind::Distance { a, b, value: 0.0, mode: DistanceMode::Center }).unwrap();
+    assert!((ca - (2.0 * r - 0.014)).abs() < 1e-9, "{ca}");
+    // Apart, the gap as before.
+    let mut sk = Sketch::new();
+    let a = sk.add_circle(v(0.0, 0.0), 1.0);
+    let b = sk.add_circle(v(3.0, 0.0), 1.0);
+    let d = sk.add_constraint(ConstraintKind::Distance { a, b, value: 1.0, mode: DistanceMode::Minimum }).unwrap();
+    solved(&mut sk);
+    assert!((sk.measure(d).unwrap() - 1.0).abs() < 1e-9);
+}

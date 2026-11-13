@@ -1599,7 +1599,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 let e = match mode {
                     DistanceMode::Center | DistanceMode::Centerline => Lin::new().dist(1.0, c1, c2),
                     DistanceMode::Minimum if h.internal => Lin::new().dist(-1.0, c1, c2).rad(h.sign2, &r1).rad(-h.sign2, &r2),
-                    DistanceMode::Minimum => Lin::new().dist(1.0, c1, c2).rad(-1.0, &r1).rad(-1.0, &r2),
+                    DistanceMode::Minimum => Lin::new().dist(h.sign, c1, c2).rad(-h.sign, &r1).rad(-h.sign, &r2),
                     DistanceMode::Maximum => Lin::new().dist(1.0, c1, c2).rad(1.0, &r1).rad(1.0, &r2),
                 };
                 self.lin(e.cst(-v));

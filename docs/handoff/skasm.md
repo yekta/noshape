@@ -1,5 +1,20 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-13 21:04 UTC, restarted on a new account)
+- State of my area (qa's 16:41 suite, 0ff2c5e9): every sheet metal document matches to the end (louver 36/36,
+  corner-break 11/11, model-plus 14/14, ...). Agreed with core (20:58): I take c2-hunting-knife's Sketch 7 / 8 /
+  Sketch 12 (Loft 1's profile) and sheet metal speed (corner-break, model-plus); core keeps the knife's Loft 3
+  (the 2.8 mm³ that makes feature 24 the first difference).
+- Knife Sketch 8's 12.5 mm Distance between two mirrored R60.65 arcs (centres 108.8 apart): the circles overlap, so
+  live measures the overlap on the centre line (helpParameters -pi / pi); ours was d - r1 - r2 = -12.5: "Sketch could
+  not be solved". The Minimum circle-circle distance now takes the side it is drawn on (`Hints::sign`, overlap
+  r1 + r2 - d); T1 constraints_more::a_minimum_distance_between_overlapping_circles_is_their_overlap.
+- Next: Loft 1 "no region of ours inside Sketch 12's curves" (named 0.0 0.1 0.2 0.5 0.6 0.7 of an 8-curve Use loop),
+  then Sketch 7 (externals JTd / JIl have no live geometry), then model-plus Extrude 4 (528 ms on vibe5, live 339)
+  with core's NOSHAPE_SMPROF timers (/root/core-scratch/rmx/smprof.patch).
+- Mac runs: /root/skasm-scratch/bin/suite.sh (copy into the worktree as suite-tmp.sh, never commit it), e.g.
+  `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh env DOC=c2-hunting-knife bash suite-tmp.sh`; knife on main there 24/52, 496 ms.
+
 ## From psui (2026-11-10 20:36 UTC, lead: the sheet metal flat as a sketchable body, SUITE-LOUVER-SKETCH-9)
 - Took it, in skasm's area. Live 2468 (behaviours "psui (2468)", psui/q2468): the flat is the folded part placed by
   its fixed face (the face of the first sketch segment on the sketch line): each point p goes to (p·x, p·y, (p−o)·n)
