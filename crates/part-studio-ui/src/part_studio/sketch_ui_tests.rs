@@ -4078,6 +4078,8 @@ mod snaps;
 mod list;
 #[path = "measure_feel_tests.rs"]
 mod measure;
+#[path = "nav_feel_tests.rs"]
+mod nav;
 
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.

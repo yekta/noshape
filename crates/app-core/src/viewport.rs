@@ -342,8 +342,11 @@ pub struct Viewport {
     /// When the press was, and how far the pointer has got from it since (live: a right press orbits from its
     /// first pixel and still opens the menu on release within 4 px and 1 s).
     press_at: Instant,
-    /// The clock the press rules read (a drag's 50 ms, the menu's hold); tests drive it.
-    press_clock: Rc<dyn Fn() -> Instant>,
+    /// The clock the press rules (a drag's 50 ms, the menu's hold, a double middle release) and camera animations
+    /// read; tests drive it.
+    clock: Rc<dyn Fn() -> Instant>,
+    /// The last middle release that wasn't the second of a double click.
+    middle_released: Option<Instant>,
     press_travel: f64,
     last_pos: DVec2,
     /// The hover was cleared by a fast move before a pick said what is under the pointer.
@@ -399,7 +402,7 @@ pub struct Viewport {
     /// (`getRotateCenterForCanvasLocation` reads the depths at once), so they
     /// are applied about it when it lands.
     pending_rotate: Vec<(DVec2, PendingRotate, Instant)>,
-    /// Since when the release inertia waits for the rotate centre.
+    /// Since when a release's inertia or held moves wait for the rotate centre.
     inertia_held_since: Option<Instant>,
     /// macOS: the pending right press is a Ctrl+left click converted by the
     /// platform (Chrome reports it as a left click with Ctrl, which never
@@ -655,7 +658,8 @@ impl Viewport {
             drag: Drag::None,
             press_pos: DVec2::ZERO,
             press_at: Instant::now(),
-            press_clock: Rc::new(Instant::now),
+            clock: Rc::new(Instant::now),
+            middle_released: None,
             press_travel: 0.0,
             last_pos: DVec2::ZERO,
             hover_unconfirmed: false,
@@ -777,13 +781,14 @@ impl Viewport {
     }
 
     /// Whether a left drag draws a selection box now.
-    /// Drives the press rules' clock (tests: a press held a set time, whatever the machine's load).
-    pub fn set_press_clock(&mut self, clock: impl Fn() -> Instant + 'static) {
-        self.press_clock = Rc::new(clock);
+    /// Drives the press rules' and camera animations' clock (tests: a press held a set time, whatever the
+    /// machine's load).
+    pub fn set_clock(&mut self, clock: impl Fn() -> Instant + 'static) {
+        self.clock = Rc::new(clock);
     }
 
     fn press_held(&self) -> Duration {
-        (self.press_clock)().saturating_duration_since(self.press_at)
+        (self.clock)().saturating_duration_since(self.press_at)
     }
 
     pub fn box_drag(&self) -> bool {
@@ -1008,13 +1013,32 @@ impl Viewport {
         self.animate_to_with(to, nav::CAMERA_LONG_ANIMATION, cx);
     }
 
+    /// The running camera animation: the camera it ends at and how long it takes.
+    pub fn animation(&self) -> Option<(Camera, Duration)> {
+        self.anim.as_ref().map(|a| (a.to, a.duration))
+    }
+
+    /// The camera still moves: an animation, arrow steps, inertia or drag moves held for their rotate centre.
+    pub fn camera_moving(&self) -> bool {
+        self.anim.is_some() || !self.step_rotations.is_empty() || self.inertia.is_some() || !self.pending_rotate.is_empty()
+    }
+
+    /// The arrow-key steps still turning: each one's angle (radians).
+    pub fn step_angles(&self) -> Vec<f64> {
+        self.step_rotations.iter().map(|s| s.angle).collect()
+    }
+
     /// Animate to `to` over `duration` with Onshape's easing (smootherstep).
     pub fn animate_to_with(&mut self, to: Camera, duration: Duration, cx: &mut Context<Self>) {
-        self.animate_from(to, duration, Instant::now(), cx);
+        self.animate_from(to, duration, (self.clock)(), cx);
     }
 
     /// [`Self::animate_to_with`] as if started at `start` (a held move's time).
+    /// Live ignores a new one while one runs (feel/navigation.json "while_animating").
     fn animate_from(&mut self, to: Camera, duration: Duration, start: Instant, cx: &mut Context<Self>) {
+        if self.anim.is_some() {
+            return;
+        }
         self.inertia = None;
         self.axis_tag = AxisTag::None;
         self.anim = Some(CameraAnimation { from: self.camera, to, start, duration });
@@ -1987,7 +2011,7 @@ impl Viewport {
         self.log_rotate(if inertia { "released moving (inertia follows)" } else { "released still" }, !inertia);
         if inertia && let Some(pivot) = self.orbit_pivot {
             self.inertia = Some((Inertia { speed: self.rotation_speed.0, factor: 1.0, pivot }, Instant::now()));
-        } else {
+        } else if self.pending_rotate.is_empty() {
             self.orbit_pivot = None;
         }
         self.nav_mode = Mode::None;
@@ -2034,7 +2058,7 @@ impl Viewport {
                     self.hold_rotate(delta, PendingRotate::Axis, cx);
                     return;
                 }
-                if !self.axis_rotate_step(delta, Instant::now(), cx) {
+                if !self.axis_rotate_step(delta, (self.clock)(), cx) {
                     return;
                 }
             }
@@ -2092,7 +2116,7 @@ impl Viewport {
     /// Hold a rotate move until the rotate centre is known; give up waiting
     /// (fallback centre) after [`MAX_PENDING_ROTATE`] moves.
     fn hold_rotate(&mut self, delta: DVec2, kind: PendingRotate, cx: &mut Context<Self>) {
-        self.pending_rotate.push((delta, kind, Instant::now()));
+        self.pending_rotate.push((delta, kind, (self.clock)()));
         if self.pending_rotate.len() >= MAX_PENDING_ROTATE {
             self.flush_pending_rotate(cx);
         }
@@ -2108,6 +2132,9 @@ impl Viewport {
             return;
         }
         let (size, pivot) = (self.size(), self.orbit_pivot.unwrap_or(self.camera.target));
+        if self.nav_mode == Mode::None && self.inertia.is_none() {
+            self.orbit_pivot = None;
+        }
         for (d, kind, at) in pending {
             match kind {
                 PendingRotate::Mouse => nav::drag_rotate(&mut self.camera, d, size, pivot, false),
@@ -2137,7 +2164,7 @@ impl Viewport {
             return;
         }
         self.press_pos = p;
-        self.press_at = (self.press_clock)();
+        self.press_at = (self.clock)();
         self.press_travel = 0.0;
         self.last_pos = p;
         if let Some(id) = self.label_at(p) {
@@ -2151,11 +2178,6 @@ impl Viewport {
             MouseButton::Left if self.tool_captures_left || self.manipulator_at(p) => {
                 self.drag = Drag::Tool;
                 cx.emit(ViewportEvent::ToolDown { position: p, modifiers: e.modifiers, click_count: e.click_count });
-            }
-            // Onshape: double-click the middle button to zoom to fit.
-            MouseButton::Middle if e.click_count >= 2 => {
-                self.drag = Drag::None;
-                self.zoom_to_fit(true, cx);
             }
             MouseButton::Left | MouseButton::Right | MouseButton::Middle => {
                 self.ctrl_click_press = e.button == MouseButton::Right && converted_ctrl_click();
@@ -2328,6 +2350,22 @@ impl Viewport {
         let p = self.local(e.position);
         self.buttons.set(e.button, false);
         let menu = e.button == MouseButton::Right && right_release_opens_menu(self.press_travel, self.press_held());
+        // Two middle releases within 500 ms zoom to fit (live: its own timer, not the OS's double click).
+        if e.button == MouseButton::Middle {
+            let now = (self.clock)();
+            let double = self.middle_released.is_some_and(|t| now.saturating_duration_since(t) < nav::MIDDLE_DOUBLE_CLICK);
+            self.middle_released = (!double).then_some(now);
+            if double {
+                if self.drag == Drag::Nav && !self.buttons.any() {
+                    self.end_nav(cx);
+                }
+                if !self.buttons.any() {
+                    self.drag = Drag::None;
+                }
+                self.zoom_to_fit(true, cx);
+                return;
+            }
+        }
         if self.drag == Drag::Nav {
             if self.buttons.any() {
                 self.update_nav_mode(e.modifiers, p);
@@ -2830,7 +2868,7 @@ impl Render for Viewport {
         }
         // Advance camera animation.
         if let Some(anim) = &self.anim {
-            let t = anim.start.elapsed().as_secs_f64() / anim.duration.as_secs_f64();
+            let t = (self.clock)().saturating_duration_since(anim.start).as_secs_f64() / anim.duration.as_secs_f64();
             self.camera = anim.from.interpolate(&anim.to, nav::ease(t));
             self.dirty = true;
             self.pick_dirty = true;
@@ -2858,6 +2896,14 @@ impl Render for Viewport {
                 self.flush_pending_rotate(cx);
             }
             window.request_animation_frame();
+        } else if self.inertia.is_none() && self.nav_mode == Mode::None && self.pivot_awaits_depth && !self.pending_rotate.is_empty() {
+            // A drag released before its rotate centre came: its moves wait for it, or 250 ms about the fallback.
+            let since = *self.inertia_held_since.get_or_insert(Instant::now());
+            if since.elapsed() > Duration::from_millis(250) {
+                self.flush_pending_rotate(cx);
+            } else {
+                window.request_animation_frame();
+            }
         } else if let Some((mut inertia, last)) = self.inertia.take() {
             self.inertia_held_since = None;
             let now = Instant::now();

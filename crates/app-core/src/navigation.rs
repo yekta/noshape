@@ -32,6 +32,8 @@ pub const POINTER_ROTATION_CYCLES_PER_SCREEN: f64 = 2.0;
 pub const ROTATION_INERTIA: f64 = 0.77;
 /// Inertia only follows a drag whose last rotation is this recent.
 pub const INERTIA_RELEASE_WINDOW: Duration = Duration::from_millis(50);
+/// Two middle releases this close zoom to fit (`MIDDLE_MOUSE_BUTTON_DOUBLE_CLICK_TIMEOUT`).
+pub const MIDDLE_DOUBLE_CLICK: Duration = Duration::from_millis(500);
 /// Ctrl+Shift+arrow pan (`DEFAULT_PAN_AMOUNT_PX`).
 pub const DEFAULT_PAN_AMOUNT_PX: f64 = 150.0;
 /// Z / Shift+Z zoom, its limits and keyboard zoom (shared with the agent

@@ -225,7 +225,7 @@ fn presses_orbit_box_and_open_the_menu_as_live(cx: &mut TestAppContext) {
         pointer.move_to(cx, &view, at);
         let clock = std::rc::Rc::new(std::cell::Cell::new(std::time::Instant::now()));
         let c = clock.clone();
-        cx.update(|cx| pointer.vp.update(cx, |vp, _| vp.set_press_clock(move || c.get())));
+        cx.update(|cx| pointer.vp.update(cx, |vp, _| vp.set_clock(move || c.get())));
         let tick = |ms: u64| clock.set(clock.get() + std::time::Duration::from_millis(ms));
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
         // A right press moved `dx` px and released 100 ms later.

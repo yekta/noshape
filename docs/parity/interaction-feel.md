@@ -236,6 +236,35 @@ entities found with `query_entities` by a point on them); `MEASURE_ROW=<part of 
 | A value clicked | 5 decimals ("20.00000"); again: 3 | the same (was nothing; `ui.measure_precise`, per selection) | = (fixed) |
 | Not yet in the matrix | a click near an edge's middle takes its midpoint (3D pick); a value's or a panel row's hover draws the dashed line (and the X/Y/Z legs); no preview while hovering a second entity; the panel's contents (220 × 345, Measure type, units, the (x) Add variable rows); the click also selects the value's text for Ctrl+C | – | – |
 
+## Navigation (matrix)
+
+live2's navigation.json (Linux Chrome, the account's default mouse mapping): wheel, right / middle / Ctrl+right /
+Alt+right drags, view keys, animations, double middle click, acted out with real events in a Part Studio (a
+40 × 30 × 10 block, orthographic) at a device pixel ratio of 1 and 2. part-studio-ui
+`nav::the_navigation_matrix_matches_live` (T1, no GPU; the viewport's press and animation clock is the test's,
+`Viewport::set_clock`); `NAV_ROW=<part of an id>` runs some rows.
+
+**Matched: 19 / 19** (11-13 10:30 UTC; 9 / 14 at the first run).
+
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| Wheel notch in / out | the view scale × 2^(∓1/12) | the same | = |
+| Wheel toward the pointer | the point under the pointer stays (≤ 1 px), zooming out too | the same | = |
+| Sideways wheel | ignored | the same | = |
+| Right drag | 3 turns per canvas diagonal (0.57049 °/px on 1673 × 886), about the part's point under the press (≤ 0.4 px), no world-up lock | the same; a drag released before the GPU's depth sample came lost its moves (now applied when it comes, or after 250 ms about the fallback centre) | = (fixed) |
+| Shift + right drag | rotates as a plain right drag | the same | = |
+| Alt + right drag | turntable: an upright view's direction keeps its z | the same | = |
+| Ctrl pressed / released mid-drag | pan while held (1:1), rotate again after | the same | = |
+| Middle drag, Ctrl + right drag | pan 1:1 | the same | = |
+| Arrows / Shift / Ctrl | 15° / 90° / 5° in 250 ms, every key repeat turns (Ctrl stays Control on a Mac) | the same | = |
+| Ctrl+Shift+arrows | pan 150 px in 250 ms | the same | = |
+| Shift+1 / 5 / 7, F | 500 ms, zoom to fit | the same | = |
+| N | normal to the selected face in 500 ms; again: 180° | the same | = |
+| Easing | smootherstep t³(6t² − 15t + 10) | the same | = |
+| A new animation while one runs | ignored until it ends | replaced the running one; now ignored | = (fixed) |
+| Double middle click | two middle releases within 500 ms fit (150 ms did, 600 ms didn't) | the OS's double click count; now live's own 500 ms timer | = (fixed) |
+| Not yet in the matrix | inertia (a flick keeps turning, ×0.77 per 16.67 ms; none held still 50 ms; none below 20 fps); a press on empty space rotates about the view centre; Alt+right on a tilted view animates upright first; the view cube (150 px, 15 px margins, face / edge / corner 500 ms, arrows 15° in 250 ms, curved arrows roll, hover fill) and its menu | – | – |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
