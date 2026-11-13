@@ -63,7 +63,12 @@ dumps (~/agents/bool-cases/{rl,imp,snap,lighten}-dump) and the dock's recording 
    intervals_on 25 %, ray_state 22 %, chords 15 %; the length table landed (3770108f). Ideas: fewer samples per C2,
    ray_state's inside tests.
 3. **The rest of bool's rows:** valve-config's Booleans (Circular pattern 1 one-by-one 320 ms, Extrude 3 sections ahead
-   136 ms), corner-break's 34 Booleans (461 ms), learning-center's Fillet 2 Boolean (283 ms), the snap hooks' Booleans,
+   136 ms; 11-13 08:20: the case is vibe5 ~/agents/bool-corpora/valve-1113/d561e54532ca1330, a cut of 39 faces by 7
+   2 m cutter cones meeting below the part, so boolean.cpp's tools_meet_outside sends it one tool at a time (7 x ~45 ms);
+   all at once it is 436-672 ms, sections ahead the most. Tried, not kept: not pairing two tools' faces whose boxes meet
+   only outside the objects' (the cut ends non-manifold: pieces far out at z -1997 mm kept, as piece states pass to
+   neighbours across shared edges and the crossings that bound them were missing). Ideas: clip each cutter to the
+   part's box first (one cheap common each), or the same skip with those far pieces dropped before the states pass), corner-break's 34 Booleans (461 ms), learning-center's Fillet 2 Boolean (283 ms), the snap hooks' Booleans,
    cf-part-draft's glued Boolean (223 ms), rings-loft Shell 1 (~580 ms on the probe, live 235), the knife's Mirror 1.
 4. Untried: eval_grad_near's NextValueOfUV without maxpreci (byte-identical, gain unclear under load).
 
