@@ -5,7 +5,7 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
-## core state (11-13 19:05 UTC)
+## core state (11-13 18:13 UTC)
 - **Landed:** 456ae051 isaac-ball's Fillet 2 (Fillet 2 18/42/26 as live, studio 5 -> 15/103, assembly mates 63 -> 90/96;
   convexity-stopped chain only through stopped_concave_arc_round; straighten_edges ShapeFix-repaired); 2cb34c6c attribute
   query of everything by body order (louver 2196 -> 1646 ms on the Mac pair, Extrude 3 218 -> 164).
