@@ -3171,13 +3171,20 @@ impl PartStudioView {
         let size = self.viewport.read(cx).size();
         let left = (so.at.x as f32 + SELECT_OTHER_OFFSET.0).min(size.x as f32 - SELECT_OTHER_SIZE.0).max(0.);
         let top = (so.at.y as f32 + SELECT_OTHER_OFFSET.1).min(size.y as f32 - SELECT_OTHER_SIZE.1).max(0.);
+        // The runner's `{"select_other_row": text, "index": n}`: the nth row with that text (live 08:01).
+        let mut seen: std::collections::HashMap<String, usize> = Default::default();
         let mut rows: Vec<AnyElement> = so
             .hits
             .iter()
             .enumerate()
             .map(|(i, r)| {
                 let r2 = r.clone();
+                let text = labeler(r);
+                let nth = seen.entry(text.to_string()).or_default();
+                let mark = format!("select_other_row:{text}#{nth}");
+                *nth += 1;
                 h_flex()
+                    .map(|d| crate::ui_script::mark(d, move || mark))
                     .id(SharedString::from(format!("so-{i}")))
                     .flex_none()
                     .h(px(24.))

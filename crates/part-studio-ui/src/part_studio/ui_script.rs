@@ -348,6 +348,22 @@ impl PartStudioView {
             }
             return panel("Named views".into(), text);
         }
+        // Select other (live 2026-11-13 select-other-row-click): its rows, or "(No selections found)".
+        if let Some(so) = &self.ui.select_other {
+            let labeler = self.labeler(cx);
+            let mut rows: Vec<String> = so.hits.iter().map(|r| labeler(r).to_string()).collect();
+            if rows.is_empty() {
+                rows.push("(No selections found)".into());
+            }
+            return Some(json!({ "kind": "panel", "title": "Select other", "text": rows, "fields": [] }));
+        }
+        // New folder's "Folder name" popover (live feature-list-new-folder-empty): its field.
+        if let Some((st, target, _)) = &self.folder_prompt
+            && matches!(target, super::FolderTarget::Features(_) | super::FolderTarget::Folder(_))
+        {
+            let v = st.read(cx).value().to_string();
+            return Some(json!({ "kind": "panel", "title": "Folder name", "text": [v], "fields": [{ "label": "Folder name", "kind": "input", "value": v }] }));
+        }
         if let Some(m) = &self.ui.material_panel {
             // Live: its tabs, the picker's text and, with none picked, "No material assigned".
             let mut text = vec!["Library".to_string(), "Custom".to_string()];

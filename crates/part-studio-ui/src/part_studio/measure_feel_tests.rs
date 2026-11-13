@@ -132,7 +132,7 @@ struct Row {
 
 fn rows() -> Vec<Row> {
     vec![
-        Row { id: "one vertex", live: &["Point: 40.000 mm 0.000 mm 0.000 mm"], gap: false, check: |b, cx| b.readout(cx, &[V40], &[]) },
+        Row { id: "one vertex", live: &["Point:", "svg-icon-XYZ-Icons-AlongX: 40.000 mm", "svg-icon-XYZ-Icons-AlongY: 0.000 mm", "svg-icon-XYZ-Icons-AlongZ: 0.000 mm"], gap: false, check: |b, cx| b.readout(cx, &[V40], &[]) },
         Row { id: "one straight edge", live: &["Length: 40.000 mm"], gap: false, check: |b, cx| b.readout(cx, &[FRONT_EDGE], &[]) },
         Row { id: "one circular edge", live: &["Diameter: 8.000 mm"], gap: false, check: |b, cx| b.readout(cx, &[HOLE_TOP], &[]) },
         Row { id: "one face (the front: less the chamfer's and the fillet's corners)", live: &["Area: 398.642 mm2"], gap: false, check: |b, cx| b.readout(cx, &[FRONT], &[]) },

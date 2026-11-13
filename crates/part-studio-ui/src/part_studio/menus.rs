@@ -1012,10 +1012,23 @@ impl PartStudioView {
         let l = |x: f64| self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx);
         let readout: Vec<serde_json::Value> = line
             .iter()
-            .map(|(label, m)| {
+            .flat_map(|(label, m)| {
+                // A point as live's recorder reads it: "Point" with no value, then each axis by its icon.
+                if let Measurement::Point(pt) = *m {
+                    let axis = |name: &str, x: f64| {
+                        let (value, units) = l(x).rsplit_once(' ').map(|(v, u)| (v.to_string(), u.to_string())).unwrap_or_default();
+                        serde_json::json!({ "name": name, "value": value, "units": units })
+                    };
+                    return vec![
+                        serde_json::json!({ "name": label, "value": "", "units": "" }),
+                        axis("svg-icon-XYZ-Icons-AlongX", pt.x),
+                        axis("svg-icon-XYZ-Icons-AlongY", pt.y),
+                        axis("svg-icon-XYZ-Icons-AlongZ", pt.z),
+                    ];
+                }
                 let (area, volume) = (Dim { length: 2, angle: 0 }, Dim { length: 3, angle: 0 });
                 let text = match *m {
-                    Measurement::Point(pt) => [pt.x, pt.y, pt.z].map(l).join(" "),
+                    Measurement::Point(_) => String::new(),
                     Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) | Measurement::Distance { distance: x, .. } => l(x),
                     Measurement::Area(x) => self.measure_fmt(Quantity::new(x, area), cx),
                     Measurement::Volume(x) => self.measure_fmt(Quantity::new(x, volume), cx),
@@ -1024,7 +1037,7 @@ impl PartStudioView {
                 };
                 let text = five(label, text, measured_si(m));
                 let (value, units) = text.rsplit_once(' ').map(|(v, u)| (v.to_string(), u.replace('²', "2").replace('³', "3"))).unwrap_or((text, String::new()));
-                serde_json::json!({ "name": label, "value": value, "units": units })
+                vec![serde_json::json!({ "name": label, "value": value, "units": units })]
             })
             .collect();
         self.ui.measure_readout = readout;

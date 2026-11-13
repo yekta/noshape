@@ -106,6 +106,15 @@ def is_panel_dialog(d):
     return t in ("Section view", "Appearance") or bool(re.match(r"Face appearance \d+$", str(t or "")))
 
 
+# Live's recorder reads Select other and the Folder name popover as panels in its recordings from 2026-11-12 on (the
+# live2 recorder); before, they were no dialog.
+POPOVER_PANELS_SINCE = "2026-11-12T00:00"
+
+
+def is_popover_panel(d):
+    return isinstance(d, dict) and d.get("kind") == "panel" and d.get("title") in ("Select other", "Folder name")
+
+
 def forget_old_query_states(live):
     """Drop the selection fields' `state` from a recording made before live's recorder could read it."""
     if str(live.get("recorded", "")) >= QUERY_STATE_SINCE:
@@ -714,6 +723,8 @@ def compare(live, ours, whole_document=True):
         a = {k: (a or {}).get(k) for k in keys}
         b = json.loads(json.dumps({k: (b or {}).get(k) for k in keys}))
         if str(live.get("recorded", "")) < PANEL_DIALOGS_SINCE and a.get("dialog") is None and is_panel_dialog(b.get("dialog")):
+            b["dialog"] = None
+        if str(live.get("recorded", "")) < POPOVER_PANELS_SINCE and a.get("dialog") is None and is_popover_panel(b.get("dialog")):
             b["dialog"] = None
         drop = PLAN_ROWS | LOCAL_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
         a, b = fold_start_edits(drop_rows(a, drop)), fold_start_edits(drop_rows(b, drop))

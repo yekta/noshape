@@ -4863,9 +4863,11 @@ impl PartStudioView {
             })
         });
         // Live (ui 10-25 b (1)): no row shows selected, the new folder's row related-highlighted until the next
-        // click; the features stay selected inside the collapsed folder (live 1844: their part drawn selected).
+        // click; the features stay selected inside the collapsed folder (live 1844: their part drawn selected). An
+        // empty folder holds nothing selected: no highlight (live feature-list-new-folder-empty).
+        let empty = matches!(&target, FolderTarget::Features(ids) if ids.is_empty());
         self.ui.selected_folder = None;
-        self.ui.fresh_folder = made.flatten();
+        self.ui.fresh_folder = made.flatten().filter(|_| !empty);
         let fh = self.focus.clone();
         window.focus(&fh, cx);
         cx.notify();

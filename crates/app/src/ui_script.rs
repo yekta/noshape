@@ -231,6 +231,10 @@ fn control_name(t: &Value) -> Option<String> {
     if let (Some(tool), Some(_)) = (t.get("tool").and_then(Value::as_str), t.get("menu")) {
         return Some(format!("caret:{tool}"));
     }
+    // A Select other row: the `index`th (from 0) with that text.
+    if let Some(text) = t.get("select_other_row").and_then(Value::as_str) {
+        return Some(format!("select_other_row:{text}#{}", t.get("index").and_then(Value::as_u64).unwrap_or(0)));
+    }
     // A face / edge / vertex point with an `instance` is geometry (in that part's coordinates), not the list row.
     let geometry = ["face", "edge", "vertex"].iter().any(|k| t.get(*k).is_some_and(Value::is_array));
     ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "sheet_ref", "sheet_table", "panel_row", "panel_more", "caret", "context_more", "navbar", "nav", "doc_row", "history_row", "var_cell", "var_header", "table_title", "table_header", "crumb", "col_header", "col_grip", "row_icon", "recent_card", "editor", "cp_header", "notice", "profile_badge", "table_cell", "measure_value"]
