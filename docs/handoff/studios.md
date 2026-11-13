@@ -54,7 +54,7 @@ BooleanOperationType): live2's full list (REQUESTS 2575) ends SplitOperationKeep
 so Boolean ranks under NewSurface (substring at 10, fuzzy 20) though its own match is better (7 / 17): some score of
 Onshape's completer we don't know; neither std's module order nor Ace's penalty explains it.
 
-### 2026-11-13 03:52 UTC: studios' speed against live (live 2525 part 1, behaviours.md "speed: studios")
+### 2026-11-13 03:52 UTC: studios' speed against live (live 2525 parts 1 and 2, behaviours.md "speed: studios")
 Live: medians of 5, input event to DOM, software-GL Chrome (3D tab switches are upper bounds). Ours: 11-11's table
 (vibe3 under load; first painted frame / idle).
 
@@ -66,10 +66,14 @@ Live: medians of 5, input event to DOM, software-GL Chrome (3D tab switches are 
 | Tab switch: Part Studio → Part Studio / Assembly / Feature Studio / back | 2.4 / 2.2 / 2.7 / 1.6 s | 14–63 ms first frame, idle to 560 ms |
 | Versions and history open | 0.77 s | 22–114 ms first frame, idle 250–750 ms (2000 entries) |
 | Name header sort | (doesn't sort in live's Owned by me) | 29–47 ms |
+| Compare / open a version / back to Main (part 2) | 7.1 / 3.7 / 4.1 s | 48–138 ms first frame, idle 470–820 ms |
+| To another workspace / back to Main (part 2) | 4.6 / 4.1 s | (in the row above: switch to B1 and back) |
+| Variable Studio tab, 200 variables (part 2; ours: 500) | 5.3 s (first visit 5.8 s) | open 42 ms first frame, idle 480–730 ms |
+| Variable value retyped + Enter (part 2) | 1.26 s | Enter 73 ms (500 variables) |
 
-Every row is faster than live; the history panel's idle (its background reads) is the nearest, next to look at. Still
-to come from live: compare / open a version / workspace switch, and the 200-variable Variable Studio (live's REST is
-rate-limited until ~18:30 UTC).
+Every row is faster than live, most by 5–50×; the nearest are the history panel's idle (250–750 ms against 0.77 s) and
+compare's idle (to 820 ms against 7.1 s). live 2525 part 2: behaviours.md "speed: studios, part 2" (screencast, load
+11–16).
 
 ### 2026-11-13 00:00 UTC: drawing speed (lead 11-12): the table, the wave spring's hidden lines, zoom off the UI thread
 Measured on vibe6 (8 cores, Xvfb, software GL, shared with psui), release app, NOSHAPE_PERF=1 (perf log
