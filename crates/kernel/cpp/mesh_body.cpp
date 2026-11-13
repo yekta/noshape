@@ -305,18 +305,23 @@ TopoDS_Shape mesh_compound(const std::vector<MeshPiece>& pieces)
   std::vector<Closed> geo;
   for (size_t i : closed)
     geo.push_back(closed_of(pieces[i].face));
-  // Each piece's containers (by a point of its first triangle's centre), the innermost the one contained by most.
+  // Each piece's containers, the innermost the one contained by most: those that hold the centres of up to 64 of its
+  // triangles spread over it (a piece through another's surface is a part of its own: cf-spur-gear's construction pin
+  // half in its gear: live reads 5 parts).
   const size_t                     n = closed.size();
   std::vector<std::vector<size_t>> in(n);
   for (size_t i = 0; i < n; ++i)
   {
-    if (geo[i].tris.empty())
-      continue;
-    const auto&  t = geo[i].tris.front();
-    const gp_Pnt p((t[0].XYZ() + t[1].XYZ() + t[2].XYZ()) / 3);
+    const auto&  ts     = geo[i].tris;
+    const size_t stride = std::max<size_t>(1, ts.size() / 64);
     for (size_t j = 0; j < n; ++j)
-      if (j != i && !geo[j].box.IsOut(geo[i].box) && inside(geo[j], p))
+    {
+      bool all = j != i && !ts.empty() && !geo[j].box.IsOut(geo[i].box);
+      for (size_t k = 0; k < ts.size() && all; k += stride)
+        all = inside(geo[j], gp_Pnt((ts[k][0].XYZ() + ts[k][1].XYZ() + ts[k][2].XYZ()) / 3));
+      if (all)
         in[i].push_back(j);
+    }
   }
   std::vector<int> solid_of(n, -1);
   std::vector<TopoDS_Solid> solids;

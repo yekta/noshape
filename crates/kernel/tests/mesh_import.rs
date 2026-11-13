@@ -68,12 +68,15 @@ fn stl_mesh_body() {
 }
 
 /// An STL of several bodies as Onshape imports it (live exchange suite 2147): a part per connected mesh, a mesh inside
-/// another that one's hollow (its volume taken out).
+/// another that one's hollow (its volume taken out), a mesh through another's face a part of its own (cf-spur-gear's
+/// construction pin, half in its gear: live reads 5 parts).
 #[test]
 fn stl_pieces_are_parts_and_a_piece_inside_is_a_hollow() {
     let mm = 1e-3;
     let boxed = |a: f64, b: f64| make_box_corners(DVec3::splat(a * mm), DVec3::splat(b * mm)).unwrap();
-    let shapes = Shape::compound(&[boxed(0.0, 30.0), boxed(10.0, 20.0), make_box_corners(DVec3::new(40.0 * mm, 0.0, 0.0), DVec3::new(50.0 * mm, 10.0 * mm, 10.0 * mm)).unwrap()]);
+    let corners = |a: DVec3, b: DVec3| make_box_corners(a * mm, b * mm).unwrap();
+    let pin = corners(DVec3::new(2.0, 2.0, 25.0), DVec3::new(4.0, 4.0, 31.0));
+    let shapes = Shape::compound(&[boxed(0.0, 30.0), boxed(10.0, 20.0), corners(DVec3::new(40.0, 0.0, 0.0), DVec3::new(50.0, 10.0, 10.0)), pin]);
     let dir = std::env::temp_dir().join(format!("noshape-meshparts-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("three.stl");
@@ -81,11 +84,12 @@ fn stl_pieces_are_parts_and_a_piece_inside_is_a_hollow() {
     let s = read_mesh_bodies(&path, LengthUnit::Meter).unwrap();
     let _ = std::fs::remove_dir_all(&dir);
     let solids = s.solids();
-    assert_eq!(solids.len(), 2, "the outer box (with its hollow) and the box beside it");
+    assert_eq!(solids.len(), 3, "the outer box (with its hollow), the box beside it and the pin");
     let mut vols: Vec<f64> = solids.iter().map(|x| volume_properties(x).unwrap().mass / (mm * mm * mm)).collect();
     vols.sort_by(f64::total_cmp);
     // (An STL's coordinates are float32.)
-    assert!((vols[0] - 1000.0).abs() < 1e-6 * 27000.0 && (vols[1] - (27000.0 - 1000.0)).abs() < 1e-6 * 27000.0, "{vols:?}");
+    let near = |v: f64, want: f64| (v - want).abs() < 1e-6 * 27000.0;
+    assert!(near(vols[0], 24.0) && near(vols[1], 1000.0) && near(vols[2], 27000.0 - 1000.0), "{vols:?}");
 }
 
 /// Display meshing leaves no triangulation on a B-rep shape (OCCT's booleans
