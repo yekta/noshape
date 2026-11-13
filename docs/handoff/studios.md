@@ -28,6 +28,46 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-13 00:00 UTC: drawing speed (lead 11-12): the table, the wave spring's hidden lines, zoom off the UI thread
+Measured on vibe6 (8 cores, Xvfb, software GL, shared with psui), release app, NOSHAPE_PERF=1 (perf log
+"drawing: …" lines, now with ms since start), scripts in /root/studios-scratch/drwperf (copies in vibe6
+~/tmp/studios/perf/bin). Drawings: the corpus' parts, asm and nist drawings, spur gear and wave spring
+(~/parity/exchange), and a drawing of hat8's Mac mini (a mode-700 private copy, never in the repo).
+
+| What | Ours | PLAN 2.7 target | Live (behaviours.md) |
+|---|---|---|---|
+| Open a drawing, cold (no display cache) | asm 0.28 s, nist 0.21 s, spur / wave 0.17 s, parts 3.1 s, hat8 17 s (its Part Studio's regen) | open a document ≤ 0.5 s | not recorded (asked, REQUESTS 00:00) |
+| Open, warm (cached sheet first) | parts 0.25 s (frame 0.75), hat8 0.47 s (frame 1.0), full 1.9 s | ≤ 0.5 s | not recorded |
+| First views, hidden lines (4 views) | nist 0.2-0.45 s polygonal + 0.15-0.37 exact; asm 2.0-2.4 s, parts 1.3-2.7 s | ≤ 2× faster than live | Create Drawing: 3.0 s server, 30 s to the views drawn |
+| Update after a model change (parts) | 1.65-1.76 s click to views; 16 ms on the UI thread at the click | — | not recorded |
+| Insert a view | nist 40 ms polygonal + 70 ms exact; wave spring 0.9 s polygonal, exact 15 s (probe) / 49 s (loaded app): **was never** | ≤ 2× faster than live | 3.0 s click to view drawn |
+| Pan / zoom frame | pan: 3-8 ms our CPU per frame (the 35-50 ms "frame" is Xvfb's pacing, the same on a tiny sheet); wheel zoom: 11-32 ms on the UI thread per step → **0** (lines remade in the background) | 120 fps | not recorded |
+| PDF / DXF export | asm 110-123 / 130-183 ms, parts 163-285 / 113-167 ms, nist 42-109 / 12-18 ms; wave spring **hung before** | — | not recorded |
+
+Fixed (826f3ff8, queued 23:59):
+- **The wave spring's hidden lines**: OCCT's exact Hide ran 35 min and on (Update 1 s; the probe: 20M break-hook checks
+  in 288 s unfinished). The exact pass now runs under a work bound (ScopedWork, TESTS.md "Budgets"): 1M checks, 2.4×
+  the most an exact view of the exchange corpus takes (motor-mount-jack's Top, 409k); past it the view is hidden on
+  the triangulation at the exact deflection. Deterministic. `kernel::with_hlr_exact_work` for tests; T1
+  `an_exact_view_past_its_work_bound_is_hidden_on_the_triangulation`, T2 `the_wave_springs_exact_views_finish`
+  (tests/data/hlr/wave-spring.brep). NOSHAPE_WORK_TRACE=1 prints `work: hlr.exact`.
+- **Zoom**: a zoom past 8% remade every mesh on the UI thread (14-27 ms per wheel step on parts / asm); now only the
+  lines (pen widths in pixels) are remade, in the background, the old ones drawn meanwhile
+  (`a_zoom_remakes_the_lines_off_the_ui_thread`).
+
+Already right (checked): views compute in the background, cached per view by content (`view_key`), only changed
+views redone (Update: 3 ms when nothing changed); sheet assembly 12-26 ms on the UI thread per change.
+
+Open:
+- A sheet's first render data: 10 ms on a quiet host (the 100-200 ms seen was load). What a warm open waits for is
+  the software renderer: the cached sheet is in at 0.28-0.48 s, its frame presented at 0.84-1.6 s (lavapipe renders
+  a drawing frame in 0.6-1.5 s at 1920×1080 with 4× MSAA, and the MSAA pipelines take 120 ms to build); on a GPU
+  that wait is gone. The pan "frame" numbers above are the UI side only.
+- ~100 ms UI-CPU stalls while a document opens on its Part Studio tab, before the drawing's source is in: not drawing
+  work (psui's open path); told the lead.
+- hat8's cold open is its Part Studio's regen (Booleans 1.1-1.7 s each): core / bool.
+- Live's numbers for open, Update, export and pan / zoom: REQUESTS 2026-11-13 00:00.
+
 ### 2026-11-12 20:48 UTC: drawing positions from live2's takes (lead: the three anchors), table cells, import toasts
 - Section / detail labels sit 3.1 mm under their view's geometry (scale and user labels 6 mm): live2 positions put
   SECTION A - A ~3.1 mm, SCALE 2:1 ~5.6 mm under (build.rs). A note's `position` is its text's box (no leader); a new
