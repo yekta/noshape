@@ -2429,14 +2429,11 @@ pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], siz
     use rayon::prelude::*;
     let legacy = k::kernel_legacy();
     let cuts = rims.0.par_iter().map(|x| k::with_kernel_legacy(legacy.clone(), || tool_of(x))).collect::<FResult<Vec<_>>>()?;
-    // A round built directly where it can be (the tools' touch curves put on the part's faces, no cut: c2-rings-loft's
-    // Fillet 1 375 -> ~95 ms), else the cut.
+    // A round or chamfer built directly where it can be (the tools' touch curves put on the part's faces, no cut:
+    // c2-rings-loft's Fillet 1 375 -> ~95 ms, c2-hunting-knife's Chamfer 2 ~73 -> ~36 ms), else the cut.
     let tools: Vec<Shape> = cuts.iter().map(|c| c.shape.clone()).collect();
     let rim_edges = rims.0.iter().map(|(_, i)| shape.sub_shape(ShapeType::Edge, edges[*i])).collect::<Result<Vec<_>, _>>()?;
-    // (A chamfer's lofted tools: the direct build classifies against them slower than the cut, 255 vs 226 ms on
-    // c2-rings-loft's Chamfer 1.)
-    if kind == RimBlend::Round
-        && let Ok(res) = k::blend_direct(shape, &tools, &rim_edges)
+    if let Ok(res) = k::blend_direct(shape, &tools, &rim_edges)
         && res.shape.count(ShapeType::Solid) == 1
     {
         let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), Some(&super::detail::blend_role));
