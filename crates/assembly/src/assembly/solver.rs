@@ -1369,6 +1369,11 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
             continue;
         }
         let exact = z_rel < -1.0 + 1e-9;
+        // A Cylindrical turns its part over only as that part's one mate (live qa4 s3: the pin flips; hand-drill's
+        // Cylindrical 29 and 31, opposite flips on one axis of a part held by more, both OK and nothing turned).
+        if m.kind == MateType::Cylindrical && [m.a, m.b].into_iter().any(|b| !bodies[b].fixed && mates.iter().filter(|o| o.follow.is_none() && (o.a == b || o.b == b)).count() > 1) {
+            continue;
+        }
         // Live (behaviours "skasm (2026-10-27): oracle_asm R3 rule", 14 runs,
         // nothing fixed): in an exact flip the first connector's part turns
         // when the connectors' common Z points to the negative side (its
@@ -1447,7 +1452,7 @@ fn turn_carrying(bodies: &mut [SolverBody], poses: &mut [Frame], mates: &[Solver
 /// and a later mate turning it back leaves an earlier one so (live 1764 (3):
 /// a Parallel disagreeing with a Planar overdefines both).
 fn axis_disagrees(poses: &[Frame], m: &SolverMate) -> bool {
-    m.follow.is_none() && matches!(m.kind, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel) && (relative(poses, m).rotation * DVec3::Z).z < 0.0
+    m.follow.is_none() && matches!(m.kind, MateType::Revolute | MateType::PinSlot | MateType::Planar | MateType::Parallel) && (relative(poses, m).rotation * DVec3::Z).z < 0.0
 }
 
 /// The first coordinate of `v` (x, then y, then z) that isn't zero.
@@ -2383,6 +2388,23 @@ mod tests {
                 assert!((p.origin.z - tz * mm).abs() < 1e-6, "{kind:?} aligned={aligned}: t {:?}", p.origin);
             }
         }
+    }
+
+    /// Live (asm-hand-drill-pinslot's Spring Tensioner): two Cylindricals with opposite flips on one axis of a part
+    /// both hold, and the part keeps its turn; the sense of a Cylindrical only turns a part it alone mates.
+    #[test]
+    fn cylindricals_with_opposite_flips_on_one_axis_both_hold() {
+        let mm = 1e-3;
+        let pin = Frame::from_axes(DVec3::new(0.0, 0.0, 5.0 * mm), DVec3::Z, DVec3::X);
+        let hole = Frame::from_axes(DVec3::new(0.0, 0.0, 20.0 * mm), DVec3::Z, DVec3::X);
+        let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.0, 0.0, 15.0 * mm), false)];
+        let start = bodies[1].pose;
+        let (mut a, mut b) = (mate(MateType::Cylindrical, 1, pin, 0, hole), mate(MateType::Cylindrical, 1, pin, 0, hole));
+        a.flip_primary = true;
+        b.flip_primary = false;
+        let r = solve(&mut bodies, &[a, b], &[], &[]);
+        assert!(r.mate_ok.iter().all(|ok| *ok), "{:?}", r.mate_ok);
+        assert!(bodies[1].pose.rotation.angle_between(start.rotation) < 1e-9, "turned: {:?}", bodies[1].pose);
     }
 
     /// Live's exact flips with nothing fixed (behaviours "skasm (2026-10-27):
