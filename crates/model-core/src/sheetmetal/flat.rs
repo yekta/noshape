@@ -489,7 +489,7 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
         return Err("Nothing to flatten".into());
     }
     // Union of all planar pieces into one region.
-    let mut shape = match union_planar(&pieces) {
+    let mut shape = match union_planar(&pieces, &frame) {
         Ok(s) => Some(s),
         Err(e) => {
             warnings.push(format!("The flat outline could not be merged ({e}); showing the pieces"));
@@ -529,7 +529,7 @@ pub fn flat_from_pieces(frame: k::Plane, pieces: &[Shape], bend_lines: Vec<FlatB
         return Err("Nothing to flatten".into());
     }
     let mut warnings = Vec::new();
-    let shape = match union_planar(pieces) {
+    let shape = match union_planar(pieces, &frame) {
         Ok(s) => Some(s),
         Err(e) => {
             warnings.push(format!("The flat outline could not be merged ({e}); showing the pieces"));
@@ -606,7 +606,7 @@ fn local_bounds(frame: &k::Plane, shapes: &[Shape]) -> (DVec2, DVec2) {
 }
 
 /// Fuse coplanar faces and merge them into maximal faces.
-fn union_planar(pieces: &[Shape]) -> Result<Shape, String> {
+fn union_planar(pieces: &[Shape], frame: &k::Plane) -> Result<Shape, String> {
     if pieces.len() == 1 {
         return Ok(pieces[0].clone());
     }
@@ -616,14 +616,66 @@ fn union_planar(pieces: &[Shape]) -> Result<Shape, String> {
     let faces = fused.shape.faces();
     let sewn = k::sew(&faces, 1e-7, false).map(|r| r.shape).unwrap_or(fused.shape);
     let unified = k::unify_same_domain(&sewn).map(|r| r.shape).unwrap_or(sewn);
-    let total_in: f64 = pieces.iter().filter_map(|p| p.area().ok()).sum();
-    let total_out: f64 = unified.faces().iter().filter_map(|f| f.area().ok()).sum();
+    let area = |f: &Shape| planar_area(f, frame).or_else(|| f.area().ok());
+    let total_in: f64 = pieces.iter().flat_map(|p| p.faces()).filter_map(|f| area(&f)).sum();
+    let total_out: f64 = unified.faces().iter().filter_map(area).sum();
     // Overlapping pieces (collisions in the flat) shrink the area; keep the
     // union anyway, it is still the flat outline.
     if total_out <= 0.0 || total_out > total_in * (1.0 + 1e-6) {
         return Err(format!("area {total_out} vs {total_in}, {} faces", unified.faces().len()));
     }
     Ok(unified)
+}
+
+/// A face's area in `frame`'s plane, exactly, when its edges are lines and circular arcs (else `None`): each loop by
+/// the shoelace of its ends plus each arc's segment, the outer loop less its holes. The Gauss integral it replaces
+/// was a tenth of c2-sm-corner-break's regeneration (its louver panel's 40 slots).
+fn planar_area(face: &Shape, frame: &k::Plane) -> Option<f64> {
+    let cross = |a: DVec2, b: DVec2| a.x * b.y - a.y * b.x;
+    let mut loops: Vec<f64> = Vec::new();
+    for w in face.wires() {
+        // Each edge as its two ends and the area its arc adds to the chord's side, going start to end.
+        let mut pieces: Vec<(DVec2, DVec2, f64)> = Vec::new();
+        for e in w.edges() {
+            let info = e.edge_info().ok()?;
+            if info.degenerated {
+                continue;
+            }
+            let (p0, p1) = (frame.to_local(info.start), frame.to_local(info.end));
+            match info.curve {
+                k::Curve::Line { .. } => pieces.push((p0, p1, 0.0)),
+                k::Curve::Circle { center, radius, .. } => {
+                    let c = frame.to_local(center);
+                    if info.closed {
+                        pieces.push((p0, p0, std::f64::consts::PI * radius * radius));
+                        continue;
+                    }
+                    let pm = frame.to_local(e.point_at((info.first_param + info.last_param) * 0.5).ok()?);
+                    let theta = (p0 - c).angle_to(pm - c).abs() + (pm - c).angle_to(p1 - c).abs();
+                    let segment = radius * radius * 0.5 * (theta - theta.sin());
+                    pieces.push((p0, p1, -cross(p1 - p0, pm - p0).signum() * segment));
+                }
+                _ => return None,
+            }
+        }
+        if pieces.is_empty() {
+            continue;
+        }
+        // Chained end to end (each edge's own direction may run either way in the loop).
+        let tol = 1e-7 * pieces.iter().map(|(a, b, _)| a.length().max(b.length())).fold(1.0, f64::max);
+        let mut twice = 0.0;
+        let (mut at, mut left) = (pieces[0].0, pieces);
+        while !left.is_empty() {
+            let i = left.iter().position(|(a, b, _)| a.distance(at) <= tol || b.distance(at) <= tol)?;
+            let (a, b, bulge) = left.swap_remove(i);
+            let (a, b, bulge) = if a.distance(at) <= tol { (a, b, bulge) } else { (b, a, -bulge) };
+            twice += cross(a, b) + 2.0 * bulge;
+            at = b;
+        }
+        loops.push((twice * 0.5).abs());
+    }
+    let outer = loops.iter().copied().fold(0.0, f64::max);
+    Some(outer - (loops.iter().sum::<f64>() - outer))
 }
 
 /// Sample the edges of a wire into one closed polyline (plane coordinates).
@@ -695,4 +747,32 @@ fn chain_loop(mut segs: Vec<Vec<DVec3>>) -> Vec<DVec3> {
         out.pop();
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use k::Segment2d as S;
+
+    /// A face's area from its lines and arcs equals the Gauss integral's: a D shape (a 270° arc and two lines), the
+    /// same with a round hole, a slot (two half circles) and a plate with a circle cut out, on a tilted plane.
+    #[test]
+    fn a_planar_area_from_lines_and_arcs_is_the_integrals() {
+        let plane = k::Plane::from_normal(DVec3::new(0.01, -0.02, 0.03), DVec3::new(0.3, -0.4, 0.86).normalize());
+        let face = |segs: &[S]| k::make_face_from_wire(&k::make_wire_2d(&plane, segs).unwrap(), true).unwrap();
+        let v = DVec2::new;
+        let r = 0.02;
+        let d = face(&[S::Arc { center: v(0.0, 0.0), radius: r, start_angle: 0.0, end_angle: 1.5 * std::f64::consts::PI }, S::Line { a: v(0.0, -r), b: v(0.0, 0.0) }, S::Line { a: v(0.0, 0.0), b: v(r, 0.0) }]);
+        let slot = face(&[S::Line { a: v(0.0, 0.0), b: v(0.05, 0.0) }, S::Arc3 { a: v(0.05, 0.0), mid: v(0.06, 0.01), b: v(0.05, 0.02) }, S::Line { a: v(0.05, 0.02), b: v(0.0, 0.02) }, S::Arc3 { a: v(0.0, 0.02), mid: v(-0.01, 0.01), b: v(0.0, 0.0) }]);
+        let plate = face(&[S::Line { a: v(-0.05, -0.05), b: v(0.05, -0.05) }, S::Line { a: v(0.05, -0.05), b: v(0.05, 0.05) }, S::Line { a: v(0.05, 0.05), b: v(-0.05, 0.05) }, S::Line { a: v(-0.05, 0.05), b: v(-0.05, -0.05) }]);
+        let disk = face(&[S::Circle { center: v(0.01, 0.005), radius: 0.012 }]);
+        let holed = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&plate), &[disk], &k::BooleanOptions::default()).unwrap().shape;
+        let small = face(&[S::Circle { center: v(-0.006, -0.006), radius: 0.003 }]);
+        let d_holed = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&d), &[small], &k::BooleanOptions::default()).unwrap().shape;
+        for (name, s) in [("D", d), ("slot", slot), ("plate with a hole", holed), ("D with a hole", d_holed)] {
+            let f = s.faces().into_iter().next().unwrap();
+            let (ours, gauss) = (planar_area(&f, &plane).unwrap(), f.area().unwrap());
+            assert!((ours - gauss).abs() <= 1e-9 * gauss, "{name}: {ours} vs {gauss}");
+        }
+    }
 }
