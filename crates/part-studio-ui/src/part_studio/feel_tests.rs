@@ -61,9 +61,17 @@ impl Pointer {
             cx.executor().advance_clock(std::time::Duration::from_millis(20));
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        // A few frames more: the scene shows the new hover, so the next pick holds a lit line (a person's pointer
-        // takes many frames to get anywhere).
+        // Until the scene shows the new hover and the pick is drawn again with it, so the next pick holds a lit line (a
+        // person's pointer takes many frames to get anywhere; a loaded machine builds the scene slowly).
+        self.settle(cx, view);
+    }
+
+    fn settle(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>) {
+        let t = std::time::Instant::now();
         self.frames(cx, view);
+        while cx.update(|cx| view.read(cx).ui.scene_task.is_some() || self.vp.read(cx).pick_pending() || self.vp.read(cx).hover_pending()) && t.elapsed() < std::time::Duration::from_secs(15) {
+            self.frames(cx, view);
+        }
     }
 
     fn frames(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>) {
@@ -76,11 +84,12 @@ impl Pointer {
         }
     }
 
-    /// Clicks there and lets the click's pick come back (a hover just changed is picked again first).
+    /// Clicks there and lets the click's pick come back (a hover just changed is picked again first; a loaded
+    /// software GPU can take a while).
     fn click(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>, at: DVec2) {
         let win = self.window_point(cx, at);
         gpui_kit::VisualTestContext::from_window(self.window, cx).simulate_click(win, Modifiers::default());
-        self.frames(cx, view);
+        self.settle(cx, view);
     }
 }
 
@@ -91,9 +100,10 @@ fn at_scale(cx: &mut TestAppContext, window: AnyWindowHandle, scale: f32) {
 }
 
 /// Outside sketch mode a click acts on exactly what is lit (lead 11-12, after the sketch reach fix), and an edge lights
-/// as live's (live/feel/3d.json "hover_reach_px", a level edge: lights at 6–7 px, stays lit to 9–10) on either side,
-/// over the background and over its own face. The pointer moves across a part edge a quarter along it, toward it and
-/// back out on each side, and the click selects what lights there.
+/// as live's (live/feel/3d.json "hover_reach_px", a level edge: lights at 6–7 px) on either side, over the background
+/// and over its own face, and lets go past its hold. The pointer moves across a part edge a quarter along it, toward
+/// it and back out on each side, and the click selects what lights there. (The hold to 9–10 px: offscreen
+/// `our_3d_pick_reach_for_edges_and_vertices`.)
 #[gpui::test]
 fn a_click_beside_an_edge_selects_what_is_lit(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -129,7 +139,7 @@ fn a_click_beside_an_edge_selects_what_is_lit(cx: &mut TestAppContext) {
         let square = 5.0 * (across.x.abs() + across.y.abs());
         let (reach, hold) = (square + 1.5, square + 4.5);
         let steps = [-1.0, 1.0f64].into_iter().flat_map(|side| {
-            [(2.0 * hold, false), (reach + 1.5, false), (reach - 1.0, true), (hold - 1.5, true), (hold + 1.5, false)].map(|(d, lit)| (side * d, lit))
+            [(2.0 * hold, false), (reach + 1.5, false), (reach - 1.0, true), (hold + 1.5, false)].map(|(d, lit)| (side * d, lit))
         });
         for (off, lights) in steps {
             cx.update_window(window, |_, _, cx| {
@@ -154,15 +164,15 @@ fn a_click_beside_an_edge_selects_what_is_lit(cx: &mut TestAppContext) {
 }
 
 /// User P0 11-12 (hat15b, 7th report): the Dimension tool's hover lit a line but the click started nothing. With the
-/// GPU's own hover pick, what lights is what the click takes, within live's sketch reach (a curve 6 px): on the line's
-/// drawn centre and 4 px beside it the line is lit and a click starts its dimension; 8 px beside it (live: 5 mm off a
-/// line at sketch-offset-key's zoom is a miss) nothing is lit or taken.
+/// GPU's own hover pick, what lights is what the click takes, within live's Dimension reach (live2's catalogue: a line
+/// from 8 px, not 9): on the line's drawn centre, 4 and 8 px beside it the line is lit and a click starts its
+/// dimension; 10 px beside it nothing is lit or taken.
 #[gpui::test]
 fn the_dimension_tool_takes_the_hovered_line(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
     RENDERING.set(true);
     for scale in [1.0, 2.0] {
-        for (off, lit) in [(0.0, true), (4.0, true), (8.0, false)] {
+        for (off, lit) in [(0.0, true), (4.0, true), (7.5, true), (10.0, false)] {
             let (window, view) = line_then_dimension_tool(cx, &format!("dim-hover-{scale}-{off}"));
             at_scale(cx, window, scale);
             let pointer = Pointer::new(cx, window, &view);
@@ -214,19 +224,26 @@ fn presses_orbit_box_and_open_the_menu_as_live(cx: &mut TestAppContext) {
         });
         pointer.move_to(cx, &view, at);
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        // (How long the press took: live's menu needs it under 1 s, and a loaded software GPU's frames can stretch it.)
         let right = |vcx: &mut gpui_kit::VisualTestContext, dx: f64| {
             let (from, to) = (pointer.window_point(vcx, at), pointer.window_point(vcx, at + DVec2::new(dx, 0.0)));
+            let t = std::time::Instant::now();
             vcx.simulate_mouse_down(from, gpui_kit::MouseButton::Right, Modifiers::default());
             vcx.simulate_mouse_move(to, gpui_kit::MouseButton::Right, Modifiers::default());
             vcx.simulate_mouse_up(to, gpui_kit::MouseButton::Right, Modifiers::default());
+            t.elapsed()
         };
         for (dx, menu) in [(3.0, true), (4.0, true), (6.0, false)] {
             cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.close_context_menu(cx))).unwrap();
             pointer.frames(cx, &view);
             let before = cx.update(|cx| pointer.vp.read(cx).camera);
-            right(&mut vcx, dx);
-            pointer.frames(cx, &view);
+            let held = right(&mut vcx, dx);
+            pointer.settle(cx, &view);
             assert_ne!(cx.update(|cx| pointer.vp.read(cx).camera), before, "scale {scale}: a {dx} px right drag orbits");
+            if menu && held >= std::time::Duration::from_millis(900) {
+                eprintln!("feel: scale {scale}, {dx} px: the press took {held:?} here, the menu check skipped");
+                continue;
+            }
             assert_eq!(cx.update(|cx| view.read(cx).context_menu.is_some()), menu, "scale {scale}: the menu after a {dx} px right drag");
         }
         cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.close_context_menu(cx))).unwrap();

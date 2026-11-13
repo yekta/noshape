@@ -15,6 +15,12 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## Resume here (psui 2026-11-11 20:31 UTC, on the new account)
+**2026-11-13 05:30 UTC:** the sketch snaps matrix (interaction-feel.md "Sketch snaps", part-studio-ui `snaps::`)
+is at 42 / 42 against live2's catalogue; its "Not yet in the matrix" row is the next work (a circular model edge's
+centre, other sketches, the rectangle / 3 point arc sets, drags). Follow-ups from live: Edit in context on an
+instance linked from another document stays in the assembly in ours (scenario context-create-version-update);
+the frame profiles library (live REQUESTS 2530, behaviours "psui (2530)") isn't built.
+
 **2026-11-13 03:09 UTC:** the user's model-edge snap P0 landed (d90b4f6f, with live2's sketch feel batch; hand-checked on
 a mode-700 hat15 copy, deleted). Next, the "3D picking as live measured it" commit (local, not queued): live's 3D picking (docs/parity/interaction-feel.md
 3D) and the press thresholds, plus tests/ui-parity/hole-remembers-last for live to record. Before landing: the 593

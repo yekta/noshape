@@ -500,12 +500,15 @@ impl PartStudioView {
         self.model_snap_of(self.hover.as_ref()?, cursor, vp)
     }
 
+    /// A lit model vertex or edge as a snap (live/feel/sketch-snaps.json "modelEntities"): only one lying in the
+    /// sketch's plane (off it nothing is offered), a vertex as a 15 px square on screen, an edge as a 15 px band.
     fn model_snap_of(&self, r: &Reference, cursor: DVec2, vp: &Viewport) -> Option<ExternalSnap> {
         let ed = self.sketch.as_ref()?;
         let frame = ed.frame;
-        let radius_px = 10.0;
+        let half_px = 7.5;
         let to_screen = |w: DVec3| vp.project(w);
         let cursor_s = to_screen(frame.to_world(cursor))?;
+        let in_plane = |w: DVec3| (frame.to_world(frame.to_local(w)) - w).length() < 1e-6;
         match r {
             Reference::Vertex(_) => {
                 let b = self.display.bodies.iter().find(|b| b.vertex_refs.contains(r))?;
@@ -513,13 +516,17 @@ impl PartStudioView {
                 let v = b.mesh.vertices.get(i)?;
                 let w = DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64);
                 let local = frame.to_local(w);
-                let s = to_screen(frame.to_world(local))?;
-                ((s - cursor_s).length() <= radius_px * 1.6).then(|| ExternalSnap::Vertex { position: local, reference: r.clone() })
+                let s = to_screen(w)?;
+                let d = (s - cursor_s).abs();
+                (in_plane(w) && d.x.max(d.y) < half_px).then(|| ExternalSnap::Vertex { position: local, reference: r.clone() })
             }
             Reference::Edge(_) => {
                 let b = self.display.bodies.iter().find(|b| b.edge_refs.contains(r))?;
                 let i = b.edge_refs.iter().position(|x| x == r)?;
                 let pl = b.mesh.edges.get(i)?;
+                if !pl.iter().all(|v| in_plane(DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64))) {
+                    return None;
+                }
                 let pts: Vec<DVec2> = pl.iter().map(|v| frame.to_local(DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64))).collect();
                 let mut best: Option<(f64, DVec2, DVec2)> = None;
                 for w in pts.windows(2) {
@@ -533,10 +540,21 @@ impl PartStudioView {
                     }
                 }
                 let (_, q, d) = best?;
+                // A straight edge's midpoint first (a point beats a curve), as a 15 px square.
+                if let (Some(&a), Some(&z)) = (pts.first(), pts.last())
+                    && pts.iter().all(|p| (z - a).perp_dot(*p - a).abs() <= 1e-9 * (z - a).length_squared().max(1e-30))
+                {
+                    let m = (a + z) * 0.5;
+                    let ms = to_screen(frame.to_world(m))?;
+                    let off = (ms - cursor_s).abs();
+                    if off.x.max(off.y) < half_px {
+                        return Some(ExternalSnap::Edge { position: m, tangent: (z - a).try_normalize().unwrap_or(DVec2::X), reference: r.clone(), midpoint: true });
+                    }
+                }
                 let s = to_screen(frame.to_world(q))?;
                 // (The edge's direction there: a direction inference meets the edge along it.)
                 let tangent = d.try_normalize().unwrap_or(DVec2::X);
-                ((s - cursor_s).length() <= radius_px).then_some(ExternalSnap::Edge { position: q, tangent, reference: r.clone() })
+                ((s - cursor_s).length() < half_px).then_some(ExternalSnap::Edge { position: q, tangent, reference: r.clone(), midpoint: false })
             }
             _ => None,
         }
@@ -545,12 +563,13 @@ impl PartStudioView {
     /// Whether sketch entity `e` is within live's pick reach of plane point `p`, on screen
     /// (SKETCH-SCREEN-SPACE-REACH): a point 10 px; a curve within the 5 px square round the pointer (woolsthorpe
     /// MOUSE_PICK_RADIUS_PX) counting its 2 px drawn width (ui-parity sketch-offset hits a line 3 mm off it,
-    /// sketch-offset-key misses one 5 mm off). Our pick pass reaches further (lines and points 8 px wider).
+    /// sketch-offset-key misses one 5 mm off). The Dimension tool's preselection reaches a line from 8 px, not 9
+    /// (live/feel/sketch-snaps.json "toolNotes").
     fn in_sketch_reach(&self, e: noshape_sketch::EntityId, p: DVec2, cx: &App) -> bool {
         let Some(ed) = self.sketch.as_ref() else { return false };
         let Some(d) = self.sketch_data(cx) else { return false };
         let r = ed.world_per_px * 10.0;
-        let curve_r = ed.world_per_px * 6.0;
+        let curve_r = ed.world_per_px * if ed.tool == Tool::Dimension { 8.0 } else { 6.0 };
         let screen = ed.screen_metric();
         match (d.sketch.point(e), screen) {
             (Some(q), Some(m)) => m.len(q - p) <= r,

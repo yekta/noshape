@@ -50,12 +50,12 @@ two zooms, A 0.2754 / B 0.2316 mm/px; where they differ both are given).
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
 | A line's end snaps onto a line | ≤ 7 px, not 8 | 7.5 px (`INFERENCE_PX`) | inference tests; GPUI `a_line_ends_on_the_hovered_point_at_scale_1/2` | = |
-| …onto a point / a centre | 8 px (A), 9 (B); onto a centre: COINCIDENT, not CONCENTRIC | 8.5 px (`inference::POINT_REACH`) | same | = |
+| …onto a point / a centre | a 15 px square: 7 px straight out, 9–10 diagonally (catalogue); onto a centre: COINCIDENT, not CONCENTRIC | the square on screen | matrix | = |
 | …onto a midpoint | ±5–7 px along the line | 6 px (`MIDPOINT_REACH`) | scene `a_snapped_point_or_midpoint_gets_the_square_and_a_curve_none` | = |
-| Horizontal / vertical to the line's start | 7 px / 6 px offset at the pointer (not an angle) | 7 / 6 px (`inference::HORIZONTAL_REACH`, `VERTICAL_REACH`) | sketch `horizontal_reaches_7_px_and_vertical_6` | = |
+| Horizontal / vertical to the line's start | 15 px bands: 7–8 px each side (catalogue; live2's first take: 7 / 6) | 7.5 px (`inference::HORIZONTAL_REACH`, `VERTICAL_REACH`) | sketch `lines_are_15_px_bands_and_points_15_px_squares`; matrix | = |
 | Alignment with another point | only a point hovered ≥ 100 ms first (the origin always); vertical 6 px, horizontal 8 (A) / 4 (B) | a point rested on ≥ 100 ms (`ACQUIRE_REST`), the origin always; 6 / 7 px | scene `a_point_aligns_only_after_a_rest_on_it` | = (horizontal reach: ≈) |
-| Perpendicular | only when the line starts on a line (its end, a point on it, the chain's previous segment); 6–7 px; live 1866 (e): also across a line whose direction a constraint holds | the same | sketch `a_woken_line_gives_perpendicular_only_when_started_on_and_never_parallel`, `square_to_a_held_line_is_perpendicular` | = |
-| Parallel | never | never | same | = |
+| Perpendicular | through the start, to a woken line (snapped onto) and from the chain's previous segment; 360 / L px (L the line's length); live 1866 (e): also across a line whose direction a constraint holds | the same | sketch `a_woken_line_gives_parallel_and_perpendicular_through_the_start`, `square_to_a_held_line_is_perpendicular`; matrix | = |
+| Parallel | through the start, to a sketch line snapped onto (woken); never before (catalogue "wakeSummary") | the same | sketch `a_woken_line_gives_parallel_and_perpendicular_through_the_start`; matrix | = |
 | Tangent (from an arc's end; ending on a circle) | 6–7 px; ending on a circle within 6 px of the tangent point | 7.5 px | – | – |
 | Two at once | horizontal + on a line both; a point snap beats horizontal; a point beats its line | – | – | – |
 | Snap target look | yellow-orange square, 17 px, round a point / midpoint; none on a line | the same (`SNAP_SQUARE_*`) | scene, same | = |
@@ -124,6 +124,43 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | Tab bar auto-scroll while dragging | ? (asked: F5) | within 30 px of an end, 360 px/s whatever the frame rate (`autoscroll_tabs`) | `a_tab_dragged_to_an_end_of_the_strip_scrolls_it`; app check 11-13 (16 tabs: ~250 px in 0.5 s) | ? (built 11-13; the gap stays where the pointer last moved while the strip scrolls under it) |
 | Tab manager drag and drop | ? (asked: F6) | rows into folders, before / after a row (2 px rgb(27,95,170) line), not undoable (tab operations) | `rows_dropped_on_a_folder_go_into_it`, `rows_dropped_on_a_tab_row_land_before_or_after_it` | ? (kept or removed by live2's F6) |
 | Ctrl / Shift + click a tab | opens it in a new window (rq 2403) | the same | – | = |
+
+## Sketch snaps (matrix)
+
+One row per target × inference × tool: live's reach and the constraints its click creates, ours, at a device pixel
+ratio of 1 and 2. The rows are data in one table-driven test, part-studio-ui `snaps::the_sketch_snaps_matrix_matches_live`
+(T1, ~13 s, no GPU: a model target is lit as the hover pick would light it); it prints matched / total, fails when a
+matched row stops matching, and when a gap starts to (so this table moves with it). Live: live2's catalogue
+(live/feel/sketch-snaps.json, behaviours "sketch snaps (catalogue)", 11-13 04:16), else live/feel/sketch.json and qsnap.
+
+Live's model (from its client): a point (an end, a centre, a midpoint, the origin, a model vertex or edge midpoint) is a
+15 px square round it; a curve (a sketch curve, a model edge) and an inference line (H / V, alignment, parallel,
+perpendicular, a tangent line) a 15 px band. Priority: coincident points > midpoints and crossings > curves > lines;
+a line crossing a curve near the pointer gives the crossing with both constraints. Waking (snapping onto) adds: a
+point → H + V through it; a sketch line → parallel + perpendicular through the start; a model edge → perpendicular;
+a circle → the two tangent lines from the start; a spline → nothing. Shift: no snapping. In-plane model entities only.
+
+**Matched: 42 / 42** (11-13 05:26 UTC). Probes: a point 6.5 px straight out snaps, 8.5 doesn't; 9.5 / 11.5 diagonally;
+a band 6.5 / 8.5 across (live's own takes vary by a pixel with where its target sits in its pixel).
+
+| Row (tool / target / inference) | Live | Ours (where) | Status |
+|---|---|---|---|
+| Line end / a line's end, an arc's end, an arc's / circle's centre, a point, the origin (straight, diagonal) | 7 / 9–10 px (6–8 by target); COINCIDENT, not CONCENTRIC, no alignment | the square (`infer`'s `in_point`; was an 8.5 px circle: 8 px snapped, 10 diagonally didn't) | = (fixed) |
+| Line end / a line's midpoint, an arc's midpoint | 9 px along (0.45, 0.89), 6 px straight; MIDPOINT | the square | = |
+| Line end / a line, a circle's rim (both sides) | 7, not 8; COINCIDENT | 7.5 band | = |
+| Line end / a lit model vertex (straight, diagonal) | 6–7 / 9 px; COINCIDENT (used) | the square (was 16 px round); in-plane only | = (fixed) |
+| Line end / a lit model edge (both sides) | 7, not 8; COINCIDENT (used); a direction kept where it meets the edge | the band (was 10 px); in-plane only | = (fixed) |
+| Line end / a lit model edge's midpoint | 6–7 px; MIDPOINT (used) | the square (`ExternalSnap::Edge { midpoint }`; also a dragged point's drop) | = (new) |
+| Horizontal / vertical through the start (both sides) | 7–8 px each side | the band (was 7 / 6) | = (fixed) |
+| Line from an arc's end / tangent; from inside a line / perpendicular (two lengths) | 360 / L px (L: the line's length in px): 100 px long 2, not 4; 150 px 2, not 3; 200 px 1, not 2; 300 px 1, not 2 | the same (`DIRECTION_REACH_PX2`; was a fixed 3°) | = (fixed) |
+| Line end / a circle at its tangent point | 6 px on along the tangent, not 10 (then on the circle only); TANGENT + COINCIDENT | the crossing of the tangent line with the circle, a point zone (`direction_onto_curve`) | = (fixed) |
+| Woken sketch line / parallel through the start | 150 px long: 2 px off, not 3; PARALLEL | the same (was never) | = (fixed) |
+| Woken circle / a tangent line from the start | TANGENT (the end on the line) | the same (new) | = (new) |
+| Circle tool, radius point / a line's midpoint or the line | nothing (coincident points and tangent points only) | the same (was midpoint / on-curve / H-V) | = (fixed) |
+| Shift / a line's end 3 px off | no snap, nothing made | the same | = |
+| Two at once: horizontal + on a free line; a point over horizontal; a point over its line; two acquired points' H × V | both; the point; the end point; H + V | the same | = |
+| Curves over lines (a line zone and a curve: the crossing if near, else the curve) | catalogue "priority" | `is_direction_line` + `direction_onto_curve` | = |
+| Not yet in the matrix | a circular model edge's centre (CONCENTRIC); other sketches' entities; crossing lines' midpoint; spline through-points; a woken model edge's perpendicular; the rectangle's second corner and the 3 point arc's third point sets; the Dimension tool (8 px, not 9: GPU `feel::the_dimension_tool_takes_the_hovered_line`); drags | – | – |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;

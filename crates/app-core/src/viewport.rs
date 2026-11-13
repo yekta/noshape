@@ -172,8 +172,9 @@ const RIGHT_MENU_PX: f64 = 4.5;
 /// …this long (`CONTEXT_MENU_DISTANCE_THRESHOLD`, `_TIME_THRESHOLD`).
 const RIGHT_MENU_HOLD: Duration = Duration::from_millis(1000);
 
-/// Whether a press `travel` px from where it was, `held` after it, is a drag now: a left press from 3 px after 50 ms, a right one (orbit) from its first pixel, others past [`nav::DRAG_THRESHOLD_PX`]. A right press macOS
-/// converted from Ctrl+left never navigates: it keeps its threshold.
+/// Whether a press `travel` px from where it was, `held` after it, is a drag now: a left press from 3 px after 50 ms,
+/// a right one (orbit) from its first pixel, others past [`nav::DRAG_THRESHOLD_PX`]. A right press macOS converted from
+/// Ctrl+left never navigates: it keeps its threshold.
 fn press_becomes_drag(button: MouseButton, travel: f64, held: Duration, converted_ctrl_click: bool) -> bool {
     match button {
         MouseButton::Left => travel > LEFT_DRAG_PX && held > LEFT_DRAG_TIME,
@@ -788,6 +789,11 @@ impl Viewport {
     /// A hover query is in flight (what is under the pointer isn't known yet).
     pub fn hover_pending(&self) -> bool {
         self.hover_query
+    }
+
+    /// A pick asked of the GPU hasn't come back yet (a click's or a menu's, after the pick buffer was redrawn).
+    pub fn pick_pending(&self) -> bool {
+        !self.pick_requests.is_empty()
     }
 
     /// What is lit is the pick under the pointer: no hover pick in flight, none waiting for a fast move to pause.

@@ -4066,6 +4066,8 @@ fn every_kind_of_plane_right_clicked_in_the_graphics_opens_its_menu(cx: &mut Tes
 
 #[path = "feel_tests.rs"]
 mod feel;
+#[path = "snap_matrix_tests.rs"]
+mod snaps;
 
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.
@@ -4119,8 +4121,9 @@ fn a_line_ending_on_a_lit_model_edge_lands_on_it(cx: &mut TestAppContext) {
         let n = along.perp();
         if (centre - a).dot(n) > 0.0 { n } else { -n }
     };
-    let mid = (a + b) * 0.5;
     let wpp = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
+    // (30 px along from the edge's midpoint, which would take the end as a point.)
+    let mid = (a + b) * 0.5 + along * 30.0 * wpp;
     // A short segment parallel to the edge, 40 px inside it.
     let (s1, s0) = (mid + inward * 40.0 * wpp - along * 30.0 * wpp, mid + inward * 40.0 * wpp);
     let (p1, p0) = (on_screen(cx, &view, s1), on_screen(cx, &view, s0));
@@ -4177,7 +4180,8 @@ fn a_point_dragged_onto_a_model_edge_lands_on_it(cx: &mut TestAppContext) {
         if (centre - a).dot(n) > 0.0 { n } else { -n }
     };
     let wpp = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
-    let start = (a + b) * 0.5 + inward * 40.0 * wpp;
+    // (30 px along from the edge's midpoint.)
+    let start = (a + b) * 0.5 + along * 30.0 * wpp + inward * 40.0 * wpp;
     let s = on_screen(cx, &view, start);
     click(cx, window, &view, (s.x, s.y));
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();

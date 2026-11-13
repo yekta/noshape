@@ -502,13 +502,21 @@ enum Drop {
     Midpoint,
 }
 
+/// A direction through the tool's anchor (horizontal, vertical, square to, parallel to, a tangent line to a curve): one
+/// of live's infinite line zones, below the curves.
+fn is_direction_line(i: &Inference) -> bool {
+    matches!(i.kind, InferenceKind::Horizontal | InferenceKind::Vertical | InferenceKind::Perpendicular | InferenceKind::Parallel | InferenceKind::Tangent)
+        && !i.constraints.iter().any(|c| matches!(c, AutoConstraint::OnCurve(_)))
+}
+
 /// Snap to model geometry (from the 3D hover) supplied by the view.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExternalSnap {
     /// A model vertex projected onto the sketch plane.
     Vertex { position: DVec2, reference: noshape_model::reference::Reference },
-    /// A point on a model edge projected onto the sketch plane, and the edge's direction there.
-    Edge { position: DVec2, tangent: DVec2, reference: noshape_model::reference::Reference },
+    /// A point on a model edge projected onto the sketch plane, and the edge's direction there; or (`midpoint`) a
+    /// straight edge's midpoint.
+    Edge { position: DVec2, tangent: DVec2, reference: noshape_model::reference::Reference, midpoint: bool },
 }
 
 pub struct SketchEditor {
@@ -1480,16 +1488,23 @@ impl SketchEditor {
             woken: self.woken.clone(),
             screen: self.screen_metric(),
         };
-        let all = noshape_sketch::infer(sk, p, &ctx);
+        let mut all = noshape_sketch::infer(sk, p, &ctx);
+        // A circle's radius point takes coincident points only (live/feel/sketch-snaps.json "toolNotes": coincident
+        // points and tangent points; no midpoints, no curves, no horizontal / vertical).
+        if self.radius_point() {
+            all.retain(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Center));
+        }
         let mut best = all.first().cloned();
-        // A direction and a line under the pointer: the end where they meet, both constraints (live2 "feel (sketch)"
-        // (1): horizontal + on a line both); if they don't meet near the pointer, the line under it wins.
+        // A direction line and a curve under the pointer: the end where they cross, both constraints (live2: a
+        // compound, ranked with the points); if they don't cross near the pointer, the curve wins (live/feel/
+        // sketch-snaps.json "priority": curves over H / V, alignment, parallel, perpendicular and tangent lines).
+        // (A tangent line and its own circle cross at the tangent point.)
         if let Some(b) = &best
-            && matches!(b.kind, InferenceKind::Horizontal | InferenceKind::Vertical | InferenceKind::Perpendicular)
-            && let Some(on) = all.iter().find(|i| i.kind == InferenceKind::OnCurve && i.entity.is_some_and(|e| sk.kind(e) == Some(EntityKind::Line) && Some(e) != b.entity))
-            && let Some(Curve2::Line { a: la, b: lb }) = on.entity.and_then(|e| sk.curve(e))
+            && is_direction_line(b)
+            && let Some(on) = all.iter().find(|i| i.kind == InferenceKind::OnCurve && i.entity.is_some_and(|e| Some(e) != b.entity || b.kind == InferenceKind::Tangent))
+            && let Some(c) = on.entity.and_then(|e| sk.curve(e))
         {
-            best = Some(match (lb - la).try_normalize().and_then(|t| self.direction_onto(b, on.position, t)) {
+            best = Some(match self.direction_onto_curve(b, &c, on.position) {
                 Some(mut both) => {
                     both.entity = on.entity;
                     both.constraints.extend(on.constraints.iter().copied());
@@ -1519,6 +1534,11 @@ impl SketchEditor {
             best = Some(Inference { kind: InferenceKind::Midpoint, position: s, entity: None, reference: Some((self.clicks[0].pos + self.clicks[1].pos) * 0.5), constraints: Vec::new(), distance: (s - p).length(), priority: 1 });
         }
         best
+    }
+
+    /// The pointer places a circle's radius point (its centre clicked).
+    fn radius_point(&self) -> bool {
+        self.tool == Tool::Circle && self.clicks.len() == 1
     }
 
     /// A drawing tool has placed its first click (or chains on): live recolours nothing under the pointer then, the
@@ -1556,12 +1576,12 @@ impl SketchEditor {
     }
 
     /// The release of a point dragged onto a model edge: `id` the edge's linked (used) curve; the point lands on it,
-    /// coincident.
+    /// coincident, or at its midpoint (live2: MIDPOINT on release).
     pub fn drop_onto_external(&mut self, id: EntityId) {
-        if let Some(ExternalSnap::Edge { position, .. }) = self.drag_external.take()
+        if let Some(ExternalSnap::Edge { position, midpoint, .. }) = self.drag_external.take()
             && self.drag_snap.is_none()
         {
-            self.drag_snap = Some((id, position, Drop::OnCurve));
+            self.drag_snap = Some((id, position, if midpoint { Drop::Midpoint } else { Drop::OnCurve }));
         }
     }
 
@@ -1780,7 +1800,7 @@ impl SketchEditor {
     /// a perpendicular to the line's start segment placed the end short of the lit model edge; live2 "feel (sketch)":
     /// horizontal and on a line both, the end on the line).
     pub fn apply_external_snap(&mut self, snap: ExternalSnap) {
-        if !self.tool.draws() {
+        if !self.tool.draws() || (self.radius_point() && matches!(snap, ExternalSnap::Edge { .. })) {
             return;
         }
         let strong = self.inference.as_ref().is_some_and(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center));
@@ -1788,7 +1808,7 @@ impl SketchEditor {
             return;
         }
         let distance = |q: DVec2| self.cursor.map(|c| (c - q).length()).unwrap_or(0.0);
-        if let ExternalSnap::Edge { position, tangent, .. } = &snap
+        if let ExternalSnap::Edge { position, tangent, midpoint: false, .. } = &snap
             && let Some(combined) = self.inference.as_ref().and_then(|i| self.direction_onto(i, *position, *tangent))
         {
             self.inference = Some(combined);
@@ -1797,6 +1817,7 @@ impl SketchEditor {
         }
         let (position, kind) = match &snap {
             ExternalSnap::Vertex { position, .. } => (*position, InferenceKind::Endpoint),
+            ExternalSnap::Edge { position, midpoint: true, .. } => (*position, InferenceKind::Midpoint),
             ExternalSnap::Edge { position, .. } => (*position, InferenceKind::OnCurve),
         };
         self.inference = Some(Inference { kind, position, entity: None, reference: None, constraints: Vec::new(), distance: distance(position), priority: 0 });
@@ -1807,19 +1828,51 @@ impl SketchEditor {
     /// they meet, if that is within reach of the pointer; its constraints kept (the on-curve one is added by whoever
     /// links the curve).
     fn direction_onto(&self, i: &Inference, on: DVec2, tangent: DVec2) -> Option<Inference> {
-        if !matches!(i.kind, InferenceKind::Horizontal | InferenceKind::Vertical | InferenceKind::Perpendicular) {
-            return None;
-        }
-        let a = i.reference?;
-        let dir = (i.position - a).try_normalize()?;
+        let (a, dir) = (i.reference?, (i.position - i.reference?).try_normalize()?);
         let den = dir.perp_dot(tangent);
         if den.abs() < 1e-9 {
             return None;
         }
-        let x = a + dir * ((on - a).perp_dot(tangent) / den);
+        self.crossing_in_reach(i, a + dir * ((on - a).perp_dot(tangent) / den))
+    }
+
+    /// [`Self::direction_onto`] for a curve `c` (the pointer near `on` on it): where the direction's line crosses it
+    /// exactly (a line, a circle or arc: the crossing nearest the pointer; a tangent line touches at its point),
+    /// along the curve's tangent there for other curves.
+    fn direction_onto_curve(&self, i: &Inference, c: &Curve2, on: DVec2) -> Option<Inference> {
+        let (a, dir) = (i.reference?, (i.position - i.reference?).try_normalize()?);
+        match *c {
+            Curve2::Line { a: la, b: lb } => self.direction_onto(i, la, lb - la),
+            Curve2::Circle { center, radius } | Curve2::Arc { center, radius, .. } => {
+                // |a + t dir - centre| = radius; a touching line's (near-zero) discriminant is its tangent point.
+                let w = a - center;
+                let (b, k) = (dir.dot(w), w.length_squared() - radius * radius);
+                let disc = b * b - k;
+                if disc < -(radius * radius) * 1e-3 {
+                    return None;
+                }
+                let r = disc.max(0.0).sqrt();
+                let p = self.cursor?;
+                let x = [-b - r, -b + r].map(|t| a + dir * t).into_iter().min_by(|x, y| (*x - p).length().total_cmp(&(*y - p).length()))?;
+                self.crossing_in_reach(i, x)
+            }
+            _ => self.direction_onto(i, on, c.tangent(c.closest(on).0)),
+        }
+    }
+
+    /// `i` moved to the crossing `x` when `x` is within a point's reach of the pointer (live: a compound is a point
+    /// zone, a 15 px square).
+    fn crossing_in_reach(&self, i: &Inference, x: DVec2) -> Option<Inference> {
+        if !is_direction_line(i) {
+            return None;
+        }
         let c = self.cursor?;
+        let within = match self.screen_metric() {
+            Some(m) => m.box_len(x - c) < self.world_per_px * INFERENCE_PX,
+            None => (x - c).length() <= self.world_per_px * INFERENCE_PX * noshape_sketch::inference::POINT_REACH,
+        };
         let seen = self.screen_metric().map_or((x - c).length(), |m| m.len(x - c));
-        (seen <= self.world_per_px * INFERENCE_PX * noshape_sketch::inference::POINT_REACH).then(|| Inference { position: x, distance: seen, ..i.clone() })
+        within.then(|| Inference { position: x, distance: seen, ..i.clone() })
     }
 
     fn snapped(&self) -> Option<(DVec2, Option<Inference>)> {
@@ -1871,13 +1924,20 @@ impl SketchEditor {
         data.sketch.solve();
     }
 
-    /// Constrain the next click onto an external entity (a snapped model edge), keeping a direction met on it.
+    /// Constrain the next click onto an external entity (a snapped model edge), keeping a direction met on it; at a
+    /// straight edge's midpoint, its MIDPOINT.
     pub fn link_edge_snap(&mut self, id: EntityId) {
+        let midpoint = matches!(self.external_snap, Some(ExternalSnap::Edge { midpoint: true, .. }));
         if let Some(inf) = &mut self.inference {
-            if inf.constraints.is_empty() {
-                inf.kind = InferenceKind::OnCurve;
+            if midpoint {
+                inf.kind = InferenceKind::Midpoint;
+                inf.constraints = vec![AutoConstraint::MidpointOf(id)];
+            } else {
+                if inf.constraints.is_empty() {
+                    inf.kind = InferenceKind::OnCurve;
+                }
+                inf.constraints.push(AutoConstraint::OnCurve(id));
             }
-            inf.constraints.push(AutoConstraint::OnCurve(id));
         }
         self.external_snap = None;
     }

@@ -666,6 +666,23 @@ fn our_3d_pick_reach_for_edges_and_vertices() {
         assert_eq!(at(corner + along * (6.0 * dpr as f64)), Some(60), "dpr {dpr}: on its edge 6 px from the vertex, the vertex wins");
         eprintln!("dpr {dpr}: edge {out} px out / {inn} px in, vertex {v} px ({diag} diagonally)");
     }
+    // Hovered itself, the edge holds the hover to 9–10 px off it (live: a lit edge stays lit to 9–10).
+    let mut scene = scene;
+    scene.add_flag(50, noshape_render::scene::state::HOVER);
+    for dpr in [1.0f32, 2.0] {
+        let (dw, dh) = ((w as f32 * dpr) as u32, (h as f32 * dpr) as u32);
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: dw, height: dh, device_pixel_ratio: dpr, style: &Style::default(), pick: true }).unwrap();
+        let pick = f.pick.unwrap();
+        let size = glam::DVec2::new(dw as f64, dh as f64);
+        let screen = |p: [f32; 3]| cam.project(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64), size, 0.05).unwrap();
+        let radius = (5.0 * dpr) as i32;
+        let at = |q: glam::DVec2| pick.pick(q.x.round() as i32, q.y.round() as i32, radius, prio);
+        let mid = screen([0.0, lo[1], hi[2]]);
+        let inward = (screen([0.0, 0.0, hi[2]]) - mid).normalize();
+        let reach = |dir: glam::DVec2| (0..40).take_while(|k| at(mid + dir * (*k as f64 * dpr as f64)) == Some(50)).count() as i32 - 1;
+        let (out, inn) = (reach(-inward), reach(inward));
+        assert!((9..=10).contains(&out) && (9..=10).contains(&inn), "dpr {dpr}: a hovered edge holds to {out} px over the background, {inn} over its face");
+    }
 }
 
 /// Overlapping datum planes pick the nearest (live ui-parity: Top where it lies in front of Front; ours took the
