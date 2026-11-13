@@ -297,10 +297,14 @@ pub struct StepEdit {
     pub _sub: Subscription,
 }
 
-/// A triad ring drag's angle as live snaps it: whole 5° (live 2759: 15°, 25°, 35° for 30, 55, 80 px).
-fn ring_snap(angle: f64) -> f64 {
-    let step = 5f64.to_radians();
-    (angle / step).round() * step
+/// A triad ring drag's angle as live's client snaps it (live feel/mates.json): the step is the coarsest of 5°, 1°,
+/// 0.1° whose arc at the pointer's distance from the centre (`radius_px`) is at most 50 px, taken within 0.4 × (1 +
+/// level / 3) of a step, else the angle is free (live 2759: 15°, 25°, 35°).
+fn ring_snap(angle: f64, radius_px: f64) -> f64 {
+    let level = [5.0, 1.0].iter().position(|deg: &f64| radius_px * deg.to_radians() <= 50.0).unwrap_or(2);
+    let step = [5.0f64, 1.0, 0.1][level].to_radians();
+    let n = angle / step;
+    if (n - n.round()).abs() <= 0.4 * (1.0 + level as f64 / 3.0) { n.round() * step } else { angle }
 }
 
 /// [`AssemblyView::arrow_snap_step`] for an arrow that spans `px_per_mm` pixels per millimetre (metres).
@@ -2958,7 +2962,8 @@ impl AssemblyView {
                         let (center, axis, v0) = (d.plane_point, d.plane_normal, d.ring_v0);
                         let Some(v) = self.ring_vector(*position, center, axis, cx) else { return };
                         let angle = v0.cross(v).dot(axis).atan2(v0.dot(v));
-                        let angle = if d.explode { explode_drag_round(angle, true, &self.units(cx)) } else { ring_snap(angle) };
+                        let radius_px = self.viewport.read(cx).project(center).map_or(0.0, |c| c.distance(*position));
+                        let angle = if d.explode { explode_drag_round(angle, true, &self.units(cx)) } else { ring_snap(angle, radius_px) };
                         let d = self.drag.as_mut().unwrap();
                         d.value = angle;
                         d.pending = Some(DVec3::ZERO);
@@ -6902,13 +6907,17 @@ mod tests {
         assert!((step(0.71) - 1e-3).abs() < 1e-14, "{}", step(0.71));
     }
 
-    /// Live 2759: a ring drag turns by whole 5°.
+    /// Live 2759 / feel mates.json: a ring drag snaps to 5° near the triad, within 0.4 of a step, finer far out.
     #[test]
-    fn ring_drags_snap_to_five_degrees() {
+    fn ring_drags_snap_to_a_step_that_follows_the_pointer_radius() {
         use super::ring_snap;
-        for (raw, want) in [(14.2, 15.0), (26.4, 25.0), (34.9, 35.0), (-2.4, 0.0), (-37.6, -40.0)] {
-            assert!((ring_snap(f64::to_radians(raw)).to_degrees() - want).abs() < 1e-9, "{raw} -> {}", ring_snap(f64::to_radians(raw)).to_degrees());
+        let snap = |deg: f64, radius_px: f64| ring_snap(deg.to_radians(), radius_px).to_degrees();
+        for (raw, want) in [(14.2, 15.0), (26.4, 25.0), (34.9, 35.0), (-1.9, 0.0), (-38.1, -40.0), (2.5, 2.5), (-37.4, -37.4)] {
+            assert!((snap(raw, 120.0) - want).abs() < 1e-9, "{raw} -> {}", snap(raw, 120.0));
         }
+        // 5° spans more than 50 px from 573 px out: whole degrees; 0.1° from 2865 px.
+        assert!((snap(37.4, 1000.0) - 37.0).abs() < 1e-9);
+        assert!((snap(37.46, 5000.0) - 37.5).abs() < 1e-9);
     }
 
     /// qa5 A3: new mates are hidden, and hidden rows are listed in grey.
