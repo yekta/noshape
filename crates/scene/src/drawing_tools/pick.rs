@@ -13,6 +13,10 @@ use noshape_model::drawing::{AnnotationKind, Drawing, PointRef, Sheet, ViewId};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// How far (screen px) a view's snap point reaches: constant on screen (live behaviours "dsn" (3): 10-13 px at two
+/// zooms, 12 fits best).
+pub const SNAP_REACH_PX: f64 = 12.0;
+
 /// The editor state picking reads.
 #[derive(Clone, Copy)]
 pub struct SheetPick<'a> {
@@ -246,13 +250,14 @@ impl<'a> SheetPick<'a> {
     pub fn snap_at_with(&self, s: [f64; 2], mid_quad: bool) -> Option<PickedPoint> {
         let built = self.built?;
         let mut best: Option<(f64, PickedPoint)> = None;
+        let reach = self.tol_mm(SNAP_REACH_PX);
         for pl in &built.placements {
-            if !pl.contains(s, 3.0) {
+            if !pl.contains(s, reach.max(3.0)) {
                 continue;
             }
             let Some(g) = self.geoms.get(&pl.id) else { continue };
             let vp = pl.to_view(s);
-            let tol = self.tol_mm(8.0) / (pl.scale * 1000.0);
+            let tol = reach / (pl.scale * 1000.0);
             if let Some(sn) = g.snap_near(vp, tol) {
                 let d = len(sub(sn.p, vp)) * pl.scale * 1000.0;
                 // Prefer vertices over centers at equal distance.

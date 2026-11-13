@@ -816,7 +816,7 @@ impl StartView {
     /// Dragged rows dropped on folder `dir`: moved into it (those already there, and a folder onto itself, stay).
     fn drop_into_folder(&mut self, drag: &DocsDrag, dir: &Path, window: &mut Window, cx: &mut Context<Self>) {
         let dir = canon(dir);
-        let items: Vec<_> = drag.items.iter().filter(|(p, _, _)| canon(p) != dir && p.parent().is_none_or(|f| canon(f) != dir)).cloned().collect();
+        let items = rows_to_move(&drag.items, &dir);
         if items.is_empty() {
             return;
         }
@@ -864,18 +864,16 @@ impl StartView {
 
     /// Moves `items` into `dir` (documents and folders; a folder can't go into itself), the moved rows selected after.
     fn move_items(&mut self, items: &[(PathBuf, String, bool)], dir: &Path, window: &mut Window, cx: &mut Context<Self>) {
+        let (done, refused) = move_rows(items, dir);
         let mut moved = Vec::new();
-        for (path, name, folder) in items {
-            let res = if *folder { lib::move_folder(path, dir) } else { lib::move_doc(path, dir) };
-            match res {
-                Ok(dest) => {
-                    if *folder {
-                        self.folder_moved(&canon(path), &canon(&dest));
-                    }
-                    moved.push(canon(&dest));
-                }
-                Err(e) => Self::notify(window, cx, AlertKind::Warning, format!("{name}: {e:#}")),
+        for (from, dest, folder) in done {
+            if folder {
+                self.folder_moved(&from, &dest);
             }
+            moved.push(dest);
+        }
+        for (name, e) in refused {
+            Self::notify(window, cx, AlertKind::Warning, format!("{name}: {e}"));
         }
         self.labels = lib::Labels::load();
         self.selected = moved.first().cloned();
@@ -4395,6 +4393,29 @@ fn library_texts(key: &str) -> (&'static str, &'static str, &'static str) {
     }
 }
 
+/// The dragged rows a drop on folder `dir` moves: not the folder itself, nor the rows already in it.
+fn rows_to_move(items: &[(PathBuf, String, bool)], dir: &Path) -> Vec<(PathBuf, String, bool)> {
+    let dir = canon(dir);
+    items.iter().filter(|(p, _, _)| canon(p) != dir && p.parent().is_none_or(|f| canon(f) != dir)).cloned().collect()
+}
+
+/// A row moved: its old path, its new one, whether it is a folder.
+type Moved = (PathBuf, PathBuf, bool);
+
+/// Rows moved into `dir` (Move to… and drops): (old, new, folder) of those moved, (name, why) of those refused (a
+/// folder into itself, a name taken there).
+fn move_rows(items: &[(PathBuf, String, bool)], dir: &Path) -> (Vec<Moved>, Vec<(String, String)>) {
+    let (mut done, mut refused) = (Vec::new(), Vec::new());
+    for (path, name, folder) in items {
+        let from = canon(path);
+        match if *folder { lib::move_folder(path, dir) } else { lib::move_doc(path, dir) } {
+            Ok(dest) => done.push((from, canon(&dest), *folder)),
+            Err(e) => refused.push((name.clone(), format!("{e:#}"))),
+        }
+    }
+    (done, refused)
+}
+
 /// A row clicked on the documents page (folders and documents, `order` as on the page), `sel` selected before (the
 /// last clicked first): the selection after it, the clicked row first, and Shift's anchor. Alone it selects the row;
 /// Ctrl (Cmd on a Mac) toggles it; Shift selects from the anchor (the last row clicked without Shift) to it.
@@ -4923,8 +4944,42 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
 
 #[cfg(test)]
 mod tests {
-    use super::{click_rows, history_change_matches, lib};
+    use super::{click_rows, history_change_matches, lib, move_rows, rows_to_move};
     use std::path::PathBuf;
+
+    /// Lead 11-13 (interaction feel): rows dragged onto a folder move into it, documents and folders with what's in
+    /// them; a drop on the folder itself or where they already are moves nothing; a folder can't go into itself.
+    #[test]
+    fn rows_dropped_on_a_folder_move_into_it() {
+        let root = std::env::temp_dir().join(format!("noshape-docs-drop-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (f, g) = (root.join("F"), root.join("G"));
+        std::fs::create_dir_all(&f).unwrap();
+        std::fs::create_dir_all(&g).unwrap();
+        for p in [root.join("a.noshape"), root.join("b.noshape"), g.join("c.noshape")] {
+            std::fs::write(&p, b"doc").unwrap();
+        }
+        let row = |p: PathBuf, folder: bool| {
+            let name = p.file_stem().unwrap().to_string_lossy().to_string();
+            (p, name, folder)
+        };
+        let rows = vec![row(root.join("a.noshape"), false), row(root.join("b.noshape"), false), row(g.clone(), true), row(f.clone(), true)];
+        // F itself drops out.
+        let take = rows_to_move(&rows, &f);
+        assert_eq!(take.iter().map(|r| r.1.as_str()).collect::<Vec<_>>(), ["a", "b", "G"]);
+        let (done, refused) = move_rows(&take, &f);
+        assert!(refused.is_empty(), "{refused:?}");
+        assert_eq!(done.len(), 3);
+        assert!(f.join("a.noshape").is_file() && f.join("b.noshape").is_file() && f.join("G").join("c.noshape").is_file(), "moved, G with its document");
+        assert!(!root.join("a.noshape").exists() && !g.exists());
+        // Dropped again where they are: nothing to move.
+        let again = vec![row(f.join("a.noshape"), false), row(f.join("G"), true)];
+        assert!(rows_to_move(&again, &f).is_empty());
+        // F into its own G: refused, F stays.
+        let (done, refused) = move_rows(&[row(f.clone(), true)], &f.join("G"));
+        assert!(done.is_empty() && refused.len() == 1 && f.is_dir(), "{refused:?}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     /// Lead 11-13 (interaction feel): the documents page's rows multi-select as a list does: a click selects one row,
     /// Ctrl toggles one, Shift selects from the anchor (the last click without Shift) to the row, folders and documents

@@ -69,11 +69,12 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (asked 11-13 00:
 | Dimension / note text | ? | inside the text box (+0.15 × height pad) | – | ? |
 | View's empty inside | the view's frame lights (bm 23413, 36443) | the smallest view box within 1 mm (`view_under`) | – | ? |
 | Priority: edge vs annotation vs view | ? | annotation (−2.5 px) > edge > title block (+1.25 px) > view box | – | ? |
-| Snap reach (Dimension tool, Note leader) | 10–13 px, 12 fits best, constant in px (bm 4078) | 8 px (`snap_at_with`) | – | ≠ (live2 pinning it down) |
-| Snap marker | a filled 10 px disc rgb(216,165,102) for every kind (bm 19501, D21); older notes saw squares / triangles | square / triangle / diamond / circle by kind, 9 px, 2 px orange stroke (`overlay.rs`) | – | ≠ (asked which is current) |
+| Snap reach (Dimension tool, Note leader) | 10–13 px, 12 fits best, constant in px (bm 4078) | 12 px (`SNAP_REACH_PX`) | GPUI `a_views_vertex_snaps_within_12_px_on_screen` (two zooms) | = (live2 pinning it down) |
+| Snap marker, dimension tools | a filled 10 px disc rgb(216,165,102) for every kind (bm 19501, D21) | the same (`SnapMark::Disc`), also the Dimension tool's sticky centre dots (bm 4062) | – | = |
+| Snap marker, Note tool | a hollow square ~15 px rgb(255,130,63) round the vertex (bm 26796, C11 (a)) | the same (`SnapMark::Box`) | – | = |
 | Midpoints / quadrants | only after Shift+Q (D22) | the same | – | = |
 | Two points in reach | the nearer, one marker (bm 4092) | the nearer (`snap_near`) | – | = |
-| Placement inference (note / dimension text) | pink dotted line, red ✕, gone 4 px off (bm 26796) | 6 px, magenta dashed, red ✕ (`drawing_tools.rs` 1517) | – | ? |
+| Placement inference (note / dimension text) | pink dotted line, red ✕, gone 4 px off (bm 26796) | 3.5 px (`INFER_REACH_PX`), the same line and ✕ | – | = (live2: exact reach) |
 | Box select left → right | ? (Part Studio: window, blue) | window (#1651B0 box) | – | ? |
 | Box select right → left | ? (Part Studio: crossing, #FFC20E dashed) | crossing, Onshape's crossing box (`select_in_box`, `box_overlay`) | GPUI `a_box_right_to_left_takes_what_it_crosses` | ? (built 11-13) |
 | Click on an item | toggles it, no modifier (help, bm 34761) | toggles (`select_click`) | – | = |
@@ -81,7 +82,7 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (asked 11-13 00:
 | Ctrl + click | ? | as a plain click | – | ? |
 | Click vs drag | ? (runs used a 0.5 s hold) | 3 px (`drawing_tools.rs` 1269) | – | ? |
 | Dragging a projected view | follows its parent's axis (bm 13993) | locked to the axis (`MoveViews`) | – | = |
-| Dragging a view near another's alignment | ? | – (building, lead 11-13) | – | ? |
+| Dragging a view near another's alignment | ? (asked: F4) | a free view's centre held on another's centre line within the inference reach, its line shown; Shift free (`align_view_drag`) | GPUI `a_dragged_view_holds_on_another_views_centre_line` | ? (kept or removed by live2's F4) |
 | Double-click | ? | the OS's (GPUI: Linux 400 ms, 5 px) | – | ? |
 
 ## Documents page and tabs (studios, from 2026-11-13)
@@ -90,13 +91,13 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (asked 11-13 00:
 |---|---|---|---|---|
 | Documents list: click / Ctrl / Shift | ? (asked: F1) | a click selects one row, Ctrl (Cmd) toggles, Shift selects from the anchor, folders and documents in page order (`click_rows`) | `rows_select_alone_with_ctrl_toggles_and_with_shift_ranges_from_the_anchor` | ? (built 11-13) |
 | Actions on N selected | "N selection(s)" wording (bm 35) | right-click menu Move to… / Send to trash, Delete key; "N selections will be sent to the trash." | – | ? |
-| Documents dragged onto a folder | ? (asked: F2) | rows, folder tiles and parent crumbs take a drop (#def1fb); the selection moves | – | ? (built 11-13) |
+| Documents dragged onto a folder | ? (asked: F2) | rows, folder tiles and parent crumbs take a drop (#def1fb); the selection moves, "N items" ghost | `rows_dropped_on_a_folder_move_into_it`; app check 11-13 (4 moved) | ? (built 11-13) |
 | Row hover / selected | #def1fb / #b2ddf6 (bm 20) | the same | – | = |
 | Tab drag: ghost, gap | 100 px ghost, a tab-wide gap, no line (bm 6562) | the same | – | = |
 | Tab drag start | ? | GPUI's 2 px | – | ? |
 | Tab dropped on a folder | lights (`hovered-group`), needs a dwell (bm 6576, 13328) | lights #def1fb, drops at once | – | ? |
-| Tab bar auto-scroll while dragging | ? (asked: F5) | within 30 px of an end, 6 px a frame (`autoscroll_tabs`) | – | ? (built 11-13) |
-| Tab manager drag and drop | ? (asked: F6) | – | – | ? |
+| Tab bar auto-scroll while dragging | ? (asked: F5) | within 30 px of an end, 360 px/s whatever the frame rate (`autoscroll_tabs`) | `a_tab_dragged_to_an_end_of_the_strip_scrolls_it`; app check 11-13 (16 tabs: ~250 px in 0.5 s) | ? (built 11-13; the gap stays where the pointer last moved while the strip scrolls under it) |
+| Tab manager drag and drop | ? (asked: F6) | rows into folders, before / after a row (2 px rgb(27,95,170) line), not undoable (tab operations) | `rows_dropped_on_a_folder_go_into_it`, `rows_dropped_on_a_tab_row_land_before_or_after_it` | ? (kept or removed by live2's F6) |
 | Ctrl / Shift + click a tab | opens it in a new window (rq 2403) | the same | – | = |
 
 ## Fix queue (biggest feel impact first)

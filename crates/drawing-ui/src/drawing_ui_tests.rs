@@ -264,8 +264,8 @@ fn a_box_right_to_left_takes_what_it_crosses(cx: &mut TestAppContext) {
     assert!(selected(cx, corner, around), "left to right around it: taken");
 }
 
-/// Lead 11-13 (interaction feel): a free view dragged within 6 px of another view's centre line is held on it, the
-/// placement inference's line shown; farther it moves freely.
+/// Lead 11-13 (interaction feel): a free view dragged near another view's centre line is held on it as placement
+/// inference holds a note (live C11: up to 3 px, gone at 4), its line shown; farther it moves freely.
 #[gpui::test]
 fn a_dragged_view_holds_on_another_views_centre_line(cx: &mut TestAppContext) {
     SUGGESTED.set(true);
@@ -288,11 +288,40 @@ fn a_dragged_view_holds_on_another_views_centre_line(cx: &mut TestAppContext) {
     });
     let px_mm = 1.0 / zoom;
     let off = |px: f64| [15.0, b[1] - a.1[1] + px * px_mm];
-    let moved = cx.update(|cx| editor.update(cx, |e, _| (e.align_view_drag(&[(a.0, start)], off(4.0)), e.infer_lines.len())));
-    assert!((moved.0[1] - (b[1] - a.1[1])).abs() < 1e-9 && moved.1 >= 1, "4 px off: held on the line, its guide shown: {moved:?}");
+    let moved = cx.update(|cx| editor.update(cx, |e, _| (e.align_view_drag(&[(a.0, start)], off(3.0)), e.infer_lines.len())));
+    assert!((moved.0[1] - (b[1] - a.1[1])).abs() < 1e-9 && moved.1 >= 1, "3 px off: held on the line, its guide shown: {moved:?}");
     let free = cx.update(|cx| editor.update(cx, |e, _| {
         e.infer_lines.clear();
-        e.align_view_drag(&[(a.0, start)], off(9.0))
+        e.align_view_drag(&[(a.0, start)], off(4.0))
     }));
-    assert!((free[1] - off(9.0)[1]).abs() < 1e-9, "9 px off: free");
+    assert!((free[1] - off(4.0)[1]).abs() < 1e-9, "4 px off: free");
+}
+
+/// Live behaviours "dsn" (3): a view's snap point reaches ~12 px on screen at any zoom (10-13 px measured; ours 12).
+#[gpui::test]
+fn a_views_vertex_snaps_within_12_px_on_screen(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "snap-reach");
+    for _ in 0..1500 {
+        if cx.update(|cx| editor.read(cx).real_sheet_in()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, window);
+    }
+    for zoom_by in [1.0, 2.5] {
+        let (corner, out, zoom) = cx.update(|cx| editor.update(cx, |e, cx| {
+            e.zoom_by(zoom_by, [600.0, 600.0], cx);
+            // A view's lower-left vertex, and the way out of the view from it.
+            let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+            let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+            let corner = g.snaps.iter().map(|s| pl.to_sheet(s.p)).min_by(|a, b| (a[0] + a[1]).total_cmp(&(b[0] + b[1]))).expect("a vertex");
+            (corner, [-std::f64::consts::FRAC_1_SQRT_2, -std::f64::consts::FRAC_1_SQRT_2], e.zoom)
+        }));
+        let at = |px: f64| [corner[0] + out[0] * px / zoom, corner[1] + out[1] * px / zoom];
+        let snapped = |cx: &mut TestAppContext, px: f64| cx.update(|cx| editor.read(cx).snap_at(at(px)).is_some());
+        assert!(snapped(cx, 11.0), "11 px off: snaps (zoom {zoom})");
+        assert!(!snapped(cx, 13.0), "13 px off: free (zoom {zoom})");
+    }
 }

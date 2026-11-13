@@ -14,8 +14,7 @@ pub struct Overlay {
     /// Red ✕ marks (centre, half size mm): the pointer on an inference
     /// line (live request 1662: 10 × 10 px, rgb(255,0,0)).
     pub crosses: Vec<([f64; 2], f64)>,
-    /// Snap point markers (Onshape: orange square = endpoint, triangle =
-    /// midpoint, diamond = quadrant, circle = center): (point, kind, size mm).
+    /// Snap point markers: (point, kind, size mm; a disc is a fixed 10 px).
     pub marks: Vec<([f64; 2], SnapMark, f64)>,
     /// Polylines with their own color and width (px), e.g. table cell
     /// selections.
@@ -24,27 +23,23 @@ pub struct Overlay {
     pub dots: Vec<([f64; 2], [u8; 4])>,
 }
 
-/// Shape of a snap point marker.
+/// Shape of a marker: a snap point's is Onshape's filled disc for every kind of point (live D21: endpoint, centre,
+/// midpoint and quadrant alike, 10 px rgb(216,165,102)); the outlines mark other points (a section's jogs).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SnapMark {
+    Disc,
+    /// The Note tool's frame round a point (live C11 (a): hollow, ~15 px, rgb(255,130,63)).
+    Box,
     Square,
     Triangle,
     Diamond,
     Circle,
 }
 
-impl SnapMark {
-    /// The marker of a snapped reference (endpoints and free points are squares).
-    pub fn of(r: Option<&noshape_model::drawing::PointRef>) -> SnapMark {
-        use noshape_model::drawing::PointRef as R;
-        match r {
-            Some(R::Midpoint { .. }) => SnapMark::Triangle,
-            Some(R::Quadrant { .. }) => SnapMark::Diamond,
-            Some(R::Center { .. }) => SnapMark::Circle,
-            _ => SnapMark::Square,
-        }
-    }
-}
+/// A snap point's disc (live D21).
+pub const SNAP_DISC_PX: f32 = 10.0;
+pub const SNAP_DISC_RGB: [u8; 4] = [216, 165, 102, 255];
+const NOTE_BOX_RGB: [u8; 4] = [255, 130, 63, 255];
 
 impl Overlay {
     pub fn is_empty(&self) -> bool {
@@ -98,9 +93,21 @@ impl Overlay {
             }
         }
         const ORANGE: [u8; 4] = [255, 140, 0, 255];
+        let mut discs = Vec::new();
         for &(c, kind, s) in &self.marks {
             let h = s * 0.5;
             let pts: Vec<[f64; 2]> = match kind {
+                SnapMark::Disc => {
+                    discs.push(c);
+                    continue;
+                }
+                SnapMark::Box => {
+                    let sq = [[c[0] - h, c[1] - h], [c[0] + h, c[1] - h], [c[0] + h, c[1] + h], [c[0] - h, c[1] + h], [c[0] - h, c[1] - h]];
+                    for w in sq.windows(2) {
+                        l.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.5], b: [w[1][0] as f32, w[1][1] as f32, 0.5], color: NOTE_BOX_RGB, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+                    }
+                    continue;
+                }
                 SnapMark::Square => vec![[c[0] - h, c[1] - h], [c[0] + h, c[1] - h], [c[0] + h, c[1] + h], [c[0] - h, c[1] + h], [c[0] - h, c[1] - h]],
                 SnapMark::Triangle => vec![[c[0] - h, c[1] - h * 0.8], [c[0] + h, c[1] - h * 0.8], [c[0], c[1] + h], [c[0] - h, c[1] - h * 0.8]],
                 SnapMark::Diamond => vec![[c[0], c[1] - h], [c[0] + h, c[1]], [c[0], c[1] + h], [c[0] - h, c[1]], [c[0], c[1] - h]],
@@ -114,6 +121,9 @@ impl Overlay {
             }
         }
         let mut p = PointData::default();
+        for c in discs {
+            p.points.push(PointSprite { position: [c[0] as f32, c[1] as f32, 0.5], color: SNAP_DISC_RGB, pick_id: 0, size: SNAP_DISC_PX, style: 2, _pad: 0 });
+        }
         for q in &self.points {
             p.points.push(PointSprite { position: [q[0] as f32, q[1] as f32, 0.5], color: [255, 140, 0, 255], pick_id: 0, size: 9.0, style: 2, _pad: 0 });
         }

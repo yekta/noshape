@@ -1601,8 +1601,7 @@ impl Workspace {
             .on_drag_move::<TabDrag>(cx.listener(|this, e: &DragMoveEvent<TabDrag>, _, cx| {
                 if let Some(g) = &mut this.tab_gap {
                     g.x = e.event.position.x;
-                    let edge = px(TAB_AUTOSCROLL_EDGE);
-                    g.scroll = if g.x < e.bounds.left() + edge { -1 } else if g.x > e.bounds.right() - edge { 1 } else { 0 };
+                    g.scroll = autoscroll_dir(g.x, e.bounds.left(), e.bounds.right());
                     if g.scroll != 0 && g.autoscroll.is_none() {
                         g.autoscroll = Some(cx.spawn(async move |this, cx| {
                             loop {
@@ -2031,10 +2030,14 @@ impl Workspace {
 
     /// A frame of a tab drag's scroll at an end of the strip; false once the drag is over.
     fn autoscroll_tabs(&mut self, cx: &mut Context<Self>) -> bool {
-        let Some(g) = &self.tab_gap else { return false };
-        if g.scroll != 0 {
+        let Some(g) = &mut self.tab_gap else { return false };
+        let now = std::time::Instant::now();
+        let secs = g.scrolled_at.replace(now).map_or(1. / 60., |t| now.duration_since(t).as_secs_f32().min(0.1));
+        if g.scroll == 0 {
+            g.scrolled_at = None;
+        } else {
             let (mut off, max) = (self.tab_scroll.offset(), self.tab_scroll.max_offset().x);
-            let x = (off.x - px(TAB_AUTOSCROLL_STEP * f32::from(g.scroll))).clamp(-max, px(0.));
+            let x = autoscroll_offset(off.x, max, g.scroll, secs);
             if x != off.x {
                 off.x = x;
                 self.tab_scroll.set_offset(off);
@@ -3224,11 +3227,30 @@ struct TabGap {
     /// The strip scrolling under a drag held at one of its ends (-1 left, 1 right), and the timer doing it.
     scroll: i8,
     autoscroll: Option<Task<()>>,
+    /// When the strip last scrolled under the drag.
+    scrolled_at: Option<std::time::Instant>,
 }
 
-/// A tab drag this close to an end of the strip scrolls it, this many px a frame (60 Hz).
+/// A tab drag this close to an end of the strip scrolls it, this many px a second (whatever the frame rate).
 const TAB_AUTOSCROLL_EDGE: f32 = 30.;
-const TAB_AUTOSCROLL_STEP: f32 = 6.;
+const TAB_AUTOSCROLL_SPEED: f32 = 360.;
+
+/// Which way a tab drag at `x` scrolls the strip spanning `left`..`right`: -1 near its left end, 1 near its right.
+fn autoscroll_dir(x: Pixels, left: Pixels, right: Pixels) -> i8 {
+    let edge = px(TAB_AUTOSCROLL_EDGE);
+    if x < left + edge {
+        -1
+    } else if x > right - edge {
+        1
+    } else {
+        0
+    }
+}
+
+/// The strip's scroll offset (0 to -`max`) `secs` of scrolling `dir` later.
+fn autoscroll_offset(x: Pixels, max: Pixels, dir: i8, secs: f32) -> Pixels {
+    (x - px(TAB_AUTOSCROLL_SPEED * secs * f32::from(dir))).clamp(-max, px(0.))
+}
 
 /// The drag start of a tab or folder chip: records the drag on the
 /// workspace (the gap starts where the tab was).
@@ -3238,7 +3260,7 @@ fn start_tab_drag(ws: WeakEntity<Workspace>) -> impl Fn(&TabDrag, Point<Pixels>,
         let _ = ws.update(cx, |w, cx| {
             let order = w.doc.read(cx).session.doc.children(w.open_folder);
             let next = order.iter().position(|t| *t == d.id).and_then(|i| order.get(i + 1)).copied();
-            w.tab_gap = Some(TabGap { dragged: d.id, before: Some(next), x, grab: offset.x, icon: d.icon, name: d.name.clone(), width: d.width, scroll: 0, autoscroll: None });
+            w.tab_gap = Some(TabGap { dragged: d.id, before: Some(next), x, grab: offset.x, icon: d.icon, name: d.name.clone(), width: d.width, scroll: 0, autoscroll: None, scrolled_at: None });
             cx.notify();
         });
         cx.new(|_| d.clone())
@@ -3400,6 +3422,26 @@ pub(crate) fn panel_tab_menu(view: Entity<Workspace>, id: TabId, m: crate::os_me
 fn close_document(_: &ClickEvent, window: &mut Window, cx: &mut App) {
     window.remove_window();
     crate::files::show_start_window(cx);
+}
+
+#[cfg(test)]
+mod tab_autoscroll_tests {
+    use super::{autoscroll_dir, autoscroll_offset, px};
+
+    /// Lead 11-13 (interaction feel): a tab dragged within 30 px of an end of the strip scrolls it that way, 360 px a
+    /// second whatever the frame rate, and stops at the strip's ends.
+    #[test]
+    fn a_tab_dragged_to_an_end_of_the_strip_scrolls_it() {
+        let (l, r) = (px(100.), px(900.));
+        assert_eq!([px(110.), px(129.), px(131.), px(500.), px(869.), px(871.), px(890.)].map(|x| autoscroll_dir(x, l, r)), [-1, -1, 0, 0, 0, 1, 1]);
+        let max = px(400.);
+        // Toward the right end: the offset goes negative with the time held, down to -max.
+        assert_eq!(autoscroll_offset(px(0.), max, 1, 0.5), px(-180.), "half a second: 180 px");
+        assert_eq!(autoscroll_offset(px(-180.), max, 1, 0.1), px(-216.), "at a slow frame rate the same speed");
+        assert_eq!(autoscroll_offset(px(-216.), max, 1, 1.0), -max, "held at the end");
+        assert_eq!(autoscroll_offset(px(0.), max, -1, 0.5), px(0.), "held at the start");
+        assert_eq!(autoscroll_offset(px(-100.), max, 0, 0.5), px(-100.));
+    }
 }
 
 #[cfg(test)]

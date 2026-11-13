@@ -597,20 +597,18 @@ impl DrawingEditor {
         {
             self.woken_points.push(p);
         }
+        // A centre the Dimension tool passed over keeps its dot (live behaviours "dsn": sticky inference dots).
         if matches!(self.tool, Tool::Dimension { .. }) {
-            let r = self.tol_mm(4.0);
             for (view, center) in self.woken_centers.clone() {
                 let Some(pl) = self.placement(view) else { continue };
-                let p = pl.to_sheet(center);
-                overlay.marks.push((p, crate::drawing_scene::SnapMark::Circle, self.tol_mm(9.0)));
-                overlay.lines.push((vec![[p[0] - r, p[1]], [p[0] + r, p[1]]], false));
-                overlay.lines.push((vec![[p[0], p[1] - r], [p[0], p[1] + r]], false));
+                overlay.marks.push((pl.to_sheet(center), crate::drawing_scene::SnapMark::Disc, 0.0));
             }
         }
         self.hover_snap = snap.as_ref().and_then(|s| self.pick_sheet(s));
-        if let (Some(p), Some(s)) = (self.hover_snap, &snap) {
-            // Shape-coded orange snap marker (live: drawing/10).
-            overlay.marks.push((p, crate::drawing_scene::SnapMark::of(s.r.as_ref()), self.tol_mm(9.0)));
+        if let Some(p) = self.hover_snap {
+            // The Note tool frames the point (live C11 (a)); the dimension tools and others put the disc on it (D21).
+            let mark = if matches!(self.tool, Tool::Note) { crate::drawing_scene::SnapMark::Box } else { crate::drawing_scene::SnapMark::Disc };
+            overlay.marks.push((p, mark, self.tol_mm(15.0)));
         }
         self.section_edit_overlay(&mut overlay);
         self.table_tool_overlay(&mut overlay, cx);
@@ -1518,10 +1516,10 @@ impl DrawingEditor {
         (matches!(self.tool, Tool::Note) && self.note_leader.is_none() && !matches!(self.panel, Some(Panel::Note { .. }))) || matches!(self.tool, Tool::PlaceImage { .. })
     }
 
-    /// A free view dragged by `d`: its centre held on another view's centre line within 6 px, shown as the
-    /// placement inference's line (Shift: free); the offset it moves by.
+    /// A free view dragged by `d`: its centre held on another view's centre line within the placement inference's
+    /// reach, shown as its line (Shift: free); the offset it moves by.
     pub(crate) fn align_view_drag(&mut self, orig: &[(ViewId, [f64; 2])], d: [f64; 2]) -> [f64; 2] {
-        let tol = self.tol_mm(6.0);
+        let tol = self.tol_mm(INFER_REACH_PX);
         let centre = |pl: &noshape_model::drawing::build::ViewPlacement| [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0];
         // The built sheet shows the drag's last preview: the view's centre at its original position.
         let Some(&(id, start)) = orig.first() else { return d };
@@ -1548,7 +1546,7 @@ impl DrawingEditor {
     }
 
     pub fn infer_placement(&mut self, skip: Option<u64>) {
-        let tol = self.tol_mm(6.0);
+        let tol = self.tol_mm(INFER_REACH_PX);
         let c = self.cursor;
         // The committed sheet: the preview holds the annotation being
         // placed, at the cursor, which would align with itself.
@@ -2706,6 +2704,9 @@ fn note_tool_preview(d: &Drawing, sheet: &Sheet, at: [f64; 2]) -> Annotation {
     let h = d.props.ann_type(noshape_model::drawing::sheet::AnnType::Notes).height.unwrap_or(d.props.ann_text_height);
     Annotation { id: sheet.next_annotation_id(), kind: AnnotationKind::note("NOTE", h), position: at, ..Default::default() }
 }
+
+/// How far (screen px) placement inference holds the pointer on another item's x or y: live C11 (a): gone 4 px off.
+const INFER_REACH_PX: f64 = 3.5;
 
 #[cfg(test)]
 mod note_preview_tests {
