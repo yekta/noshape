@@ -1998,9 +1998,6 @@ impl Ctx<'_> {
             // pieces there projected one by one, none of the whole edge kept.)
             let mut cuts: Vec<f64> = free::seam_crossings(&self.faces[f], &at, t0, t1).into_iter().filter(|&t| path.length(t0.min(t), t0.max(t)) > self.tol && path.length(t1.min(t), t1.max(t)) > self.tol).collect();
             cuts.retain(|&t| parts.iter().any(|&(a0, _, a1, _)| (t - a0) * (t - a1) < 0.0));
-            if std::env::var("XEOF").is_ok() {
-                eprintln!("XEOF edge {e} face {f}: range {t0}..{t1}, crossings {:?} kept {:?}, parts {}", free::seam_crossings(&self.faces[f], &at, t0, t1), cuts, parts.len());
-            }
             if cuts.is_empty() {
                 let Some(c) = free::projected(&self.faces[f], &at, t0, t1, GREY * self.tol) else { return Err(Decline("an edge on another argument's free-form face")) };
                 self.faces[f].pcurves.insert((e, false), (c.clone(), t0, t1));
@@ -2019,9 +2016,6 @@ impl Ctx<'_> {
                 on_free = Vec::with_capacity(parts.len());
                 for &(a0, _, a1, _) in &parts {
                     let Some(c) = free::projected(&self.faces[f], &at, a0, a1, GREY * self.tol) else {
-                        if std::env::var("XEOF").is_ok() {
-                            eprintln!("XEOF  part {a0}..{a1} not projected");
-                        }
                         return Err(Decline("an edge on another argument's free-form face"));
                     };
                     on_free.push(Some((f, c)));
@@ -2223,9 +2217,6 @@ impl Ctx<'_> {
             if matches!(self.edges[e].g, Geo::Line | Geo::Arc { .. } | Geo::Nurbs { .. }) && self.src.is_some() {
                 return Ok(true);
             }
-            if std::env::var("XEOF").is_ok() {
-                eprintln!("XEOF edge_on: edge {e} face {f}");
-            }
             return Err(Decline("an edge on another argument's free-form face"));
         }
         // (Every point past the tolerance: apart, OCCT's rule (an edge on a face within the two's tolerances), as a
@@ -2319,7 +2310,7 @@ impl Ctx<'_> {
                 if matches!(self.faces[g].s, Surf::Nurbs { .. }) && !boxes_meet(p, p, lo, hi, tol) {
                     continue;
                 }
-                if free::surface_distance(&self.faces[g], p) > tol {
+                if free::whole_surface_distance(&self.faces[g], p) > tol {
                     return self.lies_on(fs, ft) || self.lies_on(ft, fs);
                 }
                 n += 1;
@@ -2338,7 +2329,7 @@ impl Ctx<'_> {
             return false;
         }
         let samples = self.face_samples(f);
-        samples.len() >= 8 && samples.iter().rev().all(|&p| free::surface_distance(&self.faces[g], p) <= self.tol)
+        samples.len() >= 8 && samples.iter().rev().all(|&p| free::whole_surface_distance(&self.faces[g], p) <= self.tol)
     }
 
     fn nurbs_pair(&mut self, fs: usize, ft: usize) -> R<()> {

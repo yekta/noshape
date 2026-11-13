@@ -2200,6 +2200,35 @@ fn variable_rounds_against_a_boxs_planes_cut_as_occt() {
     assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
 }
 
+/// Parts of one torus fused (as a private document's rib ends): a half ring and a quarter of it, their torus faces one
+/// surface whose faces' own parameters hold different parts of it ("a piece's point on another solid's face" before),
+/// the quarter's end circle lying on the half's torus face across that face's seam ("an edge on another argument's
+/// free-form face" before): ours, as OCCT's.
+#[test]
+fn parts_of_one_torus_fused_as_occt() {
+    let o = DVec3::new(0.0, 0.0108, 0.04);
+    let half = k::make_torus(&k::Plane::new(o, DVec3::NEG_Y, DVec3::X), 0.0226, 0.0004, std::f64::consts::PI).unwrap();
+    // (The quarter from the half's start, and turned a fifth of a turn on: its own parameters start inside the half.)
+    for turn in [0.0, 0.2 * std::f64::consts::PI] {
+        let x = DVec3::new(turn.cos(), 0.0, turn.sin());
+        let quarter = k::make_torus(&k::Plane::new(o, DVec3::NEG_Y, x), 0.0226, 0.0004, std::f64::consts::FRAC_PI_2).unwrap();
+        let opts = k::BooleanOptions::default();
+        k::set_rust_boolean_only(true);
+        let r = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&half), std::slice::from_ref(&quarter), &opts);
+        let why = k::last_rust_decline();
+        k::set_rust_boolean_only(false);
+        let r = r.unwrap_or_else(|e| panic!("turned {turn}: noshape's Boolean declined: {why} ({e})"));
+        k::set_rust_boolean(Some(false));
+        let occt = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&half), &[quarter], &opts).unwrap();
+        k::set_rust_boolean(None);
+        assert!(r.shape.is_valid());
+        let counts = |s: &k::Shape| (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge), s.count(k::ShapeType::Vertex));
+        assert_eq!(counts(&r.shape), counts(&occt.shape), "turned {turn}");
+        let (v, vo) = (r.shape.volume().unwrap(), occt.shape.volume().unwrap());
+        assert!((v - vo).abs() <= 1e-7 * r.shape.area().unwrap(), "turned {turn}: volume {v} against OCCT's {vo}");
+    }
+}
+
 /// A spring's wire fused with its mirror image (c2-extension-spring's Mirror 1, recorded): their swept faces meet
 /// tangent across the 1 mm edge on the mirror plane, where OCCT's sections are seven lines 2-4 um apart along it (each
 /// 100 tolerances long, corner to corner: "a short section from a corner" before). Sections along an edge of both faces

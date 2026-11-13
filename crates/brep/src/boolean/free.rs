@@ -457,6 +457,22 @@ pub(super) fn surface_distance(g: &GFace, p: DVec3) -> f64 {
     }
 }
 
+/// The distance from `p` to face `f`'s whole surface: a torus's or a sphere's exactly, where a face's own parameters
+/// hold only part of it (two parts of one torus, the private dock's rib ends, else not seen as one surface); else
+/// [`surface_distance`].
+pub(super) fn whole_surface_distance(g: &GFace, p: DVec3) -> f64 {
+    match g.ns.as_deref() {
+        Some(FreeSurface::Torus { o, z, major, minor, .. }) if matches!(g.s, Surf::Nurbs { .. }) => {
+            let w = p - *o;
+            let h = w.dot(*z);
+            let rho = (w - *z * h).length();
+            (((rho - major) * (rho - major) + h * h).sqrt() - minor).abs()
+        }
+        Some(FreeSurface::Sphere { o, r, .. }) if matches!(g.s, Surf::Nurbs { .. }) => ((p - *o).length() - r).abs(),
+        _ => surface_distance(g, p),
+    }
+}
+
 /// Where a curve lying on free-form face `g` (its point at `t` from `at`) crosses the seam of a face going a whole turn
 /// round: its parameters (its parameters on the face jump by a turn there), in its own order.
 pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, t1: f64) -> Vec<f64> {
@@ -540,17 +556,11 @@ pub(super) fn projected(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, 
             }
         }
         if dist > tol {
-            if std::env::var("XEOF").is_ok() {
-                eprintln!("XEOF  point {k} of {N} off by {dist:e} (tol {tol:e}) at uv {uv:?} seed {seed:?} box {:?}", g.uvbox);
-            }
             return None;
         }
         if let Some(q) = qs.last()
             && ((uv.x - q.0.x).abs() > 0.25 * (u1 - u0) || (uv.y - q.0.y).abs() > 0.25 * (v1 - v0))
         {
-            if std::env::var("XEOF").is_ok() {
-                eprintln!("XEOF  point {k} jumps {:?} -> {uv:?} box {:?}", q.0, g.uvbox);
-            }
             return None;
         }
         // Its tangent there: [Su Sv] (u', v') = P' (least squares).
