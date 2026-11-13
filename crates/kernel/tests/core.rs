@@ -868,3 +868,47 @@ fn a_wire_of_nearly_meeting_edges_is_the_same_every_run() {
     assert!(!runs[0].starts_with("no wire"), "{}", runs[0]);
     assert!(runs.iter().all(|r| *r == runs[0]), "{runs:#?}");
 }
+
+/// A box's edges and corners rounded, the rounds deleted (Reapply fillet's first step on a rounded box: cylinders and
+/// sphere corners): the box again, its six planes made again where they meet, without OCCT's Defeaturing.
+#[test]
+fn a_rounded_boxs_rounds_deleted_give_the_box() {
+    let b = make_box(&Plane::xy(), 40.0, 30.0, 20.0).unwrap();
+    let rounded = fillet(&b, &b.edges(), 3.0).unwrap().shape;
+    let rounds: Vec<Shape> = rounded.faces().into_iter().filter(|f| !matches!(f.face_surface(), Ok(Surface::Plane(_)))).collect();
+    assert_eq!(rounds.len(), 20);
+    let r = delete_faces(&rounded, &rounds).unwrap();
+    assert!(r.shape.is_valid());
+    assert_eq!(r.shape.faces().len(), 6);
+    assert!(close(r.shape.volume().unwrap(), 24000.0, 1e-6), "{}", r.shape.volume().unwrap());
+    // Every kept face's image, the rounds deleted.
+    for (i, f) in rounded.faces().iter().enumerate() {
+        let planar = matches!(f.face_surface(), Ok(Surface::Plane(_)));
+        assert_eq!(r.history.modified(0, ShapeType::Face, i as u32).len(), usize::from(planar), "face {i}");
+        assert_eq!(r.history.is_deleted(0, ShapeType::Face, i as u32), !planar, "face {i}");
+    }
+}
+
+/// cf-part-draft's Part Draft 2 input in small: an open box shelled 2 mm, its vertical and bottom edges rounded first
+/// (outer rounds 4 mm, the shell's inner ones 2 mm; sphere corners), split down the middle; every round of a half
+/// deleted gives the sharp shelled half (40 × 30 × 20 less 36 × 26 × 18, halved).
+#[test]
+fn a_shelled_rounded_boxs_half_loses_its_rounds() {
+    let b = make_box(&Plane::xy(), 40.0, 30.0, 20.0).unwrap();
+    let edges: Vec<Shape> = b.edges().into_iter().filter(|e| e.endpoints().is_ok_and(|(p, q)| p.z.max(q.z) < 1e-9 || (p - q).cross(DVec3::Z).length() < 1e-9)).collect();
+    assert_eq!(edges.len(), 8);
+    let rounded = fillet(&b, &edges, 4.0).unwrap().shape;
+    let top: Vec<Shape> = rounded.faces().into_iter().filter(|f| f.face_plane().ok().flatten().is_some_and(|p| (p.origin.z - 20.0).abs() < 1e-9)).collect();
+    assert_eq!(top.len(), 1);
+    let shelled = shell(&rounded, &top, 2.0, ShellSide::Inside, JoinType::Arc).unwrap().shape;
+    let halves = split_by_plane(&shelled, &Plane::from_normal(DVec3::new(20.0, 0.0, 0.0), DVec3::X)).unwrap().shape.solids();
+    assert_eq!(halves.len(), 2);
+    for half in halves {
+        let rounds: Vec<Shape> = half.faces().into_iter().filter(|f| !matches!(f.face_surface(), Ok(Surface::Plane(_)))).collect();
+        assert!(rounds.len() >= 6, "{}", rounds.len());
+        let r = delete_faces(&half, &rounds).unwrap();
+        assert!(r.shape.is_valid());
+        assert!(r.shape.faces().iter().all(|f| matches!(f.face_surface(), Ok(Surface::Plane(_)))));
+        assert!(close(r.shape.volume().unwrap(), (24000.0 - 36.0 * 26.0 * 18.0) / 2.0, 1e-6), "{}", r.shape.volume().unwrap());
+    }
+}
