@@ -1,6 +1,6 @@
 {
  "name": "asm-triad-move-to-origin-mated",
- "about": "Part 2 (the pin, on Revolute 1 in Part 1's hole): its triad centre \u203a Move to origin; the mate holds it.",
+ "about": "Part 2 (the pin, on Revolute 1 in Part 1's hole): a click on its top face, its triad centre \u203a Move to origin; the mate holds it.",
  "area": "asm",
  "source": "asm 11-13: assembly menu takes, a second one each (live asked for the thinnest)",
  "start": "pin-block",
@@ -9,9 +9,9 @@
    "do": "click",
    "on": {
     "face": [
-     65,
+     62,
      0,
-     15
+     30
     ],
     "instance": "Part 2 <1>"
    }
