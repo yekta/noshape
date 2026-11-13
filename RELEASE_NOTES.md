@@ -17,4 +17,4 @@
 
 **Faster**
 - Sheet metal regenerates up to 3× faster (the louver test part now as fast as Onshape).
-- Fillets, chamfers, drafts and sweeps faster; more Booleans run on Noshape's own code.
+- Fillets, chamfers and sweeps faster; more Booleans run on Noshape's own code.
