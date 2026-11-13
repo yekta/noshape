@@ -4296,6 +4296,8 @@ impl<'a> Translator<'a> {
         if let Some(tab) = &self.tab {
             args["tab"] = json!(tab);
         }
+        // (Past `call`: the sketches read go.)
+        self.sketch_cache.clear();
         crate::ops::link_sketch_offset(self.ctx, &args).map_err(|e| e.message)?;
         self.sketch_edits += 1;
         Ok(())
@@ -4337,6 +4339,8 @@ impl<'a> Translator<'a> {
             args["center"] = json!(center);
             args["full"] = json!(!params.iter().any(|p| p["parameterId"] == "openPattern" && p["value"] == true));
         }
+        // (Past `call`: the sketches read go.)
+        self.sketch_cache.clear();
         crate::ops::link_sketch_pattern(self.ctx, &args).map_err(|e| e.message)?;
         self.sketch_edits += 1;
         Ok(())
@@ -4450,6 +4454,7 @@ impl<'a> Translator<'a> {
                     if let Some(tab) = &self.tab {
                         args["tab"] = json!(tab);
                     }
+                    self.sketch_cache.clear();
                     if crate::ops::pin_to_missing_reference(self.ctx, &args).is_ok() {
                         continue;
                     }
