@@ -1856,7 +1856,8 @@ impl Workspace {
                                 let t = v8.read(cx).doc.read(cx).session.doc.tab(id).cloned();
                                 cx.set_global(dd::CopiedTab(t));
                             }));
-                            return if kind == "drawing" { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
+                            let partless = matches!(view.read(cx).views.get(&id), Some(TabView::PartStudio(v)) if !v.read(cx).has_parts());
+                            return if matches!(kind, "partstudio" | "assembly" | "drawing") && !partless { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
                         }
                         // Onshape (live ui2-tabmenu-*): ⊗ Delete | Open in new browser
                         // tab, Rename, Properties…, Show code | Duplicate, Copy to
@@ -1938,8 +1939,11 @@ impl Workspace {
                                 let doc = v10.read(cx).doc.clone();
                                 dd::move_to_document(doc, vec![id], w, cx)
                             }));
-                        // Only a Drawing tab ends with Export… (live2 11-13 05:05: no longer on Part Studio or Assembly tabs).
-                        let menu = if kind == "drawing" { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
+                        // Live (dom/context-menus-partstudio.txt rmb-tab-partstudio / -assembly, TAB-EXPORT-MISSING):
+                        // Part Studio, Assembly and Drawing tabs end with Export… (before an Assembly's Release…).
+                        // (Not a Part Studio without parts: live 2409.)
+                        let partless = matches!(view.read(cx).views.get(&id), Some(TabView::PartStudio(v)) if !v.read(cx).has_parts());
+                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") && !partless { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
                         // Release management (help image Release_highlighted2, live
                         // rmb-tab-assembly / -drawing: the last entry, after Export…):
                         // Release… for Assemblies, Drawings, Variable Studios and files
@@ -3411,6 +3415,7 @@ pub(crate) fn panel_create_menu(view: Entity<Workspace>, m: crate::os_menu::OsMe
 pub(crate) fn panel_tab_menu(view: Entity<Workspace>, id: TabId, m: crate::os_menu::OsMenu, delete: crate::os_menu::OsMenuItem, add_to_folder: crate::os_menu::OsMenuItem, move_to: crate::os_menu::OsMenuItem, cx: &App) -> crate::os_menu::OsMenu {
     use crate::os_menu::OsMenuItem as I;
     let kind = view.read(cx).doc.read(cx).session.doc.tab(id).map(|t| kind_of(&t.content)).unwrap_or("");
+    let partless = matches!(view.read(cx).views.get(&id), Some(TabView::PartStudio(v)) if !v.read(cx).has_parts());
     let (v1, v2, v3, v4, v5, v6, v7) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view);
     let m = m
         .item(delete)
@@ -3439,8 +3444,8 @@ pub(crate) fn panel_tab_menu(view: Entity<Workspace>, id: TabId, m: crate::os_me
         m
     };
     let m = m.item(move_to);
-    // Export… last on a Drawing's row, as on the tab bar (live2 11-13 05:05: not on Part Studios or Assemblies).
-    if kind == "drawing" {
+    // Live (doc-tab-manager-row-menu, 16:12 (4)): Export… last, as on the tab bar.
+    if matches!(kind, "partstudio" | "assembly" | "drawing") && !partless {
         return m.item(I::new("Export…").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.open_export(id, w, cx))));
     }
     m
