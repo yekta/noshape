@@ -179,6 +179,41 @@ Medians of 3, each a CLI `feature list` of the tab on a fresh copy; cold: an emp
 | c2-valve-config | 479 ms | 175 ms | 2.7 | 478 ms |
 | c2-sm-corner-break | 2261 ms | 1972 ms | 1.1 | 2352 ms |
 
+### The Mac (the user's Mac mini: Apple M6, 12 cores, 16 GB; 2026-11-13 07:22, v0.4.48's macOS arm64 CLI)
+
+The released CLI (SHA256SUMS verified), one process per call, everything in ~/noshape-host/qa (private copies deleted after).
+vibe7 is the 02:00 window's baseline (main 91a90caf, the suite's own builds; hat15b and the dock not timed there). Mac load
+1.5–2.4 for the hats, 4.7–5.7 for the dock (re-timed after Spotlight was kept off the folder), 6–10 during the model timings
+(the CLI's own threads, 12 cores).
+
+| user document (median of 3) | Mac cold | Mac reopen | vibe7 cold | vibe7 reopen |
+|---|---|---|---|---|
+| hat8, Mac mini hat | 2.37 s | 0.11 s | 4.45 s | 0.28 s |
+| hat15, Mac mini hat | 2.42 s | 0.11 s | 4.44 s | 0.28 s |
+| hat15b, Mac mini hat | 2.44 s | 0.13 s | – | – |
+| the dock, all 8 Part Studios | 7.85 s | 1.08 s | – | – |
+
+| model suite, documents faster than live | Mac (v0.4.48 CLI) | vibe7 release | vibe7 debug |
+|---|---|---|---|
+| of 84 | **73** | 68 | 65 |
+| sum of our regenerations (live 41.1 s) | 25.2 s | 45.7 s | – |
+
+Mac / vibe7 per document: median 0.57. Faster than live on the Mac but not on vibe7: bracket03-mattie, c2-housing-draft,
+c2-rings-loft, c2-sm-corner-break, cf-part-draft; none the other way.
+
+| furthest behind live on the Mac | Mac | live | Mac / live | vibe7 release |
+|---|---|---|---|---|
+| c2-impeller-loft | 6498 ms | 2773 ms | 2.3 | 12689 ms |
+| c2-hunting-knife | 628 ms | 408 ms | 1.5 | 1166 ms |
+| c2-variable-fillet-faceblend | 226 ms | 58 ms | 3.9 | 384 ms |
+| c2-valve-config | 301 ms | 175 ms | 1.7 | 441 ms |
+| c2-helical-sweep | 110 ms | 40 ms | 2.8 | 121 ms |
+| cf-snap-hook | 328 ms | 274 ms | 1.2 | 725 ms |
+| c2-tpd-fillet-variable | 86 ms | 44 ms | 1.9 | 122 ms |
+| learning-center-michael | 113 ms | 96 ms | 1.2 | 203 ms |
+| cf-lighten | 129 ms | 114 ms | 1.1 | 229 ms |
+| c2-bottle-split | 49 ms | 40 ms | 1.2 | 92 ms |
+
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
 Of the recorded Booleans (each distinct call once), the share noshape's own Boolean takes instead of OCCT, by count and
