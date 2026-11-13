@@ -4279,3 +4279,62 @@ fn enter_in_a_configured_value_moves_down_a_row(cx: &mut TestAppContext) {
     assert!(value.map(|p| format!("{p:?}")).is_some_and(|t| t.contains("40 mm")), "committed as 40 mm");
     assert_eq!(framed, Some(format!("cp-0-{}", rows[1])), "the cell below framed");
 }
+
+/// A new Remove extrude of a circle on Top over a block below Top (psui's start hole-sketch): Remove turns the arrow
+/// into the block (std canSetBooleanFlip), also when the next pick comes before the logic's run for Remove is back,
+/// and the hole goes through. `settle`: wait for the dialog between the picks.
+fn remove_extrude_faces(cx: &mut TestAppContext, name: &str, settle: bool, picks: &[(&str, noshape_model::params::ParamValue)]) -> (bool, usize) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm", "oppositeDirection": true } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[20, 15], [23, 15]] }] }
+    ] });
+    let (window, view) = part_studio_from(cx, name, Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let sk = v.display.sketches.iter().find(|s| s.regions.len() == 1 && v.studio(cx).unwrap().feature(s.feature).is_some_and(|f| f.name == "Sketch 2")).expect("Sketch 2");
+            v.selection = vec![Reference::SketchRegion { sketch: sk.feature, key: sk.regions[0].key.clone() }];
+            v.start_feature("extrude", w, cx);
+        })
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    for (k, v) in picks {
+        let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("editing").dialog.clone());
+        dialog.update(cx, |d, cx| d.set_value(k, v.clone(), cx));
+        if settle {
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        }
+    }
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).can_submit()));
+    let flipped = cx.update(|cx| view.read(cx).edit.as_ref().expect("editing").dialog.read(cx).feature.params.bool("oppositeDirection"));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.is_none());
+    let faces = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the block").face_refs.len());
+    (flipped, faces)
+}
+
+#[gpui::test]
+fn a_remove_extrude_on_top_cuts_the_block_below(cx: &mut TestAppContext) {
+    use noshape_model::params::ParamValue;
+    let remove = ("operationType", ParamValue::Enum("REMOVE".into()));
+    let through = ("endBound", ParamValue::Enum("THROUGH_ALL".into()));
+    assert_eq!(remove_extrude_faces(cx, "rm-through", true, &[remove.clone(), through.clone()]), (true, 7), "Remove, then Through all");
+}
+
+#[gpui::test]
+fn a_remove_extrude_picked_fast_still_cuts_the_block_below(cx: &mut TestAppContext) {
+    use noshape_model::params::ParamValue;
+    let remove = ("operationType", ParamValue::Enum("REMOVE".into()));
+    let through = ("endBound", ParamValue::Enum("THROUGH_ALL".into()));
+    assert_eq!(remove_extrude_faces(cx, "rm-through-fast", false, &[remove, through]), (true, 7), "Through all picked before Remove's logic is back");
+}
+
+#[gpui::test]
+fn a_flipped_remove_extrude_points_away_from_the_block(cx: &mut TestAppContext) {
+    use noshape_model::params::ParamValue;
+    let remove = ("operationType", ParamValue::Enum("REMOVE".into()));
+    let flip = ("oppositeDirection", ParamValue::Bool(false));
+    assert_eq!(remove_extrude_faces(cx, "rm-flip", true, &[remove, flip]).0, false, "the user's flip after Remove's");
+}

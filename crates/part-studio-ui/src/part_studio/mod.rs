@@ -2907,6 +2907,7 @@ impl PartStudioView {
             self.ui.std_edit_task = None;
             self.ui.std_logic_first = None;
             self.ui.std_edit_old = None;
+            self.ui.std_edit_run_old = None;
             self.ui.preview_task = None;
             self.ui.preview_cancel.abort();
             self.ui.preview_tool_task = None;

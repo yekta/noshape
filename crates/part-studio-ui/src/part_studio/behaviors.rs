@@ -478,6 +478,8 @@ pub struct UiState {
     /// std's editing logic running off the UI thread (std Extrude runs a
     /// whole trial extrude for its boolean heuristics).
     pub std_edit_task: Option<Task<()>>,
+    /// The `oldDefinition` of the editing logic run in flight.
+    pub std_edit_run_old: Option<noshape_model::params::ParamValues>,
     /// A new feature's preview waits for std's editing logic to run once (a new Extrude on a part's face opens as
     /// New and turns Add: its New preview showed a separate part for most of a second). `Some(true)`: one was held.
     pub std_logic_first: Option<bool>,
@@ -843,6 +845,7 @@ impl UiState {
             decal_sized: None,
             std_edit_old: None,
             std_edit_task: None,
+            std_edit_run_old: None,
             std_logic_first: None,
             std_manip_live: None,
             std_manip_task: None,
@@ -4201,8 +4204,8 @@ impl PartStudioView {
         let with_subs = { dialog.read(cx).feature.clone() };
         // A std button the user clicked runs the logic with it (clickedButton).
         let clicked = dialog.update(cx, |d, _| d.clicked_button.take()).unwrap_or_default();
-        let old = self.ui.std_edit_old.replace(params.clone()).unwrap_or_default();
-        if old == params && clicked.is_empty() {
+        let prev = self.ui.std_edit_old.replace(params.clone()).unwrap_or_default();
+        if prev == params && clicked.is_empty() {
             if self.ui.std_logic_first.take() == Some(true) {
                 self.schedule_regen(window, cx);
             }
@@ -4215,6 +4218,11 @@ impl PartStudioView {
         if !creating {
             user_set.extend(["oppositeDirection", "secondDirectionOppositeDirection"].map(String::from));
         }
+        // A run still in flight is dropped for this one, which starts from that run's old values: the change it
+        // hadn't answered yet counts (Remove then Through all picked at once: Remove's flip into the part was lost).
+        let pending = self.ui.std_edit_run_old.take().filter(|_| self.ui.std_edit_task.is_some());
+        let old = pending.unwrap_or(prev);
+        self.ui.std_edit_run_old = Some(old.clone());
         let units = self.doc.read(cx).session.doc.settings.units;
         let dialog = dialog.clone();
         let sent = params.clone();
