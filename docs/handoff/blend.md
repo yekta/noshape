@@ -69,6 +69,29 @@ arcs (B-splines 57.7 mm²), the 2.04 mm lines and the corners (tori 8.1, cylinde
 +21.7 mm³, 24 faces. So live stops the chain at JN1's ends and runs the 15 mm rounds on into the new fillet (Parasolid's
 cliff / roll-over), and the 4.000 mm wall is consumed. core can't take this one quickly; it's yours when the knife allows,
 unless the lead says otherwise.
+## 11-13 02:47 UTC: the knife's Chamfer 2 (branch blend-chamfer2 on blend-knifetip, gates running)
+- Live (behaviours.md "c2-hunting-knife, Chamfer 2's hole-rim chamfers", 01:04): the one entity is the hole wall
+  (a face: both rims), Offset, 0.75 mm and 45°; JiC (y > 0) 18.856481, JiG (y < 0) 19.444938 mm². **The rule that
+  fits every contact distance live gave** (knife/ch2sim.py in blend-scratch): constant offsets from the wall and the
+  side, sized so that at the rim's middle the wall carries 0.75 and the chamfer 45° from it; the middle is where
+  Parasolid's ellipse is halfway from its start, and the two rims start on opposite sides (JhR at x 27.5, JhV at
+  32.5: the major axis's end the hole's axis points to on the side), so through sides tilted 0.5° the two rims
+  differ. Distance on the side instead, sizing at the start, or the asked 0.75 as an offset: none fit.
+- Built as `ring_blend`'s rim chamfer with unequal offsets (`RimBlend::Offset`); a picked cylinder's seam dropped
+  from a face pick. Ours 18.869078 / 19.458019 (OCCT's constant setbacks: 19.161 each): ~1 µm wider on the side than
+  live's (its plane contacts 20.332 / 20.497 mm, ours 20.339 / 20.504), within the 0.19 % band. T1 features_c::
+  an_offset_chamfer_of_a_holes_two_tilted_rims_sizes_each_at_its_own_middle_as_live.
+- **Open:** (1) which face carries the distance: here the picked wall, but a pin's picked top measures Distance 1
+  down its sides (features_a pins test), so the picked-wall rule is only in the rim route; live probe asked
+  (REQUESTS 02:47). (2) Parasolid's ellipse start: the knife's rims start at the end the axis points to (our axis =
+  Parasolid's +Y), the rings' equal-chamfer rule (2441, `Rim::whole_middle`) takes the other end with axes of ours;
+  kept apart until a case settles it.
+- asm-hand-drill-pinslot's studios (as models in vibe5 ~/tmp/blend/hd): 9fbc05's Fillet 1 (0.3 mm on 231 edges of a
+  33-tooth spur gear) fails after 31 s, live builds it in 1 s (dump blend-scratch/hd/fillet-5.*); f79298's Chamfer 1
+  likewise; 0d1e01 / 4bed3f first differ at extrudes. Next after the knife.
+- c2-impeller-loft's Fillet Ansaugflansch zum Gehaeuse (core's tolerant vertices): OCCT's round along Delete face 2's
+  degree-14 B-spline outline comes out in 7 faces with 1.14 mm vertices; but the part differs from live from feature 15
+  on (Boolean Flansch+Gehäuse 15/41/30, live 19/56/39), so it waits for that.
 
 ## 11-12 23:06 UTC: the knife's Fillet 3 as live (branch blend-knifetip a9e4c9369, pairs queued on vibe7)
 - **Rolling balls** (`blend_section::rolling_ball_blend`, detail.rs `fillet`): when OCCT's fillet leaves one edge's round
