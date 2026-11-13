@@ -74,8 +74,9 @@ impl DrawingEditor {
     }
 
     /// End of a box select (left-drag from empty sheet, live navigation/44) from `a` to `b`: left to right (window)
-    /// the views, annotations, tables, images and sketch entities wholly inside the box are selected, right to left
-    /// (crossing, as Onshape's boxes elsewhere) those it touches; Shift adds to the selection.
+    /// the annotations, tables, images and sketch entities wholly inside the box are selected, right to left
+    /// (crossing) those it touches, and views it reaches either way; `add` keeps what was selected (live2 F3: a box
+    /// adds).
     pub fn select_in_box(&mut self, a: [f64; 2], b: [f64; 2], add: bool, cx: &mut Context<Self>) {
         let (lo, hi) = ([a[0].min(b[0]), a[1].min(b[1])], [a[0].max(b[0]), a[1].max(b[1])]);
         let crossing = b[0] < a[0];
@@ -108,9 +109,11 @@ impl DrawingEditor {
                     note(sel, inside(t.pos));
                 }
             }
+            // A view the box reaches is taken either way (live2 feel/drawing.json F3: half of the Right view
+            // covered, left to right or right to left).
             for pl in &built.placements {
                 let meets = pl.min[0] <= hi[0] && pl.max[0] >= lo[0] && pl.min[1] <= hi[1] && pl.max[1] >= lo[1];
-                note(Sel::View(pl.id), if crossing { meets } else { inside(pl.min) && inside(pl.max) });
+                note(Sel::View(pl.id), meets);
             }
             all_in.into_iter().filter(|x| x.1).map(|x| x.0).collect()
         };

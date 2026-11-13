@@ -32,7 +32,8 @@ impl DrawingEditor {
 
     /// The note or callout leader under sheet point `c`.
     pub fn leader_hit(&self, c: [f64; 2]) -> Option<LeaderHit> {
-        ae::leader_hit(self.built.as_deref(), &self.current_sheet().annotations, c, self.tol_mm(5.0), self.tol_mm(3.0))
+        // Live2 feel/drawing.json D1: a note's leader lights the note within 10 px (not at 12).
+        ae::leader_hit(self.built.as_deref(), &self.current_sheet().annotations, c, self.tol_mm(11.0), self.tol_mm(11.0))
     }
 
     /// Edit annotation `id` (one undo step named `what`).

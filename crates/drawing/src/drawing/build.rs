@@ -261,6 +261,12 @@ impl BuiltSheet {
     /// Closest pick target to a sheet point within `tol` mm. Annotations win
     /// ties against view geometry.
     pub fn hit(&self, p: [f64; 2], tol: f64) -> Option<u32> {
+        self.hit_reach(p, tol, 0.0)
+    }
+
+    /// [`Self::hit`] with texts reached within `text_tol` mm of their box too (live: Select lights a dimension's or
+    /// a note's text from 8 px outside it).
+    pub fn hit_reach(&self, p: [f64; 2], tol: f64, text_tol: f64) -> Option<u32> {
         let mut best: Option<(u32, f64)> = None;
         let mut consider = |pick: u32, d: f64| {
             if pick == 0 || d > tol {
@@ -289,8 +295,13 @@ impl BuiltSheet {
             consider(l.pick, dmin);
         }
         for t in &self.geometry.texts {
-            if t.pick != 0 && font::text_hit(t, p) {
-                consider(t.pick, tol * 0.3);
+            if t.pick == 0 {
+                continue;
+            }
+            // Inside the box, or within `text_tol` of it: as near as a line can be (texts win over lines under them).
+            let d = if font::text_hit(t, p) { 0.0 } else { font::text_box_distance(t, p) };
+            if d == 0.0 || d <= text_tol {
+                consider(t.pick, tol * 0.3 * if text_tol > 0.0 { d / text_tol } else { 1.0 });
             }
         }
         // Inside a table counts as on it (tables sit on top of everything

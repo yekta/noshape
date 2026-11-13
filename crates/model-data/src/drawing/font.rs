@@ -484,6 +484,20 @@ pub fn text_box(t: &Text2) -> [[f64; 2]; 4] {
     [tr(x0, y0), tr(x1, y0), tr(x1, y1), tr(x0, y1)]
 }
 
+/// How far a sheet point is from the text's bounding box (0 inside).
+pub fn text_box_distance(t: &Text2, p: [f64; 2]) -> f64 {
+    let w = text_width(&t.text, t.height);
+    let off = anchor_offset(t.anchor, w, t.height);
+    let m = t.height * 0.15;
+    let (c, s) = (t.angle.cos(), t.angle.sin());
+    let d = [p[0] - t.pos[0], p[1] - t.pos[1]];
+    let (lx, ly) = (d[0] * c + d[1] * s, -d[0] * s + d[1] * c);
+    let (x0, y0, x1, y1) = (off[0] - m, off[1] - t.height * 0.3 - m, off[0] + w + m, off[1] + t.height + m);
+    let dx = (x0 - lx).max(lx - x1).max(0.0);
+    let dy = (y0 - ly).max(ly - y1).max(0.0);
+    dx.hypot(dy)
+}
+
 /// Whether a sheet point lies inside the text's bounding box.
 pub fn text_hit(t: &Text2, p: [f64; 2]) -> bool {
     let w = text_width(&t.text, t.height);

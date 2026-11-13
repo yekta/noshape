@@ -13,9 +13,17 @@ use noshape_model::drawing::{AnnotationKind, Drawing, PointRef, Sheet, ViewId};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// How far (screen px) a view's snap point reaches: constant on screen (live behaviours "dsn" (3): 10-13 px at two
-/// zooms, 12 fits best).
-pub const SNAP_REACH_PX: f64 = 12.0;
+/// How far (screen px) a view's snap point reaches with the Dimension tool (live2 feel/drawing.json D3: a vertex up to
+/// 7 px and not at 9, a circle centre 7 px; behaviours "dsn"'s 10–13 px was more).
+pub const SNAP_REACH_PX: f64 = 8.0;
+
+/// How far outside its geometry a view lights and takes a click in Select, in sheet mm (it scales with the zoom;
+/// live2 feel/drawing.json D1: from 14 px at 3.93 px/mm, not 16).
+pub const VIEW_REACH_MM: f64 = 3.6;
+
+/// Select's hover reach (screen px) for an annotation's lines and from a text's box (live2 feel/drawing.json D1).
+pub const SELECT_LINE_REACH_PX: f64 = 7.0;
+pub const SELECT_TEXT_REACH_PX: f64 = 9.0;
 
 /// The editor state picking reads.
 #[derive(Clone, Copy)]
@@ -65,7 +73,12 @@ impl<'a> SheetPick<'a> {
     /// The pick the active tool highlights under the cursor.
     pub fn hover_at(&self) -> Option<u32> {
         let tol = self.tol_mm(5.0);
-        let hover = self.built.and_then(|b| b.hit(self.cursor, tol));
+        // Select (live2 feel/drawing.json D1): an annotation's lines light within 6 px (not at 8), its text within 8 px
+        // of its box (not at 10); the tools keep their own reach.
+        let hover = match self.tool {
+            Tool::Select => self.built.and_then(|b| b.hit_reach(self.cursor, self.tol_mm(SELECT_LINE_REACH_PX), self.tol_mm(SELECT_TEXT_REACH_PX))),
+            _ => self.built.and_then(|b| b.hit(self.cursor, tol)),
+        };
         // Tools that take only view edges (or sketch geometry) look for those
         // under whatever else is on top (an annotation, a centerline).
         let edges_only = |also_sketch: bool| self.built.and_then(|b| b.hit_where(self.cursor, tol, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. }) || (also_sketch && matches!(t, PickTarget::SketchEntity(_)))));
@@ -236,7 +249,7 @@ impl<'a> SheetPick<'a> {
     /// behind it (live drw-aligned-section-edit), else the smallest view box holding it.
     fn view_under(&self, s: [f64; 2]) -> Option<&'a ViewPlacement> {
         let built = self.built?;
-        smallest(built.placements.iter().filter(|p| p.contains(s, 0.0) && self.geoms.get(&p.id).is_some_and(|g| g.in_cut_face(p.to_view(s))))).or_else(|| smallest_view(built, s, 1.0))
+        smallest(built.placements.iter().filter(|p| p.contains(s, 0.0) && self.geoms.get(&p.id).is_some_and(|g| g.in_cut_face(p.to_view(s))))).or_else(|| smallest_view(built, s, VIEW_REACH_MM))
     }
 
     /// Snap point (vertex / circle center) of a view near a sheet point.

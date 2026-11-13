@@ -1264,7 +1264,7 @@ impl DrawingEditor {
             return;
         }
         if let Drag::Pending { button, start, start_px, pick } = self.drag.clone()
-            && len(sub(lp, start_px)) > 3.0
+            && len(sub(lp, start_px)) > self.drag_threshold_px(button, pick, start)
         {
             self.drag = match button {
                 Button::Right | Button::Middle => {
@@ -1512,6 +1512,19 @@ impl DrawingEditor {
         (matches!(self.tool, Tool::Note) && self.note_leader.is_none() && !matches!(self.panel, Some(Panel::Note { .. }))) || matches!(self.tool, Tool::PlaceImage { .. })
     }
 
+    /// How far (screen px) the pointer moves before a press drags (live2 feel/drawing.json D5: a view or a
+    /// dimension's text from 5 px, a note's text from 8; 4 and 6 are clicks).
+    fn drag_threshold_px(&self, button: Button, pick: Option<u32>, start: [f64; 2]) -> f64 {
+        if !matches!(button, Button::Left) || !matches!(self.tool, Tool::Select) {
+            return 3.0;
+        }
+        let note = |id: u64| self.current_sheet().annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Note { .. }));
+        match self.sel_at(pick, start) {
+            Some(Sel::Annotation(id)) if note(id) => 7.0,
+            _ => 4.0,
+        }
+    }
+
     pub fn infer_placement(&mut self, skip: Option<u64>) {
         let tol = self.tol_mm(INFER_REACH_PX);
         let c = self.cursor;
@@ -1603,7 +1616,9 @@ impl DrawingEditor {
                 }
             }
             Drag::SelectCells { id, start } => self.select_cells_in(id, start, self.cursor, cx),
-            Drag::SelectBox { start } => self.select_in_box(start, self.cursor, e.modifiers.shift, cx),
+            // A box adds to the selection; Shift+drag makes none (live2 feel/drawing.json F3).
+            Drag::SelectBox { start } if !e.modifiers.shift => self.select_in_box(start, self.cursor, true, cx),
+            Drag::SelectBox { .. } => {}
             Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveBreak { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } | Drag::LeaderNode { .. } => {
                 let name = match drag {
                     Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } | Drag::LeaderNode { .. } => "Move by grip",
@@ -2672,8 +2687,9 @@ fn note_tool_preview(d: &Drawing, sheet: &Sheet, at: [f64; 2]) -> Annotation {
     Annotation { id: sheet.next_annotation_id(), kind: AnnotationKind::note("NOTE", h), position: at, ..Default::default() }
 }
 
-/// How far (screen px) placement inference holds the pointer on another item's x or y: live C11 (a): gone 4 px off.
-const INFER_REACH_PX: f64 = 3.5;
+/// How far (screen px) placement inference holds the pointer on another item's x or y (live2 feel/drawing.json D4: a
+/// note within 7 px of a dimension text's line snaps, 9 doesn't).
+const INFER_REACH_PX: f64 = 8.0;
 
 #[cfg(test)]
 mod note_preview_tests {

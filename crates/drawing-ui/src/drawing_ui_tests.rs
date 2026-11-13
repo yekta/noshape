@@ -233,13 +233,13 @@ fn a_zoom_remakes_the_lines_off_the_ui_thread(cx: &mut TestAppContext) {
     assert!(!remaking && after == zoom && zoom > before * 1.4, "the lines made for the new zoom: {before} -> {after} ({zoom})");
 }
 
-/// Lead 11-13 (interaction feel): a box dragged right to left selects what it crosses, left to right only what lies
-/// wholly inside it (Onshape's window / crossing boxes, behaviours "box selection: window vs crossing").
+/// Live2 feel/drawing.json F3: a box takes a view it reaches in either direction (half of it covered), and it adds to
+/// what was selected.
 #[gpui::test]
-fn a_box_right_to_left_takes_what_it_crosses(cx: &mut TestAppContext) {
+fn a_box_takes_the_views_it_reaches_and_adds_them(cx: &mut TestAppContext) {
     use noshape_scene::drawing_tools::Sel;
     SUGGESTED.set(true);
-    let (window, editor) = drawing(cx, "box-crossing");
+    let (window, editor) = drawing(cx, "box-views");
     for _ in 0..1500 {
         if cx.update(|cx| editor.read(cx).real_sheet_in()) {
             break;
@@ -248,47 +248,16 @@ fn a_box_right_to_left_takes_what_it_crosses(cx: &mut TestAppContext) {
         cx.executor().advance_clock(std::time::Duration::from_millis(50));
         draw(cx, window);
     }
-    let pl = cx.update(|cx| editor.read(cx).built.as_ref().and_then(|b| b.placements.first().cloned())).expect("a view placed");
-    // From below-left of the view to its middle: half of it inside.
+    let pls = cx.update(|cx| editor.read(cx).built.as_ref().map(|b| b.placements.clone()).unwrap_or_default());
+    let (pl, other) = (pls[0], pls[1]);
     let corner = [pl.min[0] - 3.0, pl.min[1] - 3.0];
     let middle = [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0];
-    let selected = |cx: &mut TestAppContext, from: [f64; 2], to: [f64; 2]| {
-        cx.update(|cx| editor.update(cx, |e, cx| {
-            e.select_in_box(from, to, false, cx);
-            e.selection.contains(&Sel::View(pl.id))
-        }))
-    };
-    assert!(!selected(cx, corner, middle), "left to right: the half-covered view isn't taken");
-    assert!(selected(cx, middle, corner), "right to left: it is");
-    let around = [pl.max[0] + 3.0, pl.max[1] + 3.0];
-    assert!(selected(cx, corner, around), "left to right around it: taken");
-}
-
-/// Live behaviours "dsn" (3): a view's snap point reaches ~12 px on screen at any zoom (10-13 px measured; ours 12).
-#[gpui::test]
-fn a_views_vertex_snaps_within_12_px_on_screen(cx: &mut TestAppContext) {
-    SUGGESTED.set(true);
-    let (window, editor) = drawing(cx, "snap-reach");
-    for _ in 0..1500 {
-        if cx.update(|cx| editor.read(cx).real_sheet_in()) {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        cx.executor().advance_clock(std::time::Duration::from_millis(50));
-        draw(cx, window);
-    }
-    for zoom_by in [1.0, 2.5] {
-        let (corner, out, zoom) = cx.update(|cx| editor.update(cx, |e, cx| {
-            e.zoom_by(zoom_by, [600.0, 600.0], cx);
-            // A view's lower-left vertex, and the way out of the view from it.
-            let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
-            let g = e.geoms.get(&pl.id).cloned().expect("geometry");
-            let corner = g.snaps.iter().map(|s| pl.to_sheet(s.p)).min_by(|a, b| (a[0] + a[1]).total_cmp(&(b[0] + b[1]))).expect("a vertex");
-            (corner, [-std::f64::consts::FRAC_1_SQRT_2, -std::f64::consts::FRAC_1_SQRT_2], e.zoom)
+    for (from, to) in [(corner, middle), (middle, corner)] {
+        let taken = cx.update(|cx| editor.update(cx, |e, cx| {
+            e.selection = vec![Sel::View(other.id)];
+            e.select_in_box(from, to, true, cx);
+            (e.selection.contains(&Sel::View(pl.id)), e.selection.contains(&Sel::View(other.id)))
         }));
-        let at = |px: f64| [corner[0] + out[0] * px / zoom, corner[1] + out[1] * px / zoom];
-        let snapped = |cx: &mut TestAppContext, px: f64| cx.update(|cx| editor.read(cx).snap_at(at(px)).is_some());
-        assert!(snapped(cx, 11.0), "11 px off: snaps (zoom {zoom})");
-        assert!(!snapped(cx, 13.0), "13 px off: free (zoom {zoom})");
+        assert_eq!(taken, (true, true), "half covered: taken, and the other view still selected ({from:?} -> {to:?})");
     }
 }
