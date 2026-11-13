@@ -49,8 +49,20 @@ seam (y = 0, below the axis: 7 edges in two pieces, 342/213 edges/vertices vs li
 - Tried, no win: the knife's Fillet 2 fuse through blend_direct (slower, one face too many; patch parked/runon-direct);
   snap-hook's empty sections (above). The knife's Chamfer 1 directly (parked/knife-chamfer1-direct): the chamfer's sides
   only approximate the blade's B-spline faces (0.006 mm), their projected touch curves chain across face 5 but don't
-  close a region with its boundary (one piece, invalid). Next for it: the touch curves made on the faces themselves
-  (the chamfer face's section with each), not projected from the loft's sides.
+  close a region with its boundary (one piece, invalid). Second try (parked/knife-chamfer1-free-tools-wip.patch, switch
+  ZZ_CHAMFER_DIRECT): the tool as the Boolean's (corner out in the air), `blend_direct(.., free_tools)` taking a tool that
+  lies on no face away by its faces' sections with every part face its box meets, each section's chamfer line run 5 %
+  past both faces (so the section crosses them inside the tool's face: at its edges it came in 13 pieces), two free tools
+  end to end adding nothing where their shared section won't trace. It now gets through the sections; left: the blade's
+  two B-spline faces split badly (face 4 not split by its one curve, face 5's three pieces invalid, one of no area), so
+  the shell stays open along the chamfered edge. Face 4 is the blade's 0.25 mm edge face: its one section curve ends
+  0.03 mm and 0.3 mm short of its ends, where each tool ends on a section plane tilted to the face's end edge (the
+  Boolean's sliver end, collapsed after); the end caps' sections with it put no cut there. Next: those cap x face
+  sections (patch parked/knife-chamfer1-free-tools-wip2.patch prints each face's bounds and cuts). wip3: at the
+  x -114.3 end the cap lies in the end face's plane (its section runs along face 4's end edge, rightly dropped); the gap
+  is the chamfer face's own section with face 4, which stops at x -114.14 (0.3 mm short of the cap).
+- Mac (lead 11-13): the model suite takes 12-16 min a side there (build included), vibe7 ~45 min.
+
 ## 11-13 15:20 UTC: cf-snap-hook's empty sections (lead: skip only what boxes and domains prove): not a win, parked
 - The direct build's part-face x blend sections that keep no cut: on snap-hook, knife, rings and faceblend 186 of 226
   pairs; snap-hook's 64 cone x torus pairs alone ~110-160 ms (dev, Mac). Every one of them has tight (AddOptimal) boxes
