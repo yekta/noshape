@@ -2188,8 +2188,12 @@ fn block_part(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<P
     // ✓ once the preview has regenerated (a regeneration without an error makes the dialog dirty).
     wait_until(cx, window, |cx| view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).can_submit()));
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
-    // The commit's regeneration (it waits out a burst's 12 ms first).
-    wait_until(cx, window, |cx| view.read(cx).context.as_ref().is_some_and(|c| !c.bodies.is_empty()));
+    // The commit's regeneration (it waits out a burst's 12 ms first): the preview's context already has the part, so
+    // wait for the consumed sketch to hide too (a loaded land server's box test still saw it).
+    wait_until(cx, window, |cx| {
+        let v = view.read(cx);
+        v.context.as_ref().is_some_and(|c| !c.bodies.is_empty()) && v.display.sketches.iter().all(|s| s.hidden) && v.display.bodies.iter().any(|b| b.kind == noshape_model::display::BodyKind::Solid)
+    });
     // The part's flat faces at its top and bottom.
     let (top, bottom) = cx.update(|cx| {
         let v = view.read(cx);
