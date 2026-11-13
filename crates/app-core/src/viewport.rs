@@ -15,6 +15,7 @@ use gpui_kit::*;
 use glam::{DVec2, DVec3};
 use noshape_render::{Camera, Frame, PickBuffer, PickRect, PresentTexture, Projection, Scene, StandardView, Style, worker::RenderJob};
 use std::collections::{HashMap, VecDeque};
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -341,6 +342,8 @@ pub struct Viewport {
     /// When the press was, and how far the pointer has got from it since (live: a right press orbits from its
     /// first pixel and still opens the menu on release within 4 px and 1 s).
     press_at: Instant,
+    /// The clock the press rules read (a drag's 50 ms, the menu's hold); tests drive it.
+    press_clock: Rc<dyn Fn() -> Instant>,
     press_travel: f64,
     last_pos: DVec2,
     /// The hover was cleared by a fast move before a pick said what is under the pointer.
@@ -652,6 +655,7 @@ impl Viewport {
             drag: Drag::None,
             press_pos: DVec2::ZERO,
             press_at: Instant::now(),
+            press_clock: Rc::new(Instant::now),
             press_travel: 0.0,
             last_pos: DVec2::ZERO,
             hover_unconfirmed: false,
@@ -773,6 +777,15 @@ impl Viewport {
     }
 
     /// Whether a left drag draws a selection box now.
+    /// Drives the press rules' clock (tests: a press held a set time, whatever the machine's load).
+    pub fn set_press_clock(&mut self, clock: impl Fn() -> Instant + 'static) {
+        self.press_clock = Rc::new(clock);
+    }
+
+    fn press_held(&self) -> Duration {
+        (self.press_clock)().saturating_duration_since(self.press_at)
+    }
+
     pub fn box_drag(&self) -> bool {
         self.drag == Drag::Box
     }
@@ -2124,7 +2137,7 @@ impl Viewport {
             return;
         }
         self.press_pos = p;
-        self.press_at = Instant::now();
+        self.press_at = (self.press_clock)();
         self.press_travel = 0.0;
         self.last_pos = p;
         if let Some(id) = self.label_at(p) {
@@ -2217,7 +2230,7 @@ impl Viewport {
         }
         self.press_travel = self.press_travel.max(p.distance(self.press_pos));
         if let Drag::Pending(button) = self.drag
-            && press_becomes_drag(button, self.press_travel, self.press_at.elapsed(), self.ctrl_click_press)
+            && press_becomes_drag(button, self.press_travel, self.press_held(), self.ctrl_click_press)
         {
             // `onDragStart`: what this button + modifier combination does.
             let resolver = ModeResolver::new(MouseControls::current(), nav::Space::ThreeD);
@@ -2314,7 +2327,7 @@ impl Viewport {
         }
         let p = self.local(e.position);
         self.buttons.set(e.button, false);
-        let menu = e.button == MouseButton::Right && right_release_opens_menu(self.press_travel, self.press_at.elapsed());
+        let menu = e.button == MouseButton::Right && right_release_opens_menu(self.press_travel, self.press_held());
         if self.drag == Drag::Nav {
             if self.buttons.any() {
                 self.update_nav_mode(e.modifiers, p);

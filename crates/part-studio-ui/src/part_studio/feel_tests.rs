@@ -205,7 +205,7 @@ fn the_dimension_tool_takes_the_hovered_line(cx: &mut TestAppContext) {
 
 /// Live/feel/3d.json "drag_thresholds" through the real pointer: a right drag orbits from its first pixel and its
 /// release still opens the context menu within 4 px (not from 5); a left press moved 6 px within its first 50 ms is
-/// a click, moved 3 px later a box.
+/// a click, moved 3 px later a box. The press rules read a clock the test sets (T1: no wall-clock time).
 #[gpui::test]
 fn presses_orbit_box_and_open_the_menu_as_live(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -223,27 +223,27 @@ fn presses_orbit_box_and_open_the_menu_as_live(cx: &mut TestAppContext) {
             v.viewport.read(cx).project(c).unwrap()
         });
         pointer.move_to(cx, &view, at);
+        let clock = std::rc::Rc::new(std::cell::Cell::new(std::time::Instant::now()));
+        let c = clock.clone();
+        cx.update(|cx| pointer.vp.update(cx, |vp, _| vp.set_press_clock(move || c.get())));
+        let tick = |ms: u64| clock.set(clock.get() + std::time::Duration::from_millis(ms));
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
-        // (How long the press took: live's menu needs it under 1 s, and a loaded software GPU's frames can stretch it.)
+        // A right press moved `dx` px and released 100 ms later.
         let right = |vcx: &mut gpui_kit::VisualTestContext, dx: f64| {
             let (from, to) = (pointer.window_point(vcx, at), pointer.window_point(vcx, at + DVec2::new(dx, 0.0)));
-            let t = std::time::Instant::now();
             vcx.simulate_mouse_down(from, gpui_kit::MouseButton::Right, Modifiers::default());
+            tick(50);
             vcx.simulate_mouse_move(to, gpui_kit::MouseButton::Right, Modifiers::default());
+            tick(50);
             vcx.simulate_mouse_up(to, gpui_kit::MouseButton::Right, Modifiers::default());
-            t.elapsed()
         };
         for (dx, menu) in [(3.0, true), (4.0, true), (6.0, false)] {
             cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.close_context_menu(cx))).unwrap();
             pointer.frames(cx, &view);
             let before = cx.update(|cx| pointer.vp.read(cx).camera);
-            let held = right(&mut vcx, dx);
+            right(&mut vcx, dx);
             pointer.settle(cx, &view);
             assert_ne!(cx.update(|cx| pointer.vp.read(cx).camera), before, "scale {scale}: a {dx} px right drag orbits");
-            if menu && held >= std::time::Duration::from_millis(900) {
-                eprintln!("feel: scale {scale}, {dx} px: the press took {held:?} here, the menu check skipped");
-                continue;
-            }
             assert_eq!(cx.update(|cx| view.read(cx).context_menu.is_some()), menu, "scale {scale}: the menu after a {dx} px right drag");
         }
         cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.close_context_menu(cx))).unwrap();
@@ -252,7 +252,7 @@ fn presses_orbit_box_and_open_the_menu_as_live(cx: &mut TestAppContext) {
         let left = |vcx: &mut gpui_kit::VisualTestContext, dx: f64, wait: u64| {
             let (from, to) = (pointer.window_point(vcx, at), pointer.window_point(vcx, at + DVec2::new(dx, 0.0)));
             vcx.simulate_mouse_down(from, gpui_kit::MouseButton::Left, Modifiers::default());
-            std::thread::sleep(std::time::Duration::from_millis(wait));
+            tick(wait);
             vcx.simulate_mouse_move(to, gpui_kit::MouseButton::Left, Modifiers::default());
             let boxed = vcx.update(|_, cx| pointer.vp.read(cx).box_drag());
             vcx.simulate_mouse_up(to, gpui_kit::MouseButton::Left, Modifiers::default());
