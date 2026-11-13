@@ -1,0 +1,23 @@
+{
+ "name": "feature-list-new-folder-empty",
+ "about": "Feature list: with nothing selected, New folder then Enter makes an empty 'New folder (0)' above the rollback bar",
+ "area": "psui",
+ "source": "live feel 2026-11-13 (live/feel/featurelist.json): rows with no scenario",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "New folder"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

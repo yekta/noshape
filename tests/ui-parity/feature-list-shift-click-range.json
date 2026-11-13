@@ -1,0 +1,22 @@
+{
+ "name": "feature-list-shift-click-range",
+ "about": "Feature list: click Sketch 1, Shift+click Fillet 1: every row from the anchor to Fillet 1 is selected",
+ "area": "psui",
+ "source": "live feel 2026-11-13 (live/feel/featurelist.json): rows with no scenario",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Fillet 1"
+   },
+   "mods": "shift"
+  }
+ ]
+}

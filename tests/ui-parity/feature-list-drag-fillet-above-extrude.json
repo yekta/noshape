@@ -1,0 +1,30 @@
+{
+ "name": "feature-list-drag-fillet-above-extrude",
+ "about": "Feature list: drag Fillet 1 onto Sketch 1's row (drops after Sketch 1, above Extrude 1): live moves it and it fails (no refusal, no message); undo restores",
+ "area": "psui",
+ "source": "live feel 2026-11-13 (live/feel/featurelist.json): rows with no scenario",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "feature": "Fillet 1"
+   },
+   "to": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

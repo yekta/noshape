@@ -1,0 +1,27 @@
+{
+ "name": "feature-list-click-toggles",
+ "about": "Feature list: a plain click adds the row (Extrude 1, then Fillet 1: both selected); clicking Extrude 1 again removes it",
+ "area": "psui",
+ "source": "live feel 2026-11-13 (live/feel/featurelist.json): rows with no scenario",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Fillet 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  }
+ ]
+}

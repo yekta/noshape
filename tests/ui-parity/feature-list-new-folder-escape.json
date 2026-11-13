@@ -1,0 +1,25 @@
+{
+ "name": "feature-list-new-folder-escape",
+ "about": "Feature list: select Fillet 1, New folder: the 'Folder name' popover opens with 'New folder' selected; Escape cancels (no folder)",
+ "area": "psui",
+ "source": "live feel 2026-11-13 (live/feel/featurelist.json): rows with no scenario",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Fillet 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "New folder"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
