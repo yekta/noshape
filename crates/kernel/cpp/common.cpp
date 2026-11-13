@@ -1,6 +1,7 @@
 // Shapes, lists, topology exploration, validation and history building.
 #include <Geom2d_Line.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
+#include <Geom_BSplineSurface.hxx>
 #include <numeric>
 #include "internal.hpp"
 #include <BRepBuilderAPI_MakeVertex.hxx>
@@ -1469,6 +1470,56 @@ double props_eps(double eps)
   return t_props_coarse ? eps * 1e3 : eps;
 }
 
+// Whether forward face `f` is bounded by its parameter box [u0, u1] × [v0, v1] alone: one wire, every edge's curve on
+// the face running along one of the box's sides (a B-spline patch as a STEP or IGES writer, a loft or a sweep leaves
+// it), no gaps.
+bool bounded_by_its_box(const TopoDS_Face& f, double u0, double u1, double v0, double v1)
+{
+  int wires = 0;
+  for (TopExp_Explorer w(f, TopAbs_WIRE); w.More(); w.Next())
+    ++wires;
+  if (wires != 1)
+    return false;
+  const double eu = 1e-6 * std::abs(u1 - u0), ev = 1e-6 * std::abs(v1 - v0);
+  for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
+  {
+    double                          a, b;
+    const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(TopoDS::Edge(ee.Current()), f, a, b);
+    if (c.IsNull())
+      return false;
+    bool on[4] = {true, true, true, true};
+    for (int k = 0; k <= 4; ++k)
+    {
+      const gp_Pnt2d q = c->Value(a + (b - a) * k / 4);
+      on[0] = on[0] && std::abs(q.X() - u0) < eu, on[1] = on[1] && std::abs(q.X() - u1) < eu;
+      on[2] = on[2] && std::abs(q.Y() - v0) < ev, on[3] = on[3] && std::abs(q.Y() - v1) < ev;
+    }
+    if (!on[0] && !on[1] && !on[2] && !on[3])
+      return false;
+  }
+  return uv_gaps(f).empty();
+}
+
+// [a, b] cut at the knots inside it and into pieces of at most `step`.
+std::vector<double> pieces(double a, double b, const std::vector<double>& knots, double step)
+{
+  std::vector<double> cuts{a};
+  for (double k : knots)
+    if (k > a + 1e-12 * std::max(1.0, std::abs(b - a)) && k < b - 1e-12 * std::max(1.0, std::abs(b - a)))
+      cuts.push_back(k);
+  cuts.push_back(b);
+  std::sort(cuts.begin(), cuts.end());
+  cuts.erase(std::unique(cuts.begin(), cuts.end()), cuts.end());
+  std::vector<double> out{a};
+  for (size_t i = 0; i + 1 < cuts.size(); ++i)
+  {
+    const int n = segments(cuts[i + 1] - cuts[i], step);
+    for (int k = 1; k <= n; ++k)
+      out.push_back(cuts[i] + (cuts[i + 1] - cuts[i]) * k / n);
+  }
+  return out;
+}
+
 Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_XYZ())
 {
   const TopoDS_Face   f = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
@@ -1501,6 +1552,55 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
     }
     return out;
   };
+  // A B-surface bounded by its parameter box (not periodic): the double integral over the box, split at every knot
+  // both ways (the integrand is smooth within a span), 4 or 8 points a piece. Exact to the knots where Green's line
+  // integral runs 8 points across many (live.igs' cf-spur-gear flanks: 45 C2 knots, 0.4 % short), and fewer
+  // evaluations.
+  if ((s.GetType() == GeomAbs_BSplineSurface || s.GetType() == GeomAbs_BezierSurface) && !uper && !vper && bounded_by_its_box(f, u0, u1, v0, v1))
+  {
+    std::vector<double> uk, vk;
+    if (s.GetType() == GeomAbs_BSplineSurface)
+    {
+      const occ::handle<Geom_BSplineSurface> b = s.BSpline();
+      for (int i = 1; i <= b->NbUKnots(); ++i)
+        uk.push_back(b->UKnot(i));
+      for (int i = 1; i <= b->NbVKnots(); ++i)
+        vk.push_back(b->VKnot(i));
+    }
+    constexpr double kX4[4] = {-0.8611363115940526, -0.3399810435848563, 0.3399810435848563, 0.8611363115940526};
+    constexpr double kW4[4] = {0.3478548451374538, 0.6521451548625461, 0.6521451548625461, 0.3478548451374538};
+    // (4 points a piece for a polynomial of degree 3 or less, as most spans are; 8 for higher degrees and rational
+    // surfaces: cf-hose-routing's degree-12 walls, cf-wave-spring's rational sweep.)
+    const bool   rational = s.GetType() == GeomAbs_BSplineSurface && (s.IsURational() || s.IsVRational());
+    const bool   fine_u = rational || s.UDegree() > 3, fine_v = rational || s.VDegree() > 3;
+    const int    nu = fine_u ? 8 : 4, nv = fine_v ? 8 : 4;
+    const double* xu = fine_u ? kGaussX : kX4;
+    const double* wu = fine_u ? kGaussW : kW4;
+    const double* xv = fine_v ? kGaussX : kX4;
+    const double* wv = fine_v ? kGaussW : kW4;
+    const std::vector<double> us = pieces(u0, u1, uk, ust), vs = pieces(v0, v1, vk, vst);
+    Moments box{};
+    for (size_t i = 0; i + 1 < us.size(); ++i)
+      for (size_t j = 0; j + 1 < vs.size(); ++j)
+      {
+        const double hu = us[i + 1] - us[i], hv = vs[j + 1] - vs[j];
+        for (int a = 0; a < nu; ++a)
+          for (int b = 0; b < nv; ++b)
+          {
+            Moments g;
+            integrand(s, us[i] + hu * (xu[a] + 1) / 2, vs[j] + hv * (xv[b] + 1) / 2, volume, o, g);
+            for (int m = 0; m < 10; ++m)
+              box[(size_t)m] += g[(size_t)m] * wu[a] * wv[b] * hu * hv / 4;
+          }
+      }
+    if (volume && face.Orientation() == TopAbs_REVERSED)
+      for (double& m : box)
+        m = -m;
+    if (!volume && box[0] < 0)
+      for (double& m : box)
+        m = -m;
+    return box;
+  }
   Moments total{};
   for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
   {

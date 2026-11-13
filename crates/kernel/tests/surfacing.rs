@@ -438,3 +438,18 @@ fn a_g1_fill_of_a_setback_corner_bends_least_inside_its_boundary() {
     let a = area(&r) * 1e6;
     assert!((a - 26.0706).abs() < 0.05, "{a} mm², live 26.0706");
 }
+
+/// A B-surface bounded by its parameter box with dense C2 knots (live.igs' cf-spur-gear flanks: cubic, 45 knots; ours
+/// read each 0.4 % short): its area as its fine mesh's.
+#[test]
+fn a_bsurface_with_dense_knots_integrates_to_its_area() {
+    let (nx, ny) = (61, 4);
+    let mm = 1e-3;
+    let heights: Vec<f64> = (0..nx).flat_map(|i| (0..ny).map(move |j| 2.0 * mm * (i as f64 * 0.7).sin() + 0.3 * mm * j as f64)).collect();
+    let face = bspline_surface_from_grid(&Plane::from_normal(DVec3::ZERO, DVec3::Z), 0.0, mm, 0.0, 3.0 * mm, &heights, nx, ny, 3, 1e-9).unwrap();
+    let area = surface_properties(&face).unwrap().mass;
+    let m = tessellate(&face, 1e-9, 0.02, false).unwrap();
+    let p = |i: u32| DVec3::from(m.positions[i as usize].map(f64::from));
+    let mesh: f64 = m.indices.chunks(3).map(|t| (p(t[1]) - p(t[0])).cross(p(t[2]) - p(t[0])).length() / 2.0).sum();
+    assert!((area - mesh).abs() < 2e-5 * mesh, "area {} mm², its mesh's {}", area / (mm * mm), mesh / (mm * mm));
+}
