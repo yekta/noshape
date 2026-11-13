@@ -3,7 +3,7 @@
 //! NOT_UNDOABLE_PREFIXES).
 
 use crate::doc_model::DocModel;
-use crate::tab_manager::{TabManager, TmDrag};
+use crate::tab_manager::{TabManager, TmDrag, TmDrop, tm_zone};
 use gpui_kit::{AppContext as _, Bounds, Entity, Point, TestAppContext, WeakEntity, WindowBounds, WindowOptions, px, size};
 use noshape_model::document::TabId;
 use noshape_ops::{Ctx, registry};
@@ -58,10 +58,39 @@ fn manager(cx: &mut TestAppContext, name: &str) -> (Entity<DocModel>, Entity<Tab
     (doc, tm.unwrap(), ids, folder)
 }
 
+fn drag(ids: Vec<TabId>) -> TmDrag {
+    TmDrag { label: format!("{} items", ids.len()), ids, offset: Point::default() }
+}
+
+/// Live2 (feel/documents.json `folderRowDropZones`, rows ~53 px): over a folder row, the top third drops above it
+/// (to 12–18 px below its top), the middle into it (to 32–36 px), the rest below it; a tab row by its halves.
+#[test]
+fn a_folder_row_takes_drops_in_its_middle_third() {
+    let h = 54.;
+    assert_eq!(tm_zone(true, 11., h), TmDrop::Before);
+    assert_eq!(tm_zone(true, 19., h), TmDrop::Into);
+    assert_eq!(tm_zone(true, 31., h), TmDrop::Into);
+    assert_eq!(tm_zone(true, 37., h), TmDrop::After);
+    assert_eq!(tm_zone(false, 26., h), TmDrop::Before);
+    assert_eq!(tm_zone(false, 28., h), TmDrop::After);
+}
+
+#[gpui::test]
+fn rows_dropped_beside_a_folder_land_before_or_after_it(cx: &mut TestAppContext) {
+    let (doc, tm, [_, a, _, _], folder) = manager(cx, "beside-folder");
+    let at = |cx: &mut TestAppContext, t: TabId| doc.read_with(cx, |d, _| d.session.doc.children(None).iter().position(|x| *x == t).unwrap());
+    tm.update(cx, |t, cx| {
+        t.drop_at = Some((folder, TmDrop::Before));
+        t.drop_by_row(&drag(vec![a]), folder, cx);
+    });
+    assert_eq!(at(cx, a) + 1, at(cx, folder), "A right before the folder");
+    assert_eq!(doc.read_with(cx, |d, _| d.session.doc.parent_of(a)), None, "and not in it");
+}
+
 #[gpui::test]
 fn rows_dropped_on_a_folder_go_into_it(cx: &mut TestAppContext) {
     let (doc, tm, [_, a, b, _], folder) = manager(cx, "into-folder");
-    let drag = TmDrag { ids: vec![a, b], label: "2 items".into() };
+    let drag = drag(vec![a, b]);
     tm.update(cx, |t, cx| t.drop_into_folder(&drag, folder, cx));
     let parents = |cx: &mut TestAppContext| doc.read_with(cx, |d, _| [a, b].map(|t| d.session.doc.parent_of(t)));
     assert_eq!(parents(cx), [Some(folder); 2], "both in the folder");
@@ -75,18 +104,18 @@ fn rows_dropped_on_a_tab_row_land_before_or_after_it(cx: &mut TestAppContext) {
     let at = |cx: &mut TestAppContext, t: TabId| doc.read_with(cx, |d, _| d.session.doc.children(None).iter().position(|x| *x == t).unwrap());
     // C onto A's upper half: just before A.
     tm.update(cx, |t, cx| {
-        t.drop_at = Some((a, false));
-        t.drop_by_row(&TmDrag { ids: vec![c], label: "C".into() }, a, cx);
+        t.drop_at = Some((a, TmDrop::Before));
+        t.drop_by_row(&drag(vec![c]), a, cx);
     });
     assert_eq!(at(cx, c) + 1, at(cx, a), "C right before A");
     // The first tab onto B's lower half: just after B.
     tm.update(cx, |t, cx| {
-        t.drop_at = Some((b, true));
-        t.drop_by_row(&TmDrag { ids: vec![first], label: "first".into() }, b, cx);
+        t.drop_at = Some((b, TmDrop::After));
+        t.drop_by_row(&drag(vec![first]), b, cx);
     });
     assert_eq!(at(cx, b) + 1, at(cx, first), "the first tab right after B");
     // A row dropped on itself stays.
     let before = at(cx, a);
-    tm.update(cx, |t, cx| t.drop_by_row(&TmDrag { ids: vec![a], label: "A".into() }, a, cx));
+    tm.update(cx, |t, cx| t.drop_by_row(&drag(vec![a]), a, cx));
     assert_eq!(at(cx, a), before);
 }

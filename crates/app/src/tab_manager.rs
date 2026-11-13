@@ -78,17 +78,73 @@ struct Thumbs {
 pub(crate) struct TmDrag {
     pub(crate) ids: Vec<TabId>,
     pub(crate) label: String,
+    /// Where the row was grabbed (the ghost is drawn from the pointer).
+    pub(crate) offset: Point<Pixels>,
 }
 
 impl Render for TmDrag {
+    /// Live2 (feel/documents.json `tabManager.ghost`, tm-thr-6): a dark-blue pill with the name (or "N items") in white
+    /// bold, below and right of the pointer.
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let pal = p();
-        div().px(px(10.)).h(px(30.)).flex().items_center().rounded(px(3.)).bg(rgb(0xffffff)).border_1().border_color(rgb(0xcccccc)).shadow_md().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(self.label.clone()))
+        div().pl(self.offset.x + px(TM_GHOST_DX)).pt(self.offset.y + px(TM_GHOST_DY)).child(
+            div().px(px(12.)).h(px(24.)).flex().items_center().rounded_full().bg(rgb(TM_DROP_LINE)).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child(crate::ui::user_text(self.label.clone())),
+        )
     }
 }
 
-/// The insertion line where dragged rows land (live's Sheets panel: 2 px rgb(27,95,170)).
-const TM_DROP_LINE: u32 = 0x1b5faa;
+/// The ghost's top-left from the pointer (live2 tmz-dy0: ~27 px below it, right of it).
+const TM_GHOST_DX: f32 = 30.;
+const TM_GHOST_DY: f32 = 26.;
+
+/// How far a row moves before it drags (live2 tabManager.dragStartPx: 5 px is a click, 6 a drag).
+pub(crate) const TM_DRAG_PX: f32 = 5.;
+
+/// The insertion line and the folder outline where dragged rows land (live2 tm-between-rows: ~2 px, dark blue).
+const TM_DROP_LINE: u32 = 0x1651b0;
+
+/// Where dragged rows land on a row (live2 feel/documents.json `tabManager`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum TmDrop {
+    Before,
+    Into,
+    After,
+}
+
+/// The zone of a row `h` px high that the pointer is `dy` px below the top of: a tab row's halves; a folder row's
+/// thirds, the middle one into the folder (live2 `folderRowDropZones`: above → into 12–18 px below a 53 px row's top,
+/// into → below 32–36 px).
+pub(crate) fn tm_zone(folder: bool, dy: f32, h: f32) -> TmDrop {
+    match folder {
+        true if dy < h * 15. / 54. => TmDrop::Before,
+        true if dy < h * 34. / 54. => TmDrop::Into,
+        true => TmDrop::After,
+        false if dy < h / 2. => TmDrop::Before,
+        false => TmDrop::After,
+    }
+}
+
+/// A row's drag starting: the pressed row is selected (live2 tabManager.ghost), the ghost drawn from the pointer.
+fn start_tm_drag(view: WeakEntity<TabManager>, id: TabId) -> impl Fn(&TmDrag, Point<Pixels>, &mut Window, &mut App) -> Entity<TmDrag> {
+    move |d, offset, _, cx| {
+        let _ = view.update(cx, |t, cx| {
+            if !t.multi.contains(&id) && !t.doc.read(cx).session.doc.is_folder(id) {
+                t.multi.clear();
+                t.selected = Some(id);
+            }
+            cx.notify();
+        });
+        let mut ghost = d.clone();
+        ghost.offset = offset;
+        cx.new(|_| ghost)
+    }
+}
+
+/// The insertion line (2 px, a small ring at its left end, live2 tm-between-rows) at the top or bottom of a row.
+fn tm_drop_line(after: bool) -> AnyElement {
+    let ring = div().absolute().left(px(-1.)).top(px(-3.)).size(px(8.)).rounded_full().border_1().border_color(rgb(TM_DROP_LINE)).bg(rgb(0xffffff));
+    let line = div().absolute().left_0().right_0().h(px(2.)).bg(rgb(TM_DROP_LINE)).child(ring);
+    if after { line.bottom(px(-1.)) } else { line.top(px(-1.)) }.into_any_element()
+}
 
 pub struct TabManager {
     doc: Entity<DocModel>,
@@ -104,7 +160,7 @@ pub struct TabManager {
     /// Ctrl+click selection (tabs and folders).
     multi: Vec<TabId>,
     /// While rows are dragged: the tab row under the pointer and whether they'd land after it.
-    pub(crate) drop_at: Option<(TabId, bool)>,
+    pub(crate) drop_at: Option<(TabId, TmDrop)>,
     collapsed: HashSet<TabId>,
     /// Folder being renamed in place.
     renaming: Option<(TabId, Entity<InputState>, Subscription)>,
@@ -231,7 +287,7 @@ impl TabManager {
     fn drag_of(&self, id: TabId, name: &str) -> TmDrag {
         let ids = self.targets(id);
         let label = if ids.len() > 1 { format!("{} items", ids.len()) } else { name.to_string() };
-        TmDrag { ids, label }
+        TmDrag { ids, label, offset: Point::default() }
     }
 
     /// Dragged rows dropped on folder `folder`: moved into it (as the tab bar's drop on a folder).
@@ -257,7 +313,7 @@ impl TabManager {
             cx.notify();
             return;
         }
-        let after = at.is_some_and(|(t, after)| t == target && after);
+        let after = at == Some((target, TmDrop::After));
         self.doc.update(cx, |doc, cx| {
             let d = &doc.session.doc;
             let parent = d.parent_of(target);
@@ -275,6 +331,18 @@ impl TabManager {
             });
         });
         cx.notify();
+    }
+
+    /// Dragged rows over row `id`: the zone under the pointer (a folder's thirds, a tab's halves).
+    fn drag_over_row(&mut self, id: TabId, folder: bool, e: &DragMoveEvent<TmDrag>, cx: &mut Context<Self>) {
+        if !e.bounds.contains(&e.event.position) {
+            return;
+        }
+        let at = Some((id, tm_zone(folder, f32::from(e.event.position.y - e.bounds.top()), f32::from(e.bounds.size.height))));
+        if self.drop_at != at {
+            self.drop_at = at;
+            cx.notify();
+        }
     }
 
     fn add_to_new_folder(&mut self, ids: Vec<TabId>, window: &mut Window, cx: &mut Context<Self>) {
@@ -330,24 +398,42 @@ impl TabManager {
         let open = !self.collapsed.contains(&id);
         let picked = self.multi.contains(&id);
         let view = cx.entity();
+        let compact = self.compact;
+        let zone = self.drop_at.filter(|(t, _)| *t == id).map(|(_, z)| z);
+        let name_el = match self.renaming.as_ref().filter(|r| r.0 == id) {
+            Some((_, st, _)) => div().w(px(200.)).child(Input::new(st).h(px(26.)).text_size(px(14.))).into_any_element(),
+            None => h_flex().gap(px(4.)).min_w_0().text_size(px(14.)).text_color(pal.text).child(os::glyph(os::GLYPH_FOLDER, 20., pal.text)).child(div().truncate().child(crate::ui::user_text(name.clone()))).into_any_element(),
+        };
+        // Live2 (tm-between-rows, tm-onto-folder-row): a folder row is a tab row (picture, name, "Folder") with its
+        // chevron in the indent.
         h_flex()
             .id(SharedString::from(format!("tm-f-{id}")))
+            .relative()
             .map(|d| noshape_app_core::ui_script::mark(d, || format!("panel_row:{name}")))
-            .h(px(40.))
+            .h(px(if compact { 30. } else { 54. }))
             .flex_none()
-            .pl(px(8. + depth as f32 * 20.))
-            .gap(px(6.))
+            .pl(px(if compact { 16. } else { 22. } + depth as f32 * 20.))
             .cursor_pointer()
             .when(picked, |d| d.bg(pal.accent_soft))
-            .when(!picked, |d| d.hover(|d| d.bg(pal.panel_hover)))
-            .on_drag(self.drag_of(id, &name), |d, _, _, cx| cx.new(|_| d.clone()))
-            .drag_over::<TmDrag>(|st, _, _, _| st.bg(rgb(0xdef1fb)))
-            .on_drop(cx.listener(move |this, drag: &TmDrag, _, cx| this.drop_into_folder(drag, id, cx)))
-            .child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 14., pal.text))
-            .child(os::glyph(os::GLYPH_FOLDER, 24., pal.text))
-            .child(match self.renaming.as_ref().filter(|r| r.0 == id) {
-                Some((_, st, _)) => div().w(px(200.)).child(Input::new(st).h(px(26.)).text_size(px(14.))).into_any_element(),
-                None => div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(name)).into_any_element(),
+            .when(!picked && zone != Some(TmDrop::Into), |d| d.hover(|d| d.bg(pal.panel_hover)))
+            .child(div().absolute().top_0().bottom_0().left(px(2. + depth as f32 * 20.)).flex().items_center().child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 14., pal.text)))
+            .drag_threshold(TM_DRAG_PX)
+            .on_drag(self.drag_of(id, &name), start_tm_drag(cx.entity().downgrade(), id))
+            .when(cx.has_active_drag(), |d| d.on_drag_move::<TmDrag>(cx.listener(move |this, e: &DragMoveEvent<TmDrag>, _, cx| this.drag_over_row(id, true, e, cx))))
+            // Into: a light-blue fill, a dark-blue 1 px frame and a » at the left edge (live2 tm-onto-folder-row).
+            .when(zone == Some(TmDrop::Into), |d| {
+                d.bg(rgb(0xdef1fb)).border_1().border_color(rgb(TM_DROP_LINE)).child(div().absolute().left(px(1.)).top_0().bottom_0().flex().items_center().text_size(px(13.)).text_color(rgb(TM_DROP_LINE)).child("»"))
+            })
+            .when_some(zone.filter(|z| *z != TmDrop::Into), |d, z| d.child(tm_drop_line(z == TmDrop::After)))
+            .on_drop(cx.listener(move |this, drag: &TmDrag, _, cx| match this.drop_at {
+                Some((t, TmDrop::Into)) if t == id => this.drop_into_folder(drag, id, cx),
+                _ => this.drop_by_row(drag, id, cx),
+            }))
+            .map(|d| match compact {
+                true => d.gap(px(6.)).child(name_el),
+                false => d
+                    .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(os::glyph(os::GLYPH_FOLDER, 30., pal.text)))
+                    .child(v_flex().pl(px(7.)).flex_1().min_w_0().child(h_flex().h(px(21.)).child(name_el)).child(div().h(px(19.)).text_size(px(12.6)).line_height(px(18.9)).italic().text_color(pal.text_muted).child("Folder"))),
             })
             .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                 if e.modifiers().secondary() {
@@ -523,22 +609,11 @@ impl Render for TabManager {
                         )
                     })
                     .tooltip(crate::ui::tooltip(format!("Click to navigate to {name}")))
-                    .on_drag(self.drag_of(id, name), |d, _, _, cx| cx.new(|_| d.clone()))
+                    .drag_threshold(TM_DRAG_PX)
+                    .on_drag(self.drag_of(id, name), start_tm_drag(cx.entity().downgrade(), id))
                     .when(tree && cx.has_active_drag(), |d| {
-                        d.on_drag_move::<TmDrag>(cx.listener(move |this, e: &DragMoveEvent<TmDrag>, _, cx| {
-                            if !e.bounds.contains(&e.event.position) {
-                                return;
-                            }
-                            let at = Some((id, e.event.position.y > e.bounds.center().y));
-                            if this.drop_at != at {
-                                this.drop_at = at;
-                                cx.notify();
-                            }
-                        }))
-                        .when_some(self.drop_at.filter(|(t, _)| *t == id), |d, (_, after)| {
-                            let line = div().absolute().left_0().right_0().h(px(2.)).bg(rgb(TM_DROP_LINE));
-                            d.child(if after { line.bottom_0() } else { line.top_0() })
-                        })
+                        d.on_drag_move::<TmDrag>(cx.listener(move |this, e: &DragMoveEvent<TmDrag>, _, cx| this.drag_over_row(id, false, e, cx)))
+                            .when_some(self.drop_at.filter(|(t, _)| *t == id), |d, (_, at)| d.child(tm_drop_line(at == TmDrop::After)))
                     })
                     .on_drop(cx.listener(move |this, drag: &TmDrag, _, cx| this.drop_by_row(drag, id, cx)))
                     .on_click(cx.listener(move |this, e: &ClickEvent, _, cx| {
@@ -616,7 +691,13 @@ impl Render for TabManager {
             .id("tab-manager")
             .size_full()
             .bg(pal.panel)
-            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, _, cx| match ev.keystroke.key.as_str() {
+            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| match ev.keystroke.key.as_str() {
+                // Live2 (tabManager.escapeCancels): Esc during a row drag cancels it.
+                "escape" if cx.has_active_drag() => {
+                    cx.stop_active_drag(window);
+                    this.drop_at = None;
+                    cx.notify();
+                }
                 // Live ("spec: psui part-studio.md … 1.27 Alt+T"): Esc does not
                 // close it; Alt+T again or its ✕ does.
                 "down" => this.step(1, cx),
