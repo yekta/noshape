@@ -680,6 +680,7 @@ pub(crate) mod ffi {
             radii: &[f64],
             checked: bool,
         ) -> Result<OpOut>;
+        fn op_fillet_variable_edges(s: &OcShape, edges: &OcShapeList, counts: &[u32], params: &[f64], radii: &[f64], checked: bool) -> Result<OpOut>;
         fn op_chamfer(
             s: &OcShape,
             edges: &OcShapeList,

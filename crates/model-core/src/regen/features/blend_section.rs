@@ -142,6 +142,22 @@ struct ChainEdge {
 /// Order the edges as one chain from the end with the smallest (x, y, z)
 /// (Onshape's position 0 on a block's edge is its end nearest the origin).
 /// Edges that don't form one chain keep their order, each its own piece.
+/// An edge of a run (see [`chain_runs`]): its index, start, end, length, and whether it runs along its own parameter.
+pub(super) type RunEdge = (usize, DVec3, DVec3, f64, bool);
+
+/// `edges` as runs of connected edges, each from its own free end, in the run's order.
+pub(super) fn chain_runs(shape: &Shape, edges: &[usize]) -> FResult<Vec<Vec<RunEdge>>> {
+    let mut runs: Vec<Vec<RunEdge>> = Vec::new();
+    for c in chain_ordered(shape, edges, true)? {
+        let joined = runs.last().and_then(|r| r.last()).is_some_and(|l| (l.2 - c.start).length() < 1e-9);
+        if !joined {
+            runs.push(Vec::new());
+        }
+        runs.last_mut().expect("a run").push((c.index, c.start, c.end, c.length, c.forward));
+    }
+    Ok(runs)
+}
+
 fn chain(shape: &Shape, edges: &[usize]) -> FResult<Vec<ChainEdge>> {
     chain_ordered(shape, edges, false)
 }

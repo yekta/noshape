@@ -8297,6 +8297,86 @@ OpOut op_fillet_variable(const OcShape& s, const OcShape& edge, rust::Slice<cons
   return out;
 }
 
+// A variable fillet of several edges in one build, each with its own law (parameters from the edge's curve's first to
+// last, in [0, 1]): each set on its edge of OCCT's contour, turned round where the contour runs the edge backwards. The
+// edges of a tangent chain are one contour (OCCT runs a fillet on along tangent edges): edge by edge, the later ones
+// were gone and the first's law the whole fillet's (c2-hunting-knife's Fillet 7).
+OpOut op_fillet_variable_edges(const OcShape& s, const OcShapeList& edges_in, rust::Slice<const uint32_t> counts,
+                               rust::Slice<const double> params, rust::Slice<const double> radii, bool checked)
+{
+  require_non_null(s.shape, "shape");
+  const std::vector<TopoDS_Shape> edges = to_vec(edges_in);
+  if (edges.empty() || counts.size() != edges.size() || params.size() != radii.size())
+    fail_invalid("one law per edge");
+  std::vector<std::vector<std::pair<double, double>>> laws;
+  size_t at = 0;
+  double rmax = 0;
+  for (const uint32_t n : counts)
+  {
+    if (n < 2 || at + n > params.size())
+      fail_invalid("variable fillet needs >= 2 (parameter, radius) pairs an edge");
+    std::vector<std::pair<double, double>> law;
+    for (size_t i = at; i < at + n; ++i)
+    {
+      if (!(radii[i] > 1e-9))
+        fail_invalid("fillet radius must be positive");
+      law.emplace_back(params[i], radii[i]);
+      rmax = std::max(rmax, radii[i]);
+    }
+    laws.push_back(law);
+    at += n;
+  }
+  BRepBuilderAPI_Copy copy(s.shape, true, false);
+  const TopoDS_Shape  in = copy.Shape();
+  carry_kept_marks(s.shape, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{copy.ModifiedShape(x)}; });
+  std::vector<TopoDS_Edge> es;
+  for (const TopoDS_Shape& e : edges)
+    es.push_back(TopoDS::Edge(copy.ModifiedShape(first_adjacent_face_edge_check(s.shape, e, "fillet edge"))));
+  OpOut     out;
+  const int r = run_budgeted(blend_budget_seconds(), [&] {
+    out = scaled_blend(in, checked, rmax, "variable fillet", [&](const Scaled& sc) -> BlendBuild {
+      return [&sc, &es, &laws](double scale, TopoDS_Shape& res, HHist& h) {
+        BRepFilletAPI_MakeFillet mk(sc.shape);
+        for (size_t i = 0; i < es.size(); ++i)
+        {
+          const TopoDS_Edge e = TopoDS::Edge(sc.image(es[i]));
+          if (mk.Contour(e) == 0)
+            mk.Add(e);
+          const int ic = mk.Contour(e);
+          int       j  = 0;
+          for (int k = 1; ic > 0 && k <= mk.NbEdges(ic); ++k)
+            if (mk.Edge(ic, k).IsSame(e))
+              j = k;
+          if (ic == 0 || j == 0)
+            return false;
+          const bool                   back = mk.Edge(ic, j).Orientation() == TopAbs_REVERSED;
+          const auto&                  law  = laws[i];
+          const int                    n    = (int)law.size();
+          NCollection_Array1<gp_Pnt2d> ur(1, n);
+          for (int k = 0; k < n; ++k)
+          {
+            const auto& [u, rr] = law[(size_t)(back ? n - 1 - k : k)];
+            ur(k + 1)           = gp_Pnt2d(back ? 1.0 - u : u, rr * scale * sc.factor);
+          }
+          mk.SetRadius(ur, ic, j);
+        }
+        mk.Build();
+        if (!mk.IsDone())
+          return false;
+        res = mk.Shape();
+        h   = history_of({sc.shape}, mk);
+        return true;
+      };
+    });
+  });
+  if (r == 1)
+    fail_op("fillet variable took too long");
+  if (r == 2)
+    fail_op("cancelled");
+  return out;
+}
+
+
 namespace {
 
 // A rational quadratic arc: poles and weights.

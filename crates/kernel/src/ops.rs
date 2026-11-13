@@ -649,6 +649,15 @@ pub fn fillet_variable_checked(shape: &Shape, edge: &Shape, law: &[(f64, f64)]) 
     recorded(|| Blend::FilletVariable { law: law.to_vec() }, true, shape, std::slice::from_ref(edge), &[], || op(ffi::op_fillet_variable(shape.raw(), edge.raw(), &params, &radii, true)))
 }
 
+/// [`fillet_variable_checked`] of several edges in one build (a tangent chain is one contour of OCCT's), each with its own
+/// law: (parameter fraction from its curve's first to last parameter, radius).
+pub fn fillet_variable_edges_checked(shape: &Shape, edges: &[Shape], laws: &[Vec<(f64, f64)>]) -> Result<OpResult> {
+    let counts: Vec<u32> = laws.iter().map(|l| l.len() as u32).collect();
+    let params: Vec<f64> = laws.iter().flatten().map(|p| p.0).collect();
+    let radii: Vec<f64> = laws.iter().flatten().map(|p| p.1).collect();
+    op(ffi::op_fillet_variable_edges(shape.raw(), &vec_to_list(edges), &counts, &params, &radii, true))
+}
+
 /// Chamfer specification.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ChamferSpec {

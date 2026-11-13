@@ -788,6 +788,9 @@ fn sharp_of_picked_faces(ev: &EvalCtx, refs: &[crate::reference::Reference]) -> 
     ev.resolve_edges(refs).into_iter().filter(|&(bi, ei)| picked.contains(&(bi, ei)) || !is_smooth(bi, ei)).collect()
 }
 
+/// An edge (by name) and its variable law.
+type EdgeLaw = (Name, Vec<(f64, f64)>);
+
 /// A variable fillet; false where it comes to the constant fillet (every radius the default: live 2325 A's plain
 /// cylinder), left to the caller.
 fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<bool> {
@@ -883,8 +886,56 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<bool> {
             }
             ev.ctx.bodies[bi] = body.clone();
         }
-        let names: Vec<Name> = edges.iter().map(|&e| body.edges[e].clone()).collect();
+        // A run of several edges (tangent, one contour of OCCT's, which runs a fillet on along it): every edge's law set in
+        // one build (c2-hunting-knife's Fillet 7: edge by edge, the first's fillet took the whole run with only its own
+        // law, lopsided, and the other edges were gone).
+        let runs = super::blend_section::chain_runs(&body.shape, &edges)?;
+        let mut singles: Vec<usize> = Vec::new();
+        let mut multi: Vec<Vec<super::blend_section::RunEdge>> = Vec::new();
+        for run in runs {
+            let closed = run.len() > 1 && (run[0].1 - run[run.len() - 1].2).length() < 1e-9;
+            if run.len() > 1 && !closed {
+                multi.push(run);
+            } else {
+                singles.extend(run.iter().map(|r| r.0));
+            }
+        }
+        // Each edge's law from its curve's first point to its last, every edge of a run set in one build.
+        let mut run_laws: Vec<Vec<EdgeLaw>> = Vec::new();
+        for run in &multi {
+            let mut laws_of_run = Vec::new();
+            for &(e, ..) in run {
+                let edge = body.shape.sub_shape(ShapeType::Edge, e)?;
+                let info = edge.edge_info()?;
+                let (p0, p1) = (edge.point_at(info.first_param)?, edge.point_at(info.last_param)?);
+                let name = body.edges[e].clone();
+                let key = |p: glam::DVec3| (p.x, p.y, p.z);
+                // (Onshape's position 0 is the end nearest the origin corner, lowest x, y, z.)
+                let low_first = key(p0).partial_cmp(&key(p1)) != Some(std::cmp::Ordering::Greater);
+                let mut points: Vec<(f64, f64)> = on_edge.iter().filter(|(n, _, _)| *n == name).map(|(_, t, r)| (if low_first { *t } else { 1.0 - *t }, *r)).collect();
+                for (p, r) in &at_vertex {
+                    if (*p - p0).length() > 1e-9 && (*p - p1).length() > 1e-9
+                        && let Some(t) = param_on_edge(&edge, &info, *p)
+                    {
+                        points.push((t, *r));
+                    }
+                }
+                laws_of_run.push((name, variable_law((radius_at(p0), radius_at(p1)), &mut points, smooth)));
+            }
+            run_laws.push(laws_of_run);
+        }
+        let names: Vec<Name> = singles.iter().map(|&e| body.edges[e].clone()).collect();
         let occt = (|| -> FResult<()> {
+        for laws_of_run in &run_laws {
+            let body = ev.ctx.bodies[bi].clone();
+            let found: Option<Vec<k::Shape>> = laws_of_run.iter().map(|(n, _)| body.find_edges(n).first().and_then(|&e| body.shape.sub_shape(ShapeType::Edge, e).ok())).collect();
+            let Some(shapes) = found else { continue };
+            let laws_only: Vec<Vec<(f64, f64)>> = laws_of_run.iter().map(|(_, l)| l.clone()).collect();
+            let res = k::fillet_variable_edges_checked(&body.shape, &shapes, &laws_only).map_err(|e| blend_failed("Failed to fillet selections.", e))?;
+            let names = body.shape_names();
+            let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
+            ev.replace_body(bi, res.shape, face_names);
+        }
         for name in names {
             let body = ev.ctx.bodies[bi].clone();
             let Some(&e) = body.find_edges(&name).first() else { continue };

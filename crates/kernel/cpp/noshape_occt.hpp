@@ -955,6 +955,8 @@ OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const do
                 bool checked);
 OpOut op_fillet_variable(const OcShape& s, const OcShape& edge, rust::Slice<const double> params,
                          rust::Slice<const double> radii, bool checked);
+OpOut op_fillet_variable_edges(const OcShape& s, const OcShapeList& edges, rust::Slice<const uint32_t> counts,
+                               rust::Slice<const double> params, rust::Slice<const double> radii, bool checked);
 OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& faces,
                  uint8_t mode, double d1, double d2, bool checked);
 OpOut op_draft_wedges(const OcShape& solid, const OcShapeList& faces, P3 pull, const PlaneF& neutral,
