@@ -487,6 +487,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-13 17:00 release (qa list 17:52, candidate release/v0.4.49 = b441978c6; the latest release is v0.4.48)
+- **qa, v0.4.49 checked (published 22:40, cut 67ab7298b): no blocker.** Released CLI against v0.4.48's (vibe5):
+  rust-zero-solid-f197 the same (Fillet 1 Ok, blend e1fc68798); every feature's status the same in hat8, hat15, hat15b and the
+  dock (the three hats' STEP reference 51188.66 -> 51188.65 mm³). Released app (vibe7, hat15 mode-700 copy): the
+  autocomplete, the model-edge snap (Coincident) and the thinner edges as on main. The compat loop and fuzz run v0.4.49.
 - **qa 18:12: corrected owner: P1 FILLET-F197 (blend 7da01b0e9, core's bisect: "a fillet OCCT leaves in split or pinched faces is built of exact rolling balls"; its parent f1d55c47 Ok). Not core's remover (f197 makes no Defeaturing call); the release branch's revert of 92d89cc2f doesn't fix it. qa's earlier attribution was wrong: the compat alert filter hid f197's first change (44e54906). Was:** NO-GO unless core shows it is live's. P1 ROUNDS-REMOVER-F197 (core): qa's ticket document
   rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v0.4.48, "Failed to fillet selections." on main; Fillet 2's missing
   selections 2 -> 1 (a saved reference resolves differently). From core's 92d89cc2f (rounds deleted by core's own code instead
