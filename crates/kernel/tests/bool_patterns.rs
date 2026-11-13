@@ -2200,6 +2200,27 @@ fn variable_rounds_against_a_boxs_planes_cut_as_occt() {
     assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
 }
 
+/// A spring's wire fused with its mirror image (c2-extension-spring's Mirror 1, recorded): their swept faces meet
+/// tangent across the 1 mm edge on the mirror plane, where OCCT's sections are seven lines 2-4 um apart along it (each
+/// 100 tolerances long, corner to corner: "a short section from a corner" before). Sections along an edge of both faces
+/// are that edge: the fuse ours, as OCCT's, its counts, its volume to its area times 1e-7.
+#[test]
+fn a_wire_fused_with_its_mirror_image_across_their_tangent_edge_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "84884726765ed48b").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    let counts = (r.shape.count(k::ShapeType::Face), r.shape.count(k::ShapeType::Edge), r.shape.count(k::ShapeType::Vertex));
+    assert_eq!(counts, (c.summary.faces, c.summary.edges, c.summary.vertices));
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
+}
+
 /// Fuses of sheets that are shells (parity documents' and the corpus's, recorded): OCCT's result keeps each input
 /// shell's pieces in shells, a shell per connected group (BOPAlgo_BOP::BuildShape); ours builds them so ("a sheet
 /// of shells" before): the same counts, shells and faces turned as OCCT's. cf-setback-fillet's corner patch takes the

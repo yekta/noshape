@@ -2392,6 +2392,18 @@ impl Ctx<'_> {
             (k < self.faces.len() && (self.faces[k].arg, self.faces[k].index) == (arg, index)).then_some(k)
         };
         let tol = self.tol;
+        // (A curve along an edge of both faces, within the tolerance all along: that edge, already there (OCCT's
+        // sections of two faces tangent across their common edge, c2-extension-spring's Mirror 1: seven lines 2-4 um
+        // apart on the 1 mm edge where the wire meets its mirror image).)
+        if let (Some(fa), Some(fb)) = (face(a), face(b)) {
+            let along = |f: usize, c: &SectionCurve| {
+                self.faces[f].edges.iter().any(|&(e, _)| {
+                    let s = Seg { v: self.edges[e].v, g: self.edges[e].g };
+                    (0..=8).all(|k| self.seg_param(&s, c.curve.at(c.t0 + (c.t1 - c.t0) * k as f64 / 8.0)).1 <= tol)
+                })
+            };
+            secs.retain(|c| !(along(fa, c) && along(fb, c)));
+        }
         // (A curve 10 to 100 tolerances long from a vertex of the faces to where two more of the pair's curves branch
         // (OCCT's section of a tool's corner on a cylinder, branching 10.6 um from the corner): OCCT's builder takes
         // it into the vertex; not ours. Shorter ones ours merges as OCCT.)
