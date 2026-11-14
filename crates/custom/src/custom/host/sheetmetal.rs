@@ -2074,24 +2074,31 @@ fn rolled_bend(topo: &Topo, fi: usize, face: &Shape, front: f64, back: f64, soli
 
 /// A point inside a face.
 pub(super) fn inner_point(f: &Shape) -> Option<DVec3> {
+    inner_uv(f).and_then(|(u, v)| f.point_at_uv(u, v).ok())
+}
+
+/// Parameters of a point inside a face (classified by its parameters: no projection).
+fn inner_uv(f: &Shape) -> Option<(f64, f64)> {
     let [u0, u1, v0, v1] = f.uv_bounds().ok()?;
-    for (a, b) in [(0.5, 0.5), (0.3, 0.3), (0.7, 0.7), (0.3, 0.7), (0.7, 0.3), (0.5, 0.2), (0.2, 0.5), (0.5, 0.8), (0.8, 0.5)] {
-        let p = f.point_at_uv(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b).ok()?;
-        if f.contains_point(p, 1e-9).unwrap_or(false) {
-            return Some(p);
-        }
-    }
-    None
+    [(0.5, 0.5), (0.3, 0.3), (0.7, 0.7), (0.3, 0.7), (0.7, 0.3), (0.5, 0.2), (0.2, 0.5), (0.5, 0.8), (0.8, 0.5)]
+        .into_iter()
+        .map(|(a, b)| (u0 + (u1 - u0) * a, v0 + (v1 - v0) * b))
+        .find(|&(u, v)| f.contains_uv(u, v, 1e-9).unwrap_or(false))
+}
+
+/// A point inside each face and the face's normal there (none for a face without one).
+fn face_probes(faces: &[Shape]) -> Vec<Option<(DVec3, DVec3)>> {
+    faces.iter().map(|f| inner_uv(f).and_then(|(u, v)| Some((f.point_at_uv(u, v).ok()?, f.normal_at_uv(u, v).ok()?)))).collect()
 }
 
 /// The part's faces lying on a face of the part this rebuild replaces take
 /// that face's name (several pieces of one: its splits by `feature`), so what
 /// a feature leaves alone keeps its references and stays pickable in the
 /// feature's preview (Onshape keeps the ids through the definition body).
-fn keep_names(part: &Shape, names: &mut [crate::naming::Name], before: &Shape, before_names: &[crate::naming::Name], feature: crate::reference::FeatureId) {
+/// (`new_probes`: the part's [`face_probes`].)
+fn keep_names(part: &Shape, new_probes: &[Option<(DVec3, DVec3)>], names: &mut [crate::naming::Name], before: &Shape, before_names: &[crate::naming::Name], feature: crate::reference::FeatureId) {
     use crate::reference::TopoName;
     let (new, old) = (part.faces(), before.faces());
-    let probe = |f: &Shape| inner_point(f).and_then(|p| Some((p, f.normal_at_point(p).ok()?)));
     // On the face, facing the same way, and not on its boundary (a bend's
     // end face touches the side face it replaces at one edge).
     let on = |f: &Shape, (p, n): (DVec3, DVec3)| {
@@ -2099,7 +2106,7 @@ fn keep_names(part: &Shape, names: &mut [crate::naming::Name], before: &Shape, b
             && f.normal_at_point(p).is_ok_and(|m| m.dot(n) > 1.0 - 1e-6)
             && k::make_vertex(p).is_ok_and(|v| f.edges().iter().all(|e| k::distance(&v, e).is_ok_and(|d| d.distance > 1e-6)))
     };
-    let (new_probes, old_probes): (Vec<_>, Vec<_>) = (new.iter().map(probe).collect(), old.iter().map(probe).collect());
+    let old_probes = face_probes(&old);
     // A point outside a face's box is not on it (most pairs skip the
     // projection: a hem's rebuild spent 2 s here, part_sources' rule).
     let boxed = |fs: &[Shape]| -> Vec<Option<k::BoundingBox>> { fs.iter().map(|f| f.bounding_box(false).ok()).collect() };
@@ -2137,29 +2144,24 @@ fn face_planes(faces: &[Shape]) -> Vec<Option<(DVec3, DVec3)>> {
     faces.iter().map(|f| f.face_plane().ok().flatten().map(|p| (p.origin, p.normal.normalize()))).collect()
 }
 
-/// What each face, edge and vertex of the part comes from.
-fn part_sources(part: &Shape, pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<Def>, Vec<Def>) {
+/// What each face, edge and vertex of the part comes from (`probes`: its faces' [`face_probes`]).
+fn part_sources(part: &Shape, probes: &[Option<(DVec3, DVec3)>], pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<Def>, Vec<Def>) {
     // Each piece's box (a point outside it is not on it: most pieces are
     // skipped without projecting onto them).
     let boxes: Vec<Option<k::BoundingBox>> = pieces.iter().map(|x| x.face.bounding_box(false).ok()).collect();
     let planes = face_planes(&pieces.iter().map(|x| x.face.clone()).collect::<Vec<_>>());
     let in_box = |i: usize, p: DVec3| boxes[i].is_none_or(|b| (b.min - DVec3::splat(1e-6)).cmple(p).all() && p.cmple(b.max + DVec3::splat(1e-6)).all()) && planes[i].is_none_or(|(o, n)| (p - o).dot(n).abs() < 1e-6);
-    let faces: Vec<Def> = part
-        .faces()
+    let faces: Vec<Def> = probes
         .iter()
-        .map(|f| {
+        .map(|probe| {
             // (Cancelled: the rest unmatched, the rebuild stops after.)
             if k::thread_cancelled() {
                 return Def::Face(0);
             }
-            let Some(p) = inner_point(f) else { return Def::Face(0) };
+            let Some((p, n)) = *probe else { return Def::Face(0) };
             // A piece through the point that faces the same way (a unified wall's
             // middle can lie on the edge of a side piece).
-            let n = f.normal_at_point(p).ok();
-            let along = |x: &Piece| match (n, x.face.normal_at_point(p)) {
-                (Some(a), Ok(b)) => a.cross(b).length() < 1e-6,
-                _ => true,
-            };
+            let along = |x: &Piece| x.face.normal_at_point(p).map_or(true, |b| n.cross(b).length() < 1e-6);
             pieces.iter().enumerate().find(|(i, x)| in_box(*i, p) && x.face.contains_point(p, 1e-7).unwrap_or(false) && along(x)).map_or(Def::Face(0), |(_, x)| x.from)
         })
         .collect();
@@ -2313,11 +2315,12 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let mut parts: Vec<PartOf> = solids
                 .into_iter()
                 .map(|solid| {
-                    let sources = part_sources(&solid, &pieces, &topo);
+                    let probes = face_probes(&solid.faces());
+                    let sources = part_sources(&solid, &probes, &pieces, &topo);
                     let mut members: Vec<usize> = sources.0.iter().filter_map(|d| if let Def::Face(f) = d { Some(*f) } else { None }).collect();
                     members.sort_unstable();
                     members.dedup();
-                    PartOf { solid, names: Vec::new(), sources, members }
+                    PartOf { solid, probes, names: Vec::new(), sources, members }
                 })
                 .collect();
             stop_if_cancelled()?;
@@ -2338,7 +2341,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     p.names = p.names.iter().map(|x| Arc::new(crate::reference::TopoName::face(ev.feature, crate::reference::Role::Copy { instance, of: x.clone() }))).collect();
                 }
                 if let Some(Some(b)) = before.get(k) {
-                    keep_names(&p.solid, &mut p.names, &b.shape, &b.faces, ev.feature);
+                    keep_names(&p.solid, &p.probes, &mut p.names, &b.shape, &b.faces, ev.feature);
                 }
                 taken.extend(p.names.iter().cloned());
                 let part_faces = p.solid.faces();
@@ -2737,6 +2740,7 @@ fn rip_offset(def: &Definition, topo: &Topo, e: usize, f: usize) -> f64 {
 /// face comes from, and its definition faces (walls and rolled bends).
 struct PartOf {
     solid: Shape,
+    probes: Vec<Option<(DVec3, DVec3)>>,
     names: Vec<crate::naming::Name>,
     sources: (Vec<Def>, Vec<Def>, Vec<Def>),
     members: Vec<usize>,
