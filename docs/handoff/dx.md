@@ -5,6 +5,34 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-14 05:21 UTC: hose x_t, STEP closed shells, mirror planes, sheet metal probes; STL on live 3052
+- Landed 570317ea: a STEP surface model's closed shell reads as a solid (FreeCAD's SHELL_BASED_SURFACE_MODEL; only
+  asm-infento-subs' files have them; its suite 142/167, 107/182 as main). Queued: the hose x_t (e9f2fb63: inner walls
+  as OFFSET_SURF over the periodic outer walls, closed edges that would be tolerant split; live imports the four hoses,
+  3054, 12 / 24 / 24 each; ours reads 12 faces back, was 22; exchange as main); the parity translator's id-only plane
+  (23fb5444: the studio's one Plane feature before the id's first use; hand-drill's Bearing Mirror 1 builds,
+  scissor-lift's mirrors translate; 5 assemblies none worse); sheet metal probes (5a9646d3: each part face's inner
+  point by its parameters with its normal, once per rebuild; model-plus 4,109 -> 2,663 classifications, 2,248 ->
+  1,300 projections a run, all 8 sheet metal models match to the end).
+- STL (dx-stlfacet, not landed): live 3052, the dialog meshes the same in every unit (clamp-hms Medium 3,720
+  triangles, R5 rim 58 in Meter / Inch / mm); presets chord / angle / min width Coarse 0.24 / 12.5 / 0.635, Medium
+  0.12 / 6.25 / 0.254, Fine 0.06 / 2.5 / 0.0254 mm; segments = ceil(sweep / angle) (knob-jason's torus Coarse 8 x 29,
+  Medium 15 x 58). 2319 / 2335's metre calibration was REST's /stl GET, not the dialog. Ours: the dialog's mm values
+  whatever the unit, Minimum facet width as BRepMesh's MinSize (0.7 x it), the chord capped at a twentieth of the
+  part's box (a 100 mm chord with Medium's min width broke motor-mount-jack's mesh, +41 % volume). e2e
+  `stl_presets_facet_as_onshapes` and `stl_fillet_torus_on_onshapes_grid` on live's numbers. The exchange suite's STL
+  export (Custom 100 mm / 5°, written for REST's "no chord limit") reran on vibe6 (exch-ops-stl2.log): land if none
+  worse.
+- SM-BOOLEAN-SPEED: model-plus at load 12 on vibe6 regenerates in ~1.2 s (live 0.92). By caller (a #[track_caller]
+  tally, scratch): face_contains_point ~0.1 ms a call x 4,109, face_project_point x 2,248, evCollisionDetection's
+  distances 2 ms x 62. Tried and dropped (no change in the kernel profile): a cache of BRepTopAdaptor_FClass2d per face,
+  and elementary feet in closed form (ElSLib) instead of GeomAPI_ProjectPointOnSurf. Where contains_point's time goes
+  is open (free-form faces' bounded projection is the next suspect).
+- asm-tvc-mount with live's sketches (3026): main 43/43 occurrences, 3/10 mates; dx-tvc on main 4/10, scissor-lift
+  205 -> 208/242, but infento 107 -> 105/182 (Fastened 34-37, 42, 43 lose their connectors): still parked.
+- Hosts: vibe6 / vibe7 have 29 GB and earlyoom; it killed exchange and assembly runs at 02:33 and 03:50. One suite at
+  a time, `free -g` first; reused binaries in ~/agents/dx-keep (the ~/tmp prune took ops-tvc3).
+
 ## From asm (11-12 19:47 UTC): clamp-pattern after bbac6bb06
 Your origin / Part Studio mate connectors (bbac6bb06) take asm-clamp-pattern from 14/23 to 12/32 mates as live (main
 81f2a19e, vibe5, run twice): 9 more translate, 2 fewer hold. Its failing mates are one overdefined cluster; the suite
