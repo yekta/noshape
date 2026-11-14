@@ -1343,9 +1343,14 @@ impl SheetGeometry {
         // Border size: at least that many characters wide (as callouts).
         let w = if style.chars == 0 { w } else { w.max(style.chars as f64 * h * 0.6) };
         let (rx, ry) = (w * 0.5 + border, h * 0.5 + border);
-        let c = [at[0] - rx - 0.8, at[1]];
         let round = matches!(shape, S::Circle | S::DoubleCircle | S::SquareCircle | S::Octagon | S::Triangle);
-        let (bx, by) = if round { (rx.max(ry), rx.max(ry)) } else { (rx, ry) };
+        // Live (3094): a round border's radius is the text height times (N + 1) / 2, N its characters (Tight Fit:
+        // the number's own); 0.08 in text, 2 Characters: 0.12 in.
+        let n = if style.chars == 0 { text.chars().count() } else { style.chars as usize };
+        let r = h * (n as f64 + 1.0) / 2.0;
+        let (rx, ry) = if round { (r, r) } else { (rx, ry) };
+        let c = [at[0] - rx - 0.8, at[1]];
+        let (bx, by) = (rx, ry);
         let outlines = callout_outlines(shape.border(), c, bx, by);
         if style.solid
             && let Some((pts, _)) = outlines.first()
@@ -3911,6 +3916,23 @@ mod tests {
         let mut g = SheetGeometry::new(100.0, 100.0);
         g.inspection_bubble([50.0, 50.0], 3, &style(false, Some([10, 20, 30]), Some([1, 2, 3])), 1);
         assert!(g.fills.is_empty() && g.text_color(0) == Some([10, 20, 30]));
+    }
+
+    /// Live 3094 (text 0.08 in): a circle bubble's radius is 0.08 / 0.12 / 0.16 / 0.20 / 0.24 in for 1-5 characters,
+    /// 0.08 Tight Fit round one digit; text 0.16 in, 2 characters: 0.24.
+    #[test]
+    fn inspection_bubble_radius_as_lives() {
+        let radius = |h_in: f64, chars: u8, n: u32| {
+            let style = InspectionStyle { shape: super::super::InspectionShape::Circle, text_height: h_in * 25.4, border: 1.2, chars, color: None, solid: false, font: None, text_color: None, fill_color: None };
+            let mut g = SheetGeometry::new(300.0, 300.0);
+            g.inspection_bubble([150.0, 150.0], n, &style, 1);
+            let xs: Vec<f64> = g.lines[0].points.iter().map(|p| p[0]).collect();
+            (xs.iter().cloned().fold(f64::MIN, f64::max) - xs.iter().cloned().fold(f64::MAX, f64::min)) / 2.0 / 25.4
+        };
+        for (chars, live) in [(1, 0.08), (2, 0.12), (3, 0.16), (4, 0.20), (5, 0.24), (0, 0.08)] {
+            assert!((radius(0.08, chars, 7) - live).abs() < 1e-3, "{chars} characters: {} in, live {live}", radius(0.08, chars, 7));
+        }
+        assert!((radius(0.16, 2, 7) - 0.24).abs() < 1e-3);
     }
 
     /// Live2 feel/callout-geom.json (text 0.12 in): a 2-character hexagon is regular, circumradius 1.5 h, vertices left
