@@ -121,6 +121,13 @@ takes re-recorded, queued fa79ac86; the drag ghost outside the list). New rows: 
 click on Extrude's depth arrow flips it (fixed: only direction-only arrows flipped), the drop line staying at its last
 spot off the list (fixed: it followed the pointer's row). parts-multi-properties / view-key-* to run once live's
 bc3dfe59 / fa79ac86 are on main.
+**11-14 00:49:** landed 11-13: Properties' Tab order + Material's second Esc (4e122aa7), the HLR read under a shared
+mesh lock + the macOS CI crash-report step (b0689603; lead's SIGTRAP: not reproduced in 1240 Mac runs). Local, to land:
+the fields matrix 9 / 9 (new: an out-of-range bare number gets its unit, Alt+↑/↓ step), a face double-click shows its
+feature's sketch until the selection changes (the double click on the viewport's clock), Draft analysis records its
+active field focused (analysis-draft), Appearance / Material layout rows (dialogs 18 / 18). Extend: live 2992 shows no
+hover preview (live2's light blue was the X axis), so the 11-13 preview (ab8fd307) is taken out again. analysis-flatten
+clicks the top face now (the fillet's edges win in iso: live), re-record asked.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's

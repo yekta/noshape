@@ -1403,6 +1403,13 @@ impl PartStudioView {
         if self.built.is_none() {
             return;
         }
+        // A face double-clicked shows its feature's sketch until the selection changes: the scene's display then
+        // changes, so it is built again (which refreshes it).
+        let dbl = self.ui.dblclick_related.as_ref().is_some_and(|(_, sel)| *sel == self.selection);
+        if dbl != self.ui.dblclick_drawn {
+            self.ui.dblclick_drawn = dbl;
+            return self.rebuild_scene(cx);
+        }
         let (mut selection, mut accent) = match &self.edit {
             Some(e) => {
                 let d = e.dialog.read(cx);
@@ -2391,7 +2398,8 @@ impl PartStudioView {
                     }
                     _ => target,
                 };
-                let dbl = target.as_ref().is_some_and(|t| self.edit.is_none() && self.is_double_click(&t.reference));
+                let now = self.viewport.read(cx).now();
+                let dbl = target.as_ref().is_some_and(|t| self.edit.is_none() && self.is_double_click(&t.reference, now));
                 match target {
                     // Live ("psui (10-27, interaction 5.x)"): Mass and section
                     // properties on its Part tab takes the whole part on a
@@ -2409,6 +2417,7 @@ impl PartStudioView {
                         let sketch = made.and_then(|f| self.studio(cx).and_then(|s| s.feature(f).and_then(|g| noshape_model::interaction::source_sketch(&s.features, g))));
                         self.pick(t, cx);
                         self.ui.dblclick_related = Some((made.into_iter().chain(sketch).collect(), self.selection.clone()));
+                        self.refresh_scene(false, cx);
                         cx.notify();
                     }
                     Some(t) => {

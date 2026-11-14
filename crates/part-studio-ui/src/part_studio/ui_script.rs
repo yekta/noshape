@@ -72,6 +72,10 @@ impl PartStudioView {
         } else if self.ui.measure_pinned && self.focus.is_focused(window) {
             // [ › Measure: its selection field has the keyboard (live key-bracket-measure).
             json!({ "kind": "field", "label": "Select entities to measure", "text": null, "selection": null, "all": false })
+        } else if let Some(d) = self.ui.draft.as_ref().filter(|_| self.focus.is_focused(window)) {
+            // Draft analysis: its active field has the keyboard (live analysis-draft: "Entities to check" once the
+            // pull direction is picked).
+            json!({ "kind": "field", "label": if d.active == 0 { "Mold split direction" } else { "Entities to check" }, "text": null, "selection": null, "all": false })
         } else if self.shortcut_sheet.is_some() {
             json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })
         } else if let Some(st) = self.ui.filter.as_ref().map(|f| f.0.read(cx)).filter(|_| filter_focused) {

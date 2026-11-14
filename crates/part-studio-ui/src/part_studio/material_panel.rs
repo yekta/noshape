@@ -466,6 +466,7 @@ impl PartStudioView {
         Some(
             v_flex()
                 .id("material-panel")
+                .debug_selector(|| "material-panel".into())
                 .occlude()
                 .child(crate::ui::panel_probe("ps-material"))
                 .absolute()

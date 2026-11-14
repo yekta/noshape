@@ -274,6 +274,8 @@ pub struct UiState {
     /// A face's feature and its sketch, lit in the list after a double-click on the face, while the selection
     /// stays as that left it (live 1957 (4): the related highlight stays after a face double-click).
     pub dblclick_related: Option<(HashSet<FeatureId>, Vec<Reference>)>,
+    /// Whether the scene was last built with that double-click's sketch shown.
+    pub dblclick_drawn: bool,
     /// Last viewport click (double-click detection).
     pub last_click: Option<(Reference, Instant)>,
     /// Focus of the feature list (rollback bar arrow keys).
@@ -772,6 +774,7 @@ impl UiState {
             midpoint_armed_at: None,
             midpoint_armed_since: None,
             dblclick_related: None,
+            dblclick_drawn: false,
             midpoint_dwell_task: None,
             inference: None,
             inference_task: None,
@@ -1198,6 +1201,20 @@ impl PartStudioView {
         interaction::filter_features(studio, &self.display, &format!(":variable {name}")).unwrap_or_default()
     }
 
+    /// A part face double-clicked: its feature's sketch shown while that selection stands (live feel/3d.json
+    /// "double_click_face": Sketch 1 drawn in blue, feel/3d/dblclick-face.png).
+    pub(super) fn with_dblclick_sketch(&self, d: Arc<StudioDisplay>) -> Arc<StudioDisplay> {
+        let Some((lit, sel)) = &self.ui.dblclick_related else { return d };
+        if *sel != self.selection || !d.sketches.iter().any(|s| s.hidden && lit.contains(&s.feature)) {
+            return d;
+        }
+        let mut out = (*d).clone();
+        for s in out.sketches.iter_mut().filter(|s| lit.contains(&s.feature)) {
+            s.hidden = false;
+        }
+        Arc::new(out)
+    }
+
     pub(super) fn related_features(&self, cx: &App) -> HashSet<FeatureId> {
         let mut out = self.variable_users(cx);
         if let Some((lit, sel)) = &self.ui.dblclick_related
@@ -1571,8 +1588,7 @@ impl PartStudioView {
     }
 
     /// Double-click on a sketch in the graphics area opens it for editing.
-    pub(super) fn is_double_click(&mut self, r: &Reference) -> bool {
-        let now = Instant::now();
+    pub(super) fn is_double_click(&mut self, r: &Reference, now: Instant) -> bool {
         let dbl = self.ui.last_click.as_ref().is_some_and(|(prev, t)| prev == r && now.duration_since(*t) < Duration::from_millis(450));
         self.ui.last_click = if dbl { None } else { Some((r.clone(), now)) };
         dbl

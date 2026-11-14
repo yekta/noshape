@@ -1666,10 +1666,8 @@ impl FeatureDialog {
         let Some(ParamKind::Num(n)) = self.spec_for_path(path).map(|s| &s.kind) else { return };
         let dim = if n.kind == noshape_model::params::NumKind::Integer { noshape_units::Dim::UNITLESS } else { n.kind.dim() };
         let text = state.read(cx).value().to_string();
-        // Live (DEPTH-RANGE): a value out of the field's range stays as typed.
-        if self.out_of_range(path, &text) {
-            return;
-        }
+        // Out of the field's range it is kept as typed, a bare number given the field's unit (live DEPTH-RANGE: "600 m"
+        // kept; feel/fields.json: "-5" in Draft angle -> "-5 deg", pink); `commit_text` leaves a unit as typed.
         let next = if text.trim().is_empty() { self.baselines.get(path).cloned().unwrap_or_default() } else { crate::quantity_field::commit_text(&text, dim, &self.units, &self.variables) };
         if next != text {
             state.update(cx, |s, cx| s.set_value(next.clone(), window, cx));
@@ -3968,14 +3966,20 @@ impl FeatureDialog {
                         cx.stop_propagation();
                     }
                 }))
-                // Ctrl+↑ / ↓ (no input binding): ×0.1.
+                // Ctrl+↑ / ↓ (no input binding): ×0.1. Alt+↑ / ↓ steps as a plain arrow (live feel/fields.json), not
+                // the text field's own Alt move.
                 .capture_key_down(cx.listener(move |this, e: &KeyDownEvent, window, cx| {
                     let k = &e.keystroke;
-                    if (k.key == "up" || k.key == "down") && crate::quantity_field::step_ctrl(&k.modifiers) && !k.modifiers.alt {
-                        let mods = crate::quantity_field::StepMods { shift: k.modifiers.shift, ctrl: true };
-                        if this.step_number(&p_k, &st_k, k.key == "up", mods, window, cx) {
-                            cx.stop_propagation();
-                        }
+                    if k.key != "up" && k.key != "down" {
+                        return;
+                    }
+                    let ctrl = crate::quantity_field::step_ctrl(&k.modifiers);
+                    if ctrl == k.modifiers.alt {
+                        return;
+                    }
+                    let mods = crate::quantity_field::StepMods { shift: k.modifiers.shift, ctrl };
+                    if this.step_number(&p_k, &st_k, k.key == "up", mods, window, cx) {
+                        cx.stop_propagation();
                     }
                 }))
                 .capture_action(cx.listener(move |this, _: &MoveUp, window, cx| {

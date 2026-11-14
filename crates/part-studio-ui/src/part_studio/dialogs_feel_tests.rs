@@ -295,6 +295,46 @@ fn rows() -> Vec<Row> {
             cx.update_window(window, |_, w, cx| w.close_dialog(cx)).unwrap();
             expect(order, vec!["Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3", "Not revision managed", "Exclude from all BOMs"], "the field after each Tab from Name")
         } },
+        Row { id: "Appearance / its panel on opening", live: "220 × 400 at the graphics area's bottom left; the hex field focused, its text selected, uppercase without '#'; A with two decimals (1.00)", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-appearance");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let b = v.display.bodies.first().map(|b| b.id.clone()).unwrap();
+                v.edit_appearance(crate::part_studio::appearance::EditTarget::Parts(vec![b]), w, cx);
+            }))
+            .unwrap();
+            draw(cx, window);
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            let panel = vcx.debug_bounds("appearance-editor").ok_or("no panel")?;
+            let area = cx.update(|cx| { let vp = view.read(cx).viewport.read(cx); (vp.origin(), vp.size()) });
+            let (hex, alpha, focused, selected) = cx.update_window(window, |_, w, cx| {
+                let e = view.read(cx).ui.appearance_edit.as_ref().unwrap();
+                let h = e.hex.read(cx);
+                (h.value().to_string(), e.alpha.read(cx).value().to_string(), h.focus_handle(cx).is_focused(w), h.selected_range().len() == h.value().len())
+            })
+            .unwrap();
+            let left = (f32::from(panel.origin.x) - f32::from(area.0.x)).round();
+            let bottom = (f32::from(area.0.y) + area.1.y as f32 - f32::from(panel.bottom())).round();
+            let size = (f32::from(panel.size.width).round(), f32::from(panel.size.height).round());
+            expect(
+                (size, (left, bottom), hex.len() == 6 && hex == hex.to_uppercase() && !hex.starts_with('#'), alpha.as_str(), focused, selected),
+                ((220., 400.), (0., 0.), true, "1.00", true, true),
+                "size, (left, bottom) in the graphics, hex uppercase without #, A, hex focused, its text selected",
+            )
+        } },
+        Row { id: "Material / its panel on opening", live: "280 × 368 at the graphics area's bottom; 'Material' with ✓ / ✗, tabs Library | Custom, 'Onshape Material Library', '- None -', 'No material assigned'", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-material-panel");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let b = v.display.bodies.first().map(|b| b.id.clone()).unwrap();
+                v.open_material_panel(vec![b], w, cx);
+            }))
+            .unwrap();
+            draw(cx, window);
+            let panel = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("material-panel").ok_or("no panel")?;
+            let area = cx.update(|cx| { let vp = view.read(cx).viewport.read(cx); (vp.origin(), vp.size()) });
+            let bottom = (f32::from(area.0.y) + area.1.y as f32 - f32::from(panel.bottom())).round();
+            let picked = cx.update(|cx| view.read(cx).ui.material_panel.as_ref().and_then(|m| m.picked_name()));
+            expect(((f32::from(panel.size.width).round(), f32::from(panel.size.height).round()), bottom, picked), ((280., 368.), 0., None), "size, bottom in the graphics, the material picked")
+        } },
         Row { id: "Material / the search and Esc", live: "the list filters as you type ('steel' left 38 rows: live's read counted the highlighted first row twice), the first highlighted; Esc closes the list only, a second Esc the dialog", gap: false, check: |cx| {
             let (window, view) = block(cx, "dlg-material");
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {

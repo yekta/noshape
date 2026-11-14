@@ -813,6 +813,7 @@ impl PartStudioView {
         Some(
             v_flex()
                 .id("appearance-editor")
+                .debug_selector(|| "appearance-editor".into())
                 // Esc in its fields cancels it (actions.rs).
                 .key_context("AppearanceEditor")
                 .on_action(cx.listener(|this, _: &AppearanceNextField, window, cx| this.appearance_tab(1, window, cx)))

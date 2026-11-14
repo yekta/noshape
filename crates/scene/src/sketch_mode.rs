@@ -5729,14 +5729,6 @@ impl SketchEditor {
             let color = crate::palette::rgb8(crate::palette::viewport::QUERY_HOVER);
             wide.push((data.sketch.tessellate(id, self.world_per_px * 0.25), color, 4.0));
         }
-        // Extend: the hovered line's extension from its nearer end up to the next entity, light blue (live
-        // feel/sketchtools.json "extendHover", feel/sketchtools/trim-extend.png: rgb(125, 164, 206)).
-        if self.tool == Tool::Extend
-            && let (Some(h), Some(c)) = (self.hover, self.cursor)
-            && let Some((from, to)) = line_extension(&data.sketch, h, c)
-        {
-            wide.push((vec![from, to], [125, 164, 206, 255], 2.0));
-        }
         // Split marker on the hovered curve.
         if self.tool == Tool::Split
             && let (Some(h), Some(c)) = (self.hover, self.cursor)
@@ -7761,24 +7753,6 @@ impl SketchEditor {
     }
 }
 
-/// A line's extension past its end nearer `pointer`, up to the first other curve it meets (Extend's hover preview).
-fn line_extension(sk: &Sketch, line: EntityId, pointer: DVec2) -> Option<(DVec2, DVec2)> {
-    let Some(Curve2::Line { a, b }) = sk.curve(line) else { return None };
-    let (end, other) = if (pointer - a).length() < (pointer - b).length() { (a, b) } else { (b, a) };
-    let dir = (end - other).try_normalize()?;
-    let reach = sk.bbox().size().max_element().max(1e-3) * 4.0;
-    let ray = Curve2::Line { a: end, b: end + dir * reach };
-    let tol = reach * 1e-9;
-    sk.entities()
-        .filter(|e| e.id != line && e.kind() != EntityKind::Point)
-        .filter_map(|e| sk.curve(e.id))
-        .flat_map(|c| noshape_sketch::intersect::intersect(&ray, &c, tol))
-        .map(|x| x.point)
-        .filter(|p| (*p - end).length() > tol.max(1e-9) * 10.0)
-        .min_by(|p, q| (*p - end).length().total_cmp(&(*q - end).length()))
-        .map(|hit| (end, hit))
-}
-
 #[cfg(test)]
 mod tests {
     //! Headless tests of the sketch editor's Onshape interaction rules:
@@ -8978,6 +8952,17 @@ mod tests {
         let (from, to) = (ed.screen_to_plane(lo), ed.screen_to_plane(hi));
         drag(&mut ed, &mut d, from, to);
         assert!(ed.selection.contains(&l), "a screen window around it selects it");
+    }
+
+    /// Live (feel/sketch.json "boxA": A selected, then a right-to-left box over B): a box adds to the selection.
+    #[test]
+    fn a_box_adds_to_the_selection() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let a = d.sketch.add_line(v(0.0, 0.01), v(0.02, 0.01));
+        let b = d.sketch.add_line(v(0.0, 0.03), v(0.02, 0.03));
+        ed.selection = vec![a];
+        drag(&mut ed, &mut d, v(0.015, 0.035), v(0.005, 0.025));
+        assert!(ed.selection.contains(&a) && ed.selection.contains(&b), "{:?}", ed.selection);
     }
 
     #[test]

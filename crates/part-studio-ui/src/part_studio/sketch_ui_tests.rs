@@ -2781,6 +2781,34 @@ fn a_hole_placed_on_an_in_feature_mate_connector(cx: &mut TestAppContext) {
     assert!(hole_ok && !features.iter().any(|t| t == "mateConnector"), "{features:?}");
 }
 
+/// Live (feel/3d.json "double_click_face", 3d/dblclick-face.png): a part face double-clicked shows its feature's
+/// sketch (consumed, so hidden) until the selection changes; the two clicks select then deselect.
+#[gpui::test]
+fn a_face_double_clicked_shows_its_features_sketch(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "dblclick-face");
+    let at = std::rc::Rc::new(std::cell::Cell::new(std::time::Instant::now()));
+    let clock = at.clone();
+    cx.update(|cx| view.read(cx).viewport.clone().update(cx, |v, _| v.set_clock(move || clock.get())));
+    let pick = cx.update(|cx| view.read(cx).built.as_ref().and_then(|b| b.picks.ids_for(&top).first().copied()));
+    let shown = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display_for_scene().sketches.iter().filter(|s| !s.hidden).count());
+    let click_at = |cx: &mut TestAppContext, pick: Option<u32>| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::Click { pick, position: DVec2::new(575., 350.), modifiers: Modifiers::default() }, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    let before = shown(cx);
+    click_at(cx, pick);
+    at.set(at.get() + std::time::Duration::from_millis(200));
+    click_at(cx, pick);
+    let (after, selected) = (shown(cx), cx.update(|cx| view.read(cx).selection.len()));
+    at.set(at.get() + std::time::Duration::from_millis(800));
+    click_at(cx, pick);
+    assert_eq!((before, after, selected, shown(cx)), (0, 1, 0, 0), "sketches shown before, after the double-click (selection), after the next click");
+}
+
 /// Live 1990 (3.18): a double-click on a shown sketch's line in the graphics doesn't open the sketch; the first click
 /// selects the line, the second deselects it.
 #[gpui::test]
@@ -4104,6 +4132,8 @@ mod sketchtools;
 mod editing;
 #[path = "dialogs_feel_tests.rs"]
 mod dialogs;
+#[path = "fields_feel_tests.rs"]
+mod fields;
 #[path = "feedback_feel_tests.rs"]
 mod feedback;
 

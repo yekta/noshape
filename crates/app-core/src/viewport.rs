@@ -788,6 +788,11 @@ impl Viewport {
     /// Whether a left drag draws a selection box now.
     /// Drives the press rules' and camera animations' clock (tests: a press held a set time, whatever the
     /// machine's load).
+    /// The time on its clock (real time, or the one a test set).
+    pub fn now(&self) -> Instant {
+        (self.clock)()
+    }
+
     pub fn set_clock(&mut self, clock: impl Fn() -> Instant + 'static) {
         self.clock = Rc::new(clock);
     }

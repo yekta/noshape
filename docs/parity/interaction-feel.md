@@ -41,7 +41,7 @@ GPU `feel::presses_orbit_box_and_open_the_menu_as_live`).
 | Edge midpoint target after a rest | live 1954: 9 px square, a short dwell | `update_hover`, `MIDPOINT_DWELL` | existing midpoint tests | = |
 | Click | adds; on a selected entity removes; on empty space clears; Shift+click on empty space keeps; Shift+click on an entity as a plain one | the same (`on_viewport_event`'s Click) | – | = |
 | Ctrl+click | the context menu of what is under the pointer, selects nothing (every OS; on a Mac Cmd+click is a plain click) | the same | – | = |
-| Double-click | a face: shows its feature's sketch, the two clicks select then deselect; an edge: nothing | a face's second click deselects, its feature lit | – | ? |
+| Double-click | a face: shows its feature's sketch, the two clicks select then deselect; an edge: nothing | the sketch wasn't shown (its row lit only); now shown until the selection changes (`with_dblclick_sketch`; the double click on the viewport's clock) | part-studio-ui `a_face_double_clicked_shows_its_features_sketch` | = (fixed) |
 | Select other (`) | the "Select other" panel, bottom right | `SelectOther` | – | – |
 | Box select | left → right: window (faces and edges wholly inside, hidden ones too, no vertices, no part: 18 round a block, 5 round its right half); right → left: crossing (13 over that half); adds; Ctrl at the start deselects | the same (`box_ids`) | `feel::box_select_takes_what_live_takes` | = |
 | Left press → drag (box) | more than 2 px and 50 ms after the press | the same (`press_becomes_drag`) | app-core, GPU feel | = |
@@ -508,7 +508,7 @@ live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-st
 | Trim, a click | removes the piece between the crossings | the same | = |
 | Trim, hover | the piece up to the nearest crossings lit tan, orange dots at its ends | the same | = |
 | Trim, a drag | every piece the trail crosses goes; one that nothing crosses any more goes whole (tr0) | the same | = |
-| Extend, hover | the line lit, its extension drawn light blue rgb(125, 164, 206) up to the next entity; the clicks: the curve, then the boundary (behaviours 34469) | nothing drawn; now the extension (`line_extension`); the two clicks were already live's | = (fixed) |
+| Extend, hover | the line and its end lit orange, nothing past it; the clicks: the curve, then the boundary (behaviours "psui (2992)"; live2's light blue was the sketch's X axis under its line) | the same (an extension preview added 11-13 from live2's note, taken out 11-14) | = |
 | Text | two clicks (corners), then its dialog with "Default text" | the same | = |
 | Search tools in a sketch | the sketch tools (Offset o, Linear / Circular pattern, Mirror, Text, Insert image, Trim, Extend) | the same | = |
 | Sketch fillet, a click on a corner | a preview, nothing made; Esc cancels | the same | = |
@@ -540,7 +540,7 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). part-studio-ui
 `dialogs::the_dialogs_matrix_matches_live` (T1, no GPU) on the block start, and `manipulators::snap_tests`.
 
-**Matched: 16 / 16** (11-13 19:26 UTC; 1 / 5 at the first run, then 11 rows added: 8 matching, 3 fixed).
+**Matched: 18 / 18** (11-14 00:29 UTC; 1 / 5 at the first run, then 11 rows added: 8 matching, 3 fixed).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -560,8 +560,30 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | Tab from Fillet's Radius | Radius's ± button, then Asymmetric, Partial, Variable, Allow edge overflow, Smooth fillet corners; selection fields and dropdowns skipped | the same | = |
 | Properties' Enter and Esc | do nothing (no apply, no close) | the same | = |
 | Properties' Tab order | Name, Description, Part number, Revision, Vendor, Project, Product line, Title 1–3, Not revision managed, Exclude from all BOMs | Tab stayed in Description (indented it) and the checkboxes took no Tab; now live's order (Description passes Tab on, the two checkboxes are Tab stops) | = (fixed) |
+| Appearance on opening | 220 × 400 at the graphics area's bottom left; hex focused and selected, uppercase without '#'; A "1.00" | the same | = |
+| Material on opening | 280 × 368 at the graphics area's bottom; nothing picked ('- None -') | the same | = |
 | Material's search and Esc | filters as you type ("steel": 38 rows; live's read counted its highlighted first row twice), the first highlighted; Esc closes the list only, a second Esc the dialog | the second Esc did nothing (the keyboard was left on the closed list's search); now it cancels | = (fixed) |
-| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, preview timing while dragging (every ~0.4 s);  the Appearance and Material dialogs' layout (their keys: Appearance's in `sketch_ui_tests` escape / Tab / Enter tests) | – | – |
+| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, preview timing while dragging (every ~0.4 s);  the Appearance palette's swatch grid and the Material picker's rows (look); Appearance's keys are in `sketch_ui_tests` (escape / Tab / Enter) | – | – |
+
+## Fields (matrix)
+
+live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft angle). part-studio-ui
+`fields::the_fields_matrix_matches_live` (T1, no GPU) on the block start.
+
+**Matched: 9 / 9** (11-14 00:33 UTC; 6 / 9 at the first run).
+
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| Enter | the expression, a bare one wrapped with the field's unit: "10+5" → "(10+5) mm", "10.123456" → "10.123456 mm"; "1 in" stays | the same | = |
+| Blurred | the value in the document unit, 3 decimals: "15 mm", "25.4 mm", "10.123 mm" | the same | = |
+| Refocused | the typed expression again | the same | = |
+| Invalid ("abc" + Enter) | pink, the text kept, the title red, ✓ disabled | the same | = |
+| Negative length | "-5" → "-5 mm", accepted | the same | = |
+| Angle | "5" → "5 deg"; "-5" → "-5 deg", pink | "-5" stayed bare (an out-of-range value was left as typed whole); now the unit too | = (fixed) |
+| Arrow keys | Up +1 unit, Down −1, Shift+Up +10, Alt+Up as Up | Alt+Up did nothing (the text field's own Alt move); now a step | = (fixed) |
+| Autocomplete | "1 m": m, max( x , y ), min( x , y ), mm; "1 i": in, isInteger( x ) | the same (its rows as drawn) | = |
+| Autocomplete's Esc | closes the list only | the same | = |
+| Not yet in the matrix | Ctrl+Up ×0.1 (an existing test), the wheel over a focused field, the "#" list's New variable… and its popover, Tab taking the highlighted entry | – | – |
 
 ## Feedback (matrix, Part Studio rows)
 

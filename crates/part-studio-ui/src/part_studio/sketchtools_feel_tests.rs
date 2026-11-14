@@ -184,7 +184,8 @@ fn rows() -> Vec<Row> {
             left.sort();
             expect((after_click, lines(cx, &view), left.len()), (4, 2, 2), "lines after the click, after the drag")
         } },
-        Row { id: "extend / hover previews the extension", live: "hovering near a line's end lights the line orange and draws its extension in light blue up to the next entity (the clicks: the curve, then the boundary, behaviours 34469)", gap: false, check: |cx| {
+        // (live2's "extendHover" light blue was the sketch's X axis under its line: behaviours "psui (2992)".)
+        Row { id: "extend / hover draws no extension", live: "behaviours 'psui (2992)': the line and its end lit orange, nothing past it; the clicks: the curve, then the boundary", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-extend-hover", Tool::Line);
             for (a, b) in [((300., 300.), (400., 300.)), ((500., 240.), (500., 360.))] {
                 click(cx, window, &view, a);
@@ -218,7 +219,7 @@ fn rows() -> Vec<Row> {
                     along > 0. && along < (wf - we).length() * 1.5 && off < 1e-5
                 })
             }));
-            expect(ahead, true, "an extension drawn past the line's end")
+            expect(ahead, false, "an extension drawn past the line's end")
         } },
         Row { id: "text / two clicks, then its dialog", live: "the first corner, then the opposite one; the Text dialog opens with 'Default text' selected", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-text", Tool::Text);
