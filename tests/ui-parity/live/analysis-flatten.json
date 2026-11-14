@@ -1,6 +1,6 @@
 {
  "scenario": "analysis-flatten",
- "recorded": "2026-11-14T00:48:06.950Z",
+ "recorded": "2026-11-14T01:38:05.753Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -10,7 +10,7 @@
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "38ab511ef522e97a9cc484cf",
+  "element": "90211655c4cbd8c90fc3bea0",
   "start": "block-fillet",
   "startElement": "56449b9c8d94cbb3e8a02724",
   "runner": "live2 .nstate-uip-3.json"
@@ -106,19 +106,19 @@
     "do": "click",
     "on": {
      "face": [
-      10,
-      0.586,
-      9.414
+      20,
+      15,
+      10
      ]
     }
    },
    "ok": true,
    "hover": [
-    "JIB"
+    "JIK"
    ],
    "at": [
-    1115,
-    498
+    1173,
+    482
    ],
    "state": {
     "focus": {
@@ -132,9 +132,9 @@
      "count": 1,
      "items": [
       {
-       "kind": "EDGE",
+       "kind": "FACE",
        "owner": "Part 1",
-       "id": "JIB"
+       "id": "JIK"
       }
      ]
     },
@@ -154,18 +154,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Fillet 1",
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": true,
+       "related": false,
        "hidden": false,
-       "cls": "related-highlight"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Fillet 1"
@@ -211,15 +211,15 @@
     "measure": {
      "readout": [
       {
-       "name": "Length",
-       "value": "40.000",
-       "units": "mm"
+       "name": "Area",
+       "value": "1120.000",
+       "units": "mm2"
       }
      ],
      "panel": null
     }
    },
-   "t": 33618
+   "t": 31092
   },
   {
    "step": 2,
@@ -262,9 +262,9 @@
      "count": 1,
      "items": [
       {
-       "kind": "EDGE",
+       "kind": "FACE",
        "owner": "Part 1",
-       "id": "JIB"
+       "id": "JIK"
       }
      ]
     },
@@ -284,18 +284,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Fillet 1",
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": true,
+       "related": false,
        "hidden": false,
-       "cls": "related-highlight"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Fillet 1"
@@ -341,15 +341,15 @@
     "measure": {
      "readout": [
       {
-       "name": "Length",
-       "value": "40.000",
-       "units": "mm"
+       "name": "Area",
+       "value": "1120.000",
+       "units": "mm2"
       }
      ],
      "panel": null
     }
    },
-   "t": 36315
+   "t": 33739
   },
   {
    "step": 3,
@@ -373,6 +373,8 @@
      "title": "Flatten surfaces",
      "text": [
       "Faces to flatten",
+      "Face of Extrude 1",
+      "×",
       "Rip edges",
       "[ ] Show facets",
       "Show facets",
@@ -442,7 +444,7 @@
      {
       "id": "analyse-flatten-view",
       "title": "Flatten surfaces",
-      "text": "Flatten surfaces / Faces to flatten / Rip edges / Show facets / Show edges / Show checkerboard / Show distortion / Show flattened / Origin / Flattened position (mate connector) / Flattened offset / Flattened angle / Show export controls / Flatten",
+      "text": "Flatten surfaces / Faces to flatten / Face of Extrude 1 / × / Rip edges / Show facets / Show edges / Show checkerboard / Show distortion / Show flattened / Origin / Flattened position (mate connector) / Flattened offset / Flattened angle / Show export controls / Flatten",
       "inputs": [
        {
         "placeholder": null,
@@ -481,8 +483,14 @@
     ],
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIK"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -500,9 +508,9 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Fillet 1",
@@ -554,9 +562,18 @@
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
-    "measure": null
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1120.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
    },
-   "t": 39849
+   "t": 37206
   },
   {
    "step": 4,
@@ -574,6 +591,8 @@
      "title": "Flatten surfaces",
      "text": [
       "Faces to flatten",
+      "Face of Extrude 1",
+      "×",
       "Rip edges",
       "[ ] Show facets",
       "Show facets",
@@ -643,7 +662,7 @@
      {
       "id": "analyse-flatten-view",
       "title": "Flatten surfaces",
-      "text": "Flatten surfaces / Faces to flatten / Rip edges / Show facets / Show edges / Show checkerboard / Show distortion / Show flattened / Origin / Flattened position (mate connector) / Flattened offset / Flattened angle / Show export controls / Flatten",
+      "text": "Flatten surfaces / Faces to flatten / Face of Extrude 1 / × / Rip edges / Show facets / Show edges / Show checkerboard / Show distortion / Show flattened / Origin / Flattened position (mate connector) / Flattened offset / Flattened angle / Show export controls / Flatten",
       "inputs": [
        {
         "placeholder": null,
@@ -682,8 +701,14 @@
     ],
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIK"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -701,9 +726,9 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Fillet 1",
@@ -755,9 +780,18 @@
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
-    "measure": null
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1120.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
    },
-   "t": 44462
+   "t": 41971
   },
   {
    "step": 5,
@@ -858,7 +892,7 @@
     },
     "measure": null
    },
-   "t": 48183
+   "t": 45618
   },
   {
    "step": 6,
@@ -951,7 +985,7 @@
     },
     "measure": null
    },
-   "t": 52768
+   "t": 50187
   }
  ]
 }
