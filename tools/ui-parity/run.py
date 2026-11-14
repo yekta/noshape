@@ -231,6 +231,19 @@ def picker_as_read(state, since):
     return state
 
 
+def export_fields_by_label(state):
+    """The Export modal's fields by label, once each, on both sides: live's recorder reads them in page order, which
+    puts STL's own fields before File name and lists a mesh format's Resolution twice (export-format-stl, -3mf)."""
+    d = (state or {}).get("dialog")
+    if isinstance(d, dict) and d.get("title") == "Export" and isinstance(d.get("fields"), list) and all(isinstance(f, dict) for f in d["fields"]):
+        seen = []
+        for f in d["fields"]:
+            if f not in seen:
+                seen.append(f)
+        d["fields"] = sorted(seen, key=lambda f: str(f.get("label")))
+    return state
+
+
 def without_free_plan_rows(state):
     """`state` with Release management's menu rows dropped (a Free-plan take's and ours)."""
     lst = (state or {}).get("list")
@@ -256,7 +269,8 @@ def normalize_live(state):
     """Live's state in the agreed form: cloud-only menu rows dropped, no highlighted row as null (live: -1)."""
     # A focused checkbox: the DOM gives its value "on" and no selection; it has no text.
     focus = (state or {}).get("focus")
-    if isinstance(focus, dict) and focus.get("text") == "on" and focus.get("selection") == [None, None]:
+    # (A checkbox's value attribute: "on" by default, IGES compatibility mode's "individual".)
+    if isinstance(focus, dict) and focus.get("text") in ("on", "individual") and focus.get("selection") == [None, None]:
         focus["text"], focus["selection"] = None, None
         # A clicked checkbox (an <input> with no selection): no text field (README "Focus").
         if focus.get("tag") == "input":
@@ -775,6 +789,7 @@ def compare(live, ours, whole_document=True):
         b = picker_as_read(b, picker_read)
         a = unknown_picks(a, b)
         a, b = camera_compared(a), camera_compared(b)
+        a, b = export_fields_by_label(a), export_fields_by_label(b)
         bl = (b or {}).get("list")
         if isinstance(bl, dict) and isinstance(bl.get("rows"), list) and str(live.get("recorded", "")) < PRO_SINCE:
             b = dict(b, list=dict(bl, rows=[r for r in bl["rows"] if r not in PRO_ROWS]))

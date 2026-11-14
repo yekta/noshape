@@ -32,6 +32,10 @@ const LABEL_AFTER_CHECK: f32 = 4.;
 impl PartStudioView {
     /// The Export modal for `bodies` (all visible parts when empty).
     pub fn open_part_export(&mut self, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
+        if bodies.is_empty() && !self.has_parts() {
+            open_no_geometry_modal(window, cx);
+            return;
+        }
         let view = cx.entity();
         // Live (dom/dialog-export-parasolid.txt): a part's file is
         // "<studio> - <part>"; the tab's is the studio's name.
@@ -147,6 +151,17 @@ pub fn open_export_modal(base: String, assembly: bool, run: RunExport, window: &
 /// a release row), which has no "Export unique parts as individual files"
 /// or "Include hidden instances in export" (live dom/dialog-export-jt.txt
 /// vs -jt-tab.txt).
+/// A tab with nothing to export (live export-tab-no-geometry): the notice and Cancel, no fields.
+fn open_no_geometry_modal(window: &mut Window, cx: &mut App) {
+    const NOTICE: &str = "Selected tab contains no supported geometry for export.";
+    window.open_dialog(cx, move |dialog, _, cx| {
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Export", "fields": [], "buttons": ["Cancel"], "text": NOTICE }));
+        crate::os_ui::modal(dialog, "Export", 600.)
+            .child(crate::os_ui::modal_body().child(crate::os_ui::info_box(NOTICE)))
+            .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
+    });
+}
+
 pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, run: RunExport, window: &mut Window, cx: &mut App) {
     open_modal(base, assembly, parts_only, false, run, window, cx);
 }
@@ -390,7 +405,8 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
                     prev_check = false;
                     body.child(
                         div().mt(px(mt)).child(crate::os_ui::field_label(label)).child(
-                            div()
+                            // (Also by its label, as live's runner finds a modal's select: `{"dropdown": "Format"}`.)
+                            crate::ui_script::mark(div(), || format!("dropdown:{label}"))
                                 .mt(px(FIELD_MT))
                                 .relative()
                                 .child(crate::os_ui::select_field(id, opts, cur, move |i, w, _| {
@@ -480,7 +496,7 @@ fn custom_text(s: &ExportSettings, f: &CustomField) -> String {
 /// radius 3; checked blue with a white check), 8 px gap, 14 px `#333` label.
 pub(super) fn modal_checkbox(id: &'static str, label: &'static str, on: bool) -> Stateful<Div> {
     let pal = crate::theme::p();
-    h_flex()
+    crate::ui_script::mark(h_flex(), move || format!("checkbox:{label}"))
         .debug_selector(move || id.into())
         .id(id)
         .h(px(27.))

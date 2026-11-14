@@ -421,7 +421,7 @@ pub fn cad_file_parts(f: &noshape_model::file_tab::FileTab, units: &noshape_unit
 }
 
 pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(String, k::Shape, [f32; 4])>) -> anyhow::Result<std::path::PathBuf> {
-    anyhow::ensure!(!parts.is_empty(), "There are no parts to export");
+    anyhow::ensure!(!parts.is_empty(), "Selected tab contains no supported geometry for export.");
     if let Some(msg) = missing_writer(s.format) {
         anyhow::bail!(msg);
     }
@@ -609,7 +609,7 @@ impl AssemblyExport {
 /// (Onshape: each part once, placed by its instances); the other formats
 /// and individual files get the placed parts.
 pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &AssemblyExport) -> anyhow::Result<std::path::PathBuf> {
-    anyhow::ensure!(!a.instances.is_empty(), "There are no parts to export");
+    anyhow::ensure!(!a.instances.is_empty(), "Selected tab contains no supported geometry for export.");
     // Y axis up: the model's +Z becomes +Y.
     let up = if s.y_up { glam::DMat4::from_rotation_x(-std::f64::consts::FRAC_PI_2) } else { glam::DMat4::IDENTITY };
     let instances: Vec<k::StepInstance> = a.instances.iter().map(|(p, _, t)| k::StepInstance { part: *p, transform: up * *t }).collect();

@@ -950,6 +950,17 @@ fn arcs_of_one_circle_extrude_to_one_side_face() {
     assert_eq!(faces, 3, "one cylinder and two planes");
 }
 
+/// Export of a Part Studio with no parts: live's notice (export-tab-no-geometry: the Export modal shows only it).
+#[test]
+fn export_of_an_empty_part_studio_says_there_is_no_geometry() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("empty-studio.noshape").to_str().unwrap() }));
+    let file = scratch("empty-studio.x_t");
+    let e = try_call(&mut ctx, "export_parts", json!({ "format": "PARASOLID", "file": file.to_str().unwrap() })).expect_err("nothing to export").to_json();
+    assert!(e.to_string().contains("Selected tab contains no supported geometry for export."), "{e}");
+    assert!(!file.exists());
+}
+
 /// The Measure tool (query_measure): a face's area; a whole part among the entities gives no measurement, as Onshape
 /// (live 2463: the readout and the Measure panel stay empty), with a note saying why.
 #[test]

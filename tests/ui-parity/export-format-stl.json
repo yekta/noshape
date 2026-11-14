@@ -4,6 +4,16 @@
  "area": "psui",
  "source": "live coverage audit 2026-11-14 (Export dialog formats and options with no recorded scenario)",
  "start": "block",
+ "config_files": {
+  "export_solid.json": {
+   "format": "STL",
+   "stl_units": 4,
+   "pvz_group": true,
+   "step": {
+    "derived_tolerances": true
+   }
+  }
+ },
  "steps": [
   {
    "do": "rclick",
