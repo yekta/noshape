@@ -853,6 +853,12 @@ def compare(live, ours, whole_document=True):
         if isinstance(a.get("dialog"), dict) and isinstance(b.get("dialog"), dict) and ("inserted" in a["dialog"]) != ("inserted" in b["dialog"]):
             a["dialog"].pop("inserted", None)
             b["dialog"].pop("inserted", None)
+        # A drawing panel's `fields` (live2's recorder from 2026-11-14: each checkbox's and select's value): compared
+        # once both sides read them.
+        da, db = a.get("dialog"), b.get("dialog")
+        if isinstance(da, dict) and isinstance(db, dict) and da.get("kind") == "drawing-panel" and ("fields" in da) != ("fields" in db):
+            da.pop("fields", None)
+            db.pop("fields", None)
         # A Feature Studio's notices while the autocomplete list is open (typing): live's count changes from run to run
         # at the same step (its compile runs on its own time), as ours.
         for side in (a, b):
