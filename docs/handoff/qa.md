@@ -5,6 +5,13 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 
 
+## 11-14 05:40: latency on the Mac, held (lead)
+Held: the Mac was overloaded and the user couldn't connect. When it runs: v0.4.50+ (has NOSHAPE_FRAME_LOG), everything in
+~/noshape-host/qa, through ~/noshape-env.sh (the single slot), short, and only when nothing else of ours is there. Method:
+/root/qa-scratch/lat (lat-block-{1..5}.json scenarios on the block start through the app's UI-script runner, run-scen.sh,
+lat-steps.py; synthetic OS input over ssh is blocked: no Accessibility permission). Input -> first frame only (the runner's
+state capture adds frames, so settle isn't usable there).
+
 ## 11-14 02:50: the GUI fuzz moved to vibe5 (lead: vibe3 at load 17 with the watcher)
 bin/fzloop.sh :61 runs on vibe5 (~/qa there, niced, seeds from 9352, the v0.4.49 app at ~/qa/rel/noshape-green); results
 ~/qa/fz*-result.txt on vibe5. vibe3 runs only the watcher-side checks qa needs (relsmoke, GUI rows).
