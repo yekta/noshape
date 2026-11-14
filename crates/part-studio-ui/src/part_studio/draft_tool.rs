@@ -28,6 +28,13 @@ pub struct DraftState {
     _sub: Subscription,
 }
 
+impl DraftState {
+    /// Minimum draft angle's text as shown.
+    pub(super) fn angle_text(&self, cx: &App) -> String {
+        self.angle_input.read(cx).text().to_string()
+    }
+}
+
 impl PartStudioView {
     pub(super) fn open_draft(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         // Onshape's number field (quantity_field): "5" → "5 deg", "1+1" →

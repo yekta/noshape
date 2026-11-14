@@ -128,6 +128,12 @@ feature's sketch until the selection changes (the double click on the viewport's
 active field focused (analysis-draft), Appearance / Material layout rows (dialogs 18 / 18). Extend: live 2992 shows no
 hover preview (live2's light blue was the X axis), so the 11-13 preview (ab8fd307) is taken out again. analysis-flatten
 clicks the top face now (the fillet's edges win in iso: live), re-record asked.
+**11-14 01:17:** the analysis-* scenarios (recorded 11-13 overnight, first compared now): 9 / 14 with the panels read as
+live's recorder reads them (`analysis_panel_state`), and live's preselection rule (Connection, Dihedral, Interference,
+Deviation keep it selected while open, as the tool took it, and clear it on close; the others take it). Left: Deviation
+(live's Surface tab takes faces, ours only curves: a feature gap, to build), analysis-thickness* x3 (live's free account
+has no Thickness analysis: ours keeps it), analysis-flatten (re-record asked). Next: the lead's viewport speed item (the
+dock and hat15 on the Mac's GPU).
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's

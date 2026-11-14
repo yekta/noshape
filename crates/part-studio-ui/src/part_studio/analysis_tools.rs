@@ -33,6 +33,12 @@ pub enum ToolKind {
 }
 
 impl ToolKind {
+    /// Tools whose preselection stays selected while they are open and clears when they close (live's recordings
+    /// analysis-connection / -dihedral / -interference / -deviation); the others take it into their field at once.
+    pub fn keeps_selection(self) -> bool {
+        matches!(self, ToolKind::Connection | ToolKind::Dihedral | ToolKind::Interference | ToolKind::Deviation)
+    }
+
     /// Tools that change how the parts are drawn: ✓ keeps them on, ✗ (or
     /// Esc) turns them off.
     pub fn is_view_mode(self) -> bool {
@@ -367,8 +373,11 @@ impl PartStudioView {
         if kind == ToolKind::Draft {
             self.open_draft(window, cx);
         }
-        if had_pre || matches!(kind, ToolKind::Draft | ToolKind::Flatten) {
+        if (had_pre && !kind.keeps_selection()) || matches!(kind, ToolKind::Draft | ToolKind::Flatten) {
             self.selection.clear();
+        } else if had_pre {
+            // Selected as the tool took it (live analysis-interference: a face picked, its part).
+            self.selection = selection.iter().chain(&selection2).cloned().collect();
         }
         // Interference detection keeps the top it opened at (live psb 10-19 i).
         let anchor_top = (kind == ToolKind::Interference).then(|| ((self.viewport.read(cx).size().y as f32) - 401.).max(0.));
@@ -377,6 +386,98 @@ impl PartStudioView {
         if kind.is_view_mode() {
             self.rebuild_scene(cx);
         }
+    }
+
+    /// The open analysis panel as live's recorder reads it (`kind` "panel": its texts in order, a checkbox as "[x] name"
+    /// then its name, and its fields; live's analysis-* recordings); Interference detection reads as a feature dialog.
+    pub(super) fn analysis_panel_state(&self, cx: &App) -> Option<serde_json::Value> {
+        use serde_json::json;
+        let check = |text: &mut Vec<String>, fields: &mut Vec<serde_json::Value>, label: &str, on: bool| {
+            text.push(format!("[{}] {label}", if on { "x" } else { " " }));
+            text.push(label.to_string());
+            fields.push(json!({ "label": label, "kind": "checkbox", "value": on }));
+        };
+        let labeler = self.labeler(cx);
+        let chips = |text: &mut Vec<String>, refs: &[Reference]| {
+            for r in refs {
+                text.push(labeler(r).to_string());
+                text.push("×".into());
+            }
+        };
+        let (mut text, mut fields) = (Vec::new(), Vec::new());
+        if let Some(d) = &self.ui.draft {
+            text.push("Mold split direction".into());
+            chips(&mut text, d.direction.as_slice());
+            let angle = d.angle_text(cx);
+            text.extend(["Minimum draft angle".to_string(), angle.clone(), "Entities to check".into()]);
+            chips(&mut text, &d.parts);
+            fields.push(json!({ "label": "Minimum draft angle", "kind": "input", "value": angle }));
+            check(&mut text, &mut fields, "Show undercut regions", d.undercut);
+            return Some(json!({ "kind": "panel", "title": "Draft analysis", "text": text, "fields": fields }));
+        }
+        let t = self.ui.analysis_tool.as_ref()?;
+        let o = &t.options;
+        let input = |i: usize, cx: &App| t.tolerance_inputs.get(i).map(|q| q.read(cx).text().to_string()).unwrap_or_default();
+        match t.kind {
+            ToolKind::Interference => {
+                let parts: Vec<String> = t.selection.iter().map(|r| labeler(r).to_string()).collect();
+                let found: Vec<String> = match t.result.as_ref().map(|r| r.interferences.as_slice()) {
+                    Some([]) | None => vec!["No interferences".into()],
+                    Some(list) => list.iter().map(|(_, a, b)| format!("{a} and {b}")).collect(),
+                };
+                return Some(json!({ "title": "Interference detection", "titleState": "ok", "kind": "feature", "tabs": [], "fields": [
+                    { "label": "Parts to analyze", "kind": "query", "items": parts, "active": true, "state": "ok" },
+                    { "label": "Interferences", "kind": "query", "items": found, "active": false, "state": "ok" }
+                ], "error": null }));
+            }
+            ToolKind::Connection => {
+                text.push("Entities".into());
+                chips(&mut text, &t.selection);
+                for (i, name) in ["No connection", "G0", "G1", "G2", "G3"].into_iter().enumerate() {
+                    check(&mut text, &mut fields, name, o.show_class[i]);
+                    if i >= 2 {
+                        let v = input(i - 2, cx);
+                        text.push(v.clone());
+                        fields.push(json!({ "label": null, "kind": "input", "value": v }));
+                    }
+                }
+            }
+            ToolKind::Dihedral => {
+                text.push("Edges to show dihedral".into());
+                chips(&mut text, &t.selection);
+                let angle = |deg: f64| if o.radians { format!("{} rad", noshape_units::format_number(deg.to_radians(), 3)) } else { format!("{} deg", noshape_units::format_number(deg, 2)) };
+                let (lo, hi) = match t.result.as_ref().and_then(|r| r.dihedral).filter(|_| !t.selection.is_empty()) {
+                    Some((lo, hi)) => (angle(lo), angle(hi)),
+                    None => (String::new(), String::new()),
+                };
+                let units = if o.radians { "Radians" } else { "Degrees" };
+                text.extend(["Units".to_string(), units.into(), "Max".into(), hi.clone(), "Min".into(), lo.clone()]);
+                fields.push(json!({ "label": units, "kind": "input", "value": "" }));
+                fields.push(json!({ "label": "Max", "kind": "input", "value": hi }));
+                fields.push(json!({ "label": "Min", "kind": "input", "value": lo }));
+                check(&mut text, &mut fields, "Enable threshold display", o.threshold);
+                text.push("Scale".into());
+            }
+            ToolKind::Zebra => {
+                let z = &o.zebra;
+                let n = input(0, cx);
+                text.extend(["Stripe count".to_string(), n.clone()]);
+                fields.push(json!({ "label": "Stripe count", "kind": "input", "value": n }));
+                check(&mut text, &mut fields, "Flip stripes", z.flip);
+                check(&mut text, &mut fields, "Show edges", z.show_edges);
+            }
+            ToolKind::Reflection => {
+                let r = &o.reflection;
+                let angle = input(0, cx);
+                text.extend(["Environment".to_string(), r.image.as_ref().map_or("Select image…".to_string(), |i| i.name().to_string()), "Rotation angle".into(), angle.clone()]);
+                fields.push(json!({ "label": "Rotation angle", "kind": "input", "value": angle }));
+                check(&mut text, &mut fields, "Show edges", r.show_edges);
+                check(&mut text, &mut fields, "Blur environment", r.blur);
+                check(&mut text, &mut fields, "Lock environment", r.lock);
+            }
+            _ => return None,
+        }
+        Some(json!({ "kind": "panel", "title": t.kind.title(), "text": text, "fields": fields }))
     }
 
     /// Close the open tool (✗, Esc, another tool); closing Zebra stripes
@@ -397,6 +498,9 @@ impl PartStudioView {
         }
         if t.kind.is_view_mode() || t.kind == ToolKind::Interference {
             self.rebuild_scene(cx);
+        }
+        if t.kind.keeps_selection() {
+            self.selection.clear();
         }
         let key = t.kind.title();
         self.ui.tool_memory.selection.insert(key, t.selection);

@@ -330,6 +330,9 @@ impl PartStudioView {
     /// of … (its rows), Named views (the name field, or "(New view name)", and "No views created" with none), Material.
     fn panel_ui_state(&self, cx: &App) -> Option<Value> {
         let panel = |title: String, text: Vec<String>| Some(json!({ "kind": "panel", "title": title, "text": text }));
+        if let Some(v) = self.analysis_panel_state(cx) {
+            return Some(v);
+        }
         if let Some(r) = &self.ui.plane_dependencies {
             let studio = self.studio(cx)?;
             let rows = noshape_model::interaction::features_using(&studio.features, r).into_iter().filter_map(|i| studio.feature(i).map(|f| f.name.clone())).collect();
