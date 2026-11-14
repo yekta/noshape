@@ -1,0 +1,60 @@
+{
+  "name": "sketch-3pt-arc-outside-semicircle-zone",
+  "about": "sketch on Top: a 3 point arc (0,0)–(20,0) with its third click at (10,15), on the bisector but ~11 px outside the semicircle: no semicircle snap (no MIDPOINT)",
+  "area": "psui",
+  "source": "psui 11-14 (live2): the 3 point arc MIDPOINT snap zone",
+  "start": "empty",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Sketch"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "plane": "Top"
+      }
+    },
+    {
+      "do": "key",
+      "key": "a"
+    },
+    {
+      "do": "click",
+      "on": {
+        "sketch_point": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sketch_point": [
+          20,
+          0
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sketch_point": [
+          10,
+          15
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

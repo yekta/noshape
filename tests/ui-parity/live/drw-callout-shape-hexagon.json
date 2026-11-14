@@ -1,16 +1,16 @@
 {
  "scenario": "drw-callout-shape-hexagon",
- "recorded": "2026-11-14T07:27:49.022Z",
+ "recorded": "2026-11-14T11:13:15.267Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.7"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "6d383cafabe6383282fe47dc",
+  "element": "f9a4130bce208aa505e57229",
   "start": "block-drawing",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -139,6 +139,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
      ]
     },
     "dialogs": [],
@@ -217,7 +229,7 @@
      "selection": []
     }
    },
-   "t": 231107
+   "t": 238840
   },
   {
    "step": 2,
@@ -255,6 +267,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
      ]
     },
     "dialogs": [],
@@ -333,7 +357,7 @@
      "selection": []
     }
    },
-   "t": 257738
+   "t": 265223
   },
   {
    "step": 3,
@@ -377,6 +401,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
      ]
     },
     "dialogs": [],
@@ -455,7 +491,7 @@
      "selection": []
     }
    },
-   "t": 271621
+   "t": 279270
   },
   {
    "step": 4,
@@ -496,6 +532,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Hexagon"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
      ]
     },
     "dialogs": [],
@@ -574,7 +622,7 @@
      "selection": []
     }
    },
-   "t": 286309
+   "t": 294693
   },
   {
    "step": 5,
@@ -612,6 +660,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Hexagon"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
      ]
     },
     "dialogs": [],
@@ -690,7 +750,7 @@
      "selection": []
     }
    },
-   "t": 310670
+   "t": 322330
   },
   {
    "step": 6,
@@ -710,7 +770,7 @@
    "ok": true,
    "at": [
     727,
-    622
+    672
    ],
    "state": {
     "focus": {
@@ -740,6 +800,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Hexagon"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
      ]
     },
     "dialogs": [],
@@ -814,25 +886,11 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [
-      {
-       "kind": "callout",
-       "text": "----",
-       "position": [
-        80.7,
-        97.9
-       ]
-      }
-     ],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Front"
-      }
-     ]
+     "annotations": [],
+     "selection": []
     }
    },
-   "t": 336953
+   "t": 348261
   },
   {
    "step": 7,
@@ -852,7 +910,7 @@
    "ok": true,
    "at": [
     787,
-    583
+    629
    ],
    "state": {
     "focus": {
@@ -882,6 +940,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Hexagon"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
      ]
     },
     "dialogs": [],
@@ -961,23 +1031,15 @@
        "kind": "callout",
        "text": "----",
        "position": [
-        80.7,
-        97.9
-       ]
-      },
-      {
-       "kind": "callout",
-       "text": "----",
-       "position": [
         94.7,
-        107
+        96.3
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 363170
+   "t": 374234
   },
   {
    "step": 8,
@@ -1077,23 +1139,15 @@
        "kind": "callout",
        "text": "----",
        "position": [
-        80.7,
-        97.9
-       ]
-      },
-      {
-       "kind": "callout",
-       "text": "----",
-       "position": [
         94.7,
-        107
+        96.3
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 389278
+   "t": 400424
   }
  ]
 }

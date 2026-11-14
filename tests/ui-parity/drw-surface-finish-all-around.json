@@ -1,0 +1,66 @@
+{
+  "name": "drw-surface-finish-all-around",
+  "about": "Surface finish symbol with All around ticked, then placed",
+  "area": "drawing",
+  "source": "live2 11-14: drawing field-level coverage (panel options no scenario touched; lead: the asm/drawing half of the coverage audit)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Surface finish symbol"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "All around"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            30,
+            0,
+            18
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

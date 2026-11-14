@@ -1,0 +1,68 @@
+{
+  "name": "drw-insert-view-scale-absolute",
+  "about": "Insert view with View scale Absolute, placed",
+  "area": "drawing",
+  "source": "live2 11-14: drawing field-level coverage (panel options no scenario touched; lead: the asm/drawing half of the coverage audit)",
+  "start": "block-drawing-empty",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Insert view"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Insert"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "list_row": "Part Studio 1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "list_row": "Part 1"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Auto"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Absolute"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          90,
+          110
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

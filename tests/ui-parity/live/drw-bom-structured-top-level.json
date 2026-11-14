@@ -1,16 +1,16 @@
 {
  "scenario": "drw-bom-structured-top-level",
- "recorded": "2026-11-14T07:34:32.328Z",
+ "recorded": "2026-11-14T10:58:39.992Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.7"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "5eb15758e97531bac297b095",
+  "element": "fdb13bb572b38a971ae1ec4d",
   "start": "pin-block-asm-drawing",
   "startElement": "2e8be4ded96940b21ba2941d",
   "runner": "live2 .nstate-uip-2.json"
@@ -189,6 +189,28 @@
       "Top to bottom",
       "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start pin-block asm Copy 1"
+      },
+      {
+       "label": "Template",
+       "kind": "select",
+       "value": "Follow assembly"
+      },
+      {
+       "label": "BOM type",
+       "kind": "select",
+       "value": "Flattened"
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -322,7 +344,7 @@
      "selection": []
     }
    },
-   "t": 236160
+   "t": 232732
   },
   {
    "step": 2,
@@ -355,6 +377,28 @@
       "Top to bottom",
       "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start pin-block asm Copy 1"
+      },
+      {
+       "label": "Template",
+       "kind": "select",
+       "value": "Follow assembly"
+      },
+      {
+       "label": "BOM type",
+       "kind": "select",
+       "value": "Flattened"
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -488,7 +532,7 @@
      "selection": []
     }
    },
-   "t": 264271
+   "t": 260948
   },
   {
    "step": 3,
@@ -527,6 +571,28 @@
       "Top to bottom",
       "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start pin-block asm Copy 1"
+      },
+      {
+       "label": "Template",
+       "kind": "select",
+       "value": "Follow assembly"
+      },
+      {
+       "label": "BOM type",
+       "kind": "select",
+       "value": "Flattened"
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -660,7 +726,7 @@
      "selection": []
     }
    },
-   "t": 281068
+   "t": 278231
   },
   {
    "step": 4,
@@ -696,6 +762,28 @@
       "Top to bottom",
       "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start pin-block asm Copy 1"
+      },
+      {
+       "label": "Template",
+       "kind": "select",
+       "value": "Follow assembly"
+      },
+      {
+       "label": "BOM type",
+       "kind": "select",
+       "value": "Structured - Top level"
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -829,7 +917,7 @@
      "selection": []
     }
    },
-   "t": 297775
+   "t": 295170
   },
   {
    "step": 5,
@@ -862,6 +950,28 @@
       "Top to bottom",
       "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start pin-block asm Copy 1"
+      },
+      {
+       "label": "Template",
+       "kind": "select",
+       "value": "Follow assembly"
+      },
+      {
+       "label": "BOM type",
+       "kind": "select",
+       "value": "Structured - Top level"
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -995,7 +1105,7 @@
      "selection": []
     }
    },
-   "t": 325872
+   "t": 323015
   },
   {
    "step": 6,
@@ -1011,7 +1121,7 @@
    "ok": true,
    "at": [
     1497,
-    175
+    181
    ],
    "state": {
     "focus": {
@@ -1156,7 +1266,7 @@
      "selection": []
     }
    },
-   "t": 351796
+   "t": 349773
   },
   {
    "step": 7,
@@ -1316,7 +1426,7 @@
      "selection": []
     }
    },
-   "t": 378274
+   "t": 377059
   }
  ]
 }

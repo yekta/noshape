@@ -1,0 +1,104 @@
+{
+  "name": "asm-mate-switch-fastened-chain",
+  "about": "two-blocks: Fastened between the two tops, the type dropdown Fastened → Ball → Parallel → Planar → Pin slot → Cylindrical, Escape",
+  "area": "asm",
+  "source": "live2 11-14: assembly field-level coverage (mate type options no recorded scenario reached)",
+  "start": "two-blocks",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Fastened mate"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "face": [
+          70,
+          10,
+          10
+        ],
+        "instance": "Part 2 <1>"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "face": [
+          20,
+          20,
+          20
+        ],
+        "instance": "Part 1 <1>"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Fastened",
+        "pick": "Ball"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Ball",
+        "pick": "Parallel"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Parallel",
+        "pick": "Planar"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Planar",
+        "pick": "Pin slot"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Pin slot",
+        "pick": "Cylindrical"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

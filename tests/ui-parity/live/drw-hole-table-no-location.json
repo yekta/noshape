@@ -1,16 +1,16 @@
 {
  "scenario": "drw-hole-table-no-location",
- "recorded": "2026-11-14T07:41:02.065Z",
+ "recorded": "2026-11-14T11:33:50.049Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.7"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "497e17bf4930e9d900ea297a",
+  "element": "8020dc8294e84c5b66df9097",
   "start": "hole-plate-drawing",
   "startElement": "1532a5517d526c1726ec8cde",
   "runner": "live2 .nstate-uip-2.json"
@@ -138,6 +138,28 @@
       "Top to bottom",
       "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Show location data",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Location precision",
+       "kind": "select",
+       "value": "0.123 (Drawing)"
+      },
+      {
+       "label": "Sheet Sheet1",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -216,7 +238,7 @@
      "selection": []
     }
    },
-   "t": 230344
+   "t": 228033
   },
   {
    "step": 2,
@@ -253,6 +275,28 @@
       "Top to bottom",
       "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Show location data",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Location precision",
+       "kind": "select",
+       "value": "0.123 (Drawing)"
+      },
+      {
+       "label": "Sheet Sheet1",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -331,7 +375,7 @@
      "selection": []
     }
    },
-   "t": 256592
+   "t": 253571
   },
   {
    "step": 3,
@@ -365,6 +409,28 @@
       "Top to bottom",
       "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Show location data",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Collapse tags",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Sheet Sheet1",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -443,7 +509,7 @@
      "selection": []
     }
    },
-   "t": 281840
+   "t": 279089
   },
   {
    "step": 4,
@@ -472,6 +538,28 @@
       "Top to bottom",
       "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Show location data",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Collapse tags",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Sheet Sheet1",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -550,7 +638,7 @@
      "selection": []
     }
    },
-   "t": 306686
+   "t": 304170
   },
   {
    "step": 5,
@@ -563,7 +651,7 @@
    "ok": true,
    "at": [
     727,
-    329
+    350
    ],
    "state": {
     "focus": {
@@ -587,6 +675,28 @@
       "Top to bottom",
       "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Show location data",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Collapse tags",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Sheet Sheet1",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -665,7 +775,7 @@
      "selection": []
     }
    },
-   "t": 332363
+   "t": 329934
   },
   {
    "step": 6,
@@ -685,7 +795,7 @@
    "ok": true,
    "at": [
     641,
-    407
+    436
    ],
    "state": {
     "focus": {
@@ -709,6 +819,28 @@
       "Top to bottom",
       "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Show location data",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Collapse tags",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Sheet Sheet1",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -787,7 +919,7 @@
      "selection": []
     }
    },
-   "t": 357252
+   "t": 356051
   },
   {
    "step": 7,
@@ -884,7 +1016,7 @@
      "selection": []
     }
    },
-   "t": 382380
+   "t": 381352
   },
   {
    "step": 8,
@@ -900,7 +1032,7 @@
    "ok": true,
    "at": [
     1023,
-    489
+    526
    ],
    "state": {
     "focus": {
@@ -984,7 +1116,7 @@
      "selection": []
     }
    },
-   "t": 406991
+   "t": 406852
   },
   {
    "step": 9,
@@ -1083,7 +1215,7 @@
      "selection": []
     }
    },
-   "t": 432904
+   "t": 432551
   }
  ]
 }

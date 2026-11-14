@@ -921,5 +921,142 @@
  "bracket": {"units": "mm", "about": "an L bracket centred on the Right plane: base 40 × 30 × 5 (x -20..20, y 0..30, z 0..5), wall 40 × 5 × 30 at the back (y 25..30; Extrude 2 adds); Sketch 3 on Right a rib line from the wall (y 25, z 25) to the base (y 5, z 5)", "features": [{"type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{"corner_rectangle": [[-20, 0], [20, 30]]}]}, {"type": "extrude", "name": "Extrude 1", "params": {"entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "5 mm", "operationType": "NEW"}}, {"type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{"corner_rectangle": [[-20, 25], [20, 30]]}]}, {"type": "extrude", "name": "Extrude 2", "params": {"entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "30 mm", "operationType": "ADD", "defaultScope": true}}, {"type": "newSketch", "name": "Sketch 3", "plane": "Right", "shapes": [{"line": [[25, 25], [5, 5]]}]}]},
  "plate-bend": {"units": "mm", "about": "the plate (60 × 40, 2 mm, z 0..2, as start plate) and Sketch 2 on Top: a bend line x 30 across it (y -5..45)", "features": [{"type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{"corner_rectangle": [[0, 0], [60, 40]]}]}, {"type": "sheetMetalStart", "name": "Sheet metal model 1", "params": {"process": "THICKEN", "regions": ["Sketch 1 region 0"], "thickness": "2 mm", "radius": "2 mm"}}, {"type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{"line": [[30, -5], [30, 45]]}]}]},
  "drawing-linked": {"units": "mm", "features": [{"type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{"corner_rectangle": [[0, 0], [40, 30]]}]}, {"type": "extrude", "name": "Extrude 1", "params": {"entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW"}}], "drawing": {"part": "Part 1", "template": "ANSI_A_INCH.dwt", "views": "none"}, "linked": {"name": "uip Source", "start": {"units": "mm", "features": [{"type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{"corner_rectangle": [[0, 0], [40, 30]]}]}, {"type": "extrude", "name": "Extrude 1", "params": {"entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW"}}], "tabs": [], "versions": [{"name": "V1", "features": [{"type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{"circle": [[20, 15], [25, 15]]}]}, {"type": "extrude", "name": "Extrude 2", "params": {"entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW"}}]}, {"name": "V2", "features": []}]}, "insert": {"source": "Part Studio 1", "part": "Part 1", "version": "V1", "view": {"orientation": "front", "position": [110, 110]}}}, "about": "the block and an empty drawing of its Part 1 (Create Drawing, ANSI_A_INCH.dwt, no views), then Insert view \u203a Other documents \u203a uip Source (doc-linked's: V1 and a newer V2) \u203a Part Studio 1 at V1 \u203a Part 1, Front, its centre at (110, 110) mm: the Sheets panel's only reference row is that Part 1 of another document's version; opens on the drawing tab"},
- "block-drawing-v1": {"units": "mm", "features": [{"type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{"corner_rectangle": [[0, 0], [40, 30]]}]}, {"type": "extrude", "name": "Extrude 1", "params": {"entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW"}}], "drawing": {"part": "Part 1", "template": "ANSI_A_INCH.dwt", "views": "suggested", "first": true}, "versions": [{"name": "V1", "features": []}], "about": "block-drawing, then a version V1 of the document (made after the drawing, nothing after it); opens on Part Studio 1"}
+ "block-drawing-v1": {"units": "mm", "features": [{"type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{"corner_rectangle": [[0, 0], [40, 30]]}]}, {"type": "extrude", "name": "Extrude 1", "params": {"entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW"}}], "drawing": {"part": "Part 1", "template": "ANSI_A_INCH.dwt", "views": "suggested", "first": true}, "versions": [{"name": "V1", "features": []}], "about": "block-drawing, then a version V1 of the document (made after the drawing, nothing after it); opens on Part Studio 1"},
+ "holes-plate-drawing": {
+  "units": "mm",
+  "about": "a 60 x 40 x 10 mm plate below Top (Extrude 1 flipped, z -10..0); Sketch 2 on Top: five r1 circles whose centres place two Hole features (Simple, Drilled, Blind 12 mm, so through the plate): Hole 1 5 mm at (10,10), (30,10), (50,10); Hole 2 8 mm at (10,30), (50,30); and its drawing (Create Drawing of Part 1, ANSI_A_INCH.dwt, Suggested views); opens on the drawing tab. Live's hole table shows them as \u00d8.197 THRU x3 and \u00d8.315 THRU x2",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        60,
+        40
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "10 mm",
+     "operationType": "NEW",
+     "oppositeDirection": true
+    }
+   },
+   {
+    "type": "newSketch",
+    "name": "Sketch 2",
+    "plane": "Top",
+    "shapes": [
+     {
+      "circle": [
+       [
+        10,
+        10
+       ],
+       [
+        11,
+        10
+       ]
+      ]
+     },
+     {
+      "circle": [
+       [
+        30,
+        10
+       ],
+       [
+        31,
+        10
+       ]
+      ]
+     },
+     {
+      "circle": [
+       [
+        50,
+        10
+       ],
+       [
+        51,
+        10
+       ]
+      ]
+     },
+     {
+      "circle": [
+       [
+        10,
+        30
+       ],
+       [
+        11,
+        30
+       ]
+      ]
+     },
+     {
+      "circle": [
+       [
+        50,
+        30
+       ],
+       [
+        51,
+        30
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "hole",
+    "name": "Hole 1",
+    "params": {
+     "locations": [
+      "Sketch 2 circle centre at [10, 10]",
+      "Sketch 2 circle centre at [30, 10]",
+      "Sketch 2 circle centre at [50, 10]"
+     ],
+     "holeDiameter": "5 mm",
+     "endStyle": "BLIND",
+     "holeDepth": "12 mm"
+    }
+   },
+   {
+    "type": "hole",
+    "name": "Hole 2",
+    "params": {
+     "locations": [
+      "Sketch 2 circle centre at [10, 30]",
+      "Sketch 2 circle centre at [50, 30]"
+     ],
+     "holeDiameter": "8 mm",
+     "endStyle": "BLIND",
+     "holeDepth": "12 mm"
+    }
+   }
+  ],
+  "drawing": {
+   "part": "Part 1",
+   "template": "ANSI_A_INCH.dwt",
+   "views": "suggested"
+  }
+ }
 }

@@ -1,0 +1,66 @@
+{
+  "name": "drw-hole-table-collapse-off",
+  "about": "holes-plate-drawing: Hole table with Show location data cleared (Collapse tags left off), Top view, placed: one row per hole (3 x 5 mm, 2 x 8 mm)",
+  "area": "drawing",
+  "source": "studios 11-14 (live2): what Collapse tags does to a placed hole table",
+  "start": "holes-plate-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Hole table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Show location data"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "view": "Top"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          150,
+          120
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

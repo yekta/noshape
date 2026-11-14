@@ -1,19 +1,19 @@
 {
  "scenario": "asm-gear-relation-ratio-reverse",
- "recorded": "2026-11-14T04:41:52.844Z",
+ "recorded": "2026-11-14T12:22:33.664Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.5"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "dd379215d30f186275051b58",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "4dfaaa410140b7b317c262d1",
   "start": "pin-block",
-  "startElement": "ed211f3bd9ad0f1f27da328a",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "2e8be4ded96940b21ba2941d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -171,9 +171,9 @@
     -28.814,
     29.209
    ],
-   "width_mm": 105.679,
+   "width_mm": 96.23,
    "height_mm": 55.966,
-   "mmPerPixel": 0.063167,
+   "mmPerPixel": 0.057519,
    "orthographic": true
   },
   "measure": null
@@ -432,14 +432,14 @@
       -28.814,
       29.209
      ],
-     "width_mm": 105.679,
+     "width_mm": 96.23,
      "height_mm": 55.966,
-     "mmPerPixel": 0.063167,
+     "mmPerPixel": 0.057519,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 32206
+   "t": 31922
   },
   {
    "step": 2,
@@ -688,14 +688,14 @@
       -28.814,
       29.209
      ],
-     "width_mm": 105.679,
+     "width_mm": 96.23,
      "height_mm": 55.966,
-     "mmPerPixel": 0.063167,
+     "mmPerPixel": 0.057519,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 37473
+   "t": 36636
   },
   {
    "step": 3,
@@ -956,14 +956,14 @@
       -28.814,
       29.209
      ],
-     "width_mm": 105.679,
+     "width_mm": 96.23,
      "height_mm": 55.966,
-     "mmPerPixel": 0.063167,
+     "mmPerPixel": 0.057519,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 40489
+   "t": 39357
   },
   {
    "step": 4,
@@ -1218,14 +1218,14 @@
       -28.814,
       29.209
      ],
-     "width_mm": 105.679,
+     "width_mm": 96.23,
      "height_mm": 55.966,
-     "mmPerPixel": 0.063167,
+     "mmPerPixel": 0.057519,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 43125
+   "t": 41877
   },
   {
    "step": 5,
@@ -1488,14 +1488,14 @@
       -28.814,
       29.209
      ],
-     "width_mm": 105.679,
+     "width_mm": 96.23,
      "height_mm": 55.966,
-     "mmPerPixel": 0.063167,
+     "mmPerPixel": 0.057519,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 45846
+   "t": 44176
   },
   {
    "step": 6,
@@ -1750,14 +1750,14 @@
       -28.814,
       29.209
      ],
-     "width_mm": 105.679,
+     "width_mm": 96.23,
      "height_mm": 55.966,
-     "mmPerPixel": 0.063167,
+     "mmPerPixel": 0.057519,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 50868
+   "t": 48891
   },
   {
    "step": 7,
@@ -2018,14 +2018,14 @@
       -28.814,
       29.209
      ],
-     "width_mm": 105.679,
+     "width_mm": 96.23,
      "height_mm": 55.966,
-     "mmPerPixel": 0.063167,
+     "mmPerPixel": 0.057519,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 53992
+   "t": 51512
   },
   {
    "step": 8,
@@ -2280,14 +2280,14 @@
       -28.814,
       29.209
      ],
-     "width_mm": 105.679,
+     "width_mm": 96.23,
      "height_mm": 55.966,
-     "mmPerPixel": 0.063167,
+     "mmPerPixel": 0.057519,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 59037
+   "t": 56368
   },
   {
    "step": 9,
@@ -2319,7 +2319,7 @@
     "features": {
      "rows": [
       {
-       "name": "start pin-block asm Copy 1",
+       "name": "start pin-block asm",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -2355,7 +2355,7 @@
        "cls": "is-instance"
       },
       {
-       "name": "Mate features (2)",
+       "name": "Mate features (1)",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -2371,22 +2371,13 @@
        "related": false,
        "hidden": true,
        "cls": "ns-list-item-hidden is-mate-item"
-      },
-      {
-       "name": "Gear 1",
-       "state": "error",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "ns-list-item-error is-mate-item"
       }
      ],
      "rollbackAfter": null
     },
     "parts": [],
     "undo": {
-     "undo": true,
+     "undo": false,
      "redo": false
     },
     "message": null,
@@ -2469,14 +2460,14 @@
       -28.814,
       29.209
      ],
-     "width_mm": 105.679,
+     "width_mm": 96.23,
      "height_mm": 55.966,
-     "mmPerPixel": 0.063167,
+     "mmPerPixel": 0.057519,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 63124
+   "t": 60199
   },
   {
    "step": 10,
@@ -2500,7 +2491,7 @@
     "features": {
      "rows": [
       {
-       "name": "start pin-block asm Copy 1",
+       "name": "start pin-block asm",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -2536,7 +2527,7 @@
        "cls": "is-instance"
       },
       {
-       "name": "Mate features (2)",
+       "name": "Mate features (1)",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -2552,22 +2543,13 @@
        "related": false,
        "hidden": true,
        "cls": "ns-list-item-hidden is-mate-item"
-      },
-      {
-       "name": "Gear 1",
-       "state": "error",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "ns-list-item-error is-mate-item"
       }
      ],
      "rollbackAfter": null
     },
     "parts": [],
     "undo": {
-     "undo": true,
+     "undo": false,
      "redo": false
     },
     "message": null,
@@ -2650,14 +2632,14 @@
       -28.814,
       29.209
      ],
-     "width_mm": 105.679,
+     "width_mm": 96.23,
      "height_mm": 55.966,
-     "mmPerPixel": 0.063167,
+     "mmPerPixel": 0.057519,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 68180
+   "t": 64876
   }
  ]
 }

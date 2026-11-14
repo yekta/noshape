@@ -1,0 +1,60 @@
+{
+  "name": "sketch-3pt-arc-semicircle-off-bisector",
+  "about": "sketch on Top: a 3 point arc (0,0)–(20,0) with its third click at (17,6), off the chord's bisector but within ~7.5 px of the semicircle: live snaps it to a semicircle (MIDPOINT: the centre at the chord's middle)",
+  "area": "psui",
+  "source": "psui 11-14 (live2): the 3 point arc MIDPOINT snap zone",
+  "start": "empty",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Sketch"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "plane": "Top"
+      }
+    },
+    {
+      "do": "key",
+      "key": "a"
+    },
+    {
+      "do": "click",
+      "on": {
+        "sketch_point": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sketch_point": [
+          20,
+          0
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sketch_point": [
+          17,
+          6
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

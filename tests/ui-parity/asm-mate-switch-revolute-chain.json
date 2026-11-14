@@ -1,0 +1,82 @@
+{
+  "name": "asm-mate-switch-revolute-chain",
+  "about": "two-blocks: Revolute between the two tops, the type dropdown Revolute → Planar → Cylindrical → Fastened, Escape",
+  "area": "asm",
+  "source": "live2 11-14: assembly field-level coverage (mate type options no recorded scenario reached)",
+  "start": "two-blocks",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Revolute mate"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "face": [
+          70,
+          10,
+          10
+        ],
+        "instance": "Part 2 <1>"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "face": [
+          20,
+          20,
+          20
+        ],
+        "instance": "Part 1 <1>"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Revolute",
+        "pick": "Planar"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Planar",
+        "pick": "Cylindrical"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Cylindrical",
+        "pick": "Fastened"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

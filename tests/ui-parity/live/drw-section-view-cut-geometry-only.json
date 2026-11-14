@@ -1,16 +1,16 @@
 {
  "scenario": "drw-section-view-cut-geometry-only",
- "recorded": "2026-11-14T06:50:47.093Z",
+ "recorded": "2026-11-14T11:41:11.555Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.6"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "3420021fba58b81491c8f292",
+  "element": "90a681dcb4d8cc2158d041fc",
   "start": "block-drawing",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -126,6 +126,18 @@
       "Angular",
       "Show cut geometry only",
       "Section depth"
+     ],
+     "fields": [
+      {
+       "label": "Show cut geometry only",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Section depth",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -204,7 +216,7 @@
      "selection": []
     }
    },
-   "t": 231615
+   "t": 226382
   },
   {
    "step": 2,
@@ -229,6 +241,18 @@
       "Angular",
       "Show cut geometry only",
       "Section depth"
+     ],
+     "fields": [
+      {
+       "label": "Show cut geometry only",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Section depth",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -307,7 +331,7 @@
      "selection": []
     }
    },
-   "t": 257713
+   "t": 251836
   },
   {
    "step": 3,
@@ -336,6 +360,13 @@
       "Horizontal",
       "Angular",
       "Show cut geometry only"
+     ],
+     "fields": [
+      {
+       "label": "Show cut geometry only",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -414,7 +445,7 @@
      "selection": []
     }
    },
-   "t": 283352
+   "t": 277224
   },
   {
    "step": 4,
@@ -438,6 +469,13 @@
       "Horizontal",
       "Angular",
       "Show cut geometry only"
+     ],
+     "fields": [
+      {
+       "label": "Show cut geometry only",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -516,7 +554,7 @@
      "selection": []
     }
    },
-   "t": 309356
+   "t": 303274
   },
   {
    "step": 5,
@@ -545,6 +583,13 @@
       "Horizontal",
       "Angular",
       "Show cut geometry only"
+     ],
+     "fields": [
+      {
+       "label": "Show cut geometry only",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -623,7 +668,7 @@
      "selection": []
     }
    },
-   "t": 333458
+   "t": 329225
   },
   {
    "step": 6,
@@ -643,7 +688,7 @@
    "ok": true,
    "at": [
     641,
-    329
+    350
    ],
    "state": {
     "focus": {
@@ -659,6 +704,13 @@
       "Horizontal",
       "Angular",
       "Show cut geometry only"
+     ],
+     "fields": [
+      {
+       "label": "Show cut geometry only",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -737,7 +789,7 @@
      "selection": []
     }
    },
-   "t": 360155
+   "t": 354385
   },
   {
    "step": 7,
@@ -753,7 +805,7 @@
    "ok": true,
    "at": [
     726,
-    469
+    504
    ],
    "state": {
     "focus": {
@@ -826,7 +878,7 @@
        "kind": "section",
        "position": [
         81,
-        133.3
+        125.1
        ],
        "parent": "Top",
        "scale": "1:1",
@@ -850,14 +902,14 @@
        "text": "SECTION A - A",
        "position": [
         81,
-        121.5
+        113.4
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 389407
+   "t": 381814
   },
   {
    "step": 8,
@@ -945,7 +997,7 @@
        "kind": "section",
        "position": [
         81,
-        133.3
+        125.1
        ],
        "parent": "Top",
        "scale": "1:1",
@@ -969,14 +1021,14 @@
        "text": "SECTION A - A",
        "position": [
         81,
-        121.5
+        113.4
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 417832
+   "t": 409767
   }
  ]
 }

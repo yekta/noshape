@@ -1,16 +1,16 @@
 {
  "scenario": "drw-section-view-section-depth",
- "recorded": "2026-11-14T06:58:00.718Z",
+ "recorded": "2026-11-14T11:48:11.466Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.6"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "ce3dfe3e86e0b9e70de38faf",
+  "element": "9548f762753edc91486cbff1",
   "start": "block-drawing",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -126,6 +126,18 @@
       "Angular",
       "Show cut geometry only",
       "Section depth"
+     ],
+     "fields": [
+      {
+       "label": "Show cut geometry only",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Section depth",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -204,7 +216,7 @@
      "selection": []
     }
    },
-   "t": 233845
+   "t": 227239
   },
   {
    "step": 2,
@@ -229,6 +241,18 @@
       "Angular",
       "Show cut geometry only",
       "Section depth"
+     ],
+     "fields": [
+      {
+       "label": "Show cut geometry only",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Section depth",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -307,7 +331,7 @@
      "selection": []
     }
    },
-   "t": 260096
+   "t": 253267
   },
   {
    "step": 3,
@@ -340,6 +364,23 @@
       "Blind",
       "Depth of section cut",
       "Offset"
+     ],
+     "fields": [
+      {
+       "label": "Section depth",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "End type",
+       "kind": "select",
+       "value": "Up to entity"
+      },
+      {
+       "label": "Offset",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -418,7 +459,7 @@
      "selection": []
     }
    },
-   "t": 285312
+   "t": 278921
   },
   {
    "step": 4,
@@ -446,6 +487,23 @@
       "Blind",
       "Depth of section cut",
       "Offset"
+     ],
+     "fields": [
+      {
+       "label": "Section depth",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "End type",
+       "kind": "select",
+       "value": "Up to entity"
+      },
+      {
+       "label": "Offset",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -524,7 +582,7 @@
      "selection": []
     }
    },
-   "t": 310417
+   "t": 304508
   },
   {
    "step": 5,
@@ -557,6 +615,23 @@
       "Blind",
       "Depth of section cut",
       "Offset"
+     ],
+     "fields": [
+      {
+       "label": "Section depth",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "End type",
+       "kind": "select",
+       "value": "Up to entity"
+      },
+      {
+       "label": "Offset",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -635,7 +710,7 @@
      "selection": []
     }
    },
-   "t": 336057
+   "t": 329510
   },
   {
    "step": 6,
@@ -655,7 +730,7 @@
    "ok": true,
    "at": [
     641,
-    329
+    350
    ],
    "state": {
     "focus": {
@@ -675,6 +750,23 @@
       "Blind",
       "Depth of section cut",
       "Offset"
+     ],
+     "fields": [
+      {
+       "label": "Section depth",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "End type",
+       "kind": "select",
+       "value": "Up to entity"
+      },
+      {
+       "label": "Offset",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -753,7 +845,7 @@
      "selection": []
     }
    },
-   "t": 363650
+   "t": 355379
   },
   {
    "step": 7,
@@ -769,7 +861,7 @@
    "ok": true,
    "at": [
     726,
-    469
+    504
    ],
    "state": {
     "focus": {
@@ -786,6 +878,23 @@
       "Blind",
       "Depth of section cut",
       "Offset"
+     ],
+     "fields": [
+      {
+       "label": "Section depth",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "End type",
+       "kind": "select",
+       "value": "Up to entity"
+      },
+      {
+       "label": "Offset",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -864,7 +973,7 @@
      "selection": []
     }
    },
-   "t": 390594
+   "t": 380505
   },
   {
    "step": 8,
@@ -963,7 +1072,7 @@
      "selection": []
     }
    },
-   "t": 418019
+   "t": 407021
   }
  ]
 }

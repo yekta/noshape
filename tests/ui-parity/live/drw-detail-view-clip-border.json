@@ -1,16 +1,16 @@
 {
  "scenario": "drw-detail-view-clip-border",
- "recorded": "2026-11-14T07:12:36.243Z",
+ "recorded": "2026-11-14T11:19:55.283Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.6"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "328e30e017eb0512a6638b0c",
+  "element": "88b0dc39317eefdea27f8701",
   "start": "hole-plate-drawing",
   "startElement": "1532a5517d526c1726ec8cde",
   "runner": "live2 .nstate-uip-2.json"
@@ -130,6 +130,23 @@
       "Leader",
       "Show detail view profile",
       "Clip border to geometry"
+     ],
+     "fields": [
+      {
+       "label": "Profile style",
+       "kind": "select",
+       "value": "In line"
+      },
+      {
+       "label": "Show detail view profile",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Clip border to geometry",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -208,7 +225,7 @@
      "selection": []
     }
    },
-   "t": 236933
+   "t": 227307
   },
   {
    "step": 2,
@@ -237,6 +254,23 @@
       "Leader",
       "Show detail view profile",
       "Clip border to geometry"
+     ],
+     "fields": [
+      {
+       "label": "Profile style",
+       "kind": "select",
+       "value": "In line"
+      },
+      {
+       "label": "Show detail view profile",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Clip border to geometry",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -315,7 +349,7 @@
      "selection": []
     }
    },
-   "t": 262976
+   "t": 253268
   },
   {
    "step": 3,
@@ -349,6 +383,23 @@
       "Leader",
       "Show detail view profile",
       "Clip border to geometry"
+     ],
+     "fields": [
+      {
+       "label": "Profile style",
+       "kind": "select",
+       "value": "In line"
+      },
+      {
+       "label": "Show detail view profile",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Clip border to geometry",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -427,7 +478,7 @@
      "selection": []
     }
    },
-   "t": 288187
+   "t": 278710
   },
   {
    "step": 4,
@@ -456,6 +507,23 @@
       "Leader",
       "Show detail view profile",
       "Clip border to geometry"
+     ],
+     "fields": [
+      {
+       "label": "Profile style",
+       "kind": "select",
+       "value": "In line"
+      },
+      {
+       "label": "Show detail view profile",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Clip border to geometry",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -534,7 +602,7 @@
      "selection": []
     }
    },
-   "t": 313483
+   "t": 304518
   },
   {
    "step": 5,
@@ -554,7 +622,7 @@
    "ok": true,
    "at": [
     813,
-    681
+    736
    ],
    "state": {
     "focus": {
@@ -575,6 +643,23 @@
       "Leader",
       "Show detail view profile",
       "Clip border to geometry"
+     ],
+     "fields": [
+      {
+       "label": "Profile style",
+       "kind": "select",
+       "value": "In line"
+      },
+      {
+       "label": "Show detail view profile",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Clip border to geometry",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -653,7 +738,7 @@
      "selection": []
     }
    },
-   "t": 339594
+   "t": 329635
   },
   {
    "step": 6,
@@ -673,7 +758,7 @@
    "ok": true,
    "at": [
     761,
-    634
+    685
    ],
    "state": {
     "focus": {
@@ -694,6 +779,23 @@
       "Leader",
       "Show detail view profile",
       "Clip border to geometry"
+     ],
+     "fields": [
+      {
+       "label": "Profile style",
+       "kind": "select",
+       "value": "In line"
+      },
+      {
+       "label": "Show detail view profile",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Clip border to geometry",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -772,7 +874,7 @@
      "selection": []
     }
    },
-   "t": 364942
+   "t": 354012
   },
   {
    "step": 7,
@@ -788,7 +890,7 @@
    "ok": true,
    "at": [
     679,
-    371
+    397
    ],
    "state": {
     "focus": {
@@ -828,7 +930,7 @@
        "kind": "detail",
        "position": [
         69.8,
-        156.1
+        150.3
        ],
        "parent": "Front",
        "scale": "2:1",
@@ -885,14 +987,14 @@
        "text": "DETAIL A SCALE 2:1",
        "position": [
         69.8,
-        114
+        106.3
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 392407
+   "t": 379421
   },
   {
    "step": 8,
@@ -947,7 +1049,7 @@
        "kind": "detail",
        "position": [
         69.8,
-        156.1
+        150.3
        ],
        "parent": "Front",
        "scale": "2:1",
@@ -1004,14 +1106,14 @@
        "text": "DETAIL A SCALE 2:1",
        "position": [
         69.8,
-        114
+        106.3
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 419285
+   "t": 405710
   }
  ]
 }

@@ -1,0 +1,60 @@
+{
+  "name": "asm-relation-switch-gear-chain",
+  "about": "pin-block: Gear relation, the type dropdown Gear → Linear → Screw → Gear, Escape",
+  "area": "asm",
+  "source": "live2 11-14: assembly field-level coverage (relation type options no recorded scenario reached)",
+  "start": "pin-block",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Gear relation"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "dialog"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Gear",
+        "pick": "Linear"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Linear",
+        "pick": "Screw"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Screw",
+        "pick": "Gear"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

@@ -1,16 +1,16 @@
 {
  "scenario": "drw-break-view-curve",
- "recorded": "2026-11-14T07:19:46.968Z",
+ "recorded": "2026-11-14T11:05:07.452Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.6"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "151fcca67436473b774f9dfd",
+  "element": "dc81b6c90877527dedbc7bc1",
   "start": "block-drawing",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -129,6 +129,13 @@
       "Straight",
       "Gap distance",
       "in"
+     ],
+     "fields": [
+      {
+       "label": "Break line type",
+       "kind": "select",
+       "value": "Zig zag"
+      }
      ]
     },
     "dialogs": [],
@@ -207,7 +214,7 @@
      "selection": []
     }
    },
-   "t": 234771
+   "t": 227585
   },
   {
    "step": 2,
@@ -235,6 +242,13 @@
       "Straight",
       "Gap distance",
       "in"
+     ],
+     "fields": [
+      {
+       "label": "Break line type",
+       "kind": "select",
+       "value": "Zig zag"
+      }
      ]
     },
     "dialogs": [],
@@ -313,7 +327,7 @@
      "selection": []
     }
    },
-   "t": 261484
+   "t": 253156
   },
   {
    "step": 3,
@@ -347,6 +361,13 @@
       "Straight",
       "Gap distance",
       "in"
+     ],
+     "fields": [
+      {
+       "label": "Break line type",
+       "kind": "select",
+       "value": "Zig zag"
+      }
      ]
     },
     "dialogs": [],
@@ -425,7 +446,7 @@
      "selection": []
     }
    },
-   "t": 275686
+   "t": 267183
   },
   {
    "step": 4,
@@ -456,6 +477,13 @@
       "Straight",
       "Gap distance",
       "in"
+     ],
+     "fields": [
+      {
+       "label": "Break line type",
+       "kind": "select",
+       "value": "Curve"
+      }
      ]
     },
     "dialogs": [],
@@ -534,7 +562,7 @@
      "selection": []
     }
    },
-   "t": 289131
+   "t": 281099
   },
   {
    "step": 5,
@@ -562,6 +590,13 @@
       "Straight",
       "Gap distance",
       "in"
+     ],
+     "fields": [
+      {
+       "label": "Break line type",
+       "kind": "select",
+       "value": "Curve"
+      }
      ]
     },
     "dialogs": [],
@@ -640,7 +675,7 @@
      "selection": []
     }
    },
-   "t": 314292
+   "t": 305729
   },
   {
    "step": 6,
@@ -668,6 +703,13 @@
       "Straight",
       "Gap distance",
       "in"
+     ],
+     "fields": [
+      {
+       "label": "Break line type",
+       "kind": "select",
+       "value": "Curve"
+      }
      ]
     },
     "dialogs": [],
@@ -746,7 +788,7 @@
      "selection": []
     }
    },
-   "t": 340912
+   "t": 330684
   },
   {
    "step": 7,
@@ -766,7 +808,7 @@
    "ok": true,
    "at": [
     684,
-    642
+    693
    ],
    "state": {
     "focus": {
@@ -778,14 +820,19 @@
      "title": "Break view",
      "text": [
       "Break view",
-      "Vertical",
-      "Horizontal",
       "Zig zag",
       "Small zig zag",
       "Curve",
       "Straight",
       "Gap distance",
       "in"
+     ],
+     "fields": [
+      {
+       "label": "Break line type",
+       "kind": "select",
+       "value": "Curve"
+      }
      ]
     },
     "dialogs": [],
@@ -864,7 +911,7 @@
      "selection": []
     }
    },
-   "t": 366810
+   "t": 357910
   },
   {
    "step": 8,
@@ -884,7 +931,7 @@
    "ok": true,
    "at": [
     770,
-    642
+    693
    ],
    "state": {
     "focus": {
@@ -896,14 +943,19 @@
      "title": "Break view",
      "text": [
       "Break view",
-      "Vertical",
-      "Horizontal",
       "Zig zag",
       "Small zig zag",
       "Curve",
       "Straight",
       "Gap distance",
       "in"
+     ],
+     "fields": [
+      {
+       "label": "Break line type",
+       "kind": "select",
+       "value": "Curve"
+      }
      ]
     },
     "dialogs": [],
@@ -982,7 +1034,7 @@
      "selection": []
     }
    },
-   "t": 392378
+   "t": 383832
   },
   {
    "step": 9,
@@ -1002,21 +1054,7 @@
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Break view",
-     "text": [
-      "Break view",
-      "Vertical",
-      "Horizontal",
-      "Zig zag",
-      "Small zig zag",
-      "Curve",
-      "Straight",
-      "Gap distance",
-      "in"
-     ]
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1042,7 +1080,7 @@
      "sheets": [
       "Sheet1"
      ],
-     "tool": "Break view",
+     "tool": null,
      "views": [
       {
        "name": "Front",
@@ -1093,7 +1131,7 @@
      "selection": []
     }
    },
-   "t": 416757
+   "t": 409400
   },
   {
    "step": 10,
@@ -1108,21 +1146,7 @@
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Break view",
-     "text": [
-      "Break view",
-      "Vertical",
-      "Horizontal",
-      "Zig zag",
-      "Small zig zag",
-      "Curve",
-      "Straight",
-      "Gap distance",
-      "in"
-     ]
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1148,7 +1172,7 @@
      "sheets": [
       "Sheet1"
      ],
-     "tool": "Break view",
+     "tool": null,
      "views": [
       {
        "name": "Front",
@@ -1199,7 +1223,7 @@
      "selection": []
     }
    },
-   "t": 443673
+   "t": 436246
   },
   {
    "step": 11,
@@ -1298,7 +1322,7 @@
      "selection": []
     }
    },
-   "t": 470137
+   "t": 463058
   }
  ]
 }

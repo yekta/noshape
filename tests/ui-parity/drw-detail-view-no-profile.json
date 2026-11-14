@@ -1,0 +1,70 @@
+{
+  "name": "drw-detail-view-no-profile",
+  "about": "Detail view with Show detail view profile cleared, placed",
+  "area": "drawing",
+  "source": "live2 11-14: drawing field-level coverage (panel options no scenario touched; lead: the asm/drawing half of the coverage audit)",
+  "start": "hole-plate-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Detail view"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Show detail view profile"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            -20,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            8,
+            -20,
+            12
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          70,
+          150
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "name": "drw-callout-flag-four-chars",
+  "about": "Callout with border Flag and size 4 Characters, placed",
+  "area": "drawing",
+  "source": "live2 11-14: drawing field-level coverage (panel options no scenario touched; lead: the asm/drawing half of the coverage audit)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Callout"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Circle"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Flag"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "2 Characters"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "4 Characters"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            34,
+            0,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

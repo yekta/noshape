@@ -1,0 +1,60 @@
+{
+  "name": "asm-relation-switch-screw-chain",
+  "about": "pin-block: Screw relation, the type dropdown Screw → Rack and pinion → Linear → Gear, Escape",
+  "area": "asm",
+  "source": "live2 11-14: assembly field-level coverage (relation type options no recorded scenario reached)",
+  "start": "pin-block",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Screw relation"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "dialog"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Screw",
+        "pick": "Rack and pinion"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Rack and pinion",
+        "pick": "Linear"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Linear",
+        "pick": "Gear"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}
