@@ -7,10 +7,11 @@
 - The sketches that moved (probe /root/skasm-scratch/probes/zz_skdump.rs on a sketch dumped just before the moving
   edit; /root/skasm-scratch/skdump-trace.diff makes the dumps):
   - cf-sheet-metal-hem's derived Sketch 3: fixed (a MIDPOINT between two model vertices, slot order).
-  - c2-rings-loft Sketch 1 (2.86 mm): a circle seen edge-on is projected as a fit spline that doubles back on itself
-    (all fit points on x = 8 mm); live keeps a Coincident point on its line past the circle's extent. Projecting
-    collinear edges as lines (/root/skasm-scratch/edgeon-line.diff) fixes it but turns c2-fan-blade-sweep's Sketch 5
-    into "conflicting constraints" (48 -> 46/53): not landed. Next: why fan-blade's Sketch 5 conflicts with the line.
+  - c2-rings-loft Sketch 1 (2.86 mm): a circle seen edge-on was sampled into a fit spline doubling back on itself;
+    now an exact line (project_edge_any). The first try (tessellation ends, single precision) broke c2-fan-blade-
+    sweep's Sketch 5: a Use joined to another edge's exact end missed it by 3 nm (two fixed points Coincident); the
+    ends now come from the exact geometry. Probe for a translated sketch's conflict: /root/skasm-scratch/probes/
+    zz_sksolve.rs on a sketch dumped with SKDUMP_ALL (patch: the dump block after `self.dimensions` in parity.rs).
   - c2-impeller-loft's Sketch Bohrung Flansch (2.6 mm): not the solver. Its external KmZB / KmZD resolve to other edges
     (ours a 67.6 mm spline at x = 0 and a full R29.5 circle; live a 52.7 mm edge at x = −44 and a 33.2 mm arc): the
     impeller's geometry differs from feature 12 on (core's). Live (behaviours "skasm (11-14) point on a spline past
