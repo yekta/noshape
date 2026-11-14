@@ -39,7 +39,9 @@ CLIs' `feature list` on copies.
   `make_cylinder` copy and keeps the end's two pieces apart (184/505/323), ×6 by Circular pattern 1. Ending on the band's
   own surface (`k::extend_face`) merges it and gives live's 182/501/321, but our geometric feature pattern then takes
   the merged band as "created by Extrude 8" and copies it ×6 (Circular pattern 1 +86 mm³, Extrude 12 fails): needs the
-  pattern to take only what the feature added (history) first.
+  pattern to take only what the feature added (history) first. (Ruled out: leaving out of the face pattern the faces
+  every instance maps onto themselves, the whole band: the same 203/554/351, 2951.07 mm³; with extend_face the pattern's
+  topology is live's 202/551/351 +1 face, so look at what the instances' tools add, vs the old 2865.28.)
 - **Next:** knife Revolve 1 vertex, handle surface; blend's knife Boolean timing
   after a3e9fb3d: not the curve's form (the projected edge on a segmented copy of the cubic: no faster in a 3-run vibe5 A/B,
   Fillet 2 210-217 vs 164-272 ms); the exact geometry's Booleans are bool's (they have blend's numbers).
