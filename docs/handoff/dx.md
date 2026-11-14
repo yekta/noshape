@@ -22,6 +22,22 @@ drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 - dx-chain9 (base vs dx-1dc / tvc variants on the new data) restarted 09:23 with 90 min a run (infento took over 45 min
   on the sketch solves: the first base run timed out); read sk-*.log, land per the rules below.
 
+## 11-14 20:44 UTC: drawing exports 59 / 81 against live's 27 drawings; copy fix and xdev frames in
+- Landed: the Transform / Mirror copy fix (257301e5; infento 104 -> 115/196 mates, one occurrence to asm's solver),
+  closed polygons not fitted as curves (c5de985b). Queued: ordinate groups as ordinate DIMENSIONs per value, callout
+  borders and note leaders with the text (ANNOTATION_TEXT, 0.72 pt), datum target bubble by text height (1.62 h,
+  label h, ANNOTATION_LINES, empty top half, cross 0.708 h at 1.68 pt); an annotation's own export layer wins.
+- xdev: live's Transform 3 frames as studios/62b37d….connectors.json (data, synced to vibe6/7): 242 -> 244/266.
+- Drawing export, live's 27 takes (drw-revision-table's take is empty: live2 retakes it), ours on vibe6 ~/tmp/dx/
+  drwexp6, compare: `compare.py /root/parity/ui/live <ours> <names> --drawn-by "LOOPELF LOOPELF" --drawn-by ROOT`.
+  59 / 81 files. Left, biggest first: drw-broken-out-section (view geometry: 182 VISIBLE lines vs 23, jog splines
+  6 vs 1, 2 hatches); drw-inspection-item (live: its own INSPECTION_CALLOUT layer, a CIRCLE r 0.12 in, a SOLID HATCH
+  colour 30 and an 0.08 in MTEXT; ours circle + 38 SOLIDs on ANNOTATION_LINES); section / auxiliary cutting lines
+  (live 1 LINE + 4 SOLIDs, ours 2-3 LINEs + 2 SOLIDs; PDF 2.04 pt strokes ours only); the hole table's title row
+  ('HOLE TABLE' ours only, 9 vs 8 lines); centermarks (8 lines 1.95 in vs 6, 0.97: arm length); crop spline (2
+  POLYLINEs live only); break lines 1.26 vs 1.19 in; drw-bom-table's extra VISIBLE circle (since this afternoon's
+  main; not these changes); PDF 0.12 pt arrow outline lengths (callout, angular, ordinate).
+
 ## 11-14 18:25 UTC: infento 1dc32b's pulley chain, the Transform / Mirror copy fix gating
 - live q3092: a sketch on a face takes its outward normal (as ours), so 1dc32b's Sketch 10 (live +x at x -6.8) is on
   a face our studio doesn't build there, not a modelling bug. Our studio diverges before it: Transform 12's copy
