@@ -34,11 +34,17 @@ pub fn release_prewarm() {
     PREWARM_RELEASED.store(true, Ordering::Relaxed);
 }
 
-/// `NOSHAPE_PREWARM=early` (a startup experiment for the perf runs): compile at once instead of after the first
-/// window draw, on low-priority threads ([`low_priority_compile`]) so the window's own work comes first.
+/// Compile at once instead of after the first window draw, on low-priority threads ([`low_priority_compile`]) so the
+/// window's own work comes first: on 8 or more cores, where it doesn't slow the window (the Mac mini's dock: the first
+/// frame waited 240 ms for the compile started at the window's draw); the hold is for small machines (3-core macOS
+/// runners drew their window at 2.7 s against 1.2 s). `NOSHAPE_PREWARM=early` / `held` force either.
 pub fn prewarm_early() -> bool {
     static EARLY: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *EARLY.get_or_init(|| std::env::var("NOSHAPE_PREWARM").is_ok_and(|v| v == "early"))
+    *EARLY.get_or_init(|| match std::env::var("NOSHAPE_PREWARM").as_deref() {
+        Ok("early") => true,
+        Ok("held") => false,
+        _ => std::thread::available_parallelism().is_ok_and(|n| n.get() >= 8),
+    })
 }
 
 /// macOS: run this thread's work (and the Metal compiler work it asks for) at utility priority.

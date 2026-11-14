@@ -134,6 +134,28 @@ Deviation keep it selected while open, as the tool took it, and clear it on clos
 (live's Surface tab takes faces, ours only curves: a feature gap, to build), analysis-thickness* x3 (live's free account
 has no Thickness analysis: ours keeps it), analysis-flatten (re-record asked). Next: the lead's viewport speed item (the
 dock and hat15 on the Mac's GPU).
+**11-14 02:07 (lead: viewport speed on big documents, the Mac's own GPU):** release build, mode-700 copies of vibe5
+~/lead-private dock / hat15 in ~/noshape-host/agents/psui/priv (deleted after), /root/psui-scratch/mac-bench.sh (the
+NOSHAPE_PERF_BENCH benches + the ui-latency open), 2388x1588 device px. Before:
+| | dock | hat15 |
+|---|---|---|
+| orbit, timer-driven (8 ms ticks) p50 / p99 | 9.76 / 13.6 ms (108 fps) | 8.53 / 13.3 (118 fps) |
+| orbit, driven by frames (capacity) | 2.0 / 3.3 ms (446 fps) | 3.4 / 5.0 ms (270 fps) |
+| pan, timer-driven p50 / p99 | 9.36 / 14.0 | 8.51 / 13.3 |
+| hover: pointer to the highlighted frame p50 / p95 | 7.5 / 9.4 (a first run's 92 was a GPU stall outside the app: ui cpu 0) | 12.1 / 14.8 |
+| pick: click to the selected frame p50 / p95 | 10.3 / 13.4 (2 ms of work, then the next 120 Hz refresh) | 15.0 / 20.3 |
+| UI thread per orbit frame | 0.04-0.21 ms | 0.11-0.24 ms |
+| first viewport frame / full model, from start | 1.09 / 1.30 s (Metal's first compile of this binary) | 0.52 / 2.68 s (cold regen 2.16 s: core's; reopen from the result store 0.27 s, qa) |
+| RSS in the benches | 160-420 MB | 600-720 MB |
+Every viewport number meets PLAN 2.7 (120 fps, a click within a frame) on the real GPU; the timer-driven orbit's p99
+is the bench's own pacing. The worst: the cold first frame (1.09 s against 1 s), the render thread held its compile
+until the window had drawn (released 795 ms, pipelines 963, frame taken 1033). Fix: on 8+ cores the compile starts at
+once at utility priority (`worker::prewarm_early`; the hold stays for small machines).
+After (lead 11-14: no more app benches on the user's Mac without a window from the user; Linux relative only): vibe6,
+release, llvmpipe, Mesa's shader cache off, 3 opens each, held / early: dock first frame 1348 / 993, 1017 / 1045,
+1088 / 1016 ms; hat15 1142 / 1038, 1039 / 1075, 1054 / 1094 ms; the window created at ~120 ms either way: no cost on an
+8-core box. On the Mac the compile moved off the first frame's path (built 104 ms after start against 963); the cold
+first-frame number there waits for a window the lead arranges.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's
