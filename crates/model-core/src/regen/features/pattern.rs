@@ -2046,9 +2046,26 @@ fn transform_of(ev: &EvalCtx) -> FResult<Option<k::Transform>> {
             } else if edges.len() > 1 {
                 return err_at(&[field], "Too many entities are selected.");
             } else if let Some(e) = edges.first() {
-                let Some(c) = resolve_curves(ev, std::slice::from_ref(*e))?.into_iter().next() else { return err_at(&[field], "Cannot resolve entities.") };
-                let (a, b) = c.shape.endpoints()?;
-                coincident(b - a)?
+                // A construction sketch line too, start to end (asm-infento-subs' studio 74d3d6, Transform 8: 20 mm
+                // along Sketch 1's construction line).
+                let construction_line = || {
+                    let Reference::SketchEntity { sketch, entity } = e else { return None };
+                    let s = ev.ctx.sketch_holding(*sketch, *entity)?;
+                    match s.sketch.curve(noshape_sketch::EntityId(*entity))? {
+                        noshape_sketch::Curve2::Line { a, b } => Some(s.frame.to_world(b) - s.frame.to_world(a)),
+                        _ => None,
+                    }
+                };
+                match resolve_curves(ev, std::slice::from_ref(*e))?.into_iter().next() {
+                    Some(c) => {
+                        let (a, b) = c.shape.endpoints()?;
+                        coincident(b - a)?
+                    }
+                    None => match construction_line() {
+                        Some(v) => coincident(v)?,
+                        None => return err_at(&[field], "Cannot resolve entities."),
+                    },
+                }
             } else if by_distance && let Some(d) = refs.iter().find(|r| matches!(r, Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::MateConnector { .. } | Reference::Implicit { .. })).map(|r| ev.resolve_direction(r)) {
                 d.ok_or_else(|| FeatureError { faulty: vec![field], ..fe("Translation by distance requires two vertices, an edge, a plane, or a cylindrical face.") })?
             } else if by_distance {

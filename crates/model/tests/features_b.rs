@@ -1548,3 +1548,29 @@ fn mutual_trim_flips_as_std() {
     let changed = noshape_model::custom::std_feature::manipulator_change_in((*r.context).clone(), "mutualTrim", mt.id, &mt.name, &s.units, &mt.params, k1, &moved).expect("std's change function ran");
     assert_eq!(changed.get("keepOtherSide1"), Some(&ParamValue::Bool(true)), "{changed:?}");
 }
+
+/// Transform by distance along a construction sketch line (as live's asm-infento-subs studio 74d3d6, Transform 8: 20 mm
+/// along Sketch 1's construction line): the line's start-to-end direction, as an edge's.
+#[test]
+fn transform_by_distance_along_a_construction_line() {
+    let mut s = block();
+    let r = s.ok();
+    let id = r.context.bodies[0].id.clone();
+    // On the Right plane (sketch x = world y, sketch y = world z): a construction line pointing up.
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = sk.add_point(DVec2::new(0.0, 0.08));
+    let b = sk.add_point(DVec2::new(0.0, 0.16));
+    let line = sk.add_line_between(a, b).unwrap();
+    sk.set_construction(line, true).unwrap();
+    let sketch = s.sketch(Reference::Plane(DatumPlane::Right), sk);
+    s.add("transform", move |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::Body(id)]));
+        p.set("transformType", ParamValue::Enum("TRANSLATION_DISTANCE".into()));
+        p.set("transformDirection", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: line.0 }]));
+        p.set("distance", expr("20 mm"));
+    });
+    let r = s.ok();
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.min.z, 0.020, 1e-6) && near(bb.max.z, 0.045, 1e-6), "moved up 20 mm: {bb:?}");
+    assert!(near(bb.min.x, 0.0, 1e-6) && near(bb.min.y, 0.0, 1e-6), "only along the line: {bb:?}");
+}
