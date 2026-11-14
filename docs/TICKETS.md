@@ -4767,7 +4767,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   is tilted against its exact neighbour by 2.3e-6, 2.8e-6 and 7.5e-5 rad (offsets 1.5e-9, 3.1e-9, 7.9e-8 m). Every other
   coplanar pair is exact. Fix where the wall is thickened: its caps on the side planes the wall ends on (or its corners
   projected onto them), not fitted.
-- [ ] P2 SUITE-FAN-BLADE-IMPORT (dx, lead 20:07; core 2026-11-08 20:05 UTC): c2-fan-blade-sweep's derived source
+- [x] (dx 2026-11-14 00:44 UTC: the STEP reads as live now, checked through the CLI on main: "fan blade" 58 / 119 / 63, "fan" 143 / 404 / 251) P2 SUITE-FAN-BLADE-IMPORT (dx, lead 20:07; core 2026-11-08 20:05 UTC): c2-fan-blade-sweep's derived source
   8b633129 (one STEP Import 1): "fan blade" 68/155/95 faces/edges/vertices, live 58/119/63; "fan" 159/470/313, live
   143/404/251 (run it alone: NOSHAPE_PARITY_MODELS=<models>/c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=8b633129…). dx 2026-11-08 21:27 UTC: ours kept the file's split
   periodic faces (STEP merged only planes; IGES already merged both): the halves of its cylinders, cone and torus and a
