@@ -865,7 +865,9 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         (None, _, None) => return Err(OpError::param("a", "required for a new mate")),
         (_, None, None) => return Err(OpError::param("b", "required for a new mate")),
     };
-    if ca.instance == cb.instance && ca.instance != InstanceId::ORIGIN && mate_type != MateType::Width {
+    // (Two parts of one flexible subassembly instance may mate at this level, live asm-tvc-mount's Fastened 3; in a rigid
+    // one they are one body and the evaluation says so.)
+    if ca.instance == cb.instance && ca.path == cb.path && ca.instance != InstanceId::ORIGIN && mate_type != MateType::Width {
         return Err(OpError::param("b", "Mate connectors are on same instance."));
     }
     let id = editing.unwrap_or_else(|| MateId(asm.next_id()));

@@ -7765,6 +7765,32 @@ fn a_mate_reaches_a_part_inside_a_subassembly() {
     assert_eq!(e["param"], "instance", "{e}");
 }
 
+/// Two parts of one flexible subassembly instance mated at the parent's level (live asm-tvc-mount's Fastened 3 between
+/// "avionics bay <1>"'s PCB and Part 2): the mate holds, the nested part moves to it.
+#[test]
+fn two_parts_of_a_flexible_subassembly_mate_in_its_parent() {
+    let mut ctx = Ctx::new();
+    let path = scratch("nested-pair-mate.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }, { "tool": "circle", "points": [[70, 10], [75, 10]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 2" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Sub" }));
+    call(&mut ctx, "assembly_set_state", json!({ "tab": "Assembly 1", "instances": ["Sub <1>"], "fixed": true }));
+    let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0]["id"].clone();
+    let (block, pin) = ("Sub <1> > Part 1 <1>", "Sub <1> > Part 2 <1>");
+    let (top, bottom) = (face(&mut ctx, block, 1.0), face(&mut ctx, pin, -1.0));
+    let m = call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "planar", "a": { "instance": pin, "entity": bottom }, "b": { "instance": block, "entity": top } }));
+    assert_eq!(m["mate_ok"], true, "{m}");
+    // A part with itself is still refused, by name.
+    let e = try_call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "planar", "a": { "instance": block, "entity": top }, "b": { "instance": block, "entity": top } })).unwrap_err().to_json();
+    assert_eq!(e["param"], "b", "{e}");
+}
+
 /// A drawing view showing an exploded view keeps showing it when an earlier one is deleted, and a named position
 /// when the list is reordered (the view refers to them by position: they're re-pointed in the same undo step).
 #[test]
