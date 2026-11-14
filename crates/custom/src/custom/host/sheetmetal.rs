@@ -150,7 +150,10 @@ fn apply_corner_breaks(part: &mut Shape, pieces: &mut Vec<Piece>, def: &Definiti
                 e.edge_info().is_ok_and(|i| {
                     let d = (i.end - i.start).normalize_or_zero();
                     let r = p - i.start;
-                    matches!(i.curve, k::Curve::Line { .. }) && (i.length - t).abs() < 1e-6 && (r - d * r.dot(d)).length() < 1e-6
+                    // (On the edge itself: the two walls' corner edges of a U lie on one line, Fillet 3 on
+                    // config-assembly 08590a's Latch.)
+                    let along = r.dot(d);
+                    matches!(i.curve, k::Curve::Line { .. }) && (i.length - t).abs() < 1e-6 && (r - d * along).length() < 1e-6 && (-1e-6..=i.length + 1e-6).contains(&along)
                 })
             })
             .collect();

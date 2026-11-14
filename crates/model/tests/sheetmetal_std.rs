@@ -564,6 +564,40 @@ fn corner_breaks_meeting_across_an_end_make_one_half_round() {
     assert_eq!(count(&r), (faces, edges, vertices), "faces / edges / vertices");
 }
 
+/// A Fillet of the top corners of a U's two walls (std: corner breaks): their thickness edges lie on one line, each
+/// corner is rounded (config-assembly 08590a's Fillet 3 on the Latch: both rounded, 343.36 mm³ less, as live).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn corner_breaks_on_collinear_wall_corners_round_both() {
+    let mut s = plate("2 mm");
+    let r = s.ok();
+    let edges = vec![edge_at(&r, DVec3::new(30.0, 0.0, 2.0)), edge_at(&r, DVec3::new(30.0, 40.0, 2.0))];
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(edges));
+        p.set("distance", expr("20 mm"));
+    });
+    let r = s.ok();
+    let before = volume_mm3(&r);
+    // The walls' top corners at x 60: their edges through the thickness, along y, the highest there.
+    let shape = &r.context.bodies[part(&r)].shape;
+    let top = shape.edges().iter().filter_map(|e| e.edge_info().ok()).filter(|i| (i.start.x - 0.06).abs() < 1e-9 && (i.end.x - 0.06).abs() < 1e-9).map(|i| i.start.z.max(i.end.z)).fold(f64::MIN, f64::max);
+    let corners: Vec<Reference> = shape
+        .edges()
+        .iter()
+        .filter_map(|e| e.edge_info().ok())
+        .filter(|i| (i.start.x - 0.06).abs() < 1e-9 && (i.end.x - 0.06).abs() < 1e-9 && (i.start.z - top).abs() < 1e-9 && (i.end.z - top).abs() < 1e-9 && (i.length - 0.002).abs() < 1e-9)
+        .map(|i| edge_at(&r, (i.start + i.end) * 500.0))
+        .collect();
+    assert_eq!(corners.len(), 2, "the two walls' top corner edges");
+    s.add("fillet", |p| {
+        p.set("entities", ParamValue::Query(corners));
+        p.set("radius", expr("5 mm"));
+    });
+    let r = s.ok();
+    let cut = 2.0 * (25.0 - std::f64::consts::PI * 25.0 / 4.0) * 2.0;
+    assert!((before - volume_mm3(&r) - cut).abs() < 1e-6, "{before} - {} mm³ vs {cut}", volume_mm3(&r));
+}
+
 /// Corner break of a slot's corners (live c2-sm-corner-break: a louver panel's slots, a flange on one side of each):
 /// each corner rounded in the flat, the slot pulled back from its flange's bend as before.
 #[test]
