@@ -32,14 +32,19 @@ status (6). Takes for these are asked of live2 (REQUESTS, studios 11-14).
   took the click as a failed entity pick. Fixed 11-14 (UI test
   `a_section_view_waits_where_it_was_placed_for_its_depth_entity`); live's grey placeholder (the section's outline
   filled light grey in a view frame) is drawn by ours as the section's preview at that point.
-- View properties of two selected views, 12 texts (drw-views-shift-select-properties): live's right-click on the
-  Top view landed on an edge (VIEW + EDGE selected) and opened "Multiple views selected."; ours, both views selected,
-  showed no panel at that step. Open.
-- Sheets panel › Properties… (drw-sheet-properties, drw-sheet-rename): after the menu closes the pointer is over the
-  Part 1 reference row in ours, which then reads "Part 1 In progress" (its hover text); live's recorder sees no hover
-  there. Open (the runner's pointer, or ours hovering without a move).
-- View › Replicate annotations (drw-view-replicate-annotations): the right-click's pick (live EDGE, ours VIEW), as
-  above. Open.
+- View properties of two selected views, 12 texts (drw-views-shift-select-properties): ours opened the panel but didn't
+  report it to the runner with several views selected. Fixed 11-14 (the panel's texts as live's: "Multiple views
+  selected.", the shared rows and each list's options).
+- Sheets panel › Properties… (drw-sheet-properties, drw-sheet-rename): after a menu item's click the pointer rests
+  over the Part 1 reference row, which reads "Part 1 In progress" while hovered; Chrome hovers it or not by its own
+  fake mouse events (live: hovered after Rename…, not after Properties…). Fixed 11-14 in the runner: that hover text
+  isn't compared until the pointer moves again (`sheets_ref_hover_after_menu`; 2 takes more match, none fewer over qa's
+  2,033).
+- A right-click on block-drawing's Top view (drw-view-align-vertically, drw-view-replicate-annotations › Replicate
+  annotations, drw-views-shift-select-properties step 3): live's selection list has an EDGE of Top and its frame is
+  dark orange, on Right and Front a VIEW with a light frame (live2 feel/drawing/rclick-top-vs-right-*.png); the point
+  is empty space inside the outline. Ours selects the view. Open: live2 checks whether the sketch on the Top plane
+  (the view looking straight down onto it) is what the click selects through to.
 
 ---
 

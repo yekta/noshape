@@ -471,6 +471,22 @@ def cloud_menu(a, b):
         lb["highlighted"] = la.get("highlighted")
 
 
+def sheets_ref_hover_after_menu(a, b, resting):
+    """The Sheets panel's reference row reads "<part> In progress[ V1]" while hovered (drw-ref-pin-reference). Right
+    after a menu item's click the pointer rests where the item was, over whichever row: Chrome hovers it or not by its
+    own fake mouse events (live drw-sheet-rename: hovered; drw-sheet-properties: not), so a row's hover text there is
+    not compared, until the pointer moves again (`resting`)."""
+    if not resting:
+        return
+    for side in (a, b):
+        d = (side or {}).get("dialog")
+        if not isinstance(d, dict) or d.get("kind") != "drawing-panel" or not isinstance(d.get("text"), list):
+            continue
+        t = d["text"]
+        hovered = {f"{t[i + 1]} In progress" for i in range(len(t) - 1) if t[i] == "In progress"}
+        d["text"] = [x for x in t if not any(isinstance(x, str) and (x == h or x.startswith(h + " ")) for h in hovered)]
+
+
 def menu_badges(a, b):
     """A menu row's badge (Releases ▸: "Released" on green) is read apart from its name, as `badges` (live2's recorder
     from 2026-11-14 on; null for a row without one): compared only when live's take has them, all-null as none."""
@@ -773,6 +789,16 @@ def compare(live, ours, whole_document=True):
     start_name = scenario_start(live.get("scenario")) if isinstance(live.get("scenario"), str) else None
     free_plan = str(live.get("recorded") or "9") < LIVE_PROFESSIONAL_FROM
     picker_read = str(live.get("recorded") or "9") >= PICKER_READ_SINCE
+    # The pointer rests where a menu item was clicked until a step moves it (a wait or a key doesn't).
+    resting, rest = set(), False
+    for s in steps:
+        do = s.get("do") if isinstance(s.get("do"), dict) else {}
+        if do.get("do") == "click" and isinstance(do.get("on"), dict) and "menu" in do["on"]:
+            rest = True
+        elif do.get("do") not in ("wait", "key", "type"):
+            rest = False
+        if rest:
+            resting.add(f"step {s.get('step')}")
     for name, a, b, failed, t, step in pairs:
         if failed:
             if first is None:
@@ -1043,6 +1069,7 @@ def compare(live, ours, whole_document=True):
         if isinstance(a.get("dialog"), dict) and "Start Professional Trial" in (a["dialog"].get("buttons") or []):
             b["dialog"], b["focus"] = a["dialog"], a.get("focus")
         drawn_sizes(a, b)
+        sheets_ref_hover_after_menu(a, b, name in resting)
         placed_alike(a, b)
         cloud_menu(a, b)
         menu_badges(a, b)

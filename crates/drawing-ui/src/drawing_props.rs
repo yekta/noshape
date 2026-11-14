@@ -1197,6 +1197,22 @@ impl DrawingEditor {
         };
         let (bom, bom_items, bom_on) = assigned(bom);
         let (cut, cut_items, cut_on) = assigned(cut);
+        // Several views (live drw-views-shift-select-properties): the rows they share, each list's options.
+        if multi.is_some() {
+            let (bom_text, cut_text) = (bom.clone(), cut.clone());
+            crate::ui_script::note_dialog(|| {
+                let mut t: Vec<String> = ["View properties", "Multiple views selected.", "Scale", "Rotation angle", "Tangent edges", "Hidden", "Solid", "Phantom", "View render mode", "Best performance", "Best quality", "View simplification"].map(String::from).to_vec();
+                t.extend(crate::drawing_insert::simplification_choices(eff).into_iter().map(|c| c.name().to_string()));
+                t.push("Sheet".into());
+                t.extend(self.drawing.sheets.iter().map(|s| s.name.clone()));
+                t.extend(["View label", "Scale label", "Show sketch appearances", "Show annotations from model", "BOM table reference"].map(String::from));
+                t.push(bom_text);
+                if !is_asm {
+                    t.extend(["Cut list table reference".to_string(), cut_text]);
+                }
+                serde_json::json!({ "kind": "drawing-panel", "title": "View properties", "text": t })
+            });
+        }
         rows.push(check("vp-sketch-app", "Show sketch appearances", props.sketch_appearances, |p, on| p.sketch_appearances = on, cx));
         rows.push(check("vp-model-ann", "Show annotations from model", props.model_annotations, |p, on| p.model_annotations = on, cx));
         rows.push(row("BOM table reference", select("vp-bom", bom, bom_items, bom_on && multi.is_none())));
