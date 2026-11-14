@@ -224,9 +224,11 @@ impl DrawingEditor {
         let b = self.built.as_ref()?;
         let mine = |pick: u32| b.picks.get(pick as usize).is_some_and(&of);
         let mut points: Vec<[f64; 2]> = b.geometry.texts.iter().filter(|t| mine(t.pick)).flat_map(noshape_model::drawing::font::text_box).collect();
-        // A note's box is its text's (live: its leader isn't in it).
+        // A note's box is its text's (live: its leader isn't in it); a callout's its text and border's (live2
+        // feel/callout-geom.json: a flag's centre takes its point, not its leader).
         if !matches!(kind, "dimension" | "note") || points.is_empty() {
-            points.extend(b.geometry.lines.iter().filter(|l| mine(l.pick)).flat_map(|l| l.points.iter().copied()));
+            let leader = |closed: bool| kind == "callout" && !closed;
+            points.extend(b.geometry.lines.iter().filter(|l| mine(l.pick) && !leader(l.closed)).flat_map(|l| l.points.iter().copied()));
         }
         let first = *points.first()?;
         let (lo, hi) = points.iter().fold((first, first), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));

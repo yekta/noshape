@@ -643,7 +643,7 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
                 // changed date (the document's latest change), Last changed by and Inspection count.
                 let changed = session.head().ok().and_then(|h| session.store.microversion(h).ok()).map(|m| us_date_of_millis(m.created)).unwrap_or_default();
                 let inspections = dr.sheets.iter().flat_map(|s| s.annotations.iter()).filter(|a| a.inspection.is_some()).count();
-                let fields = [dr.drawn_by.clone().unwrap_or_default(), dr.meta.approver.clone(), dr.meta.created.as_deref().map(us_date).unwrap_or_default(), dr.meta.approved.as_deref().map(us_date).unwrap_or_default()];
+                let fields = [dr.drawn_by.clone().unwrap_or_default(), dr.meta.approver.clone(), dr.meta.created.as_deref().map(us_date).unwrap_or_default(), dr.meta.approved.as_deref().map(us_date).unwrap_or_default(), dr.meta.revision_description.clone()];
                 Some((t.name.clone(), (*dr.meta).clone(), fields, [changed, String::new(), inspections.to_string()]))
             }
             _ => None,
@@ -662,27 +662,50 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
             values: MetaValues { name, description: m.description.clone(), part_number: m.number.clone(), revision: m.revision.clone(), meta: item, mass_override: None, bom: 0, drawing: Some(fields) },
         };
         let release = release_from_properties(&doc, tab);
-        noshape_app_core::properties_dialog::open_properties_with_release(
+        // In a version its own properties, the ones a release sets greyed (live feel/release.json
+        // 12_studios_drawing_assembly_properties); in the workspace Approver, Date approved and the worked-out rows.
+        let in_version = doc.read(cx).session.viewing.is_some();
+        let read_only = if in_version { noshape_ops::version_props::drawing_locked(&m) } else { noshape_ops::version_props::DRAWING_WORKSPACE_LOCKED.to_vec() };
+        // The form's values over the drawing's (dates as the drawing keeps them).
+        let apply = |v: &noshape_app_core::properties_dialog::MetaValues, dr: &mut noshape_model::drawing::Drawing| {
+            let mut item = v.meta.clone();
+            let title = |s: Option<String>| s.unwrap_or_default();
+            let (t1, t2, t3) = (title(item.title1.take()), title(item.title2.take()), title(item.title3.take()));
+            let m = &mut dr.meta;
+            (m.number, m.revision, m.description) = (v.part_number.clone(), v.revision.clone(), v.description.clone());
+            (m.title1, m.title2, m.title3) = (t1, t2, t3);
+            m.item = item;
+            if let Some([by, approver, drawn, approved, rev_description]) = &v.drawing {
+                m.approver = approver.clone();
+                m.created = iso_date(drawn).or(m.created.take());
+                m.approved = iso_date(approved);
+                m.revision_description = rev_description.clone();
+                dr.drawn_by = Some(by.clone()).filter(|b| !b.is_empty());
+            }
+        };
+        noshape_app_core::properties_dialog::open_properties_locked(
             spec,
+            read_only,
+            None,
             move |v, _, cx| {
+                if in_version {
+                    let r = doc.update(cx, |d, cx| {
+                        let Some(noshape_model::document::TabContent::Drawing(dr)) = d.session.doc.tab(tab).map(|t| &t.content) else { return Ok(()) };
+                        let mut dr = dr.clone();
+                        apply(&v, &mut dr);
+                        let r = noshape_ops::version_props::set_drawing_values(&mut d.session, tab, (*dr.meta).clone(), dr.drawn_by.clone());
+                        cx.notify();
+                        r
+                    });
+                    report(&doc, r, cx);
+                    return;
+                }
                 doc.update(cx, |d, cx| {
                     d.edit_document(&format!("Properties : {}", v.name), cx, |document| {
                         let Some(t) = document.tab_mut(tab) else { return };
                         t.name = v.name.clone();
                         if let noshape_model::document::TabContent::Drawing(dr) = &mut t.content {
-                            let mut item = v.meta.clone();
-                            let title = |s: Option<String>| s.unwrap_or_default();
-                            let (t1, t2, t3) = (title(item.title1.take()), title(item.title2.take()), title(item.title3.take()));
-                            let m = &mut dr.meta;
-                            (m.number, m.revision, m.description) = (v.part_number.clone(), v.revision.clone(), v.description.clone());
-                            (m.title1, m.title2, m.title3) = (t1, t2, t3);
-                            m.item = item;
-                            if let Some([by, approver, drawn, approved]) = &v.drawing {
-                                m.approver = approver.clone();
-                                m.created = iso_date(drawn).or(m.created.take());
-                                m.approved = iso_date(approved);
-                                dr.drawn_by = Some(by.clone()).filter(|b| !b.is_empty());
-                            }
+                            apply(&v, dr);
                         }
                     })
                 });

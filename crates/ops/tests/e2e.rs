@@ -7322,6 +7322,46 @@ fn a_released_drawing_shows_its_number_and_revision() {
     let p = call(&mut ctx, "drawing_element_properties", json!({ "drawing": drawing }))["properties"].clone();
     assert_eq!((p["part_number"].as_str(), p["revision"].as_str()), (Some("DRW-1"), Some("A")), "{p}");
     assert!(p["approver"].as_str().is_some_and(|a| !a.is_empty()) && p["approved"].is_string(), "the releaser and the date: {p}");
+    // Released here: its Revision description can be edited in the version (live feel/release.json 12_...).
+    let p = call(&mut ctx, "drawing_element_properties", json!({ "drawing": drawing, "set": { "revision_description": "first issue" } }))["properties"].clone();
+    assert_eq!(p["revision_description"], "first issue", "{p}");
+    call(&mut ctx, "history_view", json!({ "to": "workspace" }));
+}
+
+/// Live feel/release.json 12_studios_drawing_assembly_properties: a drawing's and an assembly's Properties in a plain
+/// version are the version's own: Title 1, Description and the like are kept with it, not written into the workspace;
+/// Part number, Revision (and the drawing's Revision description where it wasn't released) can't be edited there.
+#[test]
+fn drawing_and_assembly_properties_in_a_version() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "version-drawing-assembly-props.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": false }));
+    let drawing = d["drawing"].as_str().unwrap().to_string();
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Top" }));
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    call(&mut ctx, "history_view", json!({ "to": "V1" }));
+    let p = call(&mut ctx, "drawing_element_properties", json!({ "drawing": drawing, "set": { "title1": "T1 v1", "description": "in V1" } }))["properties"].clone();
+    assert_eq!((p["title1"].as_str(), p["state"].as_str()), (Some("T1 v1"), Some("In progress")), "{p}");
+    for (k, field) in [("part_number", "Part number"), ("revision_description", "Revision description")] {
+        let e = try_call(&mut ctx, "drawing_element_properties", json!({ "drawing": drawing, "set": { k: "X" } })).unwrap_err();
+        assert_eq!(e.param.as_deref(), Some(format!("set.{k}").as_str()), "{e:?}");
+        assert!(e.message.contains(&format!("{field} can't be edited in a version")), "{e:?}");
+    }
+    call(&mut ctx, "assembly_properties", json!({ "tab": "Top", "description": "desc v1", "vendor": "ACME" }));
+    let e = try_call(&mut ctx, "assembly_properties", json!({ "tab": "Top", "part_number": "ASM-1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("part_number"), "{e:?}");
+    // The workspace keeps its own.
+    call(&mut ctx, "history_view", json!({ "to": "workspace" }));
+    let p = call(&mut ctx, "drawing_element_properties", json!({ "drawing": drawing }))["properties"].clone();
+    assert_eq!(p["title1"], "", "{p}");
+    let a = call(&mut ctx, "assembly_properties", json!({ "tab": "Top" }))["properties"].clone();
+    assert!(a["description"].is_null(), "{a}");
+    // The version still has them.
+    call(&mut ctx, "history_view", json!({ "to": "V1" }));
+    let p = call(&mut ctx, "drawing_element_properties", json!({ "drawing": drawing }))["properties"].clone();
+    assert_eq!((p["title1"].as_str(), p["description"].as_str()), (Some("T1 v1"), Some("in V1")), "{p}");
+    let a = call(&mut ctx, "assembly_properties", json!({ "tab": "Top" }))["properties"].clone();
+    assert_eq!((a["description"].as_str(), a["vendor"].as_str()), (Some("desc v1"), Some("ACME")), "{a}");
     call(&mut ctx, "history_view", json!({ "to": "workspace" }));
 }
 

@@ -334,6 +334,12 @@ impl Workspace {
                             v.update(cx, |v, cx| v.select_part(body.clone(), cx));
                         }
                     }
+                    crate::assembly_view::AssemblyViewEvent::WhereUsed(t, body) => {
+                        this.activate(*t, window, cx);
+                        if let Some(TabView::PartStudio(v)) = this.views.get(t) {
+                            v.update(cx, |v, cx| v.show_where_used(body.clone(), cx));
+                        }
+                    }
                     crate::assembly_view::AssemblyViewEvent::EditInContext(t, ctx) => {
                         this.activate(*t, window, cx);
                         if let Some(TabView::PartStudio(v)) = this.views.get(t) {

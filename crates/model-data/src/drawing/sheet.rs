@@ -495,8 +495,14 @@ fn callout_extent(border: super::CalloutBorder, w: f64, h: f64) -> (f64, f64) {
             let r = (w / 2.0 + h * 0.9).max(h * 1.6);
             (r, r)
         }
-        B::Rectangle | B::Underline | B::None | B::Flag => (w / 2.0 + h * 0.5, h * 0.8),
-        B::Hexagon => (w / 2.0 + h * 0.9, h * 0.95),
+        B::Rectangle | B::Underline | B::None => (w / 2.0 + h * 0.5, h * 0.8),
+        // Live2 feel/callout-geom.json (4 characters): a 5 h × 2 h box, its point h further right.
+        B::Flag => (w / 2.0 + h * 1.3, h),
+        // Live2 feel/callout-geom.json (2 characters): a regular hexagon, circumradius 1.5 h, its flats top and bottom.
+        B::Hexagon => {
+            let r = w / 2.0 + h * 0.9;
+            (r, r * 3f64.sqrt() / 2.0)
+        }
         B::Diamond => (w / 2.0 + h * 1.2, h * 1.3),
         B::Triangle => {
             let r = (w / 2.0 + h * 0.6) * 1.6;
@@ -588,7 +594,7 @@ fn callout_outlines(border: super::CalloutBorder, ck: [f64; 2], rx: f64, ry: f64
         B::Underline => vec![(vec![[ck[0] - rx, ck[1] - ry], [ck[0] + rx, ck[1] - ry]], false)],
         B::Flag => vec![(vec![[ck[0] - rx, ck[1] - ry], [ck[0] + rx, ck[1] - ry], [ck[0] + rx + ry, ck[1]], [ck[0] + rx, ck[1] + ry], [ck[0] - rx, ck[1] + ry]], true)],
         B::Hexagon => {
-            let e = ry * 0.6;
+            let e = rx / 2.0;
             vec![(vec![[ck[0] - rx, ck[1]], [ck[0] - rx + e, ck[1] - ry], [ck[0] + rx - e, ck[1] - ry], [ck[0] + rx, ck[1]], [ck[0] + rx - e, ck[1] + ry], [ck[0] - rx + e, ck[1] + ry]], true)]
         }
         B::Diamond => vec![(vec![[ck[0] - rx, ck[1]], [ck[0], ck[1] - ry], [ck[0] + rx, ck[1]], [ck[0], ck[1] + ry]], true)],
@@ -2697,8 +2703,10 @@ impl SheetGeometry {
         items.extend(cs.stacked.iter().map(|st| env.stacked_text(a, st)));
         let line = |main: &str| format!("{}{main}{}", cs.left, cs.right);
         let widest_main = items.iter().map(|m| font::text_width(&line(m), h)).fold(0.0f64, f64::max);
-        // Border size: characters (Tight Fit = the text).
-        let w = if cs.chars == 0 { widest_main } else { widest_main.max(cs.chars as f64 * h * 0.6) };
+        // Border size: characters (Tight Fit = the text). An empty field's "----" doesn't widen it (live2
+        // feel/callout-geom.json: a 2-character hexagon round "----" is 1.5 h out).
+        let sized = items.iter().filter(|m| m.as_str() != "----").map(|m| font::text_width(&line(m), h)).fold(0.0f64, f64::max);
+        let w = if cs.chars == 0 { widest_main } else { sized.max(cs.chars as f64 * h * 0.6) };
         let split = cs.border == B::SplitCircle;
         let (rx, ry) = callout_extent(cs.border, w, h);
         let step = self.style.callout_stack.step([c[0] - p[0], c[1] - p[1]]);
@@ -2756,6 +2764,15 @@ impl SheetGeometry {
                     let shoulder = [sx + if left { -h * 1.2 } else { h * 1.2 }, c[1]];
                     self.lines.push(Polyline2 { points: vec![[sx, c[1]], shoulder], style: LineStyle::Thin, closed: false, pick });
                     shoulder
+                }
+                // Live2 feel/callout-geom.json: a hexagon's leader leaves from its side vertex, a flag's from the middle
+                // of its side (the point on the right).
+                _ if matches!(cs.border, B::Hexagon | B::Flag) => {
+                    if next[0] < c[0] {
+                        [c[0] - rx, c[1]]
+                    } else {
+                        [c[0] + rx + if cs.border == B::Flag { ry } else { 0.0 }, c[1]]
+                    }
                 }
                 _ => {
                     let d = [next[0] - c[0], next[1] - c[1]];
@@ -3852,6 +3869,27 @@ mod tests {
         let mut g = SheetGeometry::new(100.0, 100.0);
         g.inspection_bubble([50.0, 50.0], 3, &style(false, Some([10, 20, 30]), Some([1, 2, 3])), 1);
         assert!(g.fills.is_empty() && g.text_color(0) == Some([10, 20, 30]));
+    }
+
+    /// Live2 feel/callout-geom.json (text 0.12 in): a 2-character hexagon is regular, circumradius 1.5 h, vertices left
+    /// and right; a 4-character flag a 5 h × 2 h box with its point h to the right.
+    #[test]
+    fn callout_hexagon_and_flag_sizes() {
+        use super::super::CalloutBorder as B;
+        let h = 3.048;
+        let (rx, ry) = callout_extent(B::Hexagon, 2.0 * h * 0.6, h);
+        assert!((rx - 1.5 * h).abs() < 1e-9 && (ry - 0.1559 * 25.4).abs() < 0.01, "{rx} {ry}");
+        let hex = &callout_outlines(B::Hexagon, [0.0, 0.0], rx, ry)[0].0;
+        for (v, live) in hex.iter().zip([[-0.18, 0.0], [-0.09, -0.1559], [0.09, -0.1559], [0.18, 0.0], [0.09, 0.1559], [-0.09, 0.1559]]) {
+            assert!((v[0] - live[0] * 25.4).abs() < 0.01 && (v[1] - live[1] * 25.4).abs() < 0.01, "{v:?} live {live:?} in");
+        }
+        let (rx, ry) = callout_extent(B::Flag, 4.0 * h * 0.6, h);
+        let flag = &callout_outlines(B::Flag, [0.0, 0.0], rx, ry)[0].0;
+        let xs: Vec<f64> = flag.iter().map(|p| p[0] / 25.4).collect();
+        let ys: Vec<f64> = flag.iter().map(|p| p[1] / 25.4).collect();
+        let (lo, hi) = (xs.iter().copied().fold(f64::MAX, f64::min), xs.iter().copied().fold(f64::MIN, f64::max));
+        assert!((lo + 0.30).abs() < 1e-3 && (hi - 0.42).abs() < 1e-3, "flag x {lo} .. {hi} in");
+        assert!(ys.iter().all(|y| y.abs() < 0.12 + 1e-3), "flag y {ys:?}");
     }
 
     /// A filled arrowhead is marked for the PDF's outline; an open one isn't a fill.

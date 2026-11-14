@@ -149,8 +149,10 @@ impl DrawingEditor {
         }
         if picking == 1 {
             let Some(r) = self.snap_at(self.cursor).and_then(|p| p.r) else {
-                // A click off the views places the view (it waits for the entity).
-                if self.view_at(self.cursor).is_none() {
+                // A click off the views places the view (it waits for the entity): the sheet's views under the point,
+                // not the hovered one (the pointer has just left the view's edge) nor the preview following it.
+                let on_view = self.pk().view_containing(self.cursor).is_some_and(|v| self.drawing.sheets.get(self.sheet).is_some_and(|s| s.view(v).is_some()));
+                if !on_view {
                     let c = self.cursor;
                     if let Some(d) = &mut self.section_dlg {
                         d.placed = Some(c);

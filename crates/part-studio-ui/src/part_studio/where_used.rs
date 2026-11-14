@@ -50,6 +50,12 @@ impl WhereUsedPanel {
 
 impl PartStudioView {
     /// Parts list › Where used…: the panel, and the search run off the UI thread.
+    /// The part's Where used panel, from another tab (an assembly instance's Where used for <part>…).
+    pub fn show_where_used(&mut self, body: BodyId, cx: &mut Context<Self>) {
+        self.select_part(body.clone(), cx);
+        self.open_where_used(body, cx);
+    }
+
     pub(super) fn open_where_used(&mut self, body: BodyId, cx: &mut Context<Self>) {
         let part = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
         self.ui.where_used = Some(WhereUsedPanel { body: body.clone(), part, uses: None, version: "Main".into(), filter: 3, selected: None, version_open: false, filter_open: false, _task: None });

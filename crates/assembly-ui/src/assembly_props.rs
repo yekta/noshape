@@ -1288,7 +1288,26 @@ fn open_assembly_metadata_with(doc: Entity<crate::doc_model::DocModel>, tab: nos
         },
     };
     let release_doc = doc.clone();
+    // In a version its own properties, the ones a release sets greyed (live feel/release.json
+    // 12_studios_drawing_assembly_properties).
+    let in_version = doc.read(cx).session.viewing.is_some();
     let on_save = move |v: crate::properties_dialog::MetaValues, _: &mut Window, cx: &mut App| {
+        if in_version {
+            let r = doc.update(cx, |d, cx| {
+                let Some(TabContent::Assembly(a)) = d.session.doc.tab(tab).map(|t| &t.content) else { return Ok(()) };
+                let mut p = (*a.properties).clone();
+                p.description = Some(v.description.clone()).filter(|s| !s.is_empty());
+                p.meta = v.meta.clone();
+                p.bom_behavior = BomBehavior::ALL.get(v.bom).copied().unwrap_or_default();
+                let r = noshape_ops::version_props::set_assembly_values(&mut d.session, tab, p);
+                cx.notify();
+                r
+            });
+            if let Err(e) = r {
+                log::warn!("assembly properties in a version: {e:#}");
+            }
+            return;
+        }
         doc.update(cx, |d, cx| {
             d.edit_document(&format!("Properties : {}", v.name), cx, |document| {
                 if let Some(t) = document.tab_mut(tab) {
@@ -1310,10 +1329,8 @@ fn open_assembly_metadata_with(doc: Entity<crate::doc_model::DocModel>, tab: nos
         let items = crate::assembly_hooks::release_tab_items(release_doc.read(cx), tab);
         crate::assembly_hooks::open_release_candidate(release_doc.clone(), items, window, cx)
     };
-    match mass_later {
-        Some(mass) => crate::properties_dialog::open_properties_mass_later_with_release(spec, mass, on_save, on_release, window, cx),
-        None => crate::properties_dialog::open_properties_with_release(spec, on_save, on_release, window, cx),
-    }
+    let read_only = if in_version { noshape_ops::version_props::ASSEMBLY_LOCKED.to_vec() } else { Vec::new() };
+    crate::properties_dialog::open_properties_locked(spec, read_only, mass_later, on_save, on_release, window, cx);
 }
 
 #[cfg(test)]

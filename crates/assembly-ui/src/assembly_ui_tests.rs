@@ -240,7 +240,7 @@ fn the_instance_and_top_row_menus_are_lives(cx: &mut TestAppContext) {
                 [
                     "Properties…", "Instance properties…", sep,
                     "Hide", "Hide other instances", "Hide all instances", "Show center of mass", "Isolate…", "Make transparent…", "Suppress", "Dynamic suppression ▸", "Fix", "Use best available tessellation", sep,
-                    "Edit in context", "Add mate connector to instance origin…", "Replace instances…", "Switch to Part Studio 1", sep,
+                    "Edit in context", "Add mate connector to instance origin…", "Replace instances…", "Switch to Part Studio 1", "Where used for Part 1…", sep,
                     "Copy Part 1 <1>", sep,
                     "Move to new subassembly", "Change to version…", "Export…", sep,
                     "Zoom to selection", sep,
@@ -257,7 +257,7 @@ fn the_instance_and_top_row_menus_are_lives(cx: &mut TestAppContext) {
                     "Hide", "Hide other instances", "Hide all instances", "Show center of mass", "Isolate…", "Make transparent…", "Section view…", "Suppress Part 1 <1>", "Fix", "Use best available tessellation", sep,
                     "Copy Part 1 <1>", sep,
                     "Create Drawing of Part 1…", "Create Drawing of Assembly 1…", "Export…", sep,
-                    "Edit in context", "Find in instance list", "Add mate connector to instance origin…", "Replace Part 1 <1>…", "Switch to Part Studio 1", sep,
+                    "Edit in context", "Find in instance list", "Add mate connector to instance origin…", "Replace Part 1 <1>…", "Switch to Part Studio 1", "Where used for Part 1…", sep,
                     "Select other…", sep,
                     "Zoom to fit", "Zoom to selection", sep,
                     "Delete Part 1 <1>",
@@ -305,7 +305,7 @@ fn the_pattern_and_copy_row_menus_are_lives(cx: &mut TestAppContext) {
                 [
                     "Properties…", "Instance properties…", sep,
                     "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Suppress", "Fix", "Use best available tessellation", sep,
-                    "Add mate connector to instance origin…", "Switch to Part Studio 1", sep,
+                    "Add mate connector to instance origin…", "Switch to Part Studio 1", "Where used for Part 2…", sep,
                     "Copy Part 2 <2>", sep,
                     "Export…", sep,
                     "Zoom to selection", sep,
@@ -867,6 +867,7 @@ fn switch_to_part_studio_carries_the_part(cx: &mut TestAppContext) {
         cx.subscribe(&view, move |_, ev: &super::AssemblyViewEvent, _| {
             g.borrow_mut().push(match ev {
                 super::AssemblyViewEvent::ShowPart(_, body) => format!("show {body:?}"),
+                super::AssemblyViewEvent::WhereUsed(_, body) => format!("where used {body:?}"),
                 super::AssemblyViewEvent::ActivateTab(_) => "activate".into(),
                 super::AssemblyViewEvent::EditInContext(..) | super::AssemblyViewEvent::EditInContextOther(..) => "context".into(),
             })
@@ -884,14 +885,23 @@ fn switch_to_part_studio_carries_the_part(cx: &mut TestAppContext) {
         view.update(cx, |v, cx| {
             let id = instance(v, "Part 2 <1>", cx);
             let menu = v.instance_menu(id, false, cx);
-            let Some(super::behaviors::MenuEntry::Item { act, .. }) = menu.iter().find(|e| matches!(e, super::behaviors::MenuEntry::Item { label, .. } if label == "Switch to Part Studio 1")) else { panic!("Switch to Part Studio 1") };
-            let act = act.clone();
-            act(v, w, cx);
+            // Live (Professional, asm-triad-move-to-origin-free): Where used for <part>… right after Switch to.
+            let labels: Vec<&str> = menu.iter().filter_map(|e| match e {
+                super::behaviors::MenuEntry::Item { label, .. } => Some(label.as_str()),
+                _ => None,
+            }).collect();
+            let at = labels.iter().position(|l| *l == "Switch to Part Studio 1").expect("Switch to Part Studio 1");
+            assert_eq!(labels.get(at + 1), Some(&"Where used for Part 2…"), "{labels:?}");
+            for name in ["Switch to Part Studio 1", "Where used for Part 2…"] {
+                let Some(super::behaviors::MenuEntry::Item { act, .. }) = menu.iter().find(|e| matches!(e, super::behaviors::MenuEntry::Item { label, .. } if label == name)) else { panic!("{name}") };
+                let act = act.clone();
+                act(v, w, cx);
+            }
         })
     })
     .unwrap();
     cx.run_until_parked();
-    assert_eq!(*got.borrow(), [format!("show {body:?}")]);
+    assert_eq!(*got.borrow(), [format!("show {body:?}"), format!("where used {body:?}")]);
 }
 
 /// Show center of mass in an assembly (lead 11-10, the synchronous calls list): each part's own center is worked out

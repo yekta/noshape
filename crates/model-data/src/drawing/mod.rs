@@ -3244,6 +3244,9 @@ pub struct DrawingMeta {
     pub approver: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approved: Option<String>,
+    /// Properties › Revision description (live feel/release.json 12_studios_drawing_assembly_properties).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub revision_description: String,
 }
 
 fn item_meta_is_empty(m: &crate::partstudio::ItemMeta) -> bool {

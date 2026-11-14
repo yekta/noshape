@@ -68,7 +68,7 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "properties",
             summary: "An assembly's Properties (its top row's Properties…, Tab › Properties…)",
-            description: "Without fields, replies with the assembly's properties. Name (the tab's), description, part number, revision, Subassembly BOM behavior, a mass override (kg), vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and custom properties; State is set by releases. Fields not given keep their value; an empty text clears it. One edit (\"Properties : <name>\").",
+            description: "Without fields, replies with the assembly's properties. Name (the tab's), description, part number, revision, Subassembly BOM behavior, a mass override (kg), vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and custom properties; State is set by releases. Fields not given keep their value; an empty text clears it. One edit (\"Properties : <name>\"). In a version (history_view) they are the version's own: name, part_number, revision, mass_override and not_revision_managed can't be edited there; the others are kept with the version, not written into the workspace.",
             fields: vec![
                 doc_field(),
                 asm_field(),
@@ -742,6 +742,18 @@ fn properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(x) => p.mass_override = Some(x.as_f64().filter(|m| *m > 0.0).ok_or_else(|| OpError::param("mass_override", "a mass in kg greater than zero, or null"))?),
     }
     crate::ops::parts::apply_meta(a, &mut p.meta)?;
+    // In a version (live feel/release.json 12_studios_drawing_assembly_properties): its own properties; the ones a
+    // release sets, the name and the mass override stay.
+    if od.session.viewing.is_some() {
+        let locked = [("name", "Name"), ("part_number", "Part number"), ("revision", "Revision"), ("mass_override", "Mass override"), ("not_revision_managed", "Not revision managed")];
+        if let Some((k, f)) = locked.iter().find(|(k, _)| a.get(k).is_some()) {
+            return Err(OpError::param(k, &format!("{f} can't be edited in a version")));
+        }
+        if p != before.1 {
+            crate::version_props::set_assembly_values(&mut od.session, tab, p.clone()).map_err(|e| OpError::new("io", e.to_string()))?;
+        }
+        return Ok(json!({ "properties": properties_json(&name, &p) }).into());
+    }
     if (name.clone(), p.clone()) != before {
         let label = format!("Properties : {name}");
         od.session.edit_document(&label, |d| {

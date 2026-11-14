@@ -505,6 +505,9 @@ pub enum AssemblyViewEvent {
     /// Instance menu › Switch to Part Studio on a part: that Part Studio with the part selected (live
     /// asm-menu-switch-to-part-studio).
     ShowPart(TabId, noshape_model::reference::BodyId),
+    /// Instance menu › Where used for <part>… (live, Professional: asm-triad-move-to-origin-free): the part's Part
+    /// Studio with its Where used panel open.
+    WhereUsed(TabId, noshape_model::reference::BodyId),
     /// Instance menu › Edit in context: open the Part Studio with the
     /// assembly as context graphics.
     EditInContext(TabId, Box<crate::assembly_context::AssemblyContext>),

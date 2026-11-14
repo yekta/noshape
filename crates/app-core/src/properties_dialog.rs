@@ -83,8 +83,9 @@ pub struct MetaValues {
     pub mass_override: Option<String>,
     /// Subassembly BOM behavior (assemblies), index into the options.
     pub bom: usize,
-    /// A drawing's Drawn by, Approver, Date drawn and Date approved (dates MM/DD/YYYY as shown).
-    pub drawing: Option<[String; 4]>,
+    /// A drawing's Drawn by, Approver, Date drawn and Date approved (dates MM/DD/YYYY as shown), and its Revision
+    /// description.
+    pub drawing: Option<[String; 5]>,
 }
 
 /// What the modal shows besides the values.
@@ -275,8 +276,9 @@ pub struct MetaForm {
     project: Entity<InputState>,
     product_line: Entity<InputState>,
     titles: [Entity<InputState>; 3],
-    /// Drawings: Drawn by, Approver, Date drawn, Date approved; and the shown Last changed date / by, Inspection count.
-    drawing: Option<[Entity<InputState>; 4]>,
+    /// Drawings: Drawn by, Approver, Date drawn, Date approved, Revision description; and the shown Last changed date /
+    /// by, Inspection count.
+    drawing: Option<[Entity<InputState>; 5]>,
     drawing_info: Option<[String; 3]>,
     mass: Entity<InputState>,
     /// Values not held by text inputs.
@@ -328,7 +330,7 @@ impl MetaForm {
         let project = text(&opt(&v.meta.project), window, cx);
         let product_line = text(&opt(&v.meta.product_line), window, cx);
         let titles = [text(&opt(&v.meta.title1), window, cx), text(&opt(&v.meta.title2), window, cx), text(&opt(&v.meta.title3), window, cx)];
-        let drawing = v.drawing.as_ref().map(|d| [text(&d[0], window, cx), text(&d[1], window, cx), text(&d[2], window, cx), text(&d[3], window, cx)]);
+        let drawing = v.drawing.as_ref().map(|d| [text(&d[0], window, cx), text(&d[1], window, cx), text(&d[2], window, cx), text(&d[3], window, cx), text(&d[4], window, cx)]);
         let mass = {
             let m = v.mass_override.clone().unwrap_or_default();
             cx.new(|cx| InputState::new(window, cx).placeholder("Computed value").default_value(m))
@@ -1120,6 +1122,12 @@ impl Render for MetaForm {
             });
             if let Some(info) = self.drawing_info.clone() {
                 for (l, v) in DRAWING_INFO.iter().zip(info) {
+                    // Live doc-tab-properties-drawing: Revision description between Last changed by and Inspection count.
+                    if *l == "Inspection count"
+                        && let Some(d) = &self.drawing
+                    {
+                        form = form.child(group(label("Revision description", false), self.field("Revision description", &d[4], cx)));
+                    }
                     form = form.child(group(label(*l, false), gray_box(v, false).into_any_element()));
                 }
             }
@@ -1515,6 +1523,26 @@ pub fn open_properties_mass_later_with_release(spec: MetaSpec, mass: Task<Option
         f
     });
     mass_arrives_later(&form, mass, window, cx);
+    let focus = form.read(cx).focus.clone();
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
+    window.focus(&focus, cx);
+}
+
+/// [`open_properties_with_release`] with `read_only` fields greyed (a drawing's or an assembly's Properties, in a
+/// version too: live feel/release.json 12_studios_drawing_assembly_properties), its computed mass arriving later when
+/// `mass` is given.
+pub fn open_properties_locked(spec: MetaSpec, read_only: Vec<&'static str>, mass: Option<Task<Option<String>>>, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, on_release: impl Fn(&mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    let on_save: SaveFn = Rc::new(on_save);
+    let on_release: ReleaseFn = Rc::new(on_release);
+    let form = cx.new(|cx| {
+        let mut f = MetaForm::new(spec, on_save, window, cx);
+        f.on_release = Some(on_release);
+        f.read_only = read_only;
+        f
+    });
+    if let Some(mass) = mass {
+        mass_arrives_later(&form, mass, window, cx);
+    }
     let focus = form.read(cx).focus.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
     window.focus(&focus, cx);

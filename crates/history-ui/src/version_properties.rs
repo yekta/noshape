@@ -101,7 +101,7 @@ fn tab_spec(t: &noshape_model::document::Tab, store: &noshape_store::Document) -
             };
             let mut meta = m.item.clone();
             (meta.title1, meta.title2, meta.title3) = (Some(m.title1.clone()), Some(m.title2.clone()), Some(m.title3.clone()));
-            let drawing = [dr.drawn_by.clone().unwrap_or_default(), m.approver.clone(), m.created.as_deref().map(us).unwrap_or_default(), m.approved.as_deref().map(us).unwrap_or_default()];
+            let drawing = [dr.drawn_by.clone().unwrap_or_default(), m.approver.clone(), m.created.as_deref().map(us).unwrap_or_default(), m.approved.as_deref().map(us).unwrap_or_default(), m.revision_description.clone()];
             spec("Onshape Drawing", MetaValues { name, description: m.description.clone(), part_number: m.number.clone(), revision: m.revision.clone(), meta, drawing: Some(drawing), ..Default::default() })
         }
         TabContent::Assembly(a) => {

@@ -271,8 +271,8 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "element_properties",
             summary: "Read or set the drawing's own properties (Tab › Properties: part number, revision, description, titles)",
-            description: "The drawing element's Properties (right-click its tab › Properties). Live (behaviours \"dx title block mappings\"): the title block's DWG NO. is the drawing's Part number and REV its Revision (\"-\" when unset), never the part's; TITLE shows the sheet reference part's Title 1–3; DRAWN's date is when the drawing was made (`created`). Without `set`, replies with them; `set` changes the ones it names (part_number, revision, description, title1, title2, title3, drawn_by, approver; strings; created (Date drawn) and approved (Date approved) as YYYY-MM-DD). One edit (\"Properties\").",
-            fields: with(common(), vec![opt("set", json!({ "type": "object" }), "Properties to change: part_number, revision, description, title1, title2, title3, drawn_by, approver, created, approved."), opt("custom", json!({ "type": "object" }), "Custom properties: name → value (\"\" or null clears); company_custom_properties defines them.")]),
+            description: "The drawing element's Properties (right-click its tab › Properties). Live (behaviours \"dx title block mappings\"): the title block's DWG NO. is the drawing's Part number and REV its Revision (\"-\" when unset), never the part's; TITLE shows the sheet reference part's Title 1–3; DRAWN's date is when the drawing was made (`created`). Without `set`, replies with them; `set` changes the ones it names (part_number, revision, description, title1, title2, title3, drawn_by, approver, revision_description; strings; created (Date drawn) and approved (Date approved) as YYYY-MM-DD). One edit (\"Properties\"). In a version (history_view) they are the version's own: part_number, revision, approver, approved (and revision_description unless the version released the drawing) can't be edited there, the others are kept with the version, not written into the workspace.",
+            fields: with(common(), vec![opt("set", json!({ "type": "object" }), "Properties to change: part_number, revision, description, title1, title2, title3, drawn_by, approver, created, approved, revision_description."), opt("custom", json!({ "type": "object" }), "Custom properties: name → value (\"\" or null clears); company_custom_properties defines them.")]),
             mutates: true,
             destructive: false,
             run: element_properties,
@@ -1616,7 +1616,7 @@ fn element_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut t = target(od, a)?;
     let json_of = |d: &noshape_model::drawing::Drawing| {
         let m = &d.meta;
-        json!({ "part_number": m.number, "revision": m.revision, "description": m.description, "title1": m.title1, "title2": m.title2, "title3": m.title3, "drawn_by": d.drawn_by, "approver": m.approver, "created": m.created, "approved": m.approved, "custom": m.item.custom })
+        json!({ "part_number": m.number, "revision": m.revision, "description": m.description, "title1": m.title1, "title2": m.title2, "title3": m.title3, "drawn_by": d.drawn_by, "approver": m.approver, "created": m.created, "approved": m.approved, "revision_description": m.revision_description, "state": m.item.state.clone().unwrap_or_else(|| "In progress".into()), "custom": m.item.custom })
     };
     if a.get("set").is_none() && a.get("custom").is_none() {
         return Ok(json!({ "properties": json_of(&t.d) }).into());
@@ -1627,6 +1627,21 @@ fn element_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(s) => s.as_object().ok_or_else(|| OpError::param("set", "an object"))?,
         None => &empty,
     };
+    // In a version (live feel/release.json 12_studios_drawing_assembly_properties): the fields a release sets stay.
+    if od.session.viewing.is_some() {
+        let locked = crate::version_props::drawing_locked(&t.d.meta);
+        let label = |k: &str| match k {
+            "part_number" => "Part number",
+            "revision" => "Revision",
+            "approver" => "Approver",
+            "approved" => "Date approved",
+            "revision_description" => "Revision description",
+            _ => "",
+        };
+        if let Some(k) = set.keys().find(|k| locked.contains(&label(k))) {
+            return Err(OpError::param(&format!("set.{k}"), &format!("{} can't be edited in a version", label(k))));
+        }
+    }
     for (k, v) in set {
         let text = v.as_str().ok_or_else(|| OpError::param(&format!("set.{k}"), "a string"))?.to_string();
         let m = &mut t.d.meta;
@@ -1647,8 +1662,14 @@ fn element_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 if k == "created" { m.created = date } else { m.approved = date }
             }
             "drawn_by" => t.d.drawn_by = Some(text).filter(|x| !x.is_empty()),
-            _ => return Err(OpError::param(&format!("set.{k}"), "part_number, revision, description, title1, title2, title3, drawn_by, approver, created or approved")),
+            "revision_description" => m.revision_description = text,
+            _ => return Err(OpError::param(&format!("set.{k}"), "part_number, revision, description, title1, title2, title3, drawn_by, approver, created, approved or revision_description")),
         }
+    }
+    if od.session.viewing.is_some() {
+        let drawing = t.d.clone();
+        crate::version_props::set_drawing_values(&mut od.session, t.tab, (*drawing.meta).clone(), drawing.drawn_by.clone()).map_err(|e| OpError::new("io", e.to_string()))?;
+        return Ok(json!({ "properties": json_of(&drawing) }).into());
     }
     let (si, drawing) = (t.sheet, t.d.clone());
     commit(od, t.tab, si, t.d, "Properties")?;
