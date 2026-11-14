@@ -8,7 +8,22 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
-## Now (asm, 2026-11-14 13:01 UTC)
+## Now (asm, 2026-11-14 15:40 UTC)
+- Landed since 13:01: composite instances' mate connectors resolve on their members (infento 74 -> 104/195 mates on
+  the new corpus), assembly_mate `simulation_faces`, the suite compares studio statuses with live's, Parallel limits
+  x / y / z / rz (live2), Replicate's scope step (field named by scope, active, Undo, ✓), mate connector Realign /
+  Move focus, its Move boxes `field:#n`, selection = the active field's pick, Esc in a Move box closes it, Mirror
+  plane red once Instances is filled, Esc on a pattern clears the selection, Replace all instances focus. Queued:
+  maker-by-creation-order (77c765d2c), mate connector selection, Esc fixes.
+- Baseline on the new corpus (vibe5 g-14): config-assembly 25/25 occ, 13/18 mates; corexy 58/62, 11/11; isaac-ball
+  97/103; pinslot 16/16; pattern-std 31/40 (was 35/35: studio 36b90f's AR-S1 / AR-S2 connectors read the other
+  part's edge since the corpus update; with dx); infento 104/195 with the composite fix (the 71 "overdefines" are
+  the f0eedd frame cluster since the corpus update; with dx).
+- asm-* ui-parity: 200/213 before the latest fixes; left: studios' ✓-after-edit rule (mate dialog, mate connector
+  type, pattern value edits: they have it), asm-mate-switch-fastened-chain's Parallel pick (studios looking), the
+  two triad context-menu takes (also on green).
+
+## Earlier (asm, 2026-11-14 13:01 UTC)
 - Landed since 08:06: Transform along a construction sketch line / from the origin (infento's studio 74d3d6: the Bearing
   block 40x80 hexa 20 mm off), a same-document Derived source from the corpus' studios (robot-relations 137 -> 139/139
   occurrences, 7/9 -> 8/11 mates), edge-midpoint connectors aligned to a face second id. Queued: the suite compares
