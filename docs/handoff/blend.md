@@ -1,5 +1,50 @@
 # Blends (agent "blend")
 
+## 11-14 08:30 UTC: handoff (Bbedward's week ran out): queued, running where, next
+
+Landed since 03:50: f2twice (2eb4cf4b, dx's P0: pipeflange Fillet 2 built twice, 356 -> 157 ms; dx told).
+
+Land queue (`tools/tiers/land.sh --status` shows only the items of the worktree it runs in: run it in each):
+- blend5 `blend-coaxdirect` 23ab8f4c: coaxial rounds built directly (snap-hook Fillet 5 ~66 -> ~20 ms). Checking.
+- blend6 `blend-raysfirst` 91cb6945: the direct build's tool classification by rays first (2 commits). Queued.
+- blend7 `blend-p2live` 201b4e5e: variable + partial fillets as live 3028 (3 commits). Queued.
+  Their asm runs all show asm-tvc-mount 42 -> 43/43 occurrences, 4 -> 3/10 mates against the runs before 11-14 01:00;
+  identical on three independent branches, so it is main's (likely skasm's 7ce8b87ee translator change), not ours.
+  If one fails, fix forward in its worktree and land.sh again.
+
+Gated, waiting on its last runs (systemd units on this machine, `systemctl list-units 'blend-*'`; flags in
+/root/blend-scratch/*.done, logs there):
+- blend4 `blend-secwires` (2 commits on main 618a5fbc3: hold lines sampled once per edge with regula-falsi crossings
+  ae879b804, then a round's loft sections as wires 8dc943662). Pair on vibe7 clean (870 = 870, faceblend 388 -> 169 ms,
+  Face blend 1 346 -> 130). Unit blend-sec-gates7: asm on vibe7 (asm-secwires-new.log -> secwires-asm.done), then a
+  timing alternation (alt-secwires.sum). Land both commits together when the asm shows nothing worse than
+  /root/blend-scratch/asm-p2.sum (rebase on main, land.sh from blend4). blend10's `blend-holdcache` is the first commit
+  alone: don't land it separately.
+- blend2 `blend-partrays` 40c1654d5 (on raysfirst): the part's classification by rays first too. Unit
+  blend-partrays-pair7: pair on vibe7 (base blend3 = raysfirst detached). After rays lands: rebase on main, asm
+  (one per 8-core host: earlyoom), measure c2-rings-loft Chamfer 1 (classify.part 42 points), land.
+
+Scratch: blend-base holds a debug-only patch (ZZ per-pair section timing in blend_direct.cpp, never land it); its
+run (pairs.log) times each part-face x blend-face section of cf-snap-hook and c2-hunting-knife.
+
+Next (speed, live's per-feature times on the Mac release build):
+- cf-snap-hook Fillet 6 (32 vs 8 ms): ~55% is blend_direct's sections (part faces x blend faces, GeomInt_IntSS in
+  parallel); pairs.log says which surface pairs are slow; try analytic sections for those types.
+- c2-hunting-knife Fillet 3 (~90 vs 11 ms): OCCT's as-is attempt 25 ms (then replaced by rolling balls), blend_direct 30,
+  lofts + Rust 35. No cheap win: running the balls beside OCCT would build them for every fillet, contending for the
+  kernel lock. Chamfer 1 (165 vs 19) is bool's Rust Boolean (sections_ahead) plus 20 ms of scaled retries; Fillet 2
+  (70 vs 10) is OCCT once plus the Rust Boolean of its run-on.
+- c2-tpd-fillet-variable Fillet 1 is the variable round's tool cut by bool's Rust Boolean (sections_ahead ~80%): bool's.
+- c2-variable-fillet-faceblend after secwires: 8 lofts (parallel) and blend_direct's B-spline sections remain.
+- Live answers pending: 3022 part 2 (knife Fillet 7's mid-edge radius; ours takes 11.85 mm³, live 7.21) and batch 2
+  (FILLET-VAR-SECTION, VAR-CORNERS, PARTIAL-DIR, ASYM-SIDE, FACEBLEND-HOLD-INVERSE) in live/REQUESTS.md.
+
+Hosts: model pairs and asm on vibe6/vibe7, one asm per host (earlyoom; check `free -g`); never vibe5 for long runs (a
+guard there SIGTERMed my jobs at load 45; it hosts the land queue); the Mac for short builds and crate tests only (one
+shared slot). Scripts in /root/blend-scratch/bin: host-pair.sh, new-side.sh, asm-one.sh (asm-host.<worktree>
+overrides the host; "skip" + ASM_FORCE), asm-only.sh (the assembly suite has no name filter: it runs everything),
+alt-rel.sh (alt-host overrides). Remove a landed branch's targets on vibe5/6/7 (`~/agents/<wt>/target`).
+
 ## 11-14 03:50 UTC: landed overnight, gates in flight, hosts
 
 Landed: f197 P0 (e1fc6879), torus rounds (fab048ae, knife Fillet 5 as live), the fillet's drag arrow as std's
