@@ -60,6 +60,8 @@ pub struct LiveRef {
     pub sketch_file: bool,
     /// Live's sketch feature whose region it is (the sketch bodies file).
     pub sketch_of: Option<String>,
+    /// Which of its parameter's queries live evaluated to it (refs.jsonl `query`).
+    pub query: Option<usize>,
 }
 
 /// What became of one Onshape feature.
@@ -151,6 +153,9 @@ pub struct Translator<'a> {
     /// Live's solved sketch geometry (`sketches` geomEntities) by (sketch
     /// feature id, entity id).
     solved: HashMap<(String, String), Value>,
+    /// Import queries (bodies by import tag) as ours resolved them where live's geometry placed them: the same query
+    /// later, without geometry, is those bodies (c2-gamma-imported's Boolean 2, its tags placed by Transform 1).
+    import_bodies: HashMap<String, Vec<String>>,
     /// Sketch entities (sketch, live id) ours made with Use: their PROJECTED constraint is that.
     used: std::collections::HashSet<(String, String)>,
     /// The image tab standing in for icons live hasn't fetched.
@@ -238,7 +243,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         // and area, a sketch's line as its `mid` and `length` (live 2313, `bodyType` SKETCH).
         let point = f3(&v["point"]).or_else(|| f3(&v["origin"])).or_else(|| f3(&v["centroid"])).or_else(|| f3(&v["mid"]));
         let bbox = v["box"].as_array().and_then(|b| Some([f3(b.first()?)?, f3(b.get(1)?)?]));
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string) };
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize) };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -334,7 +339,7 @@ impl<'a> Translator<'a> {
             // (A boolean configuration's default is a JSON boolean.)
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -1827,18 +1832,31 @@ impl<'a> Translator<'a> {
                 let mut queries: Vec<Value> = p["queries"].as_array().cloned().unwrap_or_default();
                 // A query live's fetch names no ids for, evaluated by live for this parameter (refs.jsonl): its ids.
                 let pid = p["parameterId"].as_str().unwrap_or("");
-                let mut evaluated: Vec<String> = self.refs.iter().filter(|((i, _), r)| *i == k && r.parameters.iter().any(|p| p == pid)).map(|((_, id), _)| id.clone()).collect();
+                let mine: Vec<(String, Option<usize>)> = self.refs.iter().filter(|((i, _), r)| *i == k && r.parameters.iter().any(|p| p == pid)).map(|((_, id), r)| (id.clone(), r.query)).collect();
+                let mut evaluated: Vec<String> = mine.iter().map(|(id, _)| id.clone()).collect();
                 evaluated.sort();
+                // Each query's own ids when live's refs say which query gave them (an import query's bodies by tag:
+                // remembered for later features naming the same tag, `import_bodies`).
+                let per_query = mine.iter().all(|(_, n)| n.is_some());
+                let texts: Vec<String> = queries.iter().map(|q| q["queryString"].as_str().unwrap_or("").to_string()).collect();
                 if !evaluated.is_empty() {
-                    for q in queries.iter_mut().filter(|q| q["deterministicIds"].as_array().is_none_or(|a| a.is_empty())) {
-                        *q = json!({ "btType": q["btType"], "deterministicIds": evaluated, "queryString": "" });
+                    for (n, q) in queries.iter_mut().enumerate().filter(|(_, q)| q["deterministicIds"].as_array().is_none_or(|a| a.is_empty())) {
+                        let mut own: Vec<String> = mine.iter().filter(|(_, m)| *m == Some(n)).map(|(id, _)| id.clone()).collect();
+                        own.sort();
+                        let ids = if per_query && !own.is_empty() { own } else { evaluated.clone() };
+                        *q = json!({ "btType": q["btType"], "deterministicIds": ids, "queryString": "" });
                     }
                 }
                 let mut ids = Vec::new();
                 let mut missed = Vec::new();
-                for q in &queries {
+                for (n, q) in queries.iter().enumerate() {
                     match self.query(k, q) {
-                        Ok(found) => ids.extend(found),
+                        Ok(found) => {
+                            if per_query && texts[n].contains("importOp") && texts[n].contains("IMPORT") && !found.is_empty() {
+                                self.import_bodies.insert(texts[n].clone(), found.clone());
+                            }
+                            ids.extend(found)
+                        }
                         Err(e) => missed.push(match q["deterministicIds"].as_array().filter(|a| !a.is_empty()) {
                             Some(d) => format!("{} ({})", e, d.iter().filter_map(Value::as_str).collect::<Vec<_>>().join(", ")),
                             None => e,
@@ -2032,7 +2050,19 @@ impl<'a> Translator<'a> {
             }
             return text;
         }
-        self.query_text_first(k, q)
+        let text = q["queryString"].as_str().unwrap_or("").to_string();
+        let import = text.contains("importOp") && text.contains("IMPORT");
+        let found = self.query_text_first(k, q);
+        if !import {
+            return found;
+        }
+        match found {
+            Ok(ids) if !ids.is_empty() => {
+                self.import_bodies.insert(text, ids.clone());
+                Ok(ids)
+            }
+            other => self.import_bodies.get(&text).cloned().map(Ok).unwrap_or(other),
+        }
     }
 
     /// [`Self::query`] for ids only a sketch body places: the query's text first, then its ids.
