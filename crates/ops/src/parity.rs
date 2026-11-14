@@ -6814,6 +6814,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     let mut entities: HashMap<Key, String> = HashMap::new();
     // A LOOP_CENTER connector's loop: an edge of it (the connector's entity is its face).
     let mut loops: HashMap<Key, String> = HashMap::new();
+    // An edge's midpoint picked through a face (live's second id): Z along that face's normal (asm-infento-subs'
+    // Planar 10: across the edge, not along it).
+    let mut aligns: HashMap<Key, String> = HashMap::new();
     // A studio whose sketch another's Frame takes as its profile first.
     let sources: HashSet<String> = studios
         .iter()
@@ -7077,6 +7080,14 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     None => res.untranslated.push(format!("mate connector {}: LOOP_CENTER: its loop on {face} not found (the face's centroid taken)", key.1)),
                 }
             }
+            if inference == "MID_POINT"
+                && let Ok(edge) = &found
+                && edge.starts_with("edge:")
+                && let Some(second) = q["second"].as_str().filter(|s| !s.is_empty())
+                && let Some(face) = t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [second] })).ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("face:")))
+            {
+                aligns.insert(key.clone(), face);
+            }
             match found {
                 Ok(e) => {
                     entities.insert(key.clone(), e);
@@ -7294,6 +7305,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     let mut c = json!({ "instance": path_names(path)?, "entity": entities.get(&key)? });
                     if let Some(i) = inference(inf) {
                         c["inference"] = json!(i);
+                    }
+                    if let Some(face) = aligns.get(&key) {
+                        c["align"] = json!(face);
                     }
                     Some((c, inf.clone(), connector_z.get(&key).copied(), connector_origins.get(&key).copied()))
                 })();
