@@ -1,0 +1,44 @@
+{
+ "name": "part-properties-unit-of-measure-close",
+ "about": "block: Part 1 \u203a Properties\u2026, Unit of measure Kilogram, Close (nothing saved)",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (panel and dialog controls no recorded scenario touched)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Properties\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Unit of measure",
+    "pick": "Kilogram"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}

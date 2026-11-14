@@ -1,0 +1,47 @@
+{
+ "name": "part-properties-typed-close-unsaved",
+ "about": "block: Part 1 \u203a Properties\u2026, Part number typed P-100, Close (closes at once, nothing saved, no prompt)",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (panel and dialog controls no recorded scenario touched)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Properties\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Part number"
+   }
+  },
+  {
+   "do": "type",
+   "text": "P-100"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}
