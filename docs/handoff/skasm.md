@@ -4,14 +4,16 @@
 - Jog at its reduced angle: fixed (the unfold goes through two rolled bends that meet; flat 100 mm, no overlap);
   REQUESTS 11-14 19:30 asks live for that jog's flat to confirm. The collision check compares bend zones again.
 - Translator: negative stored distances (live's flip done) and live's current configuration variables fixed.
-- c2-impeller-loft's "Sketch Bohrung Flansch" (probe: /root/skasm-scratch/probes/zz_skdump.rs on a sketch dumped
-  just before the moving edit, /root/skasm-scratch/skdump-trace.diff makes the dump): the line start is Coincident
-  with external spline KmZB and Vertical to the Origin; live's point is 0.83 µm off x = 0 at the spline's end. Our
-  point-on-spline keeps its parameter in the spline's range (equations.rs FitPoint `x[2].clamp(a, b)`), so those two
-  conflict before any iteration; the conflict pass drops the Coincident and the line swings 2.6 mm. Waiting for
-  REQUESTS 11-14 20:19 (does live extend a spline for a coincident point, or tolerate the 1 µm). Then the same check
-  on c2-rings-loft Sketch 1 (2.86 mm), cf-sheet-metal-hem's derived Sketch 3 (MIDPOINT, 94.8 mm) and the impeller's
-  Stefevenrohr Führung (5 µm: its dump Fb4c32fe8b4b9 solves, moving 5.5 µm).
+- The sketches that moved (probe /root/skasm-scratch/probes/zz_skdump.rs on a sketch dumped just before the moving
+  edit; /root/skasm-scratch/skdump-trace.diff makes the dumps):
+  - cf-sheet-metal-hem's derived Sketch 3: fixed (a MIDPOINT between two model vertices, slot order).
+  - c2-rings-loft Sketch 1 (2.86 mm): a circle seen edge-on is projected as a fit spline that doubles back on itself
+    (all fit points on x = 8 mm); live keeps a Coincident point on its line past the circle's extent. Projecting
+    collinear edges as lines (/root/skasm-scratch/edgeon-line.diff) fixes it but turns c2-fan-blade-sweep's Sketch 5
+    into "conflicting constraints" (48 -> 46/53): not landed. Next: why fan-blade's Sketch 5 conflicts with the line.
+  - c2-impeller-loft's Sketch Bohrung Flansch (2.6 mm): not the solver. Its external KmZB / KmZD resolve to other edges
+    (ours a 67.6 mm spline at x = 0 and a full R29.5 circle; live a 52.7 mm edge at x = −44 and a 33.2 mm arc): the
+    impeller's geometry differs from feature 12 on (core's).
 - Knife: its first difference (feature 24) is Curve pattern 1's 3 B-spline edges in live vs 3 lines in ours, not a
   sketch; for core.
 
