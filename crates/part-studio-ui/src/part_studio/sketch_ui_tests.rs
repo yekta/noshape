@@ -2587,7 +2587,7 @@ fn a_selected_faces_edges_are_outlined(cx: &mut TestAppContext) {
     let (outlined, expected) = cx.update(|cx| {
         let v = view.read(cx);
         let built = v.built.as_ref().expect("a scene");
-        let scene = crate::scene_builder::with_highlights(built, &v.display, std::slice::from_ref(&top), None, &[], Vec::new(), false, v.gpu.uploader());
+        let scene = crate::scene_builder::with_highlights(built, &v.display, std::slice::from_ref(&top), None, &[], Vec::new(), Default::default(), v.gpu.uploader());
         let edges: Vec<u32> = (1..scene.states.len() as u32).filter(|&id| built.picks.get(id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Edge)).collect();
         let outlined: Vec<u32> = edges.iter().copied().filter(|&id| scene.states[id as usize] & noshape_render::scene::state::OUTLINE != 0).collect();
         let expected: Vec<u32> = crate::scene_builder::face_edges(&v.display, &top).iter().flat_map(|e| built.picks.ids_for(e).to_vec()).collect();
@@ -2597,6 +2597,23 @@ fn a_selected_faces_edges_are_outlined(cx: &mut TestAppContext) {
     expected.sort_unstable();
     assert_eq!(outlined.len(), 4, "the top face's four edges: {outlined:?}");
     assert_eq!(outlined, expected);
+}
+
+/// A plane picked in an open dialog's field takes a light amber (live feel/mirror 33: 20 % of the selection colour
+/// over its own fill), a plane selected without a dialog the solid amber (live selection/01).
+#[gpui::test]
+fn a_plane_picked_in_a_dialog_is_lighter_than_a_selected_plane(cx: &mut TestAppContext) {
+    let (_window, view, _, _) = block_part(cx, "plane-picked-fill");
+    let fills = cx.update(|cx| {
+        let v = view.read(cx);
+        let built = v.built.as_ref().expect("a scene");
+        let right = v.display.planes.iter().find(|p| p.name == "Right").expect("the Right plane").reference.clone();
+        [false, true].map(|dialog| {
+            let scene = crate::scene_builder::with_highlights(built, &v.display, std::slice::from_ref(&right), None, &[], Vec::new(), crate::scene_builder::Highlighting { error: false, dialog }, v.gpu.uploader());
+            scene.instances.iter().map(|i| i.color[3]).filter(|a| [crate::theme::viewport::PLANE_SELECTED_ALPHA, crate::theme::viewport::PLANE_PICKED_ALPHA].contains(a)).collect::<Vec<f32>>()
+        })
+    });
+    assert_eq!(fills, [vec![crate::theme::viewport::PLANE_SELECTED_ALPHA], vec![crate::theme::viewport::PLANE_PICKED_ALPHA]]);
 }
 
 /// Live 1993 (b): Edit healthy moment on a broken chip (the Fillet moved above its Extrude) opens the Repair panel at

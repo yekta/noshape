@@ -339,7 +339,7 @@ impl FlatView {
         }
         self.viewport.update(cx, |vp, cx| vp.set_plane_labels(fills, cx));
         let scene = match &self.parts {
-            Some((display, built, _)) => crate::scene_builder::with_highlights(built, display, &selected, self.hover.as_ref(), &[], extra_now, false, self.gpu.uploader()),
+            Some((display, built, _)) => crate::scene_builder::with_highlights(built, display, &selected, self.hover.as_ref(), &[], extra_now, Default::default(), self.gpu.uploader()),
             None => Scene::default(),
         };
         self.viewport.update(cx, |vp, cx| vp.set_scene(Arc::new(scene), geometry_changed, cx));

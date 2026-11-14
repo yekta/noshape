@@ -1345,8 +1345,18 @@ pub fn silhouette_edges(m: &noshape_model::display::MeshBuffers) -> SilhouetteDa
 /// the orange selection: edges and face outlines red, sketch regions
 /// red-outlined with a light red fill, no face fill. `accent` (hovered parts
 /// and rows) keeps its colour.
+/// How [`with_highlights`] lights the selection: in the error colour (a failed feature's picks), and as an open
+/// feature dialog's picks (`dialog`: a plane picked there takes the light dialog fill, live feel/mirror 33, not a
+/// selected plane's amber).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Highlighting {
+    pub error: bool,
+    pub dialog: bool,
+}
+
 #[allow(clippy::too_many_arguments)]
-pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, error: bool, up: &Uploader) -> Scene {
+pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, mode: Highlighting, up: &Uploader) -> Scene {
+    let Highlighting { error, dialog } = mode;
     let _t = noshape_render::perf::scope("s.with_highlights");
     let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, no_occlusion: built.scene.no_occlusion };
     let mut overlay_pts = PointData::default();
@@ -1418,8 +1428,9 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             let corners = [c(-1.0, -1.0), c(1.0, -1.0), c(1.0, 1.0), c(-1.0, 1.0)];
             if flag == state::SELECTED {
                 let n: [f32; 3] = f.normal.as_vec3().into();
-                let k = theme::lin(theme::viewport::PLANE_SELECTED_FILL);
-                overlay_regions.push((MeshData { positions: corners.to_vec(), normals: vec![n; 4], pick_ids: vec![0; 4], indices: vec![0, 1, 2, 0, 2, 3] }, [k[0], k[1], k[2], theme::viewport::PLANE_SELECTED_ALPHA], true));
+                let (fill, alpha) = if dialog { (theme::viewport::PLANE_PICKED_FILL, theme::viewport::PLANE_PICKED_ALPHA) } else { (theme::viewport::PLANE_SELECTED_FILL, theme::viewport::PLANE_SELECTED_ALPHA) };
+                let k = theme::lin(fill);
+                overlay_regions.push((MeshData { positions: corners.to_vec(), normals: vec![n; 4], pick_ids: vec![0; 4], indices: vec![0, 1, 2, 0, 2, 3] }, [k[0], k[1], k[2], alpha], true));
             }
             let border = if flag == state::HOVER { hov_color } else { sel_color };
             for i in 0..4 {

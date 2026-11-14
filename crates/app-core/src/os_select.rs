@@ -267,9 +267,9 @@ impl OsSelect {
             .child(div().flex_1().min_w_0().text_size(px(14.)).text_color(if missing.is_some() { pal.error } else { pal.text }).when(missing.is_some(), |d| d.italic()).truncate().map(|d| if self.translated { d.child(crate::ui::user_text(label)) } else { d.child(label) }))
             // Live: the 8x4 bootstrap caret, 6 px from the end.
             .child(crate::ui::glyph("drawing-tool-caret", 12., pal.text))
-            // Focused (bootstrap .btn-default-focus inside os-enum-parameter):
-            // the soft blue glow, no outline.
-            .when(focused, |d| d.shadow(vec![BoxShadow { color: hsla(207. / 360., 0.74, 0.66, 0.6), offset: point(px(0.), px(0.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }]))
+            // Focused (live/feel/mirror 37, after a pick): a 1 px `#1651b0` line over the grey underline, no glow.
+            .relative()
+            .when(focused, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(gpui_kit::rgb(0x1651b0))))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open(window, cx)))
             .into_any_element()
     }

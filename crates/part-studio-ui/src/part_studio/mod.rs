@@ -1576,7 +1576,7 @@ impl PartStudioView {
         // A plane being resized: its highlight follows the drag.
         let shown = self.with_plane_drag(self.display.clone());
         let extra_len = extra.len();
-        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
+        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none(), dialog: self.edit.is_some() }, self.gpu.uploader());
         if let Some(slot) = self.ui.cap_hover.and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }

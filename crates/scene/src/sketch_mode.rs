@@ -1187,6 +1187,10 @@ pub fn constraint_icon(k: &ConstraintKind) -> Option<&'static str> {
     })
 }
 
+/// The sketch Mirror's prompts (live's i18n), shown as Onshape's tool prompt at the top of the graphics area.
+pub const MIRROR_LINE_PROMPT: &str = "Select a mirror line.";
+pub const MIRROR_ENTITIES_PROMPT: &str = "Select entities to be mirrored.";
+
 /// Icon shown next to the cursor for an inference.
 pub fn inference_icon(k: InferenceKind) -> &'static str {
     match k {
@@ -1407,7 +1411,7 @@ impl SketchEditor {
         // P3) sketch tool hints: none in live"; SKETCH-HINT-OVERLAP: ours drew
         // over the measure readout); Mirror's prompt is live's i18n text.
         self.message = match self.tool {
-            Tool::Mirror => Some("Select a mirror line.".into()),
+            Tool::Mirror => Some(MIRROR_LINE_PROMPT.into()),
             _ => None,
         };
     }
@@ -1435,7 +1439,7 @@ impl SketchEditor {
             // Live (sketch-mirror recording): a lone preselected line is the mirror line.
             Tool::Mirror if self.selection.len() == 1 && data.sketch.kind(self.selection[0]) == Some(EntityKind::Line) => {
                 self.mirror_axis = Some(self.selection[0]);
-                self.message = Some("Select entities to be mirrored.".into());
+                self.message = Some(MIRROR_ENTITIES_PROMPT.into());
                 EditOutcome::redraw()
             }
             _ => EditOutcome::none(),
@@ -2352,7 +2356,7 @@ impl SketchEditor {
                 match self.mirror_axis.filter(|a| data.sketch.entity(*a).is_some()) {
                     None => {
                         let Some(axis) = hovered.filter(is_line) else {
-                            self.message = Some("Select a mirror line.".into());
+                            self.message = Some(MIRROR_LINE_PROMPT.into());
                             return EditOutcome::none();
                         };
                         self.mirror_axis = Some(axis);
@@ -2360,7 +2364,7 @@ impl SketchEditor {
                         if ids.is_empty() {
                             // Live (ui-parity sketch-mirror-tool): the mirror line stays selected while it asks.
                             self.selection = vec![axis];
-                            self.message = Some("Select entities to be mirrored.".into());
+                            self.message = Some(MIRROR_ENTITIES_PROMPT.into());
                             return EditOutcome::redraw();
                         }
                         self.selection.clear();
@@ -2946,7 +2950,7 @@ impl SketchEditor {
                 self.finish_create(data, &r.created);
                 // Live (ui-parity sketch-mirror-tool): nothing stays selected, the prompt stays.
                 self.selection.clear();
-                self.message = Some("Select entities to be mirrored.".into());
+                self.message = Some(MIRROR_ENTITIES_PROMPT.into());
                 EditOutcome::changed()
             }
             Err(e) => {

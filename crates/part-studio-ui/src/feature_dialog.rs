@@ -3326,6 +3326,9 @@ impl FeatureDialog {
                                 let h = self.live_h(LIVE_EMPTY_FIELD);
                                 if empty { h } else { 26. }
                             }))
+                            // Live (feel/mirror 33, 37): filled, a field with the mate connector button beside it is
+                            // 1 px taller (43 px with its border; Entities to mirror beside nothing, 42).
+                            .when(!empty && takes_mc, |d| d.pb(px(1.)))
                             .max_h(px(160.))
                             .overflow_y_scroll()
                             .rounded(px(2.))

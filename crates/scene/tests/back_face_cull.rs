@@ -79,7 +79,7 @@ fn render(r: &mut Renderer, display: &StudioDisplay, cull: bool, ao: bool, look:
     cam.rotation = Camera::look_rotation(fwd, side.cross(fwd));
     cam.projection = projection;
     cam.fit_box(lo, hi, size.0 as f64 / size.1 as f64);
-    let mut scene = builder::with_highlights(&built, display, &[], None, &[], Vec::new(), false, &up);
+    let mut scene = builder::with_highlights(&built, display, &[], None, &[], Vec::new(), Default::default(), &up);
     let closed = scene.instances.iter().filter(|i| i.closed).count();
     if !cull {
         scene.instances.iter_mut().for_each(|i| i.closed = false);

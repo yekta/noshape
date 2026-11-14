@@ -106,7 +106,7 @@ fn profiles(dpr: f32, before: u32, after: u32) -> Option<Vec<Profile>> {
     ];
     let mut out = Vec::new();
     for (name, sel, hover) in states {
-        let scene = builder::with_highlights(&built, &display, &sel, hover.as_ref(), &[], Vec::new(), false, &up);
+        let scene = builder::with_highlights(&built, &display, &sel, hover.as_ref(), &[], Vec::new(), Default::default(), &up);
         let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: dpr, style: &style, pick: false }).unwrap();
         if let Ok(dir) = std::env::var("NOSHAPE_TEST_OUT") {
             let png = noshape_scene::png::encode_png(f.bgra.clone(), w, h, w, h).unwrap();
@@ -226,7 +226,7 @@ fn a_failing_feature_leaves_the_hovered_part_unred() {
     let up = r.uploader();
     let mut cache = GpuCache::default();
     let built = builder::build(&display, &SceneOptions { display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, show_sketches: false, ..Default::default() }, &mut cache, &up);
-    let scene = builder::with_highlights(&built, &display, std::slice::from_ref(&edge), None, std::slice::from_ref(&top), Vec::new(), true, &up);
+    let scene = builder::with_highlights(&built, &display, std::slice::from_ref(&edge), None, std::slice::from_ref(&top), Vec::new(), builder::Highlighting { error: true, dialog: false }, &up);
     let flags = |r: &Reference| built.picks.ids_for(r).iter().map(|&id| scene.states[id as usize]).collect::<Vec<u32>>();
     assert!(flags(&edge).iter().all(|f| f & state::ERROR != 0), "the failing feature's input is red: {:?}", flags(&edge));
     assert!(flags(&top).iter().all(|f| f & state::ACCENT != 0 && f & state::ERROR == 0), "the hovered part's face isn't: {:?}", flags(&top));

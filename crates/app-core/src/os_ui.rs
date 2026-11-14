@@ -528,6 +528,27 @@ pub fn message_bubble(id: impl Into<ElementId>, kind: impl Into<BubbleKind>, mes
         )
 }
 
+/// Onshape's tool prompt (live feel/mirror 03, 05: the sketch Mirror's "Select a mirror line."): a 34 px `#def1fb` box
+/// with a 1 px `#b2ddf6` border and a soft shadow, the 16 px info icon 16 px in, `#094174` 14 px text, no close.
+pub fn prompt_bubble(id: impl Into<ElementId>, message: impl IntoElement, cx: &App) -> Stateful<Div> {
+    h_flex()
+        .id(id)
+        .occlude()
+        .h(px(34.))
+        .pl(px(16.))
+        .pr(px(19.))
+        .gap(px(6.))
+        .rounded(px(4.))
+        .bg(rgb(0xdef1fb))
+        .border_1()
+        .border_color(rgb(0xb2ddf6))
+        .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+        .text_size(px(14.))
+        .text_color(rgb(0x094174))
+        .child(crate::assets::icon("toast-info", 16., cx))
+        .child(div().whitespace_nowrap().child(message))
+}
+
 /// A message bubble with Onshape's action link after the message
 /// (`.osx-message-bubble-link`: 14 px, weight 600, underlined, the text
 /// color), e.g. "Sketch 2 has been canceled. **Restore**".

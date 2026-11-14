@@ -4256,7 +4256,13 @@ impl PartStudioView {
         }
         let ed = self.sketch.as_ref().expect("sketch");
         if let Some(m) = ed.message.clone() {
-            out.push(div().absolute().bottom_3().left(px(340.)).px_2().py_1().rounded_md().bg(with_alpha(pal.panel_raised, 0.9)).text_xs().text_color(pal.text_muted).child(m).into_any_element());
+            if matches!(m.as_str(), crate::sketch_mode::MIRROR_LINE_PROMPT | crate::sketch_mode::MIRROR_ENTITIES_PROMPT) {
+                // Live (feel/mirror 03, 05): Onshape's tool prompt, 6 px under the toolbar, centred over the graphics
+                // area right of the list.
+                out.push(div().absolute().top(px(6.)).left_0().right_0().flex().justify_center().child(crate::os_ui::prompt_bubble("sketch-prompt", m, cx)).into_any_element());
+            } else {
+                out.push(div().absolute().bottom_3().left(px(340.)).px_2().py_1().rounded_md().bg(with_alpha(pal.panel_raised, 0.9)).text_xs().text_color(pal.text_muted).child(m).into_any_element());
+            }
         }
         out
     }

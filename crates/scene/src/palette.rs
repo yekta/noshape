@@ -35,6 +35,11 @@ pub mod viewport {
     /// 2 px #ffa90a border, Top view, over the plane's (245,248,250)).
     pub const PLANE_SELECTED_FILL: u32 = 0xffc862;
     pub const PLANE_SELECTED_ALPHA: f32 = 0.77;
+    /// A datum plane picked in an open dialog's field: a light amber, 20 % of the selection colour over its own fill
+    /// in sRGB (live feel/mirror 33: (247,232,202) inside the 2 px #ffa90a border over the plane's (245,248,250));
+    /// this colour at this alpha gives it with the overlay's linear blending.
+    pub const PLANE_PICKED_FILL: u32 = 0xf9d683;
+    pub const PLANE_PICKED_ALPHA: f32 = 0.5;
     /// A point target (vertex, edge midpoint): an 11 px disc, a darker ring
     /// 3–4 px out and a light centre; [disc, ring, centre] hovered and
     /// selected (live selection/08, part-studio/qa4-r5-s9-6d, 6e).

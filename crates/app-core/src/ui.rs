@@ -859,9 +859,8 @@ pub fn os_checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on:
     os_checkbox_focused(id, label, on, false)
 }
 
-/// [`os_checkbox`] with keyboard focus (feature dialogs, bundle CSS
-/// `input.ns-parameter-checkbox:focus + label.os-checkbox`): the box gets a
-/// `#1651b0` border and a 3 px `#769fcc` glow.
+/// [`os_checkbox`] with keyboard focus (feature dialogs; live feel/mirror 35, Merge with all just clicked): a 2 px
+/// `#3e94ff` ring over the box's edge, 14 px across, no glow.
 pub fn os_checkbox_focused(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool, focused: bool) -> Stateful<Div> {
     let pal = p();
     h_flex()
@@ -884,12 +883,13 @@ pub fn os_checkbox_focused(id: impl Into<ElementId>, label: impl Into<SharedStri
                 .flex()
                 .items_center()
                 .justify_center()
+                .relative()
                 .rounded(px(3.))
                 .border_1()
                 .border_color(if on || focused { pal.accent } else { gpui_kit::rgb(0x888888) })
-                .when(focused, |d| d.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x769fcc).into(), offset: point(px(0.), px(0.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }]))
                 .bg(if on { pal.accent } else { gpui_kit::rgb(0xffffff) })
-                .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
+                .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff))))
+                .when(focused, |d| d.child(div().absolute().top(px(-2.)).left(px(-2.)).size(px(14.)).rounded(px(4.)).border_2().border_color(gpui_kit::rgb(0x3e94ff)))),
         )
         .child(label.into())
 }
