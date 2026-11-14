@@ -4746,7 +4746,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   text's glyph regions aren't live's. 13 of 17 features lost behind it.
 - [x] (psui 2026-11-10 20:36: the flat as a sketchable body, Sketch 9 on it matches; c2-sm-louver 32/36, next Extrude 3 is bool's) P2 SUITE-LOUVER-SKETCH-9 (skasm, paused; core 2026-11-08 20:05 UTC): c2-sm-louver's Sketch 9 frame origin [0, 0,
   606.17] mm, live [-708.49, 351.45, 2.03] (on a sheet metal definition face); 5 of 36 features lost.
-- [ ] P3 INTEGRATOR-BSPLINE-GEAR (core; dx 2026-11-09 00:46 UTC, data exchange) cf-spur-gear's live.step read in ours:
+- [x] (dx 2026-11-14 00:29 UTC: STEP by 3138c7974 (exact p-curves on cylinders / cones / spheres / tori, 32-tooth 4123.70 mm²); IGES by 0f216aa72 (a B-surface bounded by its box integrates split at every knot, 12-tooth 807.52 mm²); exchange "ours imports live's" 48/48. The hoses' walls: dx-xtoffset, waiting on live REQUESTS 11-13 19:15) P3 INTEGRATOR-BSPLINE-GEAR (core; dx 2026-11-09 00:46 UTC, data exchange) cf-spur-gear's live.step read in ours:
   the 32-tooth gear's volume / area by our integral 4757.60 mm³ / 4122.70 mm², by a fine mesh of the same import
   4761.73 / 4123.68, live's import 4761.97 / 4123.70 (also its IGES: area −0.12 %). The integral misses on its
   tooth faces (no pcurves in the file, 4-pole edge curves), as in P2 I1's blend faces. Exchange suite "ours imports
