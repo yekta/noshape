@@ -931,6 +931,25 @@ fn block_with_hole(ctx: &mut Ctx, file: &str) {
     assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
 }
 
+/// An extrude's side faces on one circle are one face, whatever splits the circle (live q-arcs: an r20 circle drawn as
+/// three arcs end to end, a line ending at one joint: one cylinder and two planes, no seam vertex).
+#[test]
+fn arcs_of_one_circle_extrude_to_one_side_face() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "arcs-one-circle.noshape", "plane:top");
+    let at = |deg: f64| json!([20.0 * deg.to_radians().cos(), 20.0 * deg.to_radians().sin()]);
+    for (a, b) in [(0.0, 120.0), (120.0, 240.0), (240.0, 360.0)] {
+        call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "center_point_arc", "points": [[0, 0], at(a), at(b)] }));
+    }
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [[40, 0], [20, 0]] }));
+    let st = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    let disc = st["regions"].as_array().unwrap().iter().find(|r| (num(&r["area"]) - std::f64::consts::PI * 400.0).abs() < 1.0).unwrap_or_else(|| panic!("{st}"))["id"].as_str().unwrap().to_string();
+    let ex = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [disc], "depth": "5 mm" } }));
+    assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
+    let faces = call(&mut ctx, "query_entities", json!({ "kind": "faces" }))["faces"].as_array().unwrap().len();
+    assert_eq!(faces, 3, "one cylinder and two planes");
+}
+
 /// The Measure tool (query_measure): a face's area; a whole part among the entities gives no measurement, as Onshape
 /// (live 2463: the readout and the Measure panel stay empty), with a note saying why.
 #[test]

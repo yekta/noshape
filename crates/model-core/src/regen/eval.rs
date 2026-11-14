@@ -1628,14 +1628,12 @@ pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::R
             (b0 - a).length() < 1e-12 && d0.perp_dot(d).abs() < 1e-9 && d0.dot(d) > 0.0 && (e0 == e || alone(a, e0, e) || one_line(a0, b))
         };
         for (seg, src) in lp.segments.iter().zip(lp.sources.iter()) {
-            // (Arcs of other entities on one circle too, where nothing else of the sketch meets them: c2-fan-blade-sweep's
-            // "klammer", two R13 fillets that ate the side between them, one half cylinder in live.)
-            let other_arc = |e_prev: u32| match seg {
-                P::Arc { center, radius, start_angle, .. } => join_arcs && !legacy && alone(*center + DVec2::new(start_angle.cos(), start_angle.sin()) * *radius, e_prev, src.entity.0),
-                _ => false,
-            };
+            // (Arcs of other entities on one circle too, whatever else of the sketch meets them at the joint: live joins
+            // three arcs of a circle and a line ending at one joint into one side face; c2-fan-blade-sweep's "klammer",
+            // two R13 fillets that ate the side between them, one half cylinder.)
+            let other_arc = matches!(seg, P::Arc { .. }) && join_arcs && !legacy;
             if let (Some((P::Arc { center: c0, radius: r0, start_angle: s0, end_angle: e0, ccw: w0 }, e_prev)), P::Arc { center, radius, end_angle, ccw, .. }) = (out.last_mut(), seg)
-                && (*e_prev == src.entity.0 || other_arc(*e_prev))
+                && (*e_prev == src.entity.0 || other_arc)
                 && (*c0 - *center).length() < 1e-12
                 && (*r0 - *radius).abs() < 1e-12
                 && *w0 == *ccw
