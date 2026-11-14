@@ -1,0 +1,71 @@
+{
+  "name": "asm-circular-pattern-angle-count",
+  "about": "Assembly circular pattern dialog › Angle 90, Instance count 3, then Escape",
+  "area": "assembly",
+  "source": "live2 11-14: asm field-level coverage, batch A2 (lead: the asm/drawing half of the coverage audit)",
+  "start": "two-blocks",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Assembly circular pattern"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "dialog"
+    },
+    {
+      "do": "click",
+      "on": {
+        "field": "Angle"
+      }
+    },
+    {
+      "do": "key",
+      "key": "ctrl+a"
+    },
+    {
+      "do": "type",
+      "text": "90"
+    },
+    {
+      "do": "key",
+      "key": "Tab"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "field": "Instance count"
+      }
+    },
+    {
+      "do": "key",
+      "key": "ctrl+a"
+    },
+    {
+      "do": "type",
+      "text": "3"
+    },
+    {
+      "do": "key",
+      "key": "Tab"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

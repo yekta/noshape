@@ -1,0 +1,67 @@
+{
+  "name": "asm-mate-connector-move-offset",
+  "about": "Mate connector on a face › Move ticked, first offset box 5, then Escape",
+  "area": "assembly",
+  "source": "live2 11-14: asm field-level coverage, batch A2 (lead: the asm/drawing half of the coverage audit)",
+  "start": "two-blocks",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Mate connector"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "face": [
+          70,
+          10,
+          10
+        ],
+        "instance": "Part 2 <1>"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Move"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "field": "",
+        "index": 0
+      }
+    },
+    {
+      "do": "type",
+      "text": "5"
+    },
+    {
+      "do": "key",
+      "key": "Enter"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

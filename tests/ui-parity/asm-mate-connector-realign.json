@@ -1,0 +1,48 @@
+{
+  "name": "asm-mate-connector-realign",
+  "about": "Mate connector on a face › Realign ticked (its axis options), then Escape",
+  "area": "assembly",
+  "source": "live2 11-14: asm field-level coverage, batch A2 (lead: the asm/drawing half of the coverage audit)",
+  "start": "two-blocks",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Mate connector"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "face": [
+          70,
+          10,
+          10
+        ],
+        "instance": "Part 2 <1>"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Realign"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

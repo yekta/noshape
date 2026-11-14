@@ -1,0 +1,42 @@
+{
+  "name": "asm-mirror-two-picks",
+  "about": "Assembly mirror dialog: Part 2 <1> as the instance, then Escape",
+  "area": "assembly",
+  "source": "live2 11-14: asm field-level coverage, batch A2 (lead: the asm/drawing half of the coverage audit)",
+  "start": "two-blocks",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Assembly mirror"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "dialog"
+    },
+    {
+      "do": "click",
+      "on": {
+        "face": [
+          70,
+          10,
+          10
+        ],
+        "instance": "Part 2 <1>"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

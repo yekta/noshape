@@ -1,0 +1,37 @@
+{
+  "name": "asm-linear-pattern-second-direction",
+  "about": "Assembly linear pattern dialog › Second direction ticked (its fields), then Escape",
+  "area": "assembly",
+  "source": "live2 11-14: asm field-level coverage, batch A2 (lead: the asm/drawing half of the coverage audit)",
+  "start": "two-blocks",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Assembly linear pattern"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "dialog"
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Second direction"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

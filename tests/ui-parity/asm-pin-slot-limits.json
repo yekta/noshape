@@ -1,0 +1,37 @@
+{
+  "name": "asm-pin-slot-limits",
+  "about": "Pin slot mate dialog › Limits ticked, then Escape",
+  "area": "assembly",
+  "source": "live2 11-14: asm field-level coverage, batch A2 (lead: the asm/drawing half of the coverage audit)",
+  "start": "pin-block",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Pin slot mate"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "dialog"
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Limits"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}
