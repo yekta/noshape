@@ -296,8 +296,9 @@ mod tests {
             (d.sheets[0].scale, d.sheets[0].views.iter().map(|v| v.position).collect::<Vec<_>>())
         };
         let near = |a: [f64; 2], b: [f64; 2], k: f64| (a[0] - b[0] * k).abs() < 1e-3 && (a[1] - b[1] * k).abs() < 1e-3;
-        // (front, right, top, isometric: live's order)
-        let ansi = [[3.209, 3.1892], [7.829, 3.1892], [3.209, 6.3308], [7.829, 6.3308]];
+        // (front, right, top, isometric: live's order; on the sheet, live2 feel/dxfshift: Front at x 81.0 mm, the DXF
+        // 0.48 mm right)
+        let ansi = [[3.190, 3.1892], [7.810, 3.1892], [3.190, 6.3308], [7.810, 6.3308]];
         for (e, scale) in [([20.0, 10.0, 5.0], 3.0), ([100.0, 50.0, 20.0], 0.5), ([60.0, 60.0, 120.0], 1.0 / 3.0)] {
             let (s, p) = at("ANSI A", e);
             assert!((s - scale).abs() < 1e-12, "{e:?}: {s}");
@@ -305,7 +306,7 @@ mod tests {
         }
         let (s, p) = at("ISO A3", [100.0, 50.0, 20.0]);
         assert_eq!(s, 1.0);
-        let iso = [[122.3, 221.2056], [298.7, 221.2056], [122.3, 111.4344], [298.7, 111.4344]];
+        let iso = [[121.8, 221.2056], [298.2, 221.2056], [121.8, 111.4344], [298.2, 111.4344]];
         assert!(p.iter().zip(iso).all(|(a, b)| near(*a, b, 1.0)), "{p:?}");
     }
 

@@ -1396,21 +1396,21 @@ mod tests {
     }
 
     /// Live's exports of an empty ANSI A / ISO A3 template drawing (samples/tpl-*.dxf, .pdf): the DXF's extents are
-    /// the zone ticks' ends; the PDF centres them on the page (the frame 0.019 in / 0.5 mm left of the DXF's).
+    /// the zone ticks' ends, the sheet's moved 0.05 m right (`SheetSize::cad_x_shift`); the PDF centres them on the
+    /// page, as the sheet has them (the frame 0.019 in / 0.5 mm left of the DXF's).
     #[test]
     fn exports_place_the_sheet_as_live() {
-        for (size, lo, hi, shift) in [
-            (crate::drawing::SheetSize::AnsiA, [0.9652, 0.4826], [279.4, 215.4174], "1 0 0 1 -1.368 0.000 cm\n"),
-            (crate::drawing::SheetSize::A3, [1.0, 0.5], [420.0, 296.5], "1 0 0 1 -1.417 0.000 cm\n"),
-        ] {
+        for (size, lo, hi) in [(crate::drawing::SheetSize::AnsiA, [0.9652, 0.4826], [279.4, 215.4174]), (crate::drawing::SheetSize::A3, [1.0, 0.5], [420.0, 296.5])] {
             let sheet = Sheet { size, ..Default::default() };
             let (w, h) = size.size_mm();
             let mut g = SheetGeometry::new(w, h);
             g.add_border_and_title(&sheet);
             let [elo, ehi] = line_extents(&g).unwrap();
             let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).abs() < 1e-3 && (a[1] - b[1]).abs() < 1e-3;
-            assert!(near(elo, lo) && near(ehi, hi), "{size:?}: {elo:?} {ehi:?}");
-            assert!(pdf_decoded(&to_pdf(&g)).contains(shift), "{size:?}");
+            let dx = size.cad_x_shift();
+            assert!(near([elo[0] + dx, elo[1]], lo) && near([ehi[0] + dx, ehi[1]], hi), "{size:?}: {elo:?} {ehi:?}");
+            let pdf = pdf_decoded(&to_pdf(&g));
+            assert!(pdf.contains("1 0 0 1 0.000 0.000 cm\n") || pdf.contains("1 0 0 1 -0.000 0.000 cm\n"), "{size:?}");
             let dxf = String::from_utf8(crate::drawing::cad_export::to_dxf_version(&g, 4, acadrust::DxfVersion::AC1032).unwrap()).unwrap();
             let at = dxf.find("$EXTMIN").unwrap();
             let v: Vec<f64> = dxf[at..].lines().skip(2).step_by(2).take(2).map(|l| l.trim().parse().unwrap()).collect();

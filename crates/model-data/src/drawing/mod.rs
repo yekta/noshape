@@ -130,17 +130,23 @@ impl SheetSize {
         }
     }
 
-    /// The border frame [x0, y0, x1, y1] (mm): `frame_margin` m at the
-    /// bottom and top, 1.05 m at the left and 0.95 m at the right (live's
-    /// templates sit 0.05 m right of centre); A4 runs from 20 mm to the
-    /// right edge (live ISO_A4 / JIS_A4, portrait too).
+    /// The border frame [x0, y0, x1, y1] (mm): `frame_margin` m all round (live2 feel/dxfshift: 0.376 in each side
+    /// on ANSI A's screen); A4 runs from 20 mm to the right edge (live ISO_A4 / JIS_A4, portrait too).
     pub fn frame_rect(self) -> [f64; 4] {
         let (w, h) = self.size_mm();
         let m = self.frame_margin();
         match self {
             SheetSize::A4 | SheetSize::A4Portrait => [20.0, m, w, h - m],
-            SheetSize::Custom { .. } => [m, m, w - m, h - m],
-            _ => [1.05 * m, m, w - 0.95 * m, h - m],
+            _ => [m, m, w - m, h - m],
+        }
+    }
+
+    /// How far right live's DXF / DWG export moves the whole sheet (mm): 0.05 m (live2 feel/dxfshift: ANSI A's frame
+    /// at 0.399 / 0.361 in there, Front's centre 81.51 mm for the sheet's 81.0); A4 and custom sizes none.
+    pub fn cad_x_shift(self) -> f64 {
+        match self {
+            SheetSize::A4 | SheetSize::A4Portrait | SheetSize::Custom { .. } => 0.0,
+            _ => 0.05 * self.frame_margin(),
         }
     }
 

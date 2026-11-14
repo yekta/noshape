@@ -2360,6 +2360,18 @@ fn jogged_extension_lines_and_broken_dimensions() {
 /// tpl-ANSI_A_MM.dxf, tpl-ISO_A4.dxf): frame, zone dividers and labels and
 /// the title block where Onshape's templates have them; nothing at the
 /// sheet edge.
+/// `g` where its DXF / DWG export puts it: every x moved by its `cad_dx` (live's template numbers are its DXF's).
+fn as_in_cad(mut g: sheet::SheetGeometry) -> sheet::SheetGeometry {
+    let dx = g.cad_dx;
+    for p in g.lines.iter_mut().flat_map(|l| l.points.iter_mut()).chain(g.fills.iter_mut().flat_map(|f| f.points.iter_mut())) {
+        p[0] += dx;
+    }
+    for t in &mut g.texts {
+        t.pos[0] += dx;
+    }
+    g
+}
+
 #[test]
 fn template_frames_and_zones_match_lives() {
     let geom = |size: SheetSize, style: TitleBlockStyle| {
@@ -2367,7 +2379,9 @@ fn template_frames_and_zones_match_lives() {
         let (w, h) = size.size_mm();
         let mut g = sheet::SheetGeometry::new(w, h);
         g.add_border_and_title(&s);
-        (g, sheet::title_block_rect(&s).unwrap())
+        let [x0, y0, x1, y1] = sheet::title_block_rect(&s).unwrap();
+        let dx = g.cad_dx;
+        (as_in_cad(g), [x0 + dx, y0, x1 + dx, y1])
     };
     let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).abs() < 1e-3 && (a[1] - b[1]).abs() < 1e-3;
     let has_line = |g: &sheet::SheetGeometry, a: [f64; 2], b: [f64; 2]| g.lines.iter().any(|l| l.points.len() == 2 && ((near(l.points[0], a) && near(l.points[1], b)) || (near(l.points[0], b) && near(l.points[1], a))));
@@ -2375,7 +2389,7 @@ fn template_frames_and_zones_match_lives() {
     let rect4 = |r: [f64; 4], e: [f64; 4]| r.iter().zip(e).all(|(a, b)| (a - b).abs() < 1e-3);
     // ISO A3: whole-millimetre zones, columns 0.5 mm right.
     let (g, tb) = geom(SheetSize::A3, TitleBlockStyle::Iso);
-    assert!(rect4(SheetSize::A3.frame_rect(), [10.5, 10.0, 410.5, 287.0]));
+    assert!(rect4(SheetSize::A3.frame_rect(), [10.0, 10.0, 410.0, 287.0]) && SheetSize::A3.cad_x_shift() == 0.5);
     assert!(has_line(&g, [70.5, 10.0], [70.5, 0.5]) && has_line(&g, [350.5, 287.0], [350.5, 296.5]));
     assert!(has_line(&g, [10.5, 74.5], [1.0, 74.5]) && has_line(&g, [410.5, 222.5], [420.0, 222.5]));
     assert!(label(&g, "6", [35.5, 5.0]) && label(&g, "1", [385.5, 292.0]) && label(&g, "A", [5.5, 37.5]) && label(&g, "D", [415.5, 259.5]));
@@ -2384,7 +2398,7 @@ fn template_frames_and_zones_match_lives() {
     assert!(!has_line(&g, [0.0, 0.0], [420.0, 0.0]) && !g.lines.iter().any(|l| l.closed && l.points.iter().any(|p| near(*p, [0.0, 0.0]))), "no sheet-edge line");
     // ANSI A (mm): exact halves, labels 0.18 in.
     let (g, tb) = geom(SheetSize::AnsiA, TitleBlockStyle::Ansi);
-    assert!(rect4(SheetSize::AnsiA.frame_rect(), [10.1346, 9.652, 270.2306, 206.248]));
+    assert!(rect4(SheetSize::AnsiA.frame_rect(), [9.652, 9.652, 269.748, 206.248]));
     assert!(has_line(&g, [140.1826, 9.652], [140.1826, 0.4826]) && has_line(&g, [270.2306, 107.95], [279.4, 107.95]) && has_line(&g, [10.1346, 107.95], [0.9652, 107.95]));
     assert!(label(&g, "1", [210.0326, 4.826]) && label(&g, "2", [70.3326, 211.074]) && label(&g, "A", [5.3086, 53.975]) && label(&g, "B", [275.0566, 161.925]));
     assert!(rect4(tb, [115.9256, 9.652, 270.2306, 47.752]), "{tb:?}");
@@ -4995,7 +5009,7 @@ fn an_unset_revision_is_a_placeholder() {
         let b = render_sheet(d, 0, &super::views::Sources::new(), &ViewCache::new(), false).unwrap();
         // The REV. value's spot (live: 10.504, 0.725 in).
         // (An empty cell keeps an empty text: live's DXF writes it.)
-        b.geometry.texts.iter().filter(|t| (t.pos[0] - 10.504 * 25.4).abs() < 0.01 && (t.pos[1] - 0.725 * 25.4).abs() < 0.01 && !t.text.is_empty()).map(|t| t.text.clone()).collect::<Vec<_>>()
+        b.geometry.texts.iter().filter(|t| (t.pos[0] + b.geometry.cad_dx - 10.504 * 25.4).abs() < 0.01 && (t.pos[1] - 0.725 * 25.4).abs() < 0.01 && !t.text.is_empty()).map(|t| t.text.clone()).collect::<Vec<_>>()
     };
     assert_eq!(revision(&d), ["-"]);
     d.props.hide_placeholder = true;
@@ -5014,7 +5028,7 @@ fn title_block_texts_where_lives_are() {
         let (w, h) = size.size_mm();
         let mut g = sheet::SheetGeometry::new(w, h);
         g.add_border_and_title_full(&s, projection, &|v: &str| v.to_string());
-        g
+        as_in_cad(g)
     };
     // (text, x, y, height, anchor) in the template's unit (`k` mm).
     let check = |g: &sheet::SheetGeometry, k: f64, want: &[(&str, f64, f64, f64, Anchor)]| {
@@ -5094,7 +5108,7 @@ fn ansi_projection_symbol_as_live() {
     let mut d = Drawing::default();
     templates::apply_template(&mut d, 0, &templates::DrawingTemplate::standard("ANSI A", SheetSize::AnsiA, TitleBlockStyle::Ansi, true, Projection::ThirdAngle));
     let b = render_sheet(&d, 0, &super::views::Sources::new(), &ViewCache::new(), false).unwrap();
-    let label = b.geometry.texts.iter().find(|t| t.text == "THIRD ANGLE PROJECTION").unwrap().pos[0] / 25.4;
+    let label = (b.geometry.texts.iter().find(|t| t.text == "THIRD ANGLE PROJECTION").unwrap().pos[0] + b.geometry.cad_dx) / 25.4;
     let dxf = super::cad_export::to_dxf_version(&b.geometry, 1, acadrust::DxfVersion::AC1014).unwrap();
     let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf)).unwrap().read().unwrap();
     let mut circles: Vec<(f64, f64, f64)> = doc.entities().filter_map(|e| match e {

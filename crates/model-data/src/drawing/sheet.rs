@@ -105,6 +105,9 @@ pub struct SheetGeometry {
     /// outlines each with a 1 plot unit stroke.
     #[serde(default)]
     pub outlined_fills: Vec<usize>,
+    /// The whole sheet's shift along x in a DXF / DWG export (mm; `SheetSize::cad_x_shift`).
+    #[serde(default)]
+    pub cad_dx: f64,
     pub width: f64,
     pub height: f64,
     pub lines: Vec<Polyline2>,
@@ -919,6 +922,7 @@ impl SheetGeometry {
         // no zone strip.
         let format = sheet.format;
         let [fx0, fy0, fx1, fy1] = sheet.size.frame_rect();
+        self.cad_dx = sheet.size.cad_x_shift();
         self.rect(fx0, fy0, fx1, fy1, LineStyle::Border);
         // A Japanese template's texts, the zones' too, are in its Japanese
         // text style (live JIS_*.dwt).
@@ -973,11 +977,10 @@ impl SheetGeometry {
     /// the left and letters from the top. Letters skip O (live drawing/560:
     /// A0 runs A..L with I). Geometry as live's templates (asb 10-24
     /// "template frames", m = `frame_margin`): ANSI zones divide the sheet
-    /// exactly, ISO / JIS ones are whole millimetres centred on it; the
-    /// columns sit 0.05 m right like the frame. Dividers run from the frame
-    /// to 0.05 m from the bottom / top edge, to 0.1 m from the left edge and
-    /// to the right edge; labels at m / 2 from the bottom / top, 0.55 m from
-    /// the left and 0.45 m from the right.
+    /// exactly, ISO / JIS ones are whole millimetres centred on it. Dividers
+    /// run from the frame to 0.05 m from each edge; labels at m / 2 from the
+    /// edges (the DXF moves them 0.05 m right with the frame,
+    /// `SheetSize::cad_x_shift`).
     fn add_zones(&mut self, sheet: &Sheet) {
         let (w, h) = (self.width, self.height);
         let [nx, ny] = sheet.format.zone_counts(sheet.size).map(|n| n as usize);
@@ -985,6 +988,8 @@ impl SheetGeometry {
         let th = sheet.size.zone_label_height();
         let m = sheet.size.frame_margin();
         let [fx0, fy0, fx1, fy1] = sheet.size.frame_rect();
+        // (Live's DXF numbers less its x shift; none on a custom size, whose zones keep them.)
+        let s = sheet.size.cad_x_shift();
         // Zone pitch and the first divider's offset along a side of length `len`.
         let ansi = sheet.size.is_ansi() || matches!(sheet.size, super::SheetSize::Custom { .. });
         let grid = |len: f64, n: usize, shift: f64| {
@@ -992,7 +997,7 @@ impl SheetGeometry {
             (step, (len - n as f64 * step) / 2.0 + shift)
         };
         if nx > 0 {
-            let (step, x00) = grid(w, nx, 0.05 * m);
+            let (step, x00) = grid(w, nx, 0.05 * m - s);
             for i in 1..nx {
                 let x = x00 + step * i as f64;
                 self.line([x, fy0], [x, 0.05 * m], LineStyle::Thin);
@@ -1009,14 +1014,14 @@ impl SheetGeometry {
             let (step, y00) = grid(h, ny, 0.0);
             for j in 1..ny {
                 let y = y00 + step * j as f64;
-                self.line([fx0, y], [0.1 * m, y], LineStyle::Thin);
-                self.line([fx1, y], [w, y], LineStyle::Thin);
+                self.line([fx0, y], [0.1 * m - s, y], LineStyle::Thin);
+                self.line([fx1, y], [w - s, y], LineStyle::Thin);
             }
             for j in 0..ny {
                 let y = y00 + step * (j as f64 + 0.5);
                 let letter = zone_letter(if top_left { ny - 1 - j } else { j });
-                self.text([0.55 * m, y], th, letter.clone(), Anchor::Center);
-                self.text([w - 0.45 * m, y], th, letter, Anchor::Center);
+                self.text([0.55 * m - s, y], th, letter.clone(), Anchor::Center);
+                self.text([w - 0.45 * m - s, y], th, letter, Anchor::Center);
             }
         }
     }
@@ -3771,17 +3776,20 @@ mod tests {
         assert_eq!(s.title_style, TitleBlockStyle::IsoContinuation);
         let mut g = SheetGeometry::new(420.0, 297.0);
         g.add_border_and_title_full(s, super::super::Projection::FirstAngle, &|v: &str| v.replace("{sheet.number} of {sheet.count}", "2 of 2").replace("{sheet.scale}", "----"));
+        // (Live's DXF numbers: the sheet's x moved right by `cad_dx`.)
+        let dx = g.cad_dx;
         let near = |a: f64, b: f64| (a - b).abs() < 2e-3;
+        let nearx = |a: f64, b: f64| near(a + dx, b);
         for x in [284.008, 339.888, 352.588, 374.94, 400.34] {
-            assert!(g.lines.iter().any(|l| near(l.points[0][0], x) && near(l.points[1][0], x) && near(l.points[0][1].min(l.points[1][1]), 10.0) && near(l.points[0][1].max(l.points[1][1]), 16.604)), "{x}");
+            assert!(g.lines.iter().any(|l| nearx(l.points[0][0], x) && nearx(l.points[1][0], x) && near(l.points[0][1].min(l.points[1][1]), 10.0) && near(l.points[0][1].max(l.points[1][1]), 16.604)), "{x}");
         }
         let t = |s: &str| g.texts.iter().find(|t| t.text == s).unwrap_or_else(|| panic!("{s}"));
         let dwg = t("DWG NO.");
-        assert!(near(dwg.pos[0], 284.544) && near(dwg.pos[1], 15.726) && near(dwg.height, 0.975), "{:?} {}", dwg.pos, dwg.height);
+        assert!(nearx(dwg.pos[0], 284.544) && near(dwg.pos[1], 15.726) && near(dwg.height, 0.975), "{:?} {}", dwg.pos, dwg.height);
         let sheet = t("2 of 2");
-        assert!(near(sheet.pos[0], 389.266) && near(sheet.pos[1], 13.302) && near(sheet.height, 2.926), "{:?}", sheet.pos);
-        assert!(near(t("A3").pos[0], 348.27) && near(t("----").pos[1], 13.302));
-        assert!(near(t("REV.").pos[0], 400.787) && near(t("REV.").pos[1], 15.873));
+        assert!(nearx(sheet.pos[0], 389.266) && near(sheet.pos[1], 13.302) && near(sheet.height, 2.926), "{:?}", sheet.pos);
+        assert!(nearx(t("A3").pos[0], 348.27) && near(t("----").pos[1], 13.302));
+        assert!(nearx(t("REV.").pos[0], 400.787) && near(t("REV.").pos[1], 15.873));
     }
 
     /// D24 (live asbdt-1a…c): a value dragged along an ANSI dimension stays

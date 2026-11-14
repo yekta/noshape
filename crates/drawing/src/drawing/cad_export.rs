@@ -288,7 +288,7 @@ pub fn cad_document_pages(pages: &[SheetGeometry], insunits: u8, version: DxfVer
         if let Some(name) = &layout {
             doc.add_layout(name).map_err(|e| e.to_string())?;
         }
-        add_sheet(&mut doc, g, k, layout.as_deref(), version, 0.0)?;
+        add_sheet(&mut doc, g, k, layout.as_deref(), version, g.cad_dx)?;
     }
     Ok(doc)
 }
@@ -332,7 +332,7 @@ pub fn cad_document_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunit
     for (i, (name, g, [lo, hi])) in sheets.iter().enumerate() {
         let dx = next - lo;
         next = hi + dx + SHEET_GAP_MM;
-        add_sheet(&mut doc, g, k, None, version, dx)?;
+        add_sheet(&mut doc, g, k, None, version, dx + g.cad_dx)?;
         // Release 13 / 14: model space only (live drw2-k-dxfR14 has no layouts).
         if version <= DxfVersion::AC1014 {
             continue;
@@ -491,9 +491,9 @@ fn document_tables(pages: &[&SheetGeometry], insunits: u8, version: DxfVersion) 
     // DASHED 0.5 in draws 6.35 mm dashes, as its PDF).
     doc.header.linetype_scale = 0.5;
     // Live: the first sheet's extents, AutoCAD's default limits.
-    if let Some([lo, hi]) = pages.first().and_then(|g| super::export::line_extents(g)) {
-        doc.header.model_space_extents_min = Vector3::new(lo[0] * k, lo[1] * k, 0.0);
-        doc.header.model_space_extents_max = Vector3::new(hi[0] * k, hi[1] * k, 0.0);
+    if let Some(([lo, hi], dx)) = pages.first().and_then(|g| Some((super::export::line_extents(g)?, g.cad_dx))) {
+        doc.header.model_space_extents_min = Vector3::new((lo[0] + dx) * k, lo[1] * k, 0.0);
+        doc.header.model_space_extents_max = Vector3::new((hi[0] + dx) * k, hi[1] * k, 0.0);
     }
     doc.header.model_space_limits_max = Vector2::new(12.0, 9.0);
     for (name, description, pattern) in LINE_TYPES {
@@ -1269,7 +1269,11 @@ pub fn r12_geometry(g: &SheetGeometry) -> SheetGeometry {
             continue;
         }
         let i = out.lines.len();
-        out.lines.push(l.clone());
+        let mut l = l.clone();
+        for p in &mut l.points {
+            p[0] += g.cad_dx;
+        }
+        out.lines.push(l);
         if let Some(c) = g.line_color(li) {
             out.colors.push(super::sheet::ColorSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, rgb: c });
         }
