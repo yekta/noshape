@@ -5,6 +5,21 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-14 22:44 UTC: landed band / inspection / broken-out; infento 1dc32b handed on in pieces
+- Landed: exchange read-back band (ed89c2e4; 47/48, the hose's ring split left), inspection bubble radius (1cfe9234),
+  broken-out only in later projected views (420a998d). TICKETS PS-INEXACT-INTERSECTION-EDGES filed (P3 core / bool).
+- infento 1dc32b on main (vibe7 ~/tmp/dx/sk14-st-1dc32b.log; first difference now only Boolean 2's loose live box):
+  - Extrude 51 (46T pulley, asm's report): every region of sketch "Large pully" fails to extrude (0.0028 mm line /
+    arc crossings, ~90 sliver regions of 0.0005 mm²): core told 22:3x, repro vibe7 ~/agents/dx-keep/repro-1dc.
+    Not a regression of 257301e5 (fails alone with and without it).
+  - live 3098: an extrude's side edges run from the far cap to the sketch plane; Translate by line follows it. Ours
+    matches for a normal extrude, but an Opposite-direction extrude's side edge points the wrong way: core told (P1).
+    Transform 11 (normal Extrude 38's edge) is right in ours.
+  - Extrude 39 / 40 / 49: Transform 12's copy sits on Part 15 in ours, both extrudes run away from their up-to
+    faces; asked live (REQUESTS 22:41) for features 92-101's parts and the faces live's queries name. Pick up from there.
+- Drawing exports 61 / 84 (list in the 21:5x entry). Hosts: vibe7 clear for qa's 01:11 window; vibe6 left to blend /
+  studios (lead 21:19).
+
 ## 11-14 22:12 UTC: read-back band, broken-out inheritance, inspection radius; next infento 1dc32b
 - Queued / landing: the exchange read-back band (lead's decision: volume within the largest edge tolerance x area,
   area within it x edge length; `query_parts` edge_tolerance / edge_length; docs/PARITY-SUITES.md §3; ours reads ours
