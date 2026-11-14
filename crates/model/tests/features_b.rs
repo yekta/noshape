@@ -357,6 +357,32 @@ fn helix_on_a_sketch_circle() {
     assert!(near(len, expected, expected * 1e-6), "length {len} vs {expected}");
 }
 
+/// Helix › Circle on an extruded circle's edge starts at the sketch circle's x, as Parasolid's cap edge keeps the
+/// sketch circle (asm-hand-drill-pinslot studio bb72f3's Helix 1, live: at +x; ours started at -x, the cylinder's x).
+#[test]
+fn helix_on_an_extruded_circles_edge_starts_at_the_sketch_x() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, 0.0129);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.extrude_largest(sid, "2 mm");
+    let r = s.ok();
+    let v = noshape_kernel::make_vertex(DVec3::new(0.0, 0.0129, 0.0)).unwrap();
+    let b = r.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).expect("the disc");
+    let i = b.shape.edges().iter().position(|e| noshape_kernel::distance(&v, e).is_ok_and(|d| d.distance < 1e-9)).expect("the bottom circle");
+    let edge = Reference::Edge((*b.edges[i]).clone());
+    s.add("helix", move |p| {
+        p.set("axisType", ParamValue::Enum("CIRCLE".into()));
+        p.set("edge", ParamValue::Query(vec![edge]));
+        p.set("height", expr("6 mm"));
+        p.set("revolutions", expr("1"));
+    });
+    let r = s.ok();
+    let w = r.context.bodies.iter().find(|b| b.kind == BodyKind::Wire).expect("the helix");
+    let (a, _) = w.shape.edges()[0].endpoints().unwrap();
+    assert!(a.distance(DVec3::new(0.0129, 0.0, 0.0)) < 1e-9, "starts at {a:?}");
+}
+
 #[test]
 fn helix_on_cylinder_face_uses_face_height() {
     let mut s = Studio::new();

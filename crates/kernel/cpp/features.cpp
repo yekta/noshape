@@ -324,8 +324,9 @@ ShapeList single(const TopoDS_Shape& s)
 // `z_new` (the frame frame_cylinders_toward_sketch gives their cylinders):
 // the swept seam then sits at the new frame's u = 0, as an OCCT primitive's
 // (a seam left at u = pi made the booleans of a part with its mirror image
-// wrong). Same circle, same sense; the old edges and vertices are recorded
-// in `rs`.
+// wrong). Same circle, same sense, same frame (Parasolid's cap edge keeps the
+// sketch circle's: a helix on it starts at its x, asm-hand-drill-pinslot
+// studio bb72f3's Helix 1); the old edges and vertices are recorded in `rs`.
 TopoDS_Shape seat_circles(const TopoDS_Shape& base, const gp_Dir& z_new, occ::handle<BRepTools_ReShape>& rs)
 {
   const gp_Dir x_new = gp_Ax2(gp_Pnt(0, 0, 0), z_new).XDirection();
@@ -348,7 +349,8 @@ TopoDS_Shape seat_circles(const TopoDS_Shape& base, const gp_Dir& z_new, occ::ha
     // Already starting there.
     if (gp_Vec(ci.Location(), BRep_Tool::Pnt(v0)).Normalized().IsEqual(gp_Vec(x_new), 1e-12, 1e-12))
       continue;
-    BRepBuilderAPI_MakeEdge mk(gp_Circ(gp_Ax2(ci.Location(), ci.Axis().Direction(), x_new), ci.Radius()));
+    const double            a = ElCLib::Parameter(ci, ci.Location().Translated(gp_Vec(x_new) * ci.Radius()));
+    BRepBuilderAPI_MakeEdge mk(occ::handle<Geom_Curve>(new Geom_Circle(ci)), a, a + 2 * M_PI);
     if (!mk.IsDone())
       continue;
     TopoDS_Edge ne = mk.Edge();
