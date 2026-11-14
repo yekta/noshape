@@ -4508,3 +4508,59 @@ export const sketchTopology = defineFeature(function(context is Context, id is I
         ]
     );
 }
+
+const DISK: &str = r#"
+annotation { "Feature Type Name" : "Disk" }
+export const disk = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        const sk = newSketchOnPlane(context, id + "sk", { "sketchPlane" : plane(vector(0, 0, 0) * meter, vector(0, 0, 1)) });
+        skCircle(sk, "addendum", { "center" : vector(0, 0) * meter, "radius" : 10 * millimeter });
+        skSolve(sk);
+        opExtrude(context, id + "blank", { "entities" : qSketchRegion(id + "sk"), "direction" : vector(0, 0, 1),
+                "endBound" : BoundingType.BLIND, "endDepth" : 5 * millimeter });
+        opDeleteBodies(context, id + "delete", { "entities" : qCreatedBy(id + "sk", EntityType.BODY) });
+        fCuboid(context, id + "n1", { "corner1" : vector(8, -1, -1) * millimeter, "corner2" : vector(11, 1, 6) * millimeter });
+        fCuboid(context, id + "n2", { "corner1" : vector(-11, -1, -1) * millimeter, "corner2" : vector(-8, 1, 6) * millimeter });
+        opBoolean(context, id + "notches", { "tools" : qUnion([qCreatedBy(id + "n1", EntityType.BODY), qCreatedBy(id + "n2", EntityType.BODY)]),
+                "targets" : qCreatedBy(id + "blank", EntityType.BODY), "operationType" : BooleanOperationType.SUBTRACTION });
+    });
+"#;
+
+/// A two-offset chamfer's first distance on a custom feature's faces goes by its operation's entity order, as on an
+/// extrude's (live G37: the profile's side before the end cap): the Spur gear's tip arcs in asm-hand-drill-pinslot,
+/// 0.2 mm along the tip cylinder and 1.6 mm into the end face (live's 15 cones 0.2 mm deep, core/qhd).
+#[test]
+fn two_offset_chamfer_on_a_custom_features_faces_measures_as_live() {
+    let fx = Fixture::new(&studio(DISK));
+    let opts = fx.opts();
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&fx.ty("disk"), &fx.units).unwrap());
+    let mut reg = Regenerator::new();
+    let r = reg.regenerate(&ps, &ConfigValues::default(), &fx.units, &opts);
+    assert_ok(&r);
+    let body = &r.context.bodies[0];
+    let top: Vec<Reference> = (0..body.edges.len())
+        .filter(|&i| {
+            let e = body.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).unwrap().edge_info().unwrap();
+            e.start.z > 0.0049 && e.end.z > 0.0049 && matches!(e.curve, noshape_kernel::Curve::Circle { .. })
+        })
+        .map(|i| Reference::Edge((*body.edges[i]).clone()))
+        .collect();
+    assert_eq!(top.len(), 2, "the top circle's two arcs between the notches: {:?}", body.edges);
+    let sides = |r: &RegenResult| r.context.bodies[0].shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).map(|f| f.area().unwrap()).sum::<f64>();
+    let before = sides(&r);
+    let mut chamfer = ps.new_feature("chamfer", &fx.units).unwrap();
+    chamfer.params.set("entities", ParamValue::Query(top));
+    chamfer.params.set("chamferType", ParamValue::Enum("TWO_OFFSETS".into()));
+    chamfer.params.set("width1", expr("0.2 mm"));
+    chamfer.params.set("width2", expr("1.6 mm"));
+    ps.features.push(chamfer);
+    let r = reg.regenerate(&ps, &ConfigValues::default(), &fx.units, &opts);
+    assert_ok(&r);
+    // (The tip cylinder in two pieces, as the gear's: 0.2 mm off its 5 mm, 4.8 / 5 of it left; 1.6 mm off, 3.4 / 5.)
+    let kept = sides(&r) / before;
+    assert!((kept - 0.96).abs() < 1e-6, "the cylinder keeps {kept} of its area, 0.96 with 0.2 mm off it");
+}

@@ -1187,13 +1187,23 @@ pub(crate) fn face_order(ev: &EvalCtx, body: &crate::regen::context::Body, face:
 /// c2-fan-blade-sweep's connector: four 0.7 mm pins, Chamfer 1's 0.4 mm down each pin's sides).
 fn face_order_in(ev: &EvalCtx, body: &crate::regen::context::Body, face: &Name, adjacency: Option<&[Vec<u32>]>) -> (usize, u8, Name) {
     use crate::reference::TopoName;
-    let TopoName::Face { feature, role } = face.root() else { return (usize::MAX, 4, face.clone()) };
-    let position = ev.features.iter().position(|f| f.id == *feature).unwrap_or(usize::MAX);
-    let side_of = |n: &Name| match n.root() {
-        TopoName::Face { feature: f, role: Role::Side(src) } if f == feature => Some(src.clone()),
+    // A custom feature's face: its operation's face inside it (`Generated` of it) ranks as that operation's does (the
+    // Spur gear's tip cylinder, its blank extrude's side, before its end cap: asm-hand-drill-pinslot's gear chamfers).
+    let op_face = |n: &Name| match n.root() {
+        TopoName::Face { feature, role: Role::Generated(inner) } => match &**inner {
+            TopoName::Face { feature: op, role } => Some((*feature, *op, role.clone())),
+            _ => Some((*feature, *feature, Role::Generated(inner.clone()))),
+        },
+        TopoName::Face { feature, role } => Some((*feature, *feature, role.clone())),
         _ => None,
     };
-    let is_cap = |n: &Name| matches!(n.root(), TopoName::Face { feature: f, role: Role::CapStart(_) | Role::CapEnd(_) } if f == feature);
+    let Some((feature, op, role)) = op_face(face) else { return (usize::MAX, 4, face.clone()) };
+    let position = ev.features.iter().position(|f| f.id == feature).unwrap_or(usize::MAX);
+    let side_of = |n: &Name| match op_face(n) {
+        Some((f, o, Role::Side(src))) if f == feature && o == op => Some(src),
+        _ => None,
+    };
+    let is_cap = |n: &Name| matches!(op_face(n), Some((f, o, Role::CapStart(_) | Role::CapEnd(_))) if f == feature && o == op);
     let first_side = || {
         let loop_sides = adjacency.and_then(|adj| {
             let me = body.faces.iter().position(|n| n == face)?;
@@ -1205,7 +1215,7 @@ fn face_order_in(ev: &EvalCtx, body: &crate::regen::context::Body, face: &Name, 
         });
         loop_sides.or_else(|| body.faces.iter().filter_map(side_of).min())
     };
-    let class = match role {
+    let class = match &role {
         Role::Side(src) if first_side().as_ref() == Some(src) => 0,
         Role::CapStart(_) => 1,
         Role::CapEnd(_) => 2,
