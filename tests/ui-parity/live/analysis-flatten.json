@@ -1,16 +1,16 @@
 {
  "scenario": "analysis-flatten",
- "recorded": "2026-11-13T00:04:45.350Z",
+ "recorded": "2026-11-14T00:48:06.950Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.2"
  },
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "2917878f2643fd9450416167",
+  "element": "38ab511ef522e97a9cc484cf",
   "start": "block-fillet",
   "startElement": "56449b9c8d94cbb3e8a02724",
   "runner": "live2 .nstate-uip-3.json"
@@ -106,7 +106,7 @@
     "do": "click",
     "on": {
      "face": [
-      20,
+      10,
       0.586,
       9.414
      ]
@@ -117,8 +117,8 @@
     "JIB"
    ],
    "at": [
-    1146,
-    507
+    1115,
+    498
    ],
    "state": {
     "focus": {
@@ -132,10 +132,9 @@
      "count": 1,
      "items": [
       {
-       "kind": "POINT",
+       "kind": "EDGE",
        "owner": "Part 1",
-       "id": "JIB",
-       "of": "EDGE"
+       "id": "JIB"
       }
      ]
     },
@@ -212,30 +211,15 @@
     "measure": {
      "readout": [
       {
-       "name": "Point",
-       "value": "",
-       "units": ""
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongX",
-       "value": "20.000",
-       "units": "mm"
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongY",
-       "value": "0.000",
-       "units": "mm"
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongZ",
-       "value": "8.000",
+       "name": "Length",
+       "value": "40.000",
        "units": "mm"
       }
      ],
      "panel": null
     }
    },
-   "t": 39256
+   "t": 33618
   },
   {
    "step": 2,
@@ -278,10 +262,9 @@
      "count": 1,
      "items": [
       {
-       "kind": "POINT",
+       "kind": "EDGE",
        "owner": "Part 1",
-       "id": "JIB",
-       "of": "EDGE"
+       "id": "JIB"
       }
      ]
     },
@@ -358,30 +341,15 @@
     "measure": {
      "readout": [
       {
-       "name": "Point",
-       "value": "",
-       "units": ""
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongX",
-       "value": "20.000",
-       "units": "mm"
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongY",
-       "value": "0.000",
-       "units": "mm"
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongZ",
-       "value": "8.000",
+       "name": "Length",
+       "value": "40.000",
        "units": "mm"
       }
      ],
      "panel": null
     }
    },
-   "t": 42281
+   "t": 36315
   },
   {
    "step": 3,
@@ -513,15 +481,8 @@
     ],
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "POINT",
-       "owner": "Part 1",
-       "id": "JIB",
-       "of": "EDGE"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -548,9 +509,9 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": true,
+       "related": false,
        "hidden": false,
-       "cls": "related-highlight"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Fillet 1"
@@ -593,33 +554,9 @@
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
-    "measure": {
-     "readout": [
-      {
-       "name": "Point",
-       "value": "",
-       "units": ""
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongX",
-       "value": "20.000",
-       "units": "mm"
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongY",
-       "value": "0.000",
-       "units": "mm"
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongZ",
-       "value": "8.000",
-       "units": "mm"
-      }
-     ],
-     "panel": null
-    }
+    "measure": null
    },
-   "t": 46090
+   "t": 39849
   },
   {
    "step": 4,
@@ -745,15 +682,8 @@
     ],
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "POINT",
-       "owner": "Part 1",
-       "id": "JIB",
-       "of": "EDGE"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -780,9 +710,9 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": true,
+       "related": false,
        "hidden": false,
-       "cls": "related-highlight"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Fillet 1"
@@ -825,33 +755,9 @@
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
-    "measure": {
-     "readout": [
-      {
-       "name": "Point",
-       "value": "",
-       "units": ""
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongX",
-       "value": "20.000",
-       "units": "mm"
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongY",
-       "value": "0.000",
-       "units": "mm"
-      },
-      {
-       "name": "svg-icon-XYZ-Icons-AlongZ",
-       "value": "8.000",
-       "units": "mm"
-      }
-     ],
-     "panel": null
-    }
+    "measure": null
    },
-   "t": 51030
+   "t": 44462
   },
   {
    "step": 5,
@@ -952,7 +858,7 @@
     },
     "measure": null
    },
-   "t": 54902
+   "t": 48183
   },
   {
    "step": 6,
@@ -1045,7 +951,7 @@
     },
     "measure": null
    },
-   "t": 59662
+   "t": 52768
   }
  ]
 }
