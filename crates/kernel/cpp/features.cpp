@@ -7012,8 +7012,9 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
                                                               const std::vector<double>& rs, int mode = 0)
 {
   // mode 0: only with a mitre's ball; 1: OCCT's round had slivers (a tangent chain's); 2: before OCCT, a tangent chain
-  // whose arcs change support (OCCT's round of it has slivers there).
-  const bool need_ball = mode == 0;
+  // whose arcs change support (OCCT's round of it has slivers there); 3: OCCT failed outright, mitres as mode 0's
+  // with or without a ball.
+  const bool need_ball = mode == 0 || mode == 3;
   const double r = rs.front();
   for (double x : rs)
     if (std::abs(x - r) > 1e-9 * r)
@@ -7212,8 +7213,56 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
     }
     // Only with a ball OCCT can't roll (elsewhere a round past an edge it doesn't take fails in live: "End boundary
     // intersects unfilleted edge.", and OCCT's blends and the other fallbacks are live's).
-    if (need_ball && std::none_of(ts.begin(), ts.end(), [](const Tool& T) { return T.kind == Ball; }))
+    if (mode == 0 && std::none_of(ts.begin(), ts.end(), [](const Tool& T) { return T.kind == Ball; }))
       return std::nullopt;
+    // (Mode 3: only rounds that stay on their faces, the ball's touch points on both along each edge, or within its
+    // radius of another selected edge, where that one's round takes them (a 0.02 mm step's beside a notch: asm-hand-
+    // drill-pinslot's Spring Shim); one rolling past a face fails in live: 4 top edges R12 of a 10 mm tall block.)
+    auto near_other = [&](const gp_Pnt& q, size_t k) {
+      for (size_t m = 0; m < es.size(); ++m)
+      {
+        if (m == k)
+          continue;
+        double                      a, b;
+        const occ::handle<Geom_Curve> g = BRep_Tool::Curve(es[m], a, b);
+        if (g.IsNull())
+          continue;
+        GeomAPI_ProjectPointOnCurve pc(q, g, a, b);
+        double d = pc.NbPoints() > 0 ? pc.LowerDistance() : 1e300;
+        for (const gp_Pnt& end : {g->Value(a), g->Value(b)})
+          d = std::min(d, q.Distance(end));
+        if (d <= r * (1 + 1e-6))
+          return true;
+      }
+      return false;
+    };
+    if (mode == 3)
+      for (size_t k = 0; k < ts.size(); ++k)
+      {
+        if (ts[k].kind != Line && ts[k].kind != Arc)
+          continue;
+        BRepAdaptor_Curve c(es[k]);
+        const double      f = c.FirstParameter(), l = c.LastParameter();
+        for (const double w : {1e-3, 0.25, 0.5, 0.75, 1 - 1e-3})
+        {
+          const double par = f + (l - f) * w;
+          TopoDS_Face  g1, g2;
+          gp_Vec       n1, n2, t;
+          const gp_Pnt P = c.Value(par);
+          if (!across(es[k], P, par, g1, g2, n1, n2, t))
+            return std::nullopt;
+          const double half = std::acos(std::max(-1.0, std::min(1.0, n1.Dot(n2)))) / 2;
+          const gp_Pnt C    = P.Translated((n1 + n2).Normalized() * (side * r / std::cos(half)));
+          for (const auto& [g, n] : {std::pair{g1, n1}, std::pair{g2, n2}})
+          {
+            // (The 3D point classified: a periodic face's parameters may come a period off.)
+            const gp_Pnt       q  = C.Translated(n * (-side * r));
+            const TopAbs_State st = BRepClass_FaceClassifier(g, q, std::max(1e-6 * r, BRep_Tool::Tolerance(g))).State();
+            if (st != TopAbs_IN && st != TopAbs_ON && !near_other(q, k))
+              return std::nullopt;
+          }
+        }
+      }
     // A line's or arc's tool, extended at its start / end by `e0` / `e1` (lengths; an arc's by the angle at its
     // ball's path).
     auto build = [&](Tool& T, double e0, double e1) -> TopoDS_Shape {
@@ -7295,7 +7344,8 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
       // (Without a ball: tangent chains only.)
       if (!need_ball)
         return std::nullopt;
-      if (A.kind != Line || B.kind != Line)
+      // (Mode 3 takes an arc's mitre too, below.)
+      if (mode != 3 && (A.kind != Line || B.kind != Line))
         return std::nullopt;
       // The face they share, and the edge at V between their other faces.
       const TopoDS_Face P  = A.w1.IsSame(B.w1) || A.w1.IsSame(B.w2) ? A.w1 : A.w2.IsSame(B.w1) || A.w2.IsSame(B.w2) ? A.w2 : TopoDS_Face();
@@ -7317,6 +7367,9 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
         return std::nullopt;
       if (m1.Crossed(m2).Dot(t3) > 0)
         continue; // convex: the two rounds meet in a mitre already
+      // (Extended past V: lines only.)
+      if (A.kind != Line || B.kind != Line)
+        return std::nullopt;
       // Both extended past V; what both take there.
       Tool         a2 = A, b2 = B;
       const bool   a_end = A.b.Distance(V) < A.a.Distance(V), b_end = B.b.Distance(V) < B.a.Distance(V);
@@ -8332,6 +8385,11 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     {
       const KernelTimer timer("blend.fallback.as_cut");
       past = fillet_as_cut(in, es, rs, false);
+    }
+    if (!past)
+    {
+      const KernelTimer timer("blend.fallback.chains");
+      past = fillet_by_tools(in, es, rs, 3);
     }
     if (!past && fillet_overflows(in, es, rs))
       fail_op("fillet failed: unfilleted edge overlapped by fillet");

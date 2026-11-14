@@ -138,6 +138,24 @@ fn a_full_round_over_a_rounded_end_is_one_torus() {
     assert_eq!(res.faces().len(), 6, "{kinds:?}");
 }
 
+/// asm-hand-drill-pinslot's Spring Shim, Fillet 4 (live 4bed3f, core/qhd): R0.5 on all 59 top edges of a 1.3 mm disc
+/// whose tabs meet its rim in 0.02 mm steps at sharp corners. OCCT fails it whole and edge by edge; the rounds as tools
+/// (lines' prisms, arcs' revolved spandrels, mitres where they meet) cut together build it as live: 120 faces, one per
+/// edge (41 tori, 18 cylinders), 473.342275 mm³.
+#[test]
+fn rounds_of_a_shim_with_tiny_steps_are_built_as_tools_as_live() {
+    setup();
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend/hand-drill-shim-fillet4.brep");
+    let s = read_brep(&path).unwrap();
+    let edges: Vec<Shape> = s.edges().into_iter().take(59).collect();
+    let r = fillet_checked(&s, &edges, &[0.5 * MM]).unwrap().shape;
+    assert!(r.is_valid());
+    assert_eq!(r.count(ShapeType::Face), 120);
+    let kinds = |k: &str| r.faces().iter().filter(|f| format!("{:?}", f.face_surface()).contains(k)).count();
+    assert_eq!((kinds("Torus"), kinds("Cylinder")), (41, 41 + 18), "{} tori, {} cylinders", kinds("Torus"), kinds("Cylinder"));
+    assert!((vol_mm3(&r) - 473.342275).abs() < 0.01, "{}", vol_mm3(&r));
+}
+
 /// Draft by wedges against OCCT's draft (where it works) and Onshape (D1).
 #[test]
 fn draft_wedges_like_onshape() {
