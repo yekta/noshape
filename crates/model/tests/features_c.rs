@@ -250,6 +250,9 @@ fn jog_preserve_material_off_and_errors() {
     assert!(near(bb.max.z - bb.min.z, mm(3.0) + t, 1e-6), "{bb:?}");
     // The two bends meet with no wall between: in the flat their zones follow each other, the plate's length kept
     // (they lay 0.73 mm over each other, the end wall laid out on its own).
+    // Live (behaviours "skasm (11-14) reduced-angle jog flat"): 8014.3306 mm³, x 0 … 99.2588 mm.
+    assert!(near(volume(&r, 0) * 1e9, 8014.3306, 1e-4), "volume {} mm³", volume(&r, 0) * 1e9);
+    assert!(near(bb.max.x, mm(99.2588), 1e-6), "{bb:?}");
     let fp = flat(&r, 0);
     let (len, width) = sorted_size(&fp);
     assert!(near(len, mm(100.0), 1e-6) && near(width, mm(40.0), 1e-9), "flat {len} x {width}");
