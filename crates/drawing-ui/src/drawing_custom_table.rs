@@ -286,9 +286,9 @@ impl DrawingEditor {
             .map(|l| MenuEntry::item(l.name(), move |t, _, cx| t.edit_table(id, "Move to", cx, |t| t.layer = l)))
             .collect();
         out.push(MenuEntry::Submenu("Move to".into(), layers));
-        // The table list is the stacking order. Live drawing/289: greyed only
-        // when the table is the only object on its sheet.
-        let alone = sheet.tables.len() == 1 && sheet.views.is_empty() && sheet.annotations.is_empty() && sheet.images.is_empty();
+        // The table list is the stacking order. Live drawing/289, live2 REQUESTS 11-14 00:48: greyed only with no
+        // other annotation-layer object on its sheet (views don't count): a table placed on a sheet of views alone.
+        let alone = sheet.tables.len() == 1 && sheet.annotations.is_empty() && sheet.images.is_empty();
         out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_table(id, true, cx)).disabled(alone));
         out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_table(id, false, cx)).disabled(alone));
         out.push(MenuEntry::Separator);

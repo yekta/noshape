@@ -177,3 +177,46 @@ fn ace_line_keys_comment_move_duplicate_and_remove(cx: &mut TestAppContext) {
     assert!(lines(cx).ends_with(" 24"), "{}", lines(cx));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live2 (REQUESTS 11-14 00:43): Ace's list shows ~250 ms after a letter with matches, not on the keystroke.
+#[gpui::test]
+fn the_completion_list_shows_250_ms_after_the_key(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        super::bind_keys(cx);
+    });
+    let dir = std::env::temp_dir().join(format!("noshape-ui-fs-ac-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))).unwrap().id;
+    let (window, view) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1600.), px(900.)) };
+        let mut view = None;
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| FeatureStudioView::new(doc, tab, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap())
+    });
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
+    let open = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).editor.read(cx).completion_menu_state().open);
+    type_key(cx, window, "enter");
+    type_key(cx, window, "o");
+    assert!(!open(cx), "not on the keystroke");
+    pause(cx, window, 300);
+    assert!(open(cx), "after ~250 ms");
+    let _ = std::fs::remove_dir_all(&dir);
+}

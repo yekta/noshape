@@ -665,7 +665,16 @@ pub fn indented(snippet: &str, indent: &str) -> String {
 }
 
 /// The editor's completion provider: [`complete_at`] on the caret's line.
-pub struct Completions;
+/// The editor's completions. Live opens Ace's list ~250 ms after the keystroke (live2 REQUESTS 11-14 00:43:
+/// 272 / 253 / 245 ms); once it shows, it follows the typing at once.
+#[derive(Default)]
+pub struct Completions {
+    /// The list was showing after the last request (it had rows).
+    showing: std::rc::Rc<std::cell::Cell<bool>>,
+}
+
+/// How long after a keystroke the list first shows.
+pub const LIST_DELAY: std::time::Duration = std::time::Duration::from_millis(250);
 
 impl gpui_kit::component::input::CompletionProvider for Completions {
     fn completions(
@@ -674,7 +683,7 @@ impl gpui_kit::component::input::CompletionProvider for Completions {
         offset: usize,
         _trigger: gpui_kit::component::input::lsp_types::CompletionContext,
         _window: &mut gpui_kit::Window,
-        _cx: &mut gpui_kit::App,
+        cx: &mut gpui_kit::App,
     ) -> gpui_kit::Task<anyhow::Result<gpui_kit::component::input::lsp_types::CompletionResponse>> {
         use gpui_kit::component::input::RopeExt as _;
         use gpui_kit::component::input::lsp_types::{CompletionItem, CompletionResponse, CompletionTextEdit, Documentation, InsertTextFormat, LSPAny, MarkupContent, MarkupKind, Range, TextEdit};
@@ -684,7 +693,7 @@ impl gpui_kit::component::input::CompletionProvider for Completions {
         let indent: String = line.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
         // Outside every function the snippets and keywords (live 2331), inside std's names.
         let top = at_top_level(&text.slice(0..offset).to_string());
-        let items = if top { complete_top_level(&line) } else { complete_at(&line, line.len()) }
+        let items: Vec<CompletionItem> = if top { complete_top_level(&line) } else { complete_at(&line, line.len()) }
             .map(|(start, rows)| {
                 let range = Range { start: text.offset_to_position(line_start + start), end: text.offset_to_position(offset) };
                 rows.into_iter()
@@ -702,7 +711,19 @@ impl gpui_kit::component::input::CompletionProvider for Completions {
                     .collect()
             })
             .unwrap_or_default();
-        gpui_kit::Task::ready(Ok(CompletionResponse::Array(items)))
+        let wait = !self.showing.get();
+        if items.is_empty() {
+            self.showing.set(false);
+            return gpui_kit::Task::ready(Ok(CompletionResponse::Array(items)));
+        }
+        let showing = self.showing.clone();
+        cx.spawn(async move |cx| {
+            if wait {
+                cx.background_executor().timer(LIST_DELAY).await;
+            }
+            showing.set(true);
+            Ok(CompletionResponse::Array(items))
+        })
     }
 
     /// Every identifier keystroke (live: the list opens on the first letter), and the dot of `Enum.`.

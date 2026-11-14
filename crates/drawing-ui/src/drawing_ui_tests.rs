@@ -321,10 +321,10 @@ fn a_views_vertex_snaps_within_8_px_on_screen(cx: &mut TestAppContext) {
     }
 }
 
-/// Live2 (REQUESTS 2578 (4), drw-dimension-tolerance-symmetrical): Enter in the dimension palette makes the edit and
-/// leaves the palette open; a click on the empty sheet leaves it open too; Esc (`cancel`) closes it, the edit kept.
+/// Live2 (drw-dimension-tolerance-symmetrical; REQUESTS 11-14 00:43): Enter in the dimension palette makes the edit
+/// and leaves the palette open; a click on the empty sheet closes it, the edit kept; Esc (`cancel`) closes it too.
 #[gpui::test]
-fn the_dimension_palette_stays_open_on_enter_and_on_the_empty_sheet(cx: &mut TestAppContext) {
+fn the_dimension_palette_stays_open_on_enter_and_closes_on_a_click_away(cx: &mut TestAppContext) {
     SUGGESTED.set(true);
     DIMENSIONED.set(true);
     let (window, editor) = drawing(cx, "palette-open");
@@ -354,15 +354,17 @@ fn the_dimension_palette_stays_open_on_enter_and_on_the_empty_sheet(cx: &mut Tes
     assert_eq!(prefix.as_deref(), Some("R"), "Enter made the edit");
     let empty = empty_sheet_point(cx, window, &editor);
     click_sheet(cx, window, &editor, empty);
-    assert!(cx.update(|cx| editor.read(cx).palette.is_some()), "a click on the empty sheet leaves it open");
-    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
-    draw(cx, window);
     let (open, prefix) = cx.update(|cx| {
         let e = editor.read(cx);
         (e.palette.is_some(), e.current_sheet().annotations.iter().find(|a| a.id == id).map(|a| a.format.prefix.clone()))
     });
-    assert!(!open, "Esc closes it");
+    assert!(!open, "a click on the empty sheet closes it");
     assert_eq!(prefix.as_deref(), Some("R"), "the edit made with Enter stays");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_dim_palette(id, w, cx))).unwrap();
+    draw(cx, window);
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    draw(cx, window);
+    assert!(cx.update(|cx| editor.read(cx).palette.is_none()), "Esc closes it");
 }
 
 /// A sheet point (mm) with nothing under the pointer: no view, frame or annotation.
@@ -562,4 +564,32 @@ fn a_centermark_click_on_a_circle_marks_it(cx: &mut TestAppContext) {
     click_sheet(cx, window, &editor, on);
     let marks = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().filter(|a| matches!(a.kind, AnnotationKind::Centermark { .. })).count());
     assert_eq!(marks, 1, "a centermark on the circle");
+}
+
+/// Live drawing/289 and live2 (REQUESTS 11-14 00:48): a table's Bring to front is greyed only with no other
+/// annotation-layer object on the sheet; views don't count.
+#[gpui::test]
+fn a_tables_bring_to_front_greys_only_without_other_annotations(cx: &mut TestAppContext) {
+    use crate::drawing_view::MenuEntry;
+    let greyed = |dimensioned: bool, cx: &mut TestAppContext| {
+        SUGGESTED.set(true);
+        DIMENSIONED.set(dimensioned);
+        let (window, editor) = drawing(cx, if dimensioned { "front-dim" } else { "front-views" });
+        DIMENSIONED.set(false);
+        real_sheet(cx, window, &editor);
+        cx.update(|cx| {
+            editor.update(cx, |e, cx| {
+                let id = e.current_sheet().tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+                e.edit_sheet("Table", cx, |s| {
+                    s.tables.push(noshape_model::drawing::Table::new(id, noshape_model::drawing::TableKind::General { cells: vec![vec!["a".into()]], title: None, header: false }, [200.0, 200.0]));
+                });
+                e.data_table_entries(id, cx).iter().find_map(|m| match m {
+                    MenuEntry::Item { label, disabled, .. } if label.as_ref() == "Bring to front" => Some(*disabled),
+                    _ => None,
+                })
+            })
+        })
+    };
+    assert_eq!(greyed(false, cx), Some(true), "views only: greyed");
+    assert_eq!(greyed(true, cx), Some(false), "with a dimension: enabled");
 }
