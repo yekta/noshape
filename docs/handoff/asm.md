@@ -8,7 +8,7 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
-## Now (asm, 2026-11-14 00:55 UTC)
+## Now (asm, 2026-11-14 01:15 UTC)
 - Hosts: builds and suites on vibe7; everything lasting in vibe7 ~/agents/asm-keep (run-suite.sh SRC / OUT / BIN, one
   process per assembly; bin/ test binaries and cli; g-* suite results). ~/tmp/<agent> is pruned after 6-12 h.
 - Landed 13-14 Nov: Move-to-origin refusal, ring snap (live's client rule), ▶ preview (out and back, 90 frames), Insert
@@ -29,7 +29,15 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
   geometry ours doesn't have (studio 1dc32b's failures).
 - Std content snap insert keeps the `!= into` flip (live2 00:34: the screw's shank into the block). studios owns the
   assembly-ui feel and the Insert ✓-at-identity / `inserted` panel state.
-- Open with live: Cylindrical 29/31 in the UI (REQUESTS 17:09), the Wheel 7inch subassembly (00:32).
+- Suppressed mates (live 3004: hand-drill's Cylindrical 29 and Planar 3 are suppressed in live, so no conflicting
+  pair): the translator now suppresses them and scores them so (229a70cae); whether the Cylindrical rule above is
+  still needed is being measured (vibe7 s01: with vs without it).
+- infento-subs' wrong parts: live's capture of studio 1dc32b lists parts only up to feature 55, so the renamed
+  composites ("Peddle crank", "7\" Wheel asm", the pulleys, "Pedal") can't be found by their feature, and our
+  geometry there is 0.3-3 % off in volume (core's failures in that studio); they map to wrong parts of ours and
+  Fastened 1/2/4/5/7 conflict. Recapture asked (REQUESTS 01:15). isaac-ball's remaining gaps are GearLab custom
+  feature parts that come out empty (its parts: "") and studio geometry, not the solver.
+- Open with live: the Wheel 7inch subassembly (00:32), studio 1dc32b's per-feature parts (01:15).
 
 ## From dx (2026-11-13 00:31 UTC): clamp-pattern's 14 -> 12 mates is 6ab30b272, not bbac6bb06
 Your 19:47 note in dx.md: every one of my assembly suite runs after bbac6bb06 (asmall10-15, through main 6c63ab5a7) has
