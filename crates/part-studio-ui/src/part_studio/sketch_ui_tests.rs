@@ -4371,6 +4371,12 @@ fn enter_in_a_configured_value_moves_down_a_row(cx: &mut TestAppContext) {
 /// into the block (std canSetBooleanFlip), also when the next pick comes before the logic's run for Remove is back,
 /// and the hole goes through. `settle`: wait for the dialog between the picks.
 fn remove_extrude_faces(cx: &mut TestAppContext, name: &str, settle: bool, picks: &[(&str, noshape_model::params::ParamValue)]) -> (bool, usize) {
+    let (flipped, faces, _) = remove_extrude_result(cx, name, settle, picks);
+    (flipped, faces)
+}
+
+/// [`remove_extrude_faces`] and the new extrude's status and message.
+fn remove_extrude_result(cx: &mut TestAppContext, name: &str, settle: bool, picks: &[(&str, noshape_model::params::ParamValue)]) -> (bool, usize, Option<(noshape_model::display::FeatureStatus, Option<String>)>) {
     let start = serde_json::json!({ "units": "mm", "features": [
         { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
         { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm", "oppositeDirection": true } },
@@ -4399,7 +4405,12 @@ fn remove_extrude_faces(cx: &mut TestAppContext, name: &str, settle: bool, picks
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.is_none());
     let faces = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the block").face_refs.len());
-    (flipped, faces)
+    let state = cx.update(|cx| {
+        let v = view.read(cx);
+        let last = v.studio(cx).unwrap().features.last().map(|f| f.id)?;
+        v.display.feature_state(last).map(|s| (s.status, s.message.clone()))
+    });
+    (flipped, faces, state)
 }
 
 #[gpui::test]
@@ -4424,6 +4435,21 @@ fn a_flipped_remove_extrude_points_away_from_the_block(cx: &mut TestAppContext) 
     let remove = ("operationType", ParamValue::Enum("REMOVE".into()));
     let flip = ("oppositeDirection", ParamValue::Bool(false));
     assert!(!remove_extrude_faces(cx, "rm-flip", true, &[remove, flip]).0, "the user's flip after Remove's");
+}
+
+/// Live (REQUESTS 2979): Remove, Through all or Blind 10 mm, then one flip: the tool stands above the block, cuts
+/// nothing, and the extrude commits as an info, "Selected tools and targets do not intersect.".
+#[gpui::test]
+fn a_flipped_remove_extrude_missing_the_block_is_an_info(cx: &mut TestAppContext) {
+    use noshape_model::display::FeatureStatus;
+    use noshape_model::params::ParamValue;
+    let remove = ("operationType", ParamValue::Enum("REMOVE".into()));
+    let flip = ("oppositeDirection", ParamValue::Bool(false));
+    let info = Some((FeatureStatus::Info, Some("Selected tools and targets do not intersect.".to_string())));
+    for (name, bound) in [("rm-flip-through", ("endBound", ParamValue::Enum("THROUGH_ALL".into()))), ("rm-flip-blind", ("depth", ParamValue::Expr(noshape_units::ExprValue::new("10 mm"))))] {
+        let (flipped, faces, state) = remove_extrude_result(cx, name, true, &[remove.clone(), bound, flip.clone()]);
+        assert_eq!((flipped, faces, state), (false, 6, info.clone()), "{name}: (flipped, the block's faces, the extrude's status)");
+    }
 }
 
 /// Live2 feedback.json (documentLoad): an opening studio shows "Loading studio data…" until a result is in and

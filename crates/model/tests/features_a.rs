@@ -3075,6 +3075,41 @@ fn up_to_a_cylinder_face_takes_the_whole_cylinder() {
     assert!((v - 2043.39).abs() < 0.01, "{v} mm³");
 }
 
+/// Up to a B-spline face with a hole where the profile reaches it (c2-hunting-knife's Extrude 10: the handle pin, up to
+/// the handle's side, through the pin's hole in it): the extrude ends on the face's surface.
+#[test]
+fn up_to_a_bspline_face_ends_on_its_surface_through_a_hole_in_it() {
+    let mut t = T::new();
+    let s1 = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.02, -0.02, 0.02, 0.02));
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("30 mm"))]);
+    let s2 = t.sketch(Reference::FeaturePlane(pl), circle(DVec2::ZERO, 0.015));
+    let item = |r: Reference| {
+        let mut v = ParamValues::default();
+        v.set("sheetProfileEntities", q(vec![r]));
+        v
+    };
+    let (r1, r2) = (t.regions(s1)[0].clone(), t.regions(s2)[0].clone());
+    t.add("loft", &[("sheetProfilesArray", ParamValue::Array(vec![item(r1), item(r2)]))]);
+    let hole = t.sketch(Reference::Plane(DatumPlane::Right), circle(DVec2::new(0.0, 0.015), 0.003));
+    let r = t.regions(hole)[0].clone();
+    let cut = t.extrude(r, "100 mm", "REMOVE");
+    t.set(cut, "symmetric", b(true));
+    let res = t.ok();
+    let body = solids(&res.context)[0].clone();
+    let x = |f: &noshape_kernel::Shape| f.bounding_box(false).map_or(f64::MIN, |bb| (bb.min.x + bb.max.x) / 2.0);
+    let faces = body.shape.faces();
+    let side = (0..faces.len()).filter(|&i| matches!(faces[i].face_surface(), Ok(noshape_kernel::Surface::BSpline { .. }))).max_by(|&a, &b| x(&faces[a]).total_cmp(&x(&faces[b]))).expect("the +x side");
+    assert!(faces[side].wires().len() > 1, "the hole is in the side face");
+    let face = Reference::Face((*body.faces[side]).clone());
+    let pin = t.sketch(Reference::Plane(DatumPlane::Right), circle(DVec2::new(0.0, 0.015), 0.003));
+    let r = t.regions(pin)[0].clone();
+    t.add("extrude", &[("entities", q(vec![r])), ("operationType", en("NEW")), ("endBound", en("UP_TO_SURFACE")), ("endBoundEntityFace", q(vec![face]))]);
+    let res = t.ok();
+    let pin = solids(&res.context).into_iter().find(|b| b.shape.bounding_box(true).is_ok_and(|bb| bb.min.x.abs() < 1e-9)).expect("the pin").clone();
+    let bb = pin.shape.bounding_box(true).unwrap();
+    assert!(bb.max.x > 0.015 && bb.max.x < 0.02, "the pin ends on the side, x {} mm", bb.max.x * 1e3);
+}
+
 /// A profile whose end is two arcs of one circle (c2-fan-blade-sweep's "klammer": a 26 mm wide rectangle with R13
 /// fillets on both right corners, its right side gone) extrudes to one half cylinder there, as live's 6 faces.
 #[test]

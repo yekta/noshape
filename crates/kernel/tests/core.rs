@@ -948,3 +948,85 @@ fn a_guided_loft_of_smooth_closed_profiles_has_one_side_face() {
     let v = s.volume().unwrap();
     assert!((v - PI * 100.0 * 30.0).abs() < 1.0, "{v} mm³");
 }
+
+/// A circle of two arcs (R12, at z 30) with straight guides at y ±10 → ±12 from the profile below, all times `k`
+/// (1e-3: metres, as the app models; its sewing tolerance is 1 µm there).
+fn loft_to_two_arcs(bottom: &Shape, k: f64) -> Shape {
+    let c = DVec3::new(0.0, 0.0, 30.0) * k;
+    let top = [make_arc(c, DVec3::Z, DVec3::X, 12.0 * k, -PI / 2.0, PI / 2.0).unwrap(), make_arc(c, DVec3::Z, DVec3::X, 12.0 * k, PI / 2.0, 3.0 * PI / 2.0).unwrap()];
+    let top = make_face_from_wire(&make_wire(&top).unwrap(), true).unwrap();
+    let guides = [(10.0, 12.0), (-10.0, -12.0)].map(|(a, b)| make_line(DVec3::new(0.0, a, 0.0) * k, DVec3::new(0.0, b, 30.0) * k).unwrap());
+    loft_guided_curved(bottom, &top, &guides, true).unwrap()
+}
+
+fn shown_faces(s: &Shape) -> usize {
+    s.shown_topology().unwrap().faces_joined.iter().enumerate().filter(|(i, j)| *i == **j).count()
+}
+
+/// A guided loft from a stadium (its curvature jumps where a line meets an arc) to a circle of two arcs makes one side
+/// face (live 3023: 3 faces) lying on both profiles (one cubic across the loop missed them by tens of µm, and its caps
+/// didn't sew: c2-hunting-knife's handle); a pin from inside ends on that face. In metres.
+#[test]
+fn a_guided_loft_of_a_stadium_to_a_circle_has_one_side_face_on_its_profiles() {
+    let mm = 1e-3;
+    let p = |x: f64, y: f64| DVec3::new(x, y, 0.0) * mm;
+    let e = [
+        make_line(p(-10.0, -10.0), p(10.0, -10.0)).unwrap(),
+        make_arc(p(10.0, 0.0), DVec3::Z, DVec3::X, 10.0 * mm, -PI / 2.0, PI / 2.0).unwrap(),
+        make_line(p(10.0, 10.0), p(-10.0, 10.0)).unwrap(),
+        make_arc(p(-10.0, 0.0), DVec3::Z, DVec3::X, 10.0 * mm, PI / 2.0, 3.0 * PI / 2.0).unwrap(),
+    ];
+    let s = loft_to_two_arcs(&make_face_from_wire(&make_wire(&e).unwrap(), true).unwrap(), mm);
+    assert!(s.is_valid());
+    assert_eq!(shown_faces(&s), 3, "two caps and one side ({} raw faces)", s.faces().len());
+    let side: Vec<Shape> = s.faces().into_iter().filter(|f| f.face_plane().ok().flatten().is_none()).collect();
+    assert_eq!(side.len(), 1);
+    let pin = make_face_from_wire(&make_wire(&[make_circle(DVec3::new(0.0, 0.0, 15.0) * mm, DVec3::Y, 2.0 * mm).unwrap()]).unwrap(), true).unwrap();
+    let r = extrude_up_to(&pin, DVec3::Y, &side[0], 0.0).unwrap();
+    let bb = r.shape.bounding_box(true).unwrap();
+    assert!((bb.max.y / mm - 11.0).abs() < 0.5, "the pin ends on the side, near y 11 mm: {} mm", bb.max.y / mm);
+}
+
+/// Live 3023: a profile joint turning by up to 3° is smoothed over (no side edge from it), past 3° it is a corner:
+/// regular polygons lofted to a circle, 150 sides (2.4°) one side face, 60 sides (6°) a face per side (in metres).
+#[test]
+fn a_guided_lofts_profile_joints_under_three_degrees_are_smooth() {
+    // Its sides' middles on the guides at y ±10 (a corner there would line up with the circle's joints).
+    let polygon = |n: usize| {
+        let p = |i: usize| {
+            let a = std::f64::consts::TAU * (i as f64 + 0.5) / n as f64;
+            DVec3::new(a.sin(), a.cos(), 0.0) * 10e-3 / (PI / n as f64).cos()
+        };
+        make_face_from_wire(&make_polyline(&(0..n).map(p).collect::<Vec<_>>(), true).unwrap(), true).unwrap()
+    };
+    for (n, sides) in [(150, 1), (60, 60)] {
+        let s = loft_to_two_arcs(&polygon(n), 1e-3);
+        assert!(s.is_valid(), "{n} sides");
+        assert_eq!(shown_faces(&s), sides + 2, "{n} sides: the caps and {sides} side faces");
+    }
+}
+
+/// Live 3023 / 3053: joints lined up across a loft are corners however smooth: a 40 × 20 stadium lofted (2 guides) to
+/// the same stadium has a side face per segment; to the stadium turned 90° (its joints off the bottom's), one side face.
+/// In metres, as the app models (its sewing tolerance is 1 µm there).
+#[test]
+fn a_guided_lofts_lined_up_joints_are_corners() {
+    let mm = 1e-3;
+    let stadium = |z: f64, turned: bool| {
+        let at = |x: f64, y: f64| if turned { DVec3::new(-y, x, z) * mm } else { DVec3::new(x, y, z) * mm };
+        let axis = if turned { DVec3::Y } else { DVec3::X };
+        let e = [
+            make_line(at(-10.0, -10.0), at(10.0, -10.0)).unwrap(),
+            make_arc(at(10.0, 0.0), DVec3::Z, axis, 10.0 * mm, -PI / 2.0, PI / 2.0).unwrap(),
+            make_line(at(10.0, 10.0), at(-10.0, 10.0)).unwrap(),
+            make_arc(at(-10.0, 0.0), DVec3::Z, axis, 10.0 * mm, PI / 2.0, 3.0 * PI / 2.0).unwrap(),
+        ];
+        make_face_from_wire(&make_wire(&e).unwrap(), true).unwrap()
+    };
+    for (turned, top_y, sides) in [(false, 10.0, 4), (true, 20.0, 1)] {
+        let guides = [1.0, -1.0].map(|k: f64| make_line(DVec3::new(0.0, 10.0 * k, 0.0) * mm, DVec3::new(0.0, top_y * k, 30.0) * mm).unwrap());
+        let s = loft_guided_curved(&stadium(0.0, false), &stadium(30.0, turned), &guides, true).unwrap();
+        assert!(s.is_valid(), "turned {turned}");
+        assert_eq!(shown_faces(&s), sides + 2, "turned {turned}: the caps and {sides} side faces");
+    }
+}

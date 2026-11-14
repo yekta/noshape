@@ -59,6 +59,10 @@ namespace noshape {
 
 namespace {
 
+// The angle over which a profile joint is a corner (an edge of the loft): live smooths joints up to 3° over (a stadium's
+// right joints kinked by 0.0523 rad give one side face, by 0.0524 a side edge up from each; REQUESTS 3023).
+constexpr double SMOOTH_JOINT = 0.05235987755982988; // 3°
+
 // A closed profile loop by arc length.
 struct Loop
 {
@@ -111,7 +115,9 @@ struct Loop
     return s >= len - 1e-12 ? 0.0 : s;
   }
   // Arc lengths of the corners (tangent breaks between edges).
-  std::vector<double> corners() const
+  std::vector<double> corners() const { return joints(SMOOTH_JOINT); }
+  // Arc lengths of the joints between edges turning by more than `over` (every joint for a negative `over`).
+  std::vector<double> joints(double over) const
   {
     std::vector<double> out;
     std::vector<TopoDS_Edge> edges;
@@ -135,7 +141,7 @@ struct Loop
         db.Reverse();
       if (da.Magnitude() < 1e-12 || db.Magnitude() < 1e-12)
         continue;
-      if (da.Angle(db) > 1e-6)
+      if (da.Angle(db) > over)
       {
         double d;
         out.push_back(abscissa(pa, d));
@@ -260,8 +266,8 @@ std::vector<double> hermite_tents(const std::vector<double>& nodes, double u)
   return w;
 }
 
-// A cubic B-spline face through a grid of points (rows along u).
-TopoDS_Face grid_face(const std::vector<std::vector<gp_Pnt>>& g)
+// A cubic B-spline surface through a grid of points (rows along u).
+occ::handle<Geom_BSplineSurface> grid_surface(const std::vector<std::vector<gp_Pnt>>& g)
 {
   const int                  nu = (int)g.size(), nv = (int)g[0].size();
   NCollection_Array2<gp_Pnt> pts(1, nu, 1, nv);
@@ -272,7 +278,142 @@ TopoDS_Face grid_face(const std::vector<std::vector<gp_Pnt>>& g)
   fit.Interpolate(pts, Approx_IsoParametric);
   if (!fit.IsDone())
     fail_op("loft: guided face interpolation failed");
-  BRepBuilderAPI_MakeFace mf(fit.Surface(), 1e-7);
+  return fit.Surface();
+}
+
+// A cubic B-spline surface through a grid's rows at `us` (its u), with the u-derivatives `t0` / `t1` (one per column) at
+// its first and last rows: pieces with the same derivative where they meet join C1.
+occ::handle<Geom_BSplineSurface> grid_surface_with_ends(const std::vector<std::vector<gp_Pnt>>& g, const std::vector<double>& us, const std::vector<gp_Vec>& t0, const std::vector<gp_Vec>& t1)
+{
+  const int                                nu = (int)g.size(), nv = (int)g[0].size();
+  occ::handle<NCollection_HArray1<double>> pu = new NCollection_HArray1<double>(1, nu);
+  for (int i = 0; i < nu; ++i)
+    pu->SetValue(i + 1, us[i]);
+  std::vector<occ::handle<Geom_BSplineCurve>> cols;
+  for (int j = 0; j < nv; ++j)
+  {
+    occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, nu);
+    for (int i = 0; i < nu; ++i)
+      pts->SetValue(i + 1, g[i][j]);
+    GeomAPI_Interpolate ip(pts, pu, false, 1e-12);
+    ip.Load(t0[j], t1[j], false);
+    ip.Perform();
+    if (!ip.IsDone())
+      fail_op("loft: guided face interpolation failed");
+    cols.push_back(ip.Curve());
+  }
+  const int                                np = cols[0]->NbPoles();
+  occ::handle<NCollection_HArray1<double>> pv = new NCollection_HArray1<double>(1, nv);
+  for (int j = 0; j < nv; ++j)
+    pv->SetValue(j + 1, (double)j / (nv - 1));
+  NCollection_Array2<gp_Pnt>                  poles;
+  occ::handle<Geom_BSplineCurve>              across;
+  for (int i = 1; i <= np; ++i)
+  {
+    occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, nv);
+    for (int j = 0; j < nv; ++j)
+      pts->SetValue(j + 1, cols[j]->Pole(i));
+    GeomAPI_Interpolate ip(pts, pv, false, 1e-12);
+    ip.Perform();
+    if (!ip.IsDone())
+      fail_op("loft: guided face interpolation failed");
+    across = ip.Curve();
+    if (i == 1)
+      poles.Resize(1, np, 1, across->NbPoles(), false);
+    for (int j = 1; j <= across->NbPoles(); ++j)
+      poles(i, j) = across->Pole(j);
+  }
+  return new Geom_BSplineSurface(poles, cols[0]->Knots(), across->Knots(), cols[0]->Multiplicities(), across->Multiplicities(), cols[0]->Degree(), across->Degree());
+}
+
+// Surfaces through grids with the same last / first rows and the same columns, one after another in u, as one
+// surface (C0 where they meet, C1 where their derivatives agree: one knot fewer there); `at` the u each starts at,
+// then where the last ends.
+occ::handle<Geom_BSplineSurface> join_u(std::vector<occ::handle<Geom_BSplineSurface>> ps, const std::vector<double>& at)
+{
+  if (ps.size() == 1)
+    return ps[0];
+  int du = 0;
+  for (const auto& p : ps)
+    du = std::max(du, p->UDegree());
+  const int dv = ps[0]->VDegree(), nv = ps[0]->NbVPoles();
+  for (auto& p : ps)
+  {
+    if (p->IsURational() || p->IsVRational() || p->VDegree() != dv || p->NbVPoles() != nv || p->NbVKnots() != ps[0]->NbVKnots())
+      fail_op("loft: guided face pieces differ");
+    if (p->UDegree() < du)
+    {
+      p = occ::down_cast<Geom_BSplineSurface>(p->Copy());
+      p->IncreaseDegree(du, dv);
+    }
+  }
+  std::vector<double>              knots;
+  std::vector<int>                 mults;
+  std::vector<std::vector<gp_Pnt>> rows;
+  for (size_t k = 0; k < ps.size(); ++k)
+  {
+    const auto&  p  = ps[k];
+    const int    nk = p->NbUKnots();
+    const double k0 = p->UKnot(1), k1 = p->UKnot(nk);
+    auto         map = [&](double x) { return at[k] + (at[k + 1] - at[k]) * (x - k0) / (k1 - k0); };
+    for (int i = k == 0 ? 1 : 2; i < nk; ++i)
+    {
+      knots.push_back(map(p->UKnot(i)));
+      mults.push_back(p->UMultiplicity(i));
+    }
+    // A piece's first row is the last one's last.
+    for (int i = k == 0 ? 1 : 2; i <= p->NbUPoles(); ++i)
+    {
+      std::vector<gp_Pnt> row;
+      for (int j = 1; j <= nv; ++j)
+        row.push_back(p->Pole(i, j));
+      rows.push_back(row);
+    }
+    if (k + 1 < ps.size())
+    {
+      knots.push_back(at[k + 1]);
+      mults.push_back(du);
+    }
+  }
+  knots.push_back(at.back());
+  mults.push_back(du + 1);
+  NCollection_Array2<gp_Pnt> poles(1, (int)rows.size(), 1, nv);
+  for (size_t i = 0; i < rows.size(); ++i)
+    for (int j = 0; j < nv; ++j)
+      poles((int)i + 1, j + 1) = rows[i][j];
+  NCollection_Array1<double> uk(1, (int)knots.size()), vk(1, ps[0]->NbVKnots());
+  NCollection_Array1<int>    um(1, (int)mults.size()), vm(1, ps[0]->NbVKnots());
+  for (size_t i = 0; i < knots.size(); ++i)
+  {
+    uk((int)i + 1) = knots[i];
+    um((int)i + 1) = mults[i];
+  }
+  for (int i = 1; i <= ps[0]->NbVKnots(); ++i)
+  {
+    vk(i) = ps[0]->VKnot(i);
+    vm(i) = ps[0]->VMultiplicity(i);
+  }
+  occ::handle<Geom_BSplineSurface> out = new Geom_BSplineSurface(poles, uk, vk, um, vm, du, dv);
+  double                           x0, x1, y0, y1;
+  out->Bounds(x0, x1, y0, y1);
+  for (size_t k = 1; k + 1 < at.size(); ++k)
+    for (int i = 2; i < out->NbUKnots(); ++i)
+      if (std::abs(out->UKnot(i) - at[k]) < 1e-12 && out->UMultiplicity(i) == du)
+      {
+        Bnd_Box b;
+        for (int a = 1; a <= out->NbUPoles(); ++a)
+          for (int c = 1; c <= out->NbVPoles(); ++c)
+            b.Add(out->Pole(a, c));
+        out->RemoveUKnot(i, du - 1, 1e-9 * std::sqrt(b.SquareExtent()));
+        break;
+      }
+  return out;
+}
+
+// A cubic B-spline face through a grid of points (rows along u).
+TopoDS_Face grid_face(const std::vector<std::vector<gp_Pnt>>& g)
+{
+  BRepBuilderAPI_MakeFace mf(grid_surface(g), 1e-7);
   if (!mf.IsDone())
     fail_op("loft: guided face failed");
   return mf.Face();
@@ -352,11 +493,45 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
     fail_invalid("loft: no guides");
   std::sort(gs.begin(), gs.end(), [&](const Guide& x, const Guide& y) { return x.sa < y.sa; });
   // Division points: A's corners and the guide starts; B's matching points.
-  const std::vector<double> corners_a = A.corners();
+  std::vector<double>       corners_a = A.corners();
   std::vector<double>       cb_raw    = B.corners();
-  std::vector<double>       corners_b;
+  const std::vector<double> joints_a  = A.joints(-1);
+  std::vector<double>       joints_b;
+  for (double s : B.joints(-1))
+    joints_b.push_back(flip_b ? std::fmod(B.len - s, B.len) : s);
+  std::vector<double> corners_b;
   for (double s : cb_raw)
     corners_b.push_back(flip_b ? std::fmod(B.len - s, B.len) : s);
+  // Joints lined up across the loft (one of A's lands on one of B's, by arc length between the guides) are corners
+  // however smooth (live 3023 / 3053: a stadium lofted to a stadium has a side edge up from each joint; turned 90°,
+  // one side face).
+  auto on_b = [&](double s) {
+    for (size_t i = 0; i < gs.size(); ++i)
+    {
+      const Guide& g = gs[i];
+      const Guide& h = gs[(i + 1) % gs.size()];
+      const double la = gs.size() == 1 ? A.len : forward(g.sa, h.sa, A.len), lb = gs.size() == 1 ? B.len : forward(g.sb, h.sb, B.len);
+      const double o  = forward(g.sa, s, A.len);
+      if (o <= la)
+        return std::fmod(g.sb + lb * o / la, B.len);
+    }
+    return -1.0;
+  };
+  const double lined = 1e-6 * (1 + size);
+  for (double s : joints_a)
+  {
+    const double t = on_b(s);
+    for (double u : joints_b)
+      if (t >= 0 && std::min(forward(t, u, B.len), forward(u, t, B.len)) < lined)
+      {
+        auto same = [&](double c, double x, double len) { return std::min(forward(c, x, len), forward(x, c, len)) < tol; };
+        if (std::none_of(corners_a.begin(), corners_a.end(), [&](double c) { return same(c, s, A.len); }))
+          corners_a.push_back(s);
+        if (std::none_of(corners_b.begin(), corners_b.end(), [&](double c) { return same(c, u, B.len); }))
+          corners_b.push_back(u);
+      }
+  }
+  std::sort(corners_a.begin(), corners_a.end());
   std::sort(corners_b.begin(), corners_b.end());
   struct Pt
   {
@@ -501,10 +676,19 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
     }
     // Gordon: the profiles linearly in v, the columns by Hermite tents in u,
     // less their tensor product.
-    std::vector<std::vector<gp_Pnt>> grid(NU + 1, std::vector<gp_Pnt>(NV + 1));
-    for (int i = 0; i <= NU; ++i)
+    // Each column's difference from the profiles' linear blend at each v (the face's own: evaluated once).
+    std::vector<std::vector<gp_XYZ>> lift(ua.size(), std::vector<gp_XYZ>(NV + 1));
+    for (size_t m = 0; m < ua.size(); ++m)
     {
-      const double              u  = (double)i / NU;
+      const gp_XYZ b = bot(ua[m]).XYZ(), t = top(ua[m]).XYZ();
+      for (int j = 0; j <= NV; ++j)
+      {
+        const double v = (double)j / NV;
+        lift[m][j]     = column(m, v).XYZ() - (b * (1 - v) + t * v);
+      }
+    }
+    auto row = [&](double u) {
+      std::vector<gp_Pnt>       r(NV + 1);
       const std::vector<double> w  = hermite_tents(ua, u);
       const gp_Pnt              pb = bot(u), pt = top(u);
       for (int j = 0; j <= NV; ++j)
@@ -512,14 +696,79 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
         const double v = (double)j / NV;
         gp_XYZ       s = pb.XYZ() * (1 - v) + pt.XYZ() * v;
         for (size_t m = 0; m < ua.size(); ++m)
-        {
-          const gp_XYZ lin = bot(ua[m]).XYZ() * (1 - v) + top(ua[m]).XYZ() * v;
-          s += (column(m, v).XYZ() - lin) * w[m];
-        }
-        grid[i][j] = gp_Pnt(s);
+          s += lift[m][j] * w[m];
+        r[j] = gp_Pnt(s);
       }
+      return r;
+    };
+    // Pieces between the columns and every joint of either profile, one surface: one cubic across a joint where
+    // the curvature jumps (an arc into a line) leaves its edge tens of µm off the profile (c2-hunting-knife's Loft 1).
+    std::vector<double> brk(ua.begin(), ua.end());
+    for (double s : joints_a)
+    {
+      const double u = forward(sa0, s, A.len) / la;
+      if (u > 0 && u < 1)
+        brk.push_back(u);
     }
-    sew.Add(grid_face(grid));
+    for (double s : joints_b)
+    {
+      const double o = forward(sb0, s, B.len) / lb;
+      if (o <= 0 || o >= 1)
+        continue;
+      size_t g = 0;
+      while (g + 2 < ub.size() && o > ub[g + 1])
+        ++g;
+      brk.push_back(ua[g] + (ua[g + 1] - ua[g]) * (o - ub[g]) / (ub[g + 1] - ub[g]));
+    }
+    std::sort(brk.begin(), brk.end());
+    std::vector<double> at{0.0};
+    for (double u : brk)
+      if (u - at.back() > 1e-6 && 1 - u > 1e-6)
+        at.push_back(u);
+    at.push_back(1.0);
+    // Each break's u-derivative, the pieces either side sharing it (C1 there); round the loop at the seam of a face
+    // that closes on itself, one-sided at a corner.
+    const bool closed = seams.size() == 1;
+    // (A step of a quarter of the narrower piece beside it, at most 1e-3: arc length can't place a much smaller one.)
+    auto slope = [&](double u, double h) {
+      std::vector<gp_Pnt> a, b;
+      double              w = 2 * h;
+      if (u <= 0 && !closed)
+        a = row(0), b = row(h), w = h;
+      else if (u >= 1 && !closed)
+        a = row(1 - h), b = row(1), w = h;
+      else
+        a = row(u - h < 0 ? u - h + 1 : u - h), b = row(u + h > 1 ? u + h - 1 : u + h);
+      std::vector<gp_Vec> t(a.size());
+      for (size_t j = 0; j < a.size(); ++j)
+        t[j] = gp_Vec(a[j], b[j]) / w;
+      return t;
+    };
+    std::vector<std::vector<gp_Vec>> slopes;
+    for (size_t k2 = 0; k2 < at.size(); ++k2)
+    {
+      const size_t n2     = at.size() - 1;
+      const double before = k2 > 0 ? at[k2] - at[k2 - 1] : at[n2] - at[n2 - 1];
+      const double after  = k2 < n2 ? at[k2 + 1] - at[k2] : at[1] - at[0];
+      slopes.push_back(slope(at[k2], std::min(1e-3, 0.25 * std::min(before, after))));
+    }
+    std::vector<occ::handle<Geom_BSplineSurface>> pieces;
+    for (size_t k2 = 0; k2 + 1 < at.size(); ++k2)
+    {
+      const int                        m = std::max(3, (int)std::ceil(NU * (at[k2 + 1] - at[k2])));
+      std::vector<std::vector<gp_Pnt>> grid;
+      std::vector<double>              us;
+      for (int i = 0; i <= m; ++i)
+      {
+        us.push_back(at[k2] + (at[k2 + 1] - at[k2]) * i / m);
+        grid.push_back(row(us.back()));
+      }
+      pieces.push_back(grid_surface_with_ends(grid, us, slopes[k2], slopes[k2 + 1]));
+    }
+    BRepBuilderAPI_MakeFace mf(join_u(pieces, at), 1e-7);
+    if (!mf.IsDone())
+      fail_op("loft: guided face failed");
+    sew.Add(mf.Face());
   }
   if (make_solid)
   {
@@ -616,7 +865,7 @@ struct Open
         da.Reverse();
       if (rb)
         db.Reverse();
-      if (da.Magnitude() > 1e-12 && db.Magnitude() > 1e-12 && da.Angle(db) > 1e-6)
+      if (da.Magnitude() > 1e-12 && db.Magnitude() > 1e-12 && da.Angle(db) > SMOOTH_JOINT)
         out.push_back(abscissa(pa));
     }
     return out;

@@ -141,6 +141,9 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &'static str, bod
                             let whole = k::make_cylinder(&k::Plane::new(origin - axis * ext, axis, x_dir), radius, 2.0 * ext, std::f64::consts::TAU)?;
                             whole.faces().into_iter().find(|f| matches!(f.face_surface(), Ok(k::Surface::Cylinder { .. }))).unwrap_or(face)
                         }
+                        // A B-spline: its whole surface, without the face's trims (c2-hunting-knife's Extrude 10: a pin up
+                        // to the handle's side, through the pin's holes in it).
+                        (None, k::Surface::BSpline { .. }) => k::extend_face_over(&face, &[], 0.0).unwrap_or(face),
                         _ => face,
                     }
                 }

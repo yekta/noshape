@@ -175,6 +175,10 @@ pub struct Translator<'a> {
     pub other_defaults: HashMap<String, HashMap<String, Value>>,
     /// Our sketches' sketch_get within the current step (a studio's every region query read every sketch).
     sketch_cache: HashMap<String, Value>,
+    /// Query results (`query_*`, by tool and arguments) until a call that can change the document: each regenerates and
+    /// keeps the result, a whole save of a big imported studio (c2-wire-clip-imported's Boolean 2, a query_parts per
+    /// body id: 650 s).
+    query_cache: HashMap<String, Value>,
     /// Import features' files (features.json `foreignFiles`: foreign id →
     /// `{ "path", "placed" }`, placed: live's export of the Part Studio).
     foreign: HashMap<String, Value>,
@@ -243,7 +247,10 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         // and area, a sketch's line as its `mid` and `length` (live 2313, `bodyType` SKETCH).
         let point = f3(&v["point"]).or_else(|| f3(&v["origin"])).or_else(|| f3(&v["centroid"])).or_else(|| f3(&v["mid"]));
         let bbox = v["box"].as_array().and_then(|b| Some([f3(b.first()?)?, f3(b.get(1)?)?]));
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize) };
+        // A curved face's normal is its tangent plane's at a point: no filter for planar faces of ours (c2-hunting-knife's
+        // Extrude 10 took the blade's flat spine for the handle's B-spline side through the same point).
+        let normal = f3(&v["normal"]).filter(|_| v["surfaceType"].as_str().is_none_or(|t| t.eq_ignore_ascii_case("plane")));
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize) };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -339,7 +346,7 @@ impl<'a> Translator<'a> {
             // (A boolean configuration's default is a JSON boolean.)
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -640,6 +647,14 @@ impl<'a> Translator<'a> {
                 None => self.sketch_cache.clear(),
             }
         }
+        let query = tool.starts_with("query_");
+        if !query {
+            self.query_cache.clear();
+        }
+        let key = format!("{tool} {args}");
+        if query && let Some(v) = self.query_cache.get(&key) {
+            return Ok(v.clone());
+        }
         // (A sketch read whole: from there.)
         let whole = tool == "sketch_get" && args.as_object().is_some_and(|a| a.keys().all(|k| k == "sketch" || k == "tab"));
         if whole && let Some(g) = args["sketch"].as_str().and_then(|sk| self.sketch_cache.get(sk)) {
@@ -648,6 +663,9 @@ impl<'a> Translator<'a> {
         let out = registry::run(self.ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string());
         if whole && let (Ok(g), Some(sk)) = (&out, args["sketch"].as_str()) {
             self.sketch_cache.insert(sk.to_string(), g.clone());
+        }
+        if query && let Ok(v) = &out {
+            self.query_cache.insert(key, v.clone());
         }
         out
     }
@@ -1166,6 +1184,8 @@ impl<'a> Translator<'a> {
         let parent_studios = self.studios.clone();
         let mut refs = refs_from_bodies(&lines);
         refs.extend(parse_refs(src["refs"].as_str().unwrap_or("")));
+        // (Another studio built in the same session: our queries read go.)
+        self.query_cache.clear();
         let mut t = Translator::open_in(&mut *self.ctx, &name, &doc, refs)?;
         for (e, tab) in parent_studios {
             t.studios.entry(e).or_insert(tab);
@@ -3146,12 +3166,22 @@ impl<'a> Translator<'a> {
             {
                 let mut faces = Vec::new();
                 for side in sides {
-                    match self.extrude_name_from_tree(side)? {
+                    match self.named_faces(side)? {
                         Ok(f) => faces.push(f),
                         Err(e) => return Some(Err(format!("INTERSECT: {e}"))),
                     }
                 }
-                return Some(self.common_edge(&faces[0], &faces[1]));
+                // (A loft's side may be several pieces: the one meeting the other face, c2-hunting-knife's Fillet 8.)
+                for a in &faces[0] {
+                    for b in &faces[1] {
+                        if let Ok(r) = self.call("query_entities", json!({ "kind": "edges", "of": [a, b], "limit": 1 }))
+                            && let Some(e) = r["edges"][0]["id"].as_str()
+                        {
+                            return Some(Ok(e.to_string()));
+                        }
+                    }
+                }
+                return Some(self.common_edge(&faces[0][0], &faces[1][0]));
             }
             // A vertex where three named faces meet (c2-hunting-knife's Fillet 7: a variable fillet's vertex, Extrude
             // 5's end cap, its swept face off an arc and Extrude 7's side).
@@ -3255,6 +3285,22 @@ impl<'a> Translator<'a> {
         // Which of the curves' crossings an edge swept from one is (ORDER).
         let crossing = packed_order(&Packed::Map(m.clone()));
         Some(if revolve { self.revolve_entity(name, &op, &sk, &curves) } else { self.extrude_entity(name, is_start, crossing, &op, &sk, &curves) })
+    }
+
+    /// The faces a packed name gives: a Loft's side face (`SWEPT_FACE` of `….opLoft`) every piece of it a later split
+    /// left, else [`Self::extrude_name_from_tree`]'s one.
+    fn named_faces(&mut self, tree: &noshape_model::custom::host::packed::Packed) -> Option<Result<Vec<String>, String>> {
+        let mut strings = Vec::new();
+        packed_strings(tree, &mut strings);
+        if strings.iter().any(|s| s == "SWEPT_FACE")
+            && let Some(loft) = strings.iter().find_map(|s| s.strip_suffix(".opLoft"))
+            && !strings.iter().any(|s| s.ends_with(".opExtrude") || s.ends_with(".opRevolve"))
+        {
+            let Some(ours) = self.feature_ids.get(loft).cloned() else { return Some(Err(format!("SWEPT_FACE: loft {loft} was not built"))) };
+            let r = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 100000 }));
+            return Some(r.map(|f| f["faces"].as_array().into_iter().flatten().filter(|f| f["surface"] != "plane").filter_map(|f| f["id"].as_str().map(str::to_string)).collect::<Vec<_>>()).and_then(|f| if f.is_empty() { Err(format!("SWEPT_FACE: loft {loft} has no side face of ours")) } else { Ok(f) }));
+        }
+        self.extrude_name_from_tree(tree).map(|r| r.map(|f| vec![f]))
     }
 
     /// An end of a curve a custom feature fit or a Helix made (`VERTEX` created by `<feature>.….opFitSpline` or
@@ -4498,8 +4544,9 @@ impl<'a> Translator<'a> {
         if let Some(tab) = &self.tab {
             args["tab"] = json!(tab);
         }
-        // (Past `call`: the sketches read go.)
+        // (Past `call`: the sketches and queries read go.)
         self.sketch_cache.clear();
+        self.query_cache.clear();
         crate::ops::link_sketch_offset(self.ctx, &args).map_err(|e| e.message)?;
         self.sketch_edits += 1;
         Ok(())
@@ -4541,8 +4588,9 @@ impl<'a> Translator<'a> {
             args["center"] = json!(center);
             args["full"] = json!(!params.iter().any(|p| p["parameterId"] == "openPattern" && p["value"] == true));
         }
-        // (Past `call`: the sketches read go.)
+        // (Past `call`: the sketches and queries read go.)
         self.sketch_cache.clear();
+        self.query_cache.clear();
         crate::ops::link_sketch_pattern(self.ctx, &args).map_err(|e| e.message)?;
         self.sketch_edits += 1;
         Ok(())
@@ -4657,6 +4705,7 @@ impl<'a> Translator<'a> {
                         args["tab"] = json!(tab);
                     }
                     self.sketch_cache.clear();
+                    self.query_cache.clear();
                     if crate::ops::pin_to_missing_reference(self.ctx, &args).is_ok() {
                         continue;
                     }
@@ -7473,6 +7522,17 @@ fn pattern_alias(sketch: &Value, id: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A curved face's normal in live's refs (its tangent plane's) is no filter for planar faces of ours; a plane's is.
+    #[test]
+    fn only_a_planar_faces_live_normal_is_kept() {
+        let refs = parse_refs(concat!(
+            r#"{"index": 3, "id": "A", "kind": "FACE", "surfaceType": "SPLINE", "point": [0, 0, 0], "normal": [0, 0, 1], "area": 1}"#,
+            "\n",
+            r#"{"index": 3, "id": "B", "kind": "FACE", "surfaceType": "PLANE", "point": [0, 0, 0], "normal": [0, 0, 1], "area": 1}"#,
+        ));
+        assert_eq!((refs[&(3, "A".to_string())].normal, refs[&(3, "B".to_string())].normal), (None, Some([0.0, 0.0, 1.0])));
+    }
 
     /// An in-feature mate connector on live's frame (live 2632, asm-corexy's Transforms): on the Origin, moved to the
     /// frame's origin, turned to its Z (a flip for −Z, a quarter turn about X for −Y); a frame turned about Z isn't

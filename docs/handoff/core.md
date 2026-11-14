@@ -5,6 +5,28 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-14 04:10 UTC)
+- **Branch core-loftcorner (worktree core-base), gating:** guided loft joints as live (REQUESTS 3023 / 3053: a joint
+  under 3° is smoothed over unless a joint of the other profile lines up with it by arc length between the guides;
+  lined-up joints are always side edges). The side face is built in pieces between every joint and column, joined into
+  one surface C1 (shared u-derivative at each break, join knots reduced to multiplicity 2): one cubic across a
+  curvature jump missed the profile by tens of µm and didn't sew; C0 joins made OCCT's fillet on it 9.4 s (Fillet 8),
+  C1 0.85 s. Per-face constants hoisted out of the row loop (a 150-gon: 15 s -> 0.1 s).
+  Extrude up to a B-spline face ends on its surface (extend_face_over, no points: the knife's pin through its holes).
+  Translator: a curved face's live normal no longer filters for planar faces (RxBG went to the blade's spine);
+  a Loft's side face in an INTERSECT is the piece meeting the other face (Fillet 8). The translator caches query_*
+  results until a call that can change the document (each read regenerates and keeps the result, a whole save:
+  c2-wire-clip-imported's Boolean 2 resolved ids one query_parts each, 650 s once its face ids resolved).
+  The first vibe5 branch suite stopped after 23 documents at wire-clip (no score line); rerun with the cache.
+  Knife: Loft 1 3 faces (live 3/20/20; ours 19/17 edges/vertices: live splits the profiles at the guides and has no
+  seam), volume +0.3 % (the surface between the guides differs), Extrude 10 and Fillet 8 build; score stays 24/52
+  (Loft 3 first).
+- Kernel T1s for units: lofts in mm sew at 0.1 µm (`1e-6 * (1 + size)`), in metres at 1 µm: write loft T1s in
+  metres as the app models. Open hole: loft_guided_curved accepts an open shell as a solid (BRepCheck NotClosed);
+  should fail instead (not changed: check parity first).
+- Hosts (lead 11-14): model suites / A/Bs on vibe5 or vibe7 (vibe7 02:00-04:00 is qa's speed window), not vibe6 or the
+  Mac; the Mac only for short builds and crate tests (one slot). vibe5 disk 94 %.
+
 ## core state (11-13 23:18 UTC)
 - **Landed:** be63331b guided loft between two smooth closed profiles: one side face round the loop from the first
   guide (knife Loft 1 "Loft guides need a profile with corners yet" before). With skasm's a5c1925e2 Loft 1 builds.
