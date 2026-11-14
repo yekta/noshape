@@ -22,7 +22,7 @@ drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 - dx-chain9 (base vs dx-1dc / tvc variants on the new data) restarted 09:23 with 90 min a run (infento took over 45 min
   on the sketch solves: the first base run timed out); read sk-*.log, land per the rules below.
 
-## 11-14 15:20 UTC: the Export dialog's ui-parity (live batches 27-28): 23 -> 279 of 305 states
+## 11-14 15:03 UTC: the Export dialog's ui-parity (live batches 27-28): 23 -> 279 of 305 states
 - Queued 7abf0245: Export… from a face makes it the selection (live: the face selected, Area readout); a Part Studio
   tab's Export… without parts opens live's notice ("Selected tab contains no supported geometry for export.", only
   Cancel; ops' export_parts says the same, e2e `export_of_an_empty_part_studio_says_there_is_no_geometry`; the 11-10
@@ -40,7 +40,7 @@ drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 - vibe7: dx-gtvca2 (tvc-a on infento) then dx-hd (asm-hand-drill-pinslot on ops-base1, ~/tmp/dx/hd.out:
   HAND-DRILL-MATES-OVERDEFINED's dx items, Cylindrical 23 and the Gear 5 Connector). Daily model run after them.
 
-## 11-14 14:25 UTC: dx-1dc, dx-tvc-b and dx-arcs landed; dx-tvc-a re-gating on main; studios rerun
+## 11-14 14:22 UTC: dx-1dc, dx-tvc-b and dx-arcs landed; dx-tvc-a re-gating on main; studios rerun
 - Landed: dx-1dc + dx-tvc-b as one batch (79f4af8a): infento on the sketch-solve data held at 152/167, 77/193 mates
   with 1dc (base ops-b0612 the same); tvc-b took tvc-mount from 3 to 4/10 mates and scissor-lift from 205 to 208/242
   occurrences. dx-arcs (f196c4919): an extrude's arcs of one circle join into one side face whatever else meets the
