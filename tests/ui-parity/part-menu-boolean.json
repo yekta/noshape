@@ -1,6 +1,6 @@
 {
  "name": "part-menu-boolean",
- "about": "overlap: Part 1 and Part 2 in the Parts list, right-click › Boolean (the Boolean dialog with both parts), Escape",
+ "about": "overlap: Part 1 and Part 2 in the Parts list, right-click › Boolean (the Boolean dialog with both parts), Escape (recorded 11-14 03:00 while the account's company release management had managed workflows off: the 2-part menu has no Release… and shows Create task…)",
  "area": "psui",
  "source": "live coverage audit 2026-11-14 (an uncovered menu item; sketch shortcuts with one recorded scenario)",
  "start": "overlap",
@@ -45,5 +45,10 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "config_files": {
+  "release_settings.json": {
+   "managed_workflows": false
+  }
+ }
 }
