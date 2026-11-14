@@ -48,5 +48,12 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "sheetMetalHem": {
+   "length:Millimeter": {
+    "length": "8 mm"
+   }
+  }
+ }
 }
