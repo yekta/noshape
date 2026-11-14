@@ -80,9 +80,24 @@ pub enum CadObject {
     /// Header / Data row); `aligned`: the cells' MTEXT carry their paragraph
     /// alignment (live: free tables only, `{\pxqc;…}`); `lineweight`: the grid lines' (mm; None: ByBlock, live 2232).
     Table { corner: [f64; 2], widths: Vec<f64>, heights: Vec<f64>, cells: Vec<Vec<String>>, rows: Vec<&'static str>, aligned: bool, lineweight: Option<f64> },
-    /// A closed cubic spline as a chain of Bézier spans (`3n + 1` poles,
-    /// sheet mm): SPLINE.
-    Spline { poles: Vec<[f64; 2]> },
+    /// A cubic spline as a chain of Bézier spans (`3n + 1` poles, sheet mm), closed or open: SPLINE.
+    Spline { poles: Vec<[f64; 2]>, closed: bool },
+}
+
+/// The open Catmull-Rom curve through `pts` as Bézier spans: `3n + 1` poles from the first point to the last.
+pub fn open_catmull_rom_poles(pts: &[[f64; 2]]) -> Vec<[f64; 2]> {
+    let n = pts.len();
+    let mut out = Vec::with_capacity(3 * n);
+    for i in 0..n.saturating_sub(1) {
+        let (p0, p1, p2, p3) = (pts[i.saturating_sub(1)], pts[i], pts[i + 1], pts[(i + 2).min(n - 1)]);
+        out.push(p1);
+        out.push([p1[0] + (p2[0] - p0[0]) / 6.0, p1[1] + (p2[1] - p0[1]) / 6.0]);
+        out.push([p2[0] - (p3[0] - p1[0]) / 6.0, p2[1] - (p3[1] - p1[1]) / 6.0]);
+    }
+    if let Some(p) = pts.last() {
+        out.push(*p);
+    }
+    out
 }
 
 /// The closed uniform Catmull-Rom curve through `pts` (`views::closed_spline`)
@@ -117,9 +132,18 @@ pub type CadMembers = (Vec<Option<usize>>, Vec<Option<usize>>, Vec<Option<usize>
 
 impl SheetGeometry {
     /// Line `line` is the spline with these Bézier poles.
+    /// One open SPLINE in place of `lines` (each a member of it).
+    pub fn add_cad_open_spline(&mut self, lines: &[usize], poles: Vec<[f64; 2]>) {
+        let obj = self.cad_objects.len();
+        self.cad_objects.push(CadObject::Spline { poles, closed: false });
+        for &i in lines {
+            self.cad_members.push(CadMember { lines: i..i + 1, texts: 0..0, fills: 0..0, obj });
+        }
+    }
+
     pub fn add_cad_spline(&mut self, line: usize, poles: Vec<[f64; 2]>) {
         let obj = self.cad_objects.len();
-        self.cad_objects.push(CadObject::Spline { poles });
+        self.cad_objects.push(CadObject::Spline { poles, closed: true });
         self.cad_members.push(CadMember { lines: line..line + 1, texts: 0..0, fills: 0..0, obj });
     }
 

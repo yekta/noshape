@@ -1022,10 +1022,10 @@ impl Sheet<'_> {
     }
 
     /// A closed spline (Bézier spans) as SPLINE, on line `li`'s layer.
-    fn spline(&self, doc: &mut CadDocument, poles: &[[f64; 2]], li: usize, owner: Owner) -> Result<(), String> {
+    fn spline(&self, doc: &mut CadDocument, poles: &[[f64; 2]], closed: bool, li: usize, owner: Owner) -> Result<(), String> {
         let mut e = Spline::new();
         e.degree = 3;
-        (e.flags.closed, e.flags.planar) = (true, true);
+        (e.flags.closed, e.flags.planar) = (closed, true);
         e.control_points = poles.iter().map(|p| self.p3(*p)).collect();
         // Clamped (4 knots at the ends), each joint a triple knot.
         let spans = poles.len().saturating_sub(1) / 3;
@@ -1173,6 +1173,22 @@ impl Sheet<'_> {
     }
 }
 
+/// Hatch loops grouped by region (even-odd): each outer loop first, then the holes directly in it.
+fn hatch_regions(loops: &[Vec<[f64; 2]>]) -> Vec<Vec<usize>> {
+    let inside = |i: usize, j: usize| i != j && loops[i].first().is_some_and(|p| super::views::point_in_polygon(*p, &loops[j]));
+    let depth = |i: usize| (0..loops.len()).filter(|j| inside(i, *j)).count();
+    let area = |l: &[[f64; 2]]| (0..l.len()).map(|i| { let (a, b) = (l[i], l[(i + 1) % l.len()]); a[0] * b[1] - b[0] * a[1] }).sum::<f64>().abs();
+    let outers: Vec<usize> = (0..loops.len()).filter(|i| depth(*i) % 2 == 0).collect();
+    let mut regions: Vec<Vec<usize>> = outers.iter().map(|o| vec![*o]).collect();
+    for hole in (0..loops.len()).filter(|i| depth(*i) % 2 == 1) {
+        let owner = outers.iter().enumerate().filter(|(_, o)| inside(hole, **o)).min_by(|a, b| area(&loops[*a.1]).total_cmp(&area(&loops[*b.1])));
+        if let Some((r, _)) = owner {
+            regions[r].push(hole);
+        }
+    }
+    regions
+}
+
 fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&str>, version: DxfVersion, dx: f64) -> Result<(), String> {
     let upper = version <= DxfVersion::AC1014;
     let sh = Sheet { g, k, dx, upper, version };
@@ -1186,29 +1202,32 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
         for i in h.lines.clone().filter(|i| *i < n) {
             hatch_line[i] = true;
         }
-        let mut e = Hatch::new();
-        let mut pattern = HatchPattern::new("ANSI31");
-        let s = h.spacing * k;
-        pattern.add_line(HatchPatternLine { angle: std::f64::consts::FRAC_PI_4, base_point: Vector2::new(0.0, 0.0), offset: Vector2::new(-s / std::f64::consts::SQRT_2, s / std::f64::consts::SQRT_2), dash_lengths: Vec::new() });
-        e.pattern = pattern;
-        e.is_solid = false;
-        e.pattern_type = HatchPatternType::Custom;
-        e.pattern_angle = 0.0;
-        // ANSI31's lines are 0.125 in apart at scale 1.
-        e.pattern_scale = h.spacing / 3.175;
-        for lp in &h.loops {
-            let mut path = BoundaryPath::new();
-            for (i, a) in lp.iter().enumerate() {
-                let b = lp[(i + 1) % lp.len()];
-                path.add_edge(BoundaryEdge::Line(LineEdge { start: p2(*a), end: p2(b) }));
+        // One HATCH per region (live): an outer loop with the holes in it.
+        for region in hatch_regions(&h.loops) {
+            let mut e = Hatch::new();
+            let mut pattern = HatchPattern::new("ANSI31");
+            let s = h.spacing * k;
+            pattern.add_line(HatchPatternLine { angle: std::f64::consts::FRAC_PI_4, base_point: Vector2::new(0.0, 0.0), offset: Vector2::new(-s / std::f64::consts::SQRT_2, s / std::f64::consts::SQRT_2), dash_lengths: Vec::new() });
+            e.pattern = pattern;
+            e.is_solid = false;
+            e.pattern_type = HatchPatternType::Custom;
+            e.pattern_angle = 0.0;
+            // ANSI31's lines are 0.125 in apart at scale 1.
+            e.pattern_scale = h.spacing / 3.175;
+            for lp in region.iter().map(|i| &h.loops[*i]) {
+                let mut path = BoundaryPath::new();
+                for (i, a) in lp.iter().enumerate() {
+                    let b = lp[(i + 1) % lp.len()];
+                    path.add_edge(BoundaryEdge::Line(LineEdge { start: p2(*a), end: p2(b) }));
+                }
+                e.paths.push(path);
             }
-            e.paths.push(path);
+            if let Some(p) = h.loops[region[0]].first() {
+                e.seed_points.push(p2(*p));
+            }
+            e.common.layer = CadLayer::ViewHatches.name(upper).into();
+            put(doc, EntityType::Hatch(Box::new(e)), owner)?;
         }
-        if let Some(p) = h.loops.first().and_then(|l| l.first()) {
-            e.seed_points.push(p2(*p));
-        }
-        e.common.layer = CadLayer::ViewHatches.name(upper).into();
-        put(doc, EntityType::Hatch(Box::new(e)), owner)?;
     }
     // Dimensions with their elements.
     let (lo, to, fo) = g.cad_members_of();
@@ -1222,7 +1241,7 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
             CadObject::Dimension(d) => sh.dimension(doc, d, (&l, &t, &f), owner, upper)?,
             CadObject::Tolerance { at, rows, height } => sh.tolerance(doc, *at, rows, *height, owner)?,
             CadObject::Symbol { at } => sh.symbol(doc, *at, &t, owner)?,
-            CadObject::Spline { poles } => sh.spline(doc, poles, l[0], owner)?,
+            CadObject::Spline { poles, closed } => sh.spline(doc, poles, *closed, l[0], owner)?,
             CadObject::Table { corner, widths, heights, cells, rows, aligned, lineweight } => sh.table(doc, (*corner, widths, heights, cells, rows, *aligned, *lineweight), (&l, &t, &f), owner)?,
         }
     }
@@ -1592,6 +1611,18 @@ mod tests {
         assert_eq!(dashed.len(), 1);
         assert!((dashed[0].common().linetype_scale - 2.0).abs() < 1e-9);
         assert!(matches!(dashed[0].common().line_weight, LineWeight::Value(35)));
+    }
+
+    /// A cut in two pieces (live drw-broken-out-section.dxf: material either
+    /// side of the hole) is two HATCH entities; a hole stays a loop of its region's.
+    #[test]
+    fn each_hatched_region_is_its_own_hatch() {
+        let sq = |x: f64, y: f64, w: f64| vec![[x, y], [x + w, y], [x + w, y + w], [x, y + w]];
+        let mut g = sample();
+        g.hatches.push(crate::drawing::cad_layers::HatchRegion { loops: vec![sq(60.0, 60.0, 20.0), sq(100.0, 60.0, 20.0), sq(105.0, 65.0, 5.0)], spacing: 2.0, lines: 0..0 });
+        let doc = cad_document(&g, 4, DxfVersion::AC1032).unwrap();
+        let loops: Vec<usize> = doc.entities().filter_map(|e| if let EntityType::Hatch(h) = e { Some(h.paths.len()) } else { None }).collect();
+        assert_eq!(loops, [1, 2]);
     }
 
     fn sample() -> SheetGeometry {

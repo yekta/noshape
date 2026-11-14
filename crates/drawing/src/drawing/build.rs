@@ -1007,6 +1007,110 @@ fn format_layer_pens(g: &mut SheetGeometry, lines: std::ops::Range<usize>, layer
     }
 }
 
+/// A broken-out section's jog lines for export (live drw-broken-out-section's DXF): where a spline profile bounds the
+/// section (its hatch), one SECTION_JOG_LINES spline per piece of each span between the profile's points; the view's
+/// edges along the profile (the cut's walls seen edge-on) go into them, not written on their own.
+fn broken_out_jog_lines(g: &mut SheetGeometry, pl: &ViewPlacement, v: &super::DrawingView, hatches_from: usize) {
+    let Some(r) = g.view_edges.iter().rev().find(|(id, _)| *id == v.id).map(|(_, r)| r.clone()) else { return };
+    let to_segment = |p: [f64; 2], s: [[f64; 2]; 2]| {
+        let (d, e) = ([s[1][0] - s[0][0], s[1][1] - s[0][1]], [p[0] - s[0][0], p[1] - s[0][1]]);
+        let t = ((e[0] * d[0] + e[1] * d[1]) / (d[0] * d[0] + d[1] * d[1]).max(1e-30)).clamp(0.0, 1.0);
+        (e[0] - t * d[0]).hypot(e[1] - t * d[1])
+    };
+    let mid = |a: [f64; 2], b: [f64; 2]| [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
+    let hatch: Vec<[[f64; 2]; 2]> = g.hatches[hatches_from..].iter().flat_map(|h| h.loops.iter()).flat_map(|lp| (0..lp.len()).map(move |k| [lp[k], lp[(k + 1) % lp.len()]])).collect();
+    let mut walls: Vec<usize> = Vec::new();
+    let mut pieces: Vec<Vec<[f64; 2]>> = Vec::new();
+    for b in v.broken_out.iter().filter(|b| b.spline && b.profile.len() >= 3) {
+        let outline = views::broken_out_outline(b);
+        let n = outline.len();
+        let sheet: Vec<[f64; 2]> = outline.iter().map(|p| pl.to_sheet(*p)).collect();
+        let segs: Vec<[[f64; 2]; 2]> = (0..n).map(|k| [sheet[k], sheet[(k + 1) % n]]).collect();
+        let on_profile = |p: [f64; 2]| segs.iter().any(|s| to_segment(p, *s) < 1e-3);
+        let along = |l: &Polyline2| l.points.len() >= 2 && l.points.iter().all(|p| on_profile(*p)) && l.points.windows(2).all(|w| on_profile(mid(w[0], w[1])));
+        walls.extend(r.clone().filter(|&i| g.lines[i].style == LineStyle::Visible && along(&g.lines[i])));
+        // Per span (16 segments between two of the profile's points), the runs of its chords over the hatch's
+        // boundary, each the span's own cubic cut to the run (live: 4 poles a piece); a run's ends where the hatch's
+        // boundary leaves the chord.
+        let per = n / b.profile.len();
+        let hatch_vertices: Vec<[f64; 2]> = hatch.iter().map(|h| h[0]).collect();
+        let bounding = |s: &[[f64; 2]; 2]| hatch.iter().any(|h| to_segment(mid(s[0], s[1]), *h) < 1e-2);
+        // Where along chord `s` (0..1) a hatch vertex lies inside it, nearest `from`'s end.
+        let leave = |s: &[[f64; 2]; 2], from_start: bool| {
+            let len2 = (s[1][0] - s[0][0]).powi(2) + (s[1][1] - s[0][1]).powi(2);
+            let fs: Vec<f64> = hatch_vertices
+                .iter()
+                .filter(|v| to_segment(**v, *s) < 1e-2)
+                .map(|v| (((v[0] - s[0][0]) * (s[1][0] - s[0][0]) + (v[1] - s[0][1]) * (s[1][1] - s[0][1])) / len2.max(1e-30)).clamp(0.0, 1.0))
+                .filter(|f| *f > 1e-6 && *f < 1.0 - 1e-6)
+                .collect();
+            if from_start { fs.iter().cloned().fold(None, |a: Option<f64>, f| Some(a.map_or(f, |a| a.min(f)))) } else { fs.iter().cloned().fold(None, |a: Option<f64>, f| Some(a.map_or(f, |a| a.max(f)))) }
+        };
+        let m = b.profile.len();
+        for span in 0..m {
+            let q = |i: usize| b.profile[(span + i + m - 1) % m];
+            let (p0, p1, p2, p3) = (q(0), q(1), q(2), q(3));
+            let bez: [[f64; 2]; 4] = [p1, [p1[0] + (p2[0] - p0[0]) / 6.0, p1[1] + (p2[1] - p0[1]) / 6.0], [p2[0] - (p3[0] - p1[0]) / 6.0, p2[1] - (p3[1] - p1[1]) / 6.0], p2].map(|p| pl.to_sheet(p));
+            let step = 1.0 / per as f64;
+            let chords = &segs[span * per..(span + 1) * per];
+            let mut start: Option<f64> = None;
+            for (k, s) in chords.iter().enumerate() {
+                let bounds = bounding(s);
+                match (bounds, start) {
+                    // It starts where the hatch's boundary meets this chord (else at its start).
+                    (true, None) => start = Some((k as f64 + leave(s, true).filter(|_| k == 0 || !bounding(&chords[k - 1])).unwrap_or(0.0)) * step),
+                    // It ended on the chord before, where the boundary left it.
+                    (false, Some(a)) => {
+                        let prev = &chords[k - 1];
+                        pieces.push(bezier_sub(&bez, a, (k as f64 - 1.0 + leave(prev, false).unwrap_or(1.0)) * step));
+                        start = None;
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(a) = start {
+                pieces.push(bezier_sub(&bez, a, 1.0));
+            }
+        }
+    }
+    if pieces.is_empty() {
+        return;
+    }
+    // Each wall line into the piece it lies on, else the nearest.
+    let mut members: Vec<Vec<usize>> = vec![Vec::new(); pieces.len()];
+    for &i in &walls {
+        let m = mid(g.lines[i].points[0], g.lines[i].points[g.lines[i].points.len() - 1]);
+        let d = |p: &Vec<[f64; 2]>| p.windows(2).map(|w| to_segment(m, [w[0], w[1]])).fold(f64::INFINITY, f64::min);
+        let k = (0..pieces.len()).min_by(|a, b| d(&pieces[*a]).total_cmp(&d(&pieces[*b]))).unwrap_or(0);
+        members[k].push(i);
+        g.cad.push(super::cad_layers::CadSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, layer: CadLayer::SectionJogLines });
+    }
+    for (p, m) in pieces.into_iter().zip(members) {
+        if !m.is_empty() {
+            g.add_cad_open_spline(&m, p);
+        }
+    }
+}
+
+/// A cubic Bézier's poles over `t0..t1` of it (de Casteljau).
+fn bezier_sub(b: &[[f64; 2]; 4], t0: f64, t1: f64) -> Vec<[f64; 2]> {
+    let lerp = |a: [f64; 2], c: [f64; 2], t: f64| [a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t];
+    // Split at t: the right part's poles.
+    let right = |b: [[f64; 2]; 4], t: f64| {
+        let (ab, bc, cd) = (lerp(b[0], b[1], t), lerp(b[1], b[2], t), lerp(b[2], b[3], t));
+        let (abc, bcd) = (lerp(ab, bc, t), lerp(bc, cd, t));
+        [lerp(abc, bcd, t), bcd, cd, b[3]]
+    };
+    let left = |b: [[f64; 2]; 4], t: f64| {
+        let (ab, bc, cd) = (lerp(b[0], b[1], t), lerp(b[1], b[2], t), lerp(b[2], b[3], t));
+        let (abc, bcd) = (lerp(ab, bc, t), lerp(bc, cd, t));
+        [b[0], ab, abc, lerp(abc, bcd, t)]
+    };
+    let r = right(*b, t0);
+    let s = if t0 < 1.0 { (t1 - t0) / (1.0 - t0) } else { 1.0 };
+    left(r, s.clamp(0.0, 1.0)).to_vec()
+}
+
 /// Export layers (lines, texts) of an annotation's elements.
 fn annotation_cad_layers(k: &AnnotationKind) -> (CadLayer, CadLayer) {
     use AnnotationKind as A;
@@ -1830,6 +1934,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 }
             }
             g.view_edges.push((v.id, edges0..g.lines.len()));
+            let hatches_from = g.hatches.len();
             // Section hatching: computed on the unbroken view, then cropped and
             // broken in view coordinates.
             let cad_mark = g.mark();
@@ -1923,8 +2028,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 }
             }
             g.cad_since(cad_mark, CadLayer::ViewHatches);
-            // Broken-out profiles (live: a SPLINE on SECTION_JOG_LINES over
-            // the cut's edge; a polygon profile as a polyline).
+            // Broken-out profiles (live drw-broken-out-section: the profile a SPLINE on VISIBLE; a polygon profile as a
+            // polyline).
             for (index, b) in v.broken_out.iter().enumerate() {
                 let pick = picks.id(PickTarget::BrokenOut { view: v.id, index });
                 let outline = views::broken_out_outline(b);
@@ -1951,7 +2056,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 if geo.broken_out_lost.contains(&index) {
                     g.colors.push(super::sheet::ColorSpan { lines: cad_mark.0..g.lines.len(), texts: 0..0, fills: 0..0, rgb: [0xdd, 0x52, 0x28] });
                 }
-                g.cad_since(cad_mark, CadLayer::SectionJogLines);
+                g.cad_since(cad_mark, CadLayer::Visible);
+            }
+            if !v.broken_out.is_empty() {
+                broken_out_jog_lines(&mut g, &pl, v, hatches_from);
             }
             // Detail boundary ("Show detail view profile"; none with "Clip
             // border to geometry"): solid, 0.15 mm (live's PDF and DXF
