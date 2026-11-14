@@ -449,6 +449,12 @@ fn setbacks(f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> FResult<(f64, 
 /// The section face at `p` (2D region between the corner, the tangent points
 /// and the curve) and its three edges (corner → T1, curve, T2 → corner).
 fn section_face(p: DVec3, f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> FResult<(Shape, [Shape; 3], bool)> {
+    let (wire, edges, convex) = section_wire(p, f, spec, first_is_side1)?;
+    Ok((k::make_face_from_wire(&wire, true)?, edges, convex))
+}
+
+/// [`section_face`]'s outline only (a loft's sections: ThruSections reads their wires).
+fn section_wire(p: DVec3, f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> FResult<(Shape, [Shape; 3], bool)> {
     let convex = f.u[0].dot(f.m[1]) > 0.0;
     let cos_phi = f.m[0].dot(f.m[1]).clamp(-1.0, 1.0);
     let phi = cos_phi.acos();
@@ -480,8 +486,7 @@ fn section_face(p: DVec3, f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> 
         let c = t + w;
         let arc = k::make_arc_3pts(t, c + ((t - c) + (cliff - c)).normalize() * r, cliff)?;
         let edges = if j == 0 { [k::make_line(p, t)?, arc, k::make_line(cliff, p)?] } else { [k::make_line(p, cliff)?, arc, k::make_line(t, p)?] };
-        let wire = k::make_wire(&edges)?;
-        return Ok((k::make_face_from_wire(&wire, true)?, edges, convex));
+        return Ok((k::make_wire(&edges)?, edges, convex));
     }
     let curve = match spec.section {
         Section::Circular if (s1 - s2).abs() <= 1e-12 * s1.max(s2) => {
@@ -497,9 +502,7 @@ fn section_face(p: DVec3, f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> 
     // (A chamfer as sections: its corner out in the air, so the tool's sides needn't lie on free-form faces.)
     let p = if spec.reference.is_some() && convex { p - (f.m[0] + f.m[1]).normalize() * s1.max(s2) } else { p };
     let edges = [k::make_line(p, t1)?, curve, k::make_line(t2, p)?];
-    let wire = k::make_wire(&edges)?;
-    let face = k::make_face_from_wire(&wire, true)?;
-    Ok((face, edges, convex))
+    Ok((k::make_wire(&edges)?, edges, convex))
 }
 
 /// Onshape's curvature-continuous blend section (live G11, exact): a quintic
@@ -905,6 +908,8 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
         }
         let closed = whole && pieces.len() == 1;
         let last_piece = pieces.len() - 1;
+        // A round's sections as wires (its bare loft reads only those); a chamfer's as faces (its loft's history).
+        let section = if spec.reference.is_some() { section_face } else { section_wire };
         let mut jobs = Vec::new();
         for (pi, &(plo, phi, ci)) in pieces.iter().enumerate() {
             // (A chamfer as sections: a ruled face, fewer sections; its cut took most of its time.)
@@ -927,7 +932,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     true => held_spec(spec, p, tangent, &fr, scale)?,
                     false => spec.clone(),
                 };
-                let (face, e3, cv) = section_face(p, &fr, &here, side1_first)?;
+                let (face, e3, cv) = section(p, &fr, &here, side1_first)?;
                 convex = cv;
                 // (Its corner: the edge's point, or out in the air for a chamfer as sections.)
                 let corner = e3[0].edge_info()?.start;
@@ -941,7 +946,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     None
                 };
                 let past = match run_on {
-                    Some(v) => Some((section_face(p + v, &fr, &here, side1_first)?.0, corner + v)),
+                    Some(v) => Some((section(p + v, &fr, &here, side1_first)?.0, corner + v)),
                     None => None,
                 };
                 if k == 0 && let Some((f, q)) = &past {
@@ -985,6 +990,12 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             };
             let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
             let supports: Vec<&Shape> = chain.iter().flat_map(|c| ef.get(c.index).cloned().unwrap_or_default()).map(|f| &faces[f as usize]).collect();
+            // (Only the end sections can be a cap.)
+            let ends = [secs.first(), secs.last()]
+                .into_iter()
+                .flatten()
+                .map(|s| if s.shape_type() == ShapeType::Face { Ok(s.clone()) } else { k::make_face_from_wire(s, true) })
+                .collect::<Result<Vec<_>, _>>()?;
             // (A point on each face found once: per section it was ~1,000 projections in c2-variable-fillet-faceblend.)
             let names: Vec<Name> = tool
                 .shape
@@ -993,7 +1004,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                 .map(|f| {
                     let Some(q) = super::helpers_a::point_on_face(f) else { return blend.clone() };
                     let on = |s: &Shape| s.contains_point(q, scale * 1e-6).unwrap_or(false);
-                    if (f.is_planar() && secs.iter().any(on)) || supports.iter().any(|s| on(s)) { generated.clone() } else { blend.clone() }
+                    if (f.is_planar() && ends.iter().any(on)) || supports.iter().any(|s| on(s)) { generated.clone() } else { blend.clone() }
                 })
                 .collect();
             let named = NamedShape::new(tool.shape, names);
