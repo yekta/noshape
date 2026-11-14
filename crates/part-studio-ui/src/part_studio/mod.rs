@@ -4818,8 +4818,8 @@ impl PartStudioView {
                             crate::part_studio_hooks::open_release_candidate(this.doc.clone(), items, w, cx);
                         }
                     }))));
-                if has_revisions && let Some(pn) = part_number.clone() {
-                    m = m.item(item("Revision history", Box::new(move |this, w, cx| crate::part_studio_hooks::open_revision_history(this.doc.clone(), pn.clone(), w, cx))));
+                if has_revisions && noshape_ops::release_settings::managed_workflows() && let Some(pn) = part_number.clone() {
+                    m = m.item(item("Revision history…", Box::new(move |this, w, cx| crate::part_studio_hooks::open_revision_history(this.doc.clone(), pn.clone(), w, cx))));
                 }
                 m = m
                     .separator()

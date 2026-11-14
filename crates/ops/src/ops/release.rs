@@ -15,7 +15,7 @@ pub fn ops() -> Vec<Op> {
             group: "release",
             verb: "create",
             summary: "Release a tab or parts: part numbers, revisions, a version named after the release",
-            description: "Release… (a tab's menu, or a part's): the Release candidate dialog with its items, then Release. Items as the dialog lists them: a Part Studio's parts (or `parts` only), an Assembly with its Bill of Materials, a Drawing with what its views show, a Variable Studio or file itself; `include_drawings` adds the drawings showing them. Each item's part number is its own (Properties) unless `part_numbers` gives one ({item name or part id: number}); its revision is the next of the revision scheme (A, B, …; `revisions` overrides, {item name or part id: revision}). The dialog's checks refuse it with their messages (a part number missing, a revision too low, Company settings' release conditions). Releasing writes the part numbers onto the parts (\"Release <name>\"), records the release at a new version named `name`; with Company settings' automatic obsoletion on, a new revision obsoletes the part number's previous one.",
+            description: "Release… (a tab's menu, or a part's; only with Company settings' managed workflows on, see company_release_settings): the Release candidate dialog with its items, then Release. Items as the dialog lists them: a Part Studio's parts (or `parts` only), an Assembly with its Bill of Materials, a Drawing with what its views show, a Variable Studio or file itself; `include_drawings` adds the drawings showing them. Each item's part number is its own (Properties) unless `part_numbers` gives one ({item name or part id: number}); its revision is the next of the revision scheme (A, B, …; `revisions` overrides, {item name or part id: revision}). The dialog's checks refuse it with their messages (a part number missing, a revision too low, Company settings' release conditions). Releasing writes the part numbers onto the parts (\"Release <name>\"), records the release at a new version named `name`; with Company settings' automatic obsoletion on, a new revision obsoletes the part number's previous one.",
             fields: vec![
                 doc_field(),
                 opt("tab", s(), "The tab to release (name or id). Required unless `from_draft` gives the items."),
@@ -161,6 +161,7 @@ fn instance_items(od: &crate::OpenDoc, tab: noshape_model::document::TabId, key:
 }
 
 fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    workflows_on()?;
     let od = ctx.doc(a.opt_str("doc")?)?;
     let provider = crate::derived::DocStudios::new(od.doc().clone(), od.studio_cache.clone());
     let draft = match a.opt_str("from_draft")? {
@@ -373,7 +374,16 @@ fn draft_delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(json!({ "deleted": name }).into())
 }
 
+/// Release… exists only with Company settings' managed workflows on (live2 2026-11-14).
+fn workflows_on() -> Result<(), OpError> {
+    if crate::release_settings::managed_workflows() {
+        return Ok(());
+    }
+    Err(OpError::invalid("Release management is off: turn on Enable managed workflows in Company settings › Release management (company_release_settings)"))
+}
+
 fn obsolete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    workflows_on()?;
     let od = ctx.doc(a.opt_str("doc")?)?;
     let pn = a.str("part_number")?;
     let log = rel::release_log(&od.session);

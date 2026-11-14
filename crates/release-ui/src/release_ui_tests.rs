@@ -5,7 +5,6 @@ use crate::doc_model::DocModel;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, IntoElement, ParentElement as _, Point, Render, Styled as _, TestAppContext, Window, WindowBounds, WindowOptions, div, px, size};
 use noshape_model::document::TabId;
 use serde_json::json;
-use std::sync::Mutex;
 
 struct Root(Entity<ReleaseDialog>);
 
@@ -15,19 +14,12 @@ impl Render for Root {
     }
 }
 
-/// The tabs `open_tab_window` was asked for.
-static OPENED: Mutex<Vec<TabId>> = Mutex::new(Vec::new());
-
 fn register_hooks() {
     crate::release_hooks::register(crate::release_hooks::Hooks {
         open_document_window: |_, _, _| Ok(()),
         open_version_window: |_, _, _, _| Err(anyhow::anyhow!("no version windows in tests")),
         create_version: |_, _, _| {},
         request_export: |_, _, _, _| {},
-        open_tab_window: |_, tab, _| {
-            OPENED.lock().unwrap().push(tab);
-            Ok(())
-        },
     });
 }
 
@@ -40,7 +32,7 @@ fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
 }
 
 /// A document with a Part Studio of one part, and the Release candidate dialog of its items in `mode`.
-fn dialog(cx: &mut TestAppContext, name: &str, mode: Mode) -> (AnyWindowHandle, Entity<ReleaseDialog>, TabId) {
+fn dialog(cx: &mut TestAppContext, name: &str, mode: Mode, release_name: &str) -> (AnyWindowHandle, Entity<ReleaseDialog>, TabId) {
     cx.update(gpui_kit::init);
     register_hooks();
     let dir = std::env::temp_dir().join(format!("noshape-release-ui-{name}-{}", std::process::id()));
@@ -66,7 +58,7 @@ fn dialog(cx: &mut TestAppContext, name: &str, mode: Mode) -> (AnyWindowHandle, 
         let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
         let mut view = None;
         let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
-            let v = cx.new(|cx| ReleaseDialog::new(doc, mode, items, String::new(), String::new(), window, cx));
+            let v = cx.new(|cx| ReleaseDialog::new(doc, mode, items, release_name.to_string(), String::new(), window, cx));
             view = Some(v.clone());
             cx.new(|_| Root(v))
         })
@@ -77,27 +69,30 @@ fn dialog(cx: &mut TestAppContext, name: &str, mode: Mode) -> (AnyWindowHandle, 
     (window, view, tab)
 }
 
-/// Help's images (drawing-release-dialog-02, reviewreleasedialog): "Create Release candidate", then "Review Release"
-/// alone once applied; the obsoletion dialog draws too.
+/// Live (release.json): "Create Release candidate", then "Review Release: <name>" once applied (and for a submitted
+/// or released one); the obsoletion dialog's own title.
 #[gpui::test]
-fn the_release_dialogs_titles_are_helps(cx: &mut TestAppContext) {
-    let (window, view, _) = dialog(cx, "titles", Mode::Release);
-    cx.update(|cx| assert_eq!(view.read(cx).title(), "Create Release candidate"));
+fn the_release_dialogs_titles_are_lives(cx: &mut TestAppContext) {
+    let (window, view, _) = dialog(cx, "titles", Mode::Release, "R1");
+    cx.update(|cx| assert_eq!(view.read(cx).title(cx), "Create Release candidate"));
     cx.update(|cx| view.update(cx, |v, _| v.applied = true));
     draw(cx, window);
-    cx.update(|cx| assert_eq!(view.read(cx).title(), "Review Release"));
-    let (_, obs, _) = dialog(cx, "titles-obs", Mode::Obsolete);
-    cx.update(|cx| assert_eq!(obs.read(cx).title(), "Create Obsolete candidate"));
+    cx.update(|cx| assert_eq!(view.read(cx).title(cx), "Review Release: R1"));
+    let (_, review, _) = dialog(cx, "titles-review", Mode::Review, "R2");
+    cx.update(|cx| assert_eq!(review.read(cx).title(cx), "Review Release: R2"));
+    let (_, obs, _) = dialog(cx, "titles-obs", Mode::Obsolete, "Obsolete PN A");
+    cx.update(|cx| assert_eq!(obs.read(cx).title(cx), "Create Obsolete candidate"));
 }
 
-/// Help (typical release workflow): an item's name opens its tab elsewhere (another browser tab; here a window) and
-/// the candidate stays as typed.
+/// The part is listed with the next revision; a click on its name (live: nothing happens) leaves the candidate as it
+/// is.
 #[gpui::test]
-fn an_items_name_opens_its_tab_elsewhere(cx: &mut TestAppContext) {
-    let (window, view, tab) = dialog(cx, "open-item", Mode::Release);
-    cx.update(|cx| assert!(!view.read(cx).rows.is_empty(), "the part is listed"));
-    cx.update(|cx| view.update(cx, |v, cx| v.open_item(0, cx)));
-    draw(cx, window);
-    assert!(OPENED.lock().unwrap().contains(&tab), "its Part Studio opened");
-    cx.update(|cx| assert_eq!(view.read(cx).title(), "Create Release candidate", "the dialog stays"));
+fn the_parts_row_lists_revision_a(cx: &mut TestAppContext) {
+    let (_, view, tab) = dialog(cx, "rows", Mode::Release, "");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert_eq!(v.rows.len(), 1, "the part");
+        assert_eq!(v.rows[0].item.tab, tab);
+        assert_eq!(v.rows[0].revision.read(cx).value().to_string(), "A");
+    });
 }

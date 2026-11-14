@@ -390,7 +390,7 @@ fn rows() -> Vec<Row> {
             l.click(cx, "feature:Extrude 1", NONE);
             l.click(cx, "part:Part 2", NONE);
             l.right_click(cx, "part:Part 2");
-            expect(l.menu(cx), names(&["Rename", "Properties…", "Assign material…", "Edit appearance…", "Copy here…", "Create Drawing of Part 2…", "Export…", "Release…", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Zoom to selection", "Delete…"]), "rows")
+            expect(l.menu(cx), names(&["Rename", "Properties…", "Assign material…", "Edit appearance…", "Copy here…", "Create Drawing of Part 2…", "Export…", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Zoom to selection", "Delete…"]), "rows")
         } },
         Row { id: "menu / a feature and a default plane, on the feature", live: "Size to Part Studio | Hide other planes | Hide all planes | Section view… | Clear selection | Add appearance to feature… (no Delete; live's document had no Plane feature: its plane is Top)", gap: false, check: |l, cx| {
             l.click(cx, "feature:Extrude 1", NONE);
@@ -398,15 +398,15 @@ fn rows() -> Vec<Row> {
             l.right_click(cx, "feature:Extrude 1");
             expect(l.menu(cx), names(&["Size to Part Studio", "Hide other planes", "Hide all planes", "Section view…", "Clear selection", "Add appearance to feature…"]), "rows")
         } },
-        Row { id: "menu / one part", live: "Rename | Properties… | Assign material… | Edit appearance… | Copy here… | Copy Part 1 | Create Drawing of Part 1… | Export… | Release… | Hide | Hide other parts | Hide all parts | Isolate… | Make transparent… | Zoom to selection | Delete…", gap: false, check: |l, cx| {
+        Row { id: "menu / one part", live: "Rename | Properties… | Assign material… | Edit appearance… | Copy here… | Copy Part 1 | Create Drawing of Part 1… | Export… | Where used… | Hide | Hide other parts | Hide all parts | Isolate… | Make transparent… | Zoom to selection | Delete…", gap: false, check: |l, cx| {
             l.right_click(cx, "part:Part 1");
-            expect(l.menu(cx), names(&["Rename", "Properties…", "Assign material…", "Edit appearance…", "Copy here…", "Copy Part 1", "Create Drawing of Part 1…", "Export…", "Where used…", "Release…", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Zoom to selection", "Delete…"]), "rows")
+            expect(l.menu(cx), names(&["Rename", "Properties…", "Assign material…", "Edit appearance…", "Copy here…", "Copy Part 1", "Create Drawing of Part 1…", "Export…", "Where used…", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Zoom to selection", "Delete…"]), "rows")
         } },
-        Row { id: "menu / two parts", live: "Properties… | Assign material for 2 parts… | Edit appearance for 2 parts… | Check interference for 2 parts… | Boolean | Copy 2 items | Hide | Hide other parts | Hide all parts | Isolate… | Make transparent… | Export… | Release… | Delete", gap: false, check: |l, cx| {
+        Row { id: "menu / two parts", live: "Properties… | Assign material for 2 parts… | Edit appearance for 2 parts… | Check interference for 2 parts… | Boolean | Copy 2 items | Hide | Hide other parts | Hide all parts | Isolate… | Make transparent… | Export… | Delete", gap: false, check: |l, cx| {
             l.click(cx, "part:Part 1", NONE);
             l.click(cx, "part:Part 2", NONE);
             l.right_click(cx, "part:Part 2");
-            expect(l.menu(cx), names(&["Properties…", "Assign material for 2 parts…", "Edit appearance for 2 parts…", "Check interference for 2 parts…", "Boolean", "Copy 2 items", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Export…", "Release…", "Delete"]), "rows")
+            expect(l.menu(cx), names(&["Properties…", "Assign material for 2 parts…", "Edit appearance for 2 parts…", "Check interference for 2 parts…", "Boolean", "Copy 2 items", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Export…", "Delete"]), "rows")
         } },
         Row { id: "menu / the rollback bar", live: "no menu", gap: false, check: |l, cx| {
             let at = l.bounds(cx, "rollback").ok_or("no rollback bar")?.center();

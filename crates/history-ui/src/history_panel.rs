@@ -1448,13 +1448,10 @@ impl Render for HistoryPanel {
                 // to create workspace…, Compare, Restore to <ws>…, Properties…,
                 // Releases ▸, Publish FeatureScript… (Copy link is web-only).
                 let (dr0, row_packages) = (d.clone(), row_packages.clone());
-                // A version row always lists Releases (live ver-version-menu); with none, its submenu says so.
-                let releases = move |m: crate::os_menu::OsMenu, version_row: bool, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>| {
-                    if !noshape_ops::release_settings::managed_workflows() {
+                let releases = move |m: crate::os_menu::OsMenu, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>| {
+                    // Live (release.json): only a version with release candidates lists Releases, with workflows on.
+                    if !noshape_ops::release_settings::managed_workflows() || row_packages.is_empty() {
                         return m;
-                    }
-                    if row_packages.is_empty() {
-                        return if version_row { m.submenu("Releases", window, cx, |sm, _, _| sm.item(crate::os_menu::OsMenuItem::new("No releases").disabled(true))) } else { m };
                     }
                     let (pk, dr) = (row_packages.clone(), dr0.clone());
                     m.submenu("Releases", window, cx, move |mut sm, _, _| {
@@ -1548,9 +1545,9 @@ impl Render for HistoryPanel {
                         match version_id {
                             Some(id) => {
                                 let m = m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d5.clone(), crate::version_properties::Item::Version(id), window, cx)));
-                                releases(m, true, window, cx).item(crate::os_menu::OsMenuItem::new("Publish FeatureScript…").on_click(move |_, window, cx| open_publish_dialog(d6.clone(), id, window, cx)))
+                                releases(m, window, cx).item(crate::os_menu::OsMenuItem::new("Publish FeatureScript…").on_click(move |_, window, cx| open_publish_dialog(d6.clone(), id, window, cx)))
                             }
-                            None => releases(m, false, window, cx),
+                            None => releases(m, window, cx),
                         }
                     }
                 }

@@ -1982,8 +1982,8 @@ impl Workspace {
                                 let items = crate::release_dialog::tab_items(d1.read(cx), id);
                                 crate::release_dialog::open_release_candidate(d1.clone(), items, w, cx)
                             })));
-                            if has_revisions && matches!(kind, "assembly" | "drawing" | "variables") {
-                                menu.item(I::new("Revision history").on_click(move |_, w, cx| crate::release_dialog::open_revision_history(d2.clone(), pn.clone(), w, cx)))
+                            if has_revisions && matches!(kind, "assembly" | "drawing" | "variables") && noshape_ops::release_settings::managed_workflows() {
+                                menu.item(I::new("Revision history…").on_click(move |_, w, cx| crate::release_dialog::open_revision_history(d2.clone(), pn.clone(), w, cx)))
                             } else {
                                 menu
                             }

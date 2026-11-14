@@ -22,5 +22,10 @@
       "until": "ms",
       "ms": 2500
     }
-  ]
+  ],
+  "config_files": {
+    "release_settings.json": {
+      "managed_workflows": true
+    }
+  }
 }

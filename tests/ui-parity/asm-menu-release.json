@@ -21,5 +21,10 @@
    "do": "key",
    "key": "Escape"
   }
- ]
+ ],
+ "config_files": {
+  "release_settings.json": {
+   "managed_workflows": true
+  }
+ }
 }

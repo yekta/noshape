@@ -242,7 +242,7 @@ fn the_instance_and_top_row_menus_are_lives(cx: &mut TestAppContext) {
                     "Hide", "Hide other instances", "Hide all instances", "Show center of mass", "Isolate…", "Make transparent…", "Suppress", "Dynamic suppression ▸", "Fix", "Use best available tessellation", sep,
                     "Edit in context", "Add mate connector to instance origin…", "Replace instances…", "Switch to Part Studio 1", sep,
                     "Copy Part 1 <1>", sep,
-                    "Move to new subassembly", "Change to version…", "Export…", "Release…", sep,
+                    "Move to new subassembly", "Change to version…", "Export…", sep,
                     "Zoom to selection", sep,
                     "Create Drawing of Part 1…", sep,
                     "Add selection to folder…", "Create empty subassembly", sep,
@@ -270,7 +270,7 @@ fn the_instance_and_top_row_menus_are_lives(cx: &mut TestAppContext) {
                     "Properties…", "Show instance list properties", sep,
                     "Rename", "Show center of mass", "Check interference…", sep,
                     "Create Drawing of Assembly 1…", "Add exploded view…", sep,
-                    "Export…", "Release…", sep,
+                    "Export…", sep,
                     "Expand all", "Collapse all",
                 ]
             );
@@ -292,7 +292,7 @@ fn the_pattern_and_copy_row_menus_are_lives(cx: &mut TestAppContext) {
                 labels(&v.pattern_menu(pat, cx)),
                 [
                     "Rename", "Edit…", "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Suppress", "Dynamic suppression ▸", sep,
-                    "Move to new subassembly", "Release…", sep,
+                    "Move to new subassembly", sep,
                     "Zoom to selection", sep,
                     "Add selection to folder…", "Expand ▸", "Collapse ▸", sep,
                     "Delete",
@@ -307,7 +307,7 @@ fn the_pattern_and_copy_row_menus_are_lives(cx: &mut TestAppContext) {
                     "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Suppress", "Fix", "Use best available tessellation", sep,
                     "Add mate connector to instance origin…", "Switch to Part Studio 1", sep,
                     "Copy Part 2 <2>", sep,
-                    "Export…", "Release…", sep,
+                    "Export…", sep,
                     "Zoom to selection", sep,
                     "Create Drawing of Part 2…",
                 ]
@@ -369,7 +369,7 @@ fn a_nested_rows_menu_is_lives(cx: &mut TestAppContext) {
                     "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Fix", "Use best available tessellation", sep,
                     "Edit in context", "Add mate connector to instance origin…", "Switch to Part Studio 1", sep,
                     "Copy Part 1 <1>", sep,
-                    "Move to new subassembly", "Export…", "Release…", sep,
+                    "Move to new subassembly", "Export…", sep,
                     "Zoom to selection", sep,
                     "Create Drawing of Part 1…", sep,
                     "Create empty subassembly",
@@ -956,7 +956,8 @@ fn another_documents_part_pins_its_reference(cx: &mut TestAppContext) {
     assert!(at("Update linked document…") < at("Open linked document") && at("Open linked document") < at("Pin reference"), "{menu:?}");
     assert!(menu.iter().any(|l| l == "Create Drawing of Part 1…"), "{menu:?}");
     assert!(at("Edit in context") < at("Add mate connector to instance origin…"), "{menu:?}");
-    assert!(at("Export…") < at("Release…"), "{menu:?}");
+    at("Export…");
+    assert!(!menu.iter().any(|l| l == "Release…"), "no Release… with a new company's managed workflows off: {menu:?}");
     cx.update(|cx| {
         view.update(cx, |v, cx| {
             v.edit("Pin reference", cx, |a| noshape_ops::assembly::set_reference_pinned(a, p1, true));
@@ -1051,7 +1052,7 @@ fn two_selected_instances_have_lives_list_menu(cx: &mut TestAppContext) {
             let live = [
                 "Hide", "Hide other instances", "Hide all instances", "Show center of mass", "Isolate…", "Make transparent…", "Suppress", "Dynamic suppression ▸", "Fix",
                 "Use best available tessellation", "Check interference…", "Replace instances…", "Copy 2 items", "Move to new subassembly", "Change to version…", "Export…",
-                "Release…", "Zoom to selection", "Add selection to folder…", "Create empty subassembly", "Clear selection", "Delete",
+                "Zoom to selection", "Add selection to folder…", "Create empty subassembly", "Clear selection", "Delete",
             ];
             assert_eq!(got, live);
         })
@@ -1106,7 +1107,7 @@ fn instances_with_a_mate_selected_have_lives_reduced_menu(cx: &mut TestAppContex
             let got: Vec<String> = labels(&v.instance_menu(p1, false, cx)).into_iter().filter(|l| l != "—").collect();
             let live = [
                 "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Use best available tessellation", "Check interference…",
-                "Show mates", "Hide mates", "Replace instances…", "Move to new subassembly", "Change to version…", "Release…", "Zoom to selection",
+                "Show mates", "Hide mates", "Replace instances…", "Move to new subassembly", "Change to version…", "Zoom to selection",
                 "Create empty subassembly", "Clear selection",
             ];
             assert_eq!(got, live);

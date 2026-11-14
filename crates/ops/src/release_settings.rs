@@ -83,8 +83,8 @@ pub struct ReleaseSettings {
     pub custom_schemes: Vec<CustomScheme>,
     #[serde(default = "default_suffix")]
     pub unreleased_suffix: String,
-    /// Workflows › Enable managed workflows.
-    #[serde(default = "yes")]
+    /// Workflows › Enable managed workflows (off in a new company: live2 2026-11-14, a fresh Professional company).
+    #[serde(default)]
     pub managed_workflows: bool,
     /// Access, as [`ACCESS`] (help: the first is checked by default).
     #[serde(default = "default_access")]
@@ -100,8 +100,8 @@ pub struct ReleaseSettings {
     pub hide_watermark_unmanaged: bool,
     #[serde(default)]
     pub watermarks: Watermarks,
-    /// Release conditions, as [`CONDITIONS`].
-    #[serde(default)]
+    /// Release conditions, as [`CONDITIONS`] (live's default: only "Prevent if a Drawing has a pending update").
+    #[serde(default = "default_conditions")]
     pub conditions: [bool; 8],
     /// Create Release candidate dialog.
     #[serde(default)]
@@ -110,9 +110,11 @@ pub struct ReleaseSettings {
     pub no_creator_approver: bool,
     #[serde(default)]
     pub require_all_approvers: bool,
-    #[serde(default)]
-    pub require_note: bool,
+    /// On in a new company (live2 release.json).
     #[serde(default = "yes")]
+    pub require_note: bool,
+    /// Off in a new company (live2 release.json).
+    #[serde(default)]
     pub allow_other_documents: bool,
     /// "Enter display names for Release & Obsoletion management properties"
     /// and the names, as [`DISPLAY_NAME_FIELDS`].
@@ -130,6 +132,10 @@ pub struct ReleaseSettings {
 
 fn yes() -> bool {
     true
+}
+
+fn default_conditions() -> [bool; 8] {
+    [false, false, false, false, true, false, false, false]
 }
 
 fn default_access() -> [bool; 3] {
@@ -150,18 +156,18 @@ impl Default for ReleaseSettings {
             scheme: Default::default(),
             custom_schemes: Vec::new(),
             unreleased_suffix: default_suffix(),
-            managed_workflows: true,
+            managed_workflows: false,
             access: default_access(),
             require_new_revision: false,
             show_watermark: false,
             hide_watermark_unmanaged: false,
             watermarks: Watermarks::default(),
-            conditions: [false; 8],
+            conditions: default_conditions(),
             require_approver: false,
             no_creator_approver: false,
             require_all_approvers: false,
-            require_note: false,
-            allow_other_documents: true,
+            require_note: true,
+            allow_other_documents: false,
             custom_display_names: false,
             display_names: default_display_names(),
             auto_obsolete: false,
@@ -232,7 +238,10 @@ mod tests {
     fn old_settings_files_keep_their_values_and_get_the_defaults() {
         let s: ReleaseSettings = serde_json::from_str(r#"{"scheme":"Alphabetical","unreleased_suffix":"-"}"#).unwrap();
         assert_eq!(s.unreleased_suffix, "-");
-        assert!(s.managed_workflows && s.allow_other_documents && !s.require_note);
+        // A new company's (live2 release.json): workflows off, a note required, no items from other documents, only
+        // the drawing's pending update a release condition.
+        assert!(!s.managed_workflows && !s.allow_other_documents && s.require_note);
+        assert_eq!(s.conditions, [false, false, false, false, true, false, false, false]);
         assert_eq!(s.access, [true, false, false], "help: only the first Access box is checked by default");
         assert_eq!(ReleaseSettings::default().access, s.access);
         assert_eq!(s.watermarks.get(0), "In progress");

@@ -5374,6 +5374,7 @@ fn assembly_inserts_another_documents_assembly_at_a_version() {
 #[test]
 fn a_linked_parts_properties_save_into_its_version() {
     let mut ctx = Ctx::new();
+    call(&mut ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } }));
     two_part_assembly(&mut ctx, "linked-props-lib.noshape");
     let lib = std::env::temp_dir().join(format!("noshape-ops-e2e-{}", std::process::id())).join("linked-props-lib.noshape");
     call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
@@ -5393,7 +5394,7 @@ fn a_linked_parts_properties_save_into_its_version() {
     let r = call(&mut ctx, "assembly_linked_part_properties", json!({ "instance": q["instance"] }));
     assert_eq!((r["properties"]["part_number"].as_str(), r["properties"]["vendor"].as_str()), (Some("Q2464"), Some("Acme")), "{r}");
     // Release… on it (live 2464, as a paid plan has it): the part at V1, linked to that version, its number there.
-    let rel = call(&mut ctx, "release_create", json!({ "tab": "Assembly 1", "instance": p["instance"], "name": "R1" }));
+    let rel = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Assembly 1", "instance": p["instance"], "name": "R1" }));
     assert_eq!(rel["items"].as_array().map(Vec::len), Some(1), "{rel}");
     assert_eq!((rel["items"][0]["name"].as_str(), rel["items"][0]["part_number"].as_str(), rel["items"][0]["linked"]["version"].as_str()), (Some("Part 2"), Some("Q2464"), Some("V1")), "{rel}");
     // The source's workspace keeps its own (none).
@@ -7045,8 +7046,10 @@ fn ui_list_variable_studio_display() {
 #[test]
 fn release_parts_and_revision_history() {
     let mut ctx = Ctx::new();
+    // Release management shows with Company settings' managed workflows on (a new company has them off).
+    call(&mut ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } }));
     block_with_hole(&mut ctx, "release.noshape");
-    let e = try_call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1" })).unwrap_err();
+    let e = try_call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R1" })).unwrap_err();
     assert!(e.message.contains("needs attention"), "no part number: {e:?}");
     let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1", "notes": "first", "part_numbers": { "Part 1": "PRT-0001" } }));
     assert_eq!(r["items"][0]["revision"], "A", "{r}");
@@ -7056,9 +7059,9 @@ fn release_parts_and_revision_history() {
     let h = call(&mut ctx, "history_list", json!({ "limit": 3 }));
     assert!(h["versions"].as_array().unwrap().iter().any(|v| v["name"] == "R1"), "{h}");
     // The part number stays; the next release is revision B.
-    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R2" }));
+    let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R2" }));
     assert_eq!(r["items"][0]["revision"], "B", "{r}");
-    let e = try_call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R3", "revisions": { "Part 1": "A" } })).unwrap_err();
+    let e = try_call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R3", "revisions": { "Part 1": "A" } })).unwrap_err();
     assert!(e.message.contains("Part 1"), "a revision lower than the released B: {e:?}");
     let rh = call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0001" }));
     let revs = rh["revisions"].as_array().unwrap();
@@ -7091,12 +7094,11 @@ fn company_release_settings_and_numbering_schemes() {
     let rejected = before["watermarks"]["rejected"].clone();
     let mut marks = before["watermarks"].clone();
     marks["rejected"] = json!("REJECTED (e2e)");
-    let after = call(&mut ctx, "company_release_settings", json!({ "set": { "watermarks": marks } }));
+    let after = call(&mut ctx, "company_release_settings", json!({ "set": { "watermarks": marks, "managed_workflows": true } }));
     assert_eq!(after["watermarks"]["rejected"], "REJECTED (e2e)", "{after}");
-    assert_eq!(call(&mut ctx, "company_release_settings", json!({}))["watermarks"]["rejected"], "REJECTED (e2e)");
     let mut back = after["watermarks"].clone();
     back["rejected"] = rejected;
-    call(&mut ctx, "company_release_settings", json!({ "set": { "watermarks": back } }));
+    call(&mut ctx, "company_release_settings", json!({ "set": { "watermarks": back, "managed_workflows": true } }));
     let e = try_call(&mut ctx, "company_release_settings", json!({ "set": { "no_such_setting": true } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("set"));
     assert!(e.message.contains("no_such_setting"), "{e:?}");
@@ -7114,6 +7116,8 @@ fn company_release_settings_and_numbering_schemes() {
 #[test]
 fn release_drafts_revert_and_generate() {
     let mut ctx = Ctx::new();
+    // Release management shows with Company settings' managed workflows on (a new company has them off).
+    call(&mut ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } }));
     block_with_hole(&mut ctx, "release-drafts.noshape");
     // Saved without a part number: a draft has no checks but its name.
     let d = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "D1", "notes": "draft", "draft": true }));
@@ -7134,9 +7138,9 @@ fn release_drafts_revert_and_generate() {
     call(&mut ctx, "release_draft_delete", json!({ "name": "R2" }));
     assert!(call(&mut ctx, "release_drafts", json!({}))["drafts"].as_array().unwrap().is_empty());
     // Nothing named: `tab` or `from_draft` is needed; generating needs a sequential numbering scheme.
-    let e = try_call(&mut ctx, "release_create", json!({ "name": "R3" })).unwrap_err();
+    let e = try_call(&mut ctx, "release_create", json!({ "notes": "e2e", "name": "R3" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("tab"));
-    let e = try_call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R3", "generate_part_numbers": true, "revert": [] })).err();
+    let e = try_call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R3", "generate_part_numbers": true, "revert": [] })).err();
     assert!(e.as_ref().is_none_or(|e| e.param.as_deref() == Some("generate_part_numbers")), "{e:?}");
 }
 
@@ -7146,11 +7150,13 @@ fn release_drafts_revert_and_generate() {
 #[test]
 fn release_submit_approve_and_reject() {
     let mut ctx = Ctx::new();
+    // Release management shows with Company settings' managed workflows on (a new company has them off).
+    call(&mut ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } }));
     block_with_hole(&mut ctx, "release-approve.noshape");
     let me = noshape_store::local_user_name();
-    let e = try_call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1", "part_numbers": { "Part 1": "PRT-0100" }, "approvers": ["Somebody Else"] })).unwrap_err();
+    let e = try_call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R1", "part_numbers": { "Part 1": "PRT-0100" }, "approvers": ["Somebody Else"] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("approvers[0]"), "{e:?}");
-    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1", "part_numbers": { "Part 1": "PRT-0100" }, "approvers": [me], "observers": [me] }));
+    let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R1", "part_numbers": { "Part 1": "PRT-0100" }, "approvers": [me], "observers": [me] }));
     assert_eq!(r["state"], "Pending", "{r}");
     // The candidate's version is made when it is submitted.
     let h = call(&mut ctx, "history_list", json!({ "limit": 3 }));
@@ -7166,7 +7172,7 @@ fn release_submit_approve_and_reject() {
     let rh = call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0100" }));
     assert_eq!(rh["revisions"][0]["revision"], "A", "{rh}");
     // A second candidate, rejected: it stays, Rejected, and can't be approved.
-    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R2", "approvers": [me] }));
+    let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R2", "approvers": [me] }));
     assert_eq!(r["state"], "Pending", "{r}");
     assert_eq!(call(&mut ctx, "release_reject", json!({ "name": "R2" }))["state"], "Rejected");
     let list = call(&mut ctx, "release_drafts", json!({}));
@@ -7182,7 +7188,7 @@ fn release_submit_approve_and_reject() {
     assert_eq!(list["candidates"][0]["comments"][0]["text"], "Wrong hole size.", "{list}");
     assert_eq!(try_call(&mut ctx, "release_discard", json!({ "name": "R2" })).unwrap_err().param.as_deref(), Some("name"));
     // Without approvers, Release releases at once.
-    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R3" }));
+    let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R3" }));
     assert_eq!(r["state"], "Released", "{r}");
 }
 
@@ -7191,6 +7197,8 @@ fn release_submit_approve_and_reject() {
 #[test]
 fn release_leaves_out_a_drawing_made_from_another_workspace() {
     let mut ctx = Ctx::new();
+    // Release management shows with Company settings' managed workflows on (a new company has them off).
+    call(&mut ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } }));
     block_with_hole(&mut ctx, "release-assoc.noshape");
     let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let drawing = d["drawing"].as_str().unwrap().to_string();

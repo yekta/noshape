@@ -208,6 +208,27 @@ CLOUD_ONLY = {"View support tickets", "App Store dev portal", "Sign out", "Add c
               "Import from", "Create task…"}
 # Rows live showed for a while and no longer has (live 2336: the + menu's "Create table" only in its 05:00–06:20
 # recordings, in no document since).
+# After live's last Free-plan take (2026-11-13 19:30; its first Professional reading 2026-11-14 02:13, live2). Free
+# takes list Release management's rows with an Upgrade badge in every menu; a Professional company shows them only
+# with managed workflows on (ours by default off): those rows aren't compared in Free takes.
+LIVE_PROFESSIONAL_FROM = "2026-11-13T19:31:00Z"
+FREE_PLAN_ROWS = {"Release…", "Releases", "Revision history", "Revision history…"}
+
+
+def without_free_plan_rows(state):
+    """`state` with Release management's menu rows dropped (a Free-plan take's and ours)."""
+    lst = (state or {}).get("list")
+    if isinstance(lst, dict) and any(r in FREE_PLAN_ROWS for r in lst.get("rows") or []):
+        rows = lst["rows"]
+        hl = lst.get("highlighted")
+        hl_row = rows[hl] if isinstance(hl, int) and 0 <= hl < len(rows) else None
+        lst["rows"] = [r for r in rows if r not in FREE_PLAN_ROWS]
+        lst["highlighted"] = kept_index(rows, hl, FREE_PLAN_ROWS, lst["rows"], hl_row)
+        if isinstance(lst.get("disabled"), list):
+            kept = [i for i, r in enumerate(rows) if r not in FREE_PLAN_ROWS]
+            lst["disabled"] = [kept.index(i) for i in lst["disabled"] if i in kept]
+    return state
+
 LIVE_TRANSIENT_ROWS = {"Create table"}
 # Rows of live's Professional plan (the research account since 2026-11-14): ours always has them (offline, no plan);
 # older takes, recorded on the free plan, don't.
@@ -692,6 +713,7 @@ def compare(live, ours, whole_document=True):
     # Ours' alerts by whether they first showed at a step live took a toast's lifetime or longer over.
     ours_slow, prev_t = {}, None
     start_name = scenario_start(live.get("scenario")) if isinstance(live.get("scenario"), str) else None
+    free_plan = str(live.get("recorded") or "9") < LIVE_PROFESSIONAL_FROM
     for name, a, b, failed, t, step in pairs:
         if failed:
             if first is None:
@@ -703,6 +725,8 @@ def compare(live, ours, whole_document=True):
         tip_blanked = isinstance(a, dict) and "url" not in a and (step or {}).get("do") != "hover"
         a = insert_panel(runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True))
         b = insert_panel(runner_names(old_workspace_labels(a, reference_manager_as_panel(a, material_as_panel(a, json.loads(json.dumps(b))))), start_name, False))
+        if free_plan:
+            a, b = without_free_plan_rows(a), without_free_plan_rows(b)
         a = unknown_picks(a, b)
         a, b = camera_compared(a), camera_compared(b)
         bl = (b or {}).get("list")

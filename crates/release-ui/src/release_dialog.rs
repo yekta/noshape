@@ -1301,7 +1301,7 @@ impl ReleaseDialog {
 
     /// Submit to the approvers: the candidate's version is made now and it waits, Pending (noshape_ops::release::submit).
     fn submit(&mut self, cx: &mut Context<Self>) -> bool {
-        let pkg = self.package(PackageKind::Release, cx);
+        let pkg = self.package(if self.mode == Mode::Obsolete { PackageKind::Obsoletion } else { PackageKind::Release }, cx);
         if pkg.name.is_empty() || self.approvers.is_empty() || self.issues(cx).iter().any(|v| !v.is_empty()) {
             cx.notify();
             return false;
@@ -1406,14 +1406,12 @@ impl ReleaseDialog {
     }
 
     /// Approvers or Observers (`approvers`): the chosen people with their ×, and a dropdown that offers the local
-    /// user (greyed as an approver when Company settings don't allow the creator as approver).
+    /// user (not as an approver when Company settings don't allow the creator as approver).
     fn people_field(&self, approvers: bool, read_only: bool, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let (label, list) = if approvers { ("Approvers", &self.approvers) } else { ("Observers", &self.observers) };
         let me = noshape_store::local_user_name();
-        let settings = release_settings();
-        let barred = approvers && settings.no_creator_approver;
-        let required = approvers && settings.require_approver && self.mode == Mode::Release;
+        let barred = approvers && release_settings().no_creator_approver;
         let chips = list.iter().map(|n| {
             let n2 = n.clone();
             h_flex()
@@ -1433,7 +1431,8 @@ impl ReleaseDialog {
                 })
                 .into_any_element()
         });
-        let open = self.people_menu == Some(approvers);
+        // Live (rc-creator-not-approver-dropdown): a barred creator isn't offered at all (nothing to pick).
+        let open = self.people_menu == Some(approvers) && !barred;
         let menu = open.then(|| {
             let taken = list.contains(&me);
             let row = div()
@@ -1443,9 +1442,8 @@ impl ReleaseDialog {
                 .py(px(6.))
                 .text_size(px(13.))
                 .child(me.clone())
-                .when(taken || barred, |d| d.text_color(pal.text_muted))
-                .when(barred, |d| d.tooltip(crate::ui::tooltip("Company settings don't allow the creator as an approver")))
-                .when(!taken && !barred, |d| {
+                .when(taken, |d| d.text_color(pal.text_muted))
+                .when(!taken, |d| {
                     let me = me.clone();
                     d.cursor_pointer().hover(|d| d.bg(pal.row_hover)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         let list = if approvers { &mut this.approvers } else { &mut this.observers };
@@ -1460,8 +1458,10 @@ impl ReleaseDialog {
         });
         v_flex()
             .gap(px(4.))
-            // Help drawing-release-dialog-02: "Approvers *" when Company settings require one.
-            .child(h_flex().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(label).when(required, |d| d.child(div().pl(px(3.)).text_color(gpui_kit::rgb(0xbd3039)).child("*"))))
+            // Live (release.json): no asterisk; Approvers' ? reads "Required for action Submit".
+            .child(h_flex().gap(px(4.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(label).when(approvers && !read_only, |d| {
+                d.child(div().id("rel-approvers-help").text_size(px(12.)).text_color(pal.text_muted).child("ⓘ").tooltip(crate::ui::tooltip("Required for action Submit")))
+            }))
             .child(
                 h_flex()
                     .id(SharedString::from(format!("rel-people-{label}")))
@@ -1486,23 +1486,25 @@ impl ReleaseDialog {
             .into_any_element()
     }
 
-    /// Help reviewreleasedialog: "Review Release" alone once applied or submitted (the name stays in its field).
-    fn title(&self) -> &'static str {
+    /// Live (release.json): "Review Release: <name>" once applied, submitted or released.
+    fn title(&self, cx: &App) -> String {
         match self.mode {
-            Mode::Release if self.applied => "Review Release",
-            Mode::Release => "Create Release candidate",
-            Mode::Review => "Review Release",
-            Mode::Obsolete => "Create Obsolete candidate",
+            Mode::Release if !self.applied => "Create Release candidate".into(),
+            Mode::Release | Mode::Review => format!("Review Release: {}", self.name.read(cx).value()),
+            Mode::Obsolete => "Create Obsolete candidate".into(),
         }
     }
 
-    /// Help (typical release workflow): an item's name opens its tab in another browser tab (here a window); the
-    /// dialog stays for Refresh.
-    fn open_item(&self, i: usize, cx: &mut App) {
-        let Some(row) = self.rows.get(i) else { return };
-        if let Err(e) = crate::release_hooks::open_tab_window(self.doc.clone(), row.item.tab, cx) {
-            self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
-        }
+    /// Submit (blue): enabled with approvers listed and the fields filled; without approvers its tooltip says why.
+    fn submit_button(&self, fields_ok: bool, cx: &mut Context<Self>) -> Stateful<Div> {
+        let has = !self.approvers.is_empty();
+        release_button_colored("rel-submit", "Submit", 0x1651b0, 0x8ba8d7, fields_ok && has)
+            .when(!has, |d| d.tooltip(crate::ui::tooltip("Submit requires Approvers")))
+            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                if !this.approvers.is_empty() && this.submit(cx) {
+                    window.close_dialog(cx);
+                }
+            }))
     }
 
     /// Release (or Obsolete): record the package at a new version.
@@ -1848,7 +1850,8 @@ impl Render for ReleaseDialog {
                                 .flex_1()
                                 .min_w_0()
                                 .child(h_flex().gap(px(4.)).child(crate::assets::icon(icon, 16., cx)).child({
-                                    div().id(SharedString::from(format!("rel-name-{i}"))).truncate().cursor_pointer().hover(|d| d.underline()).child(row.item.name.clone()).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.open_item(i, cx)))
+                                    // Live (release.json): a click on the name does nothing (the dialog stays).
+                                    div().id(SharedString::from(format!("rel-name-{i}"))).truncate().child(row.item.name.clone())
                                 })
                                 // Help (add-item-version2): an item linked from another
                                 // version shows the version icon after its name.
@@ -2032,10 +2035,11 @@ impl Render for ReleaseDialog {
                         }))))
                     }),
             )
-            .when(self.mode != Mode::Obsolete, |d| d.child(v_flex().w(px(380.)).ml(px(24.)).gap(px(4.)).child(self.people_field(true, read_only, cx)).child(div().pt(px(6.)).child(self.people_field(false, read_only, cx)))));
+            .child(v_flex().w(px(380.)).ml(px(24.)).gap(px(4.)).child(self.people_field(true, read_only, cx)).child(div().pt(px(6.)).child(self.people_field(false, read_only, cx))));
         // Company settings › Release management › "Require an approver in the Release dialog".
         let approver_missing = self.mode == Mode::Release && settings.require_approver && self.approvers.is_empty();
-        let blocked = attention > 0 || name_empty || (self.mode == Mode::Release && notes_required && notes_empty) || approver_missing;
+        let fields_blocked = attention > 0 || name_empty || (self.mode == Mode::Release && notes_required && notes_empty);
+        let blocked = fields_blocked || approver_missing;
         let status = (blocked && !read_only).then(|| div().text_size(px(12.)).text_color(pal.text_muted).child("A field required by one or more actions is empty ⓘ"));
         let button = |id: &'static str, text: &'static str, bg: u32, enabled: bool| {
             div()
@@ -2127,20 +2131,16 @@ impl Render for ReleaseDialog {
                     .child(button("rel-apply", "Apply", 0x1651b0, !name_empty).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.save_draft(cx);
                     })))
-                    // Help: Submit when approvers are listed (the candidate waits for them), else Release.
-                    .child(if self.approvers.is_empty() {
-                        button("rel-release", "Release", 0x1651b0, !blocked).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                            if this.commit(cx) {
-                                close(window, cx);
-                            }
-                        }))
-                    } else {
-                        button("rel-submit", "Submit", 0x1651b0, !blocked).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                            if this.submit(cx) {
-                                close(window, cx);
-                            }
-                        }))
-                    });
+                    // Live (release.json): Submit (blue) needs approvers; Release (green) is for none. With approvers
+                    // required, an administrator's Release asks to override the company policy.
+                    .child(self.submit_button(!fields_blocked, cx))
+                    .child(release_button("rel-release", "Release", !fields_blocked && self.approvers.is_empty()).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        if this.approvers.is_empty() && release_settings().require_approver {
+                            confirm_override_policy(cx.entity(), window, cx);
+                        } else if this.commit(cx) {
+                            close(window, cx);
+                        }
+                    })));
             }
             // A Rejected candidate: its creator can discard it.
             Mode::Review if self.candidate == Some(noshape_model::release::CandidateState::Rejected) => {
@@ -2168,7 +2168,9 @@ impl Render for ReleaseDialog {
             }
             Mode::Obsolete => {
                 let ok = !name_empty && !self.notes.read(cx).value().trim().is_empty();
-                footer = footer.child(button("rel-obsolete", "Obsolete", 0xbd3039, ok).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                // Live (release.json obsolete-candidate-dialog): Apply, Submit (needs approvers), Obsolete (red), Close.
+                footer = footer.child(self.submit_button(ok, cx));
+                footer = footer.child(button("rel-obsolete", "Obsolete", 0xbd3039, ok && self.approvers.is_empty()).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     if this.commit(cx) {
                         close(window, cx);
                     }
@@ -2177,7 +2179,7 @@ impl Render for ReleaseDialog {
             // Release__cloning_a_release_package: Clone starts a new candidate
             // from the current workspace (not while viewing a version).
             Mode::Review if self.doc.read(cx).session.viewing.is_none() => {
-                footer = footer.child(os::secondary_button("rel-clone", "Clone", cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                footer = footer.child(button("rel-apply", "Apply", 0x1651b0, false)).child(os::secondary_button("rel-clone", "Clone", cx).tooltip("Recreate Release from the current workspace").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     let doc = this.doc.clone();
                     let items = refreshed_items(doc.read(cx), &this.items(cx));
                     let (name, notes) = (this.name.read(cx).value().to_string(), this.notes.read(cx).value().to_string());
@@ -2195,7 +2197,7 @@ impl Render for ReleaseDialog {
             (None, Some(by)) if self.mode == Mode::Review => Some(format!("Approved by {by}")),
             _ => None,
         };
-        let title = self.title();
+        let title = self.title(cx);
         // The ui-parity state's `dialog`: the title, a field per item (its revision and part number), the release name.
         crate::ui_script::note_dialog(|| {
             let mut fields: Vec<serde_json::Value> = self
@@ -2249,6 +2251,43 @@ impl Render for ReleaseDialog {
 }
 
 /// "Discard Release candidate" (Onshape's strings): Discard | Cancel.
+/// A footer button in its colour, `off` its lighter colour while disabled (live: Release rgb(2,133,2) / rgb(162,219,125)).
+fn release_button_colored(id: &'static str, text: &'static str, on: u32, off: u32, enabled: bool) -> Stateful<Div> {
+    div()
+        .id(id)
+        .h(px(34.))
+        .flex()
+        .items_center()
+        .px(px(11.))
+        .rounded(px(3.))
+        .text_size(px(14.))
+        .text_color(gpui_kit::rgb_static(0xffffff))
+        .bg(gpui_kit::rgb(if enabled { on } else { off }))
+        .when(enabled, |d| d.cursor_pointer())
+        .child(text)
+        .map(|d| crate::ui_script::mark(d, move || format!("button:{text}")))
+}
+
+fn release_button(id: &'static str, text: &'static str, enabled: bool) -> Stateful<Div> {
+    release_button_colored(id, text, 0x028502, 0xa2db7d, enabled)
+}
+
+/// Live (release-override-company-policy.png): Release without the approvers Company settings require.
+fn confirm_override_policy(view: Entity<ReleaseDialog>, window: &mut Window, cx: &mut App) {
+    window.open_dialog(cx, move |dialog, _, cx| {
+        let view = view.clone();
+        os::modal(dialog, "Release and override company policy", 600.)
+            .child(os::modal_body().child(div().text_size(px(14.)).text_color(p().text).child("Your company requires approvers for Releases, but as an administrator you can override this setting and release the Release candidate immediately.")))
+            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Release"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .on_ok(move |_, window, cx| {
+                if view.update(cx, |t, cx| t.commit(cx)) {
+                    window.close_all_dialogs(cx);
+                }
+                true
+            })
+    });
+}
+
 fn confirm_discard(view: Entity<ReleaseDialog>, window: &mut Window, cx: &mut App) {
     window.open_dialog(cx, move |dialog, _, cx| {
         let view = view.clone();
@@ -2448,99 +2487,118 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
         let versions = doc.read(cx).session.store.list_versions().unwrap_or_default();
         let doc_name = doc.read(cx).name();
         let mut rows = v_flex().gap(px(8.));
-        for (k, e) in log.revisions(&part_number).into_iter().rev().enumerate() {
+        let revisions = log.revisions(&part_number);
+        for (k, e) in revisions.iter().rev().enumerate() {
             let pkg = log.packages[e.release].clone();
             // The released version (its author is the releasing user).
             let version = pkg.version.as_ref().and_then(|v| versions.iter().find(|x| x.id.to_string() == *v)).cloned();
-            let obsoletion = e.obsoleted_by.map(|i| log.packages[i].clone());
-            let obsolete = e.obsoleted_by.is_some() || e.auto_obsolete;
+            // View obsoletion: the obsoletion, or for a revision a later one obsoleted, that later release (live
+            // revision-history-auto-obsolete).
+            let auto = e.auto_obsolete && e.obsoleted_by.is_none();
+            let later = revisions.iter().position(|x| x.revision == e.revision).and_then(|i| revisions.get(i + 1)).map(|x| log.packages[x.release].clone());
+            let obsoletion = e.obsoleted_by.map(|i| log.packages[i].clone()).or_else(|| later.filter(|_| auto));
             let item = pkg.items.iter().find(|i| i.part_number == part_number).cloned();
             let (d1, d2) = (doc.clone(), doc.clone());
             let pkg2 = pkg.clone();
-            rows = rows.child(
-                h_flex()
-                    .gap_3()
-                    .py(px(6.))
-                    .border_b_1()
-                    .border_color(gpui_kit::rgb(0xeeeeee))
-                    .child(div().text_size(px(14.)).text_color(if obsolete { pal.text_muted } else { gpui_kit::rgb(0x2b9d3a) }).child(if obsolete { "△" } else { "▲" }))
-                    .child(div().w(px(40.)).text_size(px(20.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(e.revision.clone()))
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .text_size(px(12.))
-                            .text_color(pal.text)
-                            .child(h_flex().gap_2().child(div().font_weight(FontWeight::BOLD).child(crate::ui::user_text(pkg.name.clone()))).child(div().text_color(pal.text_muted).child(crate::start_library::format_onshape_time(pkg.created))))
-                            .when_some(version.as_ref().map(|v| v.author.clone()).filter(|a| !a.is_empty()), |d, a| d.child(div().text_color(pal.text_muted).child(format!("User: {a}"))))
-                            .child(div().text_color(pal.text_muted).child(format!("Document: {doc_name}")))
-                            // Help: "Click the version name … to open that version".
-                            .child(h_flex().gap_1().text_color(pal.text_muted).child("Version:").child(
-                                div()
-                                    .id(SharedString::from(format!("rh-ver-{k}")))
-                                    .map(|el| { let n = version.as_ref().map(|v| v.name.clone()).unwrap_or_else(|| pkg.name.clone()); crate::ui_script::mark(el, move || format!("history_row:{n}")) })
-                                    .text_color(pal.accent)
-                                    .cursor_pointer()
-                                    .child(version.as_ref().map(|v| v.name.clone()).unwrap_or_else(|| pkg.name.clone()))
-                                    .on_click({
-                                        let (d, mv) = (doc.clone(), version.as_ref().map(|v| v.microversion));
-                                        move |_, window, cx| {
-                                            window.close_dialog(cx);
-                                            if let Some(mv) = mv {
-                                                d.update(cx, |doc, cx| match doc.session.view_microversion(Some(mv)) {
-                                                    Ok(()) => doc.reloaded(cx),
-                                                    Err(e) => cx.emit(DocEvent::Error(format!("{e:#}"))),
-                                                });
-                                            }
-                                        }
-                                    }),
-                            ))
-                            .child(div().text_color(pal.text_muted).child(format!("Type: {}", item.as_ref().map_or("Part", |i| i.kind.label()))))
-                            .when(obsolete, |d| d.child(div().text_color(pal.text_muted).child(if e.auto_obsolete && e.obsoleted_by.is_none() { "Obsoleted by a later revision" } else { "Obsolete" }))),
-                    )
-                    // Help: "An Export button that exports the entities involved in
-                    // the release": the released version, read-only, then Export.
-                    .child({
-                        let (d, mv, it) = (doc.clone(), version.as_ref().map(|v| v.microversion), item.clone());
-                        os::secondary_button(SharedString::from(format!("rh-export-{k}")), "Export", cx).on_click(move |_, window, cx| {
-                            window.close_dialog(cx);
-                            if let Some(mv) = mv {
-                                d.update(cx, |doc, cx| match doc.session.view_microversion(Some(mv)) {
-                                    Ok(()) => doc.reloaded(cx),
-                                    Err(e) => cx.emit(DocEvent::Error(format!("{e:#}"))),
-                                });
-                            }
-                            if let Some(it) = &it {
-                                crate::release_hooks::request_export(it.tab, it.part.iter().cloned().collect(), window, cx);
-                            }
-                        })
-                    })
-                    .child(os::secondary_button(SharedString::from(format!("rh-view-{k}")), "View release", cx).on_click(move |_, window, cx| {
+            let author = version.as_ref().map(|v| v.author.clone()).filter(|a| !a.is_empty()).unwrap_or_else(noshape_store::local_user_name);
+            let version_name = version.as_ref().map(|v| v.name.clone()).unwrap_or_else(|| pkg.name.clone());
+            let field = |label: &'static str, value: String| h_flex().gap_1().child(div().font_weight(FontWeight::BOLD).child(label)).child(value);
+            // Live: ▲ released (black), the obsolete and auto-obsolete icons.
+            let mark: AnyElement = match (e.obsoleted_by.is_some(), auto) {
+                (true, _) => crate::assets::icon("release-obsolete", 20., cx).into_any_element(),
+                (false, true) => crate::assets::icon("release-auto-obsolete", 20., cx).into_any_element(),
+                _ => div().text_size(px(20.)).text_color(gpui_kit::rgb(0x333333)).child("▲").into_any_element(),
+            };
+            let buttons = v_flex()
+                .gap(px(14.))
+                .items_end()
+                .child(os::secondary_button(SharedString::from(format!("rh-view-{k}")), "View release", cx).on_click(move |_, window, cx| {
+                    window.close_dialog(cx);
+                    open_review(d1.clone(), &pkg2, window, cx);
+                }))
+                // Help: "An Export button that exports the entities involved in the release": the released version,
+                // read-only, then Export.
+                .child({
+                    let (d, mv, it) = (doc.clone(), version.as_ref().map(|v| v.microversion), item.clone());
+                    os::secondary_button(SharedString::from(format!("rh-export-{k}")), "Export", cx).on_click(move |_, window, cx| {
                         window.close_dialog(cx);
-                        open_review(d1.clone(), &pkg2, window, cx);
-                    }))
-                    // Help: once obsoleted, "the Obsolete revision button has
-                    // become a View obsoletion button".
-                    .when_some(obsoletion, |d, o| {
+                        if let Some(mv) = mv {
+                            d.update(cx, |doc, cx| match doc.session.view_microversion(Some(mv)) {
+                                Ok(()) => doc.reloaded(cx),
+                                Err(e) => cx.emit(DocEvent::Error(format!("{e:#}"))),
+                            });
+                        }
+                        if let Some(it) = &it {
+                            crate::release_hooks::request_export(it.tab, it.part.iter().cloned().collect(), window, cx);
+                        }
+                    })
+                })
+                .map(|d| match obsoletion {
+                    Some(o) => {
                         let d3 = doc.clone();
                         d.child(os::secondary_button(SharedString::from(format!("rh-viewobs-{k}")), "View obsoletion", cx).on_click(move |_, window, cx| {
                             window.close_dialog(cx);
                             open_review(d3.clone(), &o, window, cx);
                         }))
-                    })
-                    .when(e.obsoleted_by.is_none(), |d| {
+                    }
+                    None => {
                         let item = item.clone();
-                        d.child(div().id(SharedString::from(format!("rh-obs-{k}"))).px(px(10.)).py(px(4.)).rounded(px(3.)).cursor_pointer().text_size(px(13.)).text_color(gpui_kit::rgb_static(0xffffff)).bg(gpui_kit::rgb(0xbd3039)).child("Obsolete revision").map(|d| crate::ui_script::mark(d, || "button:Obsolete revision".into())).on_click(move |_, window, cx| {
+                        d.child(div().id(SharedString::from(format!("rh-obs-{k}"))).px(px(12.)).py(px(6.)).rounded(px(3.)).cursor_pointer().text_size(px(14.)).text_color(gpui_kit::rgb_static(0xffffff)).bg(gpui_kit::rgb(0xbd3039)).child("Obsolete revision").map(|d| crate::ui_script::mark(d, || "button:Obsolete revision".into())).on_click(move |_, window, cx| {
                             window.close_dialog(cx);
                             if let Some(it) = item.clone() {
                                 let name = format!("Obsolete {} {}", it.part_number, it.revision);
                                 open(d2.clone(), Mode::Obsolete, vec![it], name, String::new(), window, cx);
                             }
                         }))
-                    }),
+                    }
+                });
+            rows = rows.child(
+                h_flex()
+                    .items_start()
+                    .gap_3()
+                    .py(px(10.))
+                    .child(div().w(px(24.)).pt(px(2.)).child(mark))
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .gap(px(6.))
+                            .text_size(px(14.))
+                            .text_color(pal.text)
+                            .child(div().text_size(px(22.)).font_weight(FontWeight::BOLD).child(e.revision.clone()))
+                            .child(div().text_size(px(17.)).child(crate::ui::user_text(author)))
+                            .child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(pkg.name.clone())))
+                            .child(div().child(crate::start_library::format_onshape_time(pkg.created)))
+                            // Live: "Version: <name> ↗" (Open in new tab: a window on that version).
+                            .child(field("Version:", version_name.clone()).child(
+                                div()
+                                    .id(SharedString::from(format!("rh-ver-{k}")))
+                                    .map(|el| { let n = version_name.clone(); crate::ui_script::mark(el, move || format!("history_row:{n}")) })
+                                    .cursor_pointer()
+                                    .child(crate::assets::icon("open-external", 16., cx))
+                                    .tooltip(crate::ui::tooltip("Open in new tab"))
+                                    .on_click({
+                                        let (d, mv) = (doc.clone(), version.as_ref().map(|v| v.microversion));
+                                        move |_, _, cx| {
+                                            let Some(mv) = mv else { return };
+                                            if !cx.has_global::<crate::gpu::GpuGlobal>() {
+                                                return;
+                                            }
+                                            let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
+                                            let path = d.read(cx).session.path.clone();
+                                            if let Err(e) = crate::release_hooks::open_version_window(path, mv, gpu, cx) {
+                                                d.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+                                            }
+                                        }
+                                    }),
+                            ))
+                            .child(field("Document:", doc_name.clone()))
+                            .child(field("Type:", item.as_ref().map_or("Part", |i| i.kind.label()).to_string())),
+                    )
+                    .child(buttons),
             );
         }
         os::modal(dialog, "Revision history", 640.)
-            .title(v_flex().child(div().text_size(px(16.)).font_weight(FontWeight::SEMIBOLD).child("Revision history")).child(div().text_size(px(12.)).text_color(pal.text_muted).child(part_number.clone())))
+            .title(v_flex().gap(px(14.)).child(div().text_size(px(24.)).font_weight(FontWeight::MEDIUM).child("Revision history")).child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(part_number.clone())))
             .child(rows)
             .footer(os::modal_footer().child(os::modal_cancel(os::cancel_button("rh-close", "Close", cx))))
     });

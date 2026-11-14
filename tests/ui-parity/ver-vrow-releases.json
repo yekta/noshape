@@ -23,5 +23,10 @@
    },
    "do": "click"
   }
- ]
+ ],
+ "config_files": {
+  "release_settings.json": {
+   "managed_workflows": true
+  }
+ }
 }
