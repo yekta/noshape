@@ -36,7 +36,7 @@ impl AssemblyView {
         // scene draws the manipulator (asm_scene, world sizes).
         let triad_point = |handle: &str| -> Result<DVec3, String> {
             let f = self.manipulator(cx).ok_or("no triad shown")?;
-            let size = self.triad_size() * 1.6;
+            let size = self.manip_size(cx);
             let axes = [f.x(), f.y(), f.z()];
             let k = |c: &str| ["x", "y", "z"].iter().position(|a| *a == c).ok_or(format!("no triad handle {handle}"));
             if handle == "origin" {
@@ -44,7 +44,8 @@ impl AssemblyView {
             }
             if let Some(c) = handle.strip_prefix("ring-") {
                 let k = k(c)?;
-                return Ok(f.origin + axes[k] * (size * 0.93) + axes[(k + 1) % 3] * (size * 0.12));
+                // (Its centre, on the bar across it: live's runner right-clicks there, 91 px up the axis, asm-triad-rotate-90.)
+                return Ok(f.origin + axes[k] * (size * 0.94));
             }
             Ok(f.origin + axes[k(handle)?] * (size * 0.4))
         };

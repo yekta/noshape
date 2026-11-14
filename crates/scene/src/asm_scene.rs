@@ -602,6 +602,10 @@ pub const SECTION_HEAD_PX: f64 = 60.0;
 pub const SECTION_TIP_PX: f64 = 85.0;
 pub const SECTION_RINGS_PX: f64 = 97.0;
 
+/// The move triad's size in pixels at any zoom (live 3087: the Z arrow's tip 86 px from the origin, its ring's
+/// centre 94 px, r 8 px, the ring's bar ±20 px; the glyph's proportions are of this size).
+pub const MANIP_SIZE_PX: f64 = 100.0;
+
 /// Pickable overlay items beyond the geometry picks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OverlayPick {
@@ -953,9 +957,9 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             // ManipHandle::ring_axis) and a tick across it.
             let rid = overlay_id(built, OverlayPick::Manip(ManipHandle::Ring(k)));
             let rhl = *hovered == Some(ManipHandle::Ring(k));
-            let rc = f.origin + axis * (tip + size * 0.07);
-            stroke(&mut ol, &circle(rc, axis, side, size * 0.07), true, rid, rhl);
-            stroke(&mut ol, &[rc - side * (size * 0.17), rc + side * (size * 0.17)], false, rid, rhl);
+            let rc = f.origin + axis * (tip + size * 0.08);
+            stroke(&mut ol, &circle(rc, axis, side, size * 0.08), true, rid, rhl);
+            stroke(&mut ol, &[rc - side * (size * 0.20), rc + side * (size * 0.20)], false, rid, rhl);
             scene.set_state(rid, 0);
             // Plane handle for the plane normal to axis k: a parallelogram
             // between the other two axes, with a faint pickable fill (not in

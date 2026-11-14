@@ -2446,7 +2446,7 @@ impl AssemblyView {
     /// (the arrows are 1.6 triad sizes long), following the triad.
     fn manip_box_pos(&self, handle: ManipHandle, fallback: DVec3, cx: &App) -> Option<DVec2> {
         let tip = match (self.manipulator(cx), handle) {
-            (Some(f), ManipHandle::Axis(k) | ManipHandle::Ring(k)) => f.origin + [f.x(), f.y(), f.z()][k] * self.triad_size() * 1.6,
+            (Some(f), ManipHandle::Axis(k) | ManipHandle::Ring(k)) => f.origin + [f.x(), f.y(), f.z()][k] * self.manip_size(cx),
             (Some(f), _) => f.origin,
             (None, _) => fallback,
         };

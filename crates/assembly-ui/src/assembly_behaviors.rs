@@ -5411,6 +5411,11 @@ impl AssemblyView {
     }
 
     /// A pixel's world size at a point.
+    /// The move triad's size in world units: a fixed size on screen (live 3087).
+    pub(super) fn manip_size(&self, cx: &App) -> f64 {
+        crate::assembly_scene::MANIP_SIZE_PX * self.wpp_at(DVec3::ZERO, cx)
+    }
+
     fn wpp_at(&self, _p: DVec3, cx: &App) -> f64 {
         let vp = self.viewport.read(cx);
         vp.camera.world_per_pixel(vp.size().y.max(1.0))

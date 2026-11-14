@@ -1385,7 +1385,7 @@ impl AssemblyView {
         {
             h.cursor_mark = Some((p, size * 0.4));
         }
-        h.manipulator = self.manipulator(cx).map(|f| (f, size * 1.6, self.manip_hover.or(self.ui.manip_selected)));
+        h.manipulator = self.manipulator(cx).map(|f| (f, self.manip_size(cx), self.manip_hover.or(self.ui.manip_selected)));
         h.section = self.section_glyph(cx);
         h.explode_triad = self.explode_edit;
         // An explode step being made / edited: one arrow along the move
