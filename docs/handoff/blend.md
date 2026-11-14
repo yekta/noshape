@@ -1,5 +1,22 @@
 # Blends (agent "blend")
 
+## 11-14 10:20 UTC: restarted (new account): landed, queued, running
+
+Landed: coax (e842e6b6), rays + p2live (e53574e7). Queued: blend4 `blend-secwires` 6419eccb (both commits; its asm's
+pattern-std 31/40 and pinslot 16/16 mates are main's: main at its base 618a5fbc3 gives the same, asm2-base.log).
+- blend-emptysec (`blend` worktree) **parked**: the spine bound never fires (snap-hook debug run: 0 of 114 sections
+  skipped). The empty cone x torus pairs touch near-tangentially, so the face comes within the tube radius. Gates stopped.
+- blend2 `blend-partrays` rebased on main (71d9e0755); unit blend-partrays-gates: g++-13 on vibe5, then asm on vibe7
+  (asm-partrays-new.log -> partrays-asm.done). Pair was clean (870 = 870). Then measure rings Chamfer 1 and land.
+- blend5 `blend-frameside` (new): frame_at's undecided side on a curved face from the two step distances already
+  taken (the on-face side is ~d²/2R off, the other ~d), not the face's centroid (an area integral, ~7.5 ms a torus:
+  snap-hook Fillet 5's 4 props_surface calls). Unit blend-frameside-t on vibe5: model blend tests + snap-hook/spring.
+- blend6 `zz-coaxsec-dbg` (debug only, never land): prints whether each section's two surfaces are coaxial and IntSS's
+  curve types. snap-hook's cone x torus sections with curves are 36 pairs, 568 ms summed (dev): if coaxial, their
+  section is circles from the meridians' line x circle, no walk (unit blend-coaxdbg on vibe7, coaxdbg.log).
+- The kernel profile is one table for all threads: a feature's rows include background work (display meshes, the
+  harness's props/boxes); knife Chamfer 2's props_volume / mesh / op_split rows are that, not the chamfer.
+
 ## 11-14 08:30 UTC: handoff (Bbedward's week ran out): queued, running where, next
 
 Landed since 03:50: f2twice (2eb4cf4b, dx's P0: pipeflange Fillet 2 built twice, 356 -> 157 ms; dx told).
