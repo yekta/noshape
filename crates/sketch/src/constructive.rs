@@ -284,10 +284,7 @@ impl Sketch {
                 wanted.insert(c.id);
             }
         }
-        let drop: Vec<crate::ids::ConstraintId> = sub.constraints().map(|c| c.id).filter(|c| !wanted.contains(c)).collect();
-        for c in drop {
-            sub.remove_constraint(c).ok()?;
-        }
+        sub.retain_constraints(|c| wanted.contains(&c.id));
         // Placed geometry fixed: its points (a circle whole, for its radius);
         // fixing a line and its points too would be redundant.
         for &u in placed {

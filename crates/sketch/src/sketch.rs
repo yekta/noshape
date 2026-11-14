@@ -40,8 +40,8 @@ pub(crate) struct Cache {
 /// A 2D sketch: entities + constraints.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Sketch {
-    entities: IndexMap<EntityId, Entity>,
-    constraints: IndexMap<ConstraintId, Constraint>,
+    entities: IndexMap<EntityId, Entity, crate::ids::IdState>,
+    constraints: IndexMap<ConstraintId, Constraint, crate::ids::IdState>,
     next_entity: u32,
     next_constraint: u32,
     #[serde(skip)]
@@ -811,6 +811,13 @@ impl Sketch {
         self.constraints.insert(id, c);
         self.touch();
         Ok(id)
+    }
+
+    /// Keeps only the constraints `keep` accepts, in their order: one pass (a constructive placement's trial
+    /// sketches dropped most of theirs one `remove_constraint` at a time, each shifting the rest).
+    pub(crate) fn retain_constraints(&mut self, mut keep: impl FnMut(&Constraint) -> bool) {
+        self.constraints.retain(|_, c| keep(c));
+        self.touch();
     }
 
     pub fn remove_constraint(&mut self, id: ConstraintId) -> Result<Constraint> {
