@@ -391,6 +391,12 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     projection: "equivalent" to OCCT's, but 411 ms against 83: 45 % in BRepCheck's wire self-intersection, OCCT's 2D
     intersection taking our C0-jointed cubic pieces span by span. Next: our curves smooth (C2: one interpolating
     spline through the pieces' points, in space and on both faces) in brep_own_section, then time again.
+  - 00:40 UTC: live (JwQ): after Circular pattern 1 only OCCT's vertex, so the clipped curves must end as OCCT's. One C2
+    spline per section: the helical sweep 411 -> 131 ms (OCCT's sections 83). But on c2-rings-loft, with every
+    pair marched (the first runs' "equivalent" had most pairs on OCCT via the touch probe): thinning gives declines
+    (bd8a6b96, 0f2fe0e2); without it 78cd8309 has 2 vertices fewer (OCCT's at y 0, where two of the wedge tool's planes
+    meet on the ring) and bd8a6b96 one more. Ours and OCCT's differ where a section reaches a face's corner. Switches on
+    the branch: X_NOMARCH, X_NOCLIP, X_NOSPLINE, X_NOTHIN; probes xprobe::probe_extra_vertices, X_NEAR, X_CHAIN.
 - **c2-hunting-knife (10:52 UTC, gating 1ff449d86): to blend, I changed your blend_section.rs.** The chamfer's
   section Booleans with lofted tools ran under `with_occt_boolean` (11b4acf22: "noshape's own Boolean takes planes,
   cylinders and cones only"). Ours takes them since the knife fix (82cfec7d), so the skip is gone (and with it
