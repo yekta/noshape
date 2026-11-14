@@ -1,0 +1,45 @@
+{
+ "name": "bridging-curve-edit-edge-positions",
+ "about": "curves: Bridging curve, Edit edge positions on, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "curves",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Helix",
+    "menu": "Bridging curve"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Edit edge positions"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "remembered": {
+  "bridgingCurve": {
+   "": {
+    "editControlPoints": true
+   }
+  }
+ }
+}

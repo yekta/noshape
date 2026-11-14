@@ -1,0 +1,55 @@
+{
+ "name": "face-blend-propagation-off-isocurves",
+ "about": "block: Face blend, Propagation off, Show isocurves on, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fillet",
+    "menu": "Face blend"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Propagation"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Show isocurves"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "remembered": {
+  "faceBlend": {
+   "length:Millimeter": {
+    "radius": "2 mm"
+   }
+  }
+ }
+}
