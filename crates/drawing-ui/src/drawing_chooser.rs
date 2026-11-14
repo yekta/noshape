@@ -828,6 +828,9 @@ impl DrawingEditor {
         };
         let row_base = |id: SharedString, indent: f32| h_flex().id(id).min_h(px(22.)).pl(px(6. + indent)).pr(px(6.)).gap(px(6.)).cursor_pointer().hover(|d| d.bg(pal.row_hover)).text_size(px(13.33));
         let mut list = v_flex().id("dr-chooser-list").flex_1().min_h_0().overflow_y_scroll();
+        // The rows as live's recorder reads the picker (a checkbox per row; `child` under a studio).
+        let mut read_rows: Vec<serde_json::Value> = Vec::new();
+        let row_read = |label: &str, child: bool| serde_json::json!({ "label": label, "kind": "boolean", "checked": false, "child": child });
         let mut any = false;
         let has_tabs = tabs.iter().any(|(_, _, asm)| *asm == (tab == 1));
         for (id, name, asm) in tabs {
@@ -839,6 +842,7 @@ impl DrawingEditor {
                     continue;
                 }
                 any = true;
+                read_rows.push(row_read(&name, false));
                 list = list.child(row_base(SharedString::from(format!("dr-ch-asm-{id}")), 20.).child(div().truncate().child(crate::ui::user_text(name))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_tree(id, None, cx))));
                 continue;
             }
@@ -848,6 +852,7 @@ impl DrawingEditor {
                     continue;
                 }
                 any = true;
+                read_rows.push(row_read(&name, false));
                 let pic = pic_of(id, ThumbOf::Part(None));
                 list = list.child(row_base(SharedString::from(format!("dr-ch-ps-{id}")), 20.).min_h(px(38.)).child(thumb(pic)).child(div().truncate().child(crate::ui::user_text(name))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_tree(id, None, cx))));
                 continue;
@@ -885,6 +890,7 @@ impl DrawingEditor {
                 continue;
             }
             any = true;
+            read_rows.push(row_read(&name, false));
             let open = self.chooser.open.contains(&id) || !query.is_empty();
             let studio = name.clone();
             list = list.child(
@@ -905,6 +911,7 @@ impl DrawingEditor {
                 continue;
             }
             for (i, (label, what, part, flat, sketch)) in shown.into_iter().enumerate() {
+                read_rows.push(row_read(&label, true));
                 let pic = pic_of(id, what);
                 let name = label.to_string();
                 list = list.child(row_base(SharedString::from(format!("dr-ch-c-{id}-{i}")), 36.).min_h(px(38.)).map(|d| crate::ui_script::mark(d, || format!("list_row:{name}"))).child(thumb(pic)).child(div().truncate().child(label)).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
@@ -1153,6 +1160,30 @@ impl DrawingEditor {
         // Beside the Insert view panel (the empty one until a source is chosen).
         // (Select a composite part: beside the Cut list table panel.)
         let left = if matches!(self.tool, Tool::InsertView { .. }) || composite { None } else { Some(self.render_empty_insert_panel(cx)) };
+        // Live's recorder since 2026-11-14 reads the open picker as a feature dialog (doc-plus-create-drawing-ok): its
+        // tabs, the search box and the rows; `panel` keeps what the panel beside it read (older takes read that).
+        let panel_read = crate::ui_script::open_dialog();
+        let other = self.chooser.other;
+        let placeholder = if composite { "Search composite parts" } else { "Search parts or sketches" };
+        let search_text = self.chooser.search.as_ref().map(|s| s.read(cx).value().to_string()).unwrap_or_default();
+        crate::ui_script::note_dialog(|| {
+            let mut fields = vec![serde_json::json!({ "label": placeholder, "kind": "string", "text": search_text })];
+            fields.extend(read_rows);
+            serde_json::json!({
+                "title": null,
+                "kind": "feature",
+                "tabs": [
+                    { "label": "Current document", "selected": !other },
+                    { "label": "Other documents", "selected": other },
+                    { "label": "Part Studios", "selected": tab == 0 },
+                    { "label": "Assemblies", "selected": tab == 1 },
+                ],
+                "fields": fields,
+                "error": null,
+                "ok": null,
+                "panel": panel_read,
+            })
+        });
         let offset = match (&left, composite) {
             (Some(_), _) => 0.,
             (None, true) => 214.,

@@ -215,6 +215,19 @@ LIVE_PROFESSIONAL_FROM = "2026-11-13T19:31:00Z"
 FREE_PLAN_ROWS = {"Release…", "Releases", "Revision history", "Revision history…"}
 
 
+# Live's recorder reads a drawing's open part picker (Select a part or assembly) as a feature dialog since 11-14;
+# before, the panel beside it (ours keeps that reading in the picker's `panel`).
+PICKER_READ_SINCE = "2026-11-14T00:00:00Z"
+
+
+def picker_as_read(state, since):
+    """Ours with the drawing picker's dialog as the take's recorder read it."""
+    dlg = (state or {}).get("dialog")
+    if isinstance(dlg, dict) and "panel" in dlg:
+        state["dialog"] = {k: v for k, v in dlg.items() if k != "panel"} if since else dlg["panel"]
+    return state
+
+
 def without_free_plan_rows(state):
     """`state` with Release management's menu rows dropped (a Free-plan take's and ours)."""
     lst = (state or {}).get("list")
@@ -700,7 +713,20 @@ def compare(live, ours, whole_document=True):
         pairs = []
     clipboard_free = not copies(live)
     ours_steps = {s.get("step"): s for s in ours.get("steps", [])}
-    for s in live.get("steps", []):
+    # Live still loading: a menu click that changed nothing in live but close the menu, followed by a wait for its
+    # result (the pasted tab of doc-tab-menu-copy-paste shows ~1 s later); ours, done at once, is compared after the
+    # wait.
+    steps = live.get("steps", [])
+    loading = set()
+    settled = lambda st: {k: v for k, v in (st or {}).items() if k not in ("list", "focus", "tooltip")}
+    for i, s in enumerate(steps[:-1]):
+        prev = steps[i - 1].get("state") if i > 0 else live.get("start")
+        nxt, do = steps[i + 1].get("do") or {}, s.get("do") or {}
+        if isinstance(nxt, dict) and nxt.get("do") == "wait" and isinstance(do.get("on"), dict) and "menu" in do["on"] and settled(s.get("state")) == settled(prev):
+            loading.add(s.get("step"))
+    for s in steps:
+        if s.get("step") in loading:
+            continue
         o = ours_steps.get(s.get("step"), {})
         # A step ours couldn't do (its target not found) while live did: a difference, whatever the state after.
         failed = o.get("error") if o.get("ok") is False and s.get("ok") is not False else None
@@ -714,6 +740,7 @@ def compare(live, ours, whole_document=True):
     ours_slow, prev_t = {}, None
     start_name = scenario_start(live.get("scenario")) if isinstance(live.get("scenario"), str) else None
     free_plan = str(live.get("recorded") or "9") < LIVE_PROFESSIONAL_FROM
+    picker_read = str(live.get("recorded") or "9") >= PICKER_READ_SINCE
     for name, a, b, failed, t, step in pairs:
         if failed:
             if first is None:
@@ -727,6 +754,7 @@ def compare(live, ours, whole_document=True):
         b = insert_panel(runner_names(old_workspace_labels(a, reference_manager_as_panel(a, material_as_panel(a, json.loads(json.dumps(b))))), start_name, False))
         if free_plan:
             a, b = without_free_plan_rows(a), without_free_plan_rows(b)
+        b = picker_as_read(b, picker_read)
         a = unknown_picks(a, b)
         a, b = camera_compared(a), camera_compared(b)
         bl = (b or {}).get("list")

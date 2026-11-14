@@ -1486,11 +1486,13 @@ impl ReleaseDialog {
             .into_any_element()
     }
 
-    /// Live (release.json): "Review Release: <name>" once applied, submitted or released.
+    /// Live (release.json): a saved draft reopens as "Review Release"; a submitted or released one "Review Release:
+    /// <name>".
     fn title(&self, cx: &App) -> String {
         match self.mode {
             Mode::Release if !self.applied => "Create Release candidate".into(),
-            Mode::Release | Mode::Review => format!("Review Release: {}", self.name.read(cx).value()),
+            Mode::Release => "Review Release".into(),
+            Mode::Review => format!("Review Release: {}", self.name.read(cx).value()),
             Mode::Obsolete => "Create Obsolete candidate".into(),
         }
     }
@@ -2475,6 +2477,8 @@ impl Render for ReleaseDraftsPanel {
                     .child(crate::ui::icon_button("drafts-close", "close", 30., false, cx).tooltip("Close").on_click(|_, window, cx| window.dispatch_action(Box::new(crate::actions::ToggleReleaseDrafts), cx))),
             )
             .child(v_flex().id("drafts-list").flex_1().overflow_y_scroll().children(rows))
+            // Live (release.json): the panel's footer hint.
+            .child(div().flex_none().px(px(8.)).py(px(6.)).border_t_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(12.)).text_color(pal.text_muted).child("Double click to open a draft"))
     }
 }
 

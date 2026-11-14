@@ -3175,6 +3175,8 @@ impl Workspace {
                 .await;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 let mut new_id = None;
+                // After its source's tab; from + › Create Drawing… after the active tab (live doc-plus-create-drawing-ok).
+                let after = source.as_ref().map(|s| s.tab).or(this.active);
                 this.doc.update(cx, |doc, cx| {
                     // The views are made from the document as it is now: a
                     // later change to a source puts the drawing out of date,
@@ -3182,7 +3184,7 @@ impl Workspace {
                     let mut drawing = drawing;
                     drawing.sources_at = doc.session.head().ok().map(|m| m.to_string());
                     doc.edit_document(&format!("Insert tab : {name}"), cx, |d| {
-                        new_id = Some(docedit::insert_drawing_tab(d, &name, drawing, source.as_ref().map(|s| s.tab)));
+                        new_id = Some(docedit::insert_drawing_tab(d, &name, drawing, after));
                     });
                 });
                 let Some(id) = new_id else { return };

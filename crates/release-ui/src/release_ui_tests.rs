@@ -69,15 +69,15 @@ fn dialog(cx: &mut TestAppContext, name: &str, mode: Mode, release_name: &str) -
     (window, view, tab)
 }
 
-/// Live (release.json): "Create Release candidate", then "Review Release: <name>" once applied (and for a submitted
-/// or released one); the obsoletion dialog's own title.
+/// Live (release.json): "Create Release candidate", "Review Release" once applied (a reopened draft), "Review Release:
+/// <name>" for a submitted or released one; the obsoletion dialog's own title.
 #[gpui::test]
 fn the_release_dialogs_titles_are_lives(cx: &mut TestAppContext) {
     let (window, view, _) = dialog(cx, "titles", Mode::Release, "R1");
     cx.update(|cx| assert_eq!(view.read(cx).title(cx), "Create Release candidate"));
     cx.update(|cx| view.update(cx, |v, _| v.applied = true));
     draw(cx, window);
-    cx.update(|cx| assert_eq!(view.read(cx).title(cx), "Review Release: R1"));
+    cx.update(|cx| assert_eq!(view.read(cx).title(cx), "Review Release"));
     let (_, review, _) = dialog(cx, "titles-review", Mode::Review, "R2");
     cx.update(|cx| assert_eq!(review.read(cx).title(cx), "Review Release: R2"));
     let (_, obs, _) = dialog(cx, "titles-obs", Mode::Obsolete, "Obsolete PN A");

@@ -107,11 +107,12 @@ pub fn delete_tab_description(name: &str) -> String {
 pub const UNITS_DESCRIPTION: &str = "Change workspace units";
 
 /// Create Drawing › OK: the drawing tab is named `name` (the next "Drawing
-/// N" when empty or taken) and lands right after its source tab (Onshape).
-pub fn insert_drawing_tab(d: &mut Document, name: &str, drawing: noshape_model::drawing::Drawing, source: Option<TabId>) -> TabId {
+/// N" when empty or taken) and lands right after `after`: its source tab, or with none the active one (Onshape; live
+/// doc-plus-create-drawing-ok).
+pub fn insert_drawing_tab(d: &mut Document, name: &str, drawing: noshape_model::drawing::Drawing, after: Option<TabId>) -> TabId {
     let name = if name.is_empty() || d.tabs.iter().any(|t| t.name == name) { d.next_tab_name("Drawing") } else { name.to_string() };
     let id = d.add_tab(&name, TabContent::Drawing(drawing));
-    if let Some(src) = source
+    if let Some(src) = after
         && let Some(at) = d.settings.tab_order.iter().position(|t| *t == src)
     {
         d.settings.tab_order.retain(|t| *t != id);
