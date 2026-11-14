@@ -50,5 +50,6 @@
         "button": "ok"
       }
     }
-  ]
+  ],
+  "export": ["PDF", "DXF", {"format": "DWG", "version": "2018"}]
 }

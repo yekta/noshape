@@ -67,5 +67,6 @@
       "do": "key",
       "key": "Escape"
     }
-  ]
+  ],
+  "export": ["PDF", "DXF", {"format": "DWG", "version": "2018"}]
 }
