@@ -1,0 +1,48 @@
+{
+ "name": "frame-corner-coped-limit",
+ "about": "frame-l: edit Frame 1, Default corner type Miter → Coped butt, Limit frame ends on, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "frame-l",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Frame 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Miter",
+    "pick": "Coped butt"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Limit frame ends"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -113,7 +113,7 @@ as the app's own config files, written into the run's config directory before it
 
 ### TARGET (by name, never by pixel)
 - `{"tool": "Extrude"}`: a toolbar tool by its tooltip name; `{"tool": "Fillet", "menu": "Chamfer"}` in a dropdown.
-- `{"field": "Depth"}` (`"index": n` when a label repeats), `{"checkbox": "Symmetric"}`, `{"tab": "Remove"}`,
+- `{"field": "Depth"}` (`"index": n` when a label repeats; `{"field": "", "index": n}` is the n-th number box with no label, e.g. a mate's X / Y / Z offset boxes), `{"checkbox": "Symmetric"}`, `{"tab": "Remove"}`,
   `{"dropdown": "Blind", "pick": "Up to next"}`, `{"button": "ok" | "cancel" | "?"}`, a chip's ×
   `{"button": "x", "field": "Entities to fillet"}`, other buttons by tooltip, a row's eye
   `{"button": "eye", "feature": "Sketch 1"}`.
