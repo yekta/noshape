@@ -4171,6 +4171,7 @@ impl<'a> Translator<'a> {
         // Onshape's start and end of each curve (sketch metres): ours may
         // run the other way (an arc is counter-clockwise).
         let mut ends: Vec<Option<[[f64; 2]; 2]>> = Vec::new();
+        let mut zero_lines: Vec<String> = Vec::new();
         let mut texts: Vec<Value> = Vec::new();
         // Live's Use (PROJECTED): the entity's model geometry, used after the drawing as live's sketch uses it.
         let projected: HashMap<String, Value> = f["constraints"]
@@ -4204,8 +4205,14 @@ impl<'a> Translator<'a> {
                 texts.push(e.clone());
                 continue;
             }
+            // A line of zero length: a point where it is, its ends that point (asm-infento-subs' wheel sketches: their
+            // coincidences hold on them).
             if gt.starts_with("BTCurveGeometryLine") && (e["endParam"].as_f64().unwrap_or(0.0) - e["startParam"].as_f64().unwrap_or(0.0)).abs() < 1e-9 {
-                problems.push(format!("sketch entity {eid}: a line of zero length, left out"));
+                let t = e["startParam"].as_f64().unwrap_or(0.0);
+                shapes.push(json!({ "tool": "point", "points": [at(num("pntX") + t * num("dirX"), num("pntY") + t * num("dirY"))], "construction": construction }));
+                zero_lines.push(eid.clone());
+                local.push(eid);
+                ends.push(None);
                 continue;
             }
             let shape = match gt.split('-').next().unwrap_or("") {
@@ -4369,6 +4376,15 @@ impl<'a> Translator<'a> {
                 let made: Vec<&Value> = r["created"].as_array().into_iter().flatten().filter(|c| (c["type"] == "point") == points && c.get("handle_of").is_none()).collect();
                 for (eid, c) in ids.iter().zip(made) {
                     self.map_drawn(&oid, eid, c, points, ends_of.get(eid).copied());
+                }
+            }
+        }
+        // (Its ends only: the line itself, a direction (a sketch fillet's leftover side, its sharp corner on it), isn't
+        // a point.)
+        for eid in &zero_lines {
+            if let Some(pid) = self.sketch_entities.remove(&(oid.clone(), eid.clone())) {
+                for end in ["start", "end"] {
+                    self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}")), pid.clone());
                 }
             }
         }
@@ -4903,15 +4919,15 @@ impl<'a> Translator<'a> {
             let (dx, dy) = (e[0] - s[0], e[1] - s[1]);
             ((p[0] - s[0]) * dy - (p[1] - s[1]) * dx).abs() / dx.hypot(dy).max(1e-12)
         };
-        let (centres, radii) = match (a, b) {
-            (G::Point(p, r), G::Point(q, t)) => ((p[0] - q[0]).hypot(p[1] - q[1]), r + t),
-            (G::Point(p, r), G::Line(s, e)) | (G::Line(s, e), G::Point(p, r)) => (to_line(p, s, e), r),
+        let (d, r, t) = match (a, b) {
+            (G::Point(p, r), G::Point(q, t)) => ((p[0] - q[0]).hypot(p[1] - q[1]), r, t),
+            (G::Point(p, r), G::Line(s, e)) | (G::Line(s, e), G::Point(p, r)) => (to_line(p, s, e), r, 0.0),
             (G::Line(..), G::Line(..)) => return None,
         };
-        if radii < 1e-12 {
+        if r + t < 1e-12 {
             return None;
         }
-        [("center", centres), ("minimum", centres - radii), ("maximum", centres + radii)].into_iter().min_by(|x, y| (x.1 - want).abs().total_cmp(&(y.1 - want).abs())).map(|m| m.0)
+        circle_distances(d, r, t).into_iter().min_by(|x, y| (x.1 - want).abs().total_cmp(&(y.1 - want).abs())).map(|m| m.0)
     }
 
     /// A circular model edge's centre (in sketch `oid`'s plane, m) and radius (m), when its axis is along the
@@ -5313,6 +5329,14 @@ fn top_level_items(rest: &str) -> Option<Vec<String>> {
         }
     }
     None
+}
+
+/// A distance's lengths to circles of radii `r` and `t` (0 for a point or a line) whose centres are `d` apart: to the
+/// centres, the near sides and the far sides, as our solver measures them (the near sides of a circle inside another
+/// are the gap between them: asm-infento-subs' wheel, 75 mm between its R25 and R100 rings).
+fn circle_distances(d: f64, r: f64, t: f64) -> [(&'static str, f64); 3] {
+    let near = if d < (r - t).abs() { (r - t).abs() - d } else { (d - r - t).abs() };
+    [("center", d), ("minimum", near), ("maximum", d + r + t)]
 }
 
 /// A query filter that takes planes and nothing else (a mirror plane: planar faces or mate connectors).
@@ -7737,6 +7761,17 @@ mod tests {
         let at: Vec<serde_json::Value> = rect.iter().map(|c| json!({ "point": (o + c[0] * x + c[1] * y).to_array() })).collect();
         let square = json!({ "bodies": [{ "vertices": at }, { "vertices": [], "faces": [{ "surface": { "normal": [0.0, 1.0, 0.0] } }] }] });
         assert_eq!(super::frame_from_bodies(&json!({ "entities": sides }), &square), None);
+    }
+
+    /// Near sides of concentric rings are their gap; of circles apart, the gap between them; of a point inside a
+    /// circle, its distance to the rim.
+    #[test]
+    fn a_distance_to_circles_near_sides_is_the_gap_between_them() {
+        let near = |d: f64, r: f64, t: f64| super::circle_distances(d, r, t)[1].1;
+        assert!((near(0.0, 0.025, 0.1) - 0.075).abs() < 1e-12);
+        assert!((near(0.05, 0.01, 0.02) - 0.02).abs() < 1e-12);
+        assert!((near(0.003, 0.0, 0.01) - 0.007).abs() < 1e-12);
+        assert!((super::circle_distances(0.0, 0.025, 0.1)[2].1 - 0.125).abs() < 1e-12);
     }
 
     /// A mirror's plane filter (live's: a plane or a mate connector) takes planes only; a Plane feature's entities
