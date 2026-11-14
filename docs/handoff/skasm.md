@@ -15,6 +15,9 @@
   corner breaks on a U's collinear wall corners; Hole 3 (a pre-V2 Hole storing isV2 false lost its ISO 5 standard and
   took inch units: 1/4"). Every feature's geometry now matches but Fillet 4 (Arm Cover: two R5 fillets meeting across
   a 10 mm top, live merges their halves, 11 vs our 12 faces; handed to blend 11-14 12:20).
+- Knife Sketch 7 (live 3041: JTd the R750 blade arc, JIl a line): the 0.3 mm Distance to the arc took our centre mode;
+  now inferred as for local circles (blade 9301.21 -> 9306.43 mm³, live 9306.25). The knife's first difference stays
+  at feature 24 (3 lines / 3 "other" edges vs live, from Curve pattern 1's or the Loft's side, not the sketch).
 - Left: (1) Flange 1 … Mirror 1 have live's INFO "Collision in sheet metal flat pattern." (zero-gap contact at the
   tear; our flat's union has no overlap by area, so not reported; a contact rule is needed, not an area check);
   (2) the assembly suite lists any non-OK status as a difference without comparing live's (Fillet 2 / 3 "use Corner
