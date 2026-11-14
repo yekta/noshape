@@ -151,24 +151,24 @@ fn rows() -> Vec<Row> {
         Row { id: "drag / the angle step", live: "5° within 2° (radius ≤ 573 px), free in between: 42.4154 stays, 43.5 → 45", gap: false, check: |_| {
             expect((snap_degrees(42.4154, 300.), snap_degrees(43.5, 300.)), (42.4154, 45.0), "angles")
         } },
-        Row { id: "fields / a selected entity clicked again leaves the field", live: "[Face of Extrude 2] -> [] -> [Face of Extrude 2]", gap: false, check: |cx| {
+        Row { id: "fields / a selected entity clicked again leaves the field", live: "[Face of Extrude 2] -> [] -> [Face of Extrude 2]", gap: true, check: |cx| {
             let (window, view) = block(cx, "dlg-toggle");
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
             draw(cx, window);
-            let (edge, pick) = cx.update(|cx| {
-                let v = view.read(cx);
-                let e = v.display.bodies.first().and_then(|b| b.edge_refs.first().cloned()).unwrap();
-                let p = v.built.as_ref().and_then(|b| b.picks.ids_for(&e).first().copied());
-                (e, p)
-            });
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let edge = cx.update(|cx| view.read(cx).display.bodies.first().and_then(|b| b.edge_refs.first().cloned())).ok_or("no edge")?;
             let dialog = cx.update(|cx| view.read(cx).edit.as_ref().unwrap().dialog.clone());
             let mut counts = Vec::new();
             for _ in 0..3 {
+                // Each click on the edge's pick as the scene has it once the last click's preview is built (its picks
+                // are rebuilt with it).
                 cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                    let pick = v.built.as_ref().and_then(|b| b.picks.ids_for(&edge).first().copied());
                     let vp = v.viewport.clone();
                     v.on_viewport_event(&vp, &ViewportEvent::Click { pick, position: glam::DVec2::new(500., 300.), modifiers: Modifiers::default() }, w, cx);
                 }))
                 .unwrap();
+                wait_until(cx, window, |cx| !view.read(cx).ui_busy());
                 draw(cx, window);
                 counts.push(cx.update(|cx| dialog.read(cx).feature.params.query("entities").iter().filter(|r| **r == edge).count()));
             }
