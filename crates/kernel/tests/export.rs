@@ -1869,3 +1869,24 @@ fn a_step_surface_models_closed_shell_reads_as_a_solid() {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(back[0].shape.solids().is_empty(), "an open shell stays a surface");
 }
+
+/// cf-hose-routing's hose (its Part Studio's part, tests/data/xt-parts): its inner walls (the Shell's offsets of the
+/// outer walls, approximated as non-rational degree-12 single-span B-surfaces) won't go round periodic, and Parasolid
+/// dropped the hoses whose walls were written so (live 2452, 2975). Written as live writes its own hose, offsets of the
+/// periodic outer walls (OFFSET_SURF), every face whole: 12 faces read back (before, the one stiff seam had every
+/// closed face split in two: 22 / 44 / 24); live imports the four hoses so (3054).
+#[test]
+fn a_hoses_walls_write_whole() {
+    let dir = std::env::temp_dir().join(format!("noshape-xt-hose-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let hose = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts/hose-routing-hose.brep")).unwrap();
+    assert_eq!((hose.count(ShapeType::Face), hose.count(ShapeType::Edge), hose.count(ShapeType::Vertex)), (12, 22, 12), "the model, seams included");
+    let file = dir.join("hose.x_t");
+    write_parasolid(&file, std::slice::from_ref(&hose), LengthUnit::Meter, false).unwrap();
+    let back = read_parasolid(&file, LengthUnit::Meter).unwrap();
+    // (Its inner walls' end rings split in two: tolerant edges closed on one vertex made Parasolid drop the hose, live 3054.)
+    assert_eq!((back.count(ShapeType::Face), back.count(ShapeType::Edge), back.count(ShapeType::Vertex)), (12, 34, 24), "every face whole");
+    // (The model's inner walls are the offsets approximated, ~1 nm off on the 1 mm wall: 1e-6 of the volume.)
+    let (v0, v1) = (hose.volume().unwrap(), back.volume().unwrap());
+    assert!((v1 - v0).abs() < 2e-6 * v0, "{v1} vs {v0}");
+}
