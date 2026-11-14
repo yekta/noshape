@@ -4668,18 +4668,18 @@ P1
   Drafted rib (a cylinder) and tapered rib (a cone, live 2306 E: 6,119.2357 mm³, one CONE 503.1114 mm²) done.
 
 P2
-- [ ] P2 FILLET-PARTIAL-CAP (blend) Entity bounds cut at the face's surface (MC's XY plane) and trim the end by it, not a
+- [x] (blend 11-14: live 3028 on the start block: a plane bound ends the round on a flat cap at the plane, Trim to face boundaries the same; ours as live, T1 kernel_robustness::fillet_options_on_the_start_block_as_live_3028) P2 FILLET-PARTIAL-CAP (blend) Entity bounds cut at the face's surface (MC's XY plane) and trim the end by it, not a
   flat cap at the centroid's projection (detail.rs:307-311).
 - [ ] P2 FILLET-VAR-SECTION (blend) variable fillet ignores crossSection / asymmetric (per-point rho, magnitude, second
   radius, flip).
-- [ ] P2 FILLET-VAR-PARTIAL (blend) Variable + Partial in one feature (Variable returns before Partial).
+- [x] (blend 11-14: the span of the whole edge's law, live 3028: 1 -> 4 mm with 0.25 -> 0.75 runs 1.75 -> 3.25, flat ends, 9 faces; one straight edge between planes, the exact variable round) P2 FILLET-VAR-PARTIAL (blend) Variable + Partial in one feature (Variable returns before Partial).
 - [ ] P2 FILLET-VAR-ERRORS (blend) std's variable errors (vertex off the chain, internal zero, closed chain needs 2
   vertices, one edge a point) and VRFILLET_NO_EFFECT.
   Live 2325 A done: a setting off the chain and a closed chain with one setting warn and fillet constant; all at the
   default: a plain cylinder. Left: an internal zero (ours fails like live, untested message path), one edge a point.
 - [ ] P2 FILLET-VAR-CORNERS (blend, live) variable chains with corners are filleted edge by edge: check against live.
-- [ ] P2 FILLET-KEEPEDGES (blend) Edges to keep (keepEdges) never read.
-- [ ] P2 FILLET-SMOOTHCORNERS (blend, live) Smooth fillet corners + exceptions never read; find a case where it changes
+- [x] (blend 11-14: live 3028: keeping the far top edge or a neighbour changes nothing on the start block, ours equal (T1 above); read it when a case that changes shows up) P2 FILLET-KEEPEDGES (blend) Edges to keep (keepEdges) never read.
+- [x] (blend 11-14: live 3028: on and off identical at the start block's three-edge corner (11850.007, 10 faces), ours equal (T1 above)) P2 FILLET-SMOOTHCORNERS (blend, live) Smooth fillet corners + exceptions never read; find a case where it changes
   the geometry.
 - [x] (blend 11-14: as std 3112 edgeBlendCommon.fs: radius, a conic or curvature section's own radius, or the width; none for a variable radius; the tip at offset × (1/cos(φ/2) − 1), into the material at a convex edge; GPUI test fillet_arrow_as_std) P2 FILLET-MANIP-PARAM (blend) the drag arrow always drives `radius` (Conic / Curvature / Width edit a hidden value)
   and shows with Variable on; std's offset r(1/cos(φ/2) - 1).
