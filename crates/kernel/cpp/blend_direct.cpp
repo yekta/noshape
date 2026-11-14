@@ -132,8 +132,10 @@ bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, double tol)
   }
   if (sa.GetType() == GeomAbs_Plane)
   {
+    // (Within 1e-8 rad, 0.01 µm over a metre: a line tool's side, its normal from the part's normals at the edge, is
+    // ~2e-9 rad off the face it lies on: c2-impeller-loft's flange pocket floor.)
     const gp_Pln pa = sa.Plane(), pb = sb.Plane();
-    return pa.Axis().Direction().IsParallel(pb.Axis().Direction(), 1e-9) && pa.Distance(pb.Location()) < tol;
+    return pa.Axis().Direction().IsParallel(pb.Axis().Direction(), 1e-8) && pa.Distance(pb.Location()) < tol;
   }
   if (sa.GetType() == GeomAbs_Cylinder && sb.GetType() == GeomAbs_Cylinder)
   {
