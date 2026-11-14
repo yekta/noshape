@@ -367,7 +367,7 @@ impl AssemblyView {
                 json!({
                     "title": d.name, "titleState": if complete && !faces_missing { "ok" } else { "error" }, "kind": "feature", "tabs": [],
                     "fields": d.ui_fields(cx),
-                    "error": null, "ok": if complete { "enabled" } else { "disabled" }
+                    "error": null, "ok": if complete || d.touched { "enabled" } else { "disabled" }
                 })
             })
             .into_iter()
@@ -644,7 +644,7 @@ impl AssemblyView {
             fields.push(other(""));
             let failed = self.result.connectors.iter().any(|c| c.id == s.id && c.message.is_some());
             let title = if s.implicit { "Mate connector".to_string() } else { s.name.clone() };
-            out.push(dialog(title, s.on.is_some() && !failed, s.on.is_some(), fields));
+            out.push(dialog(title, s.on.is_some() && !failed, s.on.is_some() || s.touched, fields));
         }
         if let Some(s) = &self.pattern {
             let seeds: Vec<String> = s.seeds.iter().filter_map(|i| names.get(i).cloned()).collect();

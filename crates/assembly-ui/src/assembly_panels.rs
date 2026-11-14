@@ -88,6 +88,9 @@ pub struct McSession {
     /// pick, as a mate dialog's).
     pub picks_undo: Vec<McPicks>,
     pub picks_redo: Vec<McPicks>,
+    /// An option was changed (the Origin type): ✓ is on with nothing picked yet (live
+    /// asm-mate-connector-between-entities).
+    pub touched: bool,
     /// A viewport pick took the keyboard from the field (live: focus none after the pick, the field still active).
     pub picked: bool,
     /// Origin type and Rotation axis selects.
@@ -102,11 +105,13 @@ pub struct McPicks {
     on: Option<MateConnectorRef>,
     extra: [Option<MateConnectorRef>; 3],
     slot: usize,
+    /// The Origin type: its pick is an Undo step of the open dialog too (live asm-mate-connector-between-entities).
+    between: bool,
 }
 
 impl McSession {
     pub fn picks(&self) -> McPicks {
-        McPicks { on: self.on.clone(), extra: self.extra.clone(), slot: self.slot }
+        McPicks { on: self.on.clone(), extra: self.extra.clone(), slot: self.slot, between: self.between }
     }
 
     /// Undo (`redo` false) or redo the newest pick. False when there is none.
@@ -114,7 +119,7 @@ impl McSession {
         let Some(state) = (if redo { self.picks_redo.pop() } else { self.picks_undo.pop() }) else { return false };
         let now = self.picks();
         if redo { self.picks_undo.push(now) } else { self.picks_redo.push(now) }
-        (self.on, self.extra, self.slot) = (state.on, state.extra, state.slot);
+        (self.on, self.extra, self.slot, self.between) = (state.on, state.extra, state.slot, state.between);
         true
     }
 
@@ -438,7 +443,13 @@ impl AssemblyView {
             let crate::os_select::OsSelectEvent::Picked(id) = ev;
             let between = id.as_ref() == "BETWEEN_ENTITIES";
             if let Some(m) = &mut this.mc {
+                if m.between != between {
+                    let before = m.picks();
+                    m.picks_undo.push(before);
+                    m.picks_redo.clear();
+                }
                 m.between = between;
+                m.touched = true;
                 // (Origin entity keeps the picks until it has one: live asm-mate-connector-between-entities.)
                 if between && m.extra[0].is_none() && m.on.is_some() {
                     m.active = true;
@@ -486,6 +497,7 @@ impl AssemblyView {
             cfg_pending: Vec::new(),
             picks_undo: Vec::new(),
             picks_redo: Vec::new(),
+            touched: false,
             picked: false,
             origin_sel,
             axis_sel,
@@ -813,7 +825,7 @@ impl AssemblyView {
                     .child(div().mr(px(4.)).child(super::props::help_dot())),
             );
         let title = if implicit { "Mate connector".to_string() } else { s.name.clone() };
-        let ok = s.on.is_some();
+        let ok = s.on.is_some() || s.touched;
         let header = h_flex()
             .h(px(29.))
             .flex_none()

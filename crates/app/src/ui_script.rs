@@ -602,7 +602,25 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                 // (A native-style select's list: its rows are a menu's.)
                                 let found = cx.update(|_, cx| locate(&row, &ps, &asm, &drw, cx).or_else(|e| if row_key == "list_row" { locate(&json!({ "menu": pick }), &ps, &asm, &drw, cx) } else { Err(e) })).unwrap_or_else(|e| Err(e.to_string()));
                                 match found {
-                                    Ok(at) => {
+                                    Ok(mut at) => {
+                                        // A row below the list's fold (a select shows 7½ rows) is wheeled into view first, as
+                                        // a browser's click scrolls to it (asm-mate-switch-fastened-chain: Parallel, the 8th).
+                                        let name = format!("{row_key}:{pick}");
+                                        for _ in 0..8 {
+                                            let Some(c) = noshape_app_core::ui_script::clip_of(&name).filter(|c| c.size.height > px(10.)) else { break };
+                                            if c.top() + px(4.) < at.y && at.y < c.bottom() - px(4.) {
+                                                break;
+                                            }
+                                            let wheel = ScrollWheelEvent { position: c.center(), delta: ScrollDelta::Pixels(point(px(0.), (c.center().y - at.y).clamp(px(-600.), px(600.)))), ..Default::default() };
+                                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::ScrollWheel(wheel), cx));
+                                            sleep(cx, 120).await;
+                                            redraw(cx).await;
+                                            match cx.update(|_, cx| locate(&row, &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                                                Ok(p) => at = p,
+                                                Err(_) => break,
+                                            }
+                                        }
+                                        eprintln!("UI-SCRIPT step {} pick {pick} at ({:.0}, {:.0})", i + 1, f32::from(at.x), f32::from(at.y));
                                         let _ = cx.update(|window, cx| {
                                             window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
                                             mouse(window, cx, at, MouseButton::Left, Modifiers::default(), 1)
@@ -957,7 +975,24 @@ pub fn start_page(cx: &mut App) {
                                 sleep(cx, 300).await;
                                 redraw(w, cx).await;
                                 match find(&json!({ "list_row": pick }), cx).or_else(|_| find(&json!({ "menu": pick }), cx)) {
-                                    Ok(at) => {
+                                    Ok(mut at) => {
+                                        // A row below the list's fold (a select shows 7½ rows) is wheeled into view first,
+                                        // as a browser's click scrolls to it (asm-mate-switch-fastened-chain: Parallel, the 8th).
+                                        let name = format!("list_row:{pick}");
+                                        for _ in 0..8 {
+                                            let Some(c) = noshape_app_core::ui_script::clip_of(&name).filter(|c| c.size.height > px(10.)) else { break };
+                                            if c.top() + px(4.) < at.y && at.y < c.bottom() - px(4.) {
+                                                break;
+                                            }
+                                            let wheel = ScrollWheelEvent { position: point(c.center().x, c.center().y), delta: ScrollDelta::Pixels(point(px(0.), (c.center().y - at.y).clamp(px(-600.), px(600.)))), ..Default::default() };
+                                            let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::ScrollWheel(wheel), cx));
+                                            sleep(cx, 120).await;
+                                            redraw(w, cx).await;
+                                            match find(&json!({ "list_row": pick }), cx) {
+                                                Ok(p) => at = p,
+                                                Err(_) => break,
+                                            }
+                                        }
                                         let _ = w.update(cx, |_, window, cx| {
                                             window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
                                             mouse(window, cx, at, MouseButton::Left, Modifiers::default(), 1)

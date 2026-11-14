@@ -86,6 +86,9 @@ pub struct MateDialog {
     /// in the open dialog takes the newest pick back out).
     picks_undo: Vec<PickState>,
     picks_redo: Vec<PickState>,
+    /// An option was changed (a checkbox, a value, a flip): ✓ is on though the title is red (live
+    /// asm-cylindrical-limits, asm-tangent-propagation). Picks don't count.
+    pub touched: bool,
     pub flip_primary: bool,
     /// The connector field the Mate connector panel is editing (its chip is
     /// bold, live 578).
@@ -146,6 +149,9 @@ impl Focusable for MateDialog {
 struct PickState {
     slots: [Option<MateConnectorRef>; 4],
     active: Option<usize>,
+    /// The checkboxes (tangent propagation, offset, limits, simulation connection): a toggle is an Undo step of the
+    /// open dialog too (live asm-tangent-propagation).
+    checks: [bool; 4],
 }
 
 /// A mate's error with both connectors on one instance (live).
@@ -253,8 +259,11 @@ impl MateDialog {
         // A committed offset previews; Enter with nothing new to apply
         // accepts the mate (like a feature dialog).
         for q in &offsets {
-            subs.push(cx.subscribe(q, |_: &mut Self, _, ev: &crate::quantity_field::QuantityEvent, cx| match ev {
-                crate::quantity_field::QuantityEvent::Committed(_) => cx.emit(MateDialogEvent::Changed),
+            subs.push(cx.subscribe(q, |this: &mut Self, _, ev: &crate::quantity_field::QuantityEvent, cx| match ev {
+                crate::quantity_field::QuantityEvent::Committed(_) => {
+                    this.touched = true;
+                    cx.emit(MateDialogEvent::Changed);
+                }
                 crate::quantity_field::QuantityEvent::Enter => cx.emit(MateDialogEvent::Accept),
                 _ => {}
             }));
@@ -264,7 +273,10 @@ impl MateDialog {
         let all: Vec<(Entity<InputState>, noshape_units::Dim)> = limits.iter().flat_map(|(k, (a, b))| [(a.clone(), limit_dim(k)), (b.clone(), limit_dim(k))]).collect();
         for (s, dim) in all {
             subs.push(cx.subscribe_in(&s, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
-                InputEvent::Change => cx.emit(MateDialogEvent::Changed),
+                InputEvent::Change => {
+                    this.touched = true;
+                    cx.emit(MateDialogEvent::Changed);
+                }
                 InputEvent::PressEnter { .. } | InputEvent::Blur => {
                     let text = st.read(cx).value().to_string();
                     let rewritten = commit_limit_text(&text, dim, &this.units, &this.variables);
@@ -314,6 +326,7 @@ impl MateDialog {
             active,
             advance_disarmed: None,
             picks_undo: Vec::new(),
+            touched: false,
             picks_redo: Vec::new(),
             flip_primary: mate.flip_primary,
             editing_field: None,
@@ -354,7 +367,15 @@ impl MateDialog {
     }
 
     fn pick_state(&self) -> PickState {
-        PickState { slots: [self.a.clone(), self.b.clone(), self.c.clone(), self.d.clone()], active: self.active }
+        PickState { slots: [self.a.clone(), self.b.clone(), self.c.clone(), self.d.clone()], active: self.active, checks: [self.tangent_propagation, self.use_offset, self.use_limits, self.simulation_connection] }
+    }
+
+    /// Before a checkbox toggles: an Undo step of the open dialog.
+    fn note_toggle(&mut self) {
+        let before = self.pick_state();
+        self.picks_undo.push(before);
+        self.picks_redo.clear();
+        self.touched = true;
     }
 
     /// Undo (`redo` false) or redo a connector pick (live 1962: Ctrl+Z or the
@@ -367,6 +388,7 @@ impl MateDialog {
         let [a, b, c, d] = state.slots;
         (self.a, self.b, self.c, self.d) = (a, b, c, d);
         self.active = state.active;
+        [self.tangent_propagation, self.use_offset, self.use_limits, self.simulation_connection] = state.checks;
         cx.emit(MateDialogEvent::Changed);
         cx.notify();
         true
@@ -727,6 +749,7 @@ impl MateDialog {
 
     pub fn flip(&mut self, cx: &mut Context<Self>) {
         self.flip_primary = !self.flip_primary;
+        self.touched = true;
         cx.emit(MateDialogEvent::Changed);
         cx.notify();
     }
@@ -734,6 +757,7 @@ impl MateDialog {
     /// Reorient the secondary axis by 90 degrees.
     pub fn reorient(&mut self, cx: &mut Context<Self>) {
         self.reorient = (self.reorient + 1) % 4;
+        self.touched = true;
         cx.emit(MateDialogEvent::Changed);
         cx.notify();
     }
@@ -1062,7 +1086,7 @@ impl Render for MateDialog {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(pal.accept).when(invalid, crate::ui::disabled_accept)
+                            .bg(pal.accept).when(invalid && !self.touched, crate::ui::disabled_accept)
                             .when(!invalid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
                             .cursor_pointer()
                             .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
@@ -1093,6 +1117,7 @@ impl Render for MateDialog {
                     .child(div().h(px(5.)))
                     .when(t == MateType::Tangent, |d| {
                         d.child(os::checkbox("mate-tangent-prop", "Tangent propagation", self.tangent_propagation).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.note_toggle();
                             this.tangent_propagation = !this.tangent_propagation;
                             cx.emit(MateDialogEvent::CheckboxFocused("Tangent propagation"));
                             cx.emit(MateDialogEvent::Changed);
@@ -1101,6 +1126,7 @@ impl Render for MateDialog {
                     })
                     .when(has_offset, |d| {
                         let offset = os::checkbox("mate-offset", "Offset", self.use_offset).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.note_toggle();
                             this.use_offset = !this.use_offset;
                             cx.emit(MateDialogEvent::CheckboxFocused("Offset"));
                             cx.emit(MateDialogEvent::Changed);
@@ -1110,6 +1136,7 @@ impl Render for MateDialog {
                     })
                     .when(!lkeys.is_empty(), |d| {
                         d.child(os::checkbox("mate-limits", "Limits", self.use_limits).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.note_toggle();
                             this.use_limits = !this.use_limits;
                             cx.emit(MateDialogEvent::CheckboxFocused("Limits"));
                             cx.emit(MateDialogEvent::Changed);
@@ -1121,6 +1148,7 @@ impl Render for MateDialog {
                     // last checkbox, on every mate but Pin slot, Parallel, Tangent and Width.
                     .when(t.has_simulation_connection(), |d| {
                         d.child(os::checkbox("mate-simulation", "Simulation connection", self.simulation_connection).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.note_toggle();
                             this.simulation_connection = !this.simulation_connection;
                             this.faces_active = this.simulation_connection;
                             cx.emit(MateDialogEvent::CheckboxFocused("Simulation connection"));
