@@ -252,9 +252,10 @@ of 5 after a warm-up; block 40x30x10, Extrude 1 10 -> 15 mm. Ours (a)'s calibrat
 | view cube Top / Front, settled | 1500 / 1600 | 960 / 1094 | 1189 / 1202 |
 | tab switch settled: Drawing->PS / PS->Asm / Asm->Drawing | 2975 / 1691 / 2450 | – | – |
 | configuration Small -> Large | 2650 (regenerates) | – | – |
-| document open: toolbar / interactive | 3.8 s / 15.4 s (in-page) | – | – |
+| document open (a click on the name in the documents page): toolbar / interactive | 3.8 s / 15.4 s (in-page; live2's lane document) | block 0.53 / 1.9 s, c2-valve-config 0.47 / 2.1 s, c2-impeller-loft 0.60 / 2.2 s (warm: the result store kept from the warm-up open) | – |
 
-Not timed yet: tabs, configuration, document open (ours), and the Mac (NOSHAPE_FRAME_LOG through the app's UI-script runner, no
+Ours opens a document in a new window (Onshape: the same tab). Not timed yet: tabs and configuration (armed for the 02:00 vibe7
+window), and the Mac (NOSHAPE_FRAME_LOG through the app's UI-script runner, no
 OS input permission needed; waits for a release with the frame log, v0.4.50 if it lands before the cut).
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
