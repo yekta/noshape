@@ -68,6 +68,7 @@ impl Gpu {
             // GPUI's draw phases (render + layout requests, prepaint, paint, present).
             gpui_kit::set_draw_stats_hook(draw_stat);
         }
+        start_frame_log();
         // The shaders compile once the first window has drawn (Workspace and
         // StartView call `release_prewarm`).
         noshape_render::worker::hold_prewarm();
@@ -465,6 +466,45 @@ impl gpui_kit::Global for GpuGlobal {}
 /// A window draw phase's time (wall clock, `gpui.<phase>`) and the UI thread's CPU in it (`gpui.<phase>_cpu`: the
 /// thread's CPU time since the previous phase ended, at most the phase's wall time): CPU time is what a frame costs
 /// whatever else the machine runs (a loaded box's wall clock varied ±15 ms).
+/// `NOSHAPE_FRAME_LOG=<file>`: one line per window input and per presented frame, `<unix µs> <event>` (an input's kind or
+/// `present`), to time input -> frame without a screen recording (qa's latency runs). Written by its own thread.
+fn start_frame_log() {
+    let Ok(path) = std::env::var("NOSHAPE_FRAME_LOG") else { return };
+    let file = match std::fs::File::create(&path) {
+        Ok(f) => f,
+        Err(e) => {
+            log::warn!("NOSHAPE_FRAME_LOG: can't create {path}: {e}");
+            return;
+        }
+    };
+    let (tx, rx) = std::sync::mpsc::sync_channel::<(u128, &'static str)>(1 << 16);
+    if FRAME_LOG.set(tx).is_err() {
+        return;
+    }
+    let spawned = std::thread::Builder::new().name("noshape-frame-log".into()).spawn(move || {
+        use std::io::Write;
+        let mut out = std::io::BufWriter::new(file);
+        while let Ok((t, event)) = rx.recv() {
+            let _ = writeln!(out, "{t} {event}");
+            while let Ok((t, event)) = rx.try_recv() {
+                let _ = writeln!(out, "{t} {event}");
+            }
+            let _ = out.flush();
+        }
+    });
+    if spawned.is_ok() {
+        gpui_kit::set_frame_log_hook(frame_log);
+    }
+}
+
+static FRAME_LOG: OnceLock<std::sync::mpsc::SyncSender<(u128, &'static str)>> = OnceLock::new();
+
+fn frame_log(event: &'static str) {
+    let Some(tx) = FRAME_LOG.get() else { return };
+    let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_micros());
+    let _ = tx.try_send((t, event));
+}
+
 fn draw_stat(phase: &'static str, wall: std::time::Duration) {
     noshape_render::perf::record(phase, wall);
     thread_local!(static LAST: std::cell::Cell<Option<std::time::Duration>> = const { std::cell::Cell::new(None) });

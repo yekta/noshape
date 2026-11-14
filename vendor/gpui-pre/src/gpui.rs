@@ -219,7 +219,7 @@ pub use view::*;
 pub use window::*;
 // NOSHAPE PATCH (agent perf)
 pub use external_texture::*;
-pub use draw_stats::{DrawStatsHook, set_draw_stats_hook};
+pub use draw_stats::{DrawStatsHook, FrameLogHook, set_draw_stats_hook, set_frame_log_hook};
 
 #[cfg(not(target_family = "wasm"))]
 pub use pollster::block_on;

@@ -3740,6 +3740,7 @@ impl Window {
         let stats_present = crate::draw_stats::draw_stats_now();
         self.platform_window.draw(&self.rendered_frame.scene);
         crate::draw_stats::draw_stat("gpui.present", stats_present);
+        crate::draw_stats::frame_log("present");
         #[cfg(feature = "profiler")]
         self.window_profiler.record_present(
             present_start,
@@ -5848,6 +5849,7 @@ impl Window {
     /// Dispatch a mouse, keyboard, or touch event on the window.
     #[profiling::function]
     pub fn dispatch_event(&mut self, event: PlatformInput, cx: &mut App) -> DispatchEventResult {
+        crate::draw_stats::frame_log(event.kind_name());
         #[cfg(feature = "profiler")]
         self.window_profiler.begin_input(event.kind_name());
         let update_count_before = self.invalidator.update_count();

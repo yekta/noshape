@@ -29,3 +29,22 @@ pub(crate) fn draw_stat(phase: &'static str, start: Option<Instant>) {
         hook(phase, start.elapsed());
     }
 }
+
+/// NOSHAPE PATCH (agent qa): an input-to-frame log for latency timing (noshape's `NOSHAPE_FRAME_LOG`). Receives an input's
+/// kind (`PlatformInput::kind_name`) when a window dispatches it, and `present` after a window hands a frame to the platform.
+/// Off (nothing called) until a hook is set.
+pub type FrameLogHook = fn(&'static str);
+
+static FRAME_LOG: OnceLock<FrameLogHook> = OnceLock::new();
+
+/// Install the frame log hook (once per process).
+pub fn set_frame_log_hook(hook: FrameLogHook) {
+    let _ = FRAME_LOG.set(hook);
+}
+
+/// Report an input or a present (no-op without a hook).
+pub(crate) fn frame_log(event: &'static str) {
+    if let Some(hook) = FRAME_LOG.get() {
+        hook(event);
+    }
+}
