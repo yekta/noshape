@@ -806,6 +806,7 @@ pub(crate) mod ffi {
             relative: bool,
             parallel: bool,
             exact: bool,
+            min_size: f64,
         ) -> Result<UniquePtr<OcMesh>>;
         fn mesh_counts(m: &OcMesh) -> Result<MeshCounts>;
         fn mesh_fill(

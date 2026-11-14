@@ -8286,23 +8286,28 @@ fn drawing_view_of_another_documents_version() {
     assert_eq!(sw["version"], "V1", "{sw}");
 }
 
-/// STL presets as Onshape's facetter takes them (live 2319: its Medium cuts clamp-hms' 7.5 mm arcs into 0.085 mm
-/// segments, a sag of 0.12 µm): the 5 mm hole's rim on the top face in about 2π·5 / (0.085·√(5/7.5)) ≈ 453 segments at
-/// Medium, √2 more at Fine, √2 fewer at Coarse (lead 11-08: the same file sizes and smoothness as Onshape's).
+/// STL presets as Onshape's Export dialog facets them (live 2994, 3052; clamp-hms' R5 hole): Medium's rim is 58
+/// segments (its 6.25° limit), Coarse's 29 (12.5°), Fine's 144 (2.5°), the same in metres (the mesh scaled), and a
+/// Minimum facet width of 2 mm floors it at 23.
 #[test]
 fn stl_presets_facet_as_onshapes() {
     let mut ctx = Ctx::new();
     block_with_hole(&mut ctx, "stl_presets.noshape");
-    let rim = |ctx: &mut Ctx, resolution: &str| -> usize {
-        let file = scratch(&format!("stl_presets_{resolution}.stl"));
-        call(ctx, "export_parts", json!({ "format": "STL", "file": file.to_str().unwrap(), "units": "Millimeter", "resolution": resolution }));
+    let rim = |ctx: &mut Ctx, units: &str, resolution: &str, custom: Option<(f64, f64, f64)>| -> usize {
+        let file = scratch(&format!("stl_presets_{units}_{resolution}.stl"));
+        let mut args = json!({ "format": "STL", "file": file.to_str().unwrap(), "units": units, "resolution": resolution });
+        if let Some((c, a, w)) = custom {
+            (args["chordal_tolerance"], args["angular_deviation"], args["min_facet_width"]) = (json!(c), json!(a), json!(w));
+        }
+        call(ctx, "export_parts", args);
         let b = std::fs::read(&file).unwrap();
         let n = u32::from_le_bytes(b[80..84].try_into().unwrap()) as usize;
+        let k = if units == "Meter" { 1000.0 } else { 1.0 };
         let mut pts = std::collections::HashSet::new();
         for i in 0..n {
-            for k in 0..3 {
-                let o = 84 + i * 50 + 12 + k * 12;
-                let f = |j: usize| f32::from_le_bytes(b[o + 4 * j..o + 4 * j + 4].try_into().unwrap());
+            for j in 0..3 {
+                let o = 84 + i * 50 + 12 + j * 12;
+                let f = |m: usize| f32::from_le_bytes(b[o + 4 * m..o + 4 * m + 4].try_into().unwrap()) * k;
                 let (x, y, z) = (f(0), f(1), f(2));
                 if (z - 20.0).abs() < 1e-3 && ((x * x + y * y).sqrt() - 5.0).abs() < 1e-3 {
                     pts.insert((x.to_bits(), y.to_bits()));
@@ -8311,16 +8316,18 @@ fn stl_presets_facet_as_onshapes() {
         }
         pts.len()
     };
-    let medium = rim(&mut ctx, "medium");
-    assert!((medium as f64 - 453.0).abs() < 45.0, "Medium: {medium} rim points, Onshape's ≈ 453");
-    let (coarse, fine) = (rim(&mut ctx, "coarse"), rim(&mut ctx, "fine"));
-    let r = |a: usize, b: usize| a as f64 / b as f64;
-    assert!((r(fine, medium) - 2f64.sqrt()).abs() < 0.15 && (r(medium, coarse) - 2f64.sqrt()).abs() < 0.15, "coarse {coarse}, medium {medium}, fine {fine}");
+    let near = |got: usize, want: f64| (got as f64 - want).abs() <= (want * 0.06).max(2.0);
+    let (coarse, medium, fine) = (rim(&mut ctx, "Millimeter", "coarse", None), rim(&mut ctx, "Millimeter", "medium", None), rim(&mut ctx, "Millimeter", "fine", None));
+    assert!(near(coarse, 29.0) && near(medium, 58.0) && near(fine, 144.0), "millimetres: coarse {coarse}, medium {medium}, fine {fine} (live 29 / 58 / 144)");
+    let floored = rim(&mut ctx, "Millimeter", "custom", Some((0.12, 6.25, 2.0)));
+    assert!(near(floored, 23.0), "a 2 mm minimum facet width: {floored} (live 23)");
+    let metres = rim(&mut ctx, "Meter", "medium", None);
+    assert_eq!(metres, medium, "Medium in metres is the millimetres' mesh scaled (live 3052)");
 }
 
-/// An STL's fillet torus on live's grid (live 2335, knob-jason's fillets): across the profile and round the axis the
-/// fewest equal steps whose chords sag by at most half the chord tolerance. The hole's R 2 rim fillet (tube centre
-/// R 7 at z 18) at Coarse: 72 steps over its 90°, 537 round (live's rule; BRepMesh alone gave about half).
+/// An STL's fillet torus on live's grid (live 3052, knob-jason's R11.5 fillet: ceil(sweep / angle) steps across the
+/// profile and round the axis). The hole's R 2 rim fillet (tube centre R 7 at z 18) at Coarse: 8 steps over its 90°,
+/// 29 round.
 #[test]
 fn stl_fillet_torus_on_onshapes_grid() {
     let mut ctx = Ctx::new();
@@ -8358,9 +8365,9 @@ fn stl_fillet_torus_on_onshapes_grid() {
         *rings.last_mut().unwrap() += 1;
     }
     rings.retain(|&r| r > 10);
-    assert_eq!(rings.len(), 71, "rings inside the profile (live's rule: 72 steps): {rings:?}");
+    assert_eq!(rings.len(), 7, "rings inside the profile (live's rule: 8 steps): {rings:?}");
     let mid = rings[rings.len() / 2];
-    assert!((536..=537).contains(&mid), "{mid} nodes round a middle ring, live's rule 537 steps: {rings:?}");
+    assert_eq!(mid, 29, "nodes round a middle ring, live's 29: {rings:?}");
 }
 
 /// Live vs-ps-table-create-studio: a later Variable Studio created from a Part Studio's Variable table is inserted

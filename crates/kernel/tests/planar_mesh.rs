@@ -189,7 +189,7 @@ fn a_notched_plate_at_a_tiny_chord_keeps_the_planar_triangulation() {
         }
     }
     let part = boolean(BooleanOp::Cut, &[plate], &tools, &BooleanOptions::default()).unwrap().shape;
-    let m = tessellate_export(&part, 4e-9, 10f64.to_radians()).unwrap();
+    let m = tessellate_export(&part, 4e-9, 10f64.to_radians(), 0.0).unwrap();
     assert_eq!(m.planar_fallbacks, 0, "a face went to BRepMesh");
     let a: f64 = m.indices.chunks(3).map(|t| area(m.positions[t[0] as usize], m.positions[t[1] as usize], m.positions[t[2] as usize])).sum();
     let want = surface_properties(&part).unwrap().mass;

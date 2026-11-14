@@ -122,11 +122,14 @@ pub struct MeshOptions {
     /// BRepMesh alone (exports: [`tessellate_export`]); else noshape's display mesher takes the faces it can.
     #[serde(default)]
     pub exact: bool,
+    /// The shortest edge segment (model units; 0: none): an STL's Minimum facet width.
+    #[serde(default)]
+    pub min_size: f64,
 }
 
 impl Default for MeshOptions {
     fn default() -> Self {
-        MeshOptions { linear_deflection: 0.1, angular_deflection: 0.5, relative: false, parallel: true, exact: false }
+        MeshOptions { linear_deflection: 0.1, angular_deflection: 0.5, relative: false, parallel: true, exact: false, min_size: 0.0 }
     }
 }
 
@@ -142,7 +145,7 @@ fn as_flat_mut(v: &mut [[f32; 3]]) -> &mut [f32] {
 pub fn tessellate(shape: &Shape, linear_deflection: f64, angular_deflection: f64, parallel: bool) -> Result<Tessellation> {
     tessellate_with(
         shape,
-        &MeshOptions { linear_deflection, angular_deflection, relative: false, parallel, exact: false },
+        &MeshOptions { linear_deflection, angular_deflection, relative: false, parallel, exact: false, min_size: 0.0 },
     )
 }
 
@@ -158,20 +161,20 @@ pub fn tessellate_with(shape: &Shape, o: &MeshOptions) -> Result<Tessellation> {
 /// without area, opening its edges: lead 11-08 P1, c2-hunting-knife, learning-center-michael); the faces a mesher
 /// folded re-triangulated (a pole's pinched triangles dropped first), then a triangle wound against its neighbours turned.
 pub fn tessellate_closed(shape: &Shape, linear_deflection: f64, angular_deflection: f64) -> Result<Tessellation> {
-    let mut t = tessellate_raw(shape, &MeshOptions { linear_deflection, angular_deflection, relative: false, parallel: true, exact: false })?;
+    let mut t = tessellate_raw(shape, &MeshOptions { linear_deflection, angular_deflection, relative: false, parallel: true, exact: false, min_size: 0.0 })?;
     crate::mesh_repair::drop_pinched_triangles(&mut t);
     crate::mesh_repair::repair_folded_faces(shape, &mut t);
     crate::mesh_repair::orient_by_neighbours(&mut t);
     Ok(t)
 }
 
-/// An export mesh at Onshape's facet tolerances (the STL presets, live 2319: deflections under a micrometre): as
-/// [`tessellate_closed`], by BRepMesh alone on a copy 1000× up (OCCT's precision and the shape's own tolerances sit at
-/// 1e-7 m), then back to size. On clamp-hms Coarse / Medium / Fine come within 0.06 % of live's triangle counts.
-pub fn tessellate_export(shape: &Shape, linear_deflection: f64, angular_deflection: f64) -> Result<Tessellation> {
+/// An export mesh at Onshape's facet tolerances (the STL presets, live 2319: deflections under a micrometre in a file
+/// in metres): as [`tessellate_closed`], by BRepMesh alone on a copy 1000× up (OCCT's precision and the shape's own
+/// tolerances sit at 1e-7 m), then back to size. `min_size`: the shortest edge segment (an STL's Minimum facet width).
+pub fn tessellate_export(shape: &Shape, linear_deflection: f64, angular_deflection: f64, min_size: f64) -> Result<Tessellation> {
     const UP: f64 = 1000.0;
     let big = shape.transformed(&crate::Transform::Scale { center: glam::DVec3::ZERO, factor: UP })?;
-    let mut t = tessellate_raw(&big, &MeshOptions { linear_deflection: linear_deflection * UP, angular_deflection, relative: false, parallel: true, exact: true })?;
+    let mut t = tessellate_raw(&big, &MeshOptions { linear_deflection: linear_deflection * UP, angular_deflection, relative: false, parallel: true, exact: true, min_size: min_size * UP })?;
     crate::mesh_repair::drop_pinched_triangles(&mut t);
     crate::mesh_repair::repair_folded_faces(&big, &mut t);
     crate::mesh_repair::orient_by_neighbours(&mut t);
@@ -188,7 +191,7 @@ fn tessellate_raw(shape: &Shape, o: &MeshOptions) -> Result<Tessellation> {
     if shape.is_null() {
         return Err(KernelError::invalid("cannot tessellate a null shape"));
     }
-    let m = ck(ffi::mesh_prepare(shape.raw(), o.linear_deflection, o.angular_deflection, o.relative, o.parallel, o.exact))?;
+    let m = ck(ffi::mesh_prepare(shape.raw(), o.linear_deflection, o.angular_deflection, o.relative, o.parallel, o.exact, o.min_size))?;
     let mr = m.as_ref().ok_or_else(|| KernelError::Occt("mesh_prepare returned null".into()))?;
     let c = ck(ffi::mesh_counts(mr))?;
     let mut t = Tessellation {

@@ -1679,7 +1679,7 @@ fn stl_bspline_tube_on_a_grid() {
     let tube = sweep(&disc, &path, &SweepOptions { with_correction: true, ..Default::default() }).unwrap().shape;
     assert!(tube.faces().iter().any(|f| matches!(f.face_surface(), Ok(Surface::BSpline { .. }))), "a B-spline wall");
     let exact = volume_properties(&tube).unwrap().mass;
-    let t = tessellate_export(&tube, 100.0 * 2e-6, 10f64.to_radians()).unwrap();
+    let t = tessellate_export(&tube, 100.0 * 2e-6, 10f64.to_radians(), 0.0).unwrap();
     let p = |i: u32| DVec3::from(t.positions[i as usize].map(f64::from));
     let v: f64 = t.indices.chunks(3).map(|c| p(c[0]).dot(p(c[1]).cross(p(c[2])))).sum::<f64>() / 6.0;
     assert!((v - exact).abs() < 3e-3 * exact, "mesh {:.3} mm³, exact {:.3}", v * 1e9, exact * 1e9);
@@ -1749,7 +1749,7 @@ fn an_extruded_spline_walls_facets_follow_the_surface() {
     let walls: Vec<usize> = (0..faces.len()).filter(|&k| matches!(faces[k].face_surface(), Ok(Surface::Extrusion { .. }))).collect();
     assert_eq!(walls.len(), 2, "two extruded spline walls");
     // An STL at Medium (chordal 0.12 mm, 6.25°) as the export takes it.
-    let t = tessellate_export(&tab, 0.12 * 2e-6, 12.5f64.to_radians()).unwrap();
+    let t = tessellate_export(&tab, 0.12 * 2e-6, 12.5f64.to_radians(), 0.0).unwrap();
     assert_eq!(t.faces.len(), faces.len());
     let p = |i: u32| DVec3::from(t.positions[i as usize].map(f64::from));
     for &k in &walls {

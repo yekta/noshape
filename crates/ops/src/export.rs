@@ -487,8 +487,8 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
     // OBJ: a zip of `<name>.obj` and its `<name>.mtl`, as live downloads it.
     if s.format == PartFormat::Obj {
         let stem = path.file_stem().map(|x| x.to_string_lossy().to_string()).unwrap_or_else(|| "part".into());
-        let (defl, ang, stl) = mesh_params(s);
-        let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), export_mesh(sh, defl, ang, stl)?, *c))).collect::<anyhow::Result<_>>()?;
+        let (defl, ang, stl, min) = mesh_params(s);
+        let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), export_mesh(sh, defl, ang, stl, min)?, *c))).collect::<anyhow::Result<_>>()?;
         let (obj, mtl) = obj_and_mtl(&meshes, &stem);
         let (on, mn) = (format!("{stem}.obj"), format!("{stem}.mtl"));
         let out = path.with_extension("zip");
@@ -700,22 +700,35 @@ fn sanitize(name: &str) -> String {
 }
 
 /// The mesher's linear (meters) and angular (radians) deflection, the preset's or Custom's (STL's chordal tolerance /
-/// angular deviation, the others' distance / angular tolerance), and whether it is an STL's.
-/// An STL's chordal tolerance as Onshape's facetter takes it (live 2319: the arcs' segments of its Coarse / Medium / Fine
-/// on clamp-hms sag 0.24 / 0.12 / 0.06 µm, a thousandth of the dialog's mm): 0.002 × the value in mm, as BRepMesh's
-/// deflection (half Parasolid's chord). Coarse, Medium and Fine then come within 0.1 % of live's triangle counts.
-fn mesh_params(s: &ExportSettings) -> (f64, f64, bool) {
+/// angular deviation, the others' distance / angular tolerance), whether it is an STL's, and an STL's shortest edge
+/// segment (meters, its Minimum facet width; 0 for the others).
+/// An STL's lengths as Onshape's Export dialog facets them (live 2994, 3052), whatever the file's unit (the same mesh,
+/// scaled): Medium's 0.12 mm chord and 6.25° cut clamp-hms' R5 rim in 58 segments, ceil(sweep / angle) on every
+/// circle and torus where the chord doesn't bind. As BRepMesh's deflection twice the chord (half Parasolid's) and its
+/// angle twice the segments' turn; the minimum facet width floors the segments (0.7-0.85 × it where chord or angle
+/// would go finer).
+fn mesh_params(s: &ExportSettings) -> (f64, f64, bool, f64) {
     let c = if s.resolution == CUSTOM_RESOLUTION { s.custom } else { CustomResolution::preset(s.resolution) };
     let stl = s.format == PartFormat::Stl || (s.format == PartFormat::Urdf && URDF_GEOMETRY[s.urdf_geometry.min(3)] == PartFormat::Stl);
-    // (And its angular deviation as Parasolid's: BRepMesh's angle is twice the segments' turn, live 2319 angle-only.)
-    let (lin, ang) = if stl { (c.chordal_mm * 2e-6, 2.0 * c.angular_deg) } else { (c.distance_m.max(1e-7), c.angular_tol_deg) };
-    (lin.max(1e-10), ang.to_radians().clamp(1e-3, 1.5), stl)
+    let (lin, ang, min) = if stl {
+        (c.chordal_mm * 2e-3, 2.0 * c.angular_deg, 0.7 * c.min_facet_mm * 1e-3)
+    } else {
+        (c.distance_m.max(1e-7), c.angular_tol_deg, 0.0)
+    };
+    (lin.max(1e-10), ang.to_radians().clamp(1e-3, 1.5), stl, min)
 }
 
 /// A part's export mesh (STL, OBJ, 3MF…): a closed surface, consistently wound; an STL's at Onshape's facet
 /// tolerances ([`k::tessellate_export`]).
-fn export_mesh(sh: &k::Shape, defl: f64, ang: f64, stl: bool) -> anyhow::Result<k::Tessellation> {
-    Ok(if stl { k::tessellate_export(sh, defl, ang)? } else { k::tessellate_closed(sh, defl, ang)? })
+/// An STL's chord no longer than a twentieth of the part's box: a chord past the part's size limits nothing (its
+/// segments follow the angle), and BRepMesh's mesh broke there (motor-mount-jack at a 100 mm chord and Medium's
+/// minimum facet width: a hole filled, +41 % volume).
+fn export_mesh(sh: &k::Shape, defl: f64, ang: f64, stl: bool, min: f64) -> anyhow::Result<k::Tessellation> {
+    if !stl {
+        return Ok(k::tessellate_closed(sh, defl, ang)?);
+    }
+    let size = sh.bounding_box(false).map_or(f64::INFINITY, |b| b.max.distance(b.min));
+    Ok(k::tessellate_export(sh, defl.min(0.05 * size).max(1e-10), ang, min)?)
 }
 
 fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::Shape, [f32; 4])]) -> anyhow::Result<()> {
@@ -744,8 +757,8 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
             k::write_rhino(path, &shapes, k::LengthUnit::Meter, version)?;
         }
         f if f.mesh() => {
-            let (defl, ang, stl) = mesh_params(s);
-            let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), export_mesh(sh, defl, ang, stl)?, *c))).collect::<anyhow::Result<_>>()?;
+            let (defl, ang, stl, min) = mesh_params(s);
+            let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), export_mesh(sh, defl, ang, stl, min)?, *c))).collect::<anyhow::Result<_>>()?;
             match f {
                 PartFormat::Stl | PartFormat::Obj => {
                     // STL: in the chosen unit; OBJ: meters.

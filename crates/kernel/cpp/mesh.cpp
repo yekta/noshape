@@ -1177,7 +1177,7 @@ struct OcMeshFaces
 // `exact`: BRepMesh alone (an export at Onshape's facet tolerances: its counts follow the settings as
 // Parasolid's do; noshape's display mesher doesn't take faces).
 std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, bool relative,
-                                     bool parallel, bool exact)
+                                     bool parallel, bool exact, double min_size)
 {
   require_non_null(s.shape, "shape");
   if (!(lin > 0) || !std::isfinite(lin))
@@ -1208,7 +1208,8 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     prm.Angle                    = ang;
     prm.Relative                 = relative;
     prm.InParallel               = parallel;
-    prm.MinSize                  = Precision::Confusion();
+    // (An STL's Minimum facet width, live 2994: its edges' segments no shorter.)
+    prm.MinSize                  = std::max(Precision::Confusion(), min_size);
     // Faces whose stored triangulation already satisfies the deflection are
     // skipped by BRepMesh (mesh faces; display meshes are dropped below).
     // Not Delabella for planar faces: it dereferences null on some of them
