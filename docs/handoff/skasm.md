@@ -1,5 +1,23 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-14 06:24 UTC): sketch speed (lead: solve, regeneration and drag, then fix the slowest)
+- Probe (not in the repo): /root/skasm-scratch/probes/zz_sketch_speed.rs (copy into crates/ops/tests + a `mod` line in
+  all.rs; run with /root/skasm-scratch/bin/probe.sh through rb.sh: SKETCH_DOCS = a dir / list of .noshape files, each
+  opened from a mode-600 copy in PROBE_TMP and removed). Documents: the model suite saved by NOSHAPE_PARITY_SAVE on
+  vibe7 (~/tmp/skasm/pm) plus hat8 / hat15 / dock copies (~/tmp/skasm, mode 700; delete when done).
+- Found: all 450 sketches solve in under 9 ms cold; every drag step (restore + drag + regions, as the editor) under 16
+  ms on the 10 largest (avg 0.4-4.5 ms; flange-josh 15 ms at its limit). The cost users feel is regeneration: a sketch
+  whose expression-driven dimensions changed runs the constructive placement, 5-49 ms a sketch (dock 332 ms over 102
+  sketches) for a 0.2-0.5 ms plain solve. Of it, ~90 % was failed trial solves still walking the homotopy and
+  conflict search, then O(n^2) constraint removal and SipHash id maps.
+- Fixed (43a7f9e2a, 548c17ffb): `Sketch::solve_trial` (one solve, no walk / exclusion: the walk rescued 1 trial of
+  40,000 and changed no placement), `retain_constraints`, `ids::IdHasher` for the entity / constraint maps. Same
+  placements (43 dumped real sketches fingerprinted), live fuzz 766 / 830 as before, sketch tests 9.5 -> 3.4 s.
+- vibe7, same build, main vs mine: all sketches' regeneration 1107 -> 604 ms; dock 332 -> 115, hat8 197 -> 79, hat15
+  174 -> 81, hex-bookcase 47 -> 21, louver 51 -> 38. Drags unchanged (they never ran the constructive pass).
+- Next levers: what's left in regeneration is mostly plane resolution / imprint / regions of a few sketches
+  (cf-fix-pcb's 23 ms, impeller's 19 ms, hex-bookcase's 18 ms text sketch): profile them with per-stage timers.
+
 ## Resume here (2026-11-14 01:02 UTC): the 7 model-suite documents not matching (Mac 80/87, 870/947)
 - c2-hunting-knife, c2-impeller-loft: core's (the user's split). c2-fan-blade-sweep Boolean 2: bool (sent by core).
   cf-setback-fillet: blend (SETBACK-FILL-PATCH). cf-surface-pattern Surface Pattern 3 (85-sphere cut): bool.
