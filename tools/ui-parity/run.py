@@ -792,7 +792,13 @@ def compare(live, ours, whole_document=True):
         a, b = export_fields_by_label(a), export_fields_by_label(b)
         bl = (b or {}).get("list")
         if isinstance(bl, dict) and isinstance(bl.get("rows"), list) and str(live.get("recorded", "")) < PRO_SINCE:
-            b = dict(b, list=dict(bl, rows=[r for r in bl["rows"] if r not in PRO_ROWS and not str(r).startswith("Where used for ")]))
+            # (The pointer's row keeps its place: the rows above it that go move it up.)
+            rows = bl["rows"]
+            pro = {r for r in rows if r in PRO_ROWS or str(r).startswith("Where used for ")}
+            kept = [r for r in rows if r not in pro]
+            hl = bl.get("highlighted")
+            hl_row = rows[hl] if isinstance(hl, int) and 0 <= hl < len(rows) else None
+            b = dict(b, list=dict(bl, rows=kept, highlighted=kept_index(rows, hl, pro, kept, hl_row) if hl is not None else None))
         bd = (b or {}).get("dialog")
         if isinstance(bd, dict) and str(live.get("recorded", "")) < panel_read_since(bd.get("title")) and (a or {}).get("dialog") is None:
             b = dict(b, dialog=None)
