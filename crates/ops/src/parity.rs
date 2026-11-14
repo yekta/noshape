@@ -3915,6 +3915,18 @@ impl<'a> Translator<'a> {
                     return e["id"].as_str().map(str::to_string);
                 }
             }
+            // A circle: live's midpoint on it, its length live's (asm-hand-drill-pinslot f79298's Sketch 6 ends a line on
+            // Sketch 3's R12.62 circle, JiB).
+            let n = [0, 1, 2].map(|i| x[(i + 1) % 3] * y[(i + 2) % 3] - x[(i + 2) % 3] * y[(i + 1) % 3]);
+            for e in entities.iter().filter(|e| e["type"] == "circle") {
+                let (Some(c), Some(r)) = (uv(&e["center"]), e["radius"].as_f64()) else { continue };
+                let w = [0, 1, 2].map(|i| (o[i] + c[0] * x[i] + c[1] * y[i]) * k);
+                let d = [0, 1, 2].map(|i| mid[i] - w[i]);
+                let on = ((0..3).map(|i| d[i] * d[i]).sum::<f64>().sqrt() - r * k).abs() < 1e-6 && (0..3).map(|i| d[i] * n[i]).sum::<f64>().abs() < 1e-6;
+                if on && length.is_none_or(|l| (std::f64::consts::TAU * r * k - l).abs() < 1e-6) {
+                    return e["id"].as_str().map(str::to_string);
+                }
+            }
         }
         None
     }
@@ -4033,6 +4045,16 @@ impl<'a> Translator<'a> {
             a["limit"] = json!(64);
             let more = self.call("query_entities", a.clone()).ok()?;
             if let Some(e) = best(more[kind].as_array().map(Vec::as_slice).unwrap_or(&[])) {
+                return Some(e);
+            }
+        }
+        // None of live's curve type there: of any type (live's bodydetails gives a gear tip's 0.34 mm arc of its
+        // addendum as a LINE, the chord's length: asm-hand-drill-pinslot f79298's Chamfer 1 on the 15 tips, not the
+        // axial lines beside them).
+        if kind == "edges" && r.geometry.is_some() && r.measure.is_some() {
+            let mut any = a.clone();
+            any.as_object_mut().map(|m| m.remove("curve"));
+            if let Some(e) = self.call("query_entities", any).ok().and_then(|v| best(v[kind].as_array().map(Vec::as_slice).unwrap_or(&[]))) {
                 return Some(e);
             }
         }
