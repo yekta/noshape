@@ -2840,6 +2840,81 @@ fn a_face_double_clicked_shows_its_features_sketch(cx: &mut TestAppContext) {
     assert_eq!((before, after, selected, shown(cx)), (0, 1, 0, 0), "sketches shown before, after the double-click (selection), after the next click");
 }
 
+/// Live (analysis-deviation; behaviours "psui (Deviation analysis panel, in full)"): a face preselected opens Deviation
+/// analysis on its Surface tab, the face as the Source, read-only Max / Min, "Max and min location" on, "Absolute
+/// values" off, then Scale; reopened over an edge it opens on Curve with both chains empty.
+#[gpui::test]
+fn deviation_opens_on_surface_with_a_face_preselected(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "deviation-face");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.selection = vec![top.clone()];
+        v.toggle_analysis_tool(crate::part_studio::analysis_tools::ToolKind::Deviation, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let panel = cx.update(|cx| view.read(cx).analysis_panel_state(cx)).expect("the Deviation panel");
+    let text: Vec<String> = panel["text"].as_array().unwrap().iter().filter_map(|t| t.as_str().map(str::to_string)).collect();
+    let want = ["Curve", "Surface", "Source", "Face of Extrude 1", "×", "To measure", "Max", "Min", "[x] Max and min location", "Max and min location", "[ ] Absolute values", "Absolute values", "Scale"];
+    assert_eq!(text, want.map(String::from).to_vec());
+    // Closed, then opened again over an edge: Curve (the tab isn't remembered), the edge not taken.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.toggle_analysis_tool(crate::part_studio::analysis_tools::ToolKind::Deviation, w, cx);
+        v.selection = v.display.bodies[0].edge_refs.iter().take(1).cloned().collect();
+        v.toggle_analysis_tool(crate::part_studio::analysis_tools::ToolKind::Deviation, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let panel = cx.update(|cx| view.read(cx).analysis_panel_state(cx)).expect("the Deviation panel");
+    let text: Vec<String> = panel["text"].as_array().unwrap().iter().filter_map(|t| t.as_str().map(str::to_string)).collect();
+    assert_eq!(text, ["Curve", "Surface", "Chain 1", "Chain 2", "Max", "Min", "Scale"].map(String::from).to_vec());
+}
+
+/// Live (behaviours "psui (Deviation analysis panel, in full)", the overlap start): Part 1's top as the Source and Part
+/// 2's as To measure read Max 11.18 mm (Part 2's far corners from Part 1's edge), Min 5 mm.
+#[gpui::test]
+fn surface_deviation_measures_to_measure_against_the_source(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "deviation-overlap", Some(starts["overlap"].clone()));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.len() == 2);
+    // The top face of each part (all its triangles at the part's top height).
+    let top = |cx: &mut TestAppContext, body: usize, z: f64| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            v.display.bodies[body].face_refs.iter().find(|f| {
+                let t = v.face_triangles(f);
+                !t.is_empty() && t.iter().flatten().all(|p| (p.z - z).abs() < 1e-7)
+            })
+            .cloned()
+        })
+        .expect("the top face")
+    };
+    let (source, measured) = (top(cx, 0, 0.010), top(cx, 1, 0.015));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.selection = vec![source.clone()];
+        v.toggle_analysis_tool(crate::part_studio::analysis_tools::ToolKind::Deviation, w, cx);
+        if let Some(t) = &mut v.ui.analysis_tool {
+            t.selection2 = vec![measured.clone()];
+        }
+        v.recompute_analysis_tool(cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let panel = cx.update(|cx| view.read(cx).analysis_panel_state(cx)).expect("the Deviation panel");
+    let value = |label: &str| panel["fields"].as_array().unwrap().iter().find(|f| f["label"] == label).and_then(|f| f["value"].as_str().map(str::to_string));
+    assert_eq!((value("Max"), value("Min")), (Some("11.18 mm".to_string()), Some("5 mm".to_string())));
+    // The colour map on To measure (Viridis): its vertices over Part 1 at the low end, the far corners at the top.
+    let (low, high) = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let colors = v.vertex_colors(cx).expect("vertex colours");
+            let b = &v.display.bodies[1];
+            let c = colors.get(&b.id).expect("Part 2's colours").clone();
+            let at = |x: f32, y: f32| (0..b.mesh.positions.len()).find(|&i| (b.mesh.positions[i][0] - x).abs() < 1e-6 && (b.mesh.positions[i][1] - y).abs() < 1e-6 && (b.mesh.positions[i][2] - 0.015).abs() < 1e-6 && c[i][3] == 255).map(|i| c[i]);
+            (at(0.030, 0.010), at(0.050, 0.020))
+        })
+    });
+    assert_eq!((low, high), (Some([0x44, 0x01, 0x54, 255]), Some([0xfd, 0xe7, 0x25, 255])), "Viridis' ends at 5 and 11.18 mm");
+}
+
 /// Live 1990 (3.18): a double-click on a shown sketch's line in the graphics doesn't open the sketch; the first click
 /// selects the line, the second deselects it.
 #[gpui::test]

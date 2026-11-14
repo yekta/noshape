@@ -3421,7 +3421,7 @@ impl PartStudioView {
             self.ui.consumed_lines = None;
             return Vec::new();
         };
-        let missing = |refs: &[Reference]| -> Vec<Reference> { refs.iter().filter(|r| matches!(r, Reference::Edge(_) | Reference::Face(_)) && (built.picks.ids_for(r).is_empty() || changed.contains(r))).cloned().collect() };
+        let missing = |refs: &[Reference]| -> Vec<Reference> { refs.iter().filter(|r| matches!(r, Reference::Edge(_) | Reference::Face(_)) && (built.consumed(r) || changed.contains(r))).cloned().collect() };
         let (mut sel, mut acc) = (missing(selection), missing(accent));
         // Hovering its chip lights the pick the query-hover yellow-green
         // #f2ff80, consumed or not (live: qa4 round 5 s7, CHIP-HOVER).

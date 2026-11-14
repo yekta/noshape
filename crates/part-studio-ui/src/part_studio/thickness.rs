@@ -49,7 +49,7 @@ pub const CURVATURE_PALETTES: [(&str, &[u32]); 4] = [
 /// The palettes of a bar.
 pub fn palettes(bar: Bar) -> &'static [(&'static str, &'static [u32])] {
     match bar {
-        Bar::Thickness => &PALETTES,
+        Bar::Thickness | Bar::Deviation => &PALETTES,
         Bar::Curvature => &CURVATURE_PALETTES,
     }
 }
@@ -91,6 +91,8 @@ enum LegendDrag {
 pub enum Bar {
     Thickness,
     Curvature,
+    /// Deviation analysis' Surface tab (live qdev/b: Colors Viridis, Dim color scale).
+    Deviation,
 }
 
 /// A color bar's palette, user bounds and on-screen state.
@@ -279,6 +281,7 @@ impl PartStudioView {
         match bar {
             Bar::Thickness => self.ui.thickness.as_ref().map(|t| &t.bar),
             Bar::Curvature => self.ui.curvature_map.as_ref().map(|c| &c.bar),
+            Bar::Deviation => self.deviation_tool().map(|t| &t.bar),
         }
     }
 
@@ -286,6 +289,7 @@ impl PartStudioView {
         match bar {
             Bar::Thickness => self.ui.thickness.as_mut().map(|t| &mut t.bar),
             Bar::Curvature => self.ui.curvature_map.as_mut().map(|c| &mut c.bar),
+            Bar::Deviation => self.ui.analysis_tool.as_mut().filter(|t| t.kind == super::analysis_tools::ToolKind::Deviation).map(|t| &mut t.bar),
         }
     }
 
@@ -294,7 +298,43 @@ impl PartStudioView {
         match bar {
             Bar::Thickness => self.thickness_range(cx),
             Bar::Curvature => self.ui.curvature_map.as_ref()?.range,
+            Bar::Deviation => {
+                let map = self.deviation_tool()?.result.as_ref()?.deviation_map.clone()?;
+                let k = 1.0 / self.length_factor(cx).0;
+                let (lo, hi) = map.iter().flat_map(|(_, v)| v.iter().map(|(_, d)| d * k)).fold((f64::MAX, f64::MIN), |(lo, hi), d| (lo.min(d), hi.max(d)));
+                (lo <= hi).then_some((lo, hi))
+            }
         }
+    }
+
+    /// The open Deviation analysis, showing its Surface colour map.
+    fn deviation_tool(&self) -> Option<&super::analysis_tools::AnalysisTool> {
+        self.ui.analysis_tool.as_ref().filter(|t| t.kind == super::analysis_tools::ToolKind::Deviation && t.options.surface)
+    }
+
+    /// The colour of value `v` (display units) on a bar: its palette between the bounds, the outside colours past
+    /// user bounds, grey when dimmed.
+    pub(super) fn bar_color(&self, bar: Bar, v: f64, cx: &App) -> [u8; 4] {
+        let c = match (self.bar_bounds(bar, cx), self.bar_ui(bar)) {
+            (Some((lo, hi)), Some(b)) => {
+                let dim = match bar {
+                    Bar::Thickness => self.ui.thickness.as_ref().is_some_and(|t| t.dim),
+                    Bar::Deviation => self.deviation_tool().is_some_and(|t| t.dim),
+                    Bar::Curvature => false,
+                };
+                if b.bounds[0].is_some() && v < lo {
+                    BELOW
+                } else if b.bounds[1].is_some() && v > hi {
+                    ABOVE
+                } else if dim {
+                    DIMMED
+                } else {
+                    palette_color_in(palettes(bar), b.palette, if hi > lo { (v - lo) / (hi - lo) } else { 0.5 })
+                }
+            }
+            _ => 0x9a9a9a,
+        };
+        [(c >> 16) as u8, (c >> 8) as u8, c as u8, 255]
     }
 
     /// Bounds in use: the user's, else the data's (a curvature map of one value, a cylinder's Gaussian 0:
@@ -383,7 +423,11 @@ impl PartStudioView {
         let one_value = self.bar_one_value(bar, cx);
         let moving = matches!(b.drag, Some(LegendDrag::Move { .. }));
         let editing = b.editing.as_ref().map(|(i, st, _)| (*i, st.clone()));
-        let dim = bar == Bar::Thickness && self.ui.thickness.as_ref().is_some_and(|t| t.dim);
+        let dim = match bar {
+            Bar::Thickness => self.ui.thickness.as_ref().is_some_and(|t| t.dim),
+            Bar::Deviation => self.deviation_tool().is_some_and(|t| t.dim),
+            Bar::Curvature => false,
+        };
         let table = palettes(bar);
         const BAR: f32 = 600.;
         let view = cx.entity();
@@ -450,6 +494,14 @@ impl PartStudioView {
                         .collect(),
                 );
                 controls = controls.child(h_flex().gap_1().child(div().text_color(pal.text_muted).child("Curvature")).child(kind_menu));
+            }
+            Bar::Deviation => {
+                controls = controls.child(Checkbox::new("cb-dim").label("Dim color scale").checked(dim).on_click(cx.listener(|this, v: &bool, _, cx| {
+                    if let Some(t) = &mut this.ui.analysis_tool {
+                        t.dim = *v;
+                    }
+                    this.rebuild_scene(cx);
+                })));
             }
         }
         let rgb_of = |c: u32| gpui_kit::rgb(c);

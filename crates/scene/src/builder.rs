@@ -549,6 +549,15 @@ pub struct BuiltScene {
     /// Decal instances: (instance index, the face, the Decal feature), for
     /// the selection tint.
     pub decals: Vec<(usize, Reference, FeatureId)>,
+    /// The first pick id of the edges a preview consumed ([`add_consumed_edge_picks`]); every pick from it on is one.
+    pub consumed_from: u32,
+}
+
+impl BuiltScene {
+    /// Whether `r` is drawn here only as a consumed edge's pick (or not at all).
+    pub fn consumed(&self, r: &Reference) -> bool {
+        self.picks.ids_for(r).iter().all(|&id| id >= self.consumed_from)
+    }
 }
 
 const EDGE_COLOR: u32 = theme::viewport::EDGE;
@@ -1115,7 +1124,30 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     }
     let static_instances = scene.instances.len();
     scene.states = vec![0; picks.len() + 1];
-    BuiltScene { scene, picks, static_instances, decals: decal_instances }
+    BuiltScene { scene, picks, static_instances, decals: decal_instances, consumed_from: u32::MAX }
+}
+
+/// While a dialog previews: the edges of `base` (the model before the feature) the preview no longer has, as pick-only
+/// lines with picks of their own, so a click where a consumed edge was still reaches it (live: a fillet's selected edge
+/// clicked again leaves the field).
+pub fn add_consumed_edge_picks(built: &mut BuiltScene, base: &StudioDisplay, up: &Uploader) {
+    let mut lines = LineData::default();
+    built.consumed_from = built.picks.len() as u32 + 1;
+    for b in base.bodies.iter().filter(|b| !b.hidden) {
+        for (e, pl) in b.edge_refs.iter().zip(&b.mesh.edges) {
+            if !built.picks.ids_for(e).is_empty() {
+                continue;
+            }
+            let id = built.picks.push(PickTarget { reference: e.clone(), kind: PickKind::Edge, anchor: None });
+            lines.push_polyline(pl, [0, 0, 0, 0], id, noshape_render::scene::PART_EDGE_WIDTH, 0);
+        }
+    }
+    if lines.segments.is_empty() {
+        return;
+    }
+    built.scene.instances.insert(built.static_instances, Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().pick_only().layer(1));
+    built.static_instances += 1;
+    built.scene.states.resize(built.picks.len() + 1, 0);
 }
 
 fn sketch_color(g: &crate::graphics_prefs::GraphicsPrefs, st: SketchEntityState, construction: bool, editing: bool, external: bool) -> [u8; 4] {

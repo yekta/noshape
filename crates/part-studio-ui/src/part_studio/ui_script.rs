@@ -276,8 +276,37 @@ impl PartStudioView {
             "sketch": self.ui_sketch_state(cx),
             "camera": self.ui_camera_state(cx),
             // (No readout while a feature dialog is open: the readout isn't rebuilt then.)
-            "measure": if self.ui.measure_readout.is_empty() || self.edit.is_some() { Value::Null } else { json!({ "readout": self.ui.measure_readout, "panel": null }) },
+            "measure": match self.ui_sketch_measure(cx) {
+                Some(m) => m,
+                None if self.ui.measure_readout.is_empty() || self.edit.is_some() => Value::Null,
+                None => json!({ "readout": self.ui.measure_readout, "panel": null }),
+            },
         })
+    }
+
+    /// In a sketch, its selection's readout as live's recorder reads it ("Length", "26.987", "mm"; a point "Point" with
+    /// no value, then each axis by its icon).
+    fn ui_sketch_measure(&self, cx: &App) -> Option<Value> {
+        let ed = self.sketch.as_ref()?;
+        let data = self.sketch_data(cx)?;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let (label, text) = ed.selection_readout(&data, &units)?;
+        let split = |t: String| t.rsplit_once(' ').map(|(v, u)| (v.to_string(), u.to_string())).unwrap_or((t, String::new()));
+        let readout = match (label.as_str(), ed.selection.as_slice()) {
+            ("Point", [e]) => {
+                let w = ed.frame.to_world(data.sketch.point(*e)?);
+                let axis = |name: &str, x: f64| {
+                    let (value, units) = split(self.measure_fmt(noshape_units::Quantity::new(x, noshape_units::Dim::LENGTH), cx));
+                    json!({ "name": name, "value": value, "units": units })
+                };
+                vec![json!({ "name": label, "value": "", "units": "" }), axis("svg-icon-XYZ-Icons-AlongX", w.x), axis("svg-icon-XYZ-Icons-AlongY", w.y), axis("svg-icon-XYZ-Icons-AlongZ", w.z)]
+            }
+            _ => {
+                let (value, units) = split(text);
+                vec![json!({ "name": label, "value": value, "units": units })]
+            }
+        };
+        Some(json!({ "readout": readout, "panel": null }))
     }
 
     /// `camera` as live's recorder reads it (since 2026-11-12): view direction and up (unit vectors), target and eye
@@ -705,7 +734,7 @@ impl PartStudioView {
     pub fn ui_busy(&self) -> bool {
         // An open dialog's model before the feature and std's editing logic on it (a new Extrude opens as New and
         // turns Add once that ran) count too.
-        self.pending.is_some() || self.context.is_none() || self.ui.preview_task.is_some() || self.ui.scene_task.is_some() || self.ui.restore_check.is_some() || self.ui.std_edit_task.is_some() || self.ui.material_notice_pending
+        self.pending.is_some() || self.context.is_none() || self.measure_cache.as_ref().is_some_and(|c| c.results.is_none() && c.selection == self.selection) || self.ui.preview_task.is_some() || self.ui.scene_task.is_some() || self.ui.restore_check.is_some() || self.ui.std_edit_task.is_some() || self.ui.material_notice_pending
     }
 
     /// The hover under a resting pointer isn't settled yet: a hover query in flight, or an edge's midpoint dwell

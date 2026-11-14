@@ -4,6 +4,13 @@
  "area": "psui",
  "source": "live coverage audit 2026-11-14 (field-level gaps in the recorded suite)",
  "start": "block",
+ "remembered": {
+  "fillet": {
+   "length:Millimeter": {
+    "radius": "1 mm"
+   }
+  }
+ },
  "steps": [
   {
    "do": "click",
