@@ -355,11 +355,18 @@ fn frame_at(body: &Shape, faces: [&Shape; 2], p: DVec3, tangent: DVec3, scale: f
         let mut found = false;
         // Along the face: the side the face lies on (at a concave edge both
         // sides of the edge have material below them).
-        let on_face = |su: f64| -> FResult<bool> {
-            let q = k::make_vertex(p + dir * (su * d))?;
-            Ok(k::distance(&q, faces[i])?.distance < d * 1e-3)
+        let off_face = |su: f64| -> f64 {
+            k::make_vertex(p + dir * (su * d)).and_then(|q| k::distance(&q, faces[i])).map_or(f64::INFINITY, |r| r.distance)
         };
-        let sides: Vec<f64> = [1.0, -1.0].into_iter().filter(|su| on_face(*su).unwrap_or(false)).collect();
+        let off = [off_face(1.0), off_face(-1.0)];
+        let sides: Vec<f64> = [1.0, -1.0].into_iter().zip(off).filter(|&(_, o)| o < d * 1e-3).map(|(su, _)| su).collect();
+        // (Both off a curved face: the step along its tangent plane leaves it by ~d²/2R on its side, by ~d past the
+        // edge: that side, without the centroid's area integral (cf-snap-hook's Fillet 5: 4 tori, 30 of its 66 ms).)
+        let sides = match (sides.as_slice(), off.map(|o| o < d * 0.5)) {
+            ([], [true, false]) => vec![1.0],
+            ([], [false, true]) => vec![-1.0],
+            _ => sides,
+        };
         // (Undecided, both a step from a face's corner or both on it: the side its centroid is on. A concave corner's
         // section went into the material otherwise: c2-extension-spring's Curvature fillet.)
         let sides = match sides.as_slice() {
