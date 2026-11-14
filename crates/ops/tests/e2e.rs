@@ -931,23 +931,36 @@ fn block_with_hole(ctx: &mut Ctx, file: &str) {
     assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
 }
 
-/// An extrude's side faces on one circle are one face, whatever splits the circle (live q-arcs: an r20 circle drawn as
-/// three arcs end to end, a line ending at one joint: one cylinder and two planes, no seam vertex).
+/// An extrude's side faces on one circle are one face, whatever splits the circle (live q-arcs, an r20 circle on Top,
+/// 5 mm, every region: (a) lines ending on it from outside, (b) drawn as three arcs end to end, (c) (b) and a line
+/// ending at a joint, (d) a line across it, both regions merged; each one body of 3 faces / 2 edges / 0 vertices).
 #[test]
 fn arcs_of_one_circle_extrude_to_one_side_face() {
-    let mut ctx = Ctx::new();
-    let sk = new_sketch(&mut ctx, "arcs-one-circle.noshape", "plane:top");
-    let at = |deg: f64| json!([20.0 * deg.to_radians().cos(), 20.0 * deg.to_radians().sin()]);
-    for (a, b) in [(0.0, 120.0), (120.0, 240.0), (240.0, 360.0)] {
-        call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "center_point_arc", "points": [[0, 0], at(a), at(b)] }));
+    let at = |deg: f64, r: f64| json!([r * deg.to_radians().cos(), r * deg.to_radians().sin()]);
+    let circle = json!({ "tool": "circle", "points": [[0, 0], [20, 0]] });
+    let arcs: Vec<Value> = [(0.0, 120.0), (120.0, 240.0), (240.0, 360.0)].iter().map(|&(a, b)| json!({ "tool": "center_point_arc", "points": [[0, 0], at(a, 20.0), at(b, 20.0)] })).collect();
+    let line = |a: Value, b: Value| json!({ "tool": "line", "points": [a, b] });
+    let cases: [(&str, Vec<Value>); 4] = [
+        ("a", vec![circle.clone(), line(at(30.0, 40.0), at(30.0, 20.0)), line(at(150.0, 40.0), at(150.0, 20.0)), line(at(270.0, 40.0), at(270.0, 20.0))]),
+        ("b", arcs.clone()),
+        ("c", arcs.iter().cloned().chain([line(at(120.0, 40.0), at(120.0, 20.0))]).collect()),
+        ("d", vec![circle, line(json!([-30, 5]), json!([30, 5]))]),
+    ];
+    for (case, shapes) in cases {
+        let mut ctx = Ctx::new();
+        let sk = new_sketch(&mut ctx, &format!("arcs-one-circle-{case}.noshape"), "plane:top");
+        for mut shape in shapes {
+            shape["sketch"] = json!(sk);
+            call(&mut ctx, "sketch_draw", shape);
+        }
+        let st = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+        let inside: Vec<Value> = st["regions"].as_array().unwrap().iter().filter(|r| num(&r["area"]) < std::f64::consts::PI * 400.0 + 1.0).map(|r| r["id"].clone()).collect();
+        let ex = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": inside, "depth": "5 mm" } }));
+        assert_eq!(ex["feature_status"]["status"], "Ok", "({case}) {ex}");
+        assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 1, "({case}) one body");
+        let count = |ctx: &mut Ctx, kind: &str| call(ctx, "query_entities", json!({ "kind": kind }))[kind].as_array().unwrap().len();
+        assert_eq!([count(&mut ctx, "faces"), count(&mut ctx, "edges"), count(&mut ctx, "vertices")], [3, 2, 0], "({case}) one cylinder and two planes, no seam vertex");
     }
-    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [[40, 0], [20, 0]] }));
-    let st = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
-    let disc = st["regions"].as_array().unwrap().iter().find(|r| (num(&r["area"]) - std::f64::consts::PI * 400.0).abs() < 1.0).unwrap_or_else(|| panic!("{st}"))["id"].as_str().unwrap().to_string();
-    let ex = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [disc], "depth": "5 mm" } }));
-    assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
-    let faces = call(&mut ctx, "query_entities", json!({ "kind": "faces" }))["faces"].as_array().unwrap().len();
-    assert_eq!(faces, 3, "one cylinder and two planes");
 }
 
 /// Export of a Part Studio with no parts: live's notice (export-tab-no-geometry: the Export modal shows only it).
