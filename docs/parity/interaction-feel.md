@@ -35,7 +35,7 @@ GPU `feel::presses_orbit_box_and_open_the_menu_as_live`).
 | Plane border | 7–8, no hold | 7, no hold (`LineSegment::WIDE_PICK`, `NO_HOLD`) | matrix | = |
 | Assembly instance edge / vertex | 6 / 7, no hold | 6, no hold (`NO_HOLD`) / 7 | matrix | = |
 | Silhouette edge | lights at 6, stays lit to 9–10 | as an edge | – | ≈ |
-| Mate connector | its triad and ring: 23 px across, 14 down | – | – | – |
+| Mate connector | its triad and ring: 23 px across, 14 down | drawn at Onshape's MATE_CONNECTOR_DIAMETER_PX 36 (`MC_R_OUT_PX` 18) with the 5 px pick: 23 across, ~15 down in the iso view | – | ≈ |
 | Vertex vs its edge; edge vs edge 5.6 px apart | the vertex anywhere in its reach (a lit edge holds against it to ~4 px); the lit edge holds 3–4 px past the other | the vertex in its reach; the held band wins by distance | – | ≈ |
 | Hover timing | a pick on every move below 0.15 px/ms; faster: after a pause of min(5 × the average pick, 250 ms) | the same (`prehighlight_delay`) | app-core `prehighlight_waits_for_a_pause_as_live` | = |
 | Edge midpoint target after a rest | live 1954: 9 px square, a short dwell | `update_hover`, `MIDPOINT_DWELL` | existing midpoint tests | = |
@@ -610,7 +610,6 @@ live2's feedback.json (11-13 09:39, for psui and studios). part-studio-ui `feedb
    Ctrl+click~~ (psui 11-13).
 2. Sketch hover timing: live2's 270–300 ms after the pointer stops (no tool) vs 30 ms with the Dimension tool: asked
    whether it is Onshape's or the recording Chrome's slow redraws before copying a delay.
-3. ~~3D reach, priority, press thresholds~~ (psui 11-13). Left: mate connector reach, box select's rules, double-click
-   on a face, the held edge against its own vertex.
+3. ~~3D reach, priority, press thresholds~~ (psui 11-13). Left: the held edge against its own vertex (mate connector reach ≈, double-click fixed 11-14).
 4. ~~Inference glyph position against the pointer (live ≈ 30, 30)~~: within 2 px (psui 11-14).
 5. ~~Dimension tool placement rules~~: two points' H / V / aligned by the box, 48 / 48 of live2's positions (psui 11-14); the angle quadrant and Ø have their own tests.
