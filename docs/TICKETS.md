@@ -105,7 +105,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cold = warm on all 87.
 
 ## qa, 2026-11-10
-- [ ] P1 HAND-DRILL-MATES-OVERDEFINED (dx first, then asm; qa 2026-11-10 12:26, lead's bisect) **asm-hand-drill-pinslot's mates
+- [x] (dx 2026-11-14 15:50 UTC, main 3a6fc428c + dx-1dc / tvc-b on vibe7: 67/67 mates as live, 39/41 occurrences; left, not mates: 2 occurrences not inserted, Part 1 <4> / <7> / <9> moved 0.57 mm by our mates, ~20 studio features failing (Chamfer / Fillet 1, Sweep 1 / 2 boolean, Sketch 6 conflicting) in 7ed710, 9fbc05, bb72f3, cde2dd, e53bba, f79298: core / bool; log vibe7 ~/tmp/dx/sk-base1-hd.log) P1 HAND-DRILL-MATES-OVERDEFINED (dx first, then asm; qa 2026-11-10 12:26, lead's bisect) **asm-hand-drill-pinslot's mates
   as live 28 -> 5/52 since dx's ee69e4a6a** (parity translator: a construction Use stays construction, an imprint face's
   region in the last imprinting sketch). Bisected on vibe4 (debug as the suite, the document alone; corpus unchanged since
   11-07): 75f529a64 28, ee69e4a6a 5; main b2c82787f (with dx's 297ea7dcb) still 5 (only Studio 4bed3f / e0abe1's "Plane 1:
