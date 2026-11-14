@@ -5,6 +5,26 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-14 17:47 UTC)
+- **Landed d34b2281** (16:44): a guided loft's profiles are split at every guide end (BRepAlgoAPI_Splitter, a closed
+  circle restarted at a split point), sewing's B-spline copies replaced by the profile's own lines / arcs
+  (`keep_profile_curves`: sewing keeps the longer edge, any spline along a line is longer), a closed side's OCCT seam
+  moved onto one of A's vertices (SetUPeriodic + SetUOrigin; at a guide the shown-topology seam joins hid the guide
+  vertex), and a new edge mark `kept_ends` (common.cpp, carried like kept_edge): no unify (USD's KeepShape vertex,
+  join_loop_pieces) merges two such edges at their vertex. Knife HANDLE: Loft 1 3/20/20, Extrude 8 8/32/28, Extrude 9
+  10/36/28 all as live. T1s kernel_core::a_guided_loft_of_a_stadium_to_a_circle… (8 edges, lines), …a_cut_into_a_guided_
+  loft_keeps_its_guide_vertices. Still: from Revolve 1 one vertex short (10/27/18 vs 19), +101 mm³ (the surface),
+  Fillet 8 fails.
+- **Gating (vibe5 suite A/B vs d34b2281):** cfb94e589 translator: a sweep path's sketch arcs found by live's midpoint
+  and length (`sketch_curve_at`; only lines before: asm-hand-drill-pinslot cde2dd's Gear Selector Pin builds, 19/18/0
+  122.0491 as live); a face none near live's point matches within 5 % found by its centroid in live's box (a whole
+  cylinder's point is on its axis: e53bba's Extrude 11 up to the groove wall, then Circular pattern 2, volumes as live).
+  a6be113b0: op_prism's seat_circles keeps each circle's own frame (only the edge starts at the seam): Helix › Circle on
+  an extruded circle starts at the sketch's x as live (bb72f3 Sweep 1 and 7ed710 Sweep 1 then build as live; bool told).
+- **Next:** e53bba Extrude 8 (UP_TO_SURFACE, +2 faces +0.10 mm³, ×6 by Circular pattern 1), with the infento sliver and
+  dx's bjr 5d8bc1 Extrude 55 (the up-to family); knife Revolve 1 vertex, handle surface; blend's knife Boolean timing
+  after a3e9fb3d (projected edge = a sub-range of the whole cubic: try Segment).
+
 ## core state (11-14 14:35 UTC)
 - **Landed a3e9fb3d + a6a966cd** (12:12): (1) a curve projected along a direction onto a linear extrusion, sweeping a
   plane square to it, lands on the extruded curve projected into that plane (GeomProjLib::ProjectOnPlane, between the
