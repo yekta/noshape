@@ -8,7 +8,27 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
-## Now (asm, 2026-11-14 01:15 UTC)
+## Now (asm, 2026-11-14 08:06 UTC)
+- Queued a42d6a59 (carries dbd8da0f): suppressed mates; Cylindrical rule reverted (premise wrong: live 3004); part
+  mapping by live's centroid, by live's first maker (<element>.first.json, live 3043), several made by one feature by
+  volume; the mate dialog / Insert / filter / relation / pattern state as live's recorder reads it (asm-* coverage
+  batches 2, 6, 8, 12 and the offset takes); the runner's {"field": "", "index": n}. Gate g-s4 (vibe7): infento
+  142 -> 149/167 occurrences, 107/182 -> 131/183 mates; isaac-ball 93/99; pinslot 12/12; nothing worse.
+  Committed after it: edge-midpoint connectors aligned to live's second id (face), the exact OFF trace.
+- What's left by assembly is mostly Part Studio translation (dx's translator):
+  - infento: studio 1dc32b (dx: Extrude 7's UP_TO_NEXT with offset sent to core), studio 74d3d6 (mine: its parts
+    map right; Up to next / multi-region extrudes leave faces live merges into one, so topology differs);
+  - bjr-config: studio 5d8bc1 (Sweep 1 makes PlateCover; side triangle off in volume): dx after tvc-mount;
+  - config-assembly: studio 08590a (Sketch 2 conflicting constraints, sheet metal downstream): unassigned;
+  - robot-relations: Derived 1 from another document's Part Studio f6fb12f… not in the corpus (REQUESTS 08:05);
+  - suspension: 310e77's Extrude 1 bounds on a feature not built; Body (995636) is now inserted but off in shape.
+- "Simulation features (N)" in the tree came from the account's Professional plan: live's recorder drops it since
+  2026-11-14.2 (simulation is left out). Studios has the dialog behaviour items (✓ / undo after an edit, Tab to
+  Reverse direction, Simulation connection's Faces to connect).
+- The parity trace: `: OFF <inference> on <instance> <kind>` names every mate end off live's frame (exact own
+  connector); in-plane offsets on Planars and along-axis on Cylindricals are harmless.
+
+## Earlier (asm, 2026-11-14 01:15 UTC)
 - Hosts: builds and suites on vibe7; everything lasting in vibe7 ~/agents/asm-keep (run-suite.sh SRC / OUT / BIN, one
   process per assembly; bin/ test binaries and cli; g-* suite results). ~/tmp/<agent> is pruned after 6-12 h.
 - Landed 13-14 Nov: Move-to-origin refusal, ring snap (live's client rule), ▶ preview (out and back, 90 frames), Insert
