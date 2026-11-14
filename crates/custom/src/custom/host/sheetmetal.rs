@@ -3255,7 +3255,23 @@ fn ev_corner_type(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         // A bend alone ends at a corner when the sheet's edge carries on past it (a partial flange's end, its relief);
         // a bend running out to the sheet's edge ends at no corner (live: sm-box's Flange 1, "Selection is not a bend
         // relief.").
-        let carries_on = |bend: u32| away(bend).is_some_and(|d| free.iter().filter_map(|e| away(*e)).any(|f| f.dot(d) < -1.0 + 1e-6));
+        // (Or past a step: Outer alignment moves the bend's edge in, a free side across to the sheet's edge, which then
+        // carries on.)
+        let leaving = |e: u32, from: DVec3| -> Option<DVec3> {
+            let edge = shape.sub_shape(k::ShapeType::Edge, e as usize).ok()?;
+            let info = edge.edge_info().ok()?;
+            let span = info.last_param - info.first_param;
+            let (a, z) = (edge.point_at(info.first_param + span * 1e-3).ok()?, edge.point_at(info.last_param - span * 1e-3).ok()?);
+            let p = if a.distance(from) <= z.distance(from) { a } else { z };
+            Some((p - from).normalize_or_zero())
+        };
+        let past_step = |step: u32, d: DVec3| -> bool {
+            let Some(info) = shape.sub_shape(k::ShapeType::Edge, step as usize).ok().and_then(|x| x.edge_info().ok()) else { return false };
+            let far = if info.start.distance(at) < info.end.distance(at) { info.end } else { info.start };
+            let Some(fv) = shape.vertices().iter().position(|x| x.vertex_point().is_ok_and(|p| p.distance(far) < TOL)) else { return false };
+            ve.get(fv).into_iter().flatten().filter(|e| **e != step && sm_attribute(q.st, &q.to_ref(&Ent::Edge(*b, **e as usize)), "JOINT").is_none()).filter_map(|e| leaving(*e, far)).any(|f| f.dot(d) < -1.0 + 1e-6)
+        };
+        let carries_on = |bend: u32| away(bend).is_some_and(|d| free.iter().any(|e| away(*e).is_some_and(|f| f.dot(d) < -1.0 + 1e-6) || past_step(*e, d)));
         let kind = match (bends.as_slice(), rips) {
             ([], _) => "NOT_A_CORNER",
             ([bend], 0) if carries_on(*bend) => "BEND_END",
