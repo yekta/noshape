@@ -378,6 +378,19 @@ fn deleting_a_boss_through_a_curved_wall_cuts_its_region_away() {
     assert!((removed - 23_474.97).abs() < 0.5, "{removed} mm³ removed");
 }
 
+/// c2-impeller-loft's Delete face 2 (two planes off a flange, OCCT's defeaturing): the part it's given stays as it was
+/// (OCCT raised its tolerances in place: the same delete run again came out invalid).
+#[test]
+fn deleting_faces_leaves_its_input_as_it_was() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/defeature/impeller-delete-face-2.brep");
+    let s = read_brep(&path).unwrap();
+    let faces = s.faces();
+    let before = s.to_brep_bytes().unwrap();
+    let r = delete_faces(&s, &[faces[21].clone(), faces[27].clone()]).unwrap().shape;
+    assert!(r.is_valid());
+    assert!(s.to_brep_bytes().unwrap() == before, "the input changed");
+}
+
 /// cf-lighten's Lighten deletes its tools' rounds before rounding them again: a prism's rounds between plane sides,
 /// convex or concave, go by running the sides on to their corner (the prism built again, as OCCT's Defeaturing).
 #[test]

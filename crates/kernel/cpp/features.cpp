@@ -9909,9 +9909,17 @@ static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
       return make_result(args, prism, ph.get());
     }
   }
+  // On a copy: OCCT's Defeaturing raises its input's tolerances in place, and the input is the part as an earlier
+  // feature left it (c2-impeller-loft's Delete face 2, run twice on one input: valid, then invalid).
+  BRepBuilderAPI_Copy       cp(s.shape, true, false);
+  HHist                     ch = history_of({s.shape}, cp);
+  const TopoDS_Shape        in = cp.Shape();
+  std::vector<TopoDS_Shape> del;
+  for (const TopoDS_Shape& f : faces.items)
+    del.push_back(cp.ModifiedShape(f));
   BRepAlgoAPI_Defeaturing mk;
-  mk.SetShape(s.shape);
-  mk.AddFacesToRemove(to_list(faces.items));
+  mk.SetShape(in);
+  mk.AddFacesToRemove(to_list(del));
   // On this thread, so its CPU budget (run_budgeted) counts the work: in
   // parallel the caller only waits and its budget never ran out (qa
   // DRAFT-HANG: 623 s in one call).
@@ -9929,10 +9937,13 @@ static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
   std::vector<TopoDS_Shape> args{s.shape};
   // Not removed: the region the faces enclose, taken away or filled in.
   if (mk.HasWarning(STANDARD_TYPE(BOPAlgo_AlertUnableToRemoveTheFeature)))
-    if (auto by = defeature_by_region(s.shape, faces.items))
-      return make_result(args, by->first, by->second.get());
-  HHist                     h = history_of(args, mk);
-  return make_result(args, mk.Shape(), h.get());
+    if (auto by = defeature_by_region(in, del))
+    {
+      merge_into(ch, by->second);
+      return make_result(args, by->first, ch.get());
+    }
+  merge_into(ch, history_of({in}, mk));
+  return make_result(args, mk.Shape(), ch.get());
 }
 
 OpOut op_defeature(const OcShape& s, const OcShapeList& faces)
