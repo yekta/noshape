@@ -184,6 +184,9 @@ pub struct SheetGeometry {
     pub cad_objects: Vec<super::cad_objects::CadObject>,
     #[serde(skip)]
     pub cad_members: Vec<super::cad_objects::CadMember>,
+    /// Each value of an ordinate group as drawn, for export (live: one ordinate DIMENSION per value).
+    #[serde(skip)]
+    pub ordinate_values: Vec<super::cad_objects::OrdinateValue>,
     /// The projected edges of each view (its range of `lines`): a shaded
     /// view shows its picture instead, except while hovered or selected.
     pub view_edges: Vec<(super::ViewId, std::ops::Range<usize>)>,
@@ -482,6 +485,13 @@ impl Default for RevisionCalloutStyle {
         Self { shape: super::CalloutBorder::Triangle, chars: 1, font: None, text: super::RowText::default() }
     }
 }
+
+/// A datum target point's cross (mm; live: 14 plot units of 0.12 pt).
+const TARGET_CROSS_PEN_MM: f64 = 14.0 * 0.12 / 72.0 * 25.4;
+
+/// The pen of lines that go with an annotation's text, a callout's border and a note's leader (mm; live: 0.72 pt
+/// in drw-callout-shape-hexagon's and drw-note-add-leader's PDFs).
+const TEXT_LINE_PEN_MM: f64 = 0.254;
 
 /// A callout border's half extents (mm) around a `w` wide label `h` high.
 fn callout_extent(border: super::CalloutBorder, w: f64, h: f64) -> (f64, f64) {
@@ -1465,6 +1475,7 @@ impl SheetGeometry {
                     }).collect();
                     for path in note_leader_paths(l.bbox, &style.leaders, &targets) {
                         let (t, last) = (path.points[path.points.len() - 1], path.points[path.points.len() - 2]);
+                        self.pens.push(PenSpan { centered: false, lines: self.lines.len()..self.lines.len() + 1, width_mm: TEXT_LINE_PEN_MM, dashes: Vec::new() });
                         self.lines.push(Polyline2 { points: path.points, style: LineStyle::Thin, closed: false, pick });
                         self.arrow(t, [t[0] - last[0], t[1] - last[1]], 3.0);
                     }
@@ -2253,11 +2264,21 @@ impl SheetGeometry {
                             self.grips.push(Grip { pick, pos: at(s0, k1), kind: GripKind::Jog });
                             vec![at(s0, l0), at(s0, k1), at(s1, k2), at(s1, level)]
                         };
+                        let (l0, t0) = (self.lines.len(), self.texts.len());
                         self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
                         if self.style.ordinate_iso {
                             self.ordinate_circle(at(s1, level), pick);
                         }
                         self.dim_label(at(s1, level + sg * 1.0), ang, halign, true, &t, dh, pick);
+                        self.ordinate_values.push(super::cad_objects::OrdinateValue {
+                            lines: l0..self.lines.len(),
+                            texts: t0..self.texts.len(),
+                            origin: env.to_sheet(*view, *origin),
+                            feature: sheet_pts[i],
+                            leader: at(s1, level),
+                            x: *horizontal,
+                            value,
+                        });
                     }
                 }
                 AnnotationKind::MaxMinDimension { view, a: pa, ra, ca, b: pb, rb, cb, offset, orientation } => {
@@ -2719,8 +2740,16 @@ impl SheetGeometry {
             if split {
                 outlines.push((vec![[ck[0] - rx, ck[1]], [ck[0] + rx, ck[1]]], false));
             }
+            // Live (drw-callout-shape-hexagon's DXF and PDF): the border goes with the callout's text, on
+            // ANNOTATION_TEXT at 0.25 mm; only the leader is on ANNOTATION_LINES.
+            let l0 = self.lines.len();
             for (pts, closed) in outlines {
                 self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed, pick });
+            }
+            if self.lines.len() > l0 {
+                let lines = l0..self.lines.len();
+                self.cad.push(super::cad_layers::CadSpan { lines: lines.clone(), texts: 0..0, fills: 0..0, layer: super::cad_layers::CadLayer::AnnotationText });
+                self.pens.push(PenSpan { centered: false, lines, width_mm: TEXT_LINE_PEN_MM, dashes: Vec::new() });
             }
             // The callout data (left + main + right) in the middle, justified
             // in the widest row; a split circle has it in the top half and the
@@ -2820,10 +2849,13 @@ impl SheetGeometry {
             }
         };
         match area {
+            // Live (drw-datum-target, ANSI): the cross 0.708 text heights each way, at 14 plot units (1.68 pt).
             DatumTargetArea::Point => {
+                let (e, l0) = (0.708 * self.style.dim_text, self.lines.len());
                 for d in [[1.0, 1.0], [1.0, -1.0]] {
-                    self.lines.push(Polyline2 { points: vec![[p[0] - d[0] * 1.6, p[1] - d[1] * 1.6], [p[0] + d[0] * 1.6, p[1] + d[1] * 1.6]], style: LineStyle::Visible, closed: false, pick });
+                    self.lines.push(Polyline2 { points: vec![[p[0] - d[0] * e, p[1] - d[1] * e], [p[0] + d[0] * e, p[1] + d[1] * e]], style: LineStyle::Visible, closed: false, pick });
                 }
+                self.pens.push(PenSpan { centered: false, lines: l0..self.lines.len(), width_mm: TARGET_CROSS_PEN_MM, dashes: Vec::new() });
             }
             DatumTargetArea::Dot => dot(self, 0.7),
             DatumTargetArea::Custom => dot(self, 0.45),
@@ -2850,18 +2882,28 @@ impl SheetGeometry {
     /// label below) with its leader to the target at `p`, and the pointer
     /// of the moveable styles.
     fn target_callout(&mut self, c: [f64; 2], p: [f64; 2], label: &str, size: &str, style: super::TargetStyle, pick: u32) {
-        let r = 5.5;
+        // Live (drw-datum-target's DXF, ANSI, text 0.12 in): the bubble 1.62 text heights round, its halves' texts
+        // 2/3 of one above and below the middle, the bubble and its divider on ANNOTATION_LINES.
+        let h = self.style.dim_text;
+        let r = 1.62 * h;
+        let half = h * 2.0 / 3.0;
         let pts = (0..40).map(|i| {
             let t = i as f64 / 40.0 * std::f64::consts::TAU;
             [c[0] + r * t.cos(), c[1] + r * t.sin()]
         });
+        let l0 = self.lines.len();
         self.lines.push(Polyline2 { points: pts.collect(), style: LineStyle::Thin, closed: true, pick });
         self.lines.push(Polyline2 { points: vec![[c[0] - r, c[1]], [c[0] + r, c[1]]], style: LineStyle::Thin, closed: false, pick });
-        self.texts.push(Text2 { pos: [c[0], c[1] - 2.6], height: 2.8, text: label.to_string(), angle: 0.0, anchor: Anchor::Center, pick });
+        self.cad.push(super::cad_layers::CadSpan { lines: l0..self.lines.len(), texts: 0..0, fills: 0..0, layer: super::cad_layers::CadLayer::AnnotationLines });
+        self.texts.push(Text2 { pos: [c[0], c[1] - half], height: h, text: label.to_string(), angle: 0.0, anchor: Anchor::Center, pick });
+        // (No size: live writes the top half's empty text.)
+        if size.is_empty() {
+            self.texts.push(Text2 { pos: [c[0], c[1] + half], height: h, text: String::new(), angle: 0.0, anchor: Anchor::Center, pick });
+        }
         if !size.is_empty() && style.outside() {
             // Live request 1735: a dot in the top half, the size outside on
             // a short leader with a shoulder, up-right (rotational: up-left).
-            let dot = [c[0], c[1] + 2.6];
+            let dot = [c[0], c[1] + half];
             let pts: Vec<[f64; 2]> = (0..12).map(|i| {
                 let t = i as f64 / 12.0 * std::f64::consts::TAU;
                 [dot[0] + 0.45 * t.cos(), dot[1] + 0.45 * t.sin()]
@@ -2873,12 +2915,12 @@ impl SheetGeometry {
             let knee = [c[0] + sx * (r + 1.0), c[1] + r + 1.0];
             let end = [knee[0] + sx * 2.0, knee[1]];
             self.lines.push(Polyline2 { points: vec![dot, knee, end], style: LineStyle::Thin, closed: false, pick });
-            let (h, w) = (2.8, font::text_width(size, 2.8));
+            let w = font::text_width(size, h);
             let x = if sx > 0.0 { end[0] + 0.8 } else { end[0] - 0.8 - w };
             self.texts.push(Text2 { pos: [x, knee[1] - 1.4], height: h, text: size.to_string(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
         } else if !size.is_empty() {
             let h = (2.4f64).min(8.5 / font::text_width(size, 1.0).max(1e-9));
-            self.texts.push(Text2 { pos: [c[0], c[1] + 2.6], height: h, text: size.to_string(), angle: 0.0, anchor: Anchor::Center, pick });
+            self.texts.push(Text2 { pos: [c[0], c[1] + half], height: h, text: size.to_string(), angle: 0.0, anchor: Anchor::Center, pick });
         }
         let d = [p[0] - c[0], p[1] - c[1]];
         let l = (d[0] * d[0] + d[1] * d[1]).sqrt();

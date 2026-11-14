@@ -25,6 +25,19 @@ pub enum CadDimKind {
     Ordinate { origin: [f64; 2], feature: [f64; 2], leader: [f64; 2], x: bool },
 }
 
+/// One value of an ordinate group as drawn (sheet mm): its lines and texts, the group's origin, its feature point
+/// and the leader's end; `x`: measured along the sheet's x.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OrdinateValue {
+    pub lines: std::ops::Range<usize>,
+    pub texts: std::ops::Range<usize>,
+    pub origin: [f64; 2],
+    pub feature: [f64; 2],
+    pub leader: [f64; 2],
+    pub x: bool,
+    pub value: f64,
+}
+
 /// A dimension for export.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CadDim {
@@ -155,6 +168,26 @@ impl SheetGeometry {
                     }
                     for i in cells {
                         self.cad_members.push(CadMember { lines: 0..0, texts: i..i + 1, fills: 0..0, obj });
+                    }
+                    continue;
+                }
+                // Live (drw-ordinate-dimension's DXF): an ordinate DIMENSION per value.
+                AnnotationKind::OrdinateGroup { view, .. } => {
+                    let values: Vec<OrdinateValue> = self.ordinate_values.iter().filter(|o| o.lines.start >= l0 && o.lines.end <= l1).cloned().collect();
+                    for o in values {
+                        let pts: Vec<[f64; 2]> = self.texts[o.texts.clone()].iter().flat_map(super::font::text_box).collect();
+                        let text_mid = if pts.is_empty() {
+                            o.leader
+                        } else {
+                            let (x0, x1) = pts.iter().fold((f64::MAX, f64::MIN), |(lo, hi), p| (lo.min(p[0]), hi.max(p[0])));
+                            let (y0, y1) = pts.iter().fold((f64::MAX, f64::MIN), |(lo, hi), p| (lo.min(p[1]), hi.max(p[1])));
+                            [(x0 + x1) / 2.0, (y0 + y1) / 2.0]
+                        };
+                        let obj = self.cad_objects.len();
+                        let dual = env.dual_cad(a, false);
+                        let kind = CadDimKind::Ordinate { origin: o.origin, feature: o.feature, leader: o.leader, x: o.x };
+                        self.cad_objects.push(CadObject::Dimension(CadDim { dual, kind, measurement: o.value, text_mid, scale: env.scale(*view) }));
+                        self.cad_members.push(CadMember { lines: o.lines, texts: o.texts, fills: 0..0, obj });
                     }
                     continue;
                 }

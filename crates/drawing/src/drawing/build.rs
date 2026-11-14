@@ -2612,7 +2612,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     }
     // Export layers by annotation kind (`annotation_cad_layers`).
     let kinds: HashMap<u32, (CadLayer, CadLayer)> = resolved.annotations.iter().map(|a| ((a.id & 0xFFFF_FFFF) as u32, annotation_cad_layers(&a.kind))).collect();
-    let line_kinds: Vec<Option<CadLayer>> = g.lines[ml..].iter().map(|l| kinds.get(&l.pick).map(|k| k.0)).collect();
+    // (Not over a layer the annotation gave a line itself: a callout's border.)
+    let own = |i: usize| g.cad.iter().any(|s| s.lines.contains(&i));
+    let line_kinds: Vec<Option<CadLayer>> = g.lines[ml..].iter().enumerate().map(|(i, l)| kinds.get(&l.pick).map(|k| k.0).filter(|_| !own(ml + i))).collect();
     let text_kinds: Vec<Option<CadLayer>> = g.texts[mt..].iter().map(|t| kinds.get(&t.pick).map(|k| k.1)).collect();
     g.cad_runs(ml, &line_kinds, mt, &text_kinds);
     // Notes' texts in Onshape-Standard-NoteStyle.

@@ -2995,7 +2995,8 @@ fn datum_target_dimensions_from_its_origin() {
     let pl = built.placements.iter().find(|p| p.id == ViewId(1)).unwrap();
     let os = pl.to_sheet(o);
     let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(1)).unwrap() as u32;
-    let values: Vec<_> = built.geometry.texts.iter().filter(|x| x.pick == pick && x.text != "A1").collect();
+    // (Not the bubble's empty top half.)
+    let values: Vec<_> = built.geometry.texts.iter().filter(|x| x.pick == pick && x.text != "A1" && !x.text.is_empty()).collect();
     assert_eq!(values.len(), 2, "{values:?}");
     // One below the origin (the horizontal one), one left of it.
     assert!(values.iter().any(|x| x.pos[1] < os[1] - 1.0) && values.iter().any(|x| x.pos[0] < os[0] - 1.0), "{values:?} origin {os:?}");
@@ -4887,7 +4888,7 @@ fn datum_target_instance_off_the_model_is_red_alone() {
     s.annotations.push(Annotation { id: 1, kind: AnnotationKind::DatumTarget { view: ViewId(1), anchor: [0.12, 0.1], label: "A1".into(), area: DatumTargetArea::Point }, position: [140.0, 110.0], target: Some(Box::new(opts)), ..Default::default() });
     let mut g = sheet::SheetGeometry::new(420.0, 297.0);
     g.add_annotations(&s, &env);
-    let red_texts: Vec<&str> = g.colors.iter().filter(|c| c.rgb == sheet::OFF_MODEL_RED).flat_map(|c| g.texts[c.texts.clone()].iter().map(|t| t.text.as_str())).collect();
+    let red_texts: Vec<&str> = g.colors.iter().filter(|c| c.rgb == sheet::OFF_MODEL_RED).flat_map(|c| g.texts[c.texts.clone()].iter().map(|t| t.text.as_str())).filter(|t| !t.is_empty()).collect();
     assert_eq!(red_texts, ["A3"], "only the instance left of the origin is off the model");
 }
 
