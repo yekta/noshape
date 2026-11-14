@@ -6958,24 +6958,27 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     n.clone()
                 } else if pass {
                     continue;
-                } else if let Some(n) = by_centroid(p, &taken) {
-                    n
                 } else {
-                    // The feature whose live line first lists the part made it (a composite part, renamed and off in
-                    // volume: asm-infento-subs' "Toothed belt pulley 46T"): the one part of ours that our copy made.
+                    // The feature that first made it, by live's lines or live's bisection (a composite part, renamed and
+                    // off in volume: asm-infento-subs' "Toothed belt pulley 46T", live 3043): the one part of ours that
+                    // our copy made.
                     let first_line = studio["live"].as_array().into_iter().flatten().find(|l| l["parts"].as_array().is_some_and(|ps| ps.iter().any(|p| p["partId"] == pid)));
-                    let by_line = first_line.and_then(|l| l["featureId"].as_str()).and_then(|f| t.feature_ids.get(f)).and_then(|ours| {
+                    let maker = first_line.and_then(|l| l["featureId"].as_str()).or_else(|| studio["firstMakers"][pid]["featureId"].as_str());
+                    let by_maker = maker.and_then(|f| t.feature_ids.get(f)).and_then(|ours| {
                         let head = format!("body:{ours}.");
                         match solids.iter().filter(|s| s.2.starts_with(&head)).collect::<Vec<_>>().as_slice() {
                             [one] => Some(one.0.clone()),
                             _ => None,
                         }
                     });
-                    let by_creator = by_line.or_else(|| t.part_by_creator(t.len(), pid, &our_ids).and_then(|id| solids.iter().find(|s| s.2 == id).map(|s| s.0.clone())));
-                    match by_creator {
-                        Some(n) if fitting.contains(&n) => ours_parts.iter().map(|(n, _)| n).find(|n| !taken.contains(n) && !fitting.contains(n)).cloned().unwrap_or(n),
+                    let by_creator = || t.part_by_creator(t.len(), pid, &our_ids).and_then(|id| solids.iter().find(|s| s.2 == id).map(|s| s.0.clone()));
+                    match by_maker.or_else(|| by_centroid(p, &taken)) {
                         Some(n) => n,
-                        None => pname.to_string(),
+                        None => match by_creator() {
+                            Some(n) if fitting.contains(&n) => ours_parts.iter().map(|(n, _)| n).find(|n| !taken.contains(n) && !fitting.contains(n)).cloned().unwrap_or(n),
+                            Some(n) => n,
+                            None => pname.to_string(),
+                        },
                     }
                 };
                 taken.push(ours.clone());

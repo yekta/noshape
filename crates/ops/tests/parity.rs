@@ -2336,6 +2336,11 @@ fn parity_assemblies() {
             if let Some(c) = read(&dir.join("studios").join(format!("{element}.connectors.json"))) {
                 features["connectorFrames"] = c["connectors"].clone();
             }
+            // The features that first make its parts, where live's lines don't list them (live 3043: `{ "first": { part
+            // id: { "featureId" } } }`).
+            if let Some(f) = read(&dir.join("studios").join(format!("{element}.first.json"))) {
+                features["firstMakers"] = f["first"].clone();
+            }
             // Imported files (live's studios/foreign/foreign.json: blob element → file) as the Part Studio corpus'
             // `foreignFiles`.
             if features["foreignFiles"].is_null()
