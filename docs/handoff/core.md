@@ -5,6 +5,25 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-14 20:07 UTC)
+- **Landed 0147815a** (19:50): a guided loft pairs its profiles' joints between two guides when both have as many there
+  (live 3070: the handle's u knots are the means of A's and B's arc-length shares at paired joints), B's map eased C1 at
+  the pairs (geometric-mean speeds, as the guide chains), the guides blended by the mean share, each piece's rows
+  doubled until its ends lie on both profiles, sewn edges matched to the profile's by its midpoint on them. Knife
+  HANDLE 33003 -> 32919 mm³ (live 32902), largest deviation from live's surface 0.23 -> 0.055 mm (tool:
+  /root/core-scratch/handle/cmp.py: our STEP export's B-spline vs live's 3070 poles), Loft 1 / Extrude 8 / 9 live's
+  topology, **Fillet 8 builds** (16/34/20 vs 15/37/25: blend told). Extrude 8 23 -> ~45 ms (more pieces); Fillet 8
+  ~500 ms instead of failing. What's left (+17 mm³, a smooth +0.05 mm bulge between the guides) isn't the tents
+  (linear / cosine tried, worse or the same): the v direction or live's section construction.
+- **Gating 5fdb63f1e** (branch core-prism): op_prism_until joins a region's touching kept pieces into one solid (fuse +
+  unify, history merged): the target crossing the sketch plane left two solids sharing a face (asm-bjr-config 5d8bc1's
+  Extrude 55, 24 joins; bool's Boolean declined such compounds). T1 features::an_up_to_extrude_starting_inside_its_
+  body_is_one_solid. bool still sees the fuse declined for another reason.
+- **Knife Revolve 1 vertex (parked):** live's 19th vertex (114.5, 0, -12.56) sits on the 81.4 mm closed section edge
+  where live's periodic side starts (guide 0): a closed B-spline edge in Parasolid keeps a vertex at its start; ours is
+  joined across our seam. Needs the seam back at guide 0 and a seam rule for B-spline rings (c2-rings-loft relies on
+  the opposite); the knife already differs from 24, so no gain in its count.
+
 ## core state (11-14 18:50 UTC)
 - **Landed db17c8b6** (18:20): the hand-drill translator fixes (sketch arcs by live's midpoint and length; a face off
   its area found in live's box) and op_prism_until's seat_circles keeping each circle's frame (Helix › Circle starts at
