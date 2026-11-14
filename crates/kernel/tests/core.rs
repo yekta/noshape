@@ -1104,6 +1104,32 @@ fn a_guided_lofts_lined_up_joints_are_corners() {
     }
 }
 
+/// Live 3070: with as many joints on both profiles between two guides, a guided loft pairs them in order (its
+/// sections run joint to joint, not by arc length): a 20 × 20 stadium lofted to a 40 × 20 one along straight guides
+/// at its lines' middles passes halfway between their joints (10, -10, 0) and (20, -10, 30). In metres.
+#[test]
+fn a_guided_loft_pairs_its_profiles_joints() {
+    let mm = 1e-3;
+    let stadium = |half: f64, z: f64| {
+        let at = |x: f64, y: f64| DVec3::new(x, y, z) * mm;
+        let e = [
+            make_line(at(-half, -10.0), at(half, -10.0)).unwrap(),
+            make_arc(at(half, 0.0), DVec3::Z, DVec3::X, 10.0 * mm, -PI / 2.0, PI / 2.0).unwrap(),
+            make_line(at(half, 10.0), at(-half, 10.0)).unwrap(),
+            make_arc(at(-half, 0.0), DVec3::Z, DVec3::X, 10.0 * mm, PI / 2.0, 3.0 * PI / 2.0).unwrap(),
+        ];
+        make_face_from_wire(&make_wire(&e).unwrap(), true).unwrap()
+    };
+    let guides = [1.0, -1.0].map(|k: f64| make_line(DVec3::new(0.0, 10.0 * k, 0.0) * mm, DVec3::new(0.0, 10.0 * k, 30.0) * mm).unwrap());
+    let s = loft_guided_curved(&stadium(10.0, 0.0), &stadium(20.0, 30.0), &guides, true).unwrap();
+    assert!(s.is_valid());
+    let side: Vec<Shape> = s.faces().into_iter().filter(|f| f.face_plane().ok().flatten().is_none()).collect();
+    assert_eq!(side.len(), 1);
+    let p = make_vertex(DVec3::new(15.0, -10.0, 15.0) * mm).unwrap();
+    let d = distance(&p, &side[0]).unwrap().distance;
+    assert!(d < 1e-7, "{} mm off the side", d / mm);
+}
+
 /// A curve projected along a direction onto a linear extrusion, the projection sweeping a plane square to the
 /// extrusion: the section is the extruded curve itself in that plane (c2-hunting-knife's Split 3: live's Loft 3 guide is
 /// the sketch's cubic, one Bézier; OCCT's projection gave a degree-5 approximation 1-2 µm off it).

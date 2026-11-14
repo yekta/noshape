@@ -532,7 +532,11 @@ void keep_profile_curves(const TopoDS_Shape& sewn, const TopoDS_Shape& profile, 
       gp_Pnt p0, pm, p1;
       ends(pe, p0, pm, p1);
       const bool along = s0.Distance(p0) < tol && s1.Distance(p1) < tol, back = s0.Distance(p1) < tol && s1.Distance(p0) < tol;
-      if ((!along && !back) || sm.Distance(pm) > tol)
+      if (!along && !back)
+        continue;
+      // (The profile edge's middle on the sewn curve: their parameters run differently.)
+      GeomAPI_ProjectPointOnCurve on(pm, sc, sf, sl);
+      if (on.NbPoints() == 0 || on.LowerDistance() > tol)
         continue;
       if (back)
       {
@@ -766,14 +770,63 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
     ub.push_back(1.0);
     cols.push_back(pts[i1].guide);
     auto bot = [&](double u) { return A.at(sa0 + la * u); };
-    // B by the piecewise-linear map that puts each guide end above its start.
-    auto top = [&](double u) {
+    // B above A by arc length between the guide ends, and joint to joint where a stretch between two guides has as
+    // many joints on both (live 3070: the handle's sections pair its profiles' edges in order, its u knots the means of
+    // their arc-length shares).
+    std::vector<double> ma{ua[0]}, mb{ub[0]};
+    for (size_t g = 0; g + 1 < ua.size(); ++g)
+    {
+      std::vector<double> ja, jb;
+      for (double s : joints_a)
+        if (const double u = forward(sa0, s, A.len) / la; u > ua[g] + 1e-9 && u < ua[g + 1] - 1e-9)
+          ja.push_back(u);
+      for (double s : joints_b)
+        if (const double o = forward(sb0, s, B.len) / lb; o > ub[g] + 1e-9 && o < ub[g + 1] - 1e-9)
+          jb.push_back(o);
+      std::sort(ja.begin(), ja.end());
+      std::sort(jb.begin(), jb.end());
+      if (ja.size() == jb.size())
+      {
+        ma.insert(ma.end(), ja.begin(), ja.end());
+        mb.insert(mb.end(), jb.begin(), jb.end());
+      }
+      ma.push_back(ua[g + 1]);
+      mb.push_back(ub[g + 1]);
+    }
+    // B's share at A's share u: over each stretch between paired points a cubic in u, at each paired point running at
+    // the geometric mean of the stretches' speeds there (a speed jumping there left the side's edge 19 µm off B, its C1
+    // pieces averaging the two).
+    const size_t        nm = ma.size();
+    std::vector<double> ks(nm - 1), ds(nm);
+    for (size_t i = 0; i + 1 < nm; ++i)
+      ks[i] = (mb[i + 1] - mb[i]) / (ma[i + 1] - ma[i]);
+    const bool round = seams.size() == 1;
+    for (size_t i = 0; i < nm; ++i)
+    {
+      const double before = i > 0 ? ks[i - 1] : ks[round ? nm - 2 : 0], after = i + 1 < nm ? ks[i] : ks[round ? 0 : nm - 2];
+      ds[i]               = std::sqrt(before * after);
+    }
+    auto b_share = [&](double u) {
       size_t s = 0;
-      while (s + 2 < ua.size() && u > ua[s + 1])
+      while (s + 2 < nm && u > ma[s + 1])
         ++s;
-      const double t = (u - ua[s]) / (ua[s + 1] - ua[s]);
-      return b_at(sb0 + lb * (ub[s] + (ub[s + 1] - ub[s]) * t));
+      const double t = (u - ma[s]) / (ma[s + 1] - ma[s]), t2 = t * t, t3 = t2 * t;
+      double       a = ds[s] / ks[s], b = ds[s + 1] / ks[s];
+      // (Monotone: a² + b² <= 9.)
+      if (a * a + b * b > 9)
+      {
+        const double k = 3 / std::sqrt(a * a + b * b);
+        a *= k;
+        b *= k;
+      }
+      return mb[s] + (mb[s + 1] - mb[s]) * ((3 * t2 - 2 * t3) + a * (t3 - 2 * t2 + t) + b * (t3 - t2));
     };
+    auto top = [&](double u) { return b_at(sb0 + lb * b_share(u)); };
+    // The columns blended by the mean of A's and B's shares (live 3070's u, its knots those means at the joints).
+    auto                mean_share = [&](double u) { return 0.5 * (u + b_share(u)); };
+    std::vector<double> mean_nodes;
+    for (double u : ua)
+      mean_nodes.push_back(mean_share(u));
     // Column m at v (a guide or the straight seam).
     auto column = [&](size_t m, double v) {
       if (cols[m] >= 0)
@@ -806,7 +859,7 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
     }
     auto row = [&](double u) {
       std::vector<gp_Pnt>       r(NV + 1);
-      const std::vector<double> w  = hermite_tents(ua, u);
+      const std::vector<double> w = hermite_tents(mean_nodes, mean_share(u));
       const gp_Pnt              pb = bot(u), pt = top(u);
       for (int j = 0; j <= NV; ++j)
       {
@@ -833,9 +886,12 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
       if (o <= 0 || o >= 1)
         continue;
       size_t g = 0;
-      while (g + 2 < ub.size() && o > ub[g + 1])
+      while (g + 2 < mb.size() && o > mb[g + 1])
         ++g;
-      brk.push_back(ua[g] + (ua[g + 1] - ua[g]) * (o - ub[g]) / (ub[g + 1] - ub[g]));
+      double lo = ma[g], hi = ma[g + 1];
+      for (int it = 0; it < 60; ++it)
+        (b_share(0.5 * (lo + hi)) < o ? lo : hi) = 0.5 * (lo + hi);
+      brk.push_back(0.5 * (lo + hi));
     }
     std::sort(brk.begin(), brk.end());
     std::vector<double> at{0.0};
@@ -872,15 +928,29 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
     std::vector<occ::handle<Geom_BSplineSurface>> pieces;
     for (size_t k2 = 0; k2 + 1 < at.size(); ++k2)
     {
-      const int                        m = std::max(3, (int)std::ceil(NU * (at[k2 + 1] - at[k2])));
-      std::vector<std::vector<gp_Pnt>> grid;
-      std::vector<double>              us;
-      for (int i = 0; i <= m; ++i)
+      // Rows for the wider of A's and B's shares, twice as many until the piece's ends lie on both profiles between
+      // them (an arc of B paired to a short line or spline of A: c2-hunting-knife's handle didn't sew there).
+      occ::handle<Geom_BSplineSurface> piece;
+      for (int m = std::max(3, (int)std::ceil(NU * std::max(at[k2 + 1] - at[k2], b_share(at[k2 + 1]) - b_share(at[k2])))); ; m *= 2)
       {
-        us.push_back(at[k2] + (at[k2 + 1] - at[k2]) * i / m);
-        grid.push_back(row(us.back()));
+        std::vector<std::vector<gp_Pnt>> grid;
+        std::vector<double>              us;
+        for (int i = 0; i <= m; ++i)
+        {
+          us.push_back(at[k2] + (at[k2 + 1] - at[k2]) * i / m);
+          grid.push_back(row(us.back()));
+        }
+        piece = grid_surface_with_ends(grid, us, slopes[k2], slopes[k2 + 1]);
+        double off = 0;
+        for (int i = 0; i < m; ++i)
+        {
+          const double u = 0.5 * (us[i] + us[i + 1]);
+          off            = std::max({off, piece->Value(u, 0).Distance(bot(u)), piece->Value(u, 1).Distance(top(u))});
+        }
+        if (off <= tol || m >= 256)
+          break;
       }
-      pieces.push_back(grid_surface_with_ends(grid, us, slopes[k2], slopes[k2 + 1]));
+      pieces.push_back(piece);
     }
     occ::handle<Geom_BSplineSurface> side = join_u(pieces, at);
     // Round on itself: OCCT's seam (Parasolid's periodic face has none) through one of A's vertices, not the guide,
