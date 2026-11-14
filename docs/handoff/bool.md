@@ -199,6 +199,23 @@ The suite's per-feature kernel profiles count its own measuring (props_surface v
 Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **Sheet metal's result check and glued fuses (lead 11-14 ~03:00: the flat-face check, then skasm's walls-and-bends
+  fuse), 11-14 05:2x UTC, gating a9a785004 on vibe6 (vibe5 out of memory: earlyoom killed two gate builds):**
+  - 53cc4779d: our result's planar faces bounded by lines are checked by `planar_lines_valid` (wires closed, no two
+    segments crossing, one outer wire the face's way round, holes inside it, line ends on their vertices and in the
+    plane) instead of BRepCheck's wire pairs; anything it can't say valid goes to the whole BRepCheck. Louver's slotted
+    sheet check 12-19 -> 0.3 ms; c2-sm-louver 5.33 -> 5.06 s (live 4.99; vibe5 at load 45, best of 2).
+  - 95bc10032: `NurbsSurface::grid` sums each u's poles once (ray patch boxes: model-plus's degree 14 x 1 wall 2.8 ->
+    0.7 ms); `off_shared_edges` boxes fb's edges before projecting; the per-face checks on all threads.
+  - a9a785004: a shell my edge-use rule can't pass (a cylinder's seam a plane face also uses: the louver's glued
+    fuses) gets BRepCheck_Shell / BRepCheck_Solid alone, not the whole analyzer.
+  - Glued fuses, warm, alternating on quiet vibe3: model-plus 59 / 55 / 46 / 6.3 -> 33 / 31 / 23.5 / 4.8 ms; corner-break
+    82 / 113 / 94 / 81 -> 73 / 90 / 83 / 72; louver's 17 at 8.5 -> 6.2. Ours against BRepCheck on every corpus and
+    recording (X_CHECKCMP scratch): 0 disagreements.
+  - Left in corner-break's fuses: ~41 of 91 ms are OCCT sections of its rational ruled corner pieces (degree 1 x 2,
+    four edges) against each other, the bends and the 68-edge plate, 0 or 1 lines each, 5-19 ms a pair. The pieces of
+    neighbouring flanges are 20-28 um apart, inside the grey band (4 x their 10 um tolerance), so `free::apart`
+    rightly asks OCCT. Taking them ourselves needs a near-touching ruled-surface test.
 - **asm-hand-drill-pinslot's Sweep 1 (lead 11-13 00:35, 03:30), 11-13 05:33 UTC, queued to land (e23bc68f; gate CHECK, knurls only):**
   the thread's inner face is a B-spline on the shaft's r 4.1 mm cylinder (12 nm inside). Ours can't take it (read as
   that cylinder it winds round three times; our cylinder faces cover one turn); OCCT's plain fuse cuts the shaft in
