@@ -231,6 +231,14 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     four edges) against each other, the bends and the 68-edge plate, 0 or 1 lines each, 5-19 ms a pair. The pieces of
     neighbouring flanges are 20-28 um apart, inside the grey band (4 x their 10 um tolerance), so `free::apart`
     rightly asks OCCT. Taking them ourselves needs a near-touching ruled-surface test.
+  - Then c77138414 (to gate): c2-fan-blade-sweep's blade cut by its two bolts (fb562f41, OCCT 1.1 s, "a face lost")
+    is ours, 0.18 s, as OCCT's: each thread root's cylinder strip between two whole-turn helices covered the circle
+    up to a rounding and `gap` found a gap of 0 (or one across the circle on the mirrored bolt). T1
+    bool_patterns::bolts_with_whole_turn_thread_roots_cut_as_occt. Its 05cd5358 is taken too; 3bf5867d (35 ms, "an
+    internal face") is left.
+  - Left on OCCT from my recordings: c2-impeller-loft 9522310b (2.1 s): an input vertex of 1.14 mm tolerance 0.4 mm
+    off plane face 7 (upstream: core's), and with the 1 mm cap raised it declines "a face lost"; b4a6c1dc (1.5 s, "a
+    piece shorter than its vertices' distance": the mirrored halves' fuse at x 0).
 - **asm-hand-drill-pinslot's Sweep 1 (lead 11-13 00:35, 03:30), 11-13 05:33 UTC, queued to land (e23bc68f; gate CHECK, knurls only):**
   the thread's inner face is a B-spline on the shaft's r 4.1 mm cylinder (12 nm inside). Ours can't take it (read as
   that cylinder it winds round three times; our cylinder faces cover one turn); OCCT's plain fuse cuts the shaft in
