@@ -5,6 +5,19 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-14 09:30 UTC: on the sketch solves: 1dc32b to feature 14, bjr 5d8bc1 48/124; arcs of one circle join
+- 1dc32b alone (vibe6 sk-st-1dc32b.log): 15/56, Extrude 7 now as live; first difference feature 15 Boolean 2 ("Large
+  wheel tyre" 392/1183/793, live 391/1158/768): sent to bool 09:0x with the model dir. Not mine unless bool says so.
+- bjr 5d8bc1 alone (sk-st-5d8bc1.log, model dir vibe6 ~/agents/dx-keep/m5d8): 48/124; first difference feature 42
+  Extrude 55 ("vanity plate front" 369/955/601, live 365/943/593). Translator items there, next: Sketch 29's dimensions
+  on slot entities (`kkYH3uQr64Ld.<n>.startCap` / `.left` / `.right`, "Sketch could not be solved"), Extrude 4's
+  sketch F1IWrFkPuXzUEOU_1 not built, then Sweep 1 (feature 58, live's PlateCover).
+- Branch dx-arcs (live q-arcs, for core / asm's knurled disc in infento 74d3d6): an extrude's arcs of one circle join
+  whatever meets the joint (`alone` dropped for arcs in region_profile_with); e2e `arcs_of_one_circle_extrude_to_one_
+  side_face` (4 faces before, 3). Model gate queued on vibe6 (unit dx-garcs, models-arcs.log, binary ops-arcs) after
+  dx-chain9: land if none worse against models-d6.log / models-1dc3.log.
+- dx-chain9 (base vs dx-1dc / tvc variants on the new data) still running; read sk-*.log, land per the rules below.
+
 ## 11-14 08:45 UTC: live fetched every assembly studio's sketch solve (08:37); runs restarted on it
 - All 14 assemblies' studio JSONs now carry "sketches" (live 08:37, synced to vibe5/6/7 every 10 min). Earlier
   infento / tvc numbers were on the old data: vibe6 unit dx-chain9 (log ~/tmp/dx/chain9.out, sk-<binary>-<asm>.log)
