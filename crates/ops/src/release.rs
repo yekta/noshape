@@ -257,6 +257,13 @@ pub fn commit(session: &mut Session, pkg: Package) -> anyhow::Result<Package> {
     record_released(session, pkg)
 }
 
+/// Release from inside a version (its own Release…; live2 2026-11-14): the package is recorded at that version, no new
+/// version is made and nothing in the workspace changes.
+pub fn commit_at_version(session: &mut Session, mut pkg: Package, version: String) -> anyhow::Result<Package> {
+    pkg.version = Some(version);
+    record_released(session, pkg)
+}
+
 /// Submit a candidate to its approvers (Onshape help: "When a candidate is created, Onshape makes a version, and every
 /// object in it is from that version"): its part numbers written and its version made as a release's, then kept as
 /// Pending until its approver approves or rejects it.

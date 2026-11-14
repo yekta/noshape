@@ -6948,6 +6948,7 @@ Examples:
 | `include_drawings` | boolean |  | Include associated drawings (those made from another workspace's state are left out and listed as `drawings_left_out`). |
 | `approvers` | array of string |  | Approvers: Submit instead of Release. The candidate's version is made now and it waits, Pending, for release_approve or release_reject. The only person offered is the local user (Preferences' name; no user directory in a local app). |
 | `observers` | array of string |  | Observers (the local user). |
+| `version` | string |  | Release from inside this version (its own Release…): recorded at that version; no new version is made. |
 
 #### release_approve
 

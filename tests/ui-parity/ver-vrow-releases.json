@@ -3,7 +3,7 @@
  "about": "Releases (right-click a version row (Upgrade badge in live's Free plan))",
  "area": "studios",
  "source": "universe versions vrow-releases (studios 11-08, coverage batch)",
- "start": "doc-branches",
+ "start": "doc-branches-released",
  "steps": [
   {
    "do": "click",

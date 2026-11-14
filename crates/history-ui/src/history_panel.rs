@@ -1457,8 +1457,8 @@ impl Render for HistoryPanel {
                     m.submenu("Releases", window, cx, move |mut sm, _, _| {
                         for p in pk.clone() {
                             let dr = dr.clone();
-                            let state = if p.kind == noshape_model::release::PackageKind::Obsoletion { "Obsolete" } else { "Released" };
-                            sm = sm.item(crate::os_menu::OsMenuItem::new(format!("{} [{state}]", p.name)).on_click(move |_, window, cx| crate::release_dialog::open_review(dr.clone(), &p, window, cx)));
+                            // Live (ver-vrow-releases): a released package by its name (badges only on Pending / Rejected).
+                            sm = sm.item(crate::os_menu::OsMenuItem::new(p.name.clone()).on_click(move |_, window, cx| crate::release_dialog::open_review(dr.clone(), &p, window, cx)));
                         }
                         sm
                     })

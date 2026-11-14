@@ -33,6 +33,7 @@ pub fn ops() -> Vec<Op> {
                 opt("include_drawings", json!({ "type": "boolean" }), "Include associated drawings (those made from another workspace's state are left out and listed as `drawings_left_out`)."),
                 opt("approvers", strings(), "Approvers: Submit instead of Release. The candidate's version is made now and it waits, Pending, for release_approve or release_reject. The only person offered is the local user (Preferences' name; no user directory in a local app)."),
                 opt("observers", strings(), "Observers (the local user)."),
+                opt("version", s(), "Release from inside this version (its own Release…): recorded at that version; no new version is made."),
             ],
             mutates: true,
             destructive: false,
@@ -322,7 +323,22 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::invalid(format!("the release candidate needs attention: {}", problems.join(" | "))));
     }
     let submitting = !approvers.is_empty();
+    let at_version = match a.opt_str("version")? {
+        Some(v) => {
+            let versions = od.session.store.list_versions().map_err(|e| OpError::new("io", e.to_string()))?;
+            let found = versions.iter().find(|x| x.name == v || x.id.to_string() == v).ok_or_else(|| OpError::param("version", &format!("no version `{v}`")))?;
+            if submitting {
+                return Err(OpError::param("version", "a release from inside a version can't be submitted to approvers here"));
+            }
+            Some(found.id.to_string())
+        }
+        None => None,
+    };
     let pkg = Package { id: 0, kind: PackageKind::Release, name, notes, created, version: None, items, re_releasable: false, approvers, observers, state: None, decided_by: None, comments };
+    if let Some(v) = at_version {
+        let pkg = rel::commit_at_version(&mut od.session, pkg, v).map_err(|e| OpError::new("release", format!("{e:#}")))?;
+        return Ok(json!({ "release": pkg.name, "state": "Released", "version": pkg.version, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>(), "drawings_left_out": left_out }).into());
+    }
     // With approvers: Submit (Pending at its version); else Release at once.
     let pkg = if submitting { rel::submit(&mut od.session, pkg) } else { rel::commit(&mut od.session, pkg) }.map_err(|e| OpError::new("release", format!("{e:#}")))?;
     let state = pkg.state.map_or("Released", |s| s.label());

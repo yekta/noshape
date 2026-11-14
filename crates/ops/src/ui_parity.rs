@@ -206,6 +206,14 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
     if !branches.is_empty() {
         call(ctx, "history_switch_branch", json!({ "branch": "Main" }))?;
     }
+    // Releases from inside a version (`releases`: {version, name, notes, part_numbers}; live2's ver-vrow-releases).
+    for r in start["releases"].as_array().into_iter().flatten() {
+        let mut args = json!({ "tab": r["tab"].as_str().unwrap_or("Part Studio 1"), "version": r["version"], "name": r["name"], "notes": r["notes"].as_str().unwrap_or("release"), "part_numbers": r["part_numbers"] });
+        if r["parts"].is_array() {
+            args["parts"] = r["parts"].clone();
+        }
+        call(ctx, "release_create", args).map_err(|e| format!("start release {}: {e}", r["name"]))?;
+    }
     add_drawing_notes(ctx, start, &start["drawing_notes"])?;
     // A drawing made first: the run opens on the Part Studio, as live's runner opens a whole document.
     if start["drawing"]["first"].as_bool().unwrap_or(false) {
@@ -384,6 +392,26 @@ fn build_assembly(ctx: &mut Ctx, asm: &Value) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A start's `releases`: released from inside V1 (live2's ver-vrow-releases), recorded at V1, no new version.
+    #[test]
+    fn a_start_release_is_recorded_at_its_version() {
+        let start = json!({ "units": "mm", "features": [
+            { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+            { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }
+        ], "versions": [{ "name": "V1", "features": [] }], "releases": [{ "version": "V1", "name": "V1 release", "part_numbers": { "Part 1": "PRT-001" } }] });
+        let dir = std::env::temp_dir().join(format!("noshape-uip-rel-{}", std::process::id()));
+        let path = dir.join("released.noshape");
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } })).unwrap();
+        build_start(&mut ctx, &path, &start).unwrap();
+        let h = call(&mut ctx, "history_list", json!({})).unwrap();
+        let names: Vec<&str> = h["versions"].as_array().unwrap().iter().filter_map(|v| v["name"].as_str()).collect();
+        assert_eq!(names, ["V1"], "no version of its own: {h}");
+        let rh = call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-001" })).unwrap();
+        assert_eq!(rh["revisions"][0]["version"], "V1", "{rh}");
+        let _ = std::fs::remove_dir_all(dir);
+    }
 
     /// qa's "vars" start: two variables and a 40 × 30 × 10 box, every feature regenerated.
     #[test]
