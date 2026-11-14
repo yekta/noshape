@@ -2356,6 +2356,22 @@ fn parity_assemblies() {
             studios.push((element.to_string(), features, parts));
         }
         studios.sort_by(|a, b| a.0.cmp(&b.0));
+        // A Derived from another Part Studio of the same document (its namespace `e<element>::m…` as for another
+        // document's, live 08:37: asm-robot-relations' Derived 1 from "Rail Pieces"): that studio of the corpus.
+        let named: Vec<(usize, String)> = studios
+            .iter()
+            .enumerate()
+            .flat_map(|(i, (_, f, _))| {
+                f["features"].as_array().into_iter().flatten().filter(|x| x["featureType"] == "importDerived").flat_map(|x| x["parameters"].as_array().into_iter().flatten()).filter_map(|p| p["namespace"].as_str()).filter_map(|ns| ns.split("::").find_map(|s| s.strip_prefix('e'))).map(move |e| (i, e.to_string()))
+            })
+            .collect();
+        for (i, e) in named {
+            if studios[i].1["derivedSources"].get(e.as_str()).is_some() {
+                continue;
+            }
+            let Some(src) = studios.iter().find(|(el, ..)| *el == e).map(|(_, f, _)| json!({ "doc": f, "live": f["live"].clone(), "refs": "" })) else { continue };
+            studios[i].1["derivedSources"][e.as_str()] = src;
+        }
         let mut ctx = Ctx::new();
         let r = rebuild_assembly(&mut ctx, &scratch(&format!("asm-{name}")), &asm, &studios);
         docs += 1;
