@@ -42,7 +42,7 @@ GPU `feel::presses_orbit_box_and_open_the_menu_as_live`).
 | Click | adds; on a selected entity removes; on empty space clears; Shift+click on empty space keeps; Shift+click on an entity as a plain one | the same (`on_viewport_event`'s Click) | – | = |
 | Ctrl+click | the context menu of what is under the pointer, selects nothing (every OS; on a Mac Cmd+click is a plain click) | the same | – | = |
 | Double-click | a face: shows its feature's sketch, the two clicks select then deselect; an edge: nothing | the sketch wasn't shown (its row lit only); now shown until the selection changes (`with_dblclick_sketch`; the double click on the viewport's clock) | part-studio-ui `a_face_double_clicked_shows_its_features_sketch` | = (fixed) |
-| Select other (`) | the "Select other" panel, bottom right | `SelectOther` | – | – |
+| Select other (`) | the "Select other" panel at the pointer + (100, 51), 220 px wide (live2's chrome.json) | `SelectOther` | chrome matrix "select other / its place", "its size"; list `select_other_row` | = |
 | Box select | left → right: window (faces and edges wholly inside, hidden ones too, no vertices, no part: 18 round a block, 5 round its right half); right → left: crossing (13 over that half); adds; Ctrl at the start deselects | the same (`box_ids`) | `feel::box_select_takes_what_live_takes` | = |
 | Left press → drag (box) | more than 2 px and 50 ms after the press | the same (`press_becomes_drag`) | app-core, GPU feel | = |
 | Right press | orbits from the first pixel; the menu still opens on release within 4 px and 1 s | the same (`right_release_opens_menu`) | same | = |
@@ -329,7 +329,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Folders: a drop between its children | inside the folder | the moved feature kept its own folder and the folder lost the children before it; now the folder at the drop (`behaviors::drop_folder`) | = (fixed) |
 | A drag off the list | the drop line stays at its last spot; released over the canvas: nothing | the line went with the pointer's row (drawn by `drag_over`); now from the drop slot | = (fixed) |
 | Folders: sideways | every 19 px sideways in the slot steps a level: a last child's bottom half 19 px left drops after the folder, outside | no levels; now 19 px a level from where the pointer came onto the slot (`LIST_LEVEL_PX`) | = (fixed) |
-| Multi-part Properties… | one "2 selected" dialog, both parts listed, Name "Multiple values", shared fields editable (live 08:18) | the first part's Properties | ≠ (not a row yet) |
+| Multi-part Properties… | one "2 selected" dialog, both parts listed, Name "Multiple values", shared fields editable (live 08:18, 2962) | the first part's Properties; now live's dialog (`open_parts_properties`; list `several_parts_share_one_properties_dialog`) | = (fixed 11-13) |
 | Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); 4 levels of nesting at most; an empty new folder's caret (live2's new-folder-empty, queued); the insertion line's look | – | – |
 
 ## Measure (matrix)
