@@ -710,6 +710,9 @@ pub struct RefManager {
     pub chosen: HashMap<usize, usize>,
     /// The document whose Version graph is open (Selective update's ⎇).
     pub picking: Option<usize>,
+    /// The row's control a click left with the keyboard: "checkbox" or "button" (the ⎇) (live
+    /// ver-linked-selective-update).
+    pub focus: Option<&'static str>,
 }
 
 impl AssemblyView {
@@ -776,7 +779,7 @@ impl AssemblyView {
         // Change to version… on this document's own parts opens on Selective update (live asm-menu-change-to-version);
         // with a newer version of a linked document, on Update to latest (live 604–607).
         let tab = u8::from(scope.is_some() && docs.iter().all(|d| !d.newer));
-        self.ui.ref_manager = Some(RefManager { scope, tab, docs, checked: HashSet::new(), chosen: HashMap::new(), picking: None });
+        self.ui.ref_manager = Some(RefManager { scope, tab, docs, checked: HashSet::new(), chosen: HashMap::new(), picking: None, focus: None });
         cx.notify();
     }
 
@@ -846,7 +849,7 @@ impl AssemblyView {
                 docs.push(RefDoc { current: to, newer: false, ..d });
             }
         }
-        self.ui.ref_manager = Some(RefManager { scope: m.scope, tab: m.tab, docs, checked: HashSet::new(), chosen: HashMap::new(), picking: None });
+        self.ui.ref_manager = Some(RefManager { scope: m.scope, tab: m.tab, docs, checked: HashSet::new(), chosen: HashMap::new(), picking: None, focus: None });
         self.check_external_updates(cx);
         self.refresh_scene(true, cx);
         cx.notify();
@@ -895,10 +898,11 @@ impl AssemblyView {
                                     .bg(if checked { rgb(0x1651b0) } else { rgb(0xffffff) })
                                     .when(checked, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff))))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                        if let Some(m) = &mut this.ui.ref_manager
-                                            && !m.checked.remove(&i)
-                                        {
-                                            m.checked.insert(i);
+                                        if let Some(m) = &mut this.ui.ref_manager {
+                                            m.focus = Some("checkbox");
+                                            if !m.checked.remove(&i) {
+                                                m.checked.insert(i);
+                                            }
                                         }
                                         cx.notify();
                                     })),
@@ -938,6 +942,7 @@ impl AssemblyView {
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     if let Some(m) = &mut this.ui.ref_manager {
                                         m.picking = Some(i);
+                                        m.focus = Some("button");
                                     }
                                     cx.notify();
                                 })),
@@ -964,6 +969,7 @@ impl AssemblyView {
                         back.update(cx, |this, cx| {
                             if let Some(m) = &mut this.ui.ref_manager {
                                 m.picking = None;
+                                m.focus = None;
                             }
                             crate::ui_script::note_list(None);
                             cx.notify();
@@ -976,6 +982,7 @@ impl AssemblyView {
                                 m.chosen.insert(i, if k == 0 { PICK_MAIN } else { k - 1 });
                                 m.checked.insert(i);
                                 m.picking = None;
+                                m.focus = None;
                             }
                             crate::ui_script::note_list(None);
                             cx.notify();

@@ -419,6 +419,13 @@ impl AssemblyView {
             f["dialog"] = title;
             Some(f)
         });
+        // The Reference manager's row checkbox or ⎇ a click left with the keyboard (live ver-linked-selective-update).
+        let focus = focus.or_else(|| {
+            self.ui.ref_manager.as_ref().and_then(|m| m.focus).map(|tag| match tag {
+                "checkbox" => json!({ "kind": "field", "tag": "checkbox", "label": null, "text": null, "selection": null, "all": false }),
+                _ => json!({ "kind": "field", "tag": tag, "label": null }),
+            })
+        });
         // (The flip icon has no label: live's recorder reads an osc-svg-icon, label null.)
         let focus = focus.or_else(|| self.ui.checkbox_focus.zip(dialog.as_ref()).map(|(label, d)| json!({ "kind": "field", "label": if label.is_empty() { Value::Null } else { json!(label) }, "dialog": d["title"] })));
         // A right-clicked number field, then the page once its Configure is picked (live asm-pattern-field-configure).

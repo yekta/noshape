@@ -278,6 +278,10 @@ def normalize_live(state):
             # reads, sketch-row-copy-paste-onto-front).
             if isinstance(it, dict) and it.get("kind") == "SKETCH_ENTITY" and it.get("owner") is None:
                 it.pop("owner", None)
+    # A Professional plan's assembly list has "Simulation features (N)": simulation is a cloud feature ours leaves out.
+    feats = (state or {}).get("features")
+    if isinstance(feats, dict) and isinstance(feats.get("rows"), list):
+        feats["rows"] = [r for r in feats["rows"] if not (isinstance(r, dict) and str(r.get("name", "")).startswith("Simulation features ("))]
     # Ctrl+Space's card: an empty one (its div stays in the page) is none (live 2414).
     doc = (state or {}).get("document")
     if isinstance(doc, dict) and isinstance(doc.get("switcher"), dict) and not doc["switcher"].get("items"):

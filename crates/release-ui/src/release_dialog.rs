@@ -1285,6 +1285,7 @@ impl ReleaseDialog {
             cx.notify();
             return false;
         }
+        let name = pkg.name.clone();
         let r = self.doc.update(cx, |doc, _| {
             let mut log = release_log(doc);
             log.save_draft(pkg);
@@ -1294,6 +1295,8 @@ impl ReleaseDialog {
             self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
             return false;
         }
+        // Live (release.json): the toast after Save draft.
+        self.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(format!("{name} release candidate is saved in your release drafts."))));
         self.applied = true;
         cx.notify();
         true
@@ -1306,6 +1309,7 @@ impl ReleaseDialog {
             cx.notify();
             return false;
         }
+        let name = pkg.name.clone();
         let r = self.doc.update(cx, |doc, cx| -> anyhow::Result<()> {
             let r = noshape_ops::release::submit(&mut doc.session, pkg);
             doc.reloaded(cx);
@@ -1315,6 +1319,8 @@ impl ReleaseDialog {
             self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
             return false;
         }
+        // Live (release.json release-toast): after Submit.
+        self.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(format!("Your action on {name} is being processed. View the status of Releases in Action items."))));
         true
     }
 
@@ -1517,6 +1523,7 @@ impl ReleaseDialog {
             cx.notify();
             return false;
         }
+        let name = pkg.name.clone();
         let r = self.doc.update(cx, |doc, cx| -> anyhow::Result<()> {
             // As the agent API's release_create (noshape_ops::release::commit).
             let r = noshape_ops::release::commit(&mut doc.session, pkg);
@@ -1527,6 +1534,8 @@ impl ReleaseDialog {
             self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
             return false;
         }
+        // Live (release.json release-toast): after Release (or Obsolete).
+        self.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(format!("Your action on {name} is being processed."))));
         true
     }
 }
@@ -1875,7 +1884,7 @@ impl Render for ReleaseDialog {
                                     .flex_none()
                                     .cursor_pointer()
                                     .child(Icon::new(IconName::Close).with_size(px(16.)).text_color(red))
-                                    .tooltip(crate::ui::tooltip("Remove"))
+                                    .tooltip(crate::ui::tooltip("Remove from release"))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         if i < this.rows.len() {
                                             this.rows.remove(i);
@@ -2171,7 +2180,7 @@ impl Render for ReleaseDialog {
             Mode::Obsolete => {
                 let ok = !name_empty && !self.notes.read(cx).value().trim().is_empty();
                 // Live (release.json obsolete-candidate-dialog): Apply, Submit (needs approvers), Obsolete (red), Close.
-                footer = footer.child(self.submit_button(ok, cx));
+                footer = footer.child(button("rel-apply", "Apply", 0x1651b0, false)).child(self.submit_button(ok, cx));
                 footer = footer.child(button("rel-obsolete", "Obsolete", 0xbd3039, ok && self.approvers.is_empty()).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     if this.commit(cx) {
                         close(window, cx);

@@ -7,10 +7,44 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
   Free plan's upsell; re-record asked), ver-filter-tab (the start document's history: ours commits each sketch
   constraint, live's start has one "Add feature" per feature), ver-linked-selective-update (live's take missed the
   checkbox; re-recorded 11-14).
-- **Release management**: until 2026-11-14 live's account was on the Free plan (Release… opened only the upsell), so the
-  rows below come from Onshape's help pages and images (sources in the key below). The account is on Professional now:
-  live2 is capturing them (REQUESTS / message 2026-11-14), and each row moves to live's data as it comes in.
+- **Release management**: live's account is on Professional since 2026-11-14 (before, Release… opened only the upsell).
+  The live matrix below is live2's capture (25 rows: = 18, ≠ 3, missing 0, ? 4); the help matrix keeps the rows live
+  hasn't shown yet.
   Rows: 138; = 97, ≠ 20, missing 9, ? 6, cloud 6 (left out: other users, notifications).
+
+## Live (Professional company, live2 2026-11-14: live/feel/release.json, feel/release/*.png)
+
+| Item | Live | Ours | Test | Status |
+|---|---|---|---|---|
+| New company default | Enable managed workflows off; the settings page shows only it | `ReleaseSettings::default` (managed off) | ops old_settings_files_keep_their_values_and_get_the_defaults | = |
+| Workflows off | no Release… (part, tab, instance), no Revision history…, no Releases on Versions rows, no Create release candidate icon; nothing greyed, no upsell | `managed_workflows()` gates them; release_create / release_obsolete refuse | ui-parity part-menu-release-workflows-off, ver-vrow-releases-workflows-off (queued) | = |
+| Part Properties, workflows off | Part number, Revision, State dropdown (In progress … Discarded) by hand, Not revision managed; no release icon | the same | – | = |
+| Defaults when turned on | Alphabetical, suffix *, Access 1st on, Require a note on, "Drawing has a pending update" on, other documents off, Do not allow creator greyed until Require an approver | the same defaults; Do not allow creator greyed until Require an approver (`release_prefs`) | ops settings test | = |
+| Dialog title | "Create Release candidate" + refresh; a reopened draft "Review Release"; submitted / released "Review Release: <name>" + link icon | the same titles; the link icon missing | release-ui the_release_dialogs_titles_are_lives | ≠ (link icon) |
+| Header | "N item(s) needs attention" + red ⓘ, ⋯ (View audit log, View workflow) | the same | – | = |
+| Item row | thumbnail, icon + name, kind, yellow flag, red × "Remove from release" (top-level only) | the same ("Remove from release") | – | = |
+| Item name click | nothing (dialog stays, no tab) | nothing | – | = |
+| Columns | Revision (A, after a release "A ⟶ [B]"), State, Part number (red outline empty), Edit properties / Export… | the same | – | = |
+| Revision too low | yellow band "The next available revision for part number LV2-100 is B." | ? (our text not compared) | – | ? |
+| Form | Release name *, Release notes * (Require a note), Approvers (ⓘ "Required for action Submit", no *), Observers, both "Search users or teams" | the same | – | = |
+| Footer | undo / redo, Save draft (▴ Save draft / Delete draft on a draft), hint, Apply (blue), Submit (blue, needs approvers: "Submit requires Approvers"), Release (green #028502, #a2db7d disabled), Close | the same | – | = |
+| Release | toast "Your action on <name> is being processed." | the same toast (DocEvent::Info) | – | = |
+| Submit | toast "… View the status of Releases in Action items." | the same toast | – | = |
+| Version graph | released ▲; Pending and Rejected open △ | the same | model-core pending_and_rejected_candidates_mark_their_version | = |
+| Versions row Releases ▸ | only on a version with candidates; state badges Pending #769fcc, Rejected #bd3039 | only with candidates; badge colours not compared | ui-parity ver-vrow-releases (re-recorded) | ? |
+| Review (approver) | Comment * required, Apply, Release, Reject ▴ (Reject / Discard), Close; Reject as creator confirms "Reject and override other approvers" | Discard, Reject, Approve | – | ≠ |
+| Released review | read-only, Apply greyed, Clone ("Recreate Release from the current workspace"), Close | the same | – | = |
+| Drafts | Release drafts panel (thumbnail, name, "by <user> <time>", "Double click to open a draft") | the same | – | = |
+| Revision history | heading part number; ▲ black / obsolete / auto-obsolete icon, letter, user, release name (bold), time, Version ↗ (Open in new tab), Document, Type; View release, Export, Obsolete revision (red) or View obsoletion | the same layout (our own icons) | – | = |
+| Auto-obsolete | A's icon auto-obsolete, View obsoletion; B keeps Obsolete revision | the same | – | = |
+| Obsolete candidate | Add to Obsoletion…, read-only row, Obsoletion name *, notes *, Approvers, Observers, re-releasable; Apply, Submit, Obsolete (red), Close | the same footer (Apply greyed) | ops release_parts_and_revision_history | = |
+| Admin without required approvers | Release stays on; confirm "Release and override company policy" | the same | – | = |
+| Barred creator | not offered as approver; no asterisk | the same | – | = |
+| Assembly release | the assembly, its parts once (mirror adds none), linked parts In progress without fields ("Document is not owned by your company"), no standard content | standard content and linked parts listed | – | ≠ |
+| Drawing pending update | red band "Drawing has a pending update" blocks; after Update it releases, title block DRW-1 / A, tab menu Revision history… | ? | – | ? |
+| Locking | released version: Name, Category, Part number, Revision, State, Material locked; workspace part keeps Part number editable | ? | – | ? |
+
+## Help (rows live hasn't shown yet; until 2026-11-14 all came from here)
 
 Key: `RD` crates/release-ui/src/release_dialog.rs, `RP` release_prefs.rs, `OPS` crates/ops/src/release.rs, `RC`
 crates/ops/src/release_conditions.rs, `RS` crates/ops/src/release_settings.rs, `ML` crates/model-core/src/release.rs, `HP`
@@ -29,7 +63,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Dialog and sections resizable | "You can resize this dialog and its sections by clicking and dragging an edge or corner" (TRW) | fixed 820 px (RD:2286), list 212 px (RD:1956) | – | missing |
 | Yellow triangle on new/modified fields | "New or modified fields are marked with a yellow triangle in the upper left corner" (TRW) | RD:1794, RD:1821 | – | = |
 | Undo / Redo buttons + OS hot keys | "use the Undo and Redo buttons or your operating system hot keys" (TRW); image: ↶ ↷ at bottom left | RD:2062-2063, keys RD:2202-2211 | – | = |
-| Item row: thumbnail, type icon + name, italic type, red × | image drawing-release-dialog-02 | RD:1806-1863 | – | = |
+| Item row: thumbnail, type icon + name, italic type, red × | image drawing-release-dialog-02 | the same ("Remove from release") | – | = |
 | Red × removes item; tooltip | "clicking the red x" (TRW); BUNDLE tooltip "Remove from release" | RD:1855 tooltip "Remove" | – | ≠ (tooltip text) |
 | Click item name opens it "in another browser tab" (dialog stays, then Refresh) | TRW "The appropriate tab will open in another browser tab… return… click Refresh" | RD name click: another window on the document at that tab (`release_hooks::open_tab_window`); the dialog stays | – | = (fixed 11-14) |
 | Search by name | "search … by name" (TRW, filter-object-list.png) | RD:1586, RD:1763 | – | = |
