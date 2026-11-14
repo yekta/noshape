@@ -3236,11 +3236,12 @@ impl AssemblyView {
     /// where it was inserted, not at the pointer (live feel mates insert_dialog (3): its Part Studio position).
     pub(super) fn close_insert(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(ids) = self.placing.clone() {
-            let stored: Vec<(InstanceId, Placement)> = ids.iter().filter_map(|id| Some((*id, self.assembly(cx)?.instance(*id)?.placement))).collect();
+            // Live (asm-insert-ok-pending, 9423c8f2): ✓ keeps an instance still on the pointer at identity, its Part
+            // Studio's position (not a repeat insert's offset).
             let mut solved = self.result.solved.clone();
             for (id, pl) in &mut solved.placements {
-                if let Some((_, p)) = stored.iter().find(|(i, _)| i == id) {
-                    *pl = *p;
+                if ids.contains(id) {
+                    *pl = Placement::default();
                 }
             }
             self.ui.place_snap = None;

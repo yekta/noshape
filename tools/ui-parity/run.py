@@ -762,6 +762,17 @@ def compare(live, ours, whole_document=True):
         # its `titleState` and `ok` are defaults).
         if isinstance(a.get("dialog"), dict) and isinstance(b.get("dialog"), dict) and a["dialog"].get("kind") == "feature" and a["dialog"].get("title") is None:
             b["dialog"] = dict(b["dialog"], title=None, **{k: a["dialog"][k] for k in ("titleState", "ok") if k in a["dialog"]})
+        # The Insert dialog's "Inserted: N": live's recorder (2026-11-14.1) puts it on the dialog's panels entry, ours
+        # on the dialog (asm-insert-esc-pending / -ok-pending, where pending instances show only after ✓).
+        for side in (a, b):
+            dl = side.get("dialog")
+            if isinstance(dl, dict) and dl.get("title") == "Insert parts and assemblies" and "inserted" not in dl:
+                for pn in side.get("panels") or []:
+                    if isinstance(pn, dict) and pn.get("id") == "assembly-insert-dialog" and "inserted" in pn:
+                        dl["inserted"] = pn["inserted"]
+        if isinstance(a.get("dialog"), dict) and isinstance(b.get("dialog"), dict) and ("inserted" in a["dialog"]) != ("inserted" in b["dialog"]):
+            a["dialog"].pop("inserted", None)
+            b["dialog"].pop("inserted", None)
         # A Feature Studio's notices while the autocomplete list is open (typing): live's count changes from run to run
         # at the same step (its compile runs on its own time), as ours.
         for side in (a, b):

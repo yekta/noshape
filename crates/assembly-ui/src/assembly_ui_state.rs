@@ -751,7 +751,10 @@ impl AssemblyView {
                 text.extend(["Part Studios", "Assemblies"].map(String::from));
                 text.push(if self.ui.insert_tab == 0 { "(Search Part Studios)".into() } else { "(Search Assemblies)".into() });
             }
-            out.push(panel("Insert parts and assemblies", text));
+            // "Inserted: N" (live's recorder since 2026-11-14.1, asm-insert-*-pending; run.py takes it into the dialog).
+            let mut d = panel("Insert parts and assemblies", text);
+            d["inserted"] = json!(self.inserted_count(cx));
+            out.push(d);
         }
         out
     }
