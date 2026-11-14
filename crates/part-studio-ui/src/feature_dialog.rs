@@ -161,6 +161,9 @@ pub struct FeatureDialog {
     /// The field the open Create selection dialog fills (white with a blue
     /// border while it is open, live part-studio/395).
     pub cs_target: Option<String>,
+    /// Each field's "Create selection" button where it was last drawn (window coordinates): the panel opens 64 px
+    /// under its top (live 3096).
+    pub cs_buttons: std::rc::Rc<std::cell::RefCell<HashMap<String, Bounds<Pixels>>>>,
     subs: Vec<Subscription>,
     parse_errors: HashMap<String, String>,
     /// A number field typed into but not yet passed on to the preview (it
@@ -407,6 +410,7 @@ impl FeatureDialog {
             active_query: None,
             advance_disarmed: None,
             cs_target: None,
+            cs_buttons: Default::default(),
             subs: Vec::new(),
             parse_errors: HashMap::new(),
             typed_pending: false,
@@ -3411,6 +3415,10 @@ impl FeatureDialog {
                                 .when(cs_open, |d| d.bg(gpui_kit::rgb(0xeaeaea)))
                                 .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)).border_color(pal.accent))
                                 .child(crate::assets::icon("create-selection", 20., cx))
+                                .child({
+                                    let (map, key) = (self.cs_buttons.clone(), path.to_string());
+                                    canvas(move |b, _, _| map.borrow_mut().insert(key, b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()
+                                })
                                 .tooltip(crate::ui::tooltip("Create selection"))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                                     this.active_query = Some(p_cs.clone());

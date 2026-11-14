@@ -228,8 +228,9 @@ segment's ends, no centre or EQUAL of their own, nothing when the image is alrea
 the bottom); a plane picked in a dialog field 20 % amber (`Highlighting { dialog }`; a selected plane keeps its
 amber); a focused select's 1 px #1651b0 line (was a glow); a focused checkbox's 2 px #3e94ff ring; a filled field
 beside the mate connector button 43 px (1 px taller). Dialog fields, tabs, labels, icons otherwise match to the
-pixel. Open: the type list's search caret (live shows none in its shot; caret blink?), Part mirror's preview body
-colour, Face mirror's built preview (52b) and the Create selection panel (54b) not compared yet.
+pixel. The Create selection panel opens 4 px right of the dialog, 64 px under its button's top (live 3096; live
+loses the 4 px after a drag in the same session: not copied). Open: the type list's search caret (live shows none in
+its shot; caret blink?), Part mirror's preview body colour, Face mirror's built preview (52b).
 **11-14 18:16 (viewport speed, Linux numbers):** vibe7 (load ~16), release, llvmpipe, 60 samples, mode-700 copies
 deleted after. Pointer / click to the frame with its highlight or selection, p50: dock hover 370 ms, pick 620; hat15
 hover 381-856, pick 1074: llvmpipe drawing the models. To its submission p50 0.4-1.9 ms; the maxima (69-985 ms, one

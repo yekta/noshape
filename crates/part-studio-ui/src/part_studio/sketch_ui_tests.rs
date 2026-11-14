@@ -768,6 +768,27 @@ fn add_custom_features_closes_on_escape_and_its_close_button(cx: &mut TestAppCon
     assert!(cx.update(|cx| view.read(cx).ui.add_features.is_none()), "✕ closes it");
 }
 
+/// Live 3096: the Create selection panel opened from a field's button sits 4 px right of the dialog, its top 64 px
+/// under the button's (Mirror › Face mirror: button top 141, panel 205).
+#[gpui::test]
+fn the_create_selection_panel_opens_under_its_button(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "cs-panel-place");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("mirror", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Mirror dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("patternType", noshape_model::ParamValue::Enum("FACE".into()), cx)));
+    draw(cx, window);
+    wait_until(cx, window, |cx| dialog.read(cx).cs_buttons.borrow().contains_key("faces"));
+    cx.update(|cx| dialog.update(cx, |_, cx| cx.emit(crate::feature_dialog::DialogEvent::CreateSelection("faces".into()))));
+    draw(cx, window);
+    let (button_top, panel_top, origin_y) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = dialog.read(cx).cs_buttons.borrow().get("faces").copied().expect("the button drawn");
+        (f32::from(b.top()), f32::from(v.ui.create_selection.as_ref().expect("the panel").pos.y), f32::from(v.viewport.read(cx).origin().y))
+    });
+    assert_eq!(panel_top + origin_y - button_top, 64.0, "64 px under the button");
+}
+
 /// Live (ui-parity extrude-remove-tab): Extrude opened on a part's face takes Add by itself, and that isn't an undo
 /// step (Undo off); a change after it is, and undoing it keeps Add.
 #[gpui::test]

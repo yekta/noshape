@@ -117,13 +117,17 @@ impl PartStudioView {
         self.open_create_selection(window_pos - origin, target, cx);
     }
 
-    /// From a feature dialog field's button: beside the dialog (live
-    /// part-studio/394: its left edge at the dialog's right edge, level
-    /// with the field).
+    /// From a feature dialog field's button: beside the dialog, 4 px right of it, its top 64 px under the button's
+    /// (live 3096: Mirror's Faces to mirror and Delete face's, the dialog anywhere).
     pub(super) fn open_create_selection_for_field(&mut self, field: String, cx: &mut Context<Self>) {
         let origin = super::behaviors::feature_dialog_pos();
         let width = self.ui.dialog_width.unwrap_or(px(220.));
-        self.open_create_selection(point(origin.x + width + px(4.), origin.y + px(97.)), CsTarget::Field(field), cx);
+        let top = self.edit.as_ref().and_then(|e| e.dialog.read(cx).cs_buttons.borrow().get(&field).map(|b| b.top()));
+        let y = match top {
+            Some(t) => t - self.viewport.read(cx).origin().y + px(64.),
+            None => origin.y + px(97.),
+        };
+        self.open_create_selection(point(origin.x + width + px(4.), y), CsTarget::Field(field), cx);
     }
 
     /// From a Flatten surfaces field's button: beside that dialog.
