@@ -207,6 +207,11 @@ pub fn fit_curve(points: &[[f64; 2]], closed: bool, tol: f64) -> Option<FitCurve
     if pts.len() < 6 {
         return None;
     }
+    // A closed outline of under 12 corners is a polygon, not a curve's tessellation (30 deg or more a side): a
+    // callout's hexagon or octagon border, whose corners lie on an ellipse (live writes the hexagon as a POLYLINE).
+    if closed && pts.len() - usize::from(first_last) < 12 {
+        return None;
+    }
     // Translate to the centroid for conditioning.
     let n = pts.len() as f64;
     let o = pts.iter().fold([0.0, 0.0], |a, p| [a[0] + p[0] / n, a[1] + p[1] / n]);
@@ -291,6 +296,15 @@ pub fn fit_curve(points: &[[f64; 2]], closed: bool, tol: f64) -> Option<FitCurve
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A callout's hexagon and octagon borders stay polylines; its 40-point circle is a CIRCLE.
+    #[test]
+    fn polygons_are_not_fitted_as_curves() {
+        let poly = |n: usize, rx: f64, ry: f64| -> Vec<[f64; 2]> { (0..n).map(|i| i as f64 / n as f64 * TAU).map(|t| [rx * t.cos(), ry * t.sin()]).collect() };
+        assert_eq!(fit_curve(&poly(6, 4.57, 3.96), true, 1e-4), None);
+        assert_eq!(fit_curve(&poly(8, 4.0, 4.0), true, 1e-4), None);
+        assert!(matches!(fit_curve(&poly(40, 4.0, 4.0), true, 1e-4), Some(FitCurve::Circle { .. })));
+    }
 
     fn ring(c: [f64; 2], a: f64, b: f64, rot: f64, t0: f64, t1: f64, n: usize) -> Vec<[f64; 2]> {
         (0..=n)
