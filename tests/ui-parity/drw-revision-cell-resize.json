@@ -1,9 +1,9 @@
 {
-  "name": "drw-revision-cell-unmerge",
-  "about": "A revision table's header cells merged (Merge with cell right), then › Unmerge cells",
+  "name": "drw-revision-cell-resize",
+  "about": "A selected revision table cell's menu › Resize...",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
-  "source": "coverage (lead 11-07: the remaining drawing menu items)",
+  "source": "coverage (lead 11-07: the revision table's rows; live's Free account has no Revision table tool, asked whether another can record); live2 11-14: steps follow live (a data-row cell at sheet (70, 137)); live2 11-14: steps follow live (a data-row cell at sheet (70, 137))",
   "start": "block-drawing",
   "steps": [
     {
@@ -36,34 +36,42 @@
       "key": "Escape"
     },
     {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          70,
+          137
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 500
+    },
+    {
       "do": "rclick",
       "on": {
         "sheet_point": [
-          100,
-          141
+          70,
+          137
         ]
       }
     },
     {
       "do": "click",
       "on": {
-        "menu": "Merge with cell right"
+        "menu": "Resize..."
       }
     },
     {
-      "do": "rclick",
-      "on": {
-        "sheet_point": [
-          100,
-          141
-        ]
-      }
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
     },
     {
-      "do": "click",
-      "on": {
-        "menu": "Unmerge cells"
-      }
+      "do": "key",
+      "key": "Escape"
     }
   ]
 }

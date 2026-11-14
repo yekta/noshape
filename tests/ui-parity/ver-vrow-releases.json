@@ -22,6 +22,11 @@
     "menu": "Releases"
    },
    "do": "click"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
   }
  ],
  "config_files": {

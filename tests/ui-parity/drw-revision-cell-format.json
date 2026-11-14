@@ -1,9 +1,9 @@
 {
   "name": "drw-revision-cell-format",
-  "about": "A revision table's cell › Format cell...",
+  "about": "A revision table cell clicked: the Cell format bar (live has no Format cell... item on revision tables)",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
-  "source": "coverage (lead 11-07: the remaining drawing menu items)",
+  "source": "coverage (lead 11-07: the revision table's rows; live's Free account has no Revision table tool, asked whether another can record); live2 11-14: steps follow live (a data-row cell at sheet (70, 137))",
   "start": "block-drawing",
   "steps": [
     {
@@ -36,18 +36,12 @@
       "key": "Escape"
     },
     {
-      "do": "rclick",
-      "on": {
-        "sheet_point": [
-          130,
-          141
-        ]
-      }
-    },
-    {
       "do": "click",
       "on": {
-        "menu": "Format cell..."
+        "sheet_point": [
+          70,
+          137
+        ]
       }
     },
     {

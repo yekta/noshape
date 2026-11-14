@@ -1,0 +1,73 @@
+{
+  "name": "drw-revision-cell-menu",
+  "about": "A selected revision table cell's menu: Size ›, Resize..., Copy (live has no merge or Format cell items there)",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the revision table's rows; live's Free account has no Revision table tool, asked whether another can record); live2 11-14: steps follow live (a data-row cell at sheet (70, 137)); live2 11-14: steps follow live (a data-row cell at sheet (70, 137))",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Revision table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          150,
+          150
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 500
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          70,
+          137
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 500
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          70,
+          137
+        ]
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Size"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}

@@ -1,9 +1,9 @@
 {
   "name": "drw-revision-callout-add",
-  "about": "A revision table's menu › Add revision callout, placed at sheet (100, 100)",
+  "about": "A revision table's menu (right-click a data row) › Add revision callout, placed at sheet (190, 168)",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
-  "source": "coverage (lead 11-07: the revision table's rows; live's Free account has no Revision table tool, asked whether another can record)",
+  "source": "coverage (lead 11-07: the revision table's rows; live's Free account has no Revision table tool, asked whether another can record); live2 11-14: steps follow live (a data-row cell at sheet (70, 137))",
   "start": "block-drawing",
   "steps": [
     {
@@ -39,8 +39,8 @@
       "do": "rclick",
       "on": {
         "sheet_point": [
-          130,
-          146
+          70,
+          137
         ]
       }
     },
@@ -54,10 +54,15 @@
       "do": "click",
       "on": {
         "sheet_point": [
-          100,
-          100
+          190,
+          168
         ]
       }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
     },
     {
       "do": "key",
