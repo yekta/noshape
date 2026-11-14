@@ -6967,7 +6967,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             let step = t.step(k);
             res.untranslated.extend(step.problems.iter().map(|p| format!("{name} › {} ({}): {p}", step.name, step.feature_type)));
             // (One live has suppressed is added, then suppressed: its status is the add's.)
-            if step.status.as_deref().is_some_and(|s| s != "Ok") && studio["features"][k]["suppressed"] != true {
+            // (Not where live's own line has that status: asm-config-assembly's Fillet 2 / 3 "For active sheet metal parts
+            // use Corner break." are live's INFO too, skasm 12:40.)
+            let live_status = studio["live"].as_array().into_iter().flatten().find(|l| l["index"].as_u64() == Some(k as u64)).and_then(|l| l["status"].as_str());
+            let as_live = step.status.as_deref().zip(live_status).is_some_and(|(o, l)| o.eq_ignore_ascii_case(l));
+            if step.status.as_deref().is_some_and(|s| s != "Ok") && studio["features"][k]["suppressed"] != true && !as_live {
                 res.differences.push(format!("{name} › {}: {} ({})", step.name, step.status.as_deref().unwrap_or(""), step.message.as_deref().unwrap_or("")));
             }
         }
@@ -7154,9 +7158,12 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 && let Ok(edge) = &found
                 && edge.starts_with("edge:")
                 && let Some(second) = q["second"].as_str().filter(|s| !s.is_empty())
-                && let Some(face) = t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [second] })).ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("face:")))
             {
-                aligns.insert(key.clone(), face);
+                let ids = t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [second] }));
+                trace(&format!("{name}: mate connector {}: MID_POINT's second {second} -> {ids:?}", key.1));
+                if let Some(face) = ids.ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("face:"))) {
+                    aligns.insert(key.clone(), face);
+                }
             }
             match found {
                 Ok(e) => {
