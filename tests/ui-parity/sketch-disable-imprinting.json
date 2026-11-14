@@ -1,0 +1,37 @@
+{
+ "name": "sketch-disable-imprinting",
+ "about": "block: Sketch, Disable imprinting on, Escape (with no plane picked the Sketch dialog stays open)",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (panel and dialog controls no recorded scenario touched)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Disable imprinting"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

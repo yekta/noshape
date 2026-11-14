@@ -1,0 +1,63 @@
+{
+ "name": "analysis-deviation-options",
+ "about": "overlap: a face, Deviation analysis\u2026, Max and min location off, Absolute values on, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (panel and dialog controls no recorded scenario touched)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show analysis tools"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Deviation analysis\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Max and min location"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Absolute values"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

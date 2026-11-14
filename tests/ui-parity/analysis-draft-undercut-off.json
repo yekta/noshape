@@ -1,0 +1,53 @@
+{
+ "name": "analysis-draft-undercut-off",
+ "about": "block: the top face, Draft analysis\u2026, Show undercut regions off, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (panel and dialog controls no recorded scenario touched)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show analysis tools"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Draft analysis\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Show undercut regions"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

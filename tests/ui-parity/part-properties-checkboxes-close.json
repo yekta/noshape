@@ -1,0 +1,55 @@
+{
+ "name": "part-properties-checkboxes-close",
+ "about": "block: Part 1 \u203a Properties\u2026, Not revision managed, Exclude from all BOMs and mass Override on (below the fold), Close (nothing saved)",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (panel and dialog controls no recorded scenario touched)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Properties\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Not revision managed"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Exclude from all BOMs"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Override"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}
