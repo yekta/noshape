@@ -276,7 +276,15 @@ impl DrawingEditor {
             // (Nor a custom table: live2 drw-custom-table-insert lists none after placing one; nor a cut list,
             // drw-cut-list-table-properties.)
             for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. } | TableKind::Custom { .. } | TableKind::CutList { .. }) && Some(t.id) != editing) {
-                let parts: Vec<&str> = b.geometry.texts.iter().filter(|x| matches!(b.picks.get(x.pick as usize), Some(PickTarget::Table(id)) if *id == t.id)).map(|x| x.text.as_str()).collect();
+                let mut texts: Vec<_> = b.geometry.texts.iter().filter(|x| matches!(b.picks.get(x.pick as usize), Some(PickTarget::Table(id)) if *id == t.id)).collect();
+                // Bottom to top: live's recorder reads the rows in their data order (the header, item 1, item 2…; live2
+                // drw-bom-multi-level-bottom-to-top), bottom up here.
+                let upward = matches!(t.kind, TableKind::Bom { bottom_to_top: true, .. });
+                if upward {
+                    // (A row's cells by their whole millimetre: their anchors differ by a fraction.)
+                    texts.sort_by(|a, b| a.pos[1].round().total_cmp(&b.pos[1].round()).then(a.pos[0].total_cmp(&b.pos[0])));
+                }
+                let parts: Vec<&str> = texts.iter().map(|x| x.text.as_str()).collect();
                 annotations.push(("table", parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" "), self.ui_position("table", |p| matches!(p, PickTarget::Table(id) if *id == t.id))));
             }
             for v in &sheet.views {

@@ -184,7 +184,10 @@ pub const SHORTCUT_CATALOGUE: [(&str, &str, Act); 65] = [
     ("Auxiliary view", "auxiliary-view", |e, _, cx| e.set_tool(Tool::Auxiliary { parent: None }, cx)),
     ("Detail view", "detail-view", |e, _, cx| e.set_tool(Tool::Detail { parent: None, center: None, radius: None }, cx)),
     ("Section view", "section-view", |e, _, cx| e.set_tool(Tool::Section { parent: None, p0: None, line: None, partial: false, jogs: vec![] }, cx)),
-    ("Broken-out section", "broken-out-section", |e, _, cx| e.set_tool(Tool::BrokenOut { parent: None, points: vec![], done: false }, cx)),
+    ("Broken-out section", "broken-out-section", |e, _, cx| {
+        e.bo_start_blind = false;
+        e.set_tool(Tool::BrokenOut { parent: None, points: vec![], done: false }, cx)
+    }),
     ("Break view", "broken-view", |e, _, cx| e.set_tool(Tool::Break { parent: None, first: None, vertical: true }, cx)),
     ("Crop view", "crop-view", |e, _, cx| e.start_crop(cx)),
     ("Inspection item", "inspection-item", |e, w, cx| e.open_inspection(w, cx)),

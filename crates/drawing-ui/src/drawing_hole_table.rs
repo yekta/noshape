@@ -122,7 +122,17 @@ impl DrawingEditor {
     /// Every view of the table being inserted has its origin (live 1744: ✓
     /// waits for all of them).
     pub fn hole_origins_done(&self) -> bool {
-        matches!(self.tool, Tool::Table { kind: TableTool::Hole, origin: Some(_), .. }) && self.hole_dlg.as_ref().is_none_or(|d| !d.adding_view && d.more.iter().all(|m| m.1.is_some()))
+        let first = match &self.tool {
+            Tool::Table { kind: TableTool::Hole, view: Some(_), origin } => origin.is_some() || !self.hole_needs_origin(),
+            _ => false,
+        };
+        first && self.hole_dlg.as_ref().is_none_or(|d| !d.adding_view && (!d.show_location || d.more.iter().all(|m| m.1.is_some())))
+    }
+
+    /// The table being inserted measures from an origin: with Show location data off it has no X / Y LOC columns and
+    /// ✓ takes it without one (live drw-hole-table-collapse-tags: the view, then ✓).
+    pub fn hole_needs_origin(&self) -> bool {
+        self.hole_dlg.as_ref().is_none_or(|d| d.show_location)
     }
 
     /// A click for a further view (after the Views box) or its origin; true
@@ -173,12 +183,12 @@ impl DrawingEditor {
     /// Place the hole table being inserted at the pointer's last spot (a
     /// click on the sheet, or Esc after ✓).
     pub fn place_hole_table(&mut self, cx: &mut Context<Self>) {
-        let Tool::Table { kind: TableTool::Hole, view: Some(v), origin: Some(o) } = self.tool.clone() else { return };
+        let Tool::Table { kind: TableTool::Hole, view: Some(v), origin } = self.tool.clone() else { return };
         if !self.hole_origins_done() {
             return;
         }
         let id = self.current_sheet().next_table_id();
-        let (mut table, name) = noshape_scene::drawing_tools::view_table(id, TableTool::Hole, v, Some(o), self.cursor);
+        let (mut table, name) = noshape_scene::drawing_tools::view_table(id, TableTool::Hole, v, origin, self.cursor);
         self.apply_hole_table_dlg(&mut table);
         self.edit_sheet(name, cx, |s| s.tables.push(table));
         self.hole_dlg = None;
@@ -190,12 +200,12 @@ impl DrawingEditor {
     /// The hole table being placed, at the pointer (live 1985: the table,
     /// the view's tags and the origin arrows follow it before the click).
     pub fn hole_table_preview(&self) -> Option<noshape_model::drawing::Table> {
-        let Tool::Table { kind: TableTool::Hole, view: Some(v), origin: Some(o) } = &self.tool else { return None };
+        let Tool::Table { kind: TableTool::Hole, view: Some(v), origin } = &self.tool else { return None };
         if self.hole_dlg.as_ref().is_some_and(|d| d.picking || d.x_picking || d.y_picking) || !self.hole_origins_done() {
             return None;
         }
         let id = self.current_sheet().next_table_id();
-        let (mut t, _) = noshape_scene::drawing_tools::view_table(id, TableTool::Hole, *v, Some(o.clone()), self.cursor);
+        let (mut t, _) = noshape_scene::drawing_tools::view_table(id, TableTool::Hole, *v, origin.clone(), self.cursor);
         self.apply_hole_table_dlg(&mut t);
         Some(t)
     }
@@ -286,7 +296,9 @@ impl DrawingEditor {
         type Set = std::rc::Rc<dyn Fn(&mut HoleTableDlg)>;
         let select = |id: &'static str, label: String, w: f32, items: Vec<(String, bool, Set)>| {
             let ed = ed.clone();
-            Button::new(id).label(label).ghost().xsmall().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            // (The ui-parity runner's `{"dropdown": "<shown>"}`.)
+            let mark = format!("dropdown:{label}");
+            let button = Button::new(id).label(label).ghost().xsmall().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| {
@@ -299,7 +311,8 @@ impl DrawingEditor {
                     }));
                 }
                 m
-            })
+            });
+            crate::ui_script::mark(div().child(button), move || mark)
         };
         // "Location precision" on one line (it wrapped at 70 px, walk 10-28).
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(28.)).px(px(8.)).child(div().w(px(98.)).flex_none().text_size(px(11.)).child(label)).child(body).into_any_element();

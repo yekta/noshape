@@ -1260,7 +1260,7 @@ impl DrawingEditor {
                 }
             }
             Tool::Table { kind: TableTool::Hole, .. } if self.hole_more_click(c, cx) || self.hole_x_dir_click(cx) || self.hole_exclude_click(cx) => {}
-            Tool::Table { kind: TableTool::Hole, view: Some(v), origin: None } => {
+            Tool::Table { kind: TableTool::Hole, view: Some(v), origin: None } if self.hole_needs_origin() => {
                 if let Some(p) = self.snap_at(c).filter(|p| p.view == v) {
                     self.tool = Tool::Table { kind: TableTool::Hole, view: Some(v), origin: Some(p) };
                 }

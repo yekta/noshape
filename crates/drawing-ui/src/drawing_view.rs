@@ -450,6 +450,9 @@ pub struct DrawingEditor {
     pub table_dlg: Option<crate::drawing_table_dlg::TableDlg>,
     /// The Hole table dialog (with the Hole table tool).
     pub hole_dlg: Option<crate::drawing_hole_table::HoleTableDlg>,
+    /// Broken-out section › End type picked before the profile closes: Blind (else Up to entity; live
+    /// drw-broken-out-blind).
+    pub bo_start_blind: bool,
     /// Sheets panel › reference › Change configuration... (S6).
     pub change_config: Option<crate::drawing_config::ChangeConfigDlg>,
     /// Geometric tolerance dialog (drawing_gdt.rs).
@@ -751,6 +754,7 @@ impl DrawingEditor {
             stack_dlg: None,
             table_dlg: None,
             hole_dlg: None,
+            bo_start_blind: false,
             change_config: None,
             gdt_dlg: None,
             custom_tables: Default::default(),

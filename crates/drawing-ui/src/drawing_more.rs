@@ -299,7 +299,7 @@ impl DrawingEditor {
                 let d = noshape_scene::drawing_tools::broken_out_blind_default(u);
                 let depth = self.input(&format::format_number(d / u.meters(), None, 3), window, cx);
                 let _ = window;
-                self.panel = Some(Panel::BrokenOut { view, edit: None, profile: points, spline: true, up_to: true, depth, depth_ref: None, offset: None, exclude: Vec::new(), picking: false, add_point: false });
+                self.panel = Some(Panel::BrokenOut { view, edit: None, profile: points, spline: true, up_to: !self.bo_start_blind, depth, depth_ref: None, offset: None, exclude: Vec::new(), picking: false, add_point: false });
                 self.update_preview(cx);
                 true
             }
@@ -624,9 +624,11 @@ impl DrawingEditor {
         best.map(|(_, r)| r)
     }
 
-    fn broken_out_mode(up: bool, cx: &mut Context<Self>) -> AnyElement {
+    /// End type ▾: Up to entity / Blind (`start`: before the profile closes, the tool's choice).
+    fn broken_out_mode(up: bool, start: bool, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
-        Button::new("dr-bo-mode")
+        let mark = format!("dropdown:{}", if up { "Up to entity" } else { "Blind" });
+        let button = Button::new(if start { "dr-bo-start-mode" } else { "dr-bo-mode" })
             .label(if up { "Up to entity" } else { "Blind" })
             .xsmall()
             .ghost()
@@ -639,7 +641,9 @@ impl DrawingEditor {
                     let e = ed.clone();
                     m = m.item(crate::os_menu::OsMenuItem::new(label).checked(up == v).on_click(move |_, _, cx| {
                         e.update(cx, |this, cx| {
-                            if let Some(Panel::BrokenOut { up_to, .. }) = &mut this.panel {
+                            if start {
+                                this.bo_start_blind = !v;
+                            } else if let Some(Panel::BrokenOut { up_to, .. }) = &mut this.panel {
                                 *up_to = v;
                             }
                             this.update_preview(cx);
@@ -648,8 +652,8 @@ impl DrawingEditor {
                     }));
                 }
                 m
-            })
-            .into_any_element()
+            });
+        crate::ui_script::mark(div().w_full().child(button), move || mark).into_any_element()
     }
 
     /// The "Depth of section cut" box: its placeholder, or the picked point's chip.
@@ -700,7 +704,8 @@ impl DrawingEditor {
     /// is up from the start, ✓ greyed, Up to entity with its empty depth box and ☐ Offset).
     pub fn render_broken_out_start(&self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        Self::note_broken_out(false, true, false);
+        let up = !self.bo_start_blind;
+        Self::note_broken_out(false, up, false);
         v_flex()
             .id("dr-bo-start")
             .absolute()
@@ -725,9 +730,10 @@ impl DrawingEditor {
                     .child(div().id("dr-bo-start-x").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_tool(Tool::Select, cx)))),
             )
             .children(self.broken_out_profile_rows(false, cx))
-            .child(Button::new("dr-bo-start-mode").label("Up to entity").xsmall().ghost().w_full().dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)))
-            .child(Self::broken_out_depth_field(false, cx))
-            .child(crate::drawing_chrome::DrCheckbox::new("dr-bo-start-offset").label("Offset").checked(false))
+            .child(Self::broken_out_mode(up, true, cx))
+            .when(up, |d| d.child(Self::broken_out_depth_field(false, cx)).child(crate::drawing_chrome::DrCheckbox::new("dr-bo-start-offset").label("Offset").checked(false)))
+            // Blind: its Depth box, filled once the profile closes.
+            .when(!up, |d| d.child(div().h(px(24.)).px(px(6.)).flex().items_center().text_xs().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).text_color(pal.text_faint).child("Depth")))
             .into_any_element()
     }
 
@@ -744,7 +750,7 @@ impl DrawingEditor {
                 let (n, on) = (exclude.len(), *picking);
                 Self::note_broken_out(true, up, depth_ref.is_some());
                 let mut rows = self.broken_out_profile_rows(true, cx);
-                rows.push(Self::broken_out_mode(up, cx));
+                rows.push(Self::broken_out_mode(up, false, cx));
                 if up {
                     rows.push(Self::broken_out_depth_field(depth_ref.is_some(), cx));
                     rows.push(

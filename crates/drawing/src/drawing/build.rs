@@ -2312,7 +2312,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             match &v.kind {
                 ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } if shown => label_lines.extend(affixed(&vt.section_prefix, format!("{label} - {label}"))),
                 ViewKind::Detail { label, .. } => {
-                    if shown {
+                    // A Connected profile's line names the view: its label is the scale alone (live
+                    // drw-detail-view-profile-connected: "SCALE 2:1").
+                    if shown && v.detail_style != 1 {
                         label_lines.extend(affixed(&vt.detail_prefix, label.clone()));
                     }
                     if v.scale_label_shown() {
