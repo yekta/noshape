@@ -953,25 +953,8 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
       pieces.push_back(piece);
     }
     occ::handle<Geom_BSplineSurface> side = join_u(pieces, at);
-    // Round on itself: OCCT's seam (Parasolid's periodic face has none) through one of A's vertices, not the guide,
-    // whose vertices live shows (the shown topology joins the pieces either side of a seam).
-    for (double s : closed ? joints_a : std::vector<double>{})
-    {
-      const double u = forward(sa0, s, A.len) / la;
-      const auto   k = std::find_if(at.begin() + 1, at.end() - 1, [&](double x) { return std::abs(x - u) < 1e-6; });
-      if (k == at.end() - 1 || std::any_of(ua.begin(), ua.end(), [&](double x) { return std::abs(x - u) < 1e-6; }))
-        continue;
-      side->SetUPeriodic();
-      side->RemoveUKnot(1, side->UDegree() - 1, tol);
-      for (int i = 1; i <= side->NbUKnots(); ++i)
-        if (std::abs(side->UKnot(i) - *k) < 1e-12)
-        {
-          side->SetUOrigin(i);
-          break;
-        }
-      splits_b.push_back(top(*k));
-      break;
-    }
+    // (Round on itself: OCCT's seam at the first guide, where live's periodic face starts (3070) and its rings' vertices
+    // lie: c2-hunting-knife's handle ring after Revolve 1. The guide's vertices stay shown: kept_ends.)
     BRepBuilderAPI_MakeFace mf(side, 1e-7);
     if (!mf.IsDone())
       fail_op("loft: guided face failed");

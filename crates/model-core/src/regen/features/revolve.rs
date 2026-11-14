@@ -53,7 +53,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     let mut tools = Vec::new();
     for p in &profiles {
         if full {
-            let res = k::revolve(&p.shape, origin, axis, TAU)?;
+            let res = k::revolve_turned(&p.shape, origin, axis)?;
             let names = sweep_names(ev, p, &res, false, false);
             tools.push(NamedShape::new(res.shape, names));
             continue;

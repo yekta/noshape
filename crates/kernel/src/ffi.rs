@@ -643,6 +643,7 @@ pub(crate) mod ffi {
             start_offset: f64,
         ) -> Result<OpOut>;
         fn op_revol(profile: &OcShape, origin: P3, axis: P3, a0: f64, a1: f64) -> Result<OpOut>;
+        fn op_revol_turned(profile: &OcShape, origin: P3, axis: P3) -> Result<OpOut>;
         fn op_pipe(profile: &OcShape, spine: &OcShape) -> Result<OpOut>;
         fn op_pipe_shell(
             profiles: &OcShapeList,

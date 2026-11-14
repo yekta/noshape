@@ -1115,6 +1115,9 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       }
       if (other || two.size() != 2 || !open[two[0]] || !open[two[1]])
         continue;
+      // A vertex made to stay (a loft's guide end on its profiles: live shows it, OCCT's seam or not).
+      if (kept_ends(em(two[0])) && kept_ends(em(two[1])))
+        continue;
       // Two edges that close a loop between the same two faces (both their ends shared): one ring, seam or not (an
       // IGES writer's halves of a slot's outline, live's motor-mount: its model has rings).
       TopoDS_Vertex a0, a1, b0, b1;

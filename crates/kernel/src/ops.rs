@@ -94,6 +94,12 @@ pub fn revolve_between(profile: &Shape, origin: DVec3, axis: DVec3, start_angle:
     op(ffi::op_revol(profile.raw(), p3(origin), p3(axis), start_angle, end_angle))
 }
 
+/// A full revolve starting half round from the profile: its seams on the far side of the axis from it (a Revolve
+/// feature's, away from what the profile was drawn on).
+pub fn revolve_turned(profile: &Shape, origin: DVec3, axis: DVec3) -> Result<OpResult> {
+    op(ffi::op_revol_turned(profile.raw(), p3(origin), p3(axis)))
+}
+
 // ---------------------------------------------------------------- sweep
 
 /// Orientation control of the swept profile.

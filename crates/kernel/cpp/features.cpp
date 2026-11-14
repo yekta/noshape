@@ -1155,7 +1155,25 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
 
 // ---------------------------------------------------------------- revolve
 
+namespace {
+OpOut revol(const OcShape& profile, P3 origin, P3 axis, double a0, double a1, double full_start);
+} // namespace
+
 OpOut op_revol(const OcShape& profile, P3 origin, P3 axis, double a0, double a1)
+{
+  return revol(profile, origin, axis, a0, a1, 0.0);
+}
+
+// A full turn starting half round from the profile: its seams (Parasolid's surfaces have none) on the far side, away
+// from what the profile was drawn on (c2-hunting-knife's Revolve 1: the handle's ring crossed its torus's twice, two
+// edges for live's one).
+OpOut op_revol_turned(const OcShape& profile, P3 origin, P3 axis)
+{
+  return revol(profile, origin, axis, 0.0, 2.0 * M_PI, M_PI);
+}
+
+namespace {
+OpOut revol(const OcShape& profile, P3 origin, P3 axis, double a0, double a1, double full_start)
 {
   check_sweepable(profile.shape);
   gp_Ax1 ax(to_pnt(origin), to_dir(axis, "revolve axis"));
@@ -1173,7 +1191,7 @@ OpOut op_revol(const OcShape& profile, P3 origin, P3 axis, double a0, double a1)
   // turning it to that x moved the seams other features are aligned with
   // (the tapping screws' crown sphere against its recess).
   const gp_Dir z_new = ax.Direction().Reversed();
-  const double start = full ? 0.0 : a0;
+  const double start = full ? full_start : a0;
   // Copied: its cylinders are re-framed in place below (see op_prism).
   {
     gp_Trsf t;
@@ -1220,6 +1238,7 @@ OpOut op_revol(const OcShape& profile, P3 origin, P3 axis, double a0, double a1)
   }
   return hb.finish();
 }
+} // namespace
 
 // A copy of `s` whose cylinders coaxial with (`origin`, `axis`) take
 // Parasolid's frame with z = `axis` and their origin at `origin` (a Hole's

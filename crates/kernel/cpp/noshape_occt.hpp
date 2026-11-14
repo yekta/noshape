@@ -931,6 +931,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dir, const OcShape& until,
                      double start_offset);
 OpOut op_revol(const OcShape& profile, P3 origin, P3 axis,
                double a0, double a1);
+OpOut op_revol_turned(const OcShape& profile, P3 origin, P3 axis);
 OpOut op_pipe(const OcShape& profile, const OcShape& spine);
 OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const SweepOpts& opts,
                     const OcShape& aux);
