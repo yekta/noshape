@@ -5,6 +5,7 @@ use super::*;
 use crate::curve2::Map;
 use crate::freeform::FreeSurface;
 use glam::DVec4;
+use std::f64::consts::FRAC_PI_2;
 
 /// A free-form face's parameter box: what its edges' curves on it span (within the surface's own range), grown by
 /// a hundredth.
@@ -832,6 +833,27 @@ pub(super) fn apart(f: &GFace, g: &GFace, gap: f64, flat: [Option<(DVec2, DVec2)
     fn patches(x: &GFace) -> Option<&[Bez]> {
         x.bez.get_or_init(|| bezier_patches(x.ns.as_deref()?, pole_box(x)?)).as_deref()
     }
+    // (A torus face and a plane: the torus's distances to the plane, c ± (R h + r) (h its axis's sine to the plane's
+    // normal), all on one side past the gap (c2-rings-loft's ring fuse: 233 empty sections of OCCT's, 1.2 s).)
+    for (x, y) in [(f, g), (g, f)] {
+        if let (Some(&FreeSurface::Torus { o, x: tx, y: ty, z: tz, major, minor }), &Surf::Plane { n, d, .. }) = (x.ns.as_deref(), &y.s) {
+            // (Over the face's own angles: the distance c + (R + r cos v)(nx cos u + ny sin u) + r nz sin v, each
+            // factor's range there, their products' and sums'.)
+            let [u0, u1, v0, v1] = x.uvbox;
+            let (nx, ny, nz) = (n.dot(tx), n.dot(ty), n.dot(tz));
+            let (h, phi) = ((nx * nx + ny * ny).sqrt(), ny.atan2(nx));
+            let a = cos_range(u0 - phi, u1 - phi);
+            let a = (h * a.0, h * a.1);
+            let (c, sv) = (cos_range(v0, v1), cos_range(v0 - FRAC_PI_2, v1 - FRAC_PI_2));
+            let rad = (major + (minor * c.0).min(minor * c.1), major + (minor * c.0).max(minor * c.1));
+            let first = mul_range(rad, a);
+            let third = ((minor * nz * sv.0).min(minor * nz * sv.1), (minor * nz * sv.0).max(minor * nz * sv.1));
+            let base = n.dot(o) - d;
+            if base + first.0 + third.0 > gap || base + first.1 + third.1 < -gap {
+                return true;
+            }
+        }
+    }
     // (A free-form face and a plane or cylinder face: the patches the face's curves on it reach, each clear of the
     // other face's box or of its surface, halved while neither (c2-rings-loft's 51 cutters against the ring's faces:
     // 900 empty sections, 15 s of OCCT's).)
@@ -952,6 +974,31 @@ fn off_surface(pts: &[DVec3], g: &GFace, flat: Option<(DVec2, DVec2)>, gap: f64)
 pub(super) fn clearly_off(g: &GFace, p: DVec3, gap: f64) -> bool {
     let Some(ns) = g.ns.as_deref() else { return false };
     g.hulls.get_or_init(|| hulls(ns)).as_deref().is_some_and(|hs| hs.iter().all(|h| (h.lo - p).max_element() > gap || (p - h.hi).max_element() > gap))
+}
+
+/// The range of cos over [a, b].
+fn cos_range(a: f64, b: f64) -> (f64, f64) {
+    if b - a >= TAU {
+        return (-1.0, 1.0);
+    }
+    let (mut lo, mut hi) = (a.cos().min(b.cos()), a.cos().max(b.cos()));
+    // (Its extremes at the multiples of pi inside.)
+    let mut k = (a / PI).ceil();
+    while k * PI <= b {
+        if (k as i64) & 1 == 0 {
+            hi = 1.0;
+        } else {
+            lo = -1.0;
+        }
+        k += 1.0;
+    }
+    (lo, hi)
+}
+
+/// The range of the product of two ranges.
+fn mul_range(a: (f64, f64), b: (f64, f64)) -> (f64, f64) {
+    let p = [a.0 * b.0, a.0 * b.1, a.1 * b.0, a.1 * b.1];
+    (p.iter().copied().fold(f64::INFINITY, f64::min), p.iter().copied().fold(f64::NEG_INFINITY, f64::max))
 }
 
 #[cfg(test)]

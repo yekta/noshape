@@ -887,7 +887,42 @@ impl End {
 }
 
 /// Pool vertices sorted by x, by the argument they belong to (None: new or several arguments').
-type ByOwner = Vec<(Option<u32>, Vec<(f64, u32)>)>;
+type ByOwner = Vec<(Option<u32>, Sorted3)>;
+
+/// Vertices by x (each its x, vertex), grouped by their owner.
+type ByOwnerX = Vec<(Option<u32>, Vec<(f64, u32)>)>;
+
+/// Vertices by x (each its x as listed), and the same by y and by z: those in a box taken along the axis that has the
+/// fewest in its range (a 196-tool pattern's long edges each scanned every vertex in their x range).
+#[derive(Default)]
+struct Sorted3 {
+    x: Vec<(f64, u32)>,
+    yz: [Vec<(f64, u32, f64)>; 2],
+}
+
+impl Sorted3 {
+    fn new(x: Vec<(f64, u32)>, p: &[DVec3]) -> Self {
+        let along = |k: usize| {
+            let mut v: Vec<(f64, u32, f64)> = x.iter().map(|&(px, w)| (if k == 0 { p[w as usize].y } else { p[w as usize].z }, w, px)).collect();
+            v.sort_by(|a, b| a.0.total_cmp(&b.0));
+            v
+        };
+        let yz = [along(0), along(1)];
+        Sorted3 { x, yz }
+    }
+
+    /// The vertices whose listed x is in [lo.x, hi.x], and others by y or z wherever fewer are in that range
+    /// (a superset of those in the box: the caller checks y and z), each (its x as listed, vertex).
+    fn near(&self, lo: DVec3, hi: DVec3) -> impl Iterator<Item = (f64, u32)> + '_ {
+        let range = |v: &[(f64, u32, f64)], a: f64, b: f64| v.partition_point(|x| x.0 < a)..v.partition_point(|x| x.0 <= b);
+        let xr = self.x.partition_point(|x| x.0 < lo.x)..self.x.partition_point(|x| x.0 <= hi.x);
+        let (yr, zr) = (range(&self.yz[0], lo.y, hi.y), range(&self.yz[1], lo.z, hi.z));
+        let by_x = xr.len() <= yr.len() && xr.len() <= zr.len();
+        let (v, r) = if yr.len() <= zr.len() { (&self.yz[0], yr) } else { (&self.yz[1], zr) };
+        let (xs, others) = if by_x { (&self.x[xr], &v[0..0]) } else { (&self.x[0..0], &v[r]) };
+        xs.iter().copied().chain(others.iter().filter(move |x| x.2 >= lo.x && x.2 <= hi.x).map(|x| (x.2, x.1)))
+    }
+}
 
 /// An interval of a path inside a face: its ends (parameter, end).
 type Ival = [(f64, End); 2];
@@ -3440,24 +3475,24 @@ impl Ctx<'_> {
         Ok(out)
     }
 
-    fn split(&self, s: &Seg, sorted_x: &[(f64, u32)]) -> R<Vec<u32>> {
+    fn split(&self, s: &Seg, sorted_x: &Sorted3) -> R<Vec<u32>> {
         self.split_tol(s, sorted_x, 0.0)
     }
 
     /// `split`, a vertex on `s` within the Boolean's tolerance or the sum of its own and `te` where that's more.
-    fn split_tol(&self, s: &Seg, sorted_x: &[(f64, u32)], te: f64) -> R<Vec<u32>> {
+    fn split_tol(&self, s: &Seg, sorted_x: &Sorted3, te: f64) -> R<Vec<u32>> {
         self.split_reach(s, sorted_x, te, true)
     }
 
     /// `split_tol`; `te` counted towards the ends too (an edge's tolerance: a vertex within it of an end is that
     /// end) or only off the curve (a section's error: a crossing on it a few micrometres from its end is still a
     /// point of it).
-    fn split_reach(&self, s: &Seg, sorted_x: &[(f64, u32)], te: f64, at_ends: bool) -> R<Vec<u32>> {
+    fn split_reach(&self, s: &Seg, sorted_x: &Sorted3, te: f64, at_ends: bool) -> R<Vec<u32>> {
         Ok(self.split_params(s, sorted_x, te, at_ends)?.0)
     }
 
     /// [`Self::split_reach`]'s chain and its vertices' parameters on `s` (0 and 1 at its ends).
-    fn split_params(&self, s: &Seg, sorted_x: &[(f64, u32)], te: f64, at_ends: bool) -> R<(Vec<u32>, Vec<f64>)> {
+    fn split_params(&self, s: &Seg, sorted_x: &Sorted3, te: f64, at_ends: bool) -> R<(Vec<u32>, Vec<f64>)> {
         let tol = self.tol;
         let reach = |w: u32| self.pool.pair(te, self.pool.t[w as usize]);
         let end_reach = |w: u32| if at_ends { reach(w) } else { self.pool.pair(0.0, self.pool.t[w as usize]) };
@@ -3473,14 +3508,10 @@ impl Ctx<'_> {
             Geo::Apex { .. } => return Ok((vec![s.v[0], s.v[1]], vec![0.0, 1.0])),
         };
         let (lo, hi) = (lo - DVec3::splat(tol_far), hi + DVec3::splat(tol_far));
-        let start = sorted_x.partition_point(|x| x.0 < lo.x);
         // (Its length found when a vertex near it asks.)
         let len = std::cell::OnceCell::new();
-        let mut on: Vec<(f64, u32)> = Vec::new();
-        for &(px, w) in &sorted_x[start..] {
-            if px > hi.x {
-                break;
-            }
+        let mut on: Vec<(f64, u32, f64)> = Vec::new();
+        for (px, w) in sorted_x.near(lo, hi) {
             if w == s.v[0] || w == s.v[1] {
                 continue;
             }
@@ -3508,10 +3539,11 @@ impl Ctx<'_> {
                 continue;
             }
             if off <= r {
-                on.push((t, w));
+                on.push((t, w, px));
             }
         }
-        on.sort_by(|x, y| x.0.total_cmp(&y.0));
+        // (Along it, and at one place in the lists' order: by x, then by vertex.)
+        on.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.2.total_cmp(&y.2)).then(x.1.cmp(&y.1)));
         // (An end of OCCT's section of two quadrics with another vertex on both its faces within the section's
         // tolerance and theirs: one vertex, the other's, as OCCT puts that vertex on the curve there (c2-valve-config:
         // a handle's section of 0.206 mm ends 0.2065 mm off the vertex where it leaves a cone's rim; two vertices left
@@ -3639,14 +3671,15 @@ impl Ctx<'_> {
         if sol.sheet || !boxes_meet(p, p, sol.lo, sol.hi, tol) {
             return Ok(State::Out);
         }
+        // (Each crossing's t, and on a free-form face where on it (its parameters found with it); one list for all.)
+        let mut hits: Vec<(f64, Option<DVec2>)> = Vec::new();
         'dirs: for r in DIRS {
             let mut odd = false;
             // (The nearest crossing: its face's outward normal along the ray says in too.)
             let mut nearest: Option<(f64, usize, DVec3)> = None;
             for &f in &sol.faces {
                 let g = &self.faces[f];
-                // (Each crossing's t, and on a free-form face where on it (its parameters found with it).)
-                let mut hits: Vec<(f64, Option<DVec2>)> = Vec::new();
+                hits.clear();
                 match g.s {
                     Surf::Plane { n, d, .. } => {
                         let den = n.dot(r);
@@ -3709,7 +3742,7 @@ impl Ctx<'_> {
                     }
                     _ => Vec::new(),
                 };
-                for (t, at) in hits {
+                for &(t, at) in &hits {
                     let q3 = p + r * t;
                     if t.abs() > GREY * tol && !boxes_meet(q3, q3, g.lo, g.hi, GREY * tol) {
                         continue;
@@ -4587,6 +4620,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         None => Vec::new(),
     };
     let lone_at: Vec<DVec3> = lone.iter().map(|&(_, w)| cx.p(w)).collect();
+    let lone = Sorted3::new(lone, &cx.pool.p);
     let near_lone = |lo: DVec3, hi: DVec3| lone_at.iter().any(|&p| p.cmpge(lo - DVec3::splat(GREY * tol)).all() && p.cmple(hi + DVec3::splat(GREY * tol)).all());
     crate::check_cancel()?;
     // Pairs of solids that may meet, and their faces.
@@ -5162,14 +5196,16 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         [(a, _)] => Some(*a),
         _ => None,
     };
-    let mut lists: ByOwner = Vec::new();
+    let mut owned: ByOwnerX = Vec::new();
     for &(x, w) in &by_x {
         let o = owner(w);
-        match lists.iter_mut().find(|l| l.0 == o) {
+        match owned.iter_mut().find(|l| l.0 == o) {
             Some(l) => l.1.push((x, w)),
-            None => lists.push((o, vec![(x, w)])),
+            None => owned.push((o, vec![(x, w)])),
         }
     }
+    let lists: ByOwner = owned.into_iter().map(|(o, l)| (o, Sorted3::new(l, &cx.pool.p))).collect();
+    let by_x = Sorted3::new(by_x, &cx.pool.p);
     // Each edge's solid, and whether anything of another argument comes near it.
     let mut edge_solid = vec![usize::MAX; cx.edges.len()];
     for f in &cx.faces {
@@ -6030,7 +6066,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let arg = cx.faces[f].arg;
         // (Only the solids its own meets, in order: any other it is outside (a fill pattern's 1735 disks, each piece
         // against each).)
-        let mut states: Vec<(usize, State)> = Vec::new();
+        let mut states: Vec<(usize, State)> = Vec::with_capacity(meeting[s].len());
         if at.is_nan() {
             return Ok(states);
         }
