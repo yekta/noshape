@@ -4448,11 +4448,12 @@ rust::Vec<uint32_t> brep_occt_moved(rust::Slice<const uint32_t> ids, uint32_t a_
   }
 }
 
-// Whether planar face `f`, all its edges lines, is valid as BRepCheck's wire and face checks have it: each wire closed
-// end to end, no two of its segments crossing or overlapping (but neighbours at their shared vertex), one outer wire
-// the face's way round and the others inside it the other way, none inside another. False where it can't tell (an
-// edge not a line, a wire not explored whole).
-static bool planar_lines_valid(const TopoDS_Face& f)
+// Whether planar face `f`, all its edges lines or arcs, is valid as BRepCheck's wire and face checks have it: each
+// wire closed end to end, no two of its edges crossing or overlapping (but neighbours at their shared vertex), one
+// outer wire the face's way round and the others inside it the other way, none inside another. An arc as chords no
+// farther off it than a thousandth of its radius, two edges' chords apart by more than the tolerance and their sags.
+// False where it can't tell (another curve, a wire not explored whole, edges all but touching).
+static bool planar_valid(const TopoDS_Face& f)
 {
   TopLoc_Location                 loc;
   const occ::handle<Geom_Plane>   pl = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(f, loc));
@@ -4464,14 +4465,19 @@ static bool planar_lines_valid(const TopoDS_Face& f)
     ElSLib::Parameters(p, BRep_Tool::Pnt(v), u, w);
     return gp_XY(u, w);
   };
+  // (A line, or a chord of an arc: its edge, how far the arc strays from it, the edge's vertex at each end that is
+  // one.)
   struct Seg
   {
     gp_XY  a, b;
-    size_t wire;
+    size_t edge;
+    double sag;
     TopoDS_Vertex va, vb;
   };
+  double most_sag = 0;
   std::vector<Seg>                 segs;
   std::vector<std::vector<gp_XY>> polys;
+  size_t                           edges = 0;
   double                           eps = Precision::Confusion();
   for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
   {
@@ -4489,13 +4495,16 @@ static bool planar_lines_valid(const TopoDS_Face& f)
       const TopoDS_Edge& e = we.Current();
       double             c0 = 0, c1 = 0;
       const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, c0, c1);
-      if (c.IsNull() || occ::down_cast<Geom_Line>(basis_of(c)).IsNull())
+      if (c.IsNull())
+        return false;
+      const occ::handle<Geom_Circle> circ = occ::down_cast<Geom_Circle>(basis_of(c));
+      if (occ::down_cast<Geom_Line>(basis_of(c)).IsNull() && (circ.IsNull() || std::abs(circ->Axis().Direction().Dot(p.Axis().Direction())) < 1 - 1e-12))
         return false;
       TopoDS_Vertex v0, v1;
       TopExp::Vertices(e, v0, v1, true);
       if (v0.IsNull() || v1.IsNull() || !(c0 < c1))
         return false;
-      // (The line's ends on its vertices and in the plane, as BRepCheck_Edge and BRepCheck_Vertex have them.)
+      // (The curve's ends on its vertices and in the plane, as BRepCheck_Edge and BRepCheck_Vertex have them.)
       const double te = BRep_Tool::Tolerance(e);
       for (const auto& [v, t] : {std::pair(TopExp::FirstVertex(e), c0), std::pair(TopExp::LastVertex(e), c1)})
         if (c->Value(t).Distance(BRep_Tool::Pnt(v)) > BRep_Tool::Tolerance(v) || p.Distance(c->Value(t)) > te)
@@ -4506,8 +4515,35 @@ static bool planar_lines_valid(const TopoDS_Face& f)
         first = v0;
       last = v1;
       eps  = std::max(eps, std::max(BRep_Tool::Tolerance(v0), BRep_Tool::Tolerance(e)));
-      segs.push_back({at2(v0), at2(v1), polys.size(), v0, v1});
-      poly.push_back(at2(v0));
+      const size_t edge = edges++;
+      if (circ.IsNull())
+      {
+        segs.push_back({at2(v0), at2(v1), edge, 0.0, v0, v1});
+        poly.push_back(at2(v0));
+        continue;
+      }
+      // (Its chords from the wire's start of it, their ends at its vertices.)
+      const double r = circ->Radius(), step = 2 * std::acos(1 - 1e-3);
+      if (p.Distance(circ->Location()) > te || r <= eps)
+        return false;
+      const int    nc  = std::max(1, static_cast<int>(std::ceil((c1 - c0) / step)));
+      const double sag = r * (1 - std::cos(0.5 * (c1 - c0) / nc));
+      const bool   rev = e.Orientation() == TopAbs_REVERSED;
+      most_sag         = std::max(most_sag, sag);
+      gp_XY prev       = at2(v0);
+      for (int k = 1; k <= nc; ++k)
+      {
+        gp_XY q = at2(v1);
+        if (k < nc)
+        {
+          double qu = 0, qv = 0;
+          ElSLib::Parameters(p, c->Value(rev ? c1 - (c1 - c0) * k / nc : c0 + (c1 - c0) * k / nc), qu, qv);
+          q = gp_XY(qu, qv);
+        }
+        segs.push_back({prev, q, edge, sag, k == 1 ? v0 : TopoDS_Vertex(), k == nc ? v1 : TopoDS_Vertex()});
+        poly.push_back(prev);
+        prev = q;
+      }
     }
     if (seen != n || first.IsNull() || !last.IsSame(first))
       return false;
@@ -4525,14 +4561,19 @@ static bool planar_lines_valid(const TopoDS_Face& f)
   for (size_t x = 0; x < order.size(); ++x)
   {
     const Seg&   s  = segs[order[x]];
-    const double hx = std::max(s.a.X(), s.b.X()) + eps;
+    const double hx = std::max(s.a.X(), s.b.X()) + eps + 2 * most_sag;
     for (size_t y = x + 1; y < order.size() && lo_x(order[y]) <= hx; ++y)
     {
       const Seg& t = segs[order[y]];
-      if (std::min(s.a.Y(), s.b.Y()) > std::max(t.a.Y(), t.b.Y()) + eps || std::min(t.a.Y(), t.b.Y()) > std::max(s.a.Y(), s.b.Y()) + eps)
+      // (An arc's chords against each other: one arc, not crossing itself.)
+      if (s.edge == t.edge)
+        continue;
+      const double m = eps + s.sag + t.sag;
+      if (std::min(s.a.Y(), s.b.Y()) > std::max(t.a.Y(), t.b.Y()) + m || std::min(t.a.Y(), t.b.Y()) > std::max(s.a.Y(), s.b.Y()) + m)
         continue;
       // (Neighbours at a shared vertex: only folding back on each other is wrong.)
-      const bool shared = s.va.IsSame(t.va) || s.va.IsSame(t.vb) || s.vb.IsSame(t.va) || s.vb.IsSame(t.vb);
+      const auto same   = [](const TopoDS_Vertex& x, const TopoDS_Vertex& y) { return !x.IsNull() && x.IsSame(y); };
+      const bool shared = same(s.va, t.va) || same(s.va, t.vb) || same(s.vb, t.va) || same(s.vb, t.vb);
       const gp_XY ds = s.b - s.a, dt = t.b - t.a;
       const double ls = ds.Modulus(), lt = dt.Modulus();
       if (ls <= eps || lt <= eps)
@@ -4541,7 +4582,7 @@ static bool planar_lines_valid(const TopoDS_Face& f)
       {
         // (Along one line and turned back onto each other: an end to end pair pointing apart, a pair from or to the
         // same vertex pointing alike.)
-        const bool end_to_end = s.vb.IsSame(t.va) || s.va.IsSame(t.vb);
+        const bool end_to_end = same(s.vb, t.va) || same(s.va, t.vb);
         if (std::abs((ds ^ dt) / (ls * lt)) <= 1e-9 && (end_to_end ? (ds * dt) < 0 : (ds * dt) > 0))
           return false;
         continue;
@@ -4549,14 +4590,14 @@ static bool planar_lines_valid(const TopoDS_Face& f)
       // (Apart by more than the tolerance: each other's ends on one side of the other's line, or their spans apart.)
       const double d1 = cross(s.a, s.b, t.a) / ls, d2 = cross(s.a, s.b, t.b) / ls;
       const double d3 = cross(t.a, t.b, s.a) / lt, d4 = cross(t.a, t.b, s.b) / lt;
-      if ((d1 > eps && d2 > eps) || (d1 < -eps && d2 < -eps) || (d3 > eps && d4 > eps) || (d3 < -eps && d4 < -eps))
+      if ((d1 > m && d2 > m) || (d1 < -m && d2 < -m) || (d3 > m && d4 > m) || (d3 < -m && d4 < -m))
         continue;
       // (Along one line: apart if their projections don't meet.)
-      if (std::abs(d1) <= eps && std::abs(d2) <= eps)
+      if (std::abs(d1) <= m && std::abs(d2) <= m)
       {
         const gp_XY  u  = ds / ls;
         const double t0 = (t.a - s.a) * u, t1 = (t.b - s.a) * u;
-        if (std::max(t0, t1) < -eps || std::min(t0, t1) > ls + eps)
+        if (std::max(t0, t1) < -m || std::min(t0, t1) > ls + m)
           continue;
       }
       return false;
@@ -4577,6 +4618,17 @@ static bool planar_lines_valid(const TopoDS_Face& f)
         in = !in;
     return in;
   };
+  // (A point on or near a wire's chords: can't tell which side.)
+  const auto clear = [&](const std::vector<gp_XY>& q, const gp_XY& pt) {
+    for (size_t i = 0, j = q.size() - 1; i < q.size(); j = i++)
+    {
+      const gp_XY  d = q[i] - q[j];
+      const double l = d.SquareModulus(), t = l > 0 ? std::clamp((pt - q[j]) * d / l, 0.0, 1.0) : 0.0;
+      if ((q[j] + d * t - pt).Modulus() <= eps + most_sag)
+        return false;
+    }
+    return true;
+  };
   int outer = -1;
   for (size_t i = 0; i < polys.size(); ++i)
   {
@@ -4594,18 +4646,18 @@ static bool planar_lines_valid(const TopoDS_Face& f)
   {
     if (static_cast<int>(i) == outer)
       continue;
-    if (!inside(polys[static_cast<size_t>(outer)], polys[i][0]))
+    if (!clear(polys[static_cast<size_t>(outer)], polys[i][0]) || !inside(polys[static_cast<size_t>(outer)], polys[i][0]))
       return false;
     for (size_t j = 0; j < polys.size(); ++j)
-      if (j != i && static_cast<int>(j) != outer && inside(polys[j], polys[i][0]))
+      if (j != i && static_cast<int>(j) != outer && ((most_sag > 0 && !clear(polys[j], polys[i][0])) || inside(polys[j], polys[i][0])))
         return false;
   }
   return true;
 }
 
-// The result's check as BRepCheck_Analyzer's, cheaper where it has planar faces of lines with many edges (a louver's
-// sheet with its slots: 12 of a 14 ms fuse in the wire pair checks): the topology as BRepCheck's, those faces by
-// planar_lines_valid, the others by BRepCheck face by face.
+// The result's check as BRepCheck_Analyzer's, cheaper where it has planar faces of lines and arcs with many edges (a
+// louver's sheet with its slots: 12 of a 14 ms fuse in the wire pair checks): the topology as BRepCheck's, those faces by
+// planar_valid, the others by BRepCheck face by face.
 static bool cheaply_valid(const TopoDS_Shape& out, bool parallel);
 
 static bool result_valid(const TopoDS_Shape& out, bool parallel)
@@ -4631,7 +4683,7 @@ static bool cheaply_valid(const TopoDS_Shape& out, bool parallel)
       double                        c0 = 0, c1 = 0;
       const occ::handle<Geom_Curve> c  = BRep_Tool::Curve(TopoDS::Edge(e.Current()), c0, c1);
       const TopAbs_Orientation      o  = e.Current().Orientation();
-      lines = !c.IsNull() && !occ::down_cast<Geom_Line>(basis_of(c)).IsNull() && (o == TopAbs_FORWARD || o == TopAbs_REVERSED);
+      lines = !c.IsNull() && (!occ::down_cast<Geom_Line>(basis_of(c)).IsNull() || !occ::down_cast<Geom_Circle>(basis_of(c)).IsNull()) && (o == TopAbs_FORWARD || o == TopAbs_REVERSED);
     }
     faces.push_back(f);
     simple.push_back(lines ? 1 : 0);
@@ -4705,7 +4757,7 @@ static bool cheaply_valid(const TopoDS_Shape& out, bool parallel)
   std::atomic<bool> ok{true};
   OSD_Parallel::For(0, static_cast<int>(faces.size()), [&](int i) {
     const size_t k = static_cast<size_t>(i);
-    if (ok.load(std::memory_order_relaxed) && !(simple[k] ? planar_lines_valid(faces[k]) : BRepCheck_Analyzer(faces[k], true, false).IsValid()))
+    if (ok.load(std::memory_order_relaxed) && !(simple[k] ? planar_valid(faces[k]) : BRepCheck_Analyzer(faces[k], true, false).IsValid()))
       ok.store(false, std::memory_order_relaxed);
   }, !parallel);
   return ok.load();

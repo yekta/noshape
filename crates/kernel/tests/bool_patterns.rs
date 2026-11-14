@@ -234,6 +234,37 @@ fn slots_through_a_plate_and_its_face_as_occt() {
     }
 }
 
+/// A plate cut by 24 round holes and 6 slots, and its top face by the same (planar faces of lines and arcs, checked
+/// without BRepCheck's wire pairs): noshape's Boolean, valid and as OCCT's.
+#[test]
+fn round_holes_and_slots_through_a_plate_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let plate = k::make_box_corners(DVec3::ZERO, DVec3::new(0.12, 0.08, 0.002)).unwrap();
+    let face = plate.faces().into_iter().find(|f| (f.centroid().unwrap().z - 0.002).abs() < 1e-9).expect("its top");
+    let mut tools: Vec<k::Shape> = (0..24).map(|i| k::make_cylinder(&z_frame(DVec3::new(0.01 + 0.02 * (i % 6) as f64, 0.01 + 0.012 * (i / 6) as f64, -0.001)), 0.003, 0.004, TAU).unwrap()).collect();
+    for i in 0..6 {
+        let (x, y) = (0.01 + 0.02 * i as f64, 0.065);
+        let ends: Vec<k::Shape> = [x - 0.004, x + 0.004].iter().map(|&cx| k::make_cylinder(&z_frame(DVec3::new(cx, y, -0.001)), 0.002, 0.004, TAU).unwrap()).collect();
+        let mid = k::make_box_corners(DVec3::new(x - 0.004, y - 0.002, -0.001), DVec3::new(x + 0.004, y + 0.002, 0.003)).unwrap();
+        tools.push(k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&mid), &ends, &k::BooleanOptions { unify: true, ..Default::default() }).unwrap().shape);
+    }
+    for (name, object) in [("plate", &plate), ("face", &face)] {
+        let run = |rust: bool| {
+            k::set_rust_boolean(Some(rust));
+            let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(object), &tools, &k::BooleanOptions::default()).expect("the cut");
+            let path = k::last_boolean_path();
+            k::set_rust_boolean(None);
+            (r.shape, path)
+        };
+        let ((ours, path), (occt, _)) = (run(true), run(false));
+        assert_eq!(path, "rust", "{name}: {}", k::last_rust_decline());
+        assert!(ours.is_valid() && occt.is_valid(), "{name}: valid");
+        assert_eq!(ours.count(k::ShapeType::Edge), occt.count(k::ShapeType::Edge), "{name}: edges");
+        assert_eq!(ours.count(k::ShapeType::Face), occt.count(k::ShapeType::Face), "{name}: faces");
+        assert!((ours.area().unwrap() - occt.area().unwrap()).abs() <= 1e-12, "{name}: area");
+    }
+}
+
 /// A result's history records, each output by where it lies (a face by its centroid and area, an edge by its ends
 /// and length, a vertex by its point: none by a curve's parameters), grouped by what they say.
 fn placed_records(r: &k::OpResult) -> std::collections::BTreeMap<String, Vec<Vec<f64>>> {
