@@ -176,6 +176,9 @@ pub struct AsmSceneOptions {
     /// Camera menu render choices, as in the Part Studio (`SceneOptions`).
     pub display_mode: crate::builder::DisplayMode,
     pub hidden_edges_visible: bool,
+    /// Instances whose edges also show through what's in front of them, in the part highlight's amber (an instance
+    /// being placed from Insert: live mates.json insert_dialog preview).
+    pub xray_tops: HashSet<noshape_model::assembly::InstanceId>,
     pub tangent_edges: crate::builder::TangentEdges,
     /// Line width and phantom edges' color and width.
     pub graphics: crate::graphics_prefs::GraphicsPrefs,
@@ -200,6 +203,7 @@ impl AsmSceneOptions {
             && self.hide_edges == other.hide_edges
             && self.display_mode == other.display_mode
             && self.hidden_edges_visible == other.hidden_edges_visible
+            && self.xray_tops == other.xray_tops
             && self.tangent_edges == other.tangent_edges
             && self.graphics == other.graphics
     }
@@ -309,6 +313,9 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                     };
                 }
                 scene.instances.push(inst);
+            }
+            if opts.xray_tops.contains(&o.top()) {
+                scene.instances.push(Instance::new(Drawable::Lines(cached.edges.clone())).with_color(theme::lin(0xffc04c)).with_transform(t).unpickable().hidden_only().layer(1));
             }
             if !dimmed && (!opts.hide_edges || sketch) {
                 let edge_color = if !sketch && mode == DisplayMode::HiddenLine { theme::lin(theme::viewport::EDGE_UNSHADED) } else { edge_color };

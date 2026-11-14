@@ -933,6 +933,8 @@ impl AssemblyView {
         }
         o.display_mode = self.ui.display_mode;
         o.hidden_edges_visible = self.ui.hidden_edges_visible;
+        // Live (mates.json insert_dialog): the instance on the pointer shows its hidden edges through other parts.
+        o.xray_tops = self.placing.iter().flatten().copied().collect();
         o.tangent_edges = self.ui.tangent_edges;
         o.graphics = self.ui.graphics;
         // Interference detection: everything see-through around the red
@@ -1044,8 +1046,10 @@ impl AssemblyView {
         }
         let size = self.triad_size();
         let units = self.units(cx);
-        // (Picking a mate connector shows its own hover look, below.)
-        if let Some(t) = &self.hover
+        // (Picking a mate connector shows its own hover look, below.) An instance on the pointer from Insert lights
+        // nothing under it (live feel/mates insert-preview-follows-pointer.png), unless Snap mode looks for a face.
+        let placing_free = self.placing.is_some() && self.snap.is_none();
+        if let Some(t) = self.hover.as_ref().filter(|_| !placing_free)
             && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)
             && self.pick_mode(cx) != Some(PickMode::Inference)
         {
