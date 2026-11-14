@@ -5,6 +5,23 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-14 22:12 UTC: read-back band, broken-out inheritance, inspection radius; next infento 1dc32b
+- Queued / landing: the exchange read-back band (lead's decision: volume within the largest edge tolerance x area,
+  area within it x edge length; `query_parts` edge_tolerance / edge_length; docs/PARITY-SUITES.md §3; ours reads ours
+  back 44 -> 47/48 on vibe7, the hose x_t's deliberate ring split left); TICKETS PS-INEXACT-INTERSECTION-EDGES (P3,
+  core / bool); a broken-out section only in projected views made after it (`BrokenOut::created_before`); a round
+  inspection bubble's radius h x (N + 1) / 2 (live 3094).
+- Drawing exports (all 28 takes incl. the revision table, vibe7 ~/tmp/dx/drwexp7): 61 / 84. Next in order:
+  drw-broken-out-section's DXF (live: the profile as SECTION_JOG_LINES pieces only over material, split where it
+  crosses the hole's edges, none over the hole; the cut's outline one VISIBLE spline of 30 poles; ours one jog spline
+  of the whole profile and 64 short VISIBLE lines); drw-revision-table (live's headings REVISIONS / Revision /
+  Revision description / Date approved / Approver, rows A* and -, 9 lines 25.6 in; ours REVISION HISTORY / REV /
+  DESCRIPTION / DATE / APPROVED, 8 lines 11.3 in); drw-inspection-item (INSPECTION_CALLOUT layer, SOLID HATCH colour
+  30); section / auxiliary cutting lines; hole table title; centermark arms; crop spline polylines.
+- Hosts (lead 21:19): vibe6 for blend / studios; mine on vibe7, clear by 01:11 (qa's speed window).
+- Next: infento 1dc32b (asm 21:2x: Extrude 51 fails on main a9a0ba8d6 though 257301e5 built it; the 46T pulley,
+  Extrude 42 / 52 / 97 scopes and connector MMq01aYoMryaJirR2 hang on it), then Transform 12's copy side.
+
 ## 11-14 09:30 UTC: on the sketch solves: 1dc32b to feature 14, bjr 5d8bc1 48/124; arcs of one circle join
 - 1dc32b alone (vibe6 sk-st-1dc32b.log): 15/56, Extrude 7 now as live; first difference feature 15 Boolean 2 ("Large
   wheel tyre" 392/1183/793, live 391/1158/768): sent to bool 09:0x with the model dir. Not mine unless bool says so.
