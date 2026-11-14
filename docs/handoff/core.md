@@ -5,6 +5,28 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-14 14:35 UTC)
+- **Landed a3e9fb3d + a6a966cd** (12:12): (1) a curve projected along a direction onto a linear extrusion, sweeping a
+  plane square to it, lands on the extruded curve projected into that plane (GeomProjLib::ProjectOnPlane, between the
+  OCCT projection's ends): c2-hunting-knife's Split 3 guide is live's one cubic (REQUESTS 3027), OCCT gave degree 8 /
+  30 poles. (2) A loft guide chain is C1 as live's (2620 surface fitted): pieces over their length shares; at each
+  joint both run at the geometric mean of their speeds (predicted 134.6834, live 134.6817), the chain's ends keep
+  theirs; each piece eased by a cubic map, as C1 cubic Hermite spans (live's fit within 1.6 µm of that). Replaces
+  ease_lines (2291's "1.13 at the spline" was this mean). Knife blade after Loft 3: 4986.1985 against live's exact
+  4986.4275 (was 4983.53). T1s kernel_core::a_line_projected_onto_an_extruded_cubic_gives_the_cubic,
+  features::a_loft_guide_of_pieces_runs_at_the_geometric_mean_of_their_speeds. Knife still 24/52: feature 24's
+  edge types (3 lines ours, B-splines live) and the blade 9306.43 against REST 9306.25 (exact 9306.66).
+- **Correction:** knife Fillet 8 does NOT build on main (my 11-14 04:10 note was wrong): it built while the handle's
+  side was C0 pieces, fails since they're C1 (blend told; not chasing until the handle is live's).
+- **Handle (Loft 1), live 3070:** side RjBC u-periodic bicubic (70 u-knots at the profiles' joints and the guide
+  points, 12 v-knots), 7644.62 mm²; profiles keep their sketch's 8 edges each, split at both guide points (10 + 10).
+  Ours 3/14/14, +101 mm³: our raw edges / shown-topology joins to check (Sketch 12 has its 8 curves), then the surface.
+- **infento 74d3d6 Extrude 4 (asm, low):** after dx's arcs join (f196c4919) the profile is one circle; the 7/13/8 is
+  the up-to split's imprints of the next body on the disc's side (two tangent lines at (23.37, ±14.63) and a coincident
+  r20 sliver on the target's own cylinder copy). noshape's unify (both paths) merges none of them (candidates found;
+  refused further on: the cylinder-group merge / reorder retries, boolean.cpp unify). Parked; dump vibe5
+  ~/agents/core-keep/updump/upto-7.brep.
+
 ## core state (11-14 11:16 UTC)
 - **Landed 167ddfb6** (09:45): Delete face runs OCCT's defeaturing on a copy (it raised its input's tolerances in place:
   the same delete run twice gave valid, then invalid). T1 features::deleting_faces_leaves_its_input_as_it_was (data
