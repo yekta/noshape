@@ -1,0 +1,47 @@
+{
+ "name": "asm-insert-search",
+ "about": "two-blocks: Insert (I), type 'two' in Search Part Studios: the list narrows, Escape twice",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (assembly interactions with no recorded scenario)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "key",
+   "key": "i"
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Search Part Studios"
+   }
+  },
+  {
+   "do": "type",
+   "text": "two"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

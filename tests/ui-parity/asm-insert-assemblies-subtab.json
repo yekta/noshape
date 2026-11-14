@@ -1,0 +1,43 @@
+{
+ "name": "asm-insert-assemblies-subtab",
+ "about": "two-blocks: Insert (I), Current document › the Assemblies sub-tab, Escape twice",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (assembly interactions with no recorded scenario)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "key",
+   "key": "i"
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Assemblies"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

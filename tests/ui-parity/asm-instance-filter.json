@@ -1,0 +1,23 @@
+{
+ "name": "asm-instance-filter",
+ "about": "two-blocks: type 'Part 2' in the instance list's Filter by name: the list narrows to Part 2 <1>",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (assembly interactions with no recorded scenario)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Filter by name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Part 2"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

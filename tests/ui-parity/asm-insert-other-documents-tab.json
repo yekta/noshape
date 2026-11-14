@@ -1,0 +1,43 @@
+{
+ "name": "asm-insert-other-documents-tab",
+ "about": "two-blocks: Insert (I), the Other documents tab (its document list), Escape twice",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (assembly interactions with no recorded scenario)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "key",
+   "key": "i"
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Other documents"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
