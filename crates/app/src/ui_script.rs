@@ -320,6 +320,17 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
     asm.read(cx).ui_target_point(t, cx).map(whole)
 }
 
+/// `NOSHAPE_UI_SHOTS=<dir>`: the screen after each step as `<dir>/<step>.png` (ImageMagick's `import` on X11), for
+/// side-by-side looks against live's takes. A runner aid: nothing when unset or without `import`.
+fn screenshot(step: usize) {
+    let Some(dir) = std::env::var_os("NOSHAPE_UI_SHOTS").map(PathBuf::from) else { return };
+    let _ = std::fs::create_dir_all(&dir);
+    let out = dir.join(format!("{step:02}.png"));
+    if let Err(e) = std::process::Command::new("import").args(["-window", "root"]).arg(&out).status() {
+        eprintln!("UI-SCRIPT screenshot {}: {e}", out.display());
+    }
+}
+
 /// A `pick_files` step's files, in tests/ui-parity/files/ beside the scenarios.
 fn picked_files(step: &Value) -> Vec<PathBuf> {
     let dir = scenario_path().with_file_name("files");
@@ -761,6 +772,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             };
             let idle = settle(cx).await;
             let state_now = read(cx).await;
+            screenshot(i + 1);
             let mut rec = json!({ "step": i + 1, "do": step, "ok": result.is_ok(), "state": state_now });
             if let Some(t) = take_timing(Some(idle)) {
                 rec["timing"] = t;
@@ -1065,6 +1077,7 @@ pub fn start_page(cx: &mut App) {
             sleep(cx, 900).await;
             let Some(w) = follow(cx) else { break };
             let state_now = read(w, cx).await;
+            screenshot(i + 1);
             let mut rec = json!({ "step": i + 1, "do": step, "ok": result.is_ok(), "state": state_now });
             if let Some(t) = take_timing(None) {
                 rec["timing"] = t;

@@ -663,3 +663,5 @@ app-core `ui_script::mark` (`tool:`, `field:`, `feature:`, `part:`, `tab:`, `che
 `menu:`, `button:`); geometry targets go through `PartStudioView::ui_target_point`, the state through
 `PartStudioView::ui_state`. Under Xvfb without a window manager the runner focuses the window with xdotool (an
 inactive window gets no focus events, so fields would not select their text on focus).
+`NOSHAPE_UI_SHOTS=<dir>` also saves the screen after each step as `<dir>/NN.png` (ImageMagick's `import`, X11), for
+side-by-side looks against live's screenshots.
