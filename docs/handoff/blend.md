@@ -33,7 +33,11 @@ Next (speed, live's per-feature times on the Mac release build):
   763 summed, cone x cylinder 8 pairs 145, cone x B-spline / plane x B-spline ~27 each, plane x torus 2. Skipping
   them needs an exact proof of no curve (lead: boxes and face domains only; parked/sections-box-domains-wip wasn't
   enough): e.g. the cone face's distance to the torus's spine circle beyond the tube radius + tolerance, checked
-  cheaper than the IntSS it saves.
+  cheaper than the IntSS it saves. **Done (lead 08:45): `blend` worktree, branch `blend-emptysec` 2b4b6432f**
+  (`misses_by_spine` in blend_direct.cpp: plane / cylinder / cone part faces against torus or cylinder blends, margin
+  10 x max(tol, snap) + both faces' tolerances; T1 kernel blend 59/59 and model fillet/chamfer/blend/round 70/70).
+  Unit blend-emptysec-alt6 times snap-hook, knife, rings against blend8 (detached main 2702712c7) on vibe6; then unit
+  blend-emptysec-gates6: pair, asm, g++-13 on vibe6 (emptysec-gates.done). Don't touch `blend` or `blend8` till then.
 - c2-hunting-knife Fillet 3 (~90 vs 11 ms): OCCT's as-is attempt 25 ms (then replaced by rolling balls), blend_direct 30,
   lofts + Rust 35. No cheap win: running the balls beside OCCT would build them for every fillet, contending for the
   kernel lock. Chamfer 1 (165 vs 19) is bool's Rust Boolean (sections_ahead) plus 20 ms of scaled retries; Fillet 2
