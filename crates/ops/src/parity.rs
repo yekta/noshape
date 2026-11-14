@@ -3250,6 +3250,19 @@ impl<'a> Translator<'a> {
                 }
                 let pattern = op.iter().find_map(|o| o.strip_suffix(".opPattern"))?.to_string();
                 let index: i64 = instance.parse().ok()?;
+                // A copy of an extrude's cap, by its name: the cap itself may be gone by now (asm-infento-subs' studio
+                // 1dc32b: Extrude 39 grows over Extrude 38's end cap, Extrude 40 names Transform 12's copy of it).
+                if let Some(m) = find(seed, &["CAP_FACE"]) {
+                    let get = |key: &str| m.iter().find(|(k, _)| matches!(k, Packed::Str(k) if k == key)).map(|(_, v)| v);
+                    let is_start = matches!(get("isStart"), Some(Packed::Bool(true)));
+                    let mut strings = Vec::new();
+                    packed_strings(&Packed::Map(m.clone()), &mut strings);
+                    if let Some(ours) = strings.iter().find_map(|s| s.strip_suffix(".opExtrude")).and_then(|o| self.feature_ids.get(o)).cloned()
+                        && let Some(face) = self.cap_copy(&pattern, index, &ours, is_start)
+                    {
+                        return Some(Ok(face));
+                    }
+                }
                 let seed = match self.extrude_name_from_tree(seed)? {
                     Ok(s) => s,
                     Err(e) => return Some(Err(format!("COPY: {e}"))),
@@ -3454,6 +3467,50 @@ impl<'a> Translator<'a> {
     /// Ours of a pattern's instance `index` (live's `instanceName`) of our entity `seed`: of what the pattern made, the
     /// entity whose name, with that instance's copies taken back to what they copy, is the seed's (else shares the
     /// most faces with it).
+    /// Our instance code of a pattern's instance `index` (live's `instanceName`).
+    fn copy_code(&self, pattern: &str, index: i64) -> u32 {
+        // (A Transform's or a Mirror's one copy is our instance 1, whatever live calls it: asm-infento-subs' studio
+        // 1dc32b, Transform 12's copy under Boolean 7 / Extrude 39 / 40, Mirror 4's parts.)
+        let single = self.features.iter().any(|f| f["featureId"] == pattern && (f["featureType"] == "transform" || f["featureType"] == "mirror"));
+        if single && index == 1 {
+            1
+        } else if index >= 0 {
+            (2 * index) as u32
+        } else {
+            (-2 * index - 1) as u32
+        }
+    }
+
+    /// Ours of a pattern's instance `index` copy of extrude `extrude`'s (ours) start or end cap, by name.
+    fn cap_copy(&mut self, pattern: &str, index: i64, extrude: &str, is_start: bool) -> Option<String> {
+        use noshape_model::reference::{Reference, Role, TopoName};
+        let ours = self.feature_ids.get(pattern).cloned()?;
+        let code = self.copy_code(pattern, index);
+        let found = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 100000 })).ok()?;
+        let unsplit = |mut n: &TopoName| {
+            while let TopoName::Split { parent, .. } = n {
+                n = parent.as_ref();
+            }
+            n.clone()
+        };
+        let hits: Vec<String> = found["faces"]
+            .as_array()?
+            .iter()
+            .filter_map(|f| f["id"].as_str())
+            .filter(|id| {
+                let Some(Reference::Face(n)) = crate::refs::parse_str(id) else { return false };
+                let TopoName::Face { role: Role::Copy { instance, of }, .. } = unsplit(&n) else { return false };
+                instance == code
+                    && matches!(unsplit(&of), TopoName::Face { feature, ref role } if feature.to_string() == extrude && matches!((role, is_start), (Role::CapStart(_), true) | (Role::CapEnd(_), false)))
+            })
+            .map(str::to_string)
+            .collect();
+        match hits.as_slice() {
+            [one] => Some(one.clone()),
+            _ => None,
+        }
+    }
+
     fn pattern_copy(&mut self, pattern: &str, index: i64, seed: &str) -> Result<String, String> {
         use noshape_model::reference::{Reference, Role, TopoName};
         use std::sync::Arc;
@@ -3471,16 +3528,7 @@ impl<'a> Translator<'a> {
             }
             return Err(format!("COPY: no part of pattern {pattern}'s instance {index} copies {seed}"));
         }
-        // (A Transform's or a Mirror's one copy is our instance 1, whatever live calls it: asm-infento-subs' studio
-        // 1dc32b, Transform 12's rotated copy under Boolean 7 / Extrude 39 / 40, Mirror 4 / 5's parts.)
-        let single = self.features.iter().any(|f| f["featureId"] == pattern && (f["featureType"] == "transform" || f["featureType"] == "mirror"));
-        let code = if single && index == 1 {
-            1
-        } else if index >= 0 {
-            (2 * index) as u32
-        } else {
-            (-2 * index - 1) as u32
-        };
+        let code = self.copy_code(pattern, index);
         fn back(n: &TopoName, code: u32) -> TopoName {
             match n {
                 TopoName::Face { role: Role::Copy { instance, of }, .. } if *instance == code => (**of).clone(),
@@ -3757,6 +3805,11 @@ impl<'a> Translator<'a> {
             // Caps: over the sketch curve, nearest (start) or farthest (end) along the extrude.
             _ => {
                 let over: Vec<&(String, [f64; 3])> = cands.iter().filter(|c| lateral(c, at) < 1e-6 || name == "CAP_FACE").collect();
+                // By our own name where it tells (a part moved since its extrude: asm-infento-subs' studio 1dc32b,
+                // Transform 11 puts Extrude 38's end cap where its sketch plane was, and the nearest was taken for
+                // the start).
+                let by_name: Vec<&(String, [f64; 3])> = if name == "CAP_FACE" { over.iter().copied().filter(|c| cap_role(&c.0) == Some(is_start)).collect() } else { Vec::new() };
+                let over = if by_name.is_empty() { over } else { by_name };
                 let along = |c: &&(String, [f64; 3])| dot(sub(c.1, o), n).abs();
                 let extreme = if is_start { over.iter().map(along).fold(f64::INFINITY, f64::min) } else { over.iter().map(along).fold(f64::NEG_INFINITY, f64::max) };
                 let level: Vec<&(String, [f64; 3])> = over.into_iter().filter(|c| (along(c) - extreme).abs() < 1e-6).collect();
@@ -5439,6 +5492,22 @@ fn top_level_items(rest: &str) -> Option<Vec<String>> {
 fn circle_distances(d: f64, r: f64, t: f64) -> [(&'static str, f64); 3] {
     let near = if d < (r - t).abs() { (r - t).abs() - d } else { (d - r - t).abs() };
     [("center", d), ("minimum", near), ("maximum", d + r + t)]
+}
+
+/// Whether our face `id` is an extrude's start cap (`Some(true)`) or end cap (`Some(false)`), through any split of it;
+/// None for other faces.
+fn cap_role(id: &str) -> Option<bool> {
+    use noshape_model::reference::{Reference, Role, TopoName};
+    let Some(Reference::Face(n)) = crate::refs::parse_str(id) else { return None };
+    let mut cur: &TopoName = &n;
+    loop {
+        match cur {
+            TopoName::Split { parent, .. } => cur = parent.as_ref(),
+            TopoName::Face { role: Role::CapStart(_), .. } => return Some(true),
+            TopoName::Face { role: Role::CapEnd(_), .. } => return Some(false),
+            _ => return None,
+        }
+    }
 }
 
 /// A query filter that takes planes and nothing else (a mirror plane: planar faces or mate connectors).
