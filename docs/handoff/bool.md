@@ -236,6 +236,11 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     up to a rounding and `gap` found a gap of 0 (or one across the circle on the mirrored bolt). T1
     bool_patterns::bolts_with_whole_turn_thread_roots_cut_as_occt. Its 05cd5358 is taken too; 3bf5867d (35 ms, "an
     internal face") is left.
+  - 867a4238b (gating, vibe6): `planar_valid` takes arcs too (chords at most r/1000 off, two edges' chords apart by
+    the tolerance and their sags, a hole's point clear of the wires by as much; anything closer goes to BRepCheck).
+    Louver's glued fuses' check 3.6 -> 1.3 ms, corner-break's 10 -> 4.5 ms (vibe3, alternating). Ours against
+    BRepCheck over every corpus and recording: 11,417 results, 0 disagreements. T1
+    bool_patterns::round_holes_and_slots_through_a_plate_as_occt.
   - Left on OCCT from my recordings: c2-impeller-loft 9522310b (2.1 s): an input vertex of 1.14 mm tolerance 0.4 mm
     off plane face 7 (upstream: core's), and with the 1 mm cap raised it declines "a face lost"; b4a6c1dc (1.5 s, "a
     piece shorter than its vertices' distance": the mirrored halves' fuse at x 0).
