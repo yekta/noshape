@@ -1,0 +1,48 @@
+{
+ "name": "chamfer-measurement-tangent",
+ "about": "block: y = 0 top edge, Chamfer, Measurement Offset → Tangent, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (field-level gaps in the recorded suite)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     10,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Chamfer"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Offset",
+    "pick": "Tangent"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
