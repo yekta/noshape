@@ -108,7 +108,43 @@ struct RelationSession {
     editing: Option<MateId>,
     /// The value field has the keyboard (for the dialog's state, live asm-gear-relation-ratio-reverse).
     ratio_focused: bool,
+    /// The value as last applied (Tab or leaving the field): an edit past it is an Undo step.
+    ratio_applied: String,
+    /// The dialog's own Undo / Redo: a type switch, Reverse direction, an applied value (live
+    /// asm-relation-type-switch, asm-linear-relation-reverse: ✓ on and Undo while the title is still red).
+    history: (Vec<RelationSnap>, Vec<RelationSnap>),
     _ratio_sub: Subscription,
+}
+
+/// A relation dialog's state for its Undo.
+#[derive(Clone)]
+struct RelationSnap {
+    kind: RelationType,
+    b: Option<MateId>,
+    reverse: bool,
+    ratio: String,
+}
+
+impl RelationSession {
+    fn snap(&self) -> RelationSnap {
+        RelationSnap { kind: self.kind, b: self.b, reverse: self.reverse, ratio: self.ratio_applied.clone() }
+    }
+
+    /// Before a change: remember the state for Undo.
+    fn note(&mut self) {
+        let snap = self.snap();
+        self.history.0.push(snap);
+        self.history.1.clear();
+    }
+
+    /// The value field's edit applied (Tab, Enter, leaving it): an Undo step when it changed.
+    fn apply_ratio(&mut self, cx: &App) {
+        let now = self.ratio.read(cx).value().to_string();
+        if now != self.ratio_applied {
+            self.note();
+            self.ratio_applied = now;
+        }
+    }
 }
 
 #[path = "assembly_panels.rs"]
@@ -2007,10 +2043,27 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// Undo / redo in an open relation dialog. False when none is open.
+    fn relation_undo(&mut self, redo: bool, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(r) = &mut self.relation else { return false };
+        let now = r.snap();
+        let (from, to) = if redo { (&mut r.history.1, &mut r.history.0) } else { (&mut r.history.0, &mut r.history.1) };
+        if let Some(s) = from.pop() {
+            to.push(now);
+            (r.kind, r.b, r.reverse) = (s.kind, s.b, s.reverse);
+            r.ratio_applied = s.ratio.clone();
+            r.ratio.update(cx, |st, cx| st.set_value(s.ratio, window, cx));
+        }
+        cx.notify();
+        true
+    }
+
     /// Undo / redo in an open pattern dialog: its toggles. False when no pattern dialog is open.
     fn pattern_undo(&mut self, redo: bool, cx: &mut Context<Self>) -> bool {
         let Some(p) = &mut self.pattern else { return false };
         if p.undo_toggle(redo) {
+            // The Instances box follows the selection: it shows the restored picks.
+            self.selected = p.seeds.clone();
             self.update_pattern_preview(cx);
         }
         cx.notify();
@@ -2061,6 +2114,7 @@ impl AssemblyView {
             None if self.mc.is_some() => self.mc.as_ref().map_or((false, false), |m| (!m.picks_undo.is_empty(), !m.picks_redo.is_empty())),
             None if self.ui.group.is_some() => (!self.ui.group_picks.0.is_empty(), !self.ui.group_picks.1.is_empty()),
             None if self.pattern.is_some() => self.pattern.as_ref().map_or((false, false), |p| (!p.toggle_history.0.is_empty(), !p.toggle_history.1.is_empty())),
+            None if self.relation.is_some() => self.relation.as_ref().map_or((false, false), |r| (!r.history.0.is_empty(), !r.history.1.is_empty())),
             // The Driving mate selector has no picks to undo (live asm-mate-menu-edit-driver-mate).
             None if self.ui.np_driver.is_some() => (false, false),
             // Nor the Dynamic suppression panel (live: Undo off while it is open).
@@ -2126,10 +2180,14 @@ impl AssemblyView {
         }
         let kind = existing.as_ref().map(|r| r.relation_type).unwrap_or(kind);
         let text = existing.as_ref().map(|r| r.ratio.text.clone()).unwrap_or_else(|| noshape_ops::assembly::relation_default_ratio(kind).into());
+        let text_applied = text.clone();
         let ratio = cx.new(|cx| InputState::new(window, cx).default_value(text));
-        let ratio_sub = cx.subscribe(&ratio, |this: &mut Self, _, ev: &InputEvent, _| {
+        let ratio_sub = cx.subscribe(&ratio, |this: &mut Self, _, ev: &InputEvent, cx| {
             if let (Some(r), InputEvent::Focus | InputEvent::Blur) = (&mut this.relation, ev) {
                 r.ratio_focused = matches!(ev, InputEvent::Focus);
+                if matches!(ev, InputEvent::Blur) {
+                    r.apply_ratio(cx);
+                }
             }
         });
         // A new relation starts empty (a selected mate is the preselection);
@@ -2143,6 +2201,8 @@ impl AssemblyView {
             reverse: existing.as_ref().is_some_and(|r| r.reverse),
             editing: existing.map(|r| r.id),
             ratio_focused: false,
+            ratio_applied: text_applied,
+            history: Default::default(),
             _ratio_sub: ratio_sub,
         });
         cx.notify();
@@ -2155,10 +2215,12 @@ impl AssemblyView {
         if r.kind == kind {
             return;
         }
+        r.note();
         let old_default = noshape_ops::assembly::relation_default_ratio(r.kind);
         if r.ratio.read(cx).value().trim() == old_default {
             let text = noshape_ops::assembly::relation_default_ratio(kind);
             r.ratio.update(cx, |s, cx| s.set_value(text, window, cx));
+            r.ratio_applied = text.to_string();
         }
         r.kind = kind;
         if kind == RelationType::Screw {
@@ -5689,7 +5751,26 @@ impl AssemblyView {
             })
             .collect();
         let value_label = noshape_ops::assembly::relation_value_label(kind);
-        let value = crate::os_ui::param_row(value_label, crate::ui_script::mark(div().w_full().child(crate::os_ui::input_h(Input::new(&r.ratio).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)), move || format!("field:{value_label}")));
+        // Tab applies the value and takes the keyboard to Reverse direction (live asm-gear-relation-ratio-reverse).
+        let value = crate::os_ui::param_row(
+            value_label,
+            crate::ui_script::mark(
+                div().w_full().capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                    if e.keystroke.key != "tab" || e.keystroke.modifiers.shift {
+                        return;
+                    }
+                    if let Some(r) = &mut this.relation {
+                        r.apply_ratio(cx);
+                        r.ratio_focused = false;
+                    }
+                    this.ui.checkbox_focus = Some("Reverse direction");
+                    window.focus(&this.focus, cx);
+                    cx.stop_propagation();
+                    cx.notify();
+                })).child(crate::os_ui::input_h(Input::new(&r.ratio).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)),
+                move || format!("field:{value_label}"),
+            ),
+        );
         let body = v_flex()
             .pb(px(2.))
             .child(div().id("rel-type-field").tooltip(crate::ui::tooltip("Relation type")).child(select))
@@ -5701,6 +5782,7 @@ impl AssemblyView {
             // Reverse direction row, 3 px above its bottom.
             .child(h_flex().items_end().child(crate::os_ui::checkbox("rel-rev", "Reverse direction", r.reverse).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(r) = &mut this.relation {
+                    r.note();
                     r.reverse = !r.reverse;
                 }
                 // The clicked checkbox keeps the keyboard (live asm-linear-relation-reverse).
@@ -6853,12 +6935,12 @@ impl AssemblyView {
             .on_action(cx.listener(Self::on_accept))
             // Live 1962: in an open mate dialog Undo / Redo take its connector picks back (the dialog stays).
             .on_action(cx.listener(|this, _: &Undo, window, cx| {
-                if !this.mate_undo(false, cx) && !this.mc_undo(false, window, cx) && !this.group_undo(false, cx) && !this.pattern_undo(false, cx) && this.ui.np_driver.is_none() {
+                if !this.mate_undo(false, cx) && !this.mc_undo(false, window, cx) && !this.group_undo(false, cx) && !this.pattern_undo(false, cx) && !this.relation_undo(false, window, cx) && this.ui.np_driver.is_none() {
                     cx.propagate();
                 }
             }))
             .on_action(cx.listener(|this, _: &Redo, window, cx| {
-                if !this.mate_undo(true, cx) && !this.mc_undo(true, window, cx) && !this.group_undo(true, cx) && !this.pattern_undo(true, cx) && this.ui.np_driver.is_none() {
+                if !this.mate_undo(true, cx) && !this.mc_undo(true, window, cx) && !this.group_undo(true, cx) && !this.pattern_undo(true, cx) && !this.relation_undo(true, window, cx) && this.ui.np_driver.is_none() {
                     cx.propagate();
                 }
             }))

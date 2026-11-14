@@ -423,6 +423,9 @@ pub struct Mate {
     /// Onshape: help Assembly › Simulation).
     #[serde(default)]
     pub simulation_connection: bool,
+    /// Simulation connection's "Faces to connect" (stored only).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub simulation_faces: Vec<MateConnectorRef>,
     /// Mate indicator hidden in the graphics area (eye icon / Hide).
     #[serde(default)]
     pub hidden: bool,
@@ -456,6 +459,7 @@ impl Mate {
             extra: vec![],
             tangent_propagation: true,
             simulation_connection: false,
+            simulation_faces: Vec::new(),
             hidden: false,
             unsuppressed_if: None,
         }

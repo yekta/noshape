@@ -331,7 +331,12 @@ impl AssemblyView {
         }
         // A mate dialog's picked connectors are selected (live: implicit mate connector FEATUREs).
         if let Some(d) = self.mate.as_ref().map(|s| s.dialog.read(cx)) {
-            items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));
+            // Faces to connect active: its faces are the selection (live asm-slider-simulation-connection: none).
+            if d.faces_active {
+                items.extend(d.simulation_faces.iter().map(|_| json!({ "kind": "FACE", "owner": null })));
+            } else {
+                items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));
+            }
         }
         let mut dialogs: Vec<Value> = self
             .mate
@@ -695,7 +700,8 @@ impl AssemblyView {
                 number(json!(noshape_ops::assembly::relation_value_label(r.kind)), r.ratio.read(cx).value().to_string()),
                 check("Reverse direction", r.reverse),
             ];
-            out.push(dialog(self.relation_name(cx), complete, complete, fields));
+            // ✓ on once the dialog was changed, still red (live asm-relation-type-switch, asm-linear-relation-reverse).
+            out.push(dialog(self.relation_name(cx), complete, complete || !r.history.0.is_empty() || !r.history.1.is_empty(), fields));
         }
         if let Some(s) = &self.replace_panel {
             let fields = vec![

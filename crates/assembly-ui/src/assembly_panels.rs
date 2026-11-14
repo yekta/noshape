@@ -168,6 +168,8 @@ pub struct PatternToggles {
     pub equal: [bool; 3],
     pub centered: [bool; 3],
     pub cfg_pending: Vec<&'static str>,
+    /// The Instances picked (a pick is a step of the open dialog: live asm-linear-pattern-commit).
+    pub seeds: Vec<InstanceId>,
 }
 
 impl PatternSession {
@@ -179,6 +181,7 @@ impl PatternSession {
             equal: [self.equal, self.equal2, self.equal3],
             centered: [self.centered, self.centered2, self.centered3],
             cfg_pending: self.cfg_pending.clone(),
+            seeds: self.seeds.clone(),
         }
     }
 
@@ -188,6 +191,7 @@ impl PatternSession {
         [self.equal, self.equal2, self.equal3] = t.equal;
         [self.centered, self.centered2, self.centered3] = t.centered;
         self.cfg_pending = t.cfg_pending;
+        self.seeds = t.seeds;
     }
 
     /// Before a toggle: remember the state for Undo (and enable ✓).
@@ -1505,6 +1509,8 @@ impl AssemblyView {
             let sel = self.selected.clone();
             let mate = self.seed_mate(&sel, cx);
             if let Some(s) = &mut self.pattern {
+                // A pick: an Undo step that turns ✓ on (live asm-linear-pattern-commit, Direction still empty).
+                s.note_toggle();
                 s.seeds = sel;
                 if s.kind.matched() {
                     s.mate = mate;

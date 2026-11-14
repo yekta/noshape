@@ -96,6 +96,10 @@ pub struct MateDialog {
     pub tangent_propagation: bool,
     /// "Simulation connection" (stored only).
     pub simulation_connection: bool,
+    /// Its "Faces to connect" and whether that box takes the picks (live asm-slider-simulation-connection: checking
+    /// Simulation connection adds the box, active, and Mate connectors goes inactive).
+    pub simulation_faces: Vec<MateConnectorRef>,
+    pub faces_active: bool,
     /// Axis of the rotation offset (0 = X, 1 = Y, 2 = Z).
     pub rotation_axis: u8,
     /// Mate indicator hidden (kept when editing).
@@ -317,6 +321,8 @@ impl MateDialog {
             suppressed: mate.suppressed,
             tangent_propagation: mate.tangent_propagation,
             simulation_connection: mate.simulation_connection,
+            simulation_faces: mate.simulation_faces.clone(),
+            faces_active: false,
             rotation_axis: mate.rotation_axis,
             hidden: mate.hidden,
             unsuppressed_if: mate.unsuppressed_if.clone(),
@@ -344,7 +350,7 @@ impl MateDialog {
     }
 
     pub fn awaiting_pick(&self) -> bool {
-        self.active.is_some()
+        self.active.is_some() || self.faces_active
     }
 
     fn pick_state(&self) -> PickState {
@@ -454,6 +460,10 @@ impl MateDialog {
         }
         if t.has_simulation_connection() {
             fields.push(check("Simulation connection", self.simulation_connection));
+            if self.simulation_connection {
+                let items: Vec<String> = self.simulation_faces.iter().map(|c| (self.labeler)(c)).collect();
+                fields.push(json!({ "label": "Faces to connect", "kind": "query", "items": items, "active": self.faces_active, "state": "ok" }));
+            }
         }
         // Live: the flip is read by its icon (README "toggle"); the help row after it.
         if t != MateType::Width {
@@ -553,6 +563,14 @@ impl MateDialog {
     /// its oldest (two: the second moves up, the new pick comes last). Full, the focus moves on to the next field,
     /// filled or not; the last field keeps it.
     pub fn set_connector(&mut self, c: MateConnectorRef, cx: &mut Context<Self>) -> bool {
+        // Faces to connect takes the pick (stored only).
+        if self.faces_active {
+            if !self.simulation_faces.contains(&c) {
+                self.simulation_faces.push(c);
+                cx.notify();
+            }
+            return true;
+        }
         let Some(active) = self.active else { return false };
         let fields = self.query_fields();
         let field_slots = self.field_of(active);
@@ -691,6 +709,7 @@ impl MateDialog {
             extra,
             tangent_propagation: self.tangent_propagation,
             simulation_connection: self.simulation_connection && self.mate_type.has_simulation_connection(),
+            simulation_faces: if self.simulation_connection && self.mate_type.has_simulation_connection() { self.simulation_faces.clone() } else { Vec::new() },
             hidden: self.hidden,
             unsuppressed_if: self.unsuppressed_if.clone(),
         })
@@ -741,6 +760,9 @@ impl MateDialog {
     /// A selection box over these slots looks active: one of them takes the next pick, or, all picked, the first box
     /// keeps its active look (live assembly/2220; after a type switch too: asm-mate-type-switch).
     fn box_active(&self, slots: &[usize]) -> bool {
+        if self.faces_active {
+            return false;
+        }
         self.active.is_some_and(|a| slots.contains(&a)) || (self.active.is_none() && slots.contains(&0) && self.editing_field.is_none())
     }
 
@@ -1100,6 +1122,7 @@ impl Render for MateDialog {
                     .when(t.has_simulation_connection(), |d| {
                         d.child(os::checkbox("mate-simulation", "Simulation connection", self.simulation_connection).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.simulation_connection = !this.simulation_connection;
+                            this.faces_active = this.simulation_connection;
                             cx.emit(MateDialogEvent::CheckboxFocused("Simulation connection"));
                             cx.emit(MateDialogEvent::Changed);
                             cx.notify();
