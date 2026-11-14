@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
-## Resume here (2026-11-14 11:15 UTC): config-assembly's sheet metal studio 08590a (asm's item; lead: first difference, fix or hand on)
+## Resume here (2026-11-14 12:40 UTC): config-assembly's sheet metal studio 08590a (asm's item; lead: first difference, fix or hand on)
 - Run it alone in the model suite: copy `<asm>/studios/08590a….{json,live.jsonl,sketches.json,mass.json}` to
   `~/tmp/skasm/cfgm/cfg-08590a/{features.json,live.jsonl,sketches.json,mass.json}` on vibe7, then
   /root/skasm-scratch/bin/cfg.sh through rb.sh (NOSHAPE_PARITY_TRACE=1, DIFFERING; log ~/tmp/skasm/cfgm.log).
@@ -9,11 +9,14 @@
   and cut the plate's corner; the bend got a lofted B-spline end 87 nm off, so Sketch 2's HORIZONTAL conflicted);
   Fillet 2's two R 5 corner breaks across a 10 mm end (made one at a time, the second failed); Hole 2's connector on
   Sheet metal model 2's outer cap (a region was taken, then Sheet metal model 1's extrude named in a disambiguation).
+- Then (12:40): Mate connector 1 (live: a Part Studio connector on a cylinder / cone axis takes world X across the
+  axis, world Y for an axis along X; assembly implicit connectors keep the surface's frame, oracle R3); a Bend relief
+  past an Outer step (sheetmetal_frames::corner_break_and_relief_and_tab had failed since the bend-end rule); Fillet 3's
+  corner breaks on a U's collinear wall corners. 34/42 but for the collision INFO; next: Hole 3 (two Ø5 holes in the
+  Latch, ours removes 48.14 mm³ more than live's 78.54, same face count).
 - Left: (1) Flange 1 … Mirror 1 have live's INFO "Collision in sheet metal flat pattern." (zero-gap contact at the
   tear; our flat's union has no overlap by area, so not reported; a contact rule is needed, not an area check);
-  (2) Sketch 9 / 6 on Mate connector 1 (MID_AXIS_POINT on Extrude 3's THROUGH_ALL REMOVE hole): ours X (0,0,−1)
-  from the swept-cylinder frame gp_Ax2(Z), live X (1,0,0): REQUESTS 11-14 11:10 asks live for the hole face's frame;
-  (3) the assembly suite lists any non-OK status as a difference without comparing live's (Fillet 2 / 3 "use Corner
+  (2) the assembly suite lists any non-OK status as a difference without comparing live's (Fillet 2 / 3 "use Corner
   break" are live's own) — asm's.
 
 ## Resume here (2026-11-14 06:24 UTC): sketch speed (lead: solve, regeneration and drag, then fix the slowest)
