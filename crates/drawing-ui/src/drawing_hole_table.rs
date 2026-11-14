@@ -81,7 +81,7 @@ impl DrawingEditor {
     pub fn open_hole_table_props(&mut self, id: u64, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(id) else { return };
         let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, ref exclude, x_dir, .. } = t.kind else { return };
-        self.hole_dlg = Some(HoleTableDlg { show_location, precision, bottom_to_top, corner: t.corner, table: Some(id), flip_x, flip_y, exclude: exclude.clone(), picking: false, x_dir, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false, placing: false });
+        self.hole_dlg = Some(HoleTableDlg { show_location, collapse_tags: false, precision, bottom_to_top, corner: t.corner, table: Some(id), flip_x, flip_y, exclude: exclude.clone(), picking: false, x_dir, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false, placing: false });
         cx.notify();
     }
 
