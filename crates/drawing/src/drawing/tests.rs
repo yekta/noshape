@@ -1002,7 +1002,7 @@ fn broken_out_exclude_from_cut_leaves_the_part_whole() {
     let (key, _) = super::views::view_source(&drawing.sheets[0], ViewId(1)).unwrap();
     let all: Vec<crate::reference::BodyId> = sources[&key].context.bodies.iter().map(|b| b.id.clone()).collect();
     let profile = vec![[-0.02, -0.003], [0.0, -0.005], [0.02, -0.003], [0.022, 0.015], [-0.022, 0.015]];
-    let bo = |exclude: Vec<crate::reference::BodyId>| BrokenOut { profile: profile.clone(), spline: true, depth: 0.03, depth_ref: None, offset: 0.0, exclude };
+    let bo = |exclude: Vec<crate::reference::BodyId>| BrokenOut { profile: profile.clone(), spline: true, depth: 0.03, depth_ref: None, offset: 0.0, exclude, created_before: 0 };
     drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out = vec![bo(Vec::new())];
     assert!(!compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, true).section_segments.is_empty());
     drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out = vec![bo(all)];
@@ -1020,7 +1020,7 @@ fn broken_out_section_exposes_interior() {
     // Front view (x right, z up): open the plate down to its middle (y = 0)
     // around the center hole.
     let profile = vec![[-0.02, -0.003], [0.0, -0.005], [0.02, -0.003], [0.022, 0.015], [-0.022, 0.015]];
-    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile: profile.clone(), spline: true, depth: 0.03, depth_ref: None, offset: 0.0, exclude: Vec::new() });
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile: profile.clone(), spline: true, depth: 0.03, depth_ref: None, offset: 0.0, exclude: Vec::new(), created_before: 0 });
     let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, true);
     assert!(g.error.is_none(), "{:?}", g.error);
     assert!(!g.section_segments.is_empty(), "pocket floor is hatched");
@@ -1043,7 +1043,7 @@ fn broken_out_section_exposes_interior() {
     let ctx = sources[&SourceKey::studio(studio)].context.clone();
     let back = views::vertex_ref_near(&ctx, glam::DVec3::new(-0.05, 0.03, 0.0), 1e-6).expect("back vertex");
     let frame = g.frame.unwrap();
-    let bo = BrokenOut { profile, spline: true, depth: 0.0, depth_ref: Some(back.clone()), offset: 0.0, exclude: Vec::new() };
+    let bo = BrokenOut { profile, spline: true, depth: 0.0, depth_ref: Some(back.clone()), offset: 0.0, exclude: Vec::new(), created_before: 0 };
     assert!((views::broken_out_depth(&ctx, None, &frame, &bo) - 0.06).abs() < 1e-9);
     // Its depth point gone after an update (help V29): the profile is drawn
     // red, the stored depth still cuts.
@@ -1069,7 +1069,7 @@ fn projected_views_inherit_broken_out_and_section_cuts() {
     // top view (2), cut along the front view's direction.
     let before = compute_view(&drawing, &drawing.sheets[0], ViewId(2), &sources, &cache, false);
     let profile = vec![[-0.02, -0.003], [0.0, -0.005], [0.02, -0.003], [0.022, 0.015], [-0.022, 0.015]];
-    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile, spline: true, depth: 0.03, depth_ref: None, offset: 0.0, exclude: Vec::new() });
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile, spline: true, depth: 0.03, depth_ref: None, offset: 0.0, exclude: Vec::new(), created_before: 0 });
     let cuts = views::broken_out_cuts(&drawing, &drawing.sheets[0], ViewId(2));
     assert_eq!(cuts.len(), 1);
     assert_eq!(Some(cuts[0].1), views::view_frame(&drawing, &drawing.sheets[0], ViewId(1)));
@@ -1077,6 +1077,15 @@ fn projected_views_inherit_broken_out_and_section_cuts() {
     assert!(after.error.is_none(), "{:?}", after.error);
     assert_ne!(views::view_key(&drawing, &drawing.sheets[0], ViewId(2), &sources, false), None);
     assert!(after.edges.len() != before.edges.len() || after.snaps.len() != before.snaps.len(), "the top view shows the pocket");
+    // Made after the top view (live drw-broken-out-section, help H:projected_view): the top view stays whole; a view
+    // projected from the front afterwards shows the cut.
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out[0].created_before = 3;
+    assert!(views::broken_out_cuts(&drawing, &drawing.sheets[0], ViewId(2)).is_empty(), "projected before the broken-out section");
+    let later = ViewId(77);
+    drawing.sheets[0].views.push(DrawingView { id: later, kind: ViewKind::Projected { parent: ViewId(1), direction: Some([1.0, 0.0]) }, ..Default::default() });
+    assert_eq!(views::broken_out_cuts(&drawing, &drawing.sheets[0], later).len(), 1, "projected after it");
+    drawing.sheets[0].views.retain(|v| v.id != later);
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out[0].created_before = 0;
     // Shift+click from the section view (5): the projected view keeps the cut.
     drawing.sheets[0].set_section_points(ViewId(5), vec![[-0.025, -0.04], [-0.025, 0.04]]);
     let pos = drawing.sheets[0].view(ViewId(5)).unwrap().position;

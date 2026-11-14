@@ -1208,7 +1208,8 @@ fn broken_out_section(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
         }
     }
-    edit_view(&mut t, view, |v| dt::set_broken_out(v, index, b));
+    let next = t.d.sheets[t.sheet].next_view_id();
+    edit_view(&mut t, view, |v| dt::set_broken_out(v, index, b, next));
     done(od, t, "Broken-out section", "view", view.0)
 }
 

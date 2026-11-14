@@ -318,6 +318,15 @@ pub struct BrokenOut {
     /// Exclude from cut: parts this section leaves whole (assembly views).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exclude: Vec<BodyId>,
+    /// The sheet's next view id when it was made: only projected views made after it (ids from this one) show it
+    /// too (help H:projected_view: "Projected views created from broken-out views will also be broken"; live
+    /// drw-broken-out-section: the suggested isometric stays whole). 0 (older drawings): every projected view.
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub created_before: u64,
+}
+
+fn is_zero_u64(v: &u64) -> bool {
+    *v == 0
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

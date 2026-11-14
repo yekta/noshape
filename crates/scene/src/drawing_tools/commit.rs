@@ -777,7 +777,7 @@ pub fn broken_out_refused(sheet: &noshape_model::drawing::Sheet, view: ViewId) -
 pub fn broken_out(profile: Vec<[f64; 2]>, spline: bool, depth: Option<f64>, depth_ref: Option<PointRef>, offset: f64) -> Option<BrokenOut> {
     let depth = depth.filter(|d| d.is_finite() && *d > 0.0).or(depth_ref.as_ref().map(|_| 0.0))?;
     let offset = if depth_ref.is_some() && offset.is_finite() { offset } else { 0.0 };
-    Some(BrokenOut { profile, spline, depth, depth_ref, offset, exclude: Vec::new() })
+    Some(BrokenOut { profile, spline, depth, depth_ref, offset, exclude: Vec::new(), created_before: 0 })
 }
 
 /// The Broken-out section dialog's Blind depth (live: 25 mm, 1 in in
@@ -786,11 +786,18 @@ pub fn broken_out_blind_default(units: DimUnits) -> f64 {
     if matches!(units, DimUnits::Millimeter | DimUnits::Centimeter | DimUnits::Meter) { 0.025 } else { 0.0254 }
 }
 
-/// Add broken-out section `b` to a view, or replace its `edit`th one.
-pub fn set_broken_out(v: &mut DrawingView, edit: Option<usize>, b: BrokenOut) {
+/// Add broken-out section `b` to a view (made before view `next`: the sheet's next view id), or replace its
+/// `edit`th one (keeping when that was made).
+pub fn set_broken_out(v: &mut DrawingView, edit: Option<usize>, mut b: BrokenOut, next: ViewId) {
     match edit {
-        Some(i) if i < v.broken_out.len() => v.broken_out[i] = b,
-        _ => v.broken_out.push(b),
+        Some(i) if i < v.broken_out.len() => {
+            b.created_before = v.broken_out[i].created_before;
+            v.broken_out[i] = b;
+        }
+        _ => {
+            b.created_before = next.0;
+            v.broken_out.push(b);
+        }
     }
 }
 

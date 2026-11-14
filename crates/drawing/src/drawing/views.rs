@@ -3291,7 +3291,8 @@ pub fn projects_section(sheet: &Sheet, id: ViewId) -> bool {
 pub fn broken_out_cuts(drawing: &Drawing, sheet: &Sheet, id: ViewId) -> Vec<(BrokenOut, ViewFrame)> {
     let Some(v) = sheet.view(id) else { return Vec::new() };
     let mut out = match v.kind {
-        ViewKind::Projected { parent, .. } if !projects_section(sheet, id) => broken_out_cuts(drawing, sheet, parent),
+        // (Those made before this view only: a view projected earlier stays whole, live drw-broken-out-section.)
+        ViewKind::Projected { parent, .. } if !projects_section(sheet, id) => broken_out_cuts(drawing, sheet, parent).into_iter().filter(|(b, _)| id.0 >= b.created_before).collect(),
         _ => Vec::new(),
     };
     if !v.broken_out.is_empty()

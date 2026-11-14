@@ -893,7 +893,8 @@ impl DrawingEditor {
                     return;
                 };
                 b.exclude = exclude;
-                self.edit_view("Broken-out section", view, cx, |v| noshape_scene::drawing_tools::set_broken_out(v, edit, b));
+                let next = self.current_sheet().next_view_id();
+                self.edit_view("Broken-out section", view, cx, |v| noshape_scene::drawing_tools::set_broken_out(v, edit, b, next));
                 self.tool = Tool::Select;
                 // (Live 2131: nothing selected after ✓.)
                 self.selection.clear();
