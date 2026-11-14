@@ -1,0 +1,37 @@
+{
+ "name": "sheet-metal-model-extrude-tab",
+ "about": "plate: edit Sheet metal model 1, the Extrude tab (its fields), Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Sheet metal model 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Extrude"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
