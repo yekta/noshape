@@ -7333,8 +7333,15 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 }
             }
             trace(&format!("mate {} {args}", args["name"]));
+            let tab = args["tab"].clone();
             match placer.call("assembly_mate", args) {
                 Ok(_) => {
+                    // Suppressed in live (asm-hand-drill-pinslot's Cylindrical 29 and Planar 3, live 3004): suppressed.
+                    if f["suppressed"] == true
+                        && let Err(e) = placer.call("assembly_set_feature_state", json!({ "tab": tab, "features": [name], "suppressed": true }))
+                    {
+                        res.untranslated.push(format!("{name}: suppressed: {e}"));
+                    }
                     if k == 0 {
                         mate_names.push((f["featureId"].as_str().unwrap_or("").to_string(), name));
                     } else {
@@ -7468,6 +7475,15 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         res.mates += 1;
         let live_ok = states[id.as_str()]["featureStatus"].as_str().unwrap_or("OK") == "OK";
         let Some(m) = after["mates"].as_array().into_iter().flatten().find(|m| m["name"] == name.as_str()) else { continue };
+        // A suppressed one: as live if ours is suppressed too.
+        if root["features"].as_array().into_iter().flatten().any(|f| f["id"] == id.as_str() && f["suppressed"] == true) {
+            if m["suppressed"] == true {
+                res.mates_matching += 1;
+            } else {
+                res.differences.push(format!("{name}: active, live suppressed"));
+            }
+            continue;
+        }
         // (An inactive mate, an instance of it suppressed, is ERROR in live's capture: asm-config-assembly, live 2580.)
         let inactive = m["message"].as_str().is_some_and(|t| t.contains("instances is suppressed"));
         let ok = m["ok"] == true && !inactive;
