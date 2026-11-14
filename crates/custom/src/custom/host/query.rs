@@ -870,20 +870,24 @@ impl<'a> QueryCx<'a> {
             Ent::Vertex(b, i) => (b, i, ShapeType::Vertex),
             _ => return None,
         };
+        self.sub_boxes(b, t)?.get(i).copied()
+    }
+
+    /// Body `b`'s face, edge or vertex boxes (`t`), in its sub-shape order, kept for the body itself.
+    pub fn sub_boxes(&self, b: usize, t: ShapeType) -> Option<SubBoxes> {
         let body = self.st.ctx.bodies.untracked().get(b)?;
         let key = (Arc::as_ptr(body) as usize, t as u8);
         if let Some((_, boxes)) = self.st.sub_boxes.lock().get(&key) {
-            return boxes.get(i).copied();
+            return Some(boxes.clone());
         }
         let boxes: SubBoxes = Arc::new(body.shape.sub_shapes(t).iter().map(|s| s.bounding_box(false).ok()).collect());
-        let found = boxes.get(i).copied();
         // (A scan over more bodies than it holds would make them all again each time: room for a pattern's thousands.)
         let mut cache = self.st.sub_boxes.lock();
         if cache.len() >= 8192 {
             cache.clear();
         }
-        cache.insert(key, (body.clone(), boxes));
-        found
+        cache.insert(key, (body.clone(), boxes.clone()));
+        Some(boxes)
     }
 
     /// A shape's box ([`k::Shape::bounding_box`]), once a shape.
@@ -1003,15 +1007,50 @@ impl<'a> QueryCx<'a> {
         // What its box must reach to pass one of the tests below: hold one of `wheres`, lie by the old face, or meet
         // the old straight edge.
         let segment = (snap.etype == EType::Edge && snap.points.len() == 3).then(|| (snap.points[0].min(snap.points[2]), snap.points[0].max(snap.points[2])));
-        let may_match = |e: &Ent| {
-            let Some(Some(b)) = self.sub_box(e) else { return true };
+        // `within`: the box must lie in the old face's (an entity's own box), else only meet it (a body's, holding them).
+        let box_may_match = |b: &k::BoundingBox, within: bool| {
             let (lo, hi) = (b.min - DVec3::splat(TOL), b.max + DVec3::splat(TOL));
             wheres.iter().any(|w| w.iter().all(|p| lo.cmple(*p).all() && p.cmple(hi).all()))
                 || snap.face.is_some() && old_box.is_none_or(|o| {
                     let slack = DVec3::splat(TOL + 0.01 * o.diagonal());
-                    (o.min - slack).cmple(b.min).all() && b.max.cmple(o.max + slack).all()
+                    if within { (o.min - slack).cmple(b.min).all() && b.max.cmple(o.max + slack).all() } else { (o.min - slack).cmple(b.max).all() && b.min.cmple(o.max + slack).all() }
                 })
                 || segment.is_some_and(|(a, z)| lo.cmple(z).all() && a.cmple(hi).all())
+        };
+        // Each body's boxes of the type at once, and whether its whole box can hold a match: thousands of entities
+        // were looked up one by one (c2-sm-louver's Extrude 3 / 4: 172 and 149 trackings over every face).
+        let t = match snap.etype {
+            EType::Face => Some(ShapeType::Face),
+            EType::Edge => Some(ShapeType::Edge),
+            EType::Vertex => Some(ShapeType::Vertex),
+            _ => None,
+        };
+        let per_body: Vec<Option<(SubBoxes, bool)>> = (0..self.st.ctx.bodies.len())
+            .map(|b| {
+                let boxes = self.sub_boxes(b, t?)?;
+                // (An entity without a box passes: a body holding one is never passed over.)
+                let whole = boxes.iter().try_fold(None::<k::BoundingBox>, |acc, x| {
+                    let x = (*x)?;
+                    Some(Some(match acc {
+                        Some(a) => k::BoundingBox { min: a.min.min(x.min), max: a.max.max(x.max) },
+                        None => x,
+                    }))
+                });
+                let may = match whole {
+                    Some(Some(w)) => box_may_match(&w, false),
+                    Some(None) => false,
+                    None => true,
+                };
+                Some((boxes, may))
+            })
+            .collect();
+        let may_match = |e: &Ent| {
+            let (b, i) = match *e {
+                Ent::Face(b, i) | Ent::Edge(b, i) | Ent::Vertex(b, i) => (b, i),
+                _ => return true,
+            };
+            let Some(Some((boxes, may))) = per_body.get(b) else { return true };
+            *may && boxes.get(i).copied().flatten().is_none_or(|x| box_may_match(&x, true))
         };
         // Hidden bodies too: std sheet metal tracks its (hidden) definition.
         self.all_with(Some(snap.etype), true)
