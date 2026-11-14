@@ -36,6 +36,7 @@
 #include <Geom_BSplineSurface.hxx>
 #include <GeomLProp_SLProps.hxx>
 #include <GeomAPI_Interpolate.hxx>
+#include <TColgp_HArray1OfPnt.hxx>
 #include <BRepFill.hxx>
 #include <BRepOffsetAPI_MakeOffset.hxx>
 #include <Geom_BSplineCurve.hxx>
@@ -3165,6 +3166,374 @@ bool solve3_grad(const Surf* s[3], gp_XYZ& x, double scale)
   return false;
 }
 
+// A free-form offset's point at (u, v) and its derivatives: the base's point plus d along its natural normal (the
+// normal's derivatives from the base's second ones).
+bool offset_d1(const Surf& s, double u, double v, gp_XYZ& P, gp_XYZ& Pu, gp_XYZ& Pv)
+{
+  gp_Pnt S;
+  gp_Vec Su, Sv, Suu, Svv, Suv;
+  s.base->D2(u, v, S, Su, Sv, Suu, Svv, Suv);
+  P  = S.XYZ();
+  Pu = Su.XYZ();
+  Pv = Sv.XYZ();
+  if (s.d == 0)
+    return true;
+  const gp_Vec N = Su.Crossed(Sv);
+  const double m = N.Magnitude();
+  if (m < 1e-300)
+    return false;
+  const gp_XYZ n  = N.XYZ() / m;
+  const gp_XYZ Nu = (Suu.Crossed(Sv) + Su.Crossed(Suv)).XYZ(), Nv = (Suv.Crossed(Sv) + Su.Crossed(Svv)).XYZ();
+  P += n * s.d;
+  Pu += (Nu - n * n.Dot(Nu)) * (s.d / m);
+  Pv += (Nv - n * n.Dot(Nv)) * (s.d / m);
+  return true;
+}
+
+// x solved from A x = b (n unknowns, partial pivoting); false where A is singular.
+bool solve_small(int n, double A[4][4], double b[4], double x[4])
+{
+  for (int c = 0; c < n; ++c)
+  {
+    int piv = c;
+    for (int r = c + 1; r < n; ++r)
+      if (std::abs(A[r][c]) > std::abs(A[piv][c]))
+        piv = r;
+    if (std::abs(A[piv][c]) < 1e-300)
+      return false;
+    std::swap(A[c], A[piv]);
+    std::swap(b[c], b[piv]);
+    for (int r = c + 1; r < n; ++r)
+    {
+      const double f = A[r][c] / A[c][c];
+      for (int k = c; k < n; ++k)
+        A[r][k] -= f * A[c][k];
+      b[r] -= f * b[c];
+    }
+  }
+  for (int r = n - 1; r >= 0; --r)
+  {
+    double v = b[r];
+    for (int k = r + 1; k < n; ++k)
+      v -= A[r][k] * x[k];
+    x[r] = v / A[r][r];
+  }
+  return true;
+}
+
+// An offset edge between two faces' offsets, one of them free-form at least, marched in the faces' own parameters:
+// its 3D curve and its curves on the free-form offsets (none on the other), all at the original edge's parameters
+// from `s0` to `s1`. No projection: each point solved by Newton on both offsets in the plane across the edge there.
+struct OffsetRun
+{
+  occ::handle<Geom_BSplineCurve>   c3;
+  occ::handle<Geom2d_BSplineCurve> pc[2];
+  double                           s0 = 0, s1 = 0;
+  bool                             done = false;
+};
+
+bool march_offsets(const Surf* S[2], const TopoDS_Edge& e, const TopoDS_Face F[2], const gp_Pnt& A, const gp_Pnt& B, double size, double fit_tol, OffsetRun& out)
+{
+  if (!S[0]->general && !S[1]->general)
+    return false;
+  if (!BRep_Tool::SameParameter(e))
+    return false;
+  double                        c0, c1;
+  const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, c0, c1);
+  if (c3.IsNull())
+    return false;
+  occ::handle<Geom2d_Curve> pc[2];
+  for (int k = 0; k < 2; ++k)
+    if (S[k]->general)
+    {
+      if (BRep_Tool::IsClosed(e, F[k]))
+        return false;
+      double f0, f1;
+      pc[k] = BRep_Tool::CurveOnSurface(e, F[k], f0, f1);
+      if (pc[k].IsNull())
+        return false;
+    }
+  // Each end's parameter: where the plane across the edge passes through it, from the edge's own end (an outward
+  // corner's offset lies past it, on the curve run on).
+  auto end_param = [&](const gp_Pnt& X, double s, double& out) {
+    for (int it = 0; it < 30; ++it)
+    {
+      gp_Pnt C;
+      gp_Vec d1, d2;
+      c3->D2(s, C, d1, d2);
+      const gp_Vec w(C, X);
+      const double g = w.Dot(d1), dg = w.Dot(d2) - d1.SquareMagnitude();
+      if (std::abs(dg) < 1e-300)
+        return false;
+      const double ds = -g / dg;
+      s += ds;
+      if (std::abs(ds) <= 1e-14 * std::max(1.0, std::abs(s)))
+      {
+        out = s;
+        return std::abs(s - (s < 0.5 * (c0 + c1) ? c0 : c1)) <= 0.5 * (c1 - c0);
+      }
+    }
+    return false;
+  };
+  double m0 = 0, m1 = 0;
+  if (!end_param(A, c0, m0) || !end_param(B, c1, m1) || !(m1 > m0))
+    return false;
+  const double conv = 1e-3 * fit_tol;
+  struct Pt
+  {
+    double   s;
+    gp_XYZ   p;
+    gp_Pnt2d uv[2];
+  };
+  // On each free-form face's own patch: past it, on a B-spline's extension, the offset can turn a corner there, which
+  // the edges' corner-aware march below the intersection handles (c2-impeller-loft's inlet seams).
+  auto within = [&](const Pt& x) {
+    for (int k = 0; k < 2; ++k)
+    {
+      const Surf& q = *S[k];
+      if (!q.general || !(q.own[1] > q.own[0]) || !(q.own[3] > q.own[2]))
+        continue;
+      const double mu = 1e-6 * (q.own[1] - q.own[0]), mv = 1e-6 * (q.own[3] - q.own[2]);
+      double       u = x.uv[k].X();
+      if (q.base->IsUPeriodic())
+        u += std::round((0.5 * (q.own[0] + q.own[1]) - u) / q.base->UPeriod()) * q.base->UPeriod();
+      if (u < q.own[0] - mu || u > q.own[1] + mu || x.uv[k].Y() < q.own[2] - mv || x.uv[k].Y() > q.own[3] + mv)
+        return false;
+    }
+    return true;
+  };
+  // The point on both offsets in the plane across the edge at s, from the parameters in `x`.
+  auto solve = [&](double s, Pt& x) -> bool {
+    gp_Pnt C;
+    gp_Vec T;
+    c3->D1(s, C, T);
+    if (T.Magnitude() < 1e-300)
+      return false;
+    const gp_XYZ n = T.Normalized().XYZ();
+    const double c = n.Dot(C.XYZ());
+    const bool   both = S[0]->general && S[1]->general;
+    const int    g    = S[0]->general ? 0 : 1; // the free-form one where only one is
+    auto residual = [&](const Pt& y, double F[4], gp_XYZ P[2], gp_XYZ Pu[2], gp_XYZ Pv[2], gp_XYZ& grad) -> bool {
+      if (both)
+      {
+        for (int k = 0; k < 2; ++k)
+          if (!offset_d1(*S[k], y.uv[k].X(), y.uv[k].Y(), P[k], Pu[k], Pv[k]))
+            return false;
+        const gp_XYZ d = P[0] - P[1];
+        F[0] = d.X(), F[1] = d.Y(), F[2] = d.Z(), F[3] = n.Dot(P[0]) - c;
+        return true;
+      }
+      if (!offset_d1(*S[g], y.uv[g].X(), y.uv[g].Y(), P[g], Pu[g], Pv[g]))
+        return false;
+      F[0] = eval_grad(*S[1 - g], P[g], grad);
+      F[1] = n.Dot(P[g]) - c;
+      return std::abs(F[0]) < 1e299;
+    };
+    const int nu = both ? 4 : 2;
+    auto      norm = [&](const double F[4]) {
+      double m = 0;
+      for (int k = 0; k < nu; ++k)
+        m = std::max(m, std::abs(F[k]));
+      return m;
+    };
+    double F[4];
+    gp_XYZ P[2], Pu[2], Pv[2], grad;
+    if (!residual(x, F, P, Pu, Pv, grad))
+      return false;
+    double r = norm(F);
+    for (int it = 0; it < 40; ++it)
+    {
+      if (r < conv)
+      {
+        x.s = s;
+        x.p = both ? 0.5 * (P[0] + P[1]) : P[g];
+        return within(x);
+      }
+      double J[4][4] = {}, b[4], dx[4];
+      if (both)
+      {
+        const gp_XYZ cols[4] = {Pu[0], Pv[0], Pu[1].Reversed(), Pv[1].Reversed()};
+        for (int k = 0; k < 4; ++k)
+        {
+          J[0][k] = cols[k].X(), J[1][k] = cols[k].Y(), J[2][k] = cols[k].Z();
+          J[3][k] = k < 2 ? n.Dot(cols[k]) : 0.0;
+        }
+      }
+      else
+      {
+        J[0][0] = grad.Dot(Pu[g]), J[0][1] = grad.Dot(Pv[g]);
+        J[1][0] = n.Dot(Pu[g]), J[1][1] = n.Dot(Pv[g]);
+      }
+      for (int k = 0; k < nu; ++k)
+        b[k] = -F[k];
+      if (!solve_small(nu, J, b, dx))
+        return false;
+      // (Halved while it doesn't get closer.)
+      bool better = false;
+      for (double lam = 1; lam > 1e-3 && !better; lam *= 0.5)
+      {
+        Pt y = x;
+        if (both)
+        {
+          y.uv[0] = gp_Pnt2d(x.uv[0].X() + lam * dx[0], x.uv[0].Y() + lam * dx[1]);
+          y.uv[1] = gp_Pnt2d(x.uv[1].X() + lam * dx[2], x.uv[1].Y() + lam * dx[3]);
+        }
+        else
+          y.uv[g] = gp_Pnt2d(x.uv[g].X() + lam * dx[0], x.uv[g].Y() + lam * dx[1]);
+        double Fy[4];
+        gp_XYZ Py[2], Puy[2], Pvy[2], gy;
+        if (!residual(y, Fy, Py, Puy, Pvy, gy))
+          continue;
+        const double ry = norm(Fy);
+        if (ry < r)
+        {
+          better = true;
+          x      = y;
+          r      = ry;
+          std::copy(Fy, Fy + 4, F);
+          for (int k = 0; k < 2; ++k)
+            P[k] = Py[k], Pu[k] = Puy[k], Pv[k] = Pvy[k];
+          grad = gy;
+        }
+      }
+      if (!better)
+        return false;
+    }
+    return false;
+  };
+  // The free-form offsets' feet of an end (the corners' offset vertex, on both): Gauss-Newton from the march's.
+  auto foot = [&](const gp_XYZ& X, Pt& x) -> bool {
+    for (int k = 0; k < 2; ++k)
+    {
+      if (!S[k]->general)
+        continue;
+      gp_Pnt2d uv = x.uv[k];
+      for (int it = 0; it < 30; ++it)
+      {
+        gp_XYZ P, Pu, Pv;
+        if (!offset_d1(*S[k], uv.X(), uv.Y(), P, Pu, Pv))
+          return false;
+        const gp_XYZ dlt = X - P;
+        if (dlt.Modulus() < conv)
+          break;
+        const double a = Pu.Dot(Pu), bb = Pu.Dot(Pv), cc = Pv.Dot(Pv), det = a * cc - bb * bb;
+        if (std::abs(det) < 1e-300)
+          return false;
+        const double ru = Pu.Dot(dlt), rv = Pv.Dot(dlt);
+        uv = gp_Pnt2d(uv.X() + (cc * ru - bb * rv) / det, uv.Y() + (a * rv - bb * ru) / det);
+      }
+      gp_XYZ P, Pu, Pv;
+      if (!offset_d1(*S[k], uv.X(), uv.Y(), P, Pu, Pv) || (P - X).Modulus() > fit_tol)
+        return false;
+      x.uv[k] = uv;
+    }
+    if (!S[0]->general || !S[1]->general)
+    {
+      gp_XYZ g;
+      if (std::abs(eval_grad(*S[S[0]->general ? 1 : 0], X, g)) > fit_tol)
+        return false;
+    }
+    x.p = X;
+    return true;
+  };
+  // A point at s from the edge's own place on the faces (and from `prev`'s where that fails).
+  auto at = [&](double s, const Pt* prev, Pt& x) -> bool {
+    for (int attempt = 0; attempt < 2; ++attempt)
+    {
+      if (attempt == 1 && prev == nullptr)
+        break;
+      for (int k = 0; k < 2; ++k)
+        if (S[k]->general)
+          x.uv[k] = attempt == 0 ? pc[k]->Value(s) : prev->uv[k];
+      if (solve(s, x))
+        return true;
+    }
+    return false;
+  };
+  std::vector<Pt> pts;
+  const int       n0 = 16;
+  for (int k = 0; k <= n0; ++k)
+  {
+    Pt x;
+    if (!at(m0 + (m1 - m0) * 0.5 * (1 - std::cos(M_PI * k / n0)), pts.empty() ? nullptr : &pts.back(), x))
+      return false;
+    pts.push_back(x);
+  }
+  if (!foot(A.XYZ(), pts.front()) || !foot(B.XYZ(), pts.back()))
+    return false;
+  pts.front().s = m0, pts.back().s = m1;
+  auto fit = [&](OffsetRun& r) -> bool {
+    const int                          np = (int)pts.size();
+    occ::handle<TColgp_HArray1OfPnt>   h3 = new TColgp_HArray1OfPnt(1, np);
+    occ::handle<TColStd_HArray1OfReal> hs = new TColStd_HArray1OfReal(1, np);
+    for (int k = 0; k < np; ++k)
+      h3->SetValue(k + 1, gp_Pnt(pts[(size_t)k].p)), hs->SetValue(k + 1, pts[(size_t)k].s);
+    GeomAPI_Interpolate i3(h3, hs, false, 1e-15);
+    i3.Perform();
+    if (!i3.IsDone())
+      return false;
+    r.c3 = i3.Curve();
+    for (int g = 0; g < 2; ++g)
+    {
+      if (!S[g]->general)
+        continue;
+      occ::handle<TColgp_HArray1OfPnt2d> h2 = new TColgp_HArray1OfPnt2d(1, np);
+      for (int k = 0; k < np; ++k)
+        h2->SetValue(k + 1, pts[(size_t)k].uv[g]);
+      Geom2dAPI_Interpolate i2(h2, hs, false, 1e-15);
+      i2.Perform();
+      if (!i2.IsDone())
+        return false;
+      r.pc[g] = i2.Curve();
+    }
+    return true;
+  };
+  // Halved where the fitted curves miss the point between two by more than the fit's tolerance.
+  for (int round = 0; round < 8; ++round)
+  {
+    if (!fit(out))
+      return false;
+    std::vector<Pt> next = {pts.front()};
+    bool            added = false;
+    for (size_t k = 0; k + 1 < pts.size(); ++k)
+    {
+      const double sm = 0.5 * (pts[k].s + pts[k + 1].s);
+      Pt           x;
+      for (int g = 0; g < 2; ++g)
+        x.uv[g] = gp_Pnt2d(0.5 * (pts[k].uv[g].XY() + pts[k + 1].uv[g].XY()));
+      if (!solve(sm, x) && !at(sm, &pts[k], x))
+        return false;
+      double err = out.c3->Value(sm).Distance(gp_Pnt(x.p));
+      for (int g = 0; g < 2; ++g)
+        if (S[g]->general)
+        {
+          const gp_Pnt2d q = out.pc[g]->Value(sm);
+          gp_XYZ         P, Pu, Pv;
+          if (!offset_d1(*S[g], q.X(), q.Y(), P, Pu, Pv))
+            return false;
+          err = std::max(err, (P - x.p).Modulus());
+        }
+      if (err > fit_tol)
+      {
+        next.push_back(x);
+        added = true;
+      }
+      next.push_back(pts[k + 1]);
+    }
+    if (!added)
+    {
+      out.s0   = m0;
+      out.s1   = m1;
+      out.done = true;
+      return true;
+    }
+    if (next.size() > 2000)
+      return false;
+    pts = std::move(next);
+  }
+  return false;
+}
+
 // eval_grad by a free-form face's nearest foot, square below the point (elsewhere a projection held at the surface's
 // end gives a false sheet of zeros, and the last foot's can jump to another sheet of the offset): 1e300 where there's
 // none.
@@ -4992,6 +5361,9 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
     std::vector<std::pair<int, gp_Pnt2d>> corner_uv; // each corner's face and its place on it (exact, on the bound)
   };
   std::map<int, Marched> marched_at;
+  // Edges marched in their faces' parameters (quad::march_offsets): their curves on the free-form offsets, made there.
+  std::map<int, quad::OffsetRun> exact_at;
+  const double                   fit_tol = 100 * tol;
   // (A free-form offset only round the edge, its curve's box on the face and two walls more: the offsets keep
   // their faces' parameters; OCCT's intersection of whole B-spline offsets was most of c2-rings-loft's edges.)
   auto near_edge = [&](const TopoDS_Edge& e, int f) -> occ::handle<Geom_Surface> {
@@ -5056,6 +5428,31 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
   {
     bool                                 done = false;
     std::vector<occ::handle<Geom_Curve>> lines;
+    quad::OffsetRun                      run;
+  };
+  // An edge's offset marched in its faces' parameters (from the corners' offset vertices at its ends).
+  auto march_edge = [&](int i, quad::OffsetRun& run) {
+    const TopoDS_Edge e = TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD));
+    TopoDS_Vertex     a, b;
+    TopExp::Vertices(e, a, b);
+    const int         ia = find(verts.FindIndex(a)), ib = find(verts.FindIndex(b));
+    const int         sa = second(i, ia), sb = second(i, ib);
+    const gp_Pnt      A = gp_Pnt(sa >= 0 ? splits[(size_t)sa].pb : pts[(size_t)ia]), B = gp_Pnt(sb >= 0 ? splits[(size_t)sb].pb : pts[(size_t)ib]);
+    const int         fa = efi[(size_t)i][0], fb = efi[(size_t)i][1];
+    const quad::Surf* S2[2] = {&sf[(size_t)fa], &sf[(size_t)fb]};
+    const TopoDS_Face F2[2] = {TopoDS::Face(faces(fa).Oriented(TopAbs_FORWARD)), TopoDS::Face(faces(fb).Oriented(TopAbs_FORWARD))};
+    try
+    {
+      const bool ok = quad::march_offsets(S2, e, F2, A, B, size, fit_tol, run);
+      if (dbg)
+        std::fprintf(stderr, "quadrics: edge %d %s in its faces' parameters (%d poles)\n", i, ok ? "marched" : "not marched", ok ? run.c3->NbPoles() : 0);
+      return ok;
+    }
+    catch (const Standard_Failure&)
+    {
+      run = quad::OffsetRun();
+      return false;
+    }
   };
   std::vector<AheadSS> ahead_ss((size_t)ne + 1);
   {
@@ -5073,6 +5470,8 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         if (noshape_should_break() != 0)
           return;
         const int i = jobs[(size_t)k];
+        if (march_edge(i, ahead_ss[(size_t)i].run))
+          return;
         try
         {
           const TopoDS_Edge e = TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD));
@@ -5290,7 +5689,15 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       }
       else if (!((sf[(size_t)fa].general || sf[(size_t)fb].general) && partly_tangent(e, fa, fb)))
       {
-        if (group[(size_t)i] == 0 && ahead_ss[(size_t)i].done)
+        quad::OffsetRun& run = ahead_ss[(size_t)i].run;
+        if (group[(size_t)i] == 0 && (sf[(size_t)fa].general || sf[(size_t)fb].general) && (run.done || (!ahead_ss[(size_t)i].done && march_edge(i, run))))
+        {
+          c             = run.c3;
+          p0            = run.s0;
+          p1            = run.s1;
+          exact_at[i]   = run;
+        }
+        else if (group[(size_t)i] == 0 && ahead_ss[(size_t)i].done)
           cands = ahead_ss[(size_t)i].lines;
         else
         {
@@ -5935,6 +6342,16 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
             bld.UpdateEdge(ex[(size_t)k], occ::down_cast<Geom2d_Curve>(pc->Copy()), of, 1e3 * tol);
             bld.Range(ex[(size_t)k], of, c0, c1);
             continue;
+          }
+          if (const auto xr = exact_at.find(k); xr != exact_at.end())
+          {
+            const int g = efi[(size_t)k][0] == i ? 0 : efi[(size_t)k][1] == i ? 1 : -1;
+            if (g >= 0 && !xr->second.pc[g].IsNull())
+            {
+              bld.UpdateEdge(ex[(size_t)k], occ::down_cast<Geom2d_Curve>(xr->second.pc[g]->Copy()), of, 1e3 * tol);
+              bld.Range(ex[(size_t)k], of, xr->second.s0, xr->second.s1);
+              continue;
+            }
           }
           if (const auto mp = marched_at.find(k); mp != marched_at.end())
           {
