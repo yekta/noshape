@@ -2736,6 +2736,9 @@ impl AssemblyView {
             }
             // A linear pattern's direction on an edge runs along the edge (live).
             let c = if p.kind == PatternDialogKind::Linear { c.linear_direction() } else { c };
+            // Picked in the graphics area: the keyboard leaves the dialog (live asm-linear-pattern-commit step 5).
+            p.note_toggle();
+            self.ui.keyboard_away = true;
             // Live (auto-advance, request 1650): Direction (≤1) moves the focus on to the second Direction when it
             // shows, filled or not; the last direction field keeps it (a new pick replaces).
             match slot {
@@ -3433,8 +3436,9 @@ impl AssemblyView {
     /// clicks on faces, edges and vertices select them (additive), their
     /// instances' rows too; an empty click clears.
     fn click_select(&mut self, target: Option<AsmPickTarget>, position: DVec2, additive: bool, cx: &mut Context<Self>) {
-        // A pattern's Instances picked in the graphics area: the keyboard leaves the dialog (live asm-linear-pattern-commit).
-        if self.pattern.as_ref().is_some_and(|p| p.active.is_none()) {
+        // A pattern's pick in the graphics area (Instances or Direction): the keyboard leaves the dialog (live
+        // asm-linear-pattern-commit steps 3 and 5).
+        if self.pattern.is_some() {
             self.ui.keyboard_away = true;
         }
         self.ui.root_selected = false;
@@ -3487,7 +3491,7 @@ impl AssemblyView {
     }
 
     /// Clear the instance and entity selection.
-    fn clear_selection(&mut self) {
+    pub(crate) fn clear_selection(&mut self) {
         self.selected.clear();
         self.ui.range_patterns.clear();
         self.selected_mate = None;

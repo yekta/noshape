@@ -1,6 +1,6 @@
 //! This test binary's own settings directory: the app's settings (graphics, toolbars, shortcuts, recent files)
 //! go to `NOSHAPE_CONFIG_DIR`, else the user's ~/.config/noshape, which two runs on one machine would share.
-//! Set before `main` (the test harness has no setup hook; nothing else runs yet), unless the run already gives one.
+//! Set before `main` (the test harness has no setup hook; nothing else runs yet).
 
 #[used]
 #[cfg_attr(any(target_os = "linux", target_os = "android", target_os = "freebsd"), unsafe(link_section = ".init_array"))]
@@ -9,10 +9,10 @@
 static OWN_CONFIG_DIR: extern "C" fn() = own_config_dir;
 
 extern "C" fn own_config_dir() {
-    if std::env::var_os("NOSHAPE_CONFIG_DIR").is_some() {
-        return;
-    }
-    let dir = std::env::temp_dir().join(format!("noshape-ops-tests-config-{}", std::process::id()));
+    // (Inside a run's own directory too: these tests change company settings, e.g. managed workflows, that the
+    // run's other test binaries read.)
+    let base = std::env::var_os("NOSHAPE_CONFIG_DIR").map(std::path::PathBuf::from).unwrap_or_else(std::env::temp_dir);
+    let dir = base.join(format!("noshape-ops-tests-config-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&dir);
     // SAFETY: before `main`: no other thread exists to read the environment.
     unsafe { std::env::set_var("NOSHAPE_CONFIG_DIR", &dir) };

@@ -699,7 +699,10 @@ fn item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl Fn(S
             ("Onshape Assembly", MetaValues { name: item.name.clone(), description: p.description.clone().unwrap_or_default(), part_number: p.part_number.clone().unwrap_or_default(), revision: p.revision.clone().unwrap_or_default(), meta: p.meta.clone(), mass_override: None, bom: 0, drawing: None })
         }
         _ => {
-            let desc = d.session.store.get_meta(&format!("tab_description:{}", tab.0)).ok().flatten().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default();
+            let desc = match d.session.doc.tab(tab).map(|t| &t.content) {
+                Some(TabContent::Drawing(dr)) => dr.meta.description.clone(),
+                _ => d.session.store.get_meta(&format!("tab_description:{}", tab.0)).ok().flatten().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default(),
+            };
             let category = match item.kind {
                 ItemKind::Drawing => "Onshape Drawing",
                 ItemKind::VariableStudio => "Onshape Variable Studio",
@@ -718,6 +721,7 @@ fn item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl Fn(S
                 let content_kind = d.session.doc.tab(item.tab).map(|t| match &t.content {
                     TabContent::PartStudio(_) => 0,
                     TabContent::Assembly(_) => 1,
+                    TabContent::Drawing(_) => 3,
                     _ => 2,
                 });
                 match (content_kind, &item.part) {
@@ -742,6 +746,16 @@ fn item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl Fn(S
                                 a.properties.meta = v.meta.clone();
                             }
                         });
+                    }
+                    // (A drawing's number is its title block's, as its own Properties.)
+                    (Some(3), _) => {
+                        d.edit_tab(item.tab, &format!("Properties : {}", v.name), cx, |c| {
+                            if let TabContent::Drawing(dr) = c {
+                                (dr.meta.number, dr.meta.description) = (v.part_number.clone(), v.description.clone());
+                            }
+                        });
+                        let nrm: &[u8] = if v.meta.not_revision_managed { b"1" } else { b"" };
+                        let _ = d.session.store.set_meta(&format!("tab_not_revision_managed:{}", item.tab.0), Some(nrm));
                     }
                     _ => {
                         let _ = d.session.store.set_meta(&format!("tab_description:{}", item.tab.0), Some(v.description.as_bytes()));
@@ -1626,6 +1640,7 @@ impl Render for ReleaseDialog {
         }
         let log = release_log(self.doc.read(cx));
         let red = gpui_kit::rgb(0xbd3039);
+        let pending_elsewhere = log.pending_part_numbers(self.name.read(cx).value().trim());
         // A header cell: grid line on its left.
         let head = |w: f32| div().w(px(w)).flex_none().h_full().flex().items_center().px(px(10.)).border_l_1().border_color(gpui_kit::rgb(GRID));
         // Bordered 30 px icon buttons (row and header actions).
@@ -1878,6 +1893,8 @@ impl Render for ReleaseDialog {
                 Mode::Obsolete => "Released",
                 Mode::Review => log.state(&pn).label(),
                 Mode::Release if row.item.reverted => "Released",
+                // Help (typical release workflow): an item in another candidate still Pending reads Pending.
+                Mode::Release if !pn.is_empty() && pending_elsewhere.contains(&pn) => "Pending",
                 Mode::Release => "In progress",
             };
             // The row's Revert (help revert-04 / revert-04-01): an unchanged item, or one whose properties alone changed,

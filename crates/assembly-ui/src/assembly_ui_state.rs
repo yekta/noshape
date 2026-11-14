@@ -152,7 +152,10 @@ impl AssemblyView {
                 }
             }
             // Related through a selected mate (live: a selected row alone isn't).
-            let selected = self.selected.contains(&i.id)
+            // (A pattern's other field active: its Instances aren't the selection, live asm-linear-pattern-commit.)
+            let selected = (self.selected.contains(&i.id) && !self.pattern.as_ref().is_some_and(|p| p.active.is_some()))
+                // (Its pick's instance instead: Direction on an edge of Part 1 selects Part 1's row.)
+                || self.pattern.as_ref().and_then(|p| p.active.and_then(|k| [&p.axis, &p.axis2, &p.axis3].get(k).and_then(|a| a.as_ref()))).is_some_and(|c| c.instance == i.id)
                 || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&i.id))
                 || matches!(&self.ui.dynamic_suppression, Some((super::props::DynTarget::Instance(x), _, _)) if *x == i.id)
                 || self.mc_picks().iter().any(|c| c.instance == i.id);
@@ -286,7 +289,9 @@ impl AssemblyView {
         items.extend(held.iter().map(|_| json!({ "kind": "FEATURE", "owner": null })));
         // A clicked face, edge or vertex is selected itself, owned by its part (live asm-face-menu-clear-selection: FACE of
         // "Part 2"; the instance's row highlights); an instance only when picked whole.
-        items.extend(self.ui.entity_sel.iter().map(|(path, r)| {
+        // (A pattern's other field active: not its Instances' picks, live asm-linear-pattern-commit.)
+        let other_pattern_field = self.pattern.as_ref().is_some_and(|p| p.active.is_some());
+        items.extend(self.ui.entity_sel.iter().filter(|_| !other_pattern_field).map(|(path, r)| {
             let kind = match r {
                 Reference::Edge(_) => "EDGE",
                 Reference::Vertex(_) => "VERTEX",
@@ -448,6 +453,17 @@ impl AssemblyView {
         });
         // (The flip icon has no label: live's recorder reads an osc-svg-icon, label null.)
         let focus = focus.or_else(|| self.ui.checkbox_focus.zip(dialog.as_ref()).map(|(label, d)| json!({ "kind": "field", "label": if label.is_empty() { Value::Null } else { json!(label) }, "dialog": d["title"] })));
+        // A pattern's number field with the keyboard, by its label (live asm-linear-pattern-commit: "Distance",
+        // "Instance count", as typed).
+        let focus = focus.or_else(|| {
+            let s = self.pattern.as_ref()?;
+            let circular = s.kind == PatternDialogKind::Circular;
+            let fields = [(if circular { "Angle" } else { "Distance" }, &s.distance), ("Instance count", &s.count), ("Distance", &s.distance2), ("Instance count", &s.count2), ("Distance", &s.distance3), ("Instance count", &s.count3)];
+            let (label, q) = fields.into_iter().find(|(_, q)| q.read(cx).is_focused())?;
+            let mut f = input(Some(label), q.read(cx).state());
+            f["dialog"] = dialog.as_ref().map(|d| d["title"].clone()).unwrap_or(Value::Null);
+            Some(f)
+        });
         // A right-clicked number field, then the page once its Configure is picked (live asm-pattern-field-configure).
         let focus = focus.or_else(|| self.ui.keyboard_away.then(|| json!({ "kind": "none" })));
         let focus = focus.or_else(|| {
@@ -574,7 +590,11 @@ impl AssemblyView {
         let mate_name = |id: MateId| asm.and_then(|a| a.mates.iter().find(|m| m.id == id).map(|m| m.name.clone())).unwrap_or_default();
         let query = |label: &str, items: Vec<String>, active: bool, missing: bool| json!({ "label": label, "kind": "query", "items": items, "active": active, "state": if missing { "error" } else { "ok" } });
         let number = |label: Value, text: String| json!({ "label": label, "kind": "number", "text": text, "state": "ok" });
-        let quantity = |st: &Entity<crate::quantity_field::QuantityInput>| st.read(cx).text().to_string();
+        // (As typed while it has the keyboard: live asm-linear-pattern-commit.)
+        let quantity = |st: &Entity<crate::quantity_field::QuantityInput>| {
+            let q = st.read(cx);
+            if q.is_focused() { q.state().read(cx).value().to_string() } else { q.text().to_string() }
+        };
         let check = |label: &str, on: bool| json!({ "label": label, "kind": "boolean", "checked": on, "state": "ok" });
         let toggle = |on: bool| json!({ "label": "toggle", "kind": "toggle", "checked": on, "state": "ok" });
         let choice = |text: &str| json!({ "label": null, "kind": "enum", "text": text, "state": "ok" });

@@ -8,9 +8,8 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
   constraint, live's start has one "Add feature" per feature), ver-linked-selective-update (live's take missed the
   checkbox; re-recorded 11-14).
 - **Release management**: live's account is on Professional since 2026-11-14 (before, Release… opened only the upsell).
-  The live matrix below is live2's capture (25 rows: = 22, ? 3); the help matrix keeps the rows live hasn't shown yet
-  (138: = 108, 17 settled by the live matrix, ≠ 2, missing 2, ? 2, cloud 7).
-  Rows: 138; = 97, ≠ 20, missing 9, ? 6, cloud 6 (left out: other users, notifications).
+  The live matrix below is live2's capture (25 rows: = 23, ? 2); the help matrix keeps the rows live hasn't shown yet
+  (138: = 110, 17 settled by the live matrix, ≠ 0, missing 2, ? 1, cloud 8).
 
 ## Live (Professional company, live2 2026-11-14: live/feel/release.json, feel/release/*.png)
 
@@ -41,8 +40,8 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
 | Admin without required approvers | Release stays on; confirm "Release and override company policy" | the same | – | = |
 | Barred creator | not offered as approver; no asterisk | the same | – | = |
 | Assembly release | the assembly, its parts once (mirror adds none), linked parts In progress without fields ("Document is not owned by your company"), no standard content | the assembly and its parts once; no standard content or mirror items; linked parts left out (company ownership: none offline) | – | = (ownership: cloud) |
-| Drawing pending update | red band "Drawing has a pending update" blocks; after Update it releases, title block DRW-1 / A, tab menu Revision history… | ? | – | ? |
-| Locking | released version: Name, Category, Part number, Revision, State, Material locked; workspace part keeps Part number editable | ? | – | ? |
+| Drawing pending update | red band "Drawing has a pending update" blocks; after Update it releases, title block DRW-1 / A, tab menu Revision history… | the band (red with the condition on, yellow off: `RC` held); the release writes the drawing's number and revision into its title block; tab menu Revision history… | ops a_released_drawing_shows_its_number_and_revision | = |
+| Locking | released version: Name, Category, Part number, Revision, State, Material locked; workspace part keeps Part number editable | workspace: editable; a version: every field read-only (a version's document is read-only) | – | ? (live2: are a released version's other fields editable) |
 
 ## Help (rows live hasn't shown yet; until 2026-11-14 all came from here)
 
@@ -78,7 +77,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Imported revision kept on first release; mismatched scheme → warning and adjusted (e.g. 6 → A) | TRW (revision-update.png) | a valid typed revision kept; one the scheme lacks starts at the next with "6 is not a valid revision … is A." (yellow) | – | = (live 11-14) |
 | Revision / part number error texts | BUNDLE "Revision must not be blank.", "Part number must be unique." | ML:344-347 "Revision does not follow the revision scheme.", "Part number is used by another item of this release." | ML test releases_obsolete_and_validate | see the live matrix |
 | State column: In progress (workspace), Released (linked released) | TRW "In progress… Pending… Released reflects previously-released, linked objects" | RD:1769-1774; linked released → reverted/Released (crates/release-ui/src/release_add_source.rs:160-176) | – | = |
-| State Pending for items linked to a pending release | TRW "If a linked object is linked to a release that is Pending … Pending state" | add_source only checks released packages (release_add_source.rs:163); shows In progress | – | ≠ |
+| State Pending for items linked to a pending release | TRW "If a linked object is linked to a release that is Pending … Pending state" | an item whose part number is in another Pending candidate reads Pending | – | = (fixed 11-14) |
 | Part number field per row, # "Generate next part number" (sequential on) | TRW; image (greyed when filled) | RD:1873-1892 | ML test sequential_numbers_share_the_counter | = |
 | Header # generates part numbers for the candidate | TRW "Clicking # at the top … generates part numbers for all of the objects" | RD:1632-1641 "Generate missing part numbers" (BUNDLE tooltip) | e2e release_drafts_revert_and_generate (generate_part_numbers) | = |
 | Drawing shares part number with its single shown part (reuse on) | TRW "If either the Drawing or object… has an associated number… assigned to both… only if one object" | RD:1019-1055 | ML test drawings_may_reuse_a_part_number | = |
@@ -179,9 +178,9 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Release workflow / Obsoletion workflow tabs with diagrams + description | relmgmt-workflows-13/-04.png | RP:271-308, RP:600-686 | RP test the_workflow_charts_parse | = |
 | "Onshape default release workflow ↗" View in document link | RMS "external link icon … opens the workflow document" | a public Onshape document: cloud | – | cloud |
 | Enterprise custom workflows (Active, Published date/by, Unpublish, preview) | RMS, CW | – | – | missing (Enterprise) |
-| Revision scheme select: "Alphabetical A B C skipping I O Q S X Z", Numerical, "New custom revision scheme…" | RMS; relmgmt-workflows-14.png | RP:22-25, ML:70: Alphabetical, "Numeric 1 2 3", "Numeric 01 02 03", "Numeric 001 002 003", customs, New custom… | ML test numeric_and_custom_revision_schemes | ? (help names one "Numerical"; three numeric variants not in help) |
+| Revision scheme select: "Alphabetical A B C skipping I O Q S X Z", Numerical, "New custom revision scheme…" | RMS; relmgmt-workflows-14.png | Alphabetical A B C skipping I O Q S X Z, Numerical 1 2 3, custom schemes, New custom revision scheme… (live2 release.json; the padded numerics only for older settings) | ML test numeric_and_custom_revision_schemes | = (live 11-14) |
 | New custom scheme form: Name * , Revision list, preview, Download sample, Select file, Save revision scheme (disabled), ≥50 lines | Capture-01.png; RMS | RP:314-369, RS:19 | – | = |
-| Revision scheme id + Copy to clipboard | image (Alphabetical id 59f7562a39d71809e38162e5) | RP:388-396; id is our FNV hash (RS:180-189) | RS test scheme_ids_are_stable_and_distinct | ≠ (id value) |
+| Revision scheme id + Copy to clipboard | image (Alphabetical id 59f7562a39d71809e38162e5) | the id is a company's server id (ours a stable hash of the scheme); Copy to clipboard as live | RS test scheme_ids_are_stable_and_distinct | cloud (server id) |
 | Unreleased revision suffix, default "*" | RMS | RP:397-398, RS:130 | – | = |
 | Revision table template row + "Click here to go to release management part number generation settings" | image | RP:399-410 | – | = |
 | Access: 3 checkboxes, first checked by default | relmgmt-workflows-15.png; TRW "By default … Only administrators can edit … is checked" | RS `default_access`: the first checked | ops old_settings_files_keep_their_values_and_get_the_defaults | = (fixed 11-14) |

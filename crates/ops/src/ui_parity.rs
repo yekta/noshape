@@ -403,8 +403,12 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("noshape-uip-rel-{}", std::process::id()));
         let path = dir.join("released.noshape");
         let mut ctx = Ctx::new();
+        // (Put back after: the run's other test binaries read the company's settings.)
+        let before = crate::release_settings::release_settings();
         call(&mut ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } })).unwrap();
-        build_start(&mut ctx, &path, &start).unwrap();
+        let built = build_start(&mut ctx, &path, &start);
+        crate::release_settings::set_release_settings(&before);
+        built.unwrap();
         let h = call(&mut ctx, "history_list", json!({})).unwrap();
         let names: Vec<&str> = h["versions"].as_array().unwrap().iter().filter_map(|v| v["name"].as_str()).collect();
         assert_eq!(names, ["V1"], "no version of its own: {h}");

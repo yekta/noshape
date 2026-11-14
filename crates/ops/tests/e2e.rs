@@ -7228,6 +7228,24 @@ fn release_leaves_out_a_drawing_made_from_another_workspace() {
     assert_eq!(r["drawings_left_out"].as_array().map(Vec::len), Some(1), "{r}");
 }
 
+/// A drawing's part number is its title block's (its Properties): the release candidate offers it, and the release
+/// writes its revision there (live: the title block reads DRW-1 / A once released).
+#[test]
+fn a_released_drawing_shows_its_number_and_revision() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } }));
+    block_with_hole(&mut ctx, "release-drawing-number.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let drawing = d["drawing"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_element_properties", json!({ "drawing": drawing, "set": { "part_number": "DRW-1" } }));
+    let r = call(&mut ctx, "release_create", json!({ "tab": drawing, "name": "R1", "notes": "first", "draft": true, "part_numbers": { "Part 1": "PRT-1" } }));
+    let item = r["items"].as_array().unwrap().iter().find(|i| i["type"] == "Drawing").cloned().unwrap_or_default();
+    assert_eq!(item["part_number"], "DRW-1", "the drawing's own number: {r}");
+    call(&mut ctx, "release_create", json!({ "tab": drawing, "name": "R2", "notes": "first", "part_numbers": { "Part 1": "PRT-1" } }));
+    let p = call(&mut ctx, "drawing_element_properties", json!({ "drawing": drawing }))["properties"].clone();
+    assert_eq!((p["part_number"].as_str(), p["revision"].as_str()), (Some("DRW-1"), Some("A")), "{p}");
+}
+
 /// qa DWG-DIM-TWO-EDGES: Line to line on two parallel view edges clicked at
 /// their middles (where snap points and other targets sit on top) dimensions
 /// the distance between them.

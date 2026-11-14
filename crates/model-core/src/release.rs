@@ -67,7 +67,8 @@ pub enum RevisionScheme {
 
 impl RevisionScheme {
     /// The settings select, in order (custom last).
-    pub const CHOICES: [&'static str; 5] = ["Alphabetical A B C skipping I O Q S X Z", "Numeric 1 2 3", "Numeric 01 02 03", "Numeric 001 002 003", "Custom"];
+    /// (Live's select offers the first two and custom schemes; the padded numerics are kept for older settings.)
+    pub const CHOICES: [&'static str; 5] = ["Alphabetical A B C skipping I O Q S X Z", "Numerical 1 2 3", "Numeric 01 02 03", "Numeric 001 002 003", "Custom"];
 
     pub fn label(&self) -> &'static str {
         match self {

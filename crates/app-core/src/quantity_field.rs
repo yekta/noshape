@@ -258,8 +258,9 @@ pub enum QuantityEvent {
     /// The text was committed and rewritten by Onshape's rules; read
     /// [`QuantityInput::value`] (None: invalid, the field shows it).
     Committed(CommitVia),
-    /// Enter with nothing new to apply (or in a count, after its commit):
-    /// owners that accept their dialog on Enter do it here.
+    /// Enter with nothing new to apply (a count too: live
+    /// asm-linear-pattern-commit): owners that accept their dialog on Enter
+    /// do it here.
     Enter,
     /// Esc in the field (after the kit's revert, if there was an edit).
     Escape,
@@ -305,7 +306,7 @@ impl QuantityInput {
             InputEvent::PressEnter { .. } => {
                 let changed = this.commit(CommitVia::Enter, window, cx);
                 state.update(cx, |s, cx| s.select_all(window, cx));
-                if !changed || this.spec.integer {
+                if !changed {
                     cx.emit(QuantityEvent::Enter);
                 }
             }

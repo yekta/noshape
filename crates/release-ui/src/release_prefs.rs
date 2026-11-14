@@ -19,9 +19,9 @@ use gpui_kit::*;
 use noshape_model::release::RevisionScheme;
 use std::sync::Arc;
 
-/// The scheme select's built-in entries (custom schemes and "New custom
-/// revision scheme…" follow).
-const BUILT_IN: [&str; 4] = [RevisionScheme::CHOICES[0], RevisionScheme::CHOICES[1], RevisionScheme::CHOICES[2], RevisionScheme::CHOICES[3]];
+/// The scheme select's built-in entries, as live's (live2 release.json: Alphabetical, Numerical; custom schemes and
+/// "New custom revision scheme…" follow).
+const BUILT_IN: [&str; 2] = [RevisionScheme::CHOICES[0], RevisionScheme::CHOICES[1]];
 const NEW_SCHEME: &str = "New custom revision scheme…";
 
 /// "New custom revision scheme…" being filled in (help image Capture-01).
@@ -88,7 +88,8 @@ impl ReleasePrefsView {
         } else {
             match &self.edited.scheme {
                 RevisionScheme::Custom(labels) => self.edited.custom_schemes.iter().position(|c| &c.labels == labels).map_or(0, |i| BUILT_IN.len() + i),
-                s => BUILT_IN.iter().position(|l| *l == s.label()).unwrap_or(0),
+                RevisionScheme::Alphabetical => 0,
+                RevisionScheme::Numeric { .. } => 1,
             }
         };
         (options, current)
@@ -100,8 +101,6 @@ impl ReleasePrefsView {
         match i {
             0 => self.edited.scheme = RevisionScheme::Alphabetical,
             1 => self.edited.scheme = RevisionScheme::Numeric { width: 1 },
-            2 => self.edited.scheme = RevisionScheme::Numeric { width: 2 },
-            3 => self.edited.scheme = RevisionScheme::Numeric { width: 3 },
             i if i < BUILT_IN.len() + customs => self.edited.scheme = RevisionScheme::Custom(self.edited.custom_schemes[i - BUILT_IN.len()].labels.clone()),
             _ => {
                 let name = cx.new(|cx| InputState::new(window, cx));

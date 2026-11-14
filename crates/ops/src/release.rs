@@ -101,11 +101,12 @@ pub fn linked_part_items(session: &Session, r: &crate::derived::ExternalRef, par
     vec![ReleaseItem { tab: tab.id, part: Some(part.clone()), name: name.to_string(), kind: ItemKind::Part, revision: if nrm { String::new() } else { log.next_revision(&pn) }, part_number: pn, not_revision_managed: nrm, reverted: false, config: Default::default(), document: Some(document) }]
 }
 
-/// Part number of a tab item: an Assembly's Properties, otherwise the
-/// tab's metadata (store meta "tab_part_number:<id>").
+/// Part number of a tab item: an Assembly's Properties, a Drawing's (its title block's), otherwise the tab's
+/// metadata (store meta "tab_part_number:<id>").
 pub fn tab_part_number(session: &Session, tab: TabId) -> String {
     match session.doc.tab(tab).map(|t| &t.content) {
         Some(TabContent::Assembly(a)) => a.properties.part_number.clone().unwrap_or_default(),
+        Some(TabContent::Drawing(d)) => d.meta.number.clone(),
         _ => session.store.get_meta(&format!("tab_part_number:{}", tab.0)).ok().flatten().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default(),
     }
 }
@@ -357,9 +358,22 @@ fn make_version(session: &mut Session, mut pkg: Package) -> anyhow::Result<Packa
                 })?;
             }
         }
-        // Tab items keep their part numbers: an Assembly in its
+        // A drawing's title block shows its part number and revision (live: DRW-1 / A once released).
+        for i in pkg.items.iter().filter(|i| i.kind == ItemKind::Drawing && i.document.is_none()) {
+            let same = matches!(session.doc.tab(i.tab).map(|t| &t.content), Some(TabContent::Drawing(d)) if d.meta.number == i.part_number && d.meta.revision == i.revision);
+            if same {
+                continue;
+            }
+            let (pn, rev) = (i.part_number.clone(), i.revision.clone());
+            session.edit_tab(i.tab, &release_description(&pkg), |c| {
+                if let TabContent::Drawing(d) = c {
+                    (d.meta.number, d.meta.revision) = (pn, rev);
+                }
+            })?;
+        }
+        // Other tab items keep their part numbers: an Assembly in its
         // Properties, other tabs in their metadata.
-        for i in pkg.items.iter().filter(|i| i.part.is_none() && i.document.is_none()) {
+        for i in pkg.items.iter().filter(|i| i.part.is_none() && i.document.is_none() && i.kind != ItemKind::Drawing) {
             if tab_part_number(session, i.tab) == i.part_number {
                 continue;
             }
