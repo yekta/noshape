@@ -433,6 +433,8 @@ impl AssemblyView {
             subs.push(cx.subscribe_in(q, window, |this: &mut Self, _, ev: &QuantityEvent, window, cx| match ev {
                 QuantityEvent::Committed(_) => this.schedule_eval(window, cx),
                 QuantityEvent::Enter => this.accept_mc(window, cx),
+                // Esc in a box closes the dialog, as the dialog's own Esc (live asm-mate-connector-move-offset).
+                QuantityEvent::Escape => this.close_mc(window, cx),
                 _ => {}
             }));
         }
