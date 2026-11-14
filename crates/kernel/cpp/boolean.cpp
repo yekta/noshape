@@ -8625,7 +8625,49 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     apply_opts(*b2, glued);
     build_cancellable(*b2);
     fail_if_cancelled();
-    if (!b2->HasErrors() && b2->IsDone() && volumes_add_up(inputs, b2->Shape()) && BRepCheck_Analyzer(b2->Shape()).IsValid())
+    // (Kept only where the tools touch the arguments: the glue takes an overlap for a touch too, its volumes then
+    // adding up all the same (asm-hand-drill-pinslot's e53bba Extrude 11: a tool ending on the part's own cylinder, 3
+    // of its 14 mm3 inside, the whole tool added). By the tools' points (vertices, edges' and faces' middles) in an
+    // argument by more than 1e-5 of their size (0.5 um here): OCCT's common of the thread and its shaft, 0.08 mm3 into it (live 0.08
+    // short of the sum), came out 35.6 of the thread's 51.6.)
+    auto only_touch = [&]() {
+      std::vector<gp_Pnt> pts;
+      for (const TopoDS_Shape& t : tools.items)
+      {
+        for (TopExp_Explorer v(t, TopAbs_VERTEX); v.More(); v.Next())
+          pts.push_back(BRep_Tool::Pnt(TopoDS::Vertex(v.Current())));
+        for (TopExp_Explorer e(t, TopAbs_EDGE); e.More(); e.Next())
+          if (!BRep_Tool::Degenerated(TopoDS::Edge(e.Current())))
+          {
+            const BRepAdaptor_Curve c(TopoDS::Edge(e.Current()));
+            pts.push_back(c.Value(0.5 * (c.FirstParameter() + c.LastParameter())));
+          }
+        const occ::handle<IntTools_Context> ctx = new IntTools_Context;
+        for (TopExp_Explorer f(t, TopAbs_FACE); f.More(); f.Next())
+        {
+          gp_Pnt   p;
+          gp_Pnt2d uv;
+          if (BOPTools_AlgoTools3D::PointInFace(TopoDS::Face(f.Current()), p, uv, ctx) == 0)
+            pts.push_back(p);
+        }
+      }
+      Bnd_Box box;
+      for (const TopoDS_Shape& a : args.items)
+        BRepBndLib::Add(a, box);
+      const double reach = box.IsVoid() ? 1e-7 : 1e-5 * std::sqrt(box.SquareExtent());
+      for (const TopoDS_Shape& a : args.items)
+      {
+        BRepClass3d_SolidClassifier in(a);
+        for (const gp_Pnt& p : pts)
+        {
+          in.Perform(p, reach);
+          if (in.State() == TopAbs_IN)
+            return false;
+        }
+      }
+      return true;
+    };
+    if (!b2->HasErrors() && b2->IsDone() && volumes_add_up(inputs, b2->Shape()) && BRepCheck_Analyzer(b2->Shape()).IsValid() && only_touch())
     {
       t_bool_path = "occt_glued";
       inputs      = concat(args.items, tools.items);

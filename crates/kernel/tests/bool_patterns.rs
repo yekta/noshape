@@ -2424,6 +2424,23 @@ fn a_thread_on_its_shafts_cylinder_fuses_into_one_solid() {
     assert!((v - 4896.29).abs() <= 0.2, "volume {v} mm³ against live's 4896.29");
 }
 
+/// asm-hand-drill-pinslot's e53bba Extrude 11 (recorded): an up-to extrude's tool ending on the part's own cylinder, 3 of
+/// its 14 mm³ inside the part. OCCT's plain fuse is invalid there, and its glue for touching shapes added the whole
+/// tool (2780.97 mm³ for 2777.99; the volumes add up): that fallback is only taken where the tool's points are on or
+/// outside the part.
+#[test]
+fn a_tool_reaching_into_the_part_is_not_glued_on() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "b23b1d286fe7d731").expect("the recorded case");
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    assert_ne!(k::last_boolean_path(), "occt_glued");
+    if let Ok(r) = r {
+        let v = r.shape.volume().unwrap_or(0.0) * 1e9;
+        assert!(!(r.shape.is_valid() && (v - 2780.97).abs() < 0.01), "the whole tool added: {v} mm³");
+    }
+}
+
 /// c2-hunting-knife's Chamfer 1 cut (recorded): two chamfer tools along the blade's edge, end to end, their B-spline
 /// faces all but tangent to the blade's grind face. Tool 0's edge lies on that face within 0.4 um but runs on past the
 /// blade's tip (0.2 mm off the surface there); OCCT's sections of the tool's faces with it come in pieces with gaps.
