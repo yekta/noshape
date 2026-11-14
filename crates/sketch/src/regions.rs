@@ -296,6 +296,19 @@ impl ProfileLoop {
     }
 }
 
+/// A region's loops as polygons ([`Region::tester`]).
+pub struct RegionTester {
+    outer: Vec<DVec2>,
+    holes: Vec<Vec<DVec2>>,
+}
+
+impl RegionTester {
+    /// The same answer as [`Region::contains`].
+    pub fn contains(&self, p: DVec2) -> bool {
+        winding(&self.outer, p) != 0 && !self.holes.iter().any(|h| winding(h, p) != 0)
+    }
+}
+
 fn winding(poly: &[DVec2], p: DVec2) -> i32 {
     let n = poly.len();
     let mut w = 0;
@@ -350,8 +363,18 @@ impl Region {
     pub fn contains(&self, p: DVec2) -> bool {
         self.outer.contains(p) && !self.holes.iter().any(|h| h.contains(p))
     }
+    /// [`Region::contains`] for many points: its loops tessellated once, with the same tolerance (each `contains`
+    /// call tessellates them again; a sketch on a face tested every imprinted region against every own one).
+    pub fn tester(&self) -> RegionTester {
+        let poly = |l: &ProfileLoop| l.tessellate(l.bbox().size().max_element().max(1e-12) * 1e-5);
+        RegionTester { outer: poly(&self.outer), holes: self.holes.iter().map(poly).collect() }
+    }
     pub fn bbox(&self) -> BBox {
         self.outer.bbox()
+    }
+    /// A box holding the region, from its splines' control points (no tessellation): [`Region::bbox`] or larger.
+    pub fn hull_bbox(&self) -> BBox {
+        self.outer.segments.iter().fold(BBox::EMPTY, |b, s| b.union(&s.hull_bbox()))
     }
     pub fn entities(&self) -> Vec<EntityId> {
         self.id.entities()

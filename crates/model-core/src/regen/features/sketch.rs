@@ -285,7 +285,10 @@ fn imprint(ev: &EvalCtx, frame: &crate::display::PlaneFrame, sk: &noshape_sketch
         extra.push((noshape_sketch::EntityId(IMPRINT_ENTITY + i as u32), c));
     }
     let ids: std::collections::HashSet<&noshape_sketch::regions::RegionId> = own.iter().map(|o| &o.id).collect();
-    let boxes: Vec<_> = own.iter().map(|o| o.bbox()).collect();
+    // (A first filter only, `contains` decides: control-point boxes and polygons made once; exact spline boxes and
+    // a tessellation per test were most of an imprint, 3-11 ms a sketch on a face.)
+    let boxes: Vec<_> = own.iter().map(|o| o.hull_bbox()).collect();
+    let testers: Vec<std::cell::OnceCell<noshape_sketch::regions::RegionTester>> = own.iter().map(|_| std::cell::OnceCell::new()).collect();
     // Every closed piece is a region: the face's, those the sketch's curves close with the face's edges off it (live:
     // c2-duct-multipart's Sketch 5 triangles between a dangling line, a diagonal and the face's edge), and a hole's
     // inside, closed by the face's edges alone (live: asm-robotic-arm's Sketch 3 on a frame's face: JPC inside JPG).
@@ -293,7 +296,7 @@ fn imprint(ev: &EvalCtx, frame: &crate::display::PlaneFrame, sk: &noshape_sketch
     for r in sk.regions_with(&extra) {
         let inside = ids.contains(&r.id) || {
             let p = r.interior_point();
-            own.iter().zip(&boxes).any(|(o, b)| b.contains(p) && o.contains(p))
+            own.iter().zip(&boxes).zip(&testers).any(|((o, b), t)| b.contains(p) && t.get_or_init(|| o.tester()).contains(p))
         };
         regions.push(r);
         imprinted.push(!inside);
