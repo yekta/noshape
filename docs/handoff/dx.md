@@ -10,7 +10,10 @@ drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
   wheel tyre" 392/1183/793, live 391/1158/768): sent to bool 09:0x with the model dir. Not mine unless bool says so.
 - bjr 5d8bc1 alone (sk-st-5d8bc1.log, model dir vibe6 ~/agents/dx-keep/m5d8): 48/124; first difference feature 42
   Extrude 55 ("vanity plate front" 369/955/601, live 365/943/593). Translator items there, next: Sketch 29's dimensions
-  on slot entities (`kkYH3uQr64Ld.<n>.startCap` / `.left` / `.right`, "Sketch could not be solved"), Extrude 4's
+  on slot entities (`kkYH3uQr64Ld.<n>.startCap` / `.left` / `.right`, "Sketch could not be solved": 18 slots made by
+  a sketch Offset of the polyline jZnPUE16PbUI (OFFSET localOffset / localMaster, translated by `sketch_offset`), their
+  caps EQUAL to slot 0's with one 1.25 mm DIAMETER, each side pair MIRROR about the master plus a 1.25 mm DISTANCE: look
+  at what `sketch_offset` leaves free first), Extrude 4's
   sketch F1IWrFkPuXzUEOU_1 not built, then Sweep 1 (feature 58, live's PlateCover).
 - Branch dx-arcs (live q-arcs, for core / asm's knurled disc in infento 74d3d6): an extrude's arcs of one circle join
   whatever meets the joint (`alone` dropped for arcs in region_profile_with); e2e `arcs_of_one_circle_extrude_to_one_
