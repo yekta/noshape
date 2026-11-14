@@ -2198,7 +2198,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   flange's 0.02 mm clearance pieces at its ends); those in line with the bend now go with its pull-back: Flange 1 as
   live (182/428/248), c2-sm-corner-break 6/11 (run 131: nothing else changed); next there Corner break 1's vertex
   (the UI fetch's, REQUESTS). No T1/T2 repro yet: a plate, or a converted tray with every edge a rip, doesn't overlap. Sheet metal model 1 before it as live since run 127 (edge-joint rips, material inward).
-- [ ] P1 FS-COMPILED-INTERP (dx 11-06 01:21, lead 11-06's decision: FeatureScript speed reaches every custom feature and std's
+- [x] (dx 2026-11-14 00:43 UTC: the target met on 11-06 07:33 (the script's own part ~0.9 s, release); the Displacement map feature 2.5-3.1 s in a dev build on vibe7 today, live 11-12 s (DISPLACEMENT-MAP)) P1 FS-COMPILED-INTERP (dx 11-06 01:21, lead 11-06's decision: FeatureScript speed reaches every custom feature and std's
   sheet metal). Stage 1: the IR tree compiled to closures (or bytecode), values unchanged; the tree walker kept as the
   reference and a T2 differential test running both over the FS corpus (std tests, custom_features, the parity models'
   custom features) with identical results required. Stage 2: values without per-operation refcounting. Each stage
