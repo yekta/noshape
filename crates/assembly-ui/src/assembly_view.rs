@@ -3335,6 +3335,10 @@ impl AssemblyView {
                     Some(OverlayPick::Manip(h)) => Some(h),
                     _ => None,
                 };
+                // On the triad: the face under it (live asm-triad-rotate-90-undo: a ring over a face has View normal to).
+                if handle.is_some() {
+                    self.hover = self.raycast(self.pointer, &[], cx).filter(|t| t.kind == PickKind::Face);
+                }
                 let top = if handle.is_some() { self.selected.first().copied() } else { self.pick(*pick).map(|t| t.path[0]) };
                 // The triad shows for a list selection too (at its bounds
                 // centre, ASM-TRIAD-MENU reopened), not only a placed one.

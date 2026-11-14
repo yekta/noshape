@@ -1427,9 +1427,9 @@ impl AssemblyView {
             m.push(item("Zoom to fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
             let tg = targets.clone();
             m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(tg.clone(), cx)));
-            // A face under the pointer; on an axis, the selected face under the triad; never on a ring (live's ring
-            // menu has no View normal to: asm-triad-rotate-90, -180).
-            let normal = if on_ring { None } else { self.hovered_face_normal(cx).or_else(|| on_triad.then(|| self.selected_face_normal(cx)).flatten()) };
+            // A face under the pointer, on a ring too (live asm-triad-rotate-90-undo); on an axis, else the selected face
+            // under the triad.
+            let normal = self.hovered_face_normal(cx).or_else(|| (on_triad && !on_ring).then(|| self.selected_face_normal(cx)).flatten());
             if let Some((forward, up)) = normal {
                 m.push(item("View normal to", move |t, _, cx| t.viewport.update(cx, |vp, cx| vp.animate_to_direction(forward, up, cx))));
             }
