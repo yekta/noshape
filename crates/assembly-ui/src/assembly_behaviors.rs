@@ -388,6 +388,9 @@ pub struct AsmUi {
     /// Instances inserted since the Insert dialog opened ("Inserted: N";
     /// undone ones drop out) and the Part Studios collapsed in its tree.
     pub insert_inserted: Vec<InstanceId>,
+    /// The Redo the Insert dialog's Esc left (its dropped instance's step): closing the dialog drops it (live
+    /// asm-insert-esc-pending).
+    pub insert_redo: Option<noshape_store::MicroversionId>,
     pub insert_collapsed: HashSet<TabId>,
     /// Triad handle clicked (selected): right-clicking it opens its menu.
     pub manip_selected: Option<ManipHandle>,
@@ -3183,6 +3186,7 @@ impl AssemblyView {
             self.end_insert_step(cx);
             self.insert_open = true;
             self.ui.insert_inserted.clear();
+            self.ui.insert_redo = None;
             self.std_take_selection(cx);
             cx.notify();
         }
@@ -3206,8 +3210,7 @@ impl AssemblyView {
         self.placing_point = None;
         self.message = None;
         if inserted && self.doc.read(cx).has_pending() {
-            // Undo commits the pending session step, then reverts it.
-            self.doc.update(cx, |d, cx| d.undo(cx));
+            self.doc.update(cx, |d, cx| d.discard_pending(cx));
             self.selected.clear();
         }
         self.close_insert(window, cx);
@@ -3225,6 +3228,7 @@ impl AssemblyView {
         if self.inserted_count(cx) == 0 && self.doc.read(cx).has_pending() {
             // Nothing else in the session: the pending step goes whole (no empty step left behind).
             self.doc.update(cx, |d, cx| d.undo(cx));
+            self.ui.insert_redo = self.doc.read(cx).session.undo_tops().1;
         } else {
             self.edit_insert(noshape_ops::assembly::DELETE_INSTANCES, cx, |a| noshape_ops::assembly::delete_instances(a, &ids));
         }
@@ -3250,6 +3254,9 @@ impl AssemblyView {
         }
         self.insert_open = false;
         self.end_insert_step(cx);
+        if let Some(step) = self.ui.insert_redo.take() {
+            self.doc.update(cx, |d, cx| d.forget_redo_of(step, cx));
+        }
         // Rescanned next time; the opened document and category stay.
         self.ui.insert_other_docs = None;
         self.ui.std.auto_size = false;

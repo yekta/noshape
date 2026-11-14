@@ -370,6 +370,27 @@ impl DocModel {
         cx.notify();
     }
 
+    /// Drops the pending edit: it is committed, undone, and leaves no Redo
+    /// (a cancelled dialog's session edits; live asm-insert-esc-pending).
+    pub fn discard_pending(&mut self, cx: &mut Context<Self>) {
+        if self.pending.0.is_none() {
+            return;
+        }
+        let mark = self.session.undo_len();
+        self.undo(cx);
+        self.session.forget_undo_since(mark);
+        cx.notify();
+    }
+
+    /// Drops the redo list when `step` is still its top (a closed dialog's undone step).
+    pub fn forget_redo_of(&mut self, step: noshape_store::MicroversionId, cx: &mut Context<Self>) {
+        if self.pending.0.is_some() || self.session.undo_tops().1 != Some(step) {
+            return;
+        }
+        self.session.forget_undo_since(self.session.undo_len());
+        cx.notify();
+    }
+
     pub fn redo(&mut self, cx: &mut Context<Self>) {
         if self.undo_held || self.comparing {
             return;

@@ -1114,3 +1114,36 @@ fn instances_with_a_mate_selected_have_lives_reduced_menu(cx: &mut TestAppContex
     })
     .unwrap();
 }
+
+/// Live asm-insert-esc-pending: Esc drops the instance on the pointer (Redo offered, the dialog stays); a second Esc
+/// closes the dialog and leaves no Redo.
+#[gpui::test]
+fn closing_the_insert_dialog_after_esc_leaves_no_redo(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "insert-esc");
+    let esc = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.on_cancel(&crate::actions::Cancel, w, cx))).unwrap();
+    };
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.toggle_insert(w, cx);
+            let studio = v.doc.read(cx).session.doc.tabs.iter().find(|t| t.name == "Part Studio 1").unwrap().id;
+            let id = v.insert_part(studio, None, cx).unwrap();
+            v.start_placing(vec![id], cx);
+            assert!(v.placing.is_some(), "on the pointer");
+        })
+    })
+    .unwrap();
+    esc(cx);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.insert_open && v.placing.is_none(), "the instance dropped, the dialog open");
+        assert!(v.doc.read(cx).can_redo(), "Redo offered");
+    });
+    esc(cx);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(!v.insert_open, "closed");
+        assert!(!v.doc.read(cx).can_redo(), "no Redo left");
+    });
+    draw(cx, window);
+}
