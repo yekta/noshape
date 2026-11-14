@@ -8,32 +8,28 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
-## Now (asm, 2026-11-13 17:15 UTC)
-- Hosts: builds and suites on vibe7. The lead's disk loop prunes ~/tmp/<agent> after 6-12 h: scripts, binaries and
-  results live in vibe7 ~/agents/asm-keep (run-suite.sh: one process per assembly, SRC / OUT / BIN).
-- Landed today: Move to origin refusal on a mated part; ring snap (live's client rule, 5° / 1° / 0.1° by radius);
-  the mate dialog's ▶ preview (90 frames, out and back from the mate's zero); Insert Esc / ✓ with an instance on
-  the pointer; clamp-pattern 12 -> 32/32 mates (a region named by a whole line and a side, by live's line direction);
-  the solver's least-change pass stops at its noise floor and reuses its eigendecomposition (clamp-pattern's mates
-  placed in 7 s, was 18.5 s; big-assembly perf tests unchanged).
-- Gating: the translator keeps the sketches it read across steps (infento-subs' Part Studios 1677 -> 1460 s side by
-  side); query_entities checks a face's surface kind first and keeps area / centroid per face shape (bool's profile:
-  entity queries 15 %, OCCT's face props 11 % of the harness).
-- infento-subs is not hung (lead's P0 11-13): main and aaef71df give the same 142/167, 107/182, 25-40 min each
-  depending on host load; the time is the parity harness's per-step queries, not the kernel.
-- hand-drill-pinslot (37/67): one mate decides 30: suppressing **Cylindrical 31** (or flipping it) puts all 67 OK
-  (CLI batch: suppress each mate in turn, vibe7 ~/agents/asm-keep/hdx). Live has Cylindrical 29 (alignment true) and
-  31 (false) on the same tensioner face and housing axis, same Z directions, both OK, and Planar 3's ends 15.6 mm apart
-  against its -10 mm offset: either live ignores a Cylindrical's flip when solving or its states are stale. Asked
-  live (REQUESTS 17:09). Ours: axis_disagrees / orient_axial_mates hold every axial mate's sense.
-- isaac-ball: taking the region group closest in area (regions_by_sum) builds Studio 3c5c58 (83 -> 39 region
-  errors, 3 more occurrences) but 63 -> 37 mates as live: held back (~/asm-scratch-regions-by-sum.diff).
-- Standard content: live 2906 places a dropped part by its own mate connector's origin. Ours differ: the
-  countersunk connector sits at the head top (live: the cone apex), nuts start at z = 0 (live: centred), a socket
-  head screw's underside is z = 0 (live: its head top), connector Z points out of the part (live: into it). The cone
-  apex formula stays until live's per-family table (REQUESTS 12:36); the connector version is in
-  ~/asm-scratch-std-connector.diff.
-- studios now owns assembly-ui's feel work (11-13 16:30); asm keeps the solver, crates/assembly and the suites.
+## Now (asm, 2026-11-14 00:55 UTC)
+- Hosts: builds and suites on vibe7; everything lasting in vibe7 ~/agents/asm-keep (run-suite.sh SRC / OUT / BIN, one
+  process per assembly; bin/ test binaries and cli; g-* suite results). ~/tmp/<agent> is pruned after 6-12 h.
+- Landed 13-14 Nov: Move-to-origin refusal, ring snap (live's client rule), ▶ preview (out and back, 90 frames), Insert
+  Esc / ✓; clamp-pattern 32/32 (region by a whole line's side); least-change solver speed; parity harness speed
+  (sketch reads cached, face area / centroid per face shape: infento-subs ~1580 -> 1290 s); standard content in live's
+  frames and connectors (2979: screws' head top at z = 0, connector under the head into it, countersunk at the cone
+  apex; nuts / washers / straight pins centred; std_mating_point by the part's own connector, inch countersunk by the
+  41° formula because our ANSI "Countersunk bolt" table's k is 0.116″ where live's head is 0.081″ undercut); a
+  Cylindrical's flip is no conflict and turns a part over only as its one mate (hand-drill 67/67, isaac-ball 91/99,
+  robotic-arm 40/40 mates).
+- Gating (vibe7 g-mv2): an axis / edge connector moved along its axis to live's point whatever its flip (isaac-ball's
+  Revolute 18, 18 mm); a renamed part off in volume found by the feature whose live line first lists it (infento-subs'
+  composite pulleys); committed after it: two parts of one flexible subassembly instance may mate at the parent's level
+  (tvc-mount's Fastened 3).
+- infento-subs (107/182): no single culprit mate (suppressing each in turn: at most +3). Causes: dx is making FreeCAD
+  STEP closed shells import as solids (8 instances: shaft, lever, halfClutch, flanges); the linked "Wheel 7inch"
+  subassembly (b169…) isn't in the corpus (REQUESTS 00:32); composite pulleys (gating); the rest connectors on
+  geometry ours doesn't have (studio 1dc32b's failures).
+- Std content snap insert keeps the `!= into` flip (live2 00:34: the screw's shank into the block). studios owns the
+  assembly-ui feel and the Insert ✓-at-identity / `inserted` panel state.
+- Open with live: Cylindrical 29/31 in the UI (REQUESTS 17:09), the Wheel 7inch subassembly (00:32).
 
 ## From dx (2026-11-13 00:31 UTC): clamp-pattern's 14 -> 12 mates is 6ab30b272, not bbac6bb06
 Your 19:47 note in dx.md: every one of my assembly suite runs after bbac6bb06 (asmall10-15, through main 6c63ab5a7) has
