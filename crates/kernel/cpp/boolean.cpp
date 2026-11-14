@@ -4427,6 +4427,8 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist, bool refit = f
     const TopoDS_Edge a = TopoDS::Edge(es.First()), b = TopoDS::Edge(es.Last());
     if (a.IsSame(b) || BRep_Tool::Degenerated(a) || BRep_Tool::Degenerated(b) || BRepAdaptor_Curve(a).GetType() == GeomAbs_Line || BRepAdaptor_Curve(b).GetType() == GeomAbs_Line)
       continue;
+    if (kept_ends(a) && kept_ends(b))
+      continue;
     if (!mapped)
     {
       unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);

@@ -18,12 +18,18 @@
 #include <GeomConvert_CompCurveToBSplineCurve.hxx>
 #include <Approx_CurvilinearParameter.hxx>
 #include <Geom_Conic.hxx>
+#include <Geom_Line.hxx>
 #include <BSplCLib.hxx>
 #include <GeomAdaptor_Curve.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepAlgoAPI_Splitter.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRep_Builder.hxx>
+#include <BRepTools_ReShape.hxx>
+#include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
@@ -436,6 +442,115 @@ TopoDS_Edge sampled_edge(const std::function<gp_Pnt(double)>& f, int n)
   return BRepBuilderAPI_MakeEdge(ip.Curve(), 0.0, 1.0).Edge();
 }
 
+// The profile with a vertex at each point inside one of its edges (live splits a profile's edge where a guide meets it:
+// c2-hunting-knife's Loft 1 has a vertex at each guide end on both profiles).
+TopoDS_Shape split_at(const TopoDS_Shape& in, const std::vector<gp_Pnt>& at, double tol)
+{
+  // A closed edge (a circle) started at a split point: no vertex left where it started (live's circle split by two
+  // guides is two edges).
+  BRepTools_ReShape rs;
+  for (TopExp_Explorer x(in, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+    TopoDS_Vertex      v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    double                        f, l;
+    const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
+    if (!v0.IsSame(v1) || c.IsNull() || !c->IsPeriodic() || rs.IsRecorded(e))
+      continue;
+    for (const gp_Pnt& p : at)
+    {
+      GeomAPI_ProjectPointOnCurve pp(p, c);
+      if (pp.NbPoints() == 0 || pp.LowerDistance() > tol || p.Distance(BRep_Tool::Pnt(v0)) <= tol)
+        continue;
+      const double t  = pp.LowerDistanceParameter();
+      TopoDS_Edge  ne = BRepBuilderAPI_MakeEdge(c, t, t + (l - f)).Edge();
+      ne.Orientation(e.Orientation());
+      rs.Replace(e.Oriented(TopAbs_FORWARD), ne.Oriented(TopAbs_FORWARD));
+      break;
+    }
+  }
+  const TopoDS_Shape profile = rs.Apply(in);
+  ShapeIMap vs;
+  TopExp::MapShapes(profile, TopAbs_VERTEX, vs);
+  ShapeList tools;
+  for (const gp_Pnt& p : at)
+  {
+    bool known = false;
+    for (int i = 1; i <= vs.Extent() && !known; ++i)
+      known = BRep_Tool::Pnt(TopoDS::Vertex(vs(i))).Distance(p) <= tol;
+    if (!known)
+      tools.Append(BRepBuilderAPI_MakeVertex(p).Vertex());
+  }
+  if (tools.IsEmpty())
+    return profile;
+  ShapeList args;
+  args.Append(profile);
+  BRepAlgoAPI_Splitter sp;
+  sp.SetArguments(args);
+  sp.SetTools(tools);
+  sp.SetNonDestructive(true);
+  sp.Build();
+  return sp.HasErrors() ? profile : sp.Shape();
+}
+
+// Sewing keeps the longer of two edges it merges, and any spline along a line is longer than the line: the profile's own
+// curves back on the sewn edges along them (live's handle keeps its profiles' lines and arcs).
+void keep_profile_curves(const TopoDS_Shape& sewn, const TopoDS_Shape& profile, double tol)
+{
+  auto ends = [](const TopoDS_Edge& e, gp_Pnt& a, gp_Pnt& m, gp_Pnt& b) {
+    BRepAdaptor_Curve c(e);
+    a = c.Value(c.FirstParameter());
+    m = c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
+    b = c.Value(c.LastParameter());
+  };
+  ShapeIMap ps;
+  TopExp::MapShapes(profile, TopAbs_EDGE, ps);
+  ShapeIMap ss;
+  TopExp::MapShapes(sewn, TopAbs_EDGE, ss);
+  BRep_Builder bb;
+  for (int i = 1; i <= ss.Extent(); ++i)
+  {
+    const TopoDS_Edge& se = TopoDS::Edge(ss(i));
+    TopLoc_Location    ls;
+    double             sf, sl;
+    const occ::handle<Geom_Curve> sc = BRep_Tool::Curve(se, ls, sf, sl);
+    if (sc.IsNull() || !ls.IsIdentity() || sc->IsKind(STANDARD_TYPE(Geom_Line)) || sc->IsKind(STANDARD_TYPE(Geom_Conic)))
+      continue;
+    gp_Pnt s0, sm, s1;
+    ends(se, s0, sm, s1);
+    for (int j = 1; j <= ps.Extent(); ++j)
+    {
+      const TopoDS_Edge&      pe = TopoDS::Edge(ps(j));
+      TopLoc_Location         lp;
+      double                  pf, pl;
+      occ::handle<Geom_Curve> pc = BRep_Tool::Curve(pe, lp, pf, pl);
+      if (pc.IsNull() || pc == sc || !lp.IsIdentity())
+        continue;
+      while (const auto t = occ::down_cast<Geom_TrimmedCurve>(pc))
+        pc = t->BasisCurve();
+      gp_Pnt p0, pm, p1;
+      ends(pe, p0, pm, p1);
+      const bool along = s0.Distance(p0) < tol && s1.Distance(p1) < tol, back = s0.Distance(p1) < tol && s1.Distance(p0) < tol;
+      if ((!along && !back) || sm.Distance(pm) > tol)
+        continue;
+      if (back)
+      {
+        const double f = pc->ReversedParameter(pl), l = pc->ReversedParameter(pf);
+        pc = pc->Reversed();
+        pf = f;
+        pl = l;
+      }
+      bb.UpdateEdge(se, pc, BRep_Tool::Tolerance(se));
+      bb.Range(se, pf, pl, true);
+      bb.SameRange(se, false);
+      bb.SameParameter(se, false);
+      BRepLib::SameParameter(se, tol);
+      break;
+    }
+  }
+}
+
 } // namespace
 
 std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcShape& profile_b, const OcShapeList& guides,
@@ -628,7 +743,9 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
   if (seams.empty())
     fail_op("Loft guides need a profile with corners yet");
   // The faces between consecutive seams.
-  BRepBuilderAPI_Sewing sew(1e-6 * (1 + size));
+  std::vector<gp_Pnt>       splits_b;
+  std::vector<TopoDS_Shape> caps;
+  BRepBuilderAPI_Sewing     sew(1e-6 * (1 + size));
   const int             NU = 48, NV = 24;
   for (size_t k = 0; k < seams.size(); ++k)
   {
@@ -765,18 +882,58 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
       }
       pieces.push_back(grid_surface_with_ends(grid, us, slopes[k2], slopes[k2 + 1]));
     }
-    BRepBuilderAPI_MakeFace mf(join_u(pieces, at), 1e-7);
+    occ::handle<Geom_BSplineSurface> side = join_u(pieces, at);
+    // Round on itself: OCCT's seam (Parasolid's periodic face has none) through one of A's vertices, not the guide,
+    // whose vertices live shows (the shown topology joins the pieces either side of a seam).
+    for (double s : closed ? joints_a : std::vector<double>{})
+    {
+      const double u = forward(sa0, s, A.len) / la;
+      const auto   k = std::find_if(at.begin() + 1, at.end() - 1, [&](double x) { return std::abs(x - u) < 1e-6; });
+      if (k == at.end() - 1 || std::any_of(ua.begin(), ua.end(), [&](double x) { return std::abs(x - u) < 1e-6; }))
+        continue;
+      side->SetUPeriodic();
+      side->RemoveUKnot(1, side->UDegree() - 1, tol);
+      for (int i = 1; i <= side->NbUKnots(); ++i)
+        if (std::abs(side->UKnot(i) - *k) < 1e-12)
+        {
+          side->SetUOrigin(i);
+          break;
+        }
+      splits_b.push_back(top(*k));
+      break;
+    }
+    BRepBuilderAPI_MakeFace mf(side, 1e-7);
     if (!mf.IsDone())
       fail_op("loft: guided face failed");
     sew.Add(mf.Face());
   }
+  // Each guide end a vertex of both profiles.
+  std::vector<gp_Pnt> ends_a;
+  for (const Guide& g : gs)
+  {
+    ends_a.push_back(A.at(g.sa));
+    splits_b.push_back(b_at(g.sb));
+  }
   if (make_solid)
   {
-    sew.Add(profile_a.shape);
-    sew.Add(profile_b.shape);
+    caps = {split_at(profile_a.shape, ends_a, tol), split_at(profile_b.shape, splits_b, tol)};
+    for (const TopoDS_Shape& c : caps)
+      sew.Add(c);
   }
   sew.Perform();
   TopoDS_Shape r = sew.SewedShape();
+  for (const TopoDS_Shape& c : caps)
+    keep_profile_curves(r, c, 1e-6 * (1 + size));
+  // For good: no unify merges the edges either side of a guide end.
+  std::vector<gp_Pnt> guide_ends = ends_a;
+  guide_ends.insert(guide_ends.end(), splits_b.end() - (long)gs.size(), splits_b.end());
+  for (TopExp_Explorer x(r, TopAbs_EDGE); x.More(); x.Next())
+    for (TopExp_Explorer v(x.Current(), TopAbs_VERTEX); v.More(); v.Next())
+    {
+      const gp_Pnt p = BRep_Tool::Pnt(TopoDS::Vertex(v.Current()));
+      if (std::any_of(guide_ends.begin(), guide_ends.end(), [&](const gp_Pnt& q) { return p.Distance(q) < 1e-6 * (1 + size); }))
+        mark_kept_ends(x.Current());
+    }
   if (!make_solid)
     return wrap(r);
   TopoDS_Shell shell;

@@ -965,7 +965,8 @@ fn shown_faces(s: &Shape) -> usize {
 
 /// A guided loft from a stadium (its curvature jumps where a line meets an arc) to a circle of two arcs makes one side
 /// face (live 3023: 3 faces) lying on both profiles (one cubic across the loop missed them by tens of µm, and its caps
-/// didn't sew: c2-hunting-knife's handle); a pin from inside ends on that face. In metres.
+/// didn't sew: c2-hunting-knife's handle); a pin from inside ends on that face. The stadium's lines are split where the
+/// guides meet them, lines still, each piece an edge (live 3070: the handle's 20 edges and 20 vertices). In metres.
 #[test]
 fn a_guided_loft_of_a_stadium_to_a_circle_has_one_side_face_on_its_profiles() {
     let mm = 1e-3;
@@ -981,10 +982,40 @@ fn a_guided_loft_of_a_stadium_to_a_circle_has_one_side_face_on_its_profiles() {
     assert_eq!(shown_faces(&s), 3, "two caps and one side ({} raw faces)", s.faces().len());
     let side: Vec<Shape> = s.faces().into_iter().filter(|f| f.face_plane().ok().flatten().is_none()).collect();
     assert_eq!(side.len(), 1);
+    let t = s.shown_topology().unwrap();
+    let shown: Vec<Shape> = s.edges().into_iter().enumerate().filter(|(i, _)| t.edges[*i] && t.joined[*i] == *i).map(|(_, e)| e).collect();
+    let below: Vec<Shape> = shown.iter().filter(|e| e.endpoints().is_ok_and(|(a, b)| a.z.abs() < 1e-9 && b.z.abs() < 1e-9)).cloned().collect();
+    assert_eq!((shown.len(), below.len()), (8, 6), "the stadium's 4 edges and 2 splits, the circle's 2 arcs");
+    assert_eq!(below.iter().filter(|e| matches!(e.edge_curve(), Ok(Curve::Line { .. }))).count(), 4);
+    assert_eq!(t.vertices.iter().filter(|v| **v).count(), 8);
     let pin = make_face_from_wire(&make_wire(&[make_circle(DVec3::new(0.0, 0.0, 15.0) * mm, DVec3::Y, 2.0 * mm).unwrap()]).unwrap(), true).unwrap();
     let r = extrude_up_to(&pin, DVec3::Y, &side[0], 0.0).unwrap();
     let bb = r.shape.bounding_box(true).unwrap();
     assert!((bb.max.y / mm - 11.0).abs() < 0.5, "the pin ends on the side, near y 11 mm: {} mm", bb.max.y / mm);
+}
+
+/// A slot cut into a guided loft's end keeps the vertices where the guides met its profiles (live's handle, Extrude 8:
+/// 8/32/28; a unify merged the split lines back).
+#[test]
+fn a_cut_into_a_guided_loft_keeps_its_guide_vertices() {
+    let mm = 1e-3;
+    let p = |x: f64, y: f64| DVec3::new(x, y, 0.0) * mm;
+    let e = [
+        make_line(p(-10.0, -10.0), p(10.0, -10.0)).unwrap(),
+        make_arc(p(10.0, 0.0), DVec3::Z, DVec3::X, 10.0 * mm, -PI / 2.0, PI / 2.0).unwrap(),
+        make_line(p(10.0, 10.0), p(-10.0, 10.0)).unwrap(),
+        make_arc(p(-10.0, 0.0), DVec3::Z, DVec3::X, 10.0 * mm, PI / 2.0, 3.0 * PI / 2.0).unwrap(),
+    ];
+    // The circle above one edge, split by the guides too.
+    let top = make_face_from_wire(&make_wire(&[make_circle(DVec3::new(0.0, 0.0, 30.0) * mm, DVec3::Z, 12.0 * mm).unwrap()]).unwrap(), true).unwrap();
+    let guides = [(10.0, 12.0), (-10.0, -12.0)].map(|(a, b)| make_line(DVec3::new(0.0, a, 0.0) * mm, DVec3::new(0.0, b, 30.0) * mm).unwrap());
+    let s = loft_guided_curved(&make_face_from_wire(&make_wire(&e).unwrap(), true).unwrap(), &top, &guides, true).unwrap();
+    let slot = make_box_corners(DVec3::new(-2.0, -5.0, -1.0) * mm, DVec3::new(2.0, 5.0, 15.0) * mm).unwrap();
+    let r = boolean(BooleanOp::Cut, &[s], &[slot], &BooleanOptions::default()).unwrap().shape;
+    assert!(r.is_valid());
+    let t = r.shown_topology().unwrap();
+    let shown = r.edges().iter().enumerate().filter(|(i, _)| t.edges[*i] && t.joined[*i] == *i).count();
+    assert_eq!((shown, t.vertices.iter().filter(|v| **v).count()), (8 + 12, 8 + 8), "the loft's 8 edges and vertices, the pocket's 12 and 8");
 }
 
 /// Live 3023: a profile joint turning by up to 3° is smoothed over (no side edge from it), past 3° it is a corner:

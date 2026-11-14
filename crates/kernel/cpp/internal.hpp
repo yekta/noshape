@@ -132,9 +132,13 @@ bool closed_and_oriented(const TopoDS_Shape& r);
 // over (carry_kept_marks).
 bool kept_edge(const TopoDS_Shape& e);
 void mark_kept_edge(const TopoDS_Shape& e);
+// Edges whose ends are vertices however smoothly the next edge goes on (a loft's profile split where a guide meets it:
+// live keeps those vertices): no unify merges two of them at their common vertex. Carried with the kept marks.
+bool kept_ends(const TopoDS_Shape& e);
+void mark_kept_ends(const TopoDS_Shape& e);
 // Marks in `to` the images (by `image`) of `from`'s marked edges.
 void carry_kept_marks(const TopoDS_Shape& from, const std::function<std::vector<TopoDS_Shape>(const TopoDS_Shape&)>& image);
-// Every marked edge of `s` as a shape `u` keeps.
+// Every marked edge of `s`, and every vertex between two kept_ends edges, as a shape `u` keeps.
 void keep_marked_edges(ShapeUpgrade_UnifySameDomain& u, const TopoDS_Shape& s);
 // After `u` ran on `in`: its result's edges made from marked ones marked (USD rebuilds the edges it keeps).
 void carry_kept_marks(const TopoDS_Shape& in, const ShapeUpgrade_UnifySameDomain& u);

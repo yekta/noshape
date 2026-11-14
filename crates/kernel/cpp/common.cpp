@@ -2833,9 +2833,19 @@ public:
   occ::handle<BRep_CurveRepresentation> Copy() const override { return new KeepEdgeMark(); }
   DEFINE_STANDARD_RTTI_INLINE(KeepEdgeMark, BRep_CurveRepresentation)
 };
-} // namespace
 
-bool kept_edge(const TopoDS_Shape& e)
+class KeepEndsMark : public BRep_CurveRepresentation
+{
+public:
+  KeepEndsMark()
+      : BRep_CurveRepresentation(TopLoc_Location())
+  {
+  }
+  occ::handle<BRep_CurveRepresentation> Copy() const override { return new KeepEndsMark(); }
+  DEFINE_STANDARD_RTTI_INLINE(KeepEndsMark, BRep_CurveRepresentation)
+};
+
+bool has_mark(const TopoDS_Shape& e, const occ::handle<Standard_Type>& type)
 {
   if (e.IsNull() || e.ShapeType() != TopAbs_EDGE)
     return false;
@@ -2843,18 +2853,39 @@ bool kept_edge(const TopoDS_Shape& e)
   if (te.IsNull())
     return false;
   for (const occ::handle<BRep_CurveRepresentation>& c : te->Curves())
-    if (c->IsKind(STANDARD_TYPE(KeepEdgeMark)))
+    if (c->IsKind(type))
       return true;
   return false;
 }
 
-void mark_kept_edge(const TopoDS_Shape& e)
+void add_mark(const TopoDS_Shape& e, const occ::handle<BRep_CurveRepresentation>& mark)
 {
-  if (kept_edge(e))
+  if (has_mark(e, mark->DynamicType()))
     return;
   const occ::handle<BRep_TEdge> te = occ::down_cast<BRep_TEdge>(e.TShape());
   if (!te.IsNull())
-    te->ChangeCurves().Append(new KeepEdgeMark());
+    te->ChangeCurves().Append(mark);
+}
+} // namespace
+
+bool kept_edge(const TopoDS_Shape& e)
+{
+  return has_mark(e, STANDARD_TYPE(KeepEdgeMark));
+}
+
+void mark_kept_edge(const TopoDS_Shape& e)
+{
+  add_mark(e, new KeepEdgeMark());
+}
+
+bool kept_ends(const TopoDS_Shape& e)
+{
+  return has_mark(e, STANDARD_TYPE(KeepEndsMark));
+}
+
+void mark_kept_ends(const TopoDS_Shape& e)
+{
+  add_mark(e, new KeepEndsMark());
 }
 
 void carry_kept_marks(const TopoDS_Shape& from, const std::function<std::vector<TopoDS_Shape>(const TopoDS_Shape&)>& image)
@@ -2862,10 +2893,19 @@ void carry_kept_marks(const TopoDS_Shape& from, const std::function<std::vector<
   ShapeIMap edges;
   TopExp::MapShapes(from, TopAbs_EDGE, edges);
   for (int i = 1; i <= edges.Extent(); ++i)
-    if (kept_edge(edges(i)))
-      for (const TopoDS_Shape& x : image(edges(i)))
-        if (!x.IsNull() && x.ShapeType() == TopAbs_EDGE)
+  {
+    const bool edge = kept_edge(edges(i)), ends = kept_ends(edges(i));
+    if (!edge && !ends)
+      continue;
+    for (const TopoDS_Shape& x : image(edges(i)))
+      if (!x.IsNull() && x.ShapeType() == TopAbs_EDGE)
+      {
+        if (edge)
           mark_kept_edge(x);
+        if (ends)
+          mark_kept_ends(x);
+      }
+  }
 }
 
 uint32_t mark_kept_edges(const OcShape& s, const OcShapeList& along, double tol)
@@ -2920,9 +2960,22 @@ void keep_marked_edges(ShapeUpgrade_UnifySameDomain& u, const TopoDS_Shape& s)
 {
   ShapeIMap edges;
   TopExp::MapShapes(s, TopAbs_EDGE, edges);
+  NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> ends;
   for (int i = 1; i <= edges.Extent(); ++i)
+  {
     if (kept_edge(edges(i)))
       u.KeepShape(edges(i));
+    if (!kept_ends(edges(i)))
+      continue;
+    for (TopExp_Explorer x(edges(i), TopAbs_VERTEX); x.More(); x.Next())
+      if (int* n = ends.ChangeSeek(x.Current()))
+      {
+        if (++*n == 2)
+          u.KeepShape(x.Current());
+      }
+      else
+        ends.Bind(x.Current(), 1);
+  }
 }
 
 } // namespace noshape
