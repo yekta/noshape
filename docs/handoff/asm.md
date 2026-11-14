@@ -19,6 +19,10 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
   97/103; pinslot 16/16; pattern-std 31/40 (was 35/35: studio 36b90f's AR-S1 / AR-S2 connectors read the other
   part's edge since the corpus update; with dx); infento 104/195 with the composite fix (the 71 "overdefines" are
   the f0eedd frame cluster since the corpus update; with dx).
+- Open, small: the triad's origin and size in live (asm-triad-z-anti-align-with-z: live pivots at (·, 9.81, 9.97) mm,
+  not the pick point; ours (·, 10.06, ·); asm-triad-rotate-90-undo: our ring-z point misses the face live's (1407, 610)
+  lies on, so no "View normal to"): one live measurement each. robot-relations' Derived now builds (main's
+  translator); its Revolute 1 / 5 are studio geometry. MID_POINT second ids name edges (Planar 10), open.
 - asm-* ui-parity: 200/213 before the latest fixes; left: studios' ✓-after-edit rule (mate dialog, mate connector
   type, pattern value edits: they have it), asm-mate-switch-fastened-chain's Parallel pick (studios looking), the
   two triad context-menu takes (also on green).
