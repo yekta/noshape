@@ -22,6 +22,30 @@ drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 - dx-chain9 (base vs dx-1dc / tvc variants on the new data) restarted 09:23 with 90 min a run (infento took over 45 min
   on the sketch solves: the first base run timed out); read sk-*.log, land per the rules below.
 
+## 11-14 17:45 UTC: exchange misses diagnosed, frame shift landed, infento's Extrude 49, drawing exports widened
+- Landed: Export fixes (406782c9), the arcs e2e on live's four cases (838eb3b2), the sheet frame centred with DXF /
+  DWG moved 0.05 m right (6be60489, studios' dxfshift item: `SheetSize::cad_x_shift`, `SheetGeometry::cad_dx`; CAD
+  files as before, the PDF's centring shift now 0). Queued: 20 more drawing scenarios with "export". Daily model
+  run on main 406782c9f: 80/87, 870/947 (report /root/parity/report.json).
+- Exchange suite on main (vibe6 ~/tmp/dx/exch-ops-main2.log): ours imports live's 48/48, live imports ours 43/48,
+  ours reads ours back 44/48. The read-back misses (sheet metal STEP / x_t, wave spring x_t, hose x_t) are one cause:
+  our models' edges that are OCCT approximations off their faces (up to 3e-5 m) are written tolerant (SP-curves) and
+  refitted on every read: 1-2e-6 relative volume, over the suite's 1e-6. STEP and wave spring are fixed points after
+  one pass; sheet metal's x_t drifts every round (.3648 -> .3723 -> .3755 mm³, its extruded face and the x -10 side
+  planes). Tried and dropped: the writer's `refit` accepting up to 5e-9 / 7.5e-9 m (the exact points are noisy at
+  ~1e-8 there: shallow plane / B-surface intersections; dev grows with more samples) and Newton to 1e-12. Not
+  landed. The hose's extra 2 edges / 4 vertices are the deliberate ring split live needs to import it. Live imports
+  ours: waits on live re-importing today's files.
+- infento 1dc32b (asm's MtAjACL / Fastened 3): Extrude 49 (the 26T pulley's teeth body RmDD) fails since the sketch
+  solves: Sketch 10 is on Extrude 47's far cap (an opposite-direction extrude, outward -x at x -6.8); live's frame
+  there is +x (its region normals), ours -x, so the UP_TO_SURFACE runs away from the flange face at +3. Asked live
+  (REQUESTS 17:41) whether Onshape sketches on such a cap along its surface normal: if so it's a modelling fix for
+  every user (sketch-on-face orientation). Picking the coincident +x face instead was tried: wrong (a tooth face of
+  0.56 mm², no regions). asm told.
+- Drawing export fidelity: the 8 scenarios' 24 files all match live's on main (vibe6 ~/tmp/dx/drwexp). 20 more
+  scenarios now export; ours running on vibe6 (unit dx-drwexp2, out ~/tmp/dx/drwexp2); live asked to rerun them into
+  /root/parity/ui/live. Then compare.py and fix the biggest gaps.
+
 ## 11-14 15:03 UTC: the Export dialog's ui-parity (live batches 27-28): 23 -> 279 of 305 states
 - Queued 7abf0245: Export… from a face makes it the selection (live: the face selected, Area readout); a Part Studio
   tab's Export… without parts opens live's notice ("Selected tab contains no supported geometry for export.", only
