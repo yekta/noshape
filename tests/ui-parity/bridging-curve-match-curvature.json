@@ -49,5 +49,12 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "bridgingCurve": {
+   "": {
+    "editControlPoints": true
+   }
+  }
+ }
 }

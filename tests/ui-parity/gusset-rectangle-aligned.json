@@ -59,5 +59,13 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "gusset": {
+   "length:Millimeter": {
+    "length": "20 mm",
+    "thickness": "10 mm"
+   }
+  }
+ }
 }
