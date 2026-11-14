@@ -5,6 +5,19 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-14 18:50 UTC)
+- **Landed db17c8b6** (18:20): the hand-drill translator fixes (sketch arcs by live's midpoint and length; a face off
+  its area found in live's box) and op_prism_until's seat_circles keeping each circle's frame (Helix › Circle starts at
+  the sketch's x; bb72f3 Sweep 1 and 7ed710 Sweep 1 as live).
+- **Knife feature 24 (first difference, not a quick win):** live's line 23 has unreliable edge types (an older fetch),
+  so 24 is only the first comparison of the blade's types. Ours has 3 lines where live has OTHER: KahB (48.3877 mm,
+  same length: live's section curve is a straight B-spline) and KalC / JZJ (0.5146 vs 0.5138 mm). The blade volume
+  9306.43 against live's REST 9306.25 is inside live's own error (its exact geometry integrates to 9306.66): a harness
+  tolerance question, not ours.
+- **asm-bjr-config 5d8bc1 Extrude 55 (dx's, now bool's):** 3836 ms vs live 333; 130 up-to prisms (parallel, ~0.25 s
+  wall), then op_boolean 2642 ms + op_unify 932 ms, and the +4 faces: bool took the fuse / unify (vibe5
+  ~/agents/bool-keep/m5d8).
+
 ## core state (11-14 17:47 UTC)
 - **Landed d34b2281** (16:44): a guided loft's profiles are split at every guide end (BRepAlgoAPI_Splitter, a closed
   circle restarted at a split point), sewing's B-spline copies replaced by the profile's own lines / arcs
@@ -21,9 +34,15 @@ CLIs' `feature list` on copies.
   cylinder's point is on its axis: e53bba's Extrude 11 up to the groove wall, then Circular pattern 2, volumes as live).
   a6be113b0: op_prism's seat_circles keeps each circle's own frame (only the edge starts at the seam): Helix › Circle on
   an extruded circle starts at the sketch's x as live (bb72f3 Sweep 1 and 7ed710 Sweep 1 then build as live; bool told).
-- **Next:** e53bba Extrude 8 (UP_TO_SURFACE, +2 faces +0.10 mm³, ×6 by Circular pattern 1), with the infento sliver and
-  dx's bjr 5d8bc1 Extrude 55 (the up-to family); knife Revolve 1 vertex, handle surface; blend's knife Boolean timing
-  after a3e9fb3d (projected edge = a sub-range of the whole cubic: try Segment).
+- **e53bba Extrude 8 (parked, the up-to family with the infento sliver and dx's bjr 5d8bc1 Extrude 55):** up to a
+  cylinder band (R12.07): live merges the end into the band (JaC 75.82 -> JhC 79.39 mm², 182/501/321); ours ends on a
+  `make_cylinder` copy and keeps the end's two pieces apart (184/505/323), ×6 by Circular pattern 1. Ending on the band's
+  own surface (`k::extend_face`) merges it and gives live's 182/501/321, but our geometric feature pattern then takes
+  the merged band as "created by Extrude 8" and copies it ×6 (Circular pattern 1 +86 mm³, Extrude 12 fails): needs the
+  pattern to take only what the feature added (history) first.
+- **Next:** knife Revolve 1 vertex, handle surface; blend's knife Boolean timing
+  after a3e9fb3d: not the curve's form (the projected edge on a segmented copy of the cubic: no faster in a 3-run vibe5 A/B,
+  Fillet 2 210-217 vs 164-272 ms); the exact geometry's Booleans are bool's (they have blend's numbers).
 
 ## core state (11-14 14:35 UTC)
 - **Landed a3e9fb3d + a6a966cd** (12:12): (1) a curve projected along a direction onto a linear extrusion, sweeping a
