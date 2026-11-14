@@ -29,7 +29,11 @@ run (pairs.log) times each part-face x blend-face section of cf-snap-hook and c2
 
 Next (speed, live's per-feature times on the Mac release build):
 - cf-snap-hook Fillet 6 (32 vs 8 ms): ~55% is blend_direct's sections (part faces x blend faces, GeomInt_IntSS in
-  parallel); pairs.log says which surface pairs are slow; try analytic sections for those types.
+  parallel). pairs.log (08:40, vibe6 loaded): all 74 pairs come back with no curve; cone x torus 40 pairs 562 ms of the
+  763 summed, cone x cylinder 8 pairs 145, cone x B-spline / plane x B-spline ~27 each, plane x torus 2. Skipping
+  them needs an exact proof of no curve (lead: boxes and face domains only; parked/sections-box-domains-wip wasn't
+  enough): e.g. the cone face's distance to the torus's spine circle beyond the tube radius + tolerance, checked
+  cheaper than the IntSS it saves.
 - c2-hunting-knife Fillet 3 (~90 vs 11 ms): OCCT's as-is attempt 25 ms (then replaced by rolling balls), blend_direct 30,
   lofts + Rust 35. No cheap win: running the balls beside OCCT would build them for every fillet, contending for the
   kernel lock. Chamfer 1 (165 vs 19) is bool's Rust Boolean (sections_ahead) plus 20 ms of scaled retries; Fillet 2
