@@ -565,7 +565,7 @@ pub struct AsmUi {
     /// The graphics menu being built was opened on the triad (its handle's items first): no Find in instance list;
     /// View normal to the selected face under it (live asm-face-menu-clear-selection).
     pub menu_on_triad: bool,
-    /// …on one of its rings (live asm-triad-rotate-90: Find in instance list, no View normal to).
+    /// …on one of its rings (live asm-triad-rotate-90: Find in instance list; View normal to only over a face).
     pub menu_on_ring: bool,
     pub ds_name: Option<Entity<InputState>>,
     pub ds_selected: Option<usize>,
@@ -1421,8 +1421,9 @@ impl AssemblyView {
             m.push(item("Zoom to fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
             let tg = targets.clone();
             m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(tg.clone(), cx)));
-            // On the triad: the selected face under it.
-            let normal = if on_ring { None } else { self.hovered_face_normal(cx).or_else(|| on_triad.then(|| self.selected_face_normal(cx)).flatten()) };
+            // A face under the pointer, also on a ring (live asm-triad-rotate-90-undo; not beside the part:
+            // asm-triad-rotate-90); on an axis, the selected face under the triad.
+            let normal = self.hovered_face_normal(cx).or_else(|| (on_triad && !on_ring).then(|| self.selected_face_normal(cx)).flatten());
             if let Some((forward, up)) = normal {
                 m.push(item("View normal to", move |t, _, cx| t.viewport.update(cx, |vp, cx| vp.animate_to_direction(forward, up, cx))));
             }
@@ -2953,6 +2954,13 @@ impl AssemblyView {
                 };
                 self.ui.menu_on_triad = true;
                 self.ui.menu_on_ring = ring;
+                // On a ring the pick buffer holds the triad: the face beneath it, cast (View normal to: live
+                // asm-triad-rotate-90-undo; none beside the part: asm-triad-rotate-90).
+                if ring {
+                    let o = self.viewport.read(cx).origin();
+                    let local = DVec2::new(f64::from(f32::from(position.x - o.x)), f64::from(f32::from(position.y - o.y)));
+                    self.hover = self.raycast(local, &[], cx).filter(|t| t.kind == PickKind::Face);
+                }
                 m.extend(self.instance_menu(t, true, cx));
                 self.ui.menu_on_triad = false;
                 self.ui.menu_on_ring = false;

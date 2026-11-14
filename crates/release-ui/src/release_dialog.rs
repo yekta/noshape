@@ -96,6 +96,15 @@ pub fn drawing_watermark_text(doc: &DocModel, tab: TabId) -> Option<String> {
 }
 
 /// Release items for a tab (tab menu Release…; `noshape_ops::release::tab_items`).
+/// The items a drawing or an assembly among `items` brings in with it (its parts, subassemblies).
+fn dependents_of<'a>(doc: &DocModel, items: impl Iterator<Item = &'a ReleaseItem>) -> Vec<(TabId, Option<noshape_model::reference::BodyId>)> {
+    items
+        .filter(|i| matches!(i.kind, ItemKind::Drawing | ItemKind::Assembly) && i.document.is_none())
+        .flat_map(|i| tab_items(doc, i.tab).into_iter().filter(|d| !(d.tab == i.tab && d.part.is_none())).collect::<Vec<_>>())
+        .map(|d| (d.tab, d.part))
+        .collect()
+}
+
 pub fn tab_items(doc: &DocModel, tab: TabId) -> Vec<ReleaseItem> {
     noshape_ops::release::tab_items(&doc.session, &*doc.derived_provider(), tab)
 }
@@ -896,6 +905,8 @@ pub struct ReleaseDialog {
     /// Applied (saved as a draft): the title reads "Review Release".
     applied: bool,
     rows: Vec<Row>,
+    /// The rows a drawing or an assembly of the candidate brings in: no Remove button (live2 11_studios_abc).
+    dependents: Vec<(TabId, Option<noshape_model::reference::BodyId>)>,
     name: Entity<InputState>,
     notes: Entity<TextareaState>,
     re_releasable: bool,
@@ -1007,7 +1018,8 @@ impl ReleaseDialog {
                 cx.notify();
             }
         }));
-        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, comments: Vec::new(), comments_view: false, props_view: None, comment_input, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, conditions, _subs: subs }
+        let dependents = dependents_of(doc.read(cx), rows.iter().map(|r| &r.item));
+        Self { doc, mode, applied: false, rows, dependents, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, comments: Vec::new(), comments_view: false, props_view: None, comment_input, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, conditions, _subs: subs }
     }
 
     /// A new part number suggests its next revision (unless one was typed).
@@ -1147,6 +1159,7 @@ impl ReleaseDialog {
             };
             self.rows.push(Row { initial_pn: item.part_number.clone(), item, part_number, revision, revision_touched: false, since });
         }
+        self.dependents = dependents_of(self.doc.read(cx), self.rows.iter().map(|r| &r.item));
         if self.thumbs_started {
             self.request_thumbs(added, cx);
         }
@@ -1930,7 +1943,7 @@ impl Render for ReleaseDialog {
                 ItemKind::VariableStudio => "variable-studio",
                 ItemKind::File => "file",
             };
-            let removable = self.mode != Mode::Review;
+            let removable = self.mode != Mode::Review && !self.dependents.contains(&(row.item.tab, row.item.part.clone()));
             let picture = self.thumbs.get(&crate::release_thumbs::key(&row.item)).cloned();
             let main = h_flex()
                 .h(px(46.))

@@ -102,10 +102,16 @@ impl AssemblyView {
         } else {
             return Err(format!("not a geometry target: {t}"));
         };
-        let at = vp.project(world).ok_or("behind the camera")?;
+        let mut at = vp.project(world).ok_or("behind the camera")?;
         let size = vp.size();
         if at.x < 0.0 || at.y < 0.0 || at.x > size.x || at.y > size.y {
             return Err(format!("{t} is outside the graphics area"));
+        }
+        // A triad handle as live's runner clicks it, between pixels (its projected point; a menu opened above it has
+        // the pointer on its last row, live asm-triad-z-anti-align-with-z): ours on a whole pixel would be on the
+        // menu's border.
+        if t.get("triad").is_some() && (at.x + f64::from(f32::from(vp.origin().x))).fract().abs() < 1e-3 {
+            at.x += 0.25;
         }
         Ok(vp.origin() + point(px(at.x as f32), px(at.y as f32)))
     }
