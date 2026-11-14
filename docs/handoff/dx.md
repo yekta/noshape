@@ -22,6 +22,24 @@ drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 - dx-chain9 (base vs dx-1dc / tvc variants on the new data) restarted 09:23 with 90 min a run (infento took over 45 min
   on the sketch solves: the first base run timed out); read sk-*.log, land per the rules below.
 
+## 11-14 18:25 UTC: infento 1dc32b's pulley chain, the Transform / Mirror copy fix gating
+- live q3092: a sketch on a face takes its outward normal (as ours), so 1dc32b's Sketch 10 (live +x at x -6.8) is on
+  a face our studio doesn't build there, not a modelling bug. Our studio diverges before it: Transform 12's copy
+  (180 deg about Sketch 4's construction line, Copy part) lands on the other side of Extrude 38 from live's, so Extrude
+  39 / 40 (UP_TO_SURFACE between them, z 708.5 / 731.5 against 720) and then Extrude 49 / 50 / Circular pattern 7
+  fail: the 26T pulley 41,979 mm3, live 37,852, and asm's MtAjACL edge goes. Sketch 4's frame is live's; next: the
+  bodies' positions at Transform 12 itself (rollback there) against live's (no live lines past feature 56).
+- Branch dx-copy (worktree dx, c8b4e9c2d): `pattern_copy` takes a Transform's or Mirror's single copy as our instance
+  1 (ours names it so; live's instance 1 was read as code 2). 1dc32b: Boolean 7, Extrude 39 / 40, Composite parts 12 /
+  13, Linear pattern 3, Transform 41 resolve now (Mirror 5's Composite part 14 still not). Models 80/87, 870/947 as
+  main (vibe7 ~/tmp/dx/models-copy.log). Infento pair on vibe6 (unit dx-gcopy, ~/tmp/dx/gcopy.out, ops-main vs
+  ops-copy): land if none worse.
+- bool landed 1dc32b's Boolean 2 shown topology (17e65775, 391/1158/768 as live); rerun the studio after it: live's
+  box there is loose (169 -> 171.77 mm with no looseBoxes flag), probably the next first difference.
+- drw-callout-shape-hexagon (pre-existing, drawings are mine): live's callout text at (94.7, 96.3), ours (90.6, 92.5)
+  (the flag 4-char one at 96.2 in live): not the bubble edge along the leader (that would be ~4.0 mm, the offset is
+  5.6); compare where our click lands in sheet mm first.
+
 ## 11-14 17:45 UTC: exchange misses diagnosed, frame shift landed, infento's Extrude 49, drawing exports widened
 - Landed: Export fixes (406782c9), the arcs e2e on live's four cases (838eb3b2), the sheet frame centred with DXF /
   DWG moved 0.05 m right (6be60489, studios' dxfshift item: `SheetSize::cad_x_shift`, `SheetGeometry::cad_dx`; CAD
