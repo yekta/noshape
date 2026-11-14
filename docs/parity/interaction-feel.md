@@ -184,13 +184,13 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Snap mode ghost | the source part at 0.3 opacity | the same (17:18) | – | = |
 | Snap mode lines | mates.json lists the client's INFERENCE_SNAP_* constants (rgb(255,194,14) dashed 4-4, 8 px box) | none | – | ? (client-wide constants, the sketch's qsnap; live's snap-mode capture, behaviours 1211, shows no lines) |
 
-### Exploded, section and named views (asm-views.json): 14 / 15
+### Exploded, section and named views (asm-views.json): 15 / 15
 
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
 | Exploded views panel | 3rd of the strip; empty: Add exploded view, illustration, how-to, help link | the same (Simulation left out: cloud) | ui-parity asm-explode-panel, asm-explode-add-view | = |
 | Add exploded view | "Explode 1" in edit mode: yellow "Editing Explode 1 / Done", toolbar only undo/redo, the blue how-to, the rollback bar | the same | – | = |
-| Selecting an instance | orange outline through other parts (in explode edit mode too, live2 11-14), a triad (3 arrows, 3 rings, centre) | the triad; the outline hidden behind other parts | – | ≠ |
+| Selecting an instance | orange outline through other parts (in explode edit mode too, live2 11-14), a triad (3 arrows, 3 rings, centre) | the same (render `Instance::outline_through`: the silhouette's outline outside its own image, no depth test) | render `an_outline_through_shows_past_the_part_in_front` | = (fixed) |
 | Arrow drag | moves live, no value box; on release the Explode step dialog; only that arrow stays | the same | – | = |
 | Ring drag | a Rotation step, 5° steps, Specify axis | the same (`ring_snap`, 17:18; was 1°) | `explode_drag_values_round` | = |
 | ✓ / Esc on the step | keeps / removes the step | the same | – | = |

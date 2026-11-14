@@ -1406,15 +1406,15 @@ fn an_outline_through_shows_past_the_part_in_front() {
             return;
         }
     };
-    let back = r.upload_mesh(&primitives::box_mesh([-0.01, -0.005, -0.01], [0.01, 0.005, 0.01], 1));
-    // In front of its left half (the front view looks along +Y).
-    let front = r.upload_mesh(&primitives::box_mesh([-0.05, -0.03, -0.03], [0.0, -0.02, 0.03], 1));
-    let mut cam = Camera { rotation: Camera::rotation_for(StandardView::Front), ..Default::default() };
-    cam.fit_sphere(glam::DVec3::ZERO, 0.04, 4.0 / 3.0);
+    let back = r.upload_mesh(&primitives::box_mesh([-0.01, -0.005, -0.01], [0.01, 0.005, 0.01], 7));
+    // A wide slab in front of its left half (the view looks roughly along +Y).
+    let front = r.upload_mesh(&primitives::box_mesh([-0.06, -0.04, -0.04], [0.0, -0.03, 0.04], 1));
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(0.25, 1.0, -0.2).normalize(), glam::DVec3::Z), ..Default::default() };
+    cam.fit_sphere(glam::DVec3::ZERO, 0.05, 4.0 / 3.0);
     let (w, h) = (400u32, 300u32);
     let frame = |r: &mut Renderer, through: bool| {
         let mut scene = Scene::default();
-        let mut b = Instance::new(Drawable::Mesh(back.clone())).with_color(srgb(0x9a, 0xb4, 0xcc)).pick_base(6);
+        let mut b = Instance::new(Drawable::Mesh(back.clone())).with_color(srgb(0x9a, 0xb4, 0xcc));
         if through {
             b = b.outline_through();
         }
@@ -1426,18 +1426,25 @@ fn an_outline_through_shows_past_the_part_in_front() {
         r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap().bgra
     };
     let (plain, through) = (frame(&mut r, false), frame(&mut r, true));
-    let vp = glam::DVec2::new(w as f64, h as f64);
-    let px = |b: &[u8], p: glam::DVec2| {
-        let i = ((p.y as u32 * w + p.x as u32) * 4) as usize;
-        [b[i + 2], b[i + 1], b[i]]
-    };
-    let edge = cam.project(glam::DVec3::new(-0.01, 0.0, 0.0), vp, 0.05).unwrap();
-    let outside = glam::DVec2::new(edge.x - 2.0, edge.y);
-    let inside = cam.project(glam::DVec3::new(-0.005, 0.0, 0.0), vp, 0.05).unwrap();
+    let px = |b: &[u8], i: usize| [b[i * 4 + 2], b[i * 4 + 1], b[i * 4]];
     let orange = |c: [u8; 3]| c[0] > 200 && c[1] > 140 && c[2] < 140;
-    assert!(!orange(px(&plain, outside)), "hidden behind the front part without the flag: {:?}", px(&plain, outside));
-    assert!(orange(px(&through, outside)), "the outline past the front part: {:?}", px(&through, outside));
-    assert_eq!(px(&plain, inside), px(&through, inside), "nothing over its own image");
+    let slab = |c: [u8; 3]| c[0] < 120 && c[0].abs_diff(c[1]) < 12 && c[1].abs_diff(c[2]) < 12;
+    // The part's own image: its blue-grey faces.
+    let own = |c: [u8; 3]| c[2] > c[0] + 20 && c[2] > 120;
+    let (mut over_slab, mut over_own) = (0, Vec::new());
+    for i in 0..(w * h) as usize {
+        let (a, b) = (px(&plain, i), px(&through, i));
+        if a == b {
+            continue;
+        }
+        if slab(a) && orange(b) {
+            over_slab += 1;
+        } else if own(a) {
+            over_own.push((i as u32 % w, i as u32 / w, a, b));
+        }
+    }
+    assert!(over_slab > 20, "the outline drawn over the slab in front: {over_slab} px");
+    assert!(over_own.is_empty(), "nothing over its own image ({} px): {:?}", over_own.len(), &over_own[..over_own.len().min(12)]);
 }
 
 /// Feature previews shade like Onshape's (live part-studio/230, default

@@ -336,7 +336,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_edit_joint`](#sheetmetal_edit_joint), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
-- **release**: [`release_create`](#release_create), [`release_approve`](#release_approve), [`release_reject`](#release_reject), [`release_discard`](#release_discard), [`release_comment`](#release_comment), [`release_drafts`](#release_drafts), [`release_draft_delete`](#release_draft_delete), [`release_obsolete`](#release_obsolete), [`release_revision_history`](#release_revision_history)
+- **release**: [`release_create`](#release_create), [`release_approve`](#release_approve), [`release_reject`](#release_reject), [`release_discard`](#release_discard), [`release_comment`](#release_comment), [`release_drafts`](#release_drafts), [`release_draft_delete`](#release_draft_delete), [`release_obsolete`](#release_obsolete), [`release_re_releasable`](#release_re_releasable), [`release_revision_history`](#release_revision_history)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image), [`render_print`](#render_print), [`render_file_page`](#render_file_page)
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
@@ -7072,6 +7072,24 @@ Examples:
 | `name` | string |  | Obsoletion name (the version's name). |
 | `notes` | string | required | Reason for obsoletion. |
 | `re_releasable` | boolean |  | Mark revision as re-releasable. |
+
+#### release_re_releasable
+
+Mark an obsoleted revision as re-releasable (or not) (edits the document (one undoable history entry)).
+
+View obsoletion › Mark revision as re-releasable, then Apply: the obsoletion named `name` lets its revision be released again (`re_releasable` true) or not.
+
+Examples:
+
+```json
+{"name": "Obsolete PRT-0001 A", "re_releasable": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `name` | string | required | The obsoletion's name. |
+| `re_releasable` | boolean | required | Re-releasable. |
 
 #### release_revision_history
 
