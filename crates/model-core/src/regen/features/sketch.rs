@@ -472,6 +472,31 @@ pub fn project_edge_any(edge: &noshape_kernel::Shape, frame: &crate::display::Pl
     if len < 1e-9 {
         return None;
     }
+    // A planar curve seen edge-on (a circle whose plane holds the sketch normal) projects onto a line: that line
+    // between its extremes, as live (c2-rings-loft's Sketch 1: a point Coincident with such a circle lies on the line
+    // past the circle's extent; sampled, it went back and forth on itself and held the point within it).
+    let far = pl.iter().copied().max_by(|a, b| (*a - pl[0]).length().total_cmp(&(*b - pl[0]).length()))?;
+    if let Some(d) = (far - pl[0]).try_normalize()
+        && pl.iter().all(|p| (*p - pl[0]).perp_dot(d).abs() <= 1e-9 + 1e-7 * len)
+    {
+        let along = |p: &DVec2| (*p - pl[0]).dot(d);
+        let (lo, hi) = pl.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), p| (lo.min(along(p)), hi.max(along(p))));
+        // The extremes from the exact geometry (the tessellation's points are single precision: a Use joined to
+        // another edge's exact end missed it by 3 nm, c2-fan-blade-sweep's Sketch 5): the edge's ends, a circle's
+        // points farthest along the line.
+        let mut exact: Vec<DVec2> = vec![frame.to_local(info.start), frame.to_local(info.end)];
+        if let k::Curve::Circle { center, axis, radius, .. } = info.curve {
+            let d3 = frame.x * d.x + frame.y * d.y;
+            let a = axis.normalize();
+            if let Some(v) = (d3 - a * a.dot(d3)).try_normalize() {
+                exact.extend([frame.to_local(center + v * radius), frame.to_local(center - v * radius)]);
+            }
+        }
+        let snap = |t: f64| exact.iter().map(along).filter(|e| (e - t).abs() <= 1e-6).min_by(|x, y| (x - t).abs().total_cmp(&(y - t).abs())).unwrap_or(t);
+        let foot = |t: f64| exact.iter().find(|p| (along(p) - t).abs() <= 1e-12).copied().unwrap_or(pl[0] + d * t);
+        let (lo, hi) = (snap(lo), snap(hi));
+        return Some(SectionCurve::Exact(noshape_sketch::Curve2::Line { a: foot(lo), b: foot(hi) }));
+    }
     resample(&pl, SECTION_SAMPLES).map(SectionCurve::Sampled)
 }
 
