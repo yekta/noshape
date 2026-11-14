@@ -3823,6 +3823,40 @@ static void restore_section_curves(TopoDS_Shape& out, const std::vector<TopoDS_W
   apply(matches(out));
 }
 
+// The edges of `out` ending at a vertex of `after` that `before` hadn't (the loft's vertex count matching), marked
+// kept_ends.
+static void keep_vertices_added(const TopoDS_Shape& out, const std::vector<TopoDS_Wire>& before, const std::vector<TopoDS_Wire>& after)
+{
+  std::vector<gp_Pnt> had, added;
+  for (const TopoDS_Wire& w : before)
+    for (TopExp_Explorer x(w, TopAbs_VERTEX); x.More(); x.Next())
+      had.push_back(BRep_Tool::Pnt(TopoDS::Vertex(x.Current())));
+  for (const TopoDS_Wire& w : after)
+    for (TopExp_Explorer x(w, TopAbs_VERTEX); x.More(); x.Next())
+    {
+      const gp_Pnt p   = BRep_Tool::Pnt(TopoDS::Vertex(x.Current()));
+      const double tol = 10 * std::max(BRep_Tool::Tolerance(TopoDS::Vertex(x.Current())), Precision::Confusion());
+      if (std::none_of(had.begin(), had.end(), [&](const gp_Pnt& q) { return q.Distance(p) <= tol; }))
+        added.push_back(p);
+    }
+  if (added.empty())
+    return;
+  ShapeIMap edges;
+  TopExp::MapShapes(out, TopAbs_EDGE, edges);
+  for (int i = 1; i <= edges.Extent(); ++i)
+    for (TopExp_Explorer v(edges(i), TopAbs_VERTEX); v.More(); v.Next())
+    {
+      const TopoDS_Vertex& x   = TopoDS::Vertex(v.Current());
+      const gp_Pnt         p   = BRep_Tool::Pnt(x);
+      const double         tol = 10 * std::max(BRep_Tool::Tolerance(x), Precision::Confusion());
+      if (std::any_of(added.begin(), added.end(), [&](const gp_Pnt& q) { return q.Distance(p) <= tol; }))
+      {
+        mark_kept_ends(edges(i));
+        break;
+      }
+    }
+}
+
 static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool closed,
                        rust::Slice<const double> start_points, const LoftEnds& ends, bool allow_natural,
                        const TopoDS_Shape& path = TopoDS_Shape(), int path_count = 0, bool bare = false)
@@ -3910,6 +3944,7 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   }
   const bool circles = !points && start_points.empty() && split_closed_sections(wires, split);
   HHist      more;
+  const std::vector<TopoDS_Wire> unmatched = wires;
   const bool counts  = !points && start_points.empty() && match_vertex_counts(wires, more);
   if (counts)
     split = split.IsNull() ? more : compose(compound_of(args), split, more);
@@ -4026,6 +4061,10 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   }
   if (!std::getenv("NOSHAPE_LOFT_SPLINE_EDGES"))
     restore_section_curves(out, wires);
+  // Live keeps the vertices the matching split the profiles at (c2-impeller-loft's housing circle, its long arc in three,
+  // q2985): no later unify joins the edges either side of one.
+  if (counts)
+    keep_vertices_added(out, unmatched, wires);
   HistoryBuilder hb(args, out);
   hb.add_history(h.get());
   if (!closed)

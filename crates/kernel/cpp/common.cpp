@@ -550,12 +550,27 @@ void HistoryBuilder::add_history(const BRepTools_History* h)
             });
           };
           const size_t mod_from = myRecs.size();
-          for (NCollection_List<TopoDS_Shape>::Iterator it(h->Modified(s)); it.More(); it.Next())
+          const ShapeList& images  = h->Modified(s);
+          for (NCollection_List<TopoDS_Shape>::Iterator it(images); it.More(); it.Next())
           {
             push(ai, (uint8_t)k, (uint32_t)(i - 1), REL_MODIFIED, it.Value());
             found = true;
           }
           by_output(mod_from);
+          // An edge's kept marks on its images (an op rebuilding it): a split on purpose on every piece, kept ends only
+          // on an edge rebuilt whole (a vertex an op splits it at isn't one to keep).
+          if (k == TopAbs_EDGE && !images.IsEmpty())
+          {
+            const bool edge = kept_edge(s), ends = images.Extent() == 1 && kept_ends(s);
+            for (NCollection_List<TopoDS_Shape>::Iterator it(images); it.More() && (edge || ends); it.Next())
+              if (!it.Value().IsNull() && it.Value().ShapeType() == TopAbs_EDGE)
+              {
+                if (edge)
+                  mark_kept_edge(it.Value());
+                if (ends)
+                  mark_kept_ends(it.Value());
+              }
+          }
           const size_t gen_from = myRecs.size();
           for (NCollection_List<TopoDS_Shape>::Iterator it(h->Generated(s)); it.More(); it.Next())
             push(ai, (uint8_t)k, (uint32_t)(i - 1), REL_GENERATED, it.Value());
@@ -2891,6 +2906,7 @@ OwnCopy::OwnCopy(const OcShape& s) : in(s)
   for (const TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
     if (c->map(k).Extent() != s.map(k).Extent())
       return;
+  carry_kept_marks(s.shape, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
   copy = std::move(c);
 }
 

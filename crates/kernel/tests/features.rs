@@ -203,26 +203,59 @@ fn a_circle_loft_normal_to_its_start_as_live() {
 /// (its massproperties 257,080.9), its face within 0.3 µm of ours.
 #[test]
 fn a_loft_pairs_a_smooth_run_of_pieces_as_live() {
+    let l = impeller_loft(1.0);
+    assert!(l.is_valid());
+    assert_eq!(l.faces().len(), 4);
+    let v = l.volume().unwrap();
+    assert!(close(v, 257_080.0, 2e-5), "{v} vs live 257,078.4 / 257,080.9");
+}
+
+/// c2-impeller-loft's Loft Gehäuse: the vertices the matching split the circle's long arc at stay through later
+/// shells, Booleans and unifies, as live's (JJM / JJU after Boolean Flansch+Gehäuse, q2985), though the three arcs
+/// lie between the same side face and end face.
+#[test]
+fn a_lofts_added_vertices_stay_for_good() {
+    let l = impeller_loft(1.0);
+    let u = unify_same_domain(&l).unwrap().shape;
+    let arcs = |s: &Shape, r: f64| s.edges().iter().filter(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, Curve::Circle { radius, .. } if (radius - r).abs() < 1e-9 * r))).count();
+    assert_eq!(arcs(&l, 32.5), 4);
+    assert_eq!(arcs(&u, 32.5), 4);
+    // Shelled 3 mm with the circle's end open (Shell Gehäuse, on its own copy of the solid; in m, as the model's): its
+    // rim keeps them too.
+    let _ = set_working_scale(1000.0);
+    let m = impeller_loft(1e-3);
+    let cap = m.faces().into_iter().find(|f| f.face_plane().ok().flatten().is_some_and(|p| p.unit_normal().x.abs() > 1.0 - 1e-9 && p.origin.x.abs() < 1e-12)).expect("the circle's end");
+    let s = shell_solid(&m, &[cap], 0.003, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    assert_eq!(arcs(&s, 0.0325), 4);
+    let u = unify_same_domain(&s).unwrap().shape;
+    assert_eq!(arcs(&u, 0.0325), 4);
+    // A block fused into its far end (Boolean 1, the result's edges made anew): the same.
+    let block = make_box_corners(DVec3::new(0.03, -0.01, -0.002), DVec3::new(0.05, 0.01, 0.01)).unwrap();
+    let f = boolean(BooleanOp::Fuse, &[u], &[block], &BooleanOptions::default()).unwrap().shape;
+    let u = unify_same_domain(&f).unwrap().shape;
+    assert_eq!(arcs(&u, 0.0325), 4);
+}
+
+/// The impeller's Loft Gehäuse, a unit `mm` long: its sketches' circle (in two arcs) to the flange's D, Normal to
+/// profile at the circle.
+fn impeller_loft(mm: f64) -> Shape {
+    let v = |x: f64, y: f64| DVec2::new(x, y) * mm;
     // The sketch's circle: two arcs meeting where the D's short side lines up (±40.68° off +z).
-    let (p, q) = (DVec2::new(21.1864836303326, 24.6451397111407), DVec2::new(-21.1864836303326, 24.6451397111407));
-    let arcs = [Segment2d::Arc3 { a: p, mid: DVec2::new(0.0, 32.5), b: q }, Segment2d::Arc3 { a: q, mid: DVec2::new(0.0, -32.5), b: p }];
-    let circle = make_face_from_wire(&make_wire_2d(&Plane::new(DVec3::new(0.0, 0.0, -34.0), DVec3::X, DVec3::Y), &arcs).unwrap(), true).unwrap();
-    let (a, b) = (DVec2::new(82.4182569980622, -30.0), DVec2::new(82.4182569980622, 30.0));
+    let (p, q) = (v(21.1864836303326, 24.6451397111407), v(-21.1864836303326, 24.6451397111407));
+    let arcs = [Segment2d::Arc3 { a: p, mid: v(0.0, 32.5), b: q }, Segment2d::Arc3 { a: q, mid: v(0.0, -32.5), b: p }];
+    let circle = make_face_from_wire(&make_wire_2d(&Plane::new(DVec3::new(0.0, 0.0, -34.0) * mm, DVec3::X, DVec3::Y), &arcs).unwrap(), true).unwrap();
+    let (a, b) = (v(82.4182569980622, -30.0), v(82.4182569980622, 30.0));
     let spline = Segment2d::BSpline {
-        poles: vec![a, DVec2::new(99.8985510837477, -30.0), DVec2::new(159.331083452021, 0.0), DVec2::new(101.439282012209, 30.0), b],
+        poles: vec![a, v(99.8985510837477, -30.0), v(159.331083452021, 0.0), v(101.439282012209, 30.0), b],
         weights: None,
         knots: vec![0.0, 0.5, 1.0],
         mults: vec![4, 1, 4],
         degree: 3,
         periodic: false,
     };
-    let (c, d) = (DVec2::new(10.0, 30.0), DVec2::new(10.0, -30.0));
+    let (c, d) = (v(10.0, 30.0), v(10.0, -30.0));
     let profile = make_face_2d(&Plane::xy(), &[Segment2d::Line { a: d, b: a }, spline, Segment2d::Line { a: b, b: c }, Segment2d::Line { a: c, b: d }], &[]).unwrap();
-    let l = loft(&[circle, profile], &LoftOptions { solid: true, start: LoftEnd::Normal(1.0), squared_start_rule: true, ..Default::default() }).unwrap();
-    assert!(l.shape.is_valid());
-    assert_eq!(l.shape.faces().len(), 4);
-    let v = l.shape.volume().unwrap();
-    assert!(close(v, 257_080.0, 2e-5), "{v} vs live 257,078.4 / 257,080.9");
+    loft(&[circle, profile], &LoftOptions { solid: true, start: LoftEnd::Normal(1.0), squared_start_rule: true, ..Default::default() }).unwrap().shape
 }
 
 /// c2-impeller-loft's Loft (live: its ends' rims the sketches' 4 circles and 3 lines): a loft's edges on its sections
