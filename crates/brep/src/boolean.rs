@@ -2670,13 +2670,14 @@ impl Ctx<'_> {
         };
         let fi = if implicit_is_a { fa } else { fb };
         let ff = if implicit_is_a { fb } else { fa };
-        // (OCCT's where it found none, or a curve neither closed nor ending on either face's boundary: a march that
-        // missed a curve or ran on past the faces is OCCT's to settle.)
+        // (OCCT's where it found none, or a curve not ending on either face's boundary at both ends: a march that
+        // missed a curve or ran on past the faces, or a closed one (a thin sweep's pipe wall cut round: its volume
+        // 0.27 mm3 off live's), is OCCT's to settle.)
         let reach = GREY * self.tol;
         let on_bound = |f: usize, p: DVec3| self.bound_distance(f, self.faces[f].to2(p)).is_ok_and(|d| d <= reach);
         let ends_ok = |m: &march::Marched| {
             let (p, q) = (m.curve.at(0.0), m.curve.at(m.t1));
-            (p - q).length() <= reach || [p, q].iter().all(|&x| on_bound(fi, x) || on_bound(ff, x))
+            (p - q).length() > reach && [p, q].iter().all(|&x| on_bound(fi, x) || on_bound(ff, x))
         };
         if marched.is_empty() || !marched.iter().all(ends_ok) {
             return None;
