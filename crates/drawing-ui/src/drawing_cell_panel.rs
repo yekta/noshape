@@ -36,7 +36,8 @@ impl DrawingEditor {
         let t = self.current_sheet().table(cs.table)?;
         // Live: the Cell panel shows for one plain cell (none with a range or a merged cell selected).
         let one = cs.a == cs.b && t.merge_at(cs.a.0, cs.a.1).is_none();
-        (matches!(t.kind, TableKind::General { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select) && one).then_some(cs)
+        // A revision table's cell too (live2 drw-revision-*: its merge icons disabled).
+        (matches!(t.kind, TableKind::General { .. } | TableKind::Revision { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select) && one).then_some(cs)
     }
 
     /// Create / drop the panel's state as the cell selection changes (from render).

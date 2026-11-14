@@ -1933,92 +1933,22 @@ impl DrawingEditor {
         out
     }
 
+    /// A table's right-click menu by its kind (each with Onshape's own; live drawing/549, help bom_table, qa
+    /// HOLE-TABLE-MENU, live2 drw-revision-*): the whole table's, or with cells selected the cells'.
     pub fn table_entries(&self, id: u64, cx: &App) -> Vec<MenuEntry> {
-        let mut out = Vec::new();
         let sheet = &self.drawing.sheets[self.sheet];
-        let Some(t) = sheet.table(id).cloned() else { return out };
-        // General tables with no cell selected: the whole table's menu.
-        if matches!(t.kind, TableKind::General { .. }) && self.cell_sel.is_none_or(|c| c.table != id) {
-            return self.data_table_entries(id, cx);
+        let Some(t) = sheet.table(id).cloned() else { return Vec::new() };
+        let cells = self.cell_sel.filter(|c| c.table == id);
+        match (&t.kind, cells) {
+            (TableKind::General { .. }, Some(cs)) => self.general_cell_entries(&t, cs),
+            (TableKind::Revision { .. }, Some(cs)) => self.revision_cell_entries(&t, cs),
+            (TableKind::Revision { .. }, None) => {
+                let cell = self.built.as_ref().and_then(|b| b.table_layout(id)).and_then(|l| l.cell_at(self.cursor));
+                self.revision_table_entries(id, cell)
+            }
+            (_, Some(cs)) => self.cell_size_entries(&t, cs),
+            (_, None) => self.data_table_entries(id, cx),
         }
-        // BOM, cut list, hole and custom tables: Onshape's menus — the
-        // cells' (Size, Resize) with cells selected, else the whole table's
-        // (qa HOLE-TABLE-MENU: hole tables had the general table's).
-        if matches!(t.kind, TableKind::Bom { .. } | TableKind::CutList { .. } | TableKind::Hole { .. } | TableKind::Custom { .. }) {
-            return match self.cell_sel.filter(|c| c.table == id) {
-                Some(cs) => self.cell_size_entries(&t, cs),
-                None => self.data_table_entries(id, cx),
-            };
-        }
-        let cell = self.built.as_ref().and_then(|b| b.table_layout(id)).and_then(|l| l.cell_at(self.cursor));
-        // General table with cells selected: Onshape's cell menu.
-        if let (TableKind::General { .. }, Some(cs)) = (&t.kind, self.cell_sel.filter(|c| c.table == id)) {
-            return self.general_cell_entries(&t, cs);
-        }
-        if let TableKind::Revision { .. } = t.kind {
-            out.extend(self.revision_table_entries(id, cell));
-        }
-        out.extend(self.table_more_entries(&t, cell));
-        if let TableKind::CutList { bottom_to_top, .. } = t.kind {
-            out.push(MenuEntry::Submenu(
-                "Order".into(),
-                vec![
-                    MenuEntry::check("Top to bottom", !bottom_to_top, move |t, _, cx| t.edit_table(id, "Cut list order", cx, |t| if let TableKind::CutList { bottom_to_top, .. } = &mut t.kind { *bottom_to_top = false })),
-                    MenuEntry::check("Bottom to top", bottom_to_top, move |t, _, cx| t.edit_table(id, "Cut list order", cx, |t| if let TableKind::CutList { bottom_to_top, .. } = &mut t.kind { *bottom_to_top = true })),
-                ],
-            ));
-        }
-        if matches!(t.kind, TableKind::Bom { .. } | TableKind::CutList { .. }) {
-            out.extend(self.split_entries(&t, cell));
-        }
-        if let TableKind::Bom { structured, bottom_to_top, .. } = t.kind {
-            out.push(MenuEntry::Submenu(
-                "BOM type".into(),
-                vec![
-                    MenuEntry::check("Flattened", !structured, move |t, _, cx| t.edit_table(id, "BOM type", cx, |t| if let TableKind::Bom { structured, .. } = &mut t.kind { *structured = false })),
-                    MenuEntry::check("Structured", structured, move |t, _, cx| t.edit_table(id, "BOM type", cx, |t| if let TableKind::Bom { structured, .. } = &mut t.kind { *structured = true })),
-                ],
-            ));
-            out.push(MenuEntry::Submenu(
-                "Order".into(),
-                vec![
-                    MenuEntry::check("Top to bottom", !bottom_to_top, move |t, _, cx| t.edit_table(id, "BOM order", cx, |t| if let TableKind::Bom { bottom_to_top, .. } = &mut t.kind { *bottom_to_top = false })),
-                    MenuEntry::check("Bottom to top", bottom_to_top, move |t, _, cx| t.edit_table(id, "BOM order", cx, |t| if let TableKind::Bom { bottom_to_top, .. } = &mut t.kind { *bottom_to_top = true })),
-                ],
-            ));
-        }
-        let corner = t.corner;
-        let corners = [("Top right", TableCorner::TopRight), ("Top left", TableCorner::TopLeft), ("Bottom right", TableCorner::BottomRight), ("Bottom left", TableCorner::BottomLeft)]
-            .into_iter()
-            .map(|(name, k)| {
-                MenuEntry::check(name, corner == k, move |t, _, cx| {
-                    // Keep the table where it is: move the anchor to the new corner.
-                    let l = t.built.as_ref().and_then(|b| b.table_layout(id)).cloned();
-                    t.edit_table(id, "Table fixed corner", cx, |t| noshape_scene::drawing_tools::table_edit::set_fixed_corner(t, l.as_ref(), k))
-                })
-            })
-            .collect();
-        out.push(MenuEntry::Submenu("Fixed corner".into(), corners));
-        let mut text = Vec::new();
-        for h in noshape_scene::drawing_tools::table_edit::TEXT_HEIGHTS {
-            text.push(MenuEntry::check(format!("{h} mm"), t.own_text_height && (t.text_height - h).abs() < 1e-9, move |t, _, cx| t.edit_table(id, "Table text height", cx, |t| noshape_scene::drawing_tools::table_edit::set_text_height(t, h))));
-        }
-        out.push(MenuEntry::Submenu("Text height".into(), text));
-        out.push(MenuEntry::item("Fit to content", move |t, _, cx| t.edit_table(id, "Fit table", cx, noshape_scene::drawing_tools::table_edit::fit_to_content)));
-        out.push(MenuEntry::Separator);
-        // A revision table's menu has Copy and Paste (Onshape help "Revision Table").
-        if let TableKind::Revision { .. } = t.kind {
-            out.push(MenuEntry::item("Copy", move |t, _, cx| {
-                t.selection = vec![Sel::Table(id)];
-                t.copy_entities(cx);
-            }));
-            out.push(crate::drawing_props::paste_always());
-        }
-        out.push(MenuEntry::item("Delete table", move |t, _, cx| {
-            t.selection.clear();
-            t.edit_sheet("Delete table", cx, |s| s.tables.retain(|x| x.id != id));
-        }));
-        out
     }
 
     pub fn edit_table(&mut self, id: u64, name: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Table)) {

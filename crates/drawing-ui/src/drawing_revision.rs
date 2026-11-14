@@ -178,18 +178,21 @@ impl DrawingEditor {
         }
     }
 
-    /// Right-click on a revision table (`cell`: the cell under the cursor).
+    /// Right-click on a revision table (live2's drw-revision-* takes, dx 11-14): Revision table properties…, on a
+    /// revision's row Hide revision callouts and Add revision callout, Paste as table, Move to ▸, Bring to front, Send
+    /// to back | Clear selection, Zoom to fit, Delete (Add comment is cloud). With a cell selected: its Size ▸,
+    /// Resize…, Copy.
     pub fn revision_table_entries(&self, id: u64, cell: Option<(usize, usize)>) -> Vec<MenuEntry> {
         let mut out = vec![MenuEntry::item("Revision table properties...", move |t, w, cx| t.open_revision_props(id, w, cx))];
-        let Some(t) = self.drawing.sheets[self.sheet].table(id) else { return out };
+        let sheet = &self.drawing.sheets[self.sheet];
+        let Some(t) = sheet.table(id) else { return out };
         // The revision of the row under the cursor (row 0 is the header).
         let data = noshape_model::drawing::tables::table_data_with(&self.drawing, t, None, None, None, &self.info, &|s| s.to_string());
         let row_rev = cell.and_then(|(r, _)| r.checked_sub(1)).and_then(|r| data.rows.get(r)).and_then(|r| row_revision(r));
-        let rev = row_rev.clone().unwrap_or_else(|| self.latest_revision());
-        out.push(MenuEntry::item("Add revision callout", move |t, _, cx| t.set_tool(Tool::RevisionCallout { revision: rev.clone() }, cx)));
-        if let (Some(rev), TableKind::Revision { hidden, .. }) = (row_rev, &t.kind) {
+        if let (Some(rev), TableKind::Revision { hidden, .. }) = (row_rev.clone(), &t.kind) {
             let is_hidden = hidden.contains(&rev);
             let label = if is_hidden { "Show revision callouts" } else { "Hide revision callouts" };
+            let callout = rev.clone();
             out.push(MenuEntry::item(label, move |t, _, cx| {
                 let rev = rev.clone();
                 t.edit_table(id, label, cx, |t| {
@@ -202,8 +205,42 @@ impl DrawingEditor {
                     }
                 })
             }));
+            out.push(MenuEntry::item("Add revision callout", move |t, _, cx| t.set_tool(Tool::RevisionCallout { revision: callout.clone() }, cx)));
         }
+        out.push(MenuEntry::item("Paste as table", |t, _, cx| t.paste_as_table(cx)));
+        let cur = t.layer;
+        let layers: Vec<MenuEntry> = noshape_model::drawing::SheetLayer::FORMAT
+            .iter()
+            .copied()
+            .chain((!cur.is_drawing()).then_some(noshape_model::drawing::SheetLayer::Drawing))
+            .filter(|l| *l != cur)
+            .map(|l| MenuEntry::item(l.name(), move |t, _, cx| t.edit_table(id, "Move to", cx, |t| t.layer = l)))
+            .collect();
+        out.push(MenuEntry::Submenu("Move to".into(), layers));
+        let alone = sheet.tables.len() == 1 && sheet.annotations.is_empty() && sheet.images.is_empty();
+        out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_table(id, true, cx)).disabled(alone));
+        out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_table(id, false, cx)).disabled(alone));
         out.push(MenuEntry::Separator);
+        out.push(MenuEntry::item("Clear selection", |t, _, cx| {
+            t.selection.clear();
+            t.redraw(cx);
+        }));
+        out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
+        out.push(MenuEntry::item("Delete", move |t, _, cx| {
+            t.selection.clear();
+            t.edit_sheet("Delete table", cx, |s| s.tables.retain(|x| x.id != id));
+        }));
+        out
+    }
+
+    /// A revision table's selected cell (live2 drw-revision-*): Size ▸, Resize…, Copy.
+    pub fn revision_cell_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel) -> Vec<MenuEntry> {
+        let id = t.id;
+        let mut out = self.size_entries(t, cs, "Resize...");
+        out.push(MenuEntry::item("Copy", move |t, _, cx| {
+            t.selection = vec![Sel::Table(id)];
+            t.copy_entities(cx);
+        }));
         out
     }
 

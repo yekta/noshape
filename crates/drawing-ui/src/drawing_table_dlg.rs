@@ -381,7 +381,7 @@ impl DrawingEditor {
     }
 
     /// Size ▸ and the resize item (`resize`: its label).
-    fn size_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel, resize: &'static str) -> Vec<MenuEntry> {
+    pub(crate) fn size_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel, resize: &'static str) -> Vec<MenuEntry> {
         let id = t.id;
         let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned() else { return Vec::new() };
         let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();

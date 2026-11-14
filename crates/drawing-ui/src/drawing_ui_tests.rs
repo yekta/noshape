@@ -2,7 +2,7 @@
 //! a test window over a document made through the agent API, the GPU a no-op stand-in.
 
 use crate::doc_model::DocModel;
-use crate::drawing_view::DrawingEditor;
+use crate::drawing_view::{DrawingEditor, MenuEntry};
 use crate::gpu::Gpu;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, Modifiers, Point, TestAppContext, WindowBounds, WindowOptions, px, size};
 use noshape_ops::drawing_export::DrawingExportPrefs;
@@ -570,7 +570,6 @@ fn a_centermark_click_on_a_circle_marks_it(cx: &mut TestAppContext) {
 /// annotation-layer object on the sheet; views don't count.
 #[gpui::test]
 fn a_tables_bring_to_front_greys_only_without_other_annotations(cx: &mut TestAppContext) {
-    use crate::drawing_view::MenuEntry;
     let greyed = |dimensioned: bool, cx: &mut TestAppContext| {
         SUGGESTED.set(true);
         DIMENSIONED.set(dimensioned);
@@ -592,4 +591,38 @@ fn a_tables_bring_to_front_greys_only_without_other_annotations(cx: &mut TestApp
     };
     assert_eq!(greyed(false, cx), Some(true), "views only: greyed");
     assert_eq!(greyed(true, cx), Some(false), "with a dimension: enabled");
+}
+
+/// Live2's drw-revision-* (dx 11-14): a revision table's whole-table menu is its own (Revision table properties…,
+/// Paste as table, Move to ▸, Bring to front, Send to back | Clear selection, Zoom to fit, Delete), none of a general
+/// table's cell items; a selected cell's is Size ▸, Resize…, Copy.
+#[gpui::test]
+fn a_revision_tables_menus_are_lives(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "revision-menus");
+    let id = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let id = e.current_sheet().next_table_id();
+            let table = noshape_scene::drawing_tools::revision_table(id, &Default::default(), [300.0, 250.0]);
+            e.edit_sheet("Revision table", cx, |s| s.tables.push(table));
+            id
+        })
+    });
+    draw(cx, window);
+    let labels = |entries: Vec<MenuEntry>| -> Vec<String> {
+        entries
+            .into_iter()
+            .filter_map(|m| match m {
+                MenuEntry::Item { label, .. } | MenuEntry::Submenu(label, _) => Some(label.to_string()),
+                MenuEntry::Separator => None,
+            })
+            .collect()
+    };
+    let whole = cx.update(|cx| labels(editor.read(cx).revision_table_entries(id, None)));
+    assert_eq!(whole, ["Revision table properties...", "Paste as table", "Move to", "Bring to front", "Send to back", "Clear selection", "Zoom to fit", "Delete"]);
+    let cells = cx.update(|cx| {
+        let e = editor.read(cx);
+        let t = e.current_sheet().table(id).unwrap().clone();
+        labels(e.revision_cell_entries(&t, crate::drawing_cells::CellSel { table: id, a: (0, 0), b: (0, 0) }))
+    });
+    assert_eq!(cells, ["Size", "Resize...", "Copy"]);
 }

@@ -498,56 +498,6 @@ impl DrawingEditor {
         out
     }
 
-    pub fn table_more_entries(&self, t: &Table, cell: Option<(usize, usize)>) -> Vec<MenuEntry> {
-        let mut out = Vec::new();
-        let id = t.id;
-        let Some((r, c)) = cell.map(|(r, c)| t.anchor_cell(r, c)) else { return out };
-        out.push(MenuEntry::item("Format cell...", move |t, w, cx| t.open_cell_format_panel(id, r, c, w, cx)));
-        let layout = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned();
-        let m = t.merge_at(r, c).unwrap_or(CellMerge { row: r, col: c, rows: 1, cols: 1 });
-        let (nrows, ncols) = layout.as_ref().map(te::counts).unwrap_or((1, 1));
-        if let Some(l) = layout.clone() {
-            if m.col + m.cols < ncols {
-                let l = l.clone();
-                out.push(MenuEntry::item("Merge with cell right", move |t, _, cx| t.edit_table(id, "Merge cells", cx, |t| {
-                    te::merge_right(t, &l, r, c);
-                })));
-            }
-            if m.row + m.rows < nrows {
-                out.push(MenuEntry::item("Merge with cell below", move |t, _, cx| t.edit_table(id, "Merge cells", cx, |t| {
-                    te::merge_below(t, &l, r, c);
-                })));
-            }
-        }
-        if t.merge_at(r, c).is_some() {
-            out.push(MenuEntry::item("Unmerge cells", move |t, _, cx| t.edit_table(id, "Unmerge cells", cx, |t| {
-                t.unmerge(r, c);
-            })));
-        }
-        // Size › Columns equally / Rows equally; Resize… (column width, row height).
-        if let Some(l) = layout {
-            let (l1, l2) = (l.clone(), l.clone());
-            out.push(MenuEntry::Submenu(
-                "Size".into(),
-                vec![
-                    MenuEntry::item("Columns equally", move |t, _, cx| t.edit_table(id, "Size columns equally", cx, |t| te::columns_equally(t, &l1))),
-                    MenuEntry::item("Rows equally", move |t, _, cx| t.edit_table(id, "Size rows equally", cx, |t| te::rows_equally(t, &l2))),
-                ],
-            ));
-            let (w, h) = (l.xs.get(c + 1).zip(l.xs.get(c)).map(|(b, a)| b - a).unwrap_or(20.0), t.row_height);
-            out.push(MenuEntry::item("Resize...", move |t, win, cx| {
-                let width = t.input(&format::format_number(w, None, 2), win, cx);
-                let height = t.input(&format::format_number(h, None, 2), win, cx);
-                t.panel = Some(Panel::CellResize { table: id, col: c, width, height });
-                cx.notify();
-            }));
-        }
-        out.push(MenuEntry::Separator);
-        out
-    }
-
-    // ------------------------------------------------------------ panels
-
     pub fn open_more_panel(&mut self, a: &Annotation, window: &mut Window, cx: &mut Context<Self>) {
         if let AnnotationKind::DatumTarget { label, area, .. } = &a.kind {
             let u = format::length_units(&self.drawing, &DimFormat::default());

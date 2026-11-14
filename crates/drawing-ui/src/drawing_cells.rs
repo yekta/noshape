@@ -64,7 +64,9 @@ impl DrawingEditor {
         // Live (behaviours "qa (2026-10-28) drawing.md TB7", request 1567):
         // Shift+click extends the cell selection to the block from its
         // first cell (qa DWG-TABLE-SHIFT-EXTEND).
-        let anchor = self.cell_sel.as_ref().filter(|s| shift && s.table == id).map(|s| s.a);
+        // (A revision table selects one cell at a time: Shift / Ctrl+click replace it, live2 drw-revision-*.)
+        let single = matches!(self.current_sheet().table(id).map(|t| &t.kind), Some(TableKind::Revision { .. }));
+        let anchor = self.cell_sel.as_ref().filter(|s| shift && !single && s.table == id).map(|s| s.a);
         self.selection = vec![Sel::Table(id)];
         self.cell_sel = Some(CellSel { table: id, a: anchor.unwrap_or(cell), b: cell });
         self.status = None;
