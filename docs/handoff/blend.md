@@ -1,5 +1,25 @@
 # Blends (agent "blend")
 
+## 11-14 16:53 UTC: asm-hand-drill-pinslot's failing blends (live's targets core/qhd); floorplane, mitretools gating
+
+live's targets: /root/onshape-research/live/core/qhd/targets.md (+ out.json: created faces' ids, types, areas, boxes).
+Single-studio model dirs: vibe5 ~/tmp/blend/hdm/hd-<id6> (Mac ~/noshape-host/parity/hdm-blend), run with
+NOSHAPE_PARITY_ONLY=hd-<id6> NOSHAPE_PARITY_DIFFERING=1. Where the blend's input matches live:
+- 4bed3f Fillet 4 (Spring Shim, R0.5 on 59 top edges, 0.02 mm steps at sharp corners): OCCT fails whole and edge by
+  edge. **blend6 `blend-mitretools` e2a50fa19**: after every fallback, fillet_by_tools mode 3 (mitres as mode 0's,
+  no ball needed; arcs at convex corners) builds it as live: 120 faces, 473.342190 mm³ (live 473.342275). T1
+  blend::rounds_of_a_shim_with_tiny_steps_are_built_as_tools_as_live (tests/data/blend/hand-drill-shim-fillet4.brep).
+  Only live's box differs (y ±17.755 vs ±17.707: live's loose, a round can't grow the part). Unit blend-mitre-gates
+  (vibe5: g++-13, tests, pair vs blend10). 1.3 s in the fallback (59 tools cut together): speed next.
+- f79298 / 9fbc05 Chamfer 1: the wrong edges, not the chamfer: its 15 queries are CAP_EDGEs (the end face's tip arcs,
+  where live's 15 cones are) and ours resolves axial tip lines. Sent to skasm (translator / query resolution).
+- 9fbc05 Fillet 1: PRISM-ROUNDS-RUNOUT (parked P2, B-spline flank edges; the tools route takes lines and arcs only).
+Inputs differ upstream (not judged): 0d1e01 Chamfer 1 (Extrude 4), 7ed710 Chamfer 1 / Fillet 1 (Split 1, Sweep 2),
+e53bba Fillet 3 (Extrude 8 on), f79298 Fillet 5 (Extrude 7 on); e53bba Chamfer 1 errors in live too.
+
+blend3 `blend-floorplane` 78973612e: gates clean (g++-13, kernel 59/59 + model blend tests, pair 870 = 870 no
+differences); asm on vibe7 running (asm-floor-new.log). Land when it shows nothing worse than asm-halfround-new.log.
+
 ## 11-14 15:35 UTC: landed partrays, frameside, halfround, projonce; before/after on the Mac
 
 Landed today: secwires 66cc9880, partrays c04fdfb5, frameside 351cb81d, halfround 3a6fc428 (skasm told), projonce
