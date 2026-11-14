@@ -1,16 +1,16 @@
 {
  "scenario": "gusset-new-edit-reedit",
- "recorded": "2026-11-13T00:17:01.007Z",
+ "recorded": "2026-11-14T22:24:48.204Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "7852a842840e401298d41181",
+  "element": "457b652fe35b66b89d27b730",
   "start": "frame-l",
   "startElement": "7d64a832cc847ff5304ddb43",
   "runner": "live2 .nstate-uip-3.json"
@@ -134,14 +134,14 @@
       {
        "label": "Length",
        "kind": "number",
-       "text": "25 mm",
+       "text": "20 mm",
        "focused": false,
        "state": "ok"
       },
       {
        "label": "Thickness",
        "kind": "number",
-       "text": "25 mm",
+       "text": "10 mm",
        "focused": false,
        "state": "ok"
       },
@@ -191,14 +191,14 @@
        {
         "label": "Length",
         "kind": "number",
-        "text": "25 mm",
+        "text": "20 mm",
         "focused": false,
         "state": "ok"
        },
        {
         "label": "Thickness",
         "kind": "number",
-        "text": "25 mm",
+        "text": "10 mm",
         "focused": false,
         "state": "ok"
        },
@@ -305,7 +305,7 @@
     },
     "measure": null
    },
-   "t": 58972
+   "t": 37150
   },
   {
    "step": 2,
@@ -343,14 +343,14 @@
       {
        "label": "Length",
        "kind": "number",
-       "text": "25 mm",
+       "text": "20 mm",
        "focused": false,
        "state": "ok"
       },
       {
        "label": "Thickness",
        "kind": "number",
-       "text": "25 mm",
+       "text": "10 mm",
        "focused": false,
        "state": "ok"
       },
@@ -400,14 +400,14 @@
        {
         "label": "Length",
         "kind": "number",
-        "text": "25 mm",
+        "text": "20 mm",
         "focused": false,
         "state": "ok"
        },
        {
         "label": "Thickness",
         "kind": "number",
-        "text": "25 mm",
+        "text": "10 mm",
         "focused": false,
         "state": "ok"
        },
@@ -514,7 +514,7 @@
     },
     "measure": null
    },
-   "t": 64977
+   "t": 42347
   },
   {
    "step": 3,
@@ -564,14 +564,14 @@
       {
        "label": "Length",
        "kind": "number",
-       "text": "25 mm",
+       "text": "20 mm",
        "focused": false,
        "state": "ok"
       },
       {
        "label": "Thickness",
        "kind": "number",
-       "text": "25 mm",
+       "text": "10 mm",
        "focused": false,
        "state": "ok"
       },
@@ -623,14 +623,14 @@
        {
         "label": "Length",
         "kind": "number",
-        "text": "25 mm",
+        "text": "20 mm",
         "focused": false,
         "state": "ok"
        },
        {
         "label": "Thickness",
         "kind": "number",
-        "text": "25 mm",
+        "text": "10 mm",
         "focused": false,
         "state": "ok"
        },
@@ -744,7 +744,7 @@
     },
     "measure": null
    },
-   "t": 76410
+   "t": 48820
   },
   {
    "step": 4,
@@ -764,7 +764,7 @@
      "kind": "field",
      "tag": "input",
      "label": "Length",
-     "text": "25 mm",
+     "text": "20 mm",
      "selection": [
       0,
       5
@@ -796,14 +796,14 @@
       {
        "label": "Length",
        "kind": "number",
-       "text": "25 mm",
+       "text": "20 mm",
        "focused": true,
        "state": "ok"
       },
       {
        "label": "Thickness",
        "kind": "number",
-       "text": "25 mm",
+       "text": "10 mm",
        "focused": false,
        "state": "ok"
       },
@@ -855,14 +855,14 @@
        {
         "label": "Length",
         "kind": "number",
-        "text": "25 mm",
+        "text": "20 mm",
         "focused": true,
         "state": "ok"
        },
        {
         "label": "Thickness",
         "kind": "number",
-        "text": "25 mm",
+        "text": "10 mm",
         "focused": false,
         "state": "ok"
        },
@@ -976,7 +976,7 @@
     },
     "measure": null
    },
-   "t": 79933
+   "t": 51528
   },
   {
    "step": 5,
@@ -1029,7 +1029,7 @@
       {
        "label": "Thickness",
        "kind": "number",
-       "text": "25 mm",
+       "text": "10 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1088,7 +1088,7 @@
        {
         "label": "Thickness",
         "kind": "number",
-        "text": "25 mm",
+        "text": "10 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1202,7 +1202,7 @@
     },
     "measure": null
    },
-   "t": 82698
+   "t": 53946
   },
   {
    "step": 6,
@@ -1263,7 +1263,7 @@
       {
        "label": "Thickness",
        "kind": "number",
-       "text": "25 mm",
+       "text": "10 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1322,7 +1322,7 @@
        {
         "label": "Thickness",
         "kind": "number",
-        "text": "25 mm",
+        "text": "10 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1436,7 +1436,7 @@
     },
     "measure": null
    },
-   "t": 88965
+   "t": 58088
   },
   {
    "step": 7,
@@ -1489,7 +1489,7 @@
       {
        "label": "Thickness",
        "kind": "number",
-       "text": "25 mm",
+       "text": "10 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1548,7 +1548,7 @@
        {
         "label": "Thickness",
         "kind": "number",
-        "text": "25 mm",
+        "text": "10 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1662,7 +1662,7 @@
     },
     "measure": null
    },
-   "t": 95576
+   "t": 63150
   },
   {
    "step": 8,
@@ -1715,7 +1715,7 @@
       {
        "label": "Thickness",
        "kind": "number",
-       "text": "25 mm",
+       "text": "10 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1774,7 +1774,7 @@
        {
         "label": "Thickness",
         "kind": "number",
-        "text": "25 mm",
+        "text": "10 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1888,7 +1888,7 @@
     },
     "measure": null
    },
-   "t": 100637
+   "t": 67818
   },
   {
    "step": 9,
@@ -1989,7 +1989,7 @@
     },
     "measure": null
    },
-   "t": 106898
+   "t": 71710
   },
   {
    "step": 10,
@@ -2084,7 +2084,7 @@
     },
     "measure": null
    },
-   "t": 111956
+   "t": 76325
   },
   {
    "step": 11,
@@ -2137,7 +2137,7 @@
       {
        "label": "Thickness",
        "kind": "number",
-       "text": "25 mm",
+       "text": "10 mm",
        "focused": false,
        "state": "ok"
       },
@@ -2196,7 +2196,7 @@
        {
         "label": "Thickness",
         "kind": "number",
-        "text": "25 mm",
+        "text": "10 mm",
         "focused": false,
         "state": "ok"
        },
@@ -2310,7 +2310,7 @@
     },
     "measure": null
    },
-   "t": 118556
+   "t": 81984
   },
   {
    "step": 12,
@@ -2357,7 +2357,7 @@
       {
        "label": "Thickness",
        "kind": "number",
-       "text": "25 mm",
+       "text": "10 mm",
        "focused": false,
        "state": "ok"
       },
@@ -2416,7 +2416,7 @@
        {
         "label": "Thickness",
         "kind": "number",
-        "text": "25 mm",
+        "text": "10 mm",
         "focused": false,
         "state": "ok"
        },
@@ -2530,7 +2530,7 @@
     },
     "measure": null
    },
-   "t": 123851
+   "t": 87049
   },
   {
    "step": 13,
@@ -2550,7 +2550,7 @@
      "kind": "field",
      "tag": "input",
      "label": "Thickness",
-     "text": "25 mm",
+     "text": "10 mm",
      "selection": [
       0,
       5
@@ -2589,7 +2589,7 @@
       {
        "label": "Thickness",
        "kind": "number",
-       "text": "25 mm",
+       "text": "10 mm",
        "focused": true,
        "state": "ok"
       },
@@ -2648,7 +2648,7 @@
        {
         "label": "Thickness",
         "kind": "number",
-        "text": "25 mm",
+        "text": "10 mm",
         "focused": true,
         "state": "ok"
        },
@@ -2762,7 +2762,7 @@
     },
     "measure": null
    },
-   "t": 126858
+   "t": 89647
   },
   {
    "step": 14,
@@ -2988,7 +2988,7 @@
     },
     "measure": null
    },
-   "t": 129626
+   "t": 92143
   },
   {
    "step": 15,
@@ -3003,7 +3003,7 @@
      227
     ],
     "hover": [
-     "FWwXA6gn8oVdvJC_1"
+     "Fajfq2YXhdoyPQr_1"
     ],
     "element": "input.os-param-number.dropdown-source"
    },
@@ -3224,7 +3224,7 @@
     },
     "measure": null
    },
-   "t": 135688
+   "t": 96941
   },
   {
    "step": 16,
@@ -3450,7 +3450,7 @@
     },
     "measure": null
    },
-   "t": 143472
+   "t": 101730
   },
   {
    "step": 17,
@@ -3676,7 +3676,7 @@
     },
     "measure": null
    },
-   "t": 148466
+   "t": 106570
   },
   {
    "step": 18,
@@ -3777,7 +3777,7 @@
     },
     "measure": null
    },
-   "t": 154534
+   "t": 111264
   },
   {
    "step": 19,
@@ -3872,7 +3872,7 @@
     },
     "measure": null
    },
-   "t": 159531
+   "t": 115962
   },
   {
    "step": 20,
@@ -4098,7 +4098,7 @@
     },
     "measure": null
    },
-   "t": 168611
+   "t": 123335
   },
   {
    "step": 21,
@@ -4318,7 +4318,7 @@
     },
     "measure": null
    },
-   "t": 174518
+   "t": 127983
   },
   {
    "step": 22,
@@ -4333,7 +4333,7 @@
      339
     ],
     "hover": [
-     "FWwXA6gn8oVdvJC_1"
+     "Fajfq2YXhdoyPQr_1"
     ],
     "element": "span.os-list-item-name"
    },
@@ -4423,7 +4423,7 @@
     },
     "measure": null
    },
-   "t": 180319
+   "t": 132149
   },
   {
    "step": 23,
@@ -4518,7 +4518,7 @@
     },
     "measure": null
    },
-   "t": 185450
+   "t": 136757
   }
  ]
 }

@@ -1,16 +1,16 @@
 {
  "scenario": "end-cap-new-edit-reedit",
- "recorded": "2026-11-13T00:12:51.175Z",
+ "recorded": "2026-11-14T22:14:53.680Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "5e0ff2c06a2c0f4a264c3a71",
+  "element": "d7e263bfc567644c26ba5a1d",
   "start": "frame-l",
   "startElement": "7d64a832cc847ff5304ddb43",
   "runner": "live2 .nstate-uip-3.json"
@@ -291,7 +291,7 @@
     },
     "measure": null
    },
-   "t": 48163
+   "t": 39780
   },
   {
    "step": 2,
@@ -486,7 +486,7 @@
     },
     "measure": null
    },
-   "t": 53414
+   "t": 44614
   },
   {
    "step": 3,
@@ -702,7 +702,7 @@
     },
     "measure": null
    },
-   "t": 65828
+   "t": 53170
   },
   {
    "step": 4,
@@ -920,7 +920,7 @@
     },
     "measure": null
    },
-   "t": 76142
+   "t": 57778
   },
   {
    "step": 5,
@@ -1132,7 +1132,7 @@
     },
     "measure": null
    },
-   "t": 79412
+   "t": 60204
   },
   {
    "step": 6,
@@ -1352,7 +1352,7 @@
     },
     "measure": null
    },
-   "t": 89070
+   "t": 66112
   },
   {
    "step": 7,
@@ -1564,7 +1564,7 @@
     },
     "measure": null
    },
-   "t": 96484
+   "t": 71822
   },
   {
    "step": 8,
@@ -1776,7 +1776,7 @@
     },
     "measure": null
    },
-   "t": 101552
+   "t": 76523
   },
   {
    "step": 9,
@@ -1877,7 +1877,7 @@
     },
     "measure": null
    },
-   "t": 111003
+   "t": 82218
   },
   {
    "step": 10,
@@ -1972,7 +1972,7 @@
     },
     "measure": null
    },
-   "t": 118311
+   "t": 88031
   },
   {
    "step": 11,
@@ -2184,7 +2184,7 @@
     },
     "measure": null
    },
-   "t": 131848
+   "t": 96650
   },
   {
    "step": 12,
@@ -2390,7 +2390,7 @@
     },
     "measure": null
    },
-   "t": 139891
+   "t": 103738
   },
   {
    "step": 13,
@@ -2608,7 +2608,7 @@
     },
     "measure": null
    },
-   "t": 142820
+   "t": 106380
   },
   {
    "step": 14,
@@ -2820,7 +2820,7 @@
     },
     "measure": null
    },
-   "t": 145479
+   "t": 108641
   },
   {
    "step": 15,
@@ -3040,7 +3040,7 @@
     },
     "measure": null
    },
-   "t": 156126
+   "t": 114030
   },
   {
    "step": 16,
@@ -3252,7 +3252,7 @@
     },
     "measure": null
    },
-   "t": 163832
+   "t": 119411
   },
   {
    "step": 17,
@@ -3464,7 +3464,7 @@
     },
     "measure": null
    },
-   "t": 169106
+   "t": 124035
   },
   {
    "step": 18,
@@ -3565,7 +3565,7 @@
     },
     "measure": null
    },
-   "t": 178532
+   "t": 128086
   },
   {
    "step": 19,
@@ -3660,7 +3660,7 @@
     },
     "measure": null
    },
-   "t": 186281
+   "t": 132687
   },
   {
    "step": 20,
@@ -3872,7 +3872,7 @@
     },
     "measure": null
    },
-   "t": 204446
+   "t": 138176
   },
   {
    "step": 21,
@@ -4078,7 +4078,7 @@
     },
     "measure": null
    },
-   "t": 211552
+   "t": 143316
   },
   {
    "step": 22,
@@ -4093,7 +4093,7 @@
      339
     ],
     "hover": [
-     "FqO85EOscpm0Qxd_1"
+     "FfOTCHvAHQDjeQN_1"
     ],
     "element": "span.os-list-item-name"
    },
@@ -4183,7 +4183,7 @@
     },
     "measure": null
    },
-   "t": 220591
+   "t": 149308
   },
   {
    "step": 23,
@@ -4278,7 +4278,7 @@
     },
     "measure": null
    },
-   "t": 229166
+   "t": 154677
   }
  ]
 }

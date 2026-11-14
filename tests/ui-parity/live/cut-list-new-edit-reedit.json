@@ -1,16 +1,16 @@
 {
  "scenario": "cut-list-new-edit-reedit",
- "recorded": "2026-11-12T23:55:45.803Z",
+ "recorded": "2026-11-14T22:13:01.547Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "4030c7966e1c112fb6f476ed",
+  "element": "49da9ea0de3b52352882f806",
   "start": "frame-l",
   "startElement": "7d64a832cc847ff5304ddb43",
   "runner": "live2 .nstate-uip-3.json"
@@ -251,7 +251,7 @@
     },
     "measure": null
    },
-   "t": 35018
+   "t": 39678
   },
   {
    "step": 2,
@@ -406,7 +406,7 @@
     },
     "measure": null
    },
-   "t": 39727
+   "t": 45700
   },
   {
    "step": 3,
@@ -560,7 +560,7 @@
     },
     "measure": null
    },
-   "t": 44652
+   "t": 50392
   },
   {
    "step": 4,
@@ -708,7 +708,7 @@
     },
     "measure": null
    },
-   "t": 49983
+   "t": 55540
   },
   {
    "step": 5,
@@ -809,7 +809,7 @@
     },
     "measure": null
    },
-   "t": 53860
+   "t": 59361
   },
   {
    "step": 6,
@@ -904,7 +904,7 @@
     },
     "measure": null
    },
-   "t": 58574
+   "t": 64031
   },
   {
    "step": 7,
@@ -1052,7 +1052,7 @@
     },
     "measure": null
    },
-   "t": 63540
+   "t": 69803
   },
   {
    "step": 8,
@@ -1194,7 +1194,7 @@
     },
     "measure": null
    },
-   "t": 68783
+   "t": 75137
   },
   {
    "step": 9,
@@ -1336,7 +1336,7 @@
     },
     "measure": null
    },
-   "t": 73442
+   "t": 79767
   },
   {
    "step": 10,
@@ -1437,7 +1437,7 @@
     },
     "measure": null
    },
-   "t": 78002
+   "t": 84088
   },
   {
    "step": 11,
@@ -1532,7 +1532,7 @@
     },
     "measure": null
    },
-   "t": 82646
+   "t": 88724
   },
   {
    "step": 12,
@@ -1680,7 +1680,7 @@
     },
     "measure": null
    },
-   "t": 86114
+   "t": 92613
   },
   {
    "step": 13,
@@ -1822,7 +1822,7 @@
     },
     "measure": null
    },
-   "t": 90742
+   "t": 97412
   },
   {
    "step": 14,
@@ -1925,7 +1925,7 @@
     },
     "measure": null
    },
-   "t": 95065
+   "t": 101610
   },
   {
    "step": 15,
@@ -2020,7 +2020,7 @@
     },
     "measure": null
    },
-   "t": 99713
+   "t": 106263
   }
  ]
 }

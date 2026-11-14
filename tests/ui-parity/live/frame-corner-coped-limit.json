@@ -1,16 +1,16 @@
 {
  "scenario": "frame-corner-coped-limit",
- "recorded": "2026-11-14T04:23:28.801Z",
+ "recorded": "2026-11-14T22:21:46.161Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.5"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "e4106295df87d625651bf61f",
+  "element": "df5c17fe40e6fa4bd8d8924e",
   "start": "frame-l",
   "startElement": "7d64a832cc847ff5304ddb43",
   "runner": "live2 .nstate-uip-3.json"
@@ -128,7 +128,8 @@
        "label": "Selections",
        "kind": "query",
        "items": [
-        "Sketch 1"
+        "Edge of Sketch 1",
+        "Edge of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -204,7 +205,8 @@
         "label": "Selections",
         "kind": "query",
         "items": [
-         "Sketch 1"
+         "Edge of Sketch 1",
+         "Edge of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -345,7 +347,7 @@
     },
     "measure": null
    },
-   "t": 35559
+   "t": 39324
   },
   {
    "step": 2,
@@ -377,7 +379,8 @@
        "label": "Selections",
        "kind": "query",
        "items": [
-        "Sketch 1"
+        "Edge of Sketch 1",
+        "Edge of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -453,7 +456,8 @@
         "label": "Selections",
         "kind": "query",
         "items": [
-         "Sketch 1"
+         "Edge of Sketch 1",
+         "Edge of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -594,7 +598,7 @@
     },
     "measure": null
    },
-   "t": 42094
+   "t": 45590
   },
   {
    "step": 3,
@@ -608,7 +612,7 @@
    "ok": true,
    "at": [
     399,
-    344
+    368
    ],
    "state": {
     "focus": {
@@ -639,7 +643,8 @@
        "label": "Selections",
        "kind": "query",
        "items": [
-        "Sketch 1"
+        "Edge of Sketch 1",
+        "Edge of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -721,7 +726,8 @@
         "label": "Selections",
         "kind": "query",
         "items": [
-         "Sketch 1"
+         "Edge of Sketch 1",
+         "Edge of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -868,7 +874,7 @@
     },
     "measure": null
    },
-   "t": 49165
+   "t": 54344
   },
   {
    "step": 4,
@@ -906,7 +912,8 @@
        "label": "Selections",
        "kind": "query",
        "items": [
-        "Sketch 1"
+        "Edge of Sketch 1",
+        "Edge of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -988,7 +995,8 @@
         "label": "Selections",
         "kind": "query",
         "items": [
-         "Sketch 1"
+         "Edge of Sketch 1",
+         "Edge of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -1135,7 +1143,7 @@
     },
     "measure": null
    },
-   "t": 54929
+   "t": 59433
   },
   {
    "step": 5,
@@ -1148,7 +1156,7 @@
    "ok": true,
    "at": [
     338,
-    430
+    454
    ],
    "state": {
     "focus": {
@@ -1179,7 +1187,8 @@
        "label": "Selections",
        "kind": "query",
        "items": [
-        "Sketch 1"
+        "Edge of Sketch 1",
+        "Edge of Sketch 1"
        ],
        "active": false,
        "state": "ok"
@@ -1275,7 +1284,8 @@
         "label": "Selections",
         "kind": "query",
         "items": [
-         "Sketch 1"
+         "Edge of Sketch 1",
+         "Edge of Sketch 1"
         ],
         "active": false,
         "state": "ok"
@@ -1425,7 +1435,7 @@
     },
     "measure": null
    },
-   "t": 60048
+   "t": 65521
   },
   {
    "step": 6,
@@ -1463,7 +1473,8 @@
        "label": "Selections",
        "kind": "query",
        "items": [
-        "Sketch 1"
+        "Edge of Sketch 1",
+        "Edge of Sketch 1"
        ],
        "active": false,
        "state": "ok"
@@ -1559,7 +1570,8 @@
         "label": "Selections",
         "kind": "query",
         "items": [
-         "Sketch 1"
+         "Edge of Sketch 1",
+         "Edge of Sketch 1"
         ],
         "active": false,
         "state": "ok"
@@ -1709,7 +1721,7 @@
     },
     "measure": null
    },
-   "t": 65285
+   "t": 70712
   },
   {
    "step": 7,
@@ -1721,7 +1733,7 @@
    "pointer": {
     "at": [
      337,
-     429
+     453
     ],
     "hover": [
      "FopDy7w5SZPYbDF_0"
@@ -1804,7 +1816,7 @@
     },
     "measure": null
    },
-   "t": 70178
+   "t": 75228
   },
   {
    "step": 8,
@@ -1889,7 +1901,7 @@
     },
     "measure": null
    },
-   "t": 74737
+   "t": 80512
   }
  ]
 }
