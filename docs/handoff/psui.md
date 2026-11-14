@@ -212,6 +212,12 @@ edge already took both constraints (Perpendicular + coincident with the used edg
 Now one glyph per constraint created (`sketch_mode::inference_icons`, the direction's first). Asked live2 for the
 glyphs' order, spacing, the dashed guides of combinations, which wins of three, and direction x direction (not H/V)
 crossings; refine against that.
+**11-14 (live2 combo.json, all cases):** any two zones crossing now combine in the editor (an alignment through a
+woken point is a zone too: alignment × curve / edge, direction × alignment); of several crossings the nearest the
+pointer; a crossing holds while the pointer is in both zones (live's reach: along a line the direction's band, along
+the direction the line's 15 px band; a tangent line touching its circle keeps the 15 px point); glyphs by the pointer;
+the line landed on lit with the reference; guides to every aligned point. Open with live2: glyph order with an
+alignment (perpAlign's crop shows none), parEdge without PARALLEL (Lb not woken?), tanLine's arcs (probe artefact).
 **11-14 18:16 (viewport speed, Linux numbers):** vibe7 (load ~16), release, llvmpipe, 60 samples, mode-700 copies
 deleted after. Pointer / click to the frame with its highlight or selection, p50: dock hover 370 ms, pick 620; hat15
 hover 381-856, pick 1074: llvmpipe drawing the models. To its submission p50 0.4-1.9 ms; the maxima (69-985 ms, one

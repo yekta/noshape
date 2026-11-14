@@ -111,6 +111,9 @@ const CIRCLE: &[Draw] = &[Draw::Circle(C(80., 0.), 50.)];
 const ARC: &[Draw] = &[Draw::Arc(C(-120., 0.), C(0., 0.), C(-60., 45.))];
 
 const POINT_P: &[Draw] = &[Draw::Point(C(-60., 70.))];
+/// live2 combo perpLine's line Lc and perpAlign's line Lw3 (its end woken), in px.
+const PERP_LINE: &[Draw] = &[Draw::Line(C(-49.86, -27.92), C(49.86, -47.87))];
+const PERP_ALIGN: &[Draw] = &[Draw::Line(C(-61.83, 35.9), C(-49.86, 35.9))];
 /// Where the rows' lines start: clear of every target's horizontal and vertical.
 const S: Pt = C(-170., -130.);
 const H: f64 = std::f64::consts::FRAC_1_SQRT_2;
@@ -205,6 +208,13 @@ fn rows() -> Vec<Row> {
             rest: &[C(0., 80.), C(-120., -40.)],
             ..row("line-end/two-acquired/intersection", Tool::Line, &[Draw::Line(C(0., 80.), C(40., 120.)), Draw::Line(C(-120., -40.), C(-160., -80.))], Some(C(-200., 150.)), (C(0., -40.), (1., 0.)), (3., None), &["HORIZONTAL", "VERTICAL"])
         },
+        // Two zones crossing (live2 combo.json, its mm at 0.2507 mm a px about (17.5, 15)): a chain's end square to the
+        // last segment and on a line takes both while the pointer is in both zones: along the line 6 px holds, 9 only
+        // on the line (off the square's band); along the square 9 holds, 12 only square (off the line's band).
+        Row { clicks: &[C(9.97, 19.94)], ..row("combo/perpendicular+line/along", Tool::Line, PERP_LINE, Some(C(49.86, 39.89)), (C(43.21, -46.54), (-0.9806, 0.1961)), (5.5, Some(9.)), &["PERPENDICULAR", "COINCIDENT"]) },
+        Row { clicks: &[C(9.97, 19.94)], ..row("combo/perpendicular+line/across", Tool::Line, PERP_LINE, Some(C(49.86, 39.89)), (C(43.21, -46.54), (-0.4472, 0.8944)), (9., Some(12.)), &["COINCIDENT", "PERPENDICULAR"]) },
+        // Square to the last segment and level with a woken point (its end rested on): both.
+        Row { clicks: &[C(29.92, 0.)], rest: &[C(-49.86, 35.9)], ..row("combo/perpendicular+alignment", Tool::Line, PERP_ALIGN, Some(C(-29.92, -39.89)), (C(5.98, 35.9), (0.5547, -0.8321)), (6., None), &["HORIZONTAL", "PERPENDICULAR"]) },
         // Model targets, lit under the pointer (user P0 11-13): onto a model vertex, onto a model edge.
         Row { lit: Lit::Vertex, on_target: true, ..row("line-end/model-vertex/coincident", Tool::Line, &[], Some(C(-60., -40.)), (Pt::Corner, (-H, -H)), (3., None), &["COINCIDENT"]) },
         Row { lit: Lit::Edge, ..row("line-end/model-edge/on", Tool::Line, &[], Some(C(-60., -10.)), (Pt::EdgeQuarter, (0., -1.)), (3., None), &["COINCIDENT"]) },

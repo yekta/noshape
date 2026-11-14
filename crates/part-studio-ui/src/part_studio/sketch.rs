@@ -3998,9 +3998,11 @@ impl PartStudioView {
         out.append(&mut on_top);
 
         // ---- inference icon next to the cursor
+        // (By the pointer, not the snapped point: live2's combo crops, centred on the pointer, keep the glyphs in place
+        // while the point holds still.)
         if ed.tool.draws()
             && let Some(inf) = &ed.inference
-            && let Some((x, y)) = project(inf.position)
+            && let Some((x, y)) = project(ed.cursor.unwrap_or(inf.position))
         {
             let icons = ed.snap_icons();
             let (dx, dy) = crate::sketch_mode::glyph_offset(icons.len());

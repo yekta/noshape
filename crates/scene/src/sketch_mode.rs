@@ -512,6 +512,27 @@ fn is_direction_line(i: &Inference) -> bool {
         && !i.constraints.iter().any(|c| matches!(c, AutoConstraint::OnCurve(_)))
 }
 
+/// A horizontal / vertical alignment with a woken point (or the origin): the line through that point, a zone a
+/// direction or a curve can cross (live2 combo alignCurve, perpAlign).
+fn is_alignment(i: &Inference) -> bool {
+    matches!(i.kind, InferenceKind::AlignHorizontal | InferenceKind::AlignVertical) && i.constraints.len() == 1
+}
+
+/// A line zone: a direction through the anchor or an alignment through a woken point.
+fn is_line_zone(i: &Inference) -> bool {
+    is_direction_line(i) || is_alignment(i)
+}
+
+/// A line zone's line: a point on it and its direction.
+fn zone_line(i: &Inference) -> Option<(DVec2, DVec2)> {
+    let r = i.reference?;
+    match i.kind {
+        InferenceKind::AlignHorizontal => Some((r, DVec2::X)),
+        InferenceKind::AlignVertical => Some((r, DVec2::Y)),
+        _ => Some((r, (i.position - r).try_normalize()?)),
+    }
+}
+
 /// Snap to model geometry (from the 3D hover) supplied by the view.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExternalSnap {
@@ -1194,7 +1215,7 @@ fn auto_icon(c: &AutoConstraint) -> &'static str {
     }
 }
 
-/// Where the first of `n` snap glyphs (20 px boxes, 2 px apart) sits from the point, in px right and down: a single
+/// Where the first of `n` snap glyphs (20 px boxes, 2 px apart) sits from the pointer, in px right and down: a single
 /// one at (19, 21); a combined snap's row 4 px left and 4 px lower (live2 combo-perpEdge 3x crops: +15 / +25, a
 /// single coincident +19 / +21 beside it).
 pub fn glyph_offset(n: usize) -> (f32, f32) {
@@ -1544,23 +1565,48 @@ impl SketchEditor {
             all.retain(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Center));
         }
         let mut best = all.first().cloned();
-        // A direction line and a curve under the pointer: the end where they cross, both constraints (live2: a
-        // compound, ranked with the points); if they don't cross near the pointer, the curve wins (live/feel/
+        // Two zones crossing near the pointer: the end where they cross, both constraints (live2 combo: a direction
+        // or an alignment and a curve; a direction and an alignment; two directions through the anchor meet only
+        // there, two alignments are AlignBoth, a direction and another line's extension give nothing); the crossing
+        // nearest the pointer of all (live2 combo "three"). Without one, a curve beats a direction line (live/feel/
         // sketch-snaps.json "priority": curves over H / V, alignment, parallel, perpendicular and tangent lines).
         // (A tangent line and its own circle cross at the tangent point.)
-        if let Some(b) = &best
-            && is_direction_line(b)
-            && let Some(on) = all.iter().find(|i| i.kind == InferenceKind::OnCurve && i.entity.is_some_and(|e| Some(e) != b.entity || b.kind == InferenceKind::Tangent))
-            && let Some(c) = on.entity.and_then(|e| sk.curve(e))
-        {
-            best = Some(match self.direction_onto_curve(b, &c, on.position) {
-                Some(mut both) => {
-                    both.entity = on.entity;
-                    both.constraints.extend(on.constraints.iter().copied());
-                    both
+        let point_like = |i: &Inference| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center | InferenceKind::Quadrant);
+        if best.as_ref().is_some_and(|b| !point_like(b)) {
+            let zones: Vec<&Inference> = all.iter().filter(|i| is_line_zone(i)).collect();
+            // (The crossings `infer` makes itself: H / V through the anchor on a curve or with an alignment, two
+            // alignments.)
+            let mut crossings: Vec<Inference> = all.iter().filter(|i| i.constraints.len() >= 2 && !point_like(i)).cloned().collect();
+            for l in &zones {
+                for on in all.iter().filter(|i| i.kind == InferenceKind::OnCurve && i.constraints.len() == 1 && i.entity.is_some_and(|e| Some(e) != l.entity || l.kind == InferenceKind::Tangent)) {
+                    if let Some(c) = on.entity.and_then(|e| sk.curve(e))
+                        && let Some(mut both) = self.direction_onto_curve(l, &c, on.position)
+                    {
+                        both.constraints.extend(on.constraints.iter().copied());
+                        crossings.push(both);
+                    }
                 }
-                None => on.clone(),
-            });
+                if !is_direction_line(l) {
+                    continue;
+                }
+                for m in zones.iter().filter(|m| is_alignment(m)) {
+                    if let Some((q, u)) = zone_line(m)
+                        && let Some(mut both) = self.direction_onto(l, q, u)
+                    {
+                        // (live2 perpAlign: the alignment's constraint first.)
+                        both.constraints = m.constraints.iter().chain(&l.constraints).copied().collect();
+                        crossings.push(both);
+                    }
+                }
+            }
+            if let Some(x) = crossings.into_iter().min_by(|a, b| a.distance.total_cmp(&b.distance)) {
+                best = Some(x);
+            } else if let Some(b) = &best
+                && is_direction_line(b)
+                && let Some(on) = all.iter().find(|i| i.kind == InferenceKind::OnCurve && i.entity.is_some_and(|e| Some(e) != b.entity || b.kind == InferenceKind::Tangent))
+            {
+                best = Some(on.clone());
+            }
         }
         // Elliptical arc: the end snaps to the construction ellipse's axis points.
         if self.tool == Tool::EllipticalArc
@@ -1884,7 +1930,7 @@ impl SketchEditor {
     /// they meet, if that is within reach of the pointer; its constraints kept (the on-curve one is added by whoever
     /// links the curve).
     fn direction_onto(&self, i: &Inference, on: DVec2, tangent: DVec2) -> Option<Inference> {
-        let (a, dir) = (i.reference?, (i.position - i.reference?).try_normalize()?);
+        let (a, dir) = zone_line(i)?;
         let den = dir.perp_dot(tangent);
         if den.abs() < 1e-9 {
             return None;
@@ -1896,7 +1942,7 @@ impl SketchEditor {
     /// exactly (a line, a circle or arc: the crossing nearest the pointer; a tangent line touches at its point),
     /// along the curve's tangent there for other curves.
     fn direction_onto_curve(&self, i: &Inference, c: &Curve2, on: DVec2) -> Option<Inference> {
-        let (a, dir) = (i.reference?, (i.position - i.reference?).try_normalize()?);
+        let (a, dir) = zone_line(i)?;
         match *c {
             Curve2::Line { a: la, b: lb } => self.direction_onto(i, la, lb - la),
             Curve2::Circle { center, radius } | Curve2::Arc { center, radius, .. } => {
@@ -1910,16 +1956,33 @@ impl SketchEditor {
                 let r = disc.max(0.0).sqrt();
                 let p = self.cursor?;
                 let x = [-b - r, -b + r].map(|t| a + dir * t).into_iter().min_by(|x, y| (*x - p).length().total_cmp(&(*y - p).length()))?;
+                // A line touching the circle: its point, a 15 px square (the matrix's line-end/circle/tangent: 6 px
+                // holds, at 10 only on the circle); the zones overlap along it.
+                if disc <= (radius * radius) * 1e-3 {
+                    return self.point_in_reach(i, x);
+                }
                 self.crossing_in_reach(i, x)
             }
             _ => self.direction_onto(i, on, c.tangent(c.closest(on).0)),
         }
     }
 
-    /// `i` moved to the crossing `x` when `x` is within a point's reach of the pointer (live: a compound is a point
-    /// zone, a 15 px square).
+    /// `i` moved to the crossing `x`: the pointer is in both zones (each one's snap offered), so live takes the
+    /// crossing (live2 combo: along a line or an edge it holds while the pointer stays in the direction's band, along
+    /// the direction while it stays in the line's 15 px band: 9 px out along a square at 0.79 of the line's normal
+    /// holds, 12 doesn't; a 15 px square round the crossing held too little). (Capped at three snap reaches away.)
     fn crossing_in_reach(&self, i: &Inference, x: DVec2) -> Option<Inference> {
-        if !is_direction_line(i) {
+        if !is_line_zone(i) {
+            return None;
+        }
+        let c = self.cursor?;
+        let seen = self.screen_metric().map_or((x - c).length(), |m| m.len(x - c));
+        (seen <= self.world_per_px * INFERENCE_PX * 3.0).then(|| Inference { position: x, distance: seen, ..i.clone() })
+    }
+
+    /// `i` moved to a touching point `x` within a point's reach of the pointer (a 15 px square).
+    fn point_in_reach(&self, i: &Inference, x: DVec2) -> Option<Inference> {
+        if !is_line_zone(i) {
             return None;
         }
         let c = self.cursor?;
@@ -6007,24 +6070,43 @@ impl SketchEditor {
                 lines.push_polyline(&pts3, [0x90, 0x90, 0x90, 255], 0, 1.0, on_top | LineSegment::DASHED);
             }
         }
-        // The entity a parallel / perpendicular / tangent inference relates to
-        // is highlighted orange (Onshape).
-        if let Some(inf) = &self.inference
-            && matches!(inf.kind, InferenceKind::Parallel | InferenceKind::Perpendicular | InferenceKind::Tangent)
-            && let Some(e) = inf.entity.filter(|e| data.sketch.entity(*e).is_some())
-        {
-            let pts3: Vec<[f32; 3]> = data.sketch.tessellate(e, self.world_per_px * 0.5).iter().map(|p| w(*p)).collect();
-            lines.push_polyline(&pts3, crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT), 0, 4.0, on_top);
+        // The curves the snap relates to are highlighted orange: a parallel / perpendicular / tangent's reference and
+        // a curve the end lands on, both for a combined snap (live2 combo perpLine: the last segment and the line).
+        if let Some(inf) = &self.inference {
+            let reference = inf.entity.filter(|_| matches!(inf.kind, InferenceKind::Parallel | InferenceKind::Perpendicular | InferenceKind::Tangent));
+            let related = inf.constraints.iter().filter_map(|c| match c {
+                AutoConstraint::OnCurve(e) | AutoConstraint::PerpendicularTo(e) | AutoConstraint::ParallelTo(e) | AutoConstraint::TangentTo(e) => Some(*e),
+                _ => None,
+            });
+            let mut lit: Vec<EntityId> = Vec::new();
+            for e in reference.into_iter().chain(related) {
+                if !lit.contains(&e) && data.sketch.entity(e).is_some_and(|x| x.kind() != EntityKind::Point) {
+                    lit.push(e);
+                }
+            }
+            for e in lit {
+                let pts3: Vec<[f32; 3]> = data.sketch.tessellate(e, self.world_per_px * 0.5).iter().map(|p| w(*p)).collect();
+                lines.push_polyline(&pts3, crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT), 0, 4.0, on_top);
+            }
         }
-        // The guide to the point an alignment refers to (a direction
+        // The guide to each point an alignment refers to (live2 combo perpAlign: a direction and an alignment show
+        // the rubber band's dash and the guide); otherwise the guide to the inference's reference (a direction
         // inference of the line being drawn shows as its dash instead).
-        if let Some(inf) = self.inference.as_ref().filter(|i| !(self.tool == Tool::Line && is_direction(i.kind)))
-            && let Some(r) = inf.reference
-        {
-            // Live (part-studio/1032): a 1 px yellow dash, 4 px on / 4 off, as
-            // on a rubber band.
-            let pts3 = [w(r), w(inf.position)];
-            lines.push_polyline(&pts3, INFERRED_DASH_COLOR, 0, 1.0, on_top | LineSegment::INFERRED);
+        if let Some(inf) = &self.inference {
+            let aligned: Vec<DVec2> = inf
+                .constraints
+                .iter()
+                .filter_map(|c| match c {
+                    AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == noshape_sketch::ORIGIN => Some(DVec2::ZERO),
+                    AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) => data.sketch.point(*p),
+                    _ => None,
+                })
+                .collect();
+            let guides = if aligned.is_empty() { inf.reference.filter(|_| !(self.tool == Tool::Line && is_direction(inf.kind))).into_iter().collect() } else { aligned };
+            for r in guides {
+                // Live (part-studio/1032): a 1 px yellow dash, 4 px on / 4 off, as on a rubber band.
+                lines.push_polyline(&[w(r), w(inf.position)], INFERRED_DASH_COLOR, 0, 1.0, on_top | LineSegment::INFERRED);
+            }
         }
         // A point inference marks its point; a direction inference of the
         // line being drawn shows on the line itself (its dash and end dot),
@@ -8216,6 +8298,58 @@ mod tests {
         ed.drag_handle(&d.sketch.clone(), PatternHandle::Center, v(0.0, 0.0));
         ed.follow_transform_selection(&d.sketch);
         assert!(ed.pattern_center.length() < 1e-6, "a dragged center stays put");
+    }
+
+    /// live2's combined snaps (feel/combo.json, 0.2507 mm a pixel, mm here): a chain's next end where two zones cross
+    /// near the pointer takes both constraints; of several crossings the nearest the pointer.
+    #[test]
+    fn crossing_zones_combine_as_live() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let px = 0.2507e-3;
+        // seg1 (10, 5) -> (25, 15) unless given, chained on; `woken` points woken; the pointer at `at`: the snap's constraints and point.
+        let probe_from = |seg1: (DVec2, DVec2), setup: &dyn Fn(&mut SketchData) -> Vec<EntityId>, at: DVec2| {
+            let (mut ed, mut d) = editor(Tool::Line);
+            ed.world_per_px = px;
+            let woken = setup(&mut d);
+            click(&mut ed, &mut d, seg1.0);
+            click(&mut ed, &mut d, seg1.1);
+            for w in woken {
+                ed.wake(w);
+            }
+            ed.pointer_move(&mut d, at, false, false);
+            let seg1 = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).map(|e| e.id).max().unwrap();
+            let inf = ed.inference.clone().unwrap_or_else(|| panic!("no snap at {at:?}"));
+            (inf, seg1, d)
+        };
+        let probe = |setup: &dyn Fn(&mut SketchData) -> Vec<EntityId>, at: DVec2| probe_from((mm(10.0, 5.0), mm(25.0, 15.0)), setup, at);
+        // Square to seg1 from (25, 15), up and left.
+        let up = v(-10.0, 15.0).normalize();
+        let square_at = |y: f64| mm(25.0, 15.0) + up * ((y - 15.0) * 1e-3 / up.y);
+        // perpAlign: the square and the horizontal through a woken (5, 24): both, the alignment's first. (2 px along it:
+        // headless, a direction's reach is 3 deg.)
+        let crossing = square_at(24.0);
+        let (inf, seg1, d) = probe(&|d| { let l = d.sketch.add_line(mm(2.0, 24.0), mm(5.0, 24.0)); vec![d.sketch.endpoints(l).unwrap().1] }, crossing + v(2.0 * px, 0.0));
+        let w = d.sketch.entities().filter(|e| e.kind() == EntityKind::Point).find(|e| d.sketch.point(e.id).is_some_and(|q| (q - mm(5.0, 24.0)).length() < 1e-9)).unwrap().id;
+        assert_eq!(inf.constraints, vec![AutoConstraint::HorizontalWith(w), AutoConstraint::PerpendicularTo(seg1)], "{inf:?}");
+        assert!((inf.position - crossing).length() < 1e-9);
+        // alignCurve (seg1 (20, 8) -> (25, 12)): the vertical through a woken (31, 28) and a circle: on the circle
+        // there, vertical with the point.
+        let on_circle = mm(31.0, 20.0 - 12f64.sqrt());
+        let (inf, _, d) = probe_from((mm(20.0, 8.0), mm(25.0, 12.0)), &|d| { d.sketch.add_circle(mm(33.0, 20.0), 4e-3); let l = d.sketch.add_line(mm(24.0, 28.0), mm(31.0, 28.0)); vec![d.sketch.endpoints(l).unwrap().1] }, on_circle + v(3.0 * px, 0.0));
+        let circle = d.sketch.entities().find(|e| e.kind() == EntityKind::Circle).unwrap().id;
+        assert!(inf.constraints.contains(&AutoConstraint::OnCurve(circle)) && inf.constraints.iter().any(|c| matches!(c, AutoConstraint::VerticalWith(_))), "{inf:?}");
+        assert!((inf.position - on_circle).length() < 1e-9);
+        // three: the square, a line along y = 30 and the vertical through a woken (15, 20): the crossing nearest the
+        // pointer (on the line at the square's crossing; the square and the vertical's 1.3 px from it).
+        let three = |d: &mut SketchData| { d.sketch.add_line(mm(0.0, 30.0), mm(40.0, 30.0)); let l = d.sketch.add_line(mm(12.0, 20.0), mm(15.0, 20.0)); vec![d.sketch.endpoints(l).unwrap().1] };
+        // (seg1 where live's clicks put it: from (10, 5) to (25, 15) all three would meet at (15, 30).)
+        let (s0, s1) = (mm(9.9703, 5.221), mm(24.7641, 15.2507));
+        let up = (s1 - s0).perp().normalize();
+        let (on_line, on_vertical) = (s1 + up * ((30e-3 - s1.y) / up.y), s1 + up * ((15e-3 - s1.x) / up.x));
+        let (inf, seg1, _) = probe_from((s0, s1), &three, on_line);
+        assert!(inf.constraints.contains(&AutoConstraint::PerpendicularTo(seg1)) && inf.constraints.iter().any(|c| matches!(c, AutoConstraint::OnCurve(_))), "{inf:?}");
+        let (inf, seg1, _) = probe_from((s0, s1), &three, on_vertical);
+        assert!(inf.constraints.contains(&AutoConstraint::PerpendicularTo(seg1)) && inf.constraints.iter().any(|c| matches!(c, AutoConstraint::VerticalWith(_))), "{inf:?}");
     }
 
     /// User P0 11-14: a combined snap shows a glyph for each constraint it creates, the direction's first; a model
