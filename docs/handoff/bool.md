@@ -309,8 +309,8 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   - **Worktrees:** /root/projects/noshape-wt/bool2 (branch bool2-cov). bool2-gate and bool-gate-base are gate.sh's.
     bool2-nightly is the crons' checkout. bool2-doc is for docs-only lands. Targets on vibe5: bool2, bool2-gate,
     bool-gate-base.
-  - **Host: vibe6 (lead 11-13 13:20 UTC: vibe5 at load 50+; NOSHAPE_RB_HOST=vibe6, NOSHAPE_GATE_HOST=vibe6; knurls out
-    there too).** vibe6 got the corpora, the gate's bin and cache and my recordings (~/agents/bool2-keep) at 13:25,
+  - **Host: vibe5 again (lead 11-14 ~03:00 UTC: vibe6 at load 56; NOSHAPE_RB_HOST / NOSHAPE_GATE_HOST=vibe5). vibe6 from 11-13
+    13:20 (knurls out there too).** vibe6 got the corpora, the gate's bin and cache and my recordings (~/agents/bool2-keep) at 13:25,
     copied through this machine (vibe5 can't reach vibe6 by name); its OCCT cache starts empty. vibe7 has the corpora and the gate's caches (copied 05:55 from vibe5's
     ~/agents/bool-corpora and ~/agents/bool-gate); vibe5 can't reach vibe7 by name, so copies go through this machine.
   - **Session cron, gone with the session; recreate it:** every hour at :17: `git -C
