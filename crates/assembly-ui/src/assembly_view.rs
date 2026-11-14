@@ -26,7 +26,7 @@ use glam::{DVec2, DVec3};
 use std::rc::Rc;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -106,6 +106,9 @@ struct RelationSession {
     ratio: Entity<InputState>,
     reverse: bool,
     editing: Option<MateId>,
+    /// The value field has the keyboard (for the dialog's state, live asm-gear-relation-ratio-reverse).
+    ratio_focused: bool,
+    _ratio_sub: Subscription,
 }
 
 #[path = "assembly_panels.rs"]
@@ -519,6 +522,8 @@ impl AssemblyView {
         subs.push(cx.subscribe_in(&relation_select, window, |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, window, cx| {
             let crate::os_select::OsSelectEvent::Picked(id) = ev;
             if let Some(k) = RELATION_KINDS.iter().copied().find(|k| noshape_ops::assembly::relation_name(*k) == id.as_ref()) {
+                // The type box keeps the keyboard (live asm-relation-type-switch: its unlabelled input).
+                this.ui.checkbox_focus = Some("");
                 this.set_relation_kind(k, window, cx);
             }
         }));
@@ -2122,6 +2127,11 @@ impl AssemblyView {
         let kind = existing.as_ref().map(|r| r.relation_type).unwrap_or(kind);
         let text = existing.as_ref().map(|r| r.ratio.text.clone()).unwrap_or_else(|| noshape_ops::assembly::relation_default_ratio(kind).into());
         let ratio = cx.new(|cx| InputState::new(window, cx).default_value(text));
+        let ratio_sub = cx.subscribe(&ratio, |this: &mut Self, _, ev: &InputEvent, _| {
+            if let (Some(r), InputEvent::Focus | InputEvent::Blur) = (&mut this.relation, ev) {
+                r.ratio_focused = matches!(ev, InputEvent::Focus);
+            }
+        });
         // A new relation starts empty (a selected mate is the preselection);
         // mates are then picked in the list or the graphics area.
         let pre = self.selected_mate.filter(|id| self.assembly(cx).and_then(|a| a.mate(*id)).is_some_and(|m| m.mate_type.dof() > 0));
@@ -2132,6 +2142,8 @@ impl AssemblyView {
             ratio,
             reverse: existing.as_ref().is_some_and(|r| r.reverse),
             editing: existing.map(|r| r.id),
+            ratio_focused: false,
+            _ratio_sub: ratio_sub,
         });
         cx.notify();
     }
@@ -2164,6 +2176,8 @@ impl AssemblyView {
         let Some(r) = &self.relation else { return };
         let Some(mates) = self.assembly(cx).and_then(|a| noshape_ops::assembly::check_relation(a, r.kind, r.a, r.b).ok()) else { return };
         let Some(r) = self.relation.take() else { return };
+        self.ui.checkbox_focus = None;
+        self.ui.number_focus = None;
         let ratio = ExprValue::new(r.ratio.read(cx).value().to_string());
         let (kind, reverse, editing) = (r.kind, r.reverse, r.editing);
         // The coupling is measured from the mates' current values.
@@ -3336,6 +3350,10 @@ impl AssemblyView {
     /// clicks on faces, edges and vertices select them (additive), their
     /// instances' rows too; an empty click clears.
     fn click_select(&mut self, target: Option<AsmPickTarget>, position: DVec2, additive: bool, cx: &mut Context<Self>) {
+        // A pattern's Instances picked in the graphics area: the keyboard leaves the dialog (live asm-linear-pattern-commit).
+        if self.pattern.as_ref().is_some_and(|p| p.active.is_none()) {
+            self.ui.keyboard_away = true;
+        }
         self.ui.root_selected = false;
         let now = std::time::Instant::now();
         let double = self.ui.last_click.is_some_and(|(t, p)| now.duration_since(t) < std::time::Duration::from_millis(500) && (p - position).length() < 4.0);
@@ -5657,7 +5675,8 @@ impl AssemblyView {
                 )
             })
             .collect();
-        let value = crate::os_ui::param_row(noshape_ops::assembly::relation_value_label(kind), crate::os_ui::input_h(Input::new(&r.ratio).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.));
+        let value_label = noshape_ops::assembly::relation_value_label(kind);
+        let value = crate::os_ui::param_row(value_label, crate::ui_script::mark(div().w_full().child(crate::os_ui::input_h(Input::new(&r.ratio).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)), move || format!("field:{value_label}")));
         let body = v_flex()
             .pb(px(2.))
             .child(div().id("rel-type-field").tooltip(crate::ui::tooltip("Relation type")).child(select))
@@ -5671,6 +5690,8 @@ impl AssemblyView {
                 if let Some(r) = &mut this.relation {
                     r.reverse = !r.reverse;
                 }
+                // The clicked checkbox keeps the keyboard (live asm-linear-relation-reverse).
+                this.ui.checkbox_focus = Some("Reverse direction");
                 cx.notify();
             }))).child(div().flex_1()).child(div().mr(px(4.)).mb(px(3.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999))))));
         v_flex()
@@ -5724,6 +5745,8 @@ impl AssemblyView {
                             .child(crate::assets::icon("dialog-cancel", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.relation = None;
+                                this.ui.checkbox_focus = None;
+                                this.ui.number_focus = None;
                                 cx.notify();
                             })),
                     ),
@@ -6728,6 +6751,8 @@ impl AssemblyView {
             // Esc keeps the selection (live 312; Space clears it).
             self.insert_open = false;
             self.relation = None;
+            self.ui.checkbox_focus = None;
+            self.ui.number_focus = None;
             self.refresh_scene(false, cx);
             cx.notify();
         }

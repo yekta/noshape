@@ -404,6 +404,21 @@ impl AssemblyView {
                 f
             })
         });
+        // A mate's offset box or a relation's value field with the keyboard (live asm-fastened-offset: the box,
+        // unlabelled; asm-screw-relation-distance: "Distance per revolution").
+        let focus = focus.or_else(|| {
+            let title = dialog.as_ref().map(|d| d["title"].clone()).unwrap_or(Value::Null);
+            let mut f = if let Some(st) = self.mate.as_ref().and_then(|m| m.dialog.read(cx).focused_offset(cx)) {
+                let mut f = input(None, &st);
+                f["label"] = Value::Null;
+                f
+            } else {
+                let r = self.relation.as_ref().filter(|r| r.ratio_focused)?;
+                input(Some(noshape_ops::assembly::relation_value_label(r.kind)), &r.ratio)
+            };
+            f["dialog"] = title;
+            Some(f)
+        });
         // (The flip icon has no label: live's recorder reads an osc-svg-icon, label null.)
         let focus = focus.or_else(|| self.ui.checkbox_focus.zip(dialog.as_ref()).map(|(label, d)| json!({ "kind": "field", "label": if label.is_empty() { Value::Null } else { json!(label) }, "dialog": d["title"] })));
         // A right-clicked number field, then the page once its Configure is picked (live asm-pattern-field-configure).
@@ -591,7 +606,8 @@ impl AssemblyView {
             match s.kind {
                 PatternDialogKind::Linear | PatternDialogKind::Circular => {
                     let circular = s.kind == PatternDialogKind::Circular;
-                    fields.push(query(if circular { "Axis of pattern" } else { "Direction" }, axis(&s.axis, false), s.active == Some(0), false));
+                    // (Red once Instances is filled, the next field wanting a pick: live asm-linear-pattern-commit.)
+                    fields.push(query(if circular { "Axis of pattern" } else { "Direction" }, axis(&s.axis, false), s.active == Some(0), !s.seeds.is_empty() && s.axis.is_none()));
                     fields.push(number(json!(if circular { "Angle" } else { "Distance" }), quantity(&s.distance)));
                     fields.push(number(json!("Instance count"), quantity(&s.count)));
                     fields.push(toggle(s.opposite));

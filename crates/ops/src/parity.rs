@@ -7292,8 +7292,13 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 // such choice; a part inside a subassembly not yet.)
                 ends.push(end.map(|(mut c, inf, live_z, live_o)| {
                     let on_edge = matches!(inf.as_str(), "MID_POINT" | "CENTER") && c["entity"].as_str().is_some_and(|e| e.starts_with("edge:")) && c["instance"].as_str().is_some_and(|i| !i.contains(" > "));
-                    if inf.ends_with("AXIS_POINT") {
-                        trace(&format!("{name}: {inf} on {}: live Z {live_z:?} at {live_o:?}, ours {:?}", c["instance"], placer.connector_frame_local(&l.tab, &c)));
+                    // Every end off live's frame (its point or its Z), to tell which connectors read another entity.
+                    if let (Some(z), Some(o)) = (live_z.map(glam::DVec3::from), live_o.map(glam::DVec3::from))
+                        && let Some((ours_z, ours_o)) = placer.connector_frame_local(&l.tab, &c)
+                        && (ours_o.distance(o) > 1e-6 || ours_z.dot(z).abs() < 0.999)
+                    {
+                        let kind = c["entity"].as_str().or(c["reference"].as_str()).and_then(|e| e.split(':').next()).unwrap_or("?");
+                        trace(&format!("{name}: OFF {inf} on {} {kind}: live Z {z:?} at {:?} mm, ours Z {ours_z:?} at {:?} mm", c["instance"], o * 1e3, ours_o * 1e3));
                     }
                     if (inf.ends_with("AXIS_POINT") || on_edge)
                         && let Some(z) = live_z.map(glam::DVec3::from)

@@ -288,6 +288,8 @@ pub struct QuantityInput {
     /// The text as last committed (what `value` evaluates and the invalid
     /// state reflects).
     committed: String,
+    /// It has the keyboard (from its input's focus events: for a dialog's state).
+    focused: bool,
     _subs: Vec<gpui_kit::Subscription>,
 }
 
@@ -307,13 +309,17 @@ impl QuantityInput {
                     cx.emit(QuantityEvent::Enter);
                 }
             }
-            InputEvent::Focus => cx.notify(),
+            InputEvent::Focus => {
+                this.focused = true;
+                cx.notify();
+            }
             InputEvent::Blur => {
+                this.focused = false;
                 this.commit(CommitVia::Blur, window, cx);
                 cx.notify();
             }
         });
-        let mut this = Self { state, spec, units, variables: Default::default(), committed: String::new(), _subs: vec![sub] };
+        let mut this = Self { state, spec, units, variables: Default::default(), committed: String::new(), focused: false, _subs: vec![sub] };
         this.committed = this.rewrite(&text);
         if this.committed != text {
             let c = this.committed.clone();
@@ -329,6 +335,11 @@ impl QuantityInput {
     }
 
     /// The committed text (what an owner stores as the expression).
+    /// The field has the keyboard.
+    pub fn is_focused(&self) -> bool {
+        self.focused
+    }
+
     pub fn text(&self) -> &str {
         &self.committed
     }

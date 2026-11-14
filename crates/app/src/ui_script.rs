@@ -220,6 +220,11 @@ fn control_name(t: &Value) -> Option<String> {
         Some(b) => return Some(format!("button:{b}")),
         None => {}
     }
+    // One of a dialog's unlabelled fields by its order (`"index"`, from 0: a mate's X / Y / Z offset boxes, live
+    // asm-fastened-offset).
+    if let (Some(f), Some(i), None) = (t.get("field").and_then(Value::as_str), t.get("index").and_then(Value::as_u64), t.get("chip")) {
+        return Some(format!("field:{f}#{i}"));
+    }
     // A pick's chip in a selection field (`"chip"`: its row, from 0).
     if let (Some(row), Some(field)) = (t.get("chip").and_then(Value::as_u64), t.get("field").and_then(Value::as_str)) {
         return Some(format!("chip:{field}:{row}"));

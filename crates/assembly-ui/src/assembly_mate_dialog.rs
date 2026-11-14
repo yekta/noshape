@@ -416,6 +416,25 @@ impl MateDialog {
         if ox || oy || oz || orot {
             fields.push(check("Offset", self.use_offset));
         }
+        // Its offset boxes, unlabelled, then the rotation's axis and angle (live asm-fastened-offset).
+        if self.use_offset {
+            // (While typed in, its text as typed: live asm-fastened-offset's "10".)
+            let number = |label: &str, st: &Entity<crate::quantity_field::QuantityInput>| {
+                let q = st.read(cx);
+                let text = if q.is_focused() { q.state().read(cx).value().to_string() } else { q.text().to_string() };
+                json!({ "label": label, "kind": "number", "text": text, "focused": q.is_focused(), "state": "ok" })
+            };
+            for (on, st) in [(ox, &self.offsets[0]), (oy, &self.offsets[1]), (oz, &self.offsets[2])] {
+                if on {
+                    fields.push(number("", st));
+                }
+            }
+            if orot {
+                let axis = ["Rotate about X", "Rotate about Y", "Rotate about Z"][self.rotation_axis.min(2) as usize];
+                fields.push(json!({ "label": null, "kind": "enum", "text": axis, "state": "ok" }));
+                fields.push(number("Rotation angle", &self.offsets[3]));
+            }
+        }
         if !limit_keys(t).is_empty() {
             fields.push(check("Limits", self.use_limits));
         }
@@ -714,6 +733,11 @@ impl MateDialog {
         }
     }
 
+    /// The offset box with the keyboard, if one has it (for the dialog's state).
+    pub fn focused_offset(&self, cx: &App) -> Option<Entity<InputState>> {
+        self.offsets.iter().find(|o| o.read(cx).is_focused()).map(|o| o.read(cx).state().clone())
+    }
+
     /// A selection box over these slots looks active: one of them takes the next pick, or, all picked, the first box
     /// keeps its active look (live assembly/2220; after a type switch too: asm-mate-type-switch).
     fn box_active(&self, slots: &[usize]) -> bool {
@@ -844,21 +868,25 @@ impl Render for MateDialog {
             // "along X/Y/Z" icon and a 168 px quantity field; then the
             // "Rotate about X ▾" select (tooltip "Rotation axis") and the
             // "Rotation angle" row (12 px #666 label, 108 px field).
-            let axis_row = |icon: &'static str, st: &Entity<crate::quantity_field::QuantityInput>, cx: &App| {
+            // (Each box unlabelled: the ui-parity runner finds it by its order, "field:#n".)
+            let axis_row = |icon: &'static str, st: &Entity<crate::quantity_field::QuantityInput>, n: usize, cx: &App| {
                 h_flex()
                     .w(px(194.))
                     .h(px(29.))
                     .child(div().size(px(26.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(icon, 26., cx)))
-                    .child(div().w(px(168.)).h(px(26.)).child(st.clone()))
+                    .child(crate::ui_script::mark(div().w(px(168.)).h(px(26.)).child(st.clone()), move || format!("field:#{n}")))
             };
+            let mut n = 0;
             if ox {
-                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_X, axis_row("xyz-along-x", &self.offsets[0], cx), cx));
+                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_X, axis_row("xyz-along-x", &self.offsets[0], n, cx), cx));
+                n += 1;
             }
             if oy {
-                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_Y, axis_row("xyz-along-y", &self.offsets[1], cx), cx));
+                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_Y, axis_row("xyz-along-y", &self.offsets[1], n, cx), cx));
+                n += 1;
             }
             if oz {
-                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_Z, axis_row("xyz-along-z", &self.offsets[2], cx), cx));
+                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_Z, axis_row("xyz-along-z", &self.offsets[2], n, cx), cx));
             }
             if orot {
                 let ax = self.rotation_axis;

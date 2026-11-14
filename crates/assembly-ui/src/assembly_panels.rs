@@ -1709,6 +1709,7 @@ impl AssemblyView {
                         let e = if n == 1 { &mut p.equal2 } else { &mut p.equal3 };
                         *e = !*e;
                     }
+                    this.ui.checkbox_focus = Some("Equal spacing");
                     this.update_pattern_preview(cx);
                     cx.notify();
                 })))
@@ -1718,6 +1719,7 @@ impl AssemblyView {
                         let c = if n == 1 { &mut p.centered2 } else { &mut p.centered3 };
                         *c = !*c;
                     }
+                    this.ui.checkbox_focus = Some("Centered");
                     this.update_pattern_preview(cx);
                     cx.notify();
                 })))
@@ -1751,6 +1753,7 @@ impl AssemblyView {
                             p.note_toggle();
                             p.equal = !p.equal;
                         }
+                        this.ui.checkbox_focus = Some("Equal spacing");
                         this.update_pattern_preview(cx);
                         cx.notify();
                     })))
@@ -1759,6 +1762,7 @@ impl AssemblyView {
                             p.note_toggle();
                             p.centered = !p.centered;
                         }
+                        this.ui.checkbox_focus = Some("Centered");
                         this.update_pattern_preview(cx);
                         cx.notify();
                     })));
