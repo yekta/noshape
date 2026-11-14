@@ -1411,7 +1411,9 @@ impl ReleaseDialog {
         let pal = p();
         let (label, list) = if approvers { ("Approvers", &self.approvers) } else { ("Observers", &self.observers) };
         let me = noshape_store::local_user_name();
-        let barred = approvers && release_settings().no_creator_approver;
+        let settings = release_settings();
+        let barred = approvers && settings.no_creator_approver;
+        let required = approvers && settings.require_approver && self.mode == Mode::Release;
         let chips = list.iter().map(|n| {
             let n2 = n.clone();
             h_flex()
@@ -1458,7 +1460,8 @@ impl ReleaseDialog {
         });
         v_flex()
             .gap(px(4.))
-            .child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(label))
+            // Help drawing-release-dialog-02: "Approvers *" when Company settings require one.
+            .child(h_flex().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(label).when(required, |d| d.child(div().pl(px(3.)).text_color(gpui_kit::rgb(0xbd3039)).child("*"))))
             .child(
                 h_flex()
                     .id(SharedString::from(format!("rel-people-{label}")))
@@ -1471,6 +1474,7 @@ impl ReleaseDialog {
                     .rounded(px(3.))
                     .border_color(gpui_kit::rgb(0xcccccc))
                     .children(chips)
+                    .when(!read_only, |d| d.child(div().px(px(4.)).text_size(px(13.)).italic().text_color(pal.text_muted).child("Search users or teams")))
                     .when(!read_only, |d| {
                         d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             this.people_menu = if this.people_menu == Some(approvers) { None } else { Some(approvers) };
@@ -1825,11 +1829,14 @@ impl Render for ReleaseDialog {
                                 .flex_1()
                                 .min_w_0()
                                 .child(h_flex().gap(px(4.)).child(crate::assets::icon(icon, 16., cx)).child({
-                                    // The name opens the item's tab (the dialog closes first).
+                                    // Help (typical release workflow): the name opens the item's tab in another browser
+                                    // tab (here a window); the dialog stays for Refresh.
                                     let t = row.item.tab;
-                                    div().id(SharedString::from(format!("rel-name-{i}"))).truncate().cursor_pointer().hover(|d| d.underline()).child(row.item.name.clone()).on_click(move |_, window, cx| {
-                                        window.close_dialog(cx);
-                                        crate::actions::request_activate_tab(t, window, cx);
+                                    let doc = self.doc.clone();
+                                    div().id(SharedString::from(format!("rel-name-{i}"))).truncate().cursor_pointer().hover(|d| d.underline()).child(row.item.name.clone()).on_click(move |_, _, cx| {
+                                        if let Err(e) = crate::release_hooks::open_tab_window(doc.clone(), t, cx) {
+                                            doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+                                        }
                                     })
                                 })
                                 // Help (add-item-version2): an item linked from another
@@ -2111,13 +2118,13 @@ impl Render for ReleaseDialog {
                     })))
                     // Help: Submit when approvers are listed (the candidate waits for them), else Release.
                     .child(if self.approvers.is_empty() {
-                        button("rel-release", "Release", 0x2b9d3a, !blocked).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        button("rel-release", "Release", 0x1651b0, !blocked).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                             if this.commit(cx) {
                                 close(window, cx);
                             }
                         }))
                     } else {
-                        button("rel-submit", "Submit", 0x2b9d3a, !blocked).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        button("rel-submit", "Submit", 0x1651b0, !blocked).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                             if this.submit(cx) {
                                 close(window, cx);
                             }
@@ -2177,11 +2184,12 @@ impl Render for ReleaseDialog {
             (None, Some(by)) if self.mode == Mode::Review => Some(format!("Approved by {by}")),
             _ => None,
         };
+        // Help reviewreleasedialog: the title alone, the name stays in its field.
         let title = match self.mode {
-            Mode::Release if self.applied => format!("Review Release: {}", self.name.read(cx).value()),
-            Mode::Release => "Create Release candidate".into(),
-            Mode::Review => format!("Review Release: {}", self.name.read(cx).value()),
-            Mode::Obsolete => "Create Obsolete candidate".into(),
+            Mode::Release if self.applied => "Review Release",
+            Mode::Release => "Create Release candidate",
+            Mode::Review => "Review Release",
+            Mode::Obsolete => "Create Obsolete candidate",
         };
         // The ui-parity state's `dialog`: the title, a field per item (its revision and part number), the release name.
         crate::ui_script::note_dialog(|| {

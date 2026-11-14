@@ -9,7 +9,8 @@ use crate::registry::{Args, Op, OpOutput, opt};
 use serde_json::{Value, json};
 
 pub fn ops() -> Vec<Op> {
-    vec![Op {
+    vec![
+    Op {
         group: "company",
         verb: "custom_properties",
         summary: "Company settings › Custom properties: list, create, edit, delete",
@@ -28,7 +29,58 @@ pub fn ops() -> Vec<Op> {
         mutates: false,
         destructive: false,
         run: custom_props,
+    },
+    Op {
+        group: "company",
+        verb: "release_settings",
+        summary: "Company settings › Release management: read or change",
+        description: "Release management settings (kept for every document on this computer, as a company's are for its documents): the revision scheme (`scheme`: \"Alphabetical\", \"Numeric\", …, or {\"Custom\": [labels]}), `unreleased_suffix`, `managed_workflows`, `access` [3], `require_new_revision`, watermarks (`show_watermark`, `hide_watermark_unmanaged`, `watermarks`), release `conditions` [8], the Create Release candidate dialog's `require_approver`, `no_creator_approver`, `require_all_approvers`, `require_note`, `allow_other_documents`, `custom_display_names` / `display_names` [4], `auto_obsolete` and the `revision_table` template. Without `set`, returns them; `set` changes the fields it names (as Save release settings).",
+        fields: vec![opt("set", json!({ "type": "object" }), "The fields to change, as returned.")],
+        mutates: false,
+        destructive: false,
+        run: release_settings,
+    },
+    Op {
+        group: "company",
+        verb: "numbering_schemes",
+        summary: "Company settings › Numbering schemes: read or change",
+        description: "Numbering scheme settings: `release_objects`, `standard_content`, `items` and `release_names` (each its number generation, prefixes, minimum length and next number), `drawing_reuse` and `propagation`. Without `set`, returns them; `set` changes the fields it names (as Save).",
+        fields: vec![opt("set", json!({ "type": "object" }), "The fields to change, as returned.")],
+        mutates: false,
+        destructive: false,
+        run: numbering_schemes,
     }]
+}
+
+/// `current` with the fields of `set` replaced, read back as `T` (an error names the field at fault).
+fn merged<T: serde::Serialize + serde::de::DeserializeOwned>(current: &T, set: &Value) -> Result<T, OpError> {
+    let Value::Object(changes) = set else { return Err(OpError::param("set", "an object of the fields to change")) };
+    let mut v = serde_json::to_value(current).map_err(|e| OpError::new("company", e.to_string()))?;
+    for (k, x) in changes {
+        let Some(slot) = v.get_mut(k) else { return Err(OpError::param("set", &format!("no setting `{k}`"))) };
+        *slot = x.clone();
+    }
+    serde_json::from_value(v).map_err(|e| OpError::param("set", &e.to_string()))
+}
+
+fn release_settings(_ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::release_settings::{release_settings, set_release_settings};
+    let mut s = release_settings();
+    if let Some(set) = a.get("set") {
+        s = merged(&s, set)?;
+        set_release_settings(&s);
+    }
+    Ok(serde_json::to_value(&s).map_err(|e| OpError::new("company", e.to_string()))?.into())
+}
+
+fn numbering_schemes(_ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::release::{numbering_schemes, set_numbering_schemes};
+    let mut s = numbering_schemes();
+    if let Some(set) = a.get("set") {
+        s = merged(&s, set)?;
+        set_numbering_schemes(&s);
+    }
+    Ok(serde_json::to_value(&s).map_err(|e| OpError::new("company", e.to_string()))?.into())
 }
 
 pub fn def_json(p: &CustomProperty) -> Value {

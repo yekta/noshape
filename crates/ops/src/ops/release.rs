@@ -100,6 +100,23 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "release",
+            verb: "obsolete",
+            summary: "Obsolete a released revision of a part number",
+            description: "Revision history › Obsolete revision: the Create Obsolete candidate dialog for that revision, then Obsolete. The revision (default: the newest) is recorded obsolete at a new version named `name` (default \"Obsolete <part number> <revision>\"); `notes` (Reason for obsoletion) is required. `re_releasable` keeps the revision free to be released again. A revision already obsoleted is refused.",
+            fields: vec![
+                doc_field(),
+                req("part_number", s(), "The released part number."),
+                opt("revision", s(), "The revision to obsolete (default: the newest)."),
+                opt("name", s(), "Obsoletion name (the version's name)."),
+                req("notes", s(), "Reason for obsoletion."),
+                opt("re_releasable", json!({ "type": "boolean" }), "Mark revision as re-releasable."),
+            ],
+            mutates: true,
+            destructive: false,
+            run: obsolete,
+        },
+        Op {
+            group: "release",
             verb: "revision_history",
             summary: "A part number's revisions: release, version, state",
             description: "Revision history (a released part's or tab's menu): the part number's revisions, newest first, each with its release's name and time, the version it was released at, the item type, and whether it is obsolete (by an obsoletion, or by a later revision). Without `part_number`, the release log's packages.",
@@ -354,6 +371,33 @@ fn draft_delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     log.delete_draft(name);
     rel::save_log(&mut od.session, &log).map_err(|e| OpError::new("release", format!("{e:#}")))?;
     Ok(json!({ "deleted": name }).into())
+}
+
+fn obsolete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let pn = a.str("part_number")?;
+    let log = rel::release_log(&od.session);
+    let revs = log.revisions(pn);
+    let Some(newest) = revs.last() else { return Err(OpError::param("part_number", "no released revision of this part number")) };
+    let entry = match a.opt_str("revision")? {
+        Some(r) => revs.iter().find(|e| e.revision == r).ok_or_else(|| OpError::param("revision", &format!("{pn} has no released revision {r}")))?,
+        None => newest,
+    };
+    if entry.obsoleted_by.is_some() {
+        return Err(OpError::param("revision", &format!("{pn} revision {} is already obsolete", entry.revision)));
+    }
+    let notes = a.str("notes")?.trim().to_string();
+    if notes.is_empty() {
+        return Err(OpError::param("notes", "Required field must not be empty."));
+    }
+    let Some(item) = log.packages[entry.release].items.iter().find(|i| i.part_number == pn).cloned() else { return Err(OpError::param("part_number", "its release lists no such item")) };
+    let item = noshape_model::release::ReleaseItem { revision: entry.revision.clone(), ..item };
+    let name = a.opt_str("name")?.map_or_else(|| format!("Obsolete {pn} {}", item.revision), str::to_string);
+    let created = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+    let re_releasable = a.bool_or("re_releasable", false)?;
+    let pkg = Package { id: 0, kind: PackageKind::Obsoletion, name, notes, created, version: None, items: vec![item], re_releasable, approvers: Vec::new(), observers: Vec::new(), state: None, decided_by: None, comments: Vec::new() };
+    let pkg = rel::commit(&mut od.session, pkg).map_err(|e| OpError::new("release", format!("{e:#}")))?;
+    Ok(json!({ "obsoletion": pkg.name, "version": pkg.version, "re_releasable": pkg.re_releasable, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>() }).into())
 }
 
 fn history(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

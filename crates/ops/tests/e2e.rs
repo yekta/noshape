@@ -7033,6 +7033,44 @@ fn release_parts_and_revision_history() {
     assert!(revs[1]["revision"] == "A" && revs[1]["version"] == "R1", "{rh}");
     let all = call(&mut ctx, "release_revision_history", json!({}));
     assert_eq!(all["packages"].as_array().unwrap().len(), 2, "{all}");
+    // Revision history › Obsolete revision: a reason is required; the revision is obsolete at its own version, once.
+    let e = try_call(&mut ctx, "release_obsolete", json!({ "part_number": "PRT-0001", "revision": "A", "notes": " " })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("notes"));
+    let e = try_call(&mut ctx, "release_obsolete", json!({ "part_number": "PRT-0001", "revision": "C", "notes": "x" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("revision"));
+    let o = call(&mut ctx, "release_obsolete", json!({ "part_number": "PRT-0001", "revision": "A", "notes": "wrong material" }));
+    assert_eq!(o["obsoletion"], "Obsolete PRT-0001 A", "{o}");
+    let rh = call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0001" }));
+    assert!(rh["revisions"][1]["revision"] == "A" && rh["revisions"][1]["obsolete"] == true, "{rh}");
+    assert_eq!(rh["revisions"][0]["obsolete"], false, "B stays released: {rh}");
+    let e = try_call(&mut ctx, "release_obsolete", json!({ "part_number": "PRT-0001", "revision": "A", "notes": "again" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("revision"), "already obsolete");
+}
+
+/// Company settings › Release management and Numbering schemes through the API: read, change a field, and errors that
+/// name the field.
+#[test]
+fn company_release_settings_and_numbering_schemes() {
+    let mut ctx = Ctx::new();
+    let before = call(&mut ctx, "company_release_settings", json!({}));
+    let rejected = before["watermarks"]["rejected"].clone();
+    let mut marks = before["watermarks"].clone();
+    marks["rejected"] = json!("REJECTED (e2e)");
+    let after = call(&mut ctx, "company_release_settings", json!({ "set": { "watermarks": marks } }));
+    assert_eq!(after["watermarks"]["rejected"], "REJECTED (e2e)", "{after}");
+    assert_eq!(call(&mut ctx, "company_release_settings", json!({}))["watermarks"]["rejected"], "REJECTED (e2e)");
+    let mut back = after["watermarks"].clone();
+    back["rejected"] = rejected;
+    call(&mut ctx, "company_release_settings", json!({ "set": { "watermarks": back } }));
+    let e = try_call(&mut ctx, "company_release_settings", json!({ "set": { "no_such_setting": true } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("set"));
+    assert!(e.message.contains("no_such_setting"), "{e:?}");
+    let e = try_call(&mut ctx, "company_release_settings", json!({ "set": { "require_note": "yes" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("set"), "a wrong type");
+    let n = call(&mut ctx, "company_numbering_schemes", json!({}));
+    assert!(n["release_objects"].is_object() && n["release_names"].is_object(), "{n}");
+    let same = call(&mut ctx, "company_numbering_schemes", json!({ "set": { "drawing_reuse": n["drawing_reuse"].clone() } }));
+    assert_eq!(same, n);
 }
 
 /// The Release candidate dialog's drafts and row actions through the API (Onshape help "Typical Release Workflow"):

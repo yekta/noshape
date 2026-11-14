@@ -331,12 +331,12 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **ui**: [`ui_state`](#ui_state), [`ui_preferences`](#ui_preferences), [`ui_toolbar`](#ui_toolbar), [`ui_search_tools`](#ui_search_tools), [`ui_shortcuts`](#ui_shortcuts), [`ui_select`](#ui_select), [`ui_list`](#ui_list)
 - **history**: [`history_view`](#history_view), [`history_compare`](#history_compare), [`history_repair_view`](#history_repair_view), [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_version_properties`](#history_version_properties), [`history_publish`](#history_publish), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearance_row`](#part_appearance_row), [`part_appearances`](#part_appearances)
-- **company**: [`company_custom_properties`](#company_custom_properties)
+- **company**: [`company_custom_properties`](#company_custom_properties), [`company_release_settings`](#company_release_settings), [`company_numbering_schemes`](#company_numbering_schemes)
 - **material**: [`material_list`](#material_list), [`material_library_update`](#material_library_update), [`material_library_export`](#material_library_export)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_edit_joint`](#sheetmetal_edit_joint), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
-- **release**: [`release_create`](#release_create), [`release_approve`](#release_approve), [`release_reject`](#release_reject), [`release_discard`](#release_discard), [`release_comment`](#release_comment), [`release_drafts`](#release_drafts), [`release_draft_delete`](#release_draft_delete), [`release_revision_history`](#release_revision_history)
+- **release**: [`release_create`](#release_create), [`release_approve`](#release_approve), [`release_reject`](#release_reject), [`release_discard`](#release_discard), [`release_comment`](#release_comment), [`release_drafts`](#release_drafts), [`release_draft_delete`](#release_draft_delete), [`release_obsolete`](#release_obsolete), [`release_revision_history`](#release_revision_history)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image), [`render_print`](#render_print), [`render_file_page`](#render_file_page)
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
@@ -6394,6 +6394,26 @@ Custom property definitions (kept for every document on this computer, as a comp
 | `default` | string |  | Default value. |
 | `description` | string |  | Description. |
 
+#### company_release_settings
+
+Company settings › Release management: read or change.
+
+Release management settings (kept for every document on this computer, as a company's are for its documents): the revision scheme (`scheme`: "Alphabetical", "Numeric", …, or {"Custom": [labels]}), `unreleased_suffix`, `managed_workflows`, `access` [3], `require_new_revision`, watermarks (`show_watermark`, `hide_watermark_unmanaged`, `watermarks`), release `conditions` [8], the Create Release candidate dialog's `require_approver`, `no_creator_approver`, `require_all_approvers`, `require_note`, `allow_other_documents`, `custom_display_names` / `display_names` [4], `auto_obsolete` and the `revision_table` template. Without `set`, returns them; `set` changes the fields it names (as Save release settings).
+
+| field | type | | description |
+|---|---|---|---|
+| `set` | object |  | The fields to change, as returned. |
+
+#### company_numbering_schemes
+
+Company settings › Numbering schemes: read or change.
+
+Numbering scheme settings: `release_objects`, `standard_content`, `items` and `release_names` (each its number generation, prefixes, minimum length and next number), `drawing_reuse` and `propagation`. Without `set`, returns them; `set` changes the fields it names (as Save).
+
+| field | type | | description |
+|---|---|---|---|
+| `set` | object |  | The fields to change, as returned. |
+
 ### material
 
 #### material_list
@@ -7009,6 +7029,28 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `name` | string | required | The draft's name. |
+
+#### release_obsolete
+
+Obsolete a released revision of a part number (edits the document (one undoable history entry)).
+
+Revision history › Obsolete revision: the Create Obsolete candidate dialog for that revision, then Obsolete. The revision (default: the newest) is recorded obsolete at a new version named `name` (default "Obsolete <part number> <revision>"); `notes` (Reason for obsoletion) is required. `re_releasable` keeps the revision free to be released again. A revision already obsoleted is refused.
+
+Examples:
+
+```json
+{"part_number": "PRT-0001", "notes": "Replaced by PRT-0002"}
+{"part_number": "PRT-0001", "revision": "A", "notes": "Wrong material", "re_releasable": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `part_number` | string | required | The released part number. |
+| `revision` | string |  | The revision to obsolete (default: the newest). |
+| `name` | string |  | Obsoletion name (the version's name). |
+| `notes` | string | required | Reason for obsoletion. |
+| `re_releasable` | boolean |  | Mark revision as re-releasable. |
 
 #### release_revision_history
 

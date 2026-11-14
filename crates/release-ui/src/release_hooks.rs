@@ -23,6 +23,8 @@ pub struct Hooks {
     pub create_version: fn(Entity<DocModel>, &mut Window, &mut App),
     /// The window's workspace exports a tab (or some of its parts).
     pub request_export: fn(TabId, Vec<BodyId>, &mut Window, &mut App),
+    /// Another window on the open document showing a tab (Onshape's new browser tab).
+    pub open_tab_window: fn(Entity<DocModel>, TabId, &mut App) -> anyhow::Result<()>,
 }
 
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
@@ -50,4 +52,8 @@ pub fn create_version(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) 
 
 pub fn request_export(tab: TabId, parts: Vec<BodyId>, window: &mut Window, cx: &mut App) {
     (hooks().request_export)(tab, parts, window, cx)
+}
+
+pub fn open_tab_window(doc: Entity<DocModel>, tab: TabId, cx: &mut App) -> anyhow::Result<()> {
+    (hooks().open_tab_window)(doc, tab, cx)
 }
