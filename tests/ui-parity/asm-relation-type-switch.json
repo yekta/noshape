@@ -1,0 +1,38 @@
+{
+ "name": "asm-relation-type-switch",
+ "about": "pin-block: Gear relation, the type dropdown Gear → Rack and pinion (its field becomes Distance per revolution), Escape",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (assembly relation and pattern dialog options with no recorded scenario)",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Gear relation"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Gear",
+    "pick": "Rack and pinion"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

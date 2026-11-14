@@ -1,0 +1,83 @@
+{
+ "name": "asm-linear-pattern-commit",
+ "about": "two-blocks: Assembly linear pattern of Part 2 along Part 1's x edge, 30 mm, 3 instances, Enter: two more Part 2 instances",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (assembly relation and pattern dialog options with no recorded scenario)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Assembly linear pattern"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Direction"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     0
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Distance"
+   }
+  },
+  {
+   "do": "type",
+   "text": "30"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Instance count"
+   }
+  },
+  {
+   "do": "type",
+   "text": "3"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,45 @@
+{
+ "name": "asm-screw-relation-distance",
+ "about": "pin-block: Screw relation, Distance per revolution 3 mm, Escape",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (assembly relation and pattern dialog options with no recorded scenario)",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Screw relation"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Distance per revolution"
+   }
+  },
+  {
+   "do": "type",
+   "text": "3"
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

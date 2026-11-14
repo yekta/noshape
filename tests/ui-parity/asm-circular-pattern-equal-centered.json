@@ -1,0 +1,47 @@
+{
+ "name": "asm-circular-pattern-equal-centered",
+ "about": "two-blocks: Assembly circular pattern, Equal spacing off, Centered on, Escape",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (assembly relation and pattern dialog options with no recorded scenario)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Assembly circular pattern"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Equal spacing"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Centered"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

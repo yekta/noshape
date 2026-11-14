@@ -1,0 +1,54 @@
+{
+ "name": "sketch-midpoint-line-vertical",
+ "about": "sketch on Top: Midpoint line from (0,0) to (0,15) (vertical, centred on the origin)",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (sketch tools with one recorded take: a fuller second use)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Line",
+    "menu": "Midpoint line"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     15
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
