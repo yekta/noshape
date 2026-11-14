@@ -748,25 +748,31 @@ impl DrawingEditor {
                 tip.push_str(&format!("\n{k}  {v}"));
             }
             let hover_key = key.clone();
+            let mark_key = key.clone();
             crate::ui::tree_row(SharedString::from(key), false)
                 .map(|d| crate::ui_script::mark(d, || format!("sheet_ref:{mark}")))
                 .cursor_pointer()
                 .tooltip(crate::ui::tooltip(tip))
-                .on_hover(cx.listener(move |this, on: &bool, _, cx| {
+                .on_hover(cx.listener(move |this, on: &bool, window, cx| {
                     let k = Some(hover_key.clone());
+                    // Its menu closed with Esc, the pointer where the right-click was: still hovered (live
+                    // drw-ref-selective-update-pin); a menu item's click moved the pointer away.
+                    let unmoved = this.sheets_ref_menu_at.as_ref().is_some_and(|(key, at)| Some(key) == k.as_ref() && *at == window.mouse_position());
                     if *on {
                         this.sheets_ref_hover = k;
-                    } else if this.sheets_ref_hover == k {
+                    } else if this.sheets_ref_hover == k && !unmoved {
                         this.sheets_ref_hover = None;
                     }
                     cx.notify();
                 }))
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_ref_manager(cx)))
                 .when_some(menu, |row, entries| {
+                    let menu_key = mark_key.clone();
                     row.on_mouse_down(
                         MouseButton::Right,
                         cx.listener(move |this, e: &MouseDownEvent, window, cx| {
                             cx.stop_propagation();
+                            this.sheets_ref_menu_at = Some((menu_key.clone(), e.position));
                             let entries = entries.clone();
                             let ed = cx.entity();
                             let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));

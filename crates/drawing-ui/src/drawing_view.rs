@@ -480,6 +480,8 @@ pub struct DrawingEditor {
     pub frame_menu: Option<WeakEntity<crate::os_menu::OsMenu>>,
     /// The Sheets panel's reference row under the pointer (its key): live's hover popup of its name and version.
     pub sheets_ref_hover: Option<String>,
+    /// The reference row last right-clicked and where (its hover outlasts the menu while the pointer stays there).
+    pub sheets_ref_menu_at: Option<(String, Point<Pixels>)>,
     /// The ordinate group Add to ordinate dimension group is adding to, and its values as they were (live lists
     /// those until the tool ends).
     pub ordinate_extending: Option<(u64, String)>,
@@ -761,6 +763,7 @@ impl DrawingEditor {
             menu_at: [0.0; 2],
             frame_menu: None,
             sheets_ref_hover: None,
+            sheets_ref_menu_at: None,
             ordinate_extending: None,
             move_sheet: None,
             table_props: None,
