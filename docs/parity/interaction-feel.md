@@ -148,7 +148,7 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 Live: live/feel/mates.json, asm-views.json, fields.json `assemblyInstanceList`, 3d.json `assembly` (live and live2,
 11-13). The UI is studios'; asm keeps the mate solver and landed the ring snap, the ▶ preview, Insert's Esc / ✓ and the
 drag thresholds (their commits below). Menus leave out "Add comment" (comments are cloud). Counts are matched / total
-per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3D 9 / 10**.
+per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3D 10 / 10**.
 
 ### Mate dialog, mate list, Insert (mates.json): 26 / 28
 
@@ -230,7 +230,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Failed mate's colour | rgb(170,37,45) | the same (17:18; was #bd3039) | `hidden_mate_rows_are_grey` | = |
 | Failed mate's marks | red "!" on the icon, "Fastened 1 has error: …", red Mate features icon and root overlay, ⚠ on the fixed instances | the same | – | = |
 
-### 3D in an assembly (3d.json `assembly`): 9 / 10
+### 3D in an assembly (3d.json `assembly`): 10 / 10
 
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
@@ -243,7 +243,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Free drag | moves in the screen plane by the full pointer delta | the same | – | = |
 | Drag start | > 2 px and > 50 ms | the same (asm ccbc333f) | asm's tests | = |
 | Short press | a click: the face selected, the triad there; its centre ball moves the triad | the same | – | = |
-| Constrained drag | a Revolute part turns about its axis, axial position kept | through the solver, grabbed nearest the part's box centre | – | ? |
+| Constrained drag | a Revolute part turns about its axis, axial position kept | the same, grabbed where the pointer meets the part (`ray_hit`; was the box centre, which turned pin-block's pin the wrong way) | app check 11-14 (pin-block: +24.8° toward the pointer, z −5 kept) | = |
 
 ## Sketch snaps (matrix)
 

@@ -2944,15 +2944,16 @@ impl AssemblyView {
                 // A part of a flexible subassembly is dragged on its own (Onshape).
                 let nested = (t.path.len() > 1 && self.result.prepared.is_flexible_child(top, t.path[1])).then(|| t.path[1]);
                 let (origin, dir) = self.viewport.read(cx).ray(*position);
-                // Grab point: closest point on the ray to the instance's bounds center.
+                // Grab point: where the pointer meets the part (live 3d.json part_drag: a Revolute pin turns by its
+                // lever arm from the axis), else the closest point on the ray to the instance's bounds centre.
+                let hit = self.ray_hit(*position, |path| path[0] == top && nested.is_none_or(|c| path.get(1) == Some(&c)), cx);
                 let center = match nested {
                     Some(c) => self.result.occurrences.iter().filter(|o| o.path.len() > 1 && o.path[0] == top && o.path[1] == c).filter_map(|o| o.world_bounds()).fold(None, |acc: Option<(DVec3, DVec3)>, (a, b)| Some(acc.map(|(x, y)| (x.min(a), y.max(b))).unwrap_or((a, b)))),
                     None => self.result.instance_bounds(top),
                 }
                 .map(|(a, b)| (a + b) * 0.5)
                 .unwrap_or(DVec3::ZERO);
-                let tt = (center - origin).dot(dir);
-                let grab = origin + dir * tt;
+                let grab = hit.unwrap_or_else(|| origin + dir * (center - origin).dot(dir));
                 let pose = match nested {
                     Some(c) => self.result.solved.nested_world(top, c).unwrap_or_default(),
                     None => self.result.solved.placement(top).map(|p| placement_to_frame(&p)).unwrap_or_default(),
@@ -3431,9 +3432,16 @@ impl AssemblyView {
     /// clicked (axes along the world axes).
     fn triad_at_click(&mut self, position: DVec2, cx: &App) {
         let [top] = self.selected[..] else { return };
+        let (Some(hit), Some(p)) = (self.ray_hit(position, |path| path[0] == top, cx), self.result.solved.placement(top)) else { return };
+        let world = Frame::new(hit, glam::DQuat::IDENTITY);
+        self.triad = Some((vec![top], placement_to_frame(&p).inverse().mul(&world)));
+    }
+
+    /// Where the pointer's ray first meets the shown occurrences whose path passes `keep` (world).
+    fn ray_hit(&self, position: DVec2, keep: impl Fn(&[InstanceId]) -> bool, cx: &App) -> Option<DVec3> {
         let (o, d) = self.viewport.read(cx).ray(position);
         let mut best: Option<f64> = None;
-        for occ in self.result.occurrences.iter().filter(|occ| occ.top() == top && !occ.hidden) {
+        for occ in self.result.occurrences.iter().filter(|occ| keep(&occ.path) && !occ.hidden) {
             let inv = occ.transform.inverse();
             let (lo, ld) = (inv.transform_point3(o), inv.transform_vector3(d));
             let m = &occ.mesh;
@@ -3446,9 +3454,7 @@ impl AssemblyView {
                 }
             }
         }
-        let (Some(t), Some(p)) = (best, self.result.solved.placement(top)) else { return };
-        let world = Frame::new(o + d * t, glam::DQuat::IDENTITY);
-        self.triad = Some((vec![top], placement_to_frame(&p).inverse().mul(&world)));
+        best.map(|t| o + d * t)
     }
 
     fn run_drag_solve(&mut self, cx: &mut Context<Self>) {
