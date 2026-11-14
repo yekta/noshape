@@ -6915,8 +6915,15 @@ fn instance_drops_explode_reorder_mirror_strategy_and_image_menu() {
     let pat = m["patterns"].as_array().unwrap().iter().find(|x| x["name"] == "Mirror 1").unwrap().clone();
     assert_eq!(pat["strategy"], json!([{ "instance": b, "action": "derived", "placement": "origin_xy" }]), "{pat}");
     assert_eq!(m["created"].as_array().unwrap().len(), 1, "{m}");
+    // Live: the copy is named for the mirrored part ("Part 2-Mirrored <1>"), and back to the seed's name.
+    let name_of = |ctx: &mut Ctx, id: &Value| call(ctx, "assembly_list", json!({}))["instances"].as_array().unwrap().iter().find(|i| &i["id"] == id).unwrap()["name"].as_str().unwrap().to_string();
+    let copy = m["created"][0].clone();
+    let seed = name_of(&mut ctx, &json!(b));
+    let base = seed.rsplit_once(" <").unwrap().0.to_string();
+    assert_eq!(name_of(&mut ctx, &copy), format!("{base}-Mirrored <1>"));
     // Back to Transform: no second Part Studio.
     let m = call(&mut ctx, "assembly_pattern", json!({ "edit": "Mirror 1", "strategy": [{ "instance": b, "action": "transform", "placement": "auto" }] }));
+    assert!(name_of(&mut ctx, &copy).starts_with(&format!("{base} <")), "{seed}");
     let pat = m["patterns"].as_array().unwrap().iter().find(|x| x["name"] == "Mirror 1").unwrap().clone();
     assert_eq!(pat["strategy"][0]["action"], "transform", "{pat}");
     assert_eq!(last(&mut ctx), "Assembly 1 :: Edit : Mirror 1");

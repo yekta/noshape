@@ -1439,9 +1439,18 @@ impl Assembly {
                     InstanceSource::Part { studio, body, .. } => mirrored_studios.iter().find(|(s, _)| s == studio).map(|(_, m)| InstanceSource::Part { studio: *m, body: body.clone(), config: Default::default() }),
                     _ => None,
                 };
+                let to_derived = derived.contains(&g.seed) && derived_part.is_some();
                 let want = if *handed || derived.contains(&g.seed) { derived_part.or_else(|| seed.mirrored()).unwrap_or(seed) } else { seed };
+                let Some(inst) = self.instance(g.instance) else { continue };
+                // Live: a Derived copy is named for the mirrored part ("Part 2-Mirrored <1>"), and back.
+                let base = Self::base_name(self.instance(g.seed).map_or("", |s| s.name.as_str())).to_string();
+                let base = if to_derived { format!("{base}-Mirrored") } else { base };
+                let name = (inst.source != want && Self::base_name(&inst.name) != base).then(|| self.next_instance_name(&base));
                 if let Some(inst) = self.instance_mut(g.instance) {
                     inst.source = want;
+                    if let Some(name) = name {
+                        inst.name = name;
+                    }
                 }
             }
         }

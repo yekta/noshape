@@ -1283,6 +1283,27 @@ fn derived_mirror_makes_one_mirrored_studio() {
     assert_eq!(f.doc.tabs.len(), 2);
 }
 
+/// Live (feel/mirror 69, 70): a Derived copy is the "-Mirrored" Part Studio's part, named for it ("Part 2-Mirrored
+/// <1>"); back to Transform it is the seed's part with the seed's name again.
+#[test]
+fn a_derived_mirror_copy_is_named_for_the_mirrored_part() {
+    let mut f = doc_with(vec![block_studio()]);
+    let src = f.studios[0];
+    let m = f.doc.ensure_mirrored_studio(src).unwrap();
+    let mut asm = Assembly { instances: vec![part_instance(1, "Block <1>", src, BodyId { feature: crate::reference::FeatureId(1), index: 0 }, DVec3::ZERO, true)], connectors: vec![x_axis_connector(60)], ..Default::default() };
+    let mirror = |derived: Vec<InstanceId>| PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: false, derived, placement: vec![], mirrored_studios: vec![(src, m)] };
+    asm.patterns.push(InstancePattern { id: MateId(70), name: "Mirror 1".into(), kind: mirror(vec![InstanceId(1)]), seeds: vec![InstanceId(1)], generated: vec![], suppressed: false });
+    let copy = asm.sync_pattern(MateId(70))[0];
+    let i = asm.instance(copy).unwrap();
+    assert_eq!(i.name, "Block-Mirrored <1>");
+    assert!(matches!(&i.source, InstanceSource::Part { studio, .. } if *studio == m));
+    asm.patterns[0].kind = mirror(vec![]);
+    asm.sync_pattern(MateId(70));
+    let i = asm.instance(copy).unwrap();
+    assert_eq!(i.name, "Block <2>");
+    assert!(matches!(&i.source, InstanceSource::Part { studio, .. } if *studio == src));
+}
+
 /// 80 x 40 x 10 mm plate with two 5 mm holes at x = ±20 mm and a 3 mm hole at (0, 10).
 fn plate_with_holes() -> PartStudio {
     let mut sk = noshape_sketch::Sketch::new();
