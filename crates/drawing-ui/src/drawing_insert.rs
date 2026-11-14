@@ -104,6 +104,12 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// + › Create Drawing…'s chooser: as [`Self::open_insert_chooser`], the only Part Studio with parts expanded.
+    pub fn open_insert_chooser_expanded(&mut self, cx: &mut Context<Self>) {
+        self.chooser.expand_single = true;
+        self.open_insert_chooser(cx);
+    }
+
     pub fn open_insert_chooser(&mut self, cx: &mut Context<Self>) {
         self.insert.chooser = Some(self.insert.chooser.unwrap_or(0));
         self.ensure_sources(false, cx);

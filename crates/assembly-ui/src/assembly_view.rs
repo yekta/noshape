@@ -3782,6 +3782,9 @@ impl AssemblyView {
         let dyn_suppressed = suppressed && inst.is_some_and(|i| i.unsuppressed_if.is_some());
         // Live E15: "Part 2 <1> has error: Failed to resolve instance." (the badge repeats it).
         // A pattern copy in error (live 1754 (C)) is red with just its name.
+        // A plain name's tooltip shows only when the name is cut off (live2 06:1x: a row whose name fits has none).
+        let plain_tip = error.as_ref().is_none_or(|e| e.is_empty()) && !dyn_suppressed;
+        let has_state = state.is_some();
         let row_tip: SharedString = if let Some(e) = error.as_ref().filter(|e| !e.is_empty()) {
             format!("{name} has error: {e}").into()
         } else if dyn_suppressed {
@@ -3940,7 +3943,17 @@ impl AssemblyView {
                     ),
                 )
             })
-            .when(!crate::os_menu::is_open(cx), |d| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(row_tip.clone()).build(w, cx)).tooltip_show_delay(crate::ui::ROW_TIP_DELAY))
+            .when(!crate::os_menu::is_open(cx), |d| {
+                // The name's room: the list's width less the row's indent, expander, icon, state glyphs and the eye.
+                let room = crate::ui::left_panel_w(self.tab) - (7. + depth as f32 * 22.) - 12. - 20. - 3. * 4. - if fixed { 20. } else { 0. } - if has_state { 40. } else { 0. } - if is_top { 24. } else { 0. };
+                d.tooltip(move |w, cx| {
+                    if plain_tip && crate::ui::text_width(w, &row_tip, crate::ui::ROW_TEXT) <= room {
+                        return cx.new(|_| gpui_kit::Empty).into();
+                    }
+                    gpui_kit::component::tooltip::Tooltip::new(row_tip.clone()).build(w, cx)
+                })
+                .tooltip_show_delay(crate::ui::ROW_TIP_DELAY)
+            })
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 // Hovering a row highlights the instance in the graphics area.
                 let new = if *h { Some(top) } else { None };

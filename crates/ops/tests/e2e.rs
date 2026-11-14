@@ -7083,6 +7083,10 @@ fn release_parts_and_revision_history() {
     assert_eq!(rh["revisions"][0]["obsolete"], false, "B stays released: {rh}");
     let e = try_call(&mut ctx, "release_obsolete", json!({ "part_number": "PRT-0001", "revision": "A", "notes": "again" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("revision"), "already obsolete");
+    // View obsoletion › Mark revision as re-releasable: A no longer blocks a lower next revision.
+    call(&mut ctx, "release_re_releasable", json!({ "name": "Obsolete PRT-0001 A", "re_releasable": true }));
+    let e = try_call(&mut ctx, "release_re_releasable", json!({ "name": "nope", "re_releasable": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("name"));
 }
 
 /// Company settings › Release management and Numbering schemes through the API: read, change a field, and errors that

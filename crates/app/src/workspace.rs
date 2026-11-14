@@ -3214,7 +3214,7 @@ impl Workspace {
                             });
                         }
                         // From "+" › Create Drawing…: choose what to insert first.
-                        None => v.update(cx, |v, cx| v.open_insert_chooser(cx)),
+                        None => v.update(cx, |v, cx| v.open_insert_chooser_expanded(cx)),
                     }
                 }
             });

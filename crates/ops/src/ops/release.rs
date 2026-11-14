@@ -6,7 +6,7 @@ use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, release as rel};
 use noshape_model::document::TabContent;
-use noshape_model::release::{Package, PackageKind};
+use noshape_model::release::{Issue, Package, PackageKind};
 use serde_json::{Value, json};
 
 pub fn ops() -> Vec<Op> {
@@ -114,6 +114,16 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: obsolete,
+        },
+        Op {
+            group: "release",
+            verb: "re_releasable",
+            summary: "Mark an obsoleted revision as re-releasable (or not)",
+            description: "View obsoletion › Mark revision as re-releasable, then Apply: the obsoletion named `name` lets its revision be released again (`re_releasable` true) or not.",
+            fields: vec![doc_field(), req("name", s(), "The obsoletion's name."), req("re_releasable", json!({ "type": "boolean" }), "Re-releasable.")],
+            mutates: true,
+            destructive: false,
+            run: re_releasable,
         },
         Op {
             group: "release",
@@ -307,7 +317,7 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     for (row, held) in issues.iter_mut().zip(crate::release_conditions::condition_issues(&od.session, &items)) {
         row.extend(held);
     }
-    let problems: Vec<String> = items.iter().zip(&issues).filter(|(_, v)| !v.is_empty()).map(|(it, v)| format!("{}: {}", it.name, v.iter().map(|i| i.message()).collect::<Vec<_>>().join("; "))).collect();
+    let problems: Vec<String> = items.iter().zip(&issues).filter(|(_, v)| v.iter().any(Issue::blocks)).map(|(it, v)| format!("{}: {}", it.name, v.iter().filter(|i| i.blocks()).map(|i| i.message()).collect::<Vec<_>>().join("; "))).collect();
     if !problems.is_empty() {
         return Err(OpError::invalid(format!("the release candidate needs attention: {}", problems.join(" | "))));
     }
@@ -380,6 +390,15 @@ fn workflows_on() -> Result<(), OpError> {
         return Ok(());
     }
     Err(OpError::invalid("Release management is off: turn on Enable managed workflows in Company settings › Release management (company_release_settings)"))
+}
+
+fn re_releasable(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    workflows_on()?;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let name = a.str("name")?;
+    let on = a.bool_or("re_releasable", false)?;
+    rel::set_re_releasable(&mut od.session, name, on).map_err(|_| OpError::param("name", &format!("no obsoletion `{name}`")))?;
+    Ok(json!({ "obsoletion": name, "re_releasable": on }).into())
 }
 
 fn obsolete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

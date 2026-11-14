@@ -73,7 +73,9 @@ pub fn part_items(session: &Session, tab: TabId, parts: &[BodyId], names: &[Stri
             // Release__typical_release_workflow: a part imported with a
             // revision keeps it in its first release.
             let nrm = p.is_some_and(|p| p.meta.not_revision_managed);
-            let imported = p.and_then(|p| p.revision.clone()).filter(|r| !r.trim().is_empty() && log.revisions(&pn).is_empty());
+            // One the scheme doesn't have ("6" under Alphabetical) starts at the scheme's next, with a notice
+            // (`release_conditions::condition_issues`; live release.json 10_helpRows (4)).
+            let imported = p.and_then(|p| p.revision.clone()).filter(|r| !r.trim().is_empty() && log.revisions(&pn).is_empty() && log.scheme.index(r.trim()).is_some());
             let name = if desc.is_empty() { name.clone() } else { format!("{name} ({desc})") };
             ReleaseItem { tab, part: Some(b.clone()), name, kind: ItemKind::Part, revision: if nrm { String::new() } else { imported.unwrap_or_else(|| log.next_revision(&pn)) }, part_number: pn, not_revision_managed: nrm, reverted: false, config: if desc.is_empty() { Default::default() } else { config.clone() }, document: None }
         })
@@ -281,6 +283,14 @@ pub fn discard(session: &mut Session, name: &str) -> anyhow::Result<()> {
     if !log.discard(name) {
         anyhow::bail!("no pending or rejected release candidate `{name}`");
     }
+    save_log(session, &log)
+}
+
+/// An obsoletion's "Mark revision as re-releasable" (View obsoletion › Apply; live2 release.json 10_helpRows (7)).
+pub fn set_re_releasable(session: &mut Session, name: &str, on: bool) -> anyhow::Result<()> {
+    let mut log = release_log(session);
+    let Some(p) = log.packages.iter_mut().rev().find(|p| p.name == name && p.kind == PackageKind::Obsoletion) else { anyhow::bail!("no obsoletion `{name}`") };
+    p.re_releasable = on;
     save_log(session, &log)
 }
 

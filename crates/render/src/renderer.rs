@@ -690,6 +690,8 @@ struct DrawLists {
     /// Color pass only: [`Instance::see_through_self`] opaque meshes and `hidden_only` lines.
     self_marks: Vec<usize>,
     lines_hidden_self: Vec<usize>,
+    /// Color pass only: [`Instance::outline_through`] opaque meshes.
+    outline_through: Vec<usize>,
     culled: usize,
     /// The pass's instances in draw order (shader slots), each once: a
     /// list's run of copies sharing a buffer gets consecutive slots and is
@@ -921,6 +923,7 @@ impl DrawLists {
         self.points_hidden.clear();
         self.self_marks.clear();
         self.lines_hidden_self.clear();
+        self.outline_through.clear();
         self.culled = 0;
         self.boxes.clear();
         self.line_levels.clear();
@@ -1063,6 +1066,9 @@ impl DrawLists {
                     self.opaque.push(i);
                     if !pick && inst.see_through_self {
                         self.self_marks.push(i);
+                    }
+                    if !pick && inst.outline_through {
+                        self.outline_through.push(i);
                     }
                 }
                 Drawable::Mesh(_) => self.transparent.push(i),
@@ -1362,6 +1368,13 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         // plane; drawn before them it came out washed, (233,208,188)).
         if outline {
             draw(pass, &lists.opaque, &pipelines.mesh_outline);
+            if !lists.outline_through.is_empty() {
+                // Its whole silhouette marked (depth ignored), then its outline outside the mark over everything.
+                pass.set_stencil_reference(XRAY_BIT);
+                draw(pass, &lists.outline_through, &pipelines.mesh_xray_mark);
+                draw(pass, &lists.outline_through, &pipelines.mesh_outline_xray);
+                pass.set_stencil_reference(0);
+            }
         }
         draw(pass, &lists.on_top, &pipelines.mesh_on_top);
         // Hidden-only geometry right after the meshes, so only faces count
@@ -1697,7 +1710,14 @@ enum Stencil {
     Mark,
     /// Draws only where the stencil differs from the reference.
     Unmarked,
+    /// [`XRAY_BIT`] written wherever drawn (no depth test).
+    MarkXray,
+    /// Draws only where [`XRAY_BIT`] is clear.
+    OutsideXray,
 }
+
+/// The stencil bit of [`Instance::outline_through`]'s silhouettes (bit 0 is [`Instance::see_through_self`]'s).
+const XRAY_BIT: u32 = 2;
 
 impl Stencil {
     fn state(self) -> wgpu::StencilState {
@@ -1706,11 +1726,19 @@ impl Stencil {
             Stencil::Off => Default::default(),
             Stencil::Mark => {
                 let f = face(wgpu::CompareFunction::Always, wgpu::StencilOperation::Replace);
-                wgpu::StencilState { front: f, back: f, read_mask: 0xff, write_mask: 0xff }
+                wgpu::StencilState { front: f, back: f, read_mask: 0x01, write_mask: 0x01 }
             }
             Stencil::Unmarked => {
                 let f = face(wgpu::CompareFunction::NotEqual, wgpu::StencilOperation::Keep);
-                wgpu::StencilState { front: f, back: f, read_mask: 0xff, write_mask: 0 }
+                wgpu::StencilState { front: f, back: f, read_mask: 0x01, write_mask: 0 }
+            }
+            Stencil::MarkXray => {
+                let f = face(wgpu::CompareFunction::Always, wgpu::StencilOperation::Replace);
+                wgpu::StencilState { front: f, back: f, read_mask: XRAY_BIT, write_mask: XRAY_BIT }
+            }
+            Stencil::OutsideXray => {
+                let f = face(wgpu::CompareFunction::NotEqual, wgpu::StencilOperation::Keep);
+                wgpu::StencilState { front: f, back: f, read_mask: XRAY_BIT, write_mask: 0 }
             }
         }
     }
@@ -2057,6 +2085,9 @@ struct Pipelines {
     /// [`Instance::see_through_self`]: its mesh marks the stencil where front-most, its hidden lines skip the marks.
     mesh_self_mark: Lazy,
     line_hidden_self: Lazy,
+    /// [`Instance::outline_through`]: the silhouette's stencil mark, then the outline outside it.
+    mesh_xray_mark: Lazy,
+    mesh_outline_xray: Lazy,
     mesh_pick: Lazy,
     mesh_pick_transparent: Lazy,
     mesh_pick_plane: Lazy,
@@ -2105,6 +2136,8 @@ impl Pipelines {
             &self.point_hidden,
             &self.mesh_self_mark,
             &self.line_hidden_self,
+            &self.mesh_xray_mark,
+            &self.mesh_outline_xray,
             &self.mesh_pick,
             &self.mesh_pick_transparent,
             &self.mesh_pick_plane,
@@ -2748,6 +2781,9 @@ impl Renderer {
         let line_hidden = lazy(LayoutKind::Main, P { label: "line-hidden", vs: "vs_line", fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN);
         let line_hidden_self = lazy(LayoutKind::Main, P { label: "line-hidden-self", vs: "vs_line", fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: EDGE_DEPTH_BIAS, samples: msaa }, Extra { stencil: Stencil::Unmarked, ..PLAIN });
         let mesh_self_mark = lazy(LayoutKind::Main, P { label: "mesh-self-mark", vs: "vs_mesh", fs: "fs_self_mark", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((false, ge)), bias: face, samples: msaa }, Extra { writes: wgpu::ColorWrites::empty(), cull: None, stencil: Stencil::Mark });
+        let always = wgpu::CompareFunction::Always;
+        let mesh_xray_mark = lazy(LayoutKind::Main, P { label: "mesh-xray-mark", vs: "vs_mesh", fs: "fs_xray_mark", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((false, always)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::empty(), cull: None, stencil: Stencil::MarkXray });
+        let mesh_outline_xray = lazy(LayoutKind::Main, P { label: "mesh-outline-xray", vs: "vs_outline", fs: "fs_outline", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((false, always)), bias: none, samples: msaa }, Extra { stencil: Stencil::OutsideXray, ..PLAIN });
         let point_hidden = lazy(LayoutKind::Main, P { label: "point-hidden", vs: "vs_point", fs: "fs_point", buffers: POINT_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: POINT_DEPTH_BIAS, samples: msaa }, PLAIN);
         let mesh_pick = lazy(LayoutKind::Main, P { label: "mesh-pick", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }, PLAIN);
         let mesh_pick_transparent = lazy(LayoutKind::Main, P { label: "mesh-pick-t", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((false, ge)), bias: none, samples: 1 }, PLAIN);
@@ -2791,6 +2827,8 @@ impl Renderer {
             point_hidden,
             mesh_self_mark,
             line_hidden_self,
+            mesh_xray_mark,
+            mesh_outline_xray,
             mesh_pick,
             mesh_pick_transparent,
             mesh_pick_plane,

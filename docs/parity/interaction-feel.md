@@ -190,7 +190,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 |---|---|---|---|---|
 | Exploded views panel | 3rd of the strip; empty: Add exploded view, illustration, how-to, help link | the same (Simulation left out: cloud) | ui-parity asm-explode-panel, asm-explode-add-view | = |
 | Add exploded view | "Explode 1" in edit mode: yellow "Editing Explode 1 / Done", toolbar only undo/redo, the blue how-to, the rollback bar | the same | – | = |
-| Selecting an instance | orange outline through other parts, a triad (3 arrows, 3 rings, centre) | the triad; the outline's see-through not compared | – | ? |
+| Selecting an instance | orange outline through other parts (in explode edit mode too, live2 11-14), a triad (3 arrows, 3 rings, centre) | the triad; the outline hidden behind other parts | – | ≠ |
 | Arrow drag | moves live, no value box; on release the Explode step dialog; only that arrow stays | the same | – | = |
 | Ring drag | a Rotation step, 5° steps, Specify axis | the same (`ring_snap`, 17:18; was 1°) | `explode_drag_values_round` | = |
 | ✓ / Esc on the step | keeps / removes the step | the same | – | = |
@@ -204,12 +204,12 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Section Esc | cancels | the same | – | = |
 | Named views | New view name + "+", No views created, Select a view + ⊗ | the same (named_views_dialog.rs) | – | = |
 
-### Instance list (fields.json): 21 / 22
+### Instance list (fields.json): 22 / 22
 
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
 | Hovered row | light blue, an eye at the right end | the same | – | = |
-| Row tooltip | ~70 ms (a 30 fps recording) | 160 ms, as the feature list's rows (`ROW_TIP_DELAY`: live featurelist.json's 160–390 ms) | – | ? (two live numbers) |
+| Row tooltip | only for a cut-off name (a row whose name fits has none; the fix icon's "Part is fixed"), live2 11-14 | the same (the name measured against its room), at 160 ms (`ROW_TIP_DELAY`) | – | = (fixed) |
 | 3D highlight on hover | ~0.85 s after the pointer arrives on live2's software-GL host; its graphics hover takes ~0.73 s too (live2 18:20 (6)): the host, not a delay of Onshape's | at once | – | = |
 | Plain click | toggles the row | the same (`list_click`) | ui-parity asm-select-mate-row | = |
 | Ctrl+click | opens the context menu (live2 18:20; behaviours "skb (10-24)" (3)) | the same | – | = |
@@ -244,7 +244,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Free drag | moves in the screen plane by the full pointer delta | the same | – | = |
 | Drag start | > 2 px and > 50 ms | the same (asm ccbc333f) | asm's tests | = |
 | Short press | a click: the face selected, the triad there; its centre ball moves the triad | the same | – | = |
-| Constrained drag | a Revolute part turns about its axis, axial position kept | the same, grabbed where the pointer meets the part (`ray_hit`; was the box centre, which turned pin-block's pin the wrong way) | app check 11-14 (pin-block: +24.8° toward the pointer, z −5 kept) | = |
+| Constrained drag | a Revolute part turns about its axis, axial position kept; the turn depends on the grab point (live2 11-14, 100 px right: 53.1° from the top face's centre, 42.0° / 44.5° 4 mm off-axis) | the same, grabbed where the pointer meets the part (`ray_hit`; was the box centre, which turned pin-block's pin the wrong way) | app check 11-14 (pin-block: +24.8° toward the pointer, z −5 kept) | = |
 
 ## Sketch snaps (matrix)
 

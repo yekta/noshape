@@ -37,16 +37,16 @@ impl Default for Watermarks {
 }
 
 impl Watermarks {
-    /// The dialog's rows, in order.
-    pub const LABELS: [&'static str; 6] = ["In progress", "Pending", "Released", "Obsolete", "Rejected", "Discarded"];
+    /// The dialog's rows, in order (live2 release.json watermarks-dialog).
+    pub const LABELS: [&'static str; 6] = ["In progress", "Released", "Discarded", "Pending", "Obsolete", "Rejected"];
     pub const MAX_LEN: usize = 64;
 
     pub fn get(&self, i: usize) -> &str {
-        [&self.in_progress, &self.pending, &self.released, &self.obsolete, &self.rejected, &self.discarded][i.min(5)]
+        [&self.in_progress, &self.released, &self.discarded, &self.pending, &self.obsolete, &self.rejected][i.min(5)]
     }
 
     pub fn set(&mut self, i: usize, text: String) {
-        *[&mut self.in_progress, &mut self.pending, &mut self.released, &mut self.obsolete, &mut self.rejected, &mut self.discarded][i.min(5)] = text;
+        *[&mut self.in_progress, &mut self.released, &mut self.discarded, &mut self.pending, &mut self.obsolete, &mut self.rejected][i.min(5)] = text;
     }
 }
 

@@ -9,7 +9,7 @@
 use crate::doc_model::{DocEvent, DocModel};
 use crate::os_ui as os;
 use crate::theme::p;
-use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::{Disableable as _, WindowExt as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -666,7 +666,14 @@ impl Render for AddItemsDialog {
 /// part, the assembly, or the tab (drawings, Variable Studios, files keep
 /// name, description and part number in the tab's metadata). `on_saved`
 /// gets the saved part number.
+/// An item from a version (Edit properties in that version's window): the Properties modal.
 fn open_item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl Fn(String, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    let (spec, save) = item_properties(doc, item, on_saved, cx);
+    crate::properties_dialog::open_properties(spec, save, window, cx);
+}
+
+/// The form's spec and its save (shown inside the dialog: [`ReleaseDialog::edit_item_properties`]).
+fn item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl Fn(String, &mut Window, &mut App) + 'static, cx: &mut App) -> (crate::properties_dialog::MetaSpec, impl Fn(crate::properties_dialog::MetaValues, &mut Window, &mut App) + 'static) {
     use crate::properties_dialog::{MetaSpec, MetaValues};
     use noshape_model::document::TabContent;
     let d = doc.read(cx);
@@ -703,9 +710,9 @@ fn open_item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl
         }
     };
     let spec = MetaSpec { category, material, computed_mass, bom_options: None, drawing_info: None, values };
-    crate::properties_dialog::open_properties(
+    (
         spec,
-        move |v, window, cx| {
+        move |v: MetaValues, window: &mut Window, cx: &mut App| {
             let item = item.clone();
             doc.update(cx, |d, cx| {
                 let content_kind = d.session.doc.tab(item.tab).map(|t| match &t.content {
@@ -746,9 +753,7 @@ fn open_item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl
             });
             on_saved(v.part_number.clone(), window, cx);
         },
-        window,
-        cx,
-    );
+    )
 }
 
 /// How a previously released item compares with its latest revision (Help:
@@ -895,6 +900,8 @@ pub struct ReleaseDialog {
     /// Comments (the dialog's Comments view: "Back to Release properties" returns), and the new comment's field.
     comments: Vec<noshape_model::release::Comment>,
     comments_view: bool,
+    /// Edit properties' view inside the dialog: the item's name and its form.
+    props_view: Option<(String, Entity<crate::properties_dialog::MetaForm>)>,
     comment_input: Entity<TextareaState>,
     /// Item search and the type filter (help: "Searching and filtering the
     /// object list"): empty = every type.
@@ -985,7 +992,7 @@ impl ReleaseDialog {
                 cx.notify();
             }
         }));
-        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, comments: Vec::new(), comments_view: false, comment_input, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, conditions, _subs: subs }
+        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, comments: Vec::new(), comments_view: false, props_view: None, comment_input, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, conditions, _subs: subs }
     }
 
     /// A new part number suggests its next revision (unless one was typed).
@@ -1305,7 +1312,7 @@ impl ReleaseDialog {
     /// Submit to the approvers: the candidate's version is made now and it waits, Pending (noshape_ops::release::submit).
     fn submit(&mut self, cx: &mut Context<Self>) -> bool {
         let pkg = self.package(if self.mode == Mode::Obsolete { PackageKind::Obsoletion } else { PackageKind::Release }, cx);
-        if pkg.name.is_empty() || self.approvers.is_empty() || self.issues(cx).iter().any(|v| !v.is_empty()) {
+        if pkg.name.is_empty() || self.approvers.is_empty() || self.issues(cx).iter().flatten().any(Issue::blocks) {
             cx.notify();
             return false;
         }
@@ -1515,11 +1522,46 @@ impl ReleaseDialog {
             }))
     }
 
+    /// Edit properties: the item's Properties inside the dialog (live2 release.json 10_helpRows (5)), with a back arrow
+    /// and Apply / Go back.
+    fn edit_item_properties(&mut self, i: usize, item: ReleaseItem, window: &mut Window, cx: &mut Context<Self>) {
+        let me = cx.entity();
+        let saved = me.clone();
+        let (spec, save) = item_properties(
+            self.doc.clone(),
+            item.clone(),
+            move |pn, window, cx| {
+                saved.update(cx, |this, cx| {
+                    if let Some(r) = this.rows.get(i) {
+                        r.part_number.update(cx, |s, cx| s.set_value(pn.clone(), window, cx));
+                    }
+                    cx.notify();
+                })
+            },
+            cx,
+        );
+        let back = me.clone();
+        let form = crate::properties_dialog::embedded_properties(
+            spec,
+            save,
+            move |_, cx| {
+                back.update(cx, |this, cx| {
+                    this.props_view = None;
+                    cx.notify();
+                })
+            },
+            window,
+            cx,
+        );
+        self.props_view = Some((item.name.clone(), form));
+        cx.notify();
+    }
+
     /// Release (or Obsolete): record the package at a new version.
     fn commit(&mut self, cx: &mut Context<Self>) -> bool {
         let kind = if self.mode == Mode::Obsolete { PackageKind::Obsoletion } else { PackageKind::Release };
         let pkg = self.package(kind, cx);
-        if pkg.name.is_empty() || (kind == PackageKind::Obsoletion && pkg.notes.trim().is_empty()) || self.issues(cx).iter().any(|v| !v.is_empty()) {
+        if pkg.name.is_empty() || (kind == PackageKind::Obsoletion && pkg.notes.trim().is_empty()) || self.issues(cx).iter().flatten().any(Issue::blocks) {
             cx.notify();
             return false;
         }
@@ -1547,6 +1589,10 @@ const COL_REVISION: f32 = 140.;
 const COL_STATE: f32 = 140.;
 const COL_PART_NUMBER: f32 = 150.;
 const GRID: u32 = 0xdddddd;
+/// An item row's bands (background, text): Bootstrap's alert-warning, alert-danger and alert-info.
+const BAND_WARNING: (u32, u32) = (0xfcf8e3, 0x8a6d3b);
+const BAND_DANGER: (u32, u32) = (0xf2dede, 0xa94442);
+const BAND_INFO: (u32, u32) = (0xd9edf7, INFO_BLUE);
 /// An item's INFO message (Bootstrap's alert-info text).
 const INFO_BLUE: u32 = 0x31708f;
 
@@ -1560,7 +1606,14 @@ impl Render for ReleaseDialog {
         let pal = p();
         let read_only = self.mode == Mode::Review;
         let issues = self.issues(cx);
-        let attention = issues.iter().filter(|v| !v.is_empty()).count();
+        let attention = issues.iter().filter(|v| v.iter().any(Issue::blocks)).count();
+        // The item types listed, in the list's order (the filter's toggles).
+        let mut present_kinds: Vec<ItemKind> = Vec::new();
+        for r in &self.rows {
+            if !present_kinds.contains(&r.item.kind) {
+                present_kinds.push(r.item.kind);
+            }
+        }
         let log = release_log(self.doc.read(cx));
         let red = gpui_kit::rgb(0xbd3039);
         // A header cell: grid line on its left.
@@ -1620,10 +1673,13 @@ impl Render for ReleaseDialog {
                     .gap(px(4.))
                     .font_weight(FontWeight::NORMAL)
                     .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(28.)).flex().items_center().border_1().rounded(px(3.)).border_color(gpui_kit::rgb(0xcccccc)).map(|d| crate::ui_script::mark(d, || "field:Search items".into())).child(Input::new(&self.search).appearance(false).small())))
-                    .child(small("rel-filter", "filter", "Filter", cx).when(self.filter_open || !self.kinds.is_empty(), |d| d.bg(gpui_kit::rgb(0xeaeaea))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.filter_open = !this.filter_open;
-                        cx.notify();
-                    })))
+                    // Live (release.json 2_filter): "Toggle filters", only with more than one item type listed.
+                    .when(present_kinds.len() > 1, |d| {
+                        d.child(small("rel-filter", "filter", "Toggle filters", cx).when(self.filter_open || !self.kinds.is_empty(), |d| d.bg(gpui_kit::rgb(0xeaeaea))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.filter_open = !this.filter_open;
+                            cx.notify();
+                        })))
+                    })
                     .when(self.mode == Mode::Release, |d| {
                         d.child(small("rel-assoc-drawings", "release-drawings", "Include associated drawings", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let (extra, left_out) = associated_drawings(this.doc.read(cx), &this.items(cx));
@@ -1745,7 +1801,7 @@ impl Render for ReleaseDialog {
                 )).with_priority(101)))
             });
         // Type icons toggle a filter; Clear removes it.
-        let filter_row = self.filter_open.then(|| {
+        let filter_row = (self.filter_open && present_kinds.len() > 1).then(|| {
             let kind_button = |k: ItemKind, icon: &'static str, cx: &mut Context<Self>| {
                 let on = self.kinds.contains(&k);
                 div()
@@ -1777,12 +1833,18 @@ impl Render for ReleaseDialog {
                 .gap_1()
                 .border_b_1()
                 .border_color(gpui_kit::rgb(GRID))
-                .child(kind_button(ItemKind::Part, "part", cx))
-                .child(kind_button(ItemKind::Assembly, "assembly", cx))
-                .child(kind_button(ItemKind::Drawing, "drawing", cx))
-                .child(kind_button(ItemKind::VariableStudio, "variable-studio", cx))
-                .child(kind_button(ItemKind::File, "file", cx))
-                .child(os::secondary_button("rel-kind-clear", "Clear", cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                // One toggle per item type listed, in the list's order; Clear greyed until one is on.
+                .children(present_kinds.iter().map(|k| {
+                    let icon = match k {
+                        ItemKind::Part => "part",
+                        ItemKind::Assembly => "assembly",
+                        ItemKind::Drawing => "drawing",
+                        ItemKind::VariableStudio => "variable-studio",
+                        ItemKind::File => "file",
+                    };
+                    kind_button(*k, icon, cx)
+                }))
+                .child(os::secondary_button("rel-kind-clear", "Clear", cx).disabled(self.kinds.is_empty()).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.kinds.clear();
                     cx.notify();
                 })))
@@ -1793,7 +1855,7 @@ impl Render for ReleaseDialog {
         let policy_new_revision = release_settings().require_new_revision;
         for (i, row) in self.rows.iter().enumerate() {
             let row_issues = issues.get(i).cloned().unwrap_or_default();
-            if self.problems_only && row_issues.is_empty() {
+            if self.problems_only && !row_issues.iter().any(Issue::blocks) {
                 continue;
             }
             if (!query.is_empty() && !row.item.name.to_lowercase().contains(&query)) || (!self.kinds.is_empty() && !self.kinds.contains(&row.item.kind)) {
@@ -1940,14 +2002,7 @@ impl Render for ReleaseDialog {
                                     add_source::run_linked(&item, &doc_path, add_source::LinkedAction::Properties, cx);
                                     return;
                                 }
-                                let me = me.clone();
-                                let doc = me.read(cx).doc.clone();
-                                open_item_properties(doc, item.clone(), move |pn, window, cx| me.update(cx, |this, cx| {
-                                    if let Some(r) = this.rows.get(i) {
-                                        r.part_number.update(cx, |s, cx| s.set_value(pn.clone(), window, cx));
-                                    }
-                                    cx.notify();
-                                }), window, cx)
+                                me.update(cx, |this, cx| this.edit_item_properties(i, item.clone(), window, cx));
                             })
                         })
                         .child({
@@ -1962,11 +2017,15 @@ impl Render for ReleaseDialog {
                             })
                         }),
                 );
-            let note = |text: SharedString, color: Hsla| div().pl(px(COL_ITEM + 10.)).pb(px(4.)).text_size(px(12.)).text_color(color).child(text).into_any_element();
+            // Live (release.json): a band under the row, Bootstrap's alert-warning / -danger / -info colours.
+            let note = |text: SharedString, (bg, fg): (u32, u32)| div().ml(px(COL_ITEM)).mr(px(8.)).mb(px(4.)).px(px(10.)).py(px(6.)).rounded(px(3.)).bg(gpui_kit::rgb(bg)).text_size(px(12.)).text_color(gpui_kit::rgb(fg)).child(text).into_any_element();
             rows_el.push(
                 v_flex()
                     .child(main)
-                    .children(row_issues.iter().filter(|x| **x != Issue::MissingPartNumber).map(|x| note(x.message().into(), red.into())))
+                    .children(row_issues.iter().filter(|x| **x != Issue::MissingPartNumber).map(|x| {
+                        let colours = if matches!(x, Issue::RevisionTooLow { .. } | Issue::Notice(_)) { BAND_WARNING } else { BAND_DANGER };
+                        note(x.message().into(), colours)
+                    }))
                     // The server's INFO messages (alert-info), as Onshape's help screenshots show them.
                     .children(since.filter(|_| !reverted).map(|s| {
                         note(
@@ -1976,19 +2035,27 @@ impl Render for ReleaseDialog {
                                 SinceRelease::MetadataChanged => "Item's geometry has not changed since its last revision, but its properties have changed.".to_string(),
                             }
                             .into(),
-                            gpui_kit::rgb(INFO_BLUE).into(),
+                            BAND_INFO,
                         )
                     }))
                     .into_any_element(),
             );
         }
         // The item column's grid line runs the table's full height.
+        // Live (release.json 1_resize): the list / form split drags (ns-resize).
         let list = div()
             .relative()
-            .h(px(212.))
+            .h(px(RC_SIZE.with(|c| c.get()).1))
             .flex_none()
             .child(div().absolute().top_0().bottom_0().left(px(COL_ITEM)).w(px(1.)).bg(gpui_kit::rgb(GRID)))
-            .child(v_flex().id("rel-items").size_full().overflow_y_scroll().children(rows_el));
+            .child(v_flex().id("rel-items").size_full().overflow_y_scroll().children(rows_el))
+            .child(
+                div().id("rel-split").absolute().left_0().right_0().bottom(px(-3.)).h(px(6.)).cursor(CursorStyle::ResizeUpDown).on_drag(RcResize::Split, |d, _, _, cx| cx.new(|_| *d)).on_drag_move(|e: &DragMoveEvent<RcResize>, window, cx| {
+                    if *e.drag(cx) == RcResize::Split {
+                        rc_resize_list(f32::from(e.event.position.y - e.bounds.center().y), window);
+                    }
+                }),
+            );
         // Release management: the fields' display names, and "Require a
         // note in the Release dialog".
         let settings = release_settings();
@@ -2058,7 +2125,8 @@ impl Render for ReleaseDialog {
                         )
                         .child(div().map(|d| crate::ui_script::mark(d, || "field:Comment".into())).child(Textarea::new(&self.comment_input)))
                     })
-                    .when(self.mode == Mode::Obsolete, |d| {
+                    // An obsoletion and its review (View obsoletion: the admin can change it, live2 10_helpRows (7)).
+                    .when(self.mode == Mode::Obsolete || self.package.as_ref().is_some_and(|p| p.kind == PackageKind::Obsoletion && self.mode == Mode::Review), |d| {
                         let on = self.re_releasable;
                         d.child(div().pt(px(6.)).child(os::checkbox("rel-rerelease", "Mark revision as re-releasable", on).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.re_releasable = !this.re_releasable;
@@ -2246,6 +2314,31 @@ impl Render for ReleaseDialog {
                     }
                 })));
             }
+            // View obsoletion: Apply saves "Mark revision as re-releasable" once changed.
+            Mode::Review if self.package.as_ref().is_some_and(|p| p.kind == PackageKind::Obsoletion) => {
+                let changed = self.package.as_ref().is_some_and(|p| p.re_releasable != self.re_releasable);
+                footer = footer.child(button("rel-apply", "Apply", 0x1651b0, changed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    let Some(name) = this.package.as_ref().map(|p| p.name.clone()) else { return };
+                    let on = this.re_releasable;
+                    if this.package.as_ref().is_some_and(|p| p.re_releasable == on) {
+                        return;
+                    }
+                    let r = this.doc.update(cx, |doc, cx| {
+                        let r = noshape_ops::release::set_re_releasable(&mut doc.session, &name, on);
+                        doc.reloaded(cx);
+                        r
+                    });
+                    match r {
+                        Ok(()) => {
+                            if let Some(p) = &mut this.package {
+                                p.re_releasable = on;
+                            }
+                        }
+                        Err(e) => this.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}")))),
+                    }
+                    cx.notify();
+                })));
+            }
             // Release__cloning_a_release_package: Clone starts a new candidate
             // from the current workspace (not while viewing a version).
             Mode::Review if self.doc.read(cx).session.viewing.is_none() => {
@@ -2310,9 +2403,30 @@ impl Render for ReleaseDialog {
                     .children(attention_filter)
                     .child(overflow),
             )
-            .when(!self.comments_view, |d| d.child(v_flex().border_t_1().border_b_1().border_color(gpui_kit::rgb(GRID)).child(header).children(filter_row).child(list)).child(form))
-            .when(self.comments_view, |d| d.child(div().border_t_1().border_color(gpui_kit::rgb(GRID)).child(self.render_comments(cx))))
-            .child(h_flex().h(px(56.)).px(px(12.)).gap(px(8.)).border_t_1().border_color(gpui_kit::rgb(os::MODAL_DIVIDER)).child(left).child(div().flex_1().child(footer)))
+            .map(|d| match self.props_view.clone() {
+                // Live (rc-edit-properties-view): ← (Back to Release properties) and the item's name over its form.
+                Some((name, props)) => d.child(
+                    v_flex()
+                        .border_t_1()
+                        .border_color(gpui_kit::rgb(GRID))
+                        .child(
+                            h_flex()
+                                .h(px(40.))
+                                .px(px(10.))
+                                .gap(px(8.))
+                                .child(div().id("rel-props-back").map(|d| crate::ui_script::mark(d, || "button:Back to Release properties".into())).cursor_pointer().text_size(px(18.)).text_color(pal.text).child("←").tooltip(crate::ui::tooltip("Back to Release properties")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.props_view = None;
+                                    cx.notify();
+                                })))
+                                .child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(name))),
+                        )
+                        .child(props),
+                ),
+                None => d
+                    .when(!self.comments_view, |d| d.child(v_flex().border_t_1().border_b_1().border_color(gpui_kit::rgb(GRID)).child(header).children(filter_row).child(list)).child(form))
+                    .when(self.comments_view, |d| d.child(div().border_t_1().border_color(gpui_kit::rgb(GRID)).child(self.render_comments(cx))))
+                    .child(h_flex().h(px(56.)).px(px(12.)).gap(px(8.)).border_t_1().border_color(gpui_kit::rgb(os::MODAL_DIVIDER)).child(left).child(div().flex_1().child(footer))),
+            })
     }
 }
 
@@ -2421,13 +2535,75 @@ fn confirm_delete_draft(doc: Entity<DocModel>, name: String, window: &mut Window
 /// The release dialogs' modal: no title bar (the dialog draws its own
 /// title row, Help image savedraftbutton-relcandidatedialog).
 fn release_modal(dialog: gpui_kit::component::dialog::Dialog) -> gpui_kit::component::dialog::Dialog {
-    dialog.w(px(820.)).margin_top(px(26.)).close_button(false).p_0().gap_0().rounded(px(4.)).border_color(gpui_kit::rgb(os::MODAL_DIVIDER))
+    dialog.w(px(RC_SIZE.with(|c| c.get()).0)).margin_top(px(26.)).close_button(false).p_0().gap_0().rounded(px(4.)).border_color(gpui_kit::rgb(os::MODAL_DIVIDER))
+}
+
+/// The Release candidate dialog's width and its item list's height (live release.json 1_resize: the dialog resizes
+/// from its edges and corner, re-centred; the list / form split drags). Kept for the session.
+const RC_DEFAULT: (f32, f32) = (820., 212.);
+const RC_MIN: (f32, f32) = (680., 80.);
+thread_local! {
+    static RC_SIZE: std::cell::Cell<(f32, f32)> = const { std::cell::Cell::new(RC_DEFAULT) };
+}
+
+/// What a drag on the dialog resizes.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RcResize {
+    Width,
+    Height,
+    Corner,
+    Split,
+}
+
+impl Render for RcResize {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        Empty
+    }
+}
+
+fn rc_resize_list(dy: f32, window: &mut Window) {
+    let (w, h) = RC_SIZE.with(|c| c.get());
+    let max = (f32::from(window.viewport_size().height) - 360.).max(RC_MIN.1);
+    let h2 = (h + dy).round().clamp(RC_MIN.1, max);
+    if h2 != h {
+        RC_SIZE.with(|c| c.set((w, h2)));
+        window.refresh();
+    }
+}
+
+/// The dialog's resize handles: its right edge (width, the dialog stays centred), its bottom edge (the list's
+/// height) and the corner (both).
+fn rc_resize_handles() -> impl IntoElement {
+    let handle = |id: &'static str, kind: RcResize, cursor: CursorStyle| div().id(id).absolute().cursor(cursor).on_drag(kind, |d, _, _, cx| cx.new(|_| *d));
+    div()
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
+        .child(handle("rel-resize-e", RcResize::Width, CursorStyle::ResizeLeftRight).top_0().bottom_0().right_0().w(px(5.)))
+        .child(handle("rel-resize-s", RcResize::Height, CursorStyle::ResizeUpDown).left_0().right_0().bottom_0().h(px(5.)))
+        .child(handle("rel-resize-se", RcResize::Corner, CursorStyle::ResizeUpLeftDownRight).right_0().bottom_0().size(px(10.)))
+        .on_drag_move(|e: &DragMoveEvent<RcResize>, window, cx| {
+            let kind = *e.drag(cx);
+            if matches!(kind, RcResize::Width | RcResize::Corner) {
+                let (w, h) = RC_SIZE.with(|c| c.get());
+                let view = f32::from(window.viewport_size().width);
+                let w2 = (2. * f32::from(e.event.position.x - e.bounds.center().x)).round().clamp(RC_MIN.0, view.max(RC_MIN.0));
+                if w2 != w {
+                    RC_SIZE.with(|c| c.set((w2, h)));
+                    window.refresh();
+                }
+            }
+            if matches!(kind, RcResize::Height | RcResize::Corner) {
+                rc_resize_list(f32::from(e.event.position.y - e.bounds.bottom()), window);
+            }
+        })
 }
 
 /// A ReleaseDialog's modal. While the workflow lightbox is open, Esc
 /// closes only the lightbox (bundle: preventEscapeFromClosingDialog).
 fn release_dialog_modal(dialog: gpui_kit::component::dialog::Dialog, view: &Entity<ReleaseDialog>, cx: &App) -> gpui_kit::component::dialog::Dialog {
-    release_modal(dialog).keyboard(view.read(cx).workflow.is_none()).child(view.clone())
+    release_modal(dialog).keyboard(view.read(cx).workflow.is_none()).child(view.clone()).child(rc_resize_handles())
 }
 
 /// Open "Create Release candidate" for items (parts list or versions panel).
@@ -2442,6 +2618,7 @@ pub fn open_review(doc: Entity<DocModel>, package: &Package, window: &mut Window
     let package = package.clone();
     let view = cx.new(|cx| {
         let mut d = ReleaseDialog::new(doc, Mode::Review, package.items.clone(), package.name.clone(), package.notes.clone(), window, cx);
+        d.re_releasable = package.re_releasable;
         d.comments = package.comments.clone();
         d.approvers = package.approvers.clone();
         d.observers = package.observers.clone();

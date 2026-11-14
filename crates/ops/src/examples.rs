@@ -171,6 +171,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("part_appearances", &[r##"{}"##]),
     ("release_create", &[r##"{"tab": "Part Studio 1", "name": "Release 1", "part_numbers": {"Part 1": "PRT-0001"}}"##, r##"{"tab": "Assembly 1", "name": "R2", "notes": "first build", "include_drawings": true}"##, r##"{"tab": "Part Studio 1", "tabs": ["Drawing 1"], "name": "Release 2", "generate_part_numbers": true, "draft": true}"##, r##"{"from_draft": "Release 2"}"##]),
     ("release_obsolete", &[r##"{"part_number": "PRT-0001", "notes": "Replaced by PRT-0002"}"##, r##"{"part_number": "PRT-0001", "revision": "A", "notes": "Wrong material", "re_releasable": true}"##]),
+    ("release_re_releasable", &[r##"{"name": "Obsolete PRT-0001 A", "re_releasable": true}"##]),
     ("release_revision_history", &[r##"{"part_number": "PRT-0001"}"##, r##"{}"##]),
     ("release_drafts", &[r##"{}"##]),
     ("release_approve", &[r##"{"name": "Release 3"}"##]),

@@ -117,6 +117,8 @@ pub struct AsmBuilt {
 #[derive(Clone, Debug)]
 pub struct OccSpan {
     pub occ: usize,
+    /// Its top-level instance.
+    pub top: noshape_model::assembly::InstanceId,
     pub start: usize,
     pub end: usize,
     pub lod: Option<(usize, Mat4)>,
@@ -421,7 +423,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
             lod.transform = t * lod.transform;
             scene.instances.push(lod);
         }
-        spans.push(OccSpan { occ: oi, start: first_instance, end: scene.instances.len(), lod: lod_at });
+        spans.push(OccSpan { occ: oi, top: o.top(), start: first_instance, end: scene.instances.len(), lod: lod_at });
     }
     let static_instances = scene.instances.len();
     scene.states = vec![0; picks.len() + 1];
@@ -730,6 +732,12 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     // A selected (or just inserted) instance: Onshape's whole-part amber,
     // lighter than a selected face, outlined in light amber; its edges go
     // dark amber (live ins-902, qa5 A15).
+    // Its outline shows through the parts in front (live2 11-14, explode edit mode too).
+    for span in built.spans.iter().filter(|s| h.selected_tops.contains(&s.top)) {
+        for inst in &mut scene.instances[span.start..span.end.min(built.static_instances)] {
+            inst.outline_through = true;
+        }
+    }
     for top in &h.selected_tops {
         for &id in built.picks.faces_of(*top) {
             scene.add_flag(id, state::SELECTED | state::BODY | state::OUTLINE);

@@ -512,6 +512,15 @@ fn fs_outline_depth(i: MeshOut) -> @location(0) vec4<f32> {
     return vec4(0.0);
 }
 
+// An outline-through mesh's OUTLINE faces, all of them (depth ignored), marked in the stencil (no color).
+@fragment
+fn fs_xray_mark(i: MeshOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
+    let st = state_of(i.pick);
+    if ((st & OUTLINE) == 0u || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    return vec4(0.0);
+}
+
 // A see-through-self mesh's front-most pixels, marked in the stencil (no color).
 @fragment
 fn fs_self_mark(i: MeshOut) -> @location(0) vec4<f32> {

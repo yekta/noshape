@@ -252,6 +252,9 @@ pub struct MetaForm {
     /// Release management: the release-create icon at the top left
     /// (Release__typical_release_workflow, "From any Properties dialog").
     on_release: Option<ReleaseFn>,
+    /// Shown inside the Release candidate dialog (Edit properties, live2 release.json 10_helpRows (5)): no Part number,
+    /// Revision or State; the footer's Apply and Go back (this).
+    embedded: Option<ReleaseFn>,
     /// Part Studio parts: "Reset all" restores these values (live
     /// dom/dialog-partstudio-part-properties.txt; absent for assembly parts).
     reset_to: Option<MetaValues>,
@@ -370,6 +373,7 @@ impl MetaForm {
         }
         Self {
             on_release: None,
+            embedded: None,
             reset_to: None,
             configured: Vec::new(),
             read_only: Vec::new(),
@@ -1028,7 +1032,7 @@ impl Render for MetaForm {
         // Live 1738 (Tab › Properties…): the fields a tab kind has, by its
         // category. Parts, assemblies and drawings have them all.
         let kind = self.spec_category;
-        let numbered = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio");
+        let numbered = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio") && self.embedded.is_none();
         // A drawing has its own fields in their place (live doc-tab-properties-drawing).
         let sourced = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio" | "Onshape Drawing");
         let titled = kind != "Onshape Feature Studio";
@@ -1387,8 +1391,12 @@ impl Render for MetaForm {
                             .gap(px(5.))
                             .pr(px(4.))
                             .child(footer_button("meta-apply", "Apply", true, dirty).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.save(false, window, cx))))
-                            .child(footer_button("meta-save", "Save", true, dirty).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.save(true, window, cx))))
-                            .child(footer_button("meta-close", "Close", false, true).on_click(|_, window, cx| window.close_dialog(cx))),
+                            .map(|d| match self.embedded.clone() {
+                                Some(back) => d.child(footer_button("meta-go-back", "Go back", false, true).on_click(move |_, window, cx| back(window, cx))),
+                                None => d
+                                    .child(footer_button("meta-save", "Save", true, dirty).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.save(true, window, cx))))
+                                    .child(footer_button("meta-close", "Close", false, true).on_click(|_, window, cx| window.close_dialog(cx))),
+                            }),
                     ),
             )
     }
@@ -1548,11 +1556,32 @@ fn mass_arrives_later(form: &Entity<MetaForm>, mass: Task<Option<String>>, windo
 
 /// [`open_properties`] with the item's card in a left tree (Part Studio
 /// tabs).
-pub fn open_properties_with_card(spec: MetaSpec, card: ItemCard, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+/// The Properties form shown inside another dialog (the Release candidate dialog's Edit properties): Apply, and Go back
+/// running `go_back`.
+pub fn embedded_properties(spec: MetaSpec, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, go_back: impl Fn(&mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) -> Entity<MetaForm> {
     let on_save: SaveFn = Rc::new(on_save);
+    cx.new(|cx| {
+        let mut f = MetaForm::new(spec, on_save, window, cx);
+        f.embedded = Some(Rc::new(go_back));
+        f
+    })
+}
+
+pub fn open_properties_with_card(spec: MetaSpec, card: ItemCard, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    open_card_properties(spec, card, Rc::new(on_save), None, window, cx);
+}
+
+/// [`open_properties_with_card`] with the Release icon (a Part Studio tab's Properties: live2 release.json
+/// 10_helpRows (10)).
+pub fn open_properties_with_card_and_release(spec: MetaSpec, card: ItemCard, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, on_release: impl Fn(&mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    open_card_properties(spec, card, Rc::new(on_save), Some(Rc::new(on_release)), window, cx);
+}
+
+fn open_card_properties(spec: MetaSpec, card: ItemCard, on_save: SaveFn, on_release: Option<ReleaseFn>, window: &mut Window, cx: &mut App) {
     let form = cx.new(|cx| {
         let mut f = MetaForm::new(spec, on_save, window, cx);
         f.card = Some(card);
+        f.on_release = on_release;
         f
     });
     let focus = form.read(cx).focus.clone();

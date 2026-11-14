@@ -1394,6 +1394,52 @@ fn see_through_self_lines_skip_their_own_mesh() {
     assert!(!red(visible), "not where nothing hides it: {visible:?}");
 }
 
+/// [`Instance::outline_through`]: a selected part's outline shows through the part in front of it (an assembly's
+/// selected instance, live2 2026-11-14), and nothing of it is drawn over its own image.
+#[test]
+fn an_outline_through_shows_past_the_part_in_front() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let back = r.upload_mesh(&primitives::box_mesh([-0.01, -0.005, -0.01], [0.01, 0.005, 0.01], 1));
+    // In front of its left half (the front view looks along +Y).
+    let front = r.upload_mesh(&primitives::box_mesh([-0.05, -0.03, -0.03], [0.0, -0.02, 0.03], 1));
+    let mut cam = Camera { rotation: Camera::rotation_for(StandardView::Front), ..Default::default() };
+    cam.fit_sphere(glam::DVec3::ZERO, 0.04, 4.0 / 3.0);
+    let (w, h) = (400u32, 300u32);
+    let frame = |r: &mut Renderer, through: bool| {
+        let mut scene = Scene::default();
+        let mut b = Instance::new(Drawable::Mesh(back.clone())).with_color(srgb(0x9a, 0xb4, 0xcc)).pick_base(6);
+        if through {
+            b = b.outline_through();
+        }
+        scene.instances.push(b);
+        scene.instances.push(Instance::new(Drawable::Mesh(front.clone())).with_color(srgb(0x40, 0x40, 0x40)));
+        for id in 7..=12 {
+            scene.set_state(id, state::SELECTED | state::BODY | state::OUTLINE);
+        }
+        r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap().bgra
+    };
+    let (plain, through) = (frame(&mut r, false), frame(&mut r, true));
+    let vp = glam::DVec2::new(w as f64, h as f64);
+    let px = |b: &[u8], p: glam::DVec2| {
+        let i = ((p.y as u32 * w + p.x as u32) * 4) as usize;
+        [b[i + 2], b[i + 1], b[i]]
+    };
+    let edge = cam.project(glam::DVec3::new(-0.01, 0.0, 0.0), vp, 0.05).unwrap();
+    let outside = glam::DVec2::new(edge.x - 2.0, edge.y);
+    let inside = cam.project(glam::DVec3::new(-0.005, 0.0, 0.0), vp, 0.05).unwrap();
+    let orange = |c: [u8; 3]| c[0] > 200 && c[1] > 140 && c[2] < 140;
+    assert!(!orange(px(&plain, outside)), "hidden behind the front part without the flag: {:?}", px(&plain, outside));
+    assert!(orange(px(&through, outside)), "the outline past the front part: {:?}", px(&through, outside));
+    assert_eq!(px(&plain, inside), px(&through, inside), "nothing over its own image");
+}
+
 /// Feature previews shade like Onshape's (live part-studio/230, default
 /// view, white background): the top and front faces alike, the right side
 /// lighter, flat (no highlight); the box is opaque in the preview blend's

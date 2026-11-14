@@ -62,6 +62,8 @@ pub struct ChooserState {
     pub filter: Option<u8>,
     /// Expanded studios.
     pub open: Vec<TabId>,
+    /// Opened from + › Create Drawing…: the only Part Studio with parts starts expanded (live doc-plus-create-drawing-ok).
+    pub expand_single: bool,
     pub search: Option<Entity<InputState>>,
     /// Create version… left the keyboard on the drawing (the state reads the drawing, not the chooser's field, until
     /// the chooser is used again).
@@ -809,6 +811,15 @@ impl DrawingEditor {
             Some(d) => SourceKey { version: d.key(id).map(|k| k.0), ..SourceKey::studio(id) },
             None => SourceKey::studio(id),
         };
+        if self.chooser.expand_single && other_doc.is_none() {
+            let with_parts: Vec<TabId> = tabs.iter().filter(|t| !t.2).map(|t| t.0).filter(|id| self.sources.get(&key_of(*id)).is_some_and(|s| !s.context.bodies.is_empty())).collect();
+            if let [only] = with_parts[..] {
+                self.chooser.expand_single = false;
+                if !self.chooser.open.contains(&only) {
+                    self.chooser.open.push(only);
+                }
+            }
+        }
         let tag = other_doc.as_ref().map_or(0, |d| d.tag());
         let pic_of = |id: TabId, what: ThumbOf| self.chooser.thumbs.get(&(tag, id, what)).cloned();
         // Live: blue underlined tabs, 12 px.

@@ -749,7 +749,7 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
     // Live 1738: only a Part Studio's modal has the left tree (its card).
     if category == "Onshape Part Studio" {
         let card = noshape_app_core::properties_dialog::ItemCard { kind: "Part Studio", thumb };
-        noshape_app_core::properties_dialog::open_properties_with_card(spec, card, save, window, cx);
+        noshape_app_core::properties_dialog::open_properties_with_card_and_release(spec, card, save, release, window, cx);
     } else if releasable {
         noshape_app_core::properties_dialog::open_properties_with_release(spec, save, release, window, cx);
     } else {

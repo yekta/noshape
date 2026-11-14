@@ -330,12 +330,14 @@ pub enum Issue {
     MissingPartNumber,
     /// The revision isn't a label of the scheme.
     InvalidRevision,
-    /// Lower than (or equal to) a released revision of the part number.
-    RevisionTooLow { latest: String },
+    /// Lower than (or equal to) a released revision of the part number: the latest released one and the next free.
+    RevisionTooLow { latest: String, part_number: String, next: String },
     /// The same part number appears twice in the candidate.
     DuplicatePartNumber,
     /// A Release management › Release condition holds (its message).
     Prevented(String),
+    /// The same with the condition off: shown, not blocking (live release.json: yellow, red once the condition is on).
+    Notice(String),
 }
 
 impl Issue {
@@ -343,10 +345,16 @@ impl Issue {
         match self {
             Issue::MissingPartNumber => "Required field must not be empty.".into(),
             Issue::InvalidRevision => "Revision does not follow the revision scheme.".into(),
-            Issue::RevisionTooLow { latest } => format!("Revision must be later than {latest}, the latest released revision."),
+            // Live (release.json rc-revision-lower-error): a warning band under the row.
+            Issue::RevisionTooLow { part_number, next, .. } => format!("The next available revision for part number {part_number} is {next}."),
             Issue::DuplicatePartNumber => "Part number is used by another item of this release.".into(),
-            Issue::Prevented(message) => message.clone(),
+            Issue::Prevented(message) | Issue::Notice(message) => message.clone(),
         }
+    }
+
+    /// Whether it holds the release back (all but a [`Issue::Notice`]).
+    pub fn blocks(&self) -> bool {
+        !matches!(self, Issue::Notice(_))
     }
 }
 
@@ -443,7 +451,7 @@ impl ReleaseLog {
                         if let Some(max) = blocking
                             && r <= max
                         {
-                            v.push(Issue::RevisionTooLow { latest: self.scheme.at(max).unwrap_or_default() });
+                            v.push(Issue::RevisionTooLow { latest: self.scheme.at(max).unwrap_or_default(), part_number: it.part_number.clone(), next: self.scheme.at(max + 1).unwrap_or_default() });
                         }
                     }
                 }
@@ -628,7 +636,8 @@ pub struct NumberingSchemes {
 impl Default for NumberingSchemes {
     fn default() -> Self {
         Self {
-            release_objects: NumberScheme::new(&["", "", "", "", ""]),
+            // Live (release.json 9_numbering): PRT-, ASM-, DRW-, VS-, FILE- (min length 3, next 1).
+            release_objects: NumberScheme::new(&["PRT-", "ASM-", "DRW-", "VS-", "FILE-"]),
             standard_content: NumberScheme::new(&[""]),
             items: NumberScheme::new(&[""]),
             release_names: NumberScheme::new(&[""]),
@@ -780,7 +789,8 @@ mod tests {
         assert_eq!(log.next_revision("P-1"), "B");
         assert_eq!(log.state("P-1"), ItemState::Released);
         // Releasing A again, or an earlier label, is refused; a later one is fine.
-        assert_eq!(log.validate(&[item("P-1", "A")]), vec![vec![Issue::RevisionTooLow { latest: "A".into() }]]);
+        assert_eq!(log.validate(&[item("P-1", "A")]), vec![vec![Issue::RevisionTooLow { latest: "A".into(), part_number: "P-1".into(), next: "B".into() }]]);
+        assert_eq!(log.validate(&[item("P-1", "A")])[0][0].message(), "The next available revision for part number P-1 is B.");
         assert!(log.validate(&[item("P-1", "C")])[0].is_empty());
         assert_eq!(log.validate(&[item("", "A")]), vec![vec![Issue::MissingPartNumber]]);
         assert_eq!(log.validate(&[item("P-1", "I")]), vec![vec![Issue::InvalidRevision]]);

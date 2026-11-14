@@ -37,11 +37,22 @@ pub fn condition_issues(session: &Session, items: &[ReleaseItem]) -> Vec<Vec<Iss
                 return v;
             }
             let prevented = |v: &mut Vec<Issue>, text: &str| v.push(Issue::Prevented(text.into()));
+            // A condition live shows either way: red and blocking when on, a yellow notice when off.
+            let held = |v: &mut Vec<Issue>, on: bool, text: &str| v.push(if on { Issue::Prevented(text.into()) } else { Issue::Notice(text.into()) });
             if !it.part_number.is_empty() && pending.contains(&it.part_number) {
                 prevented(&mut v, "The part number is included in another pending Release candidate.");
             }
             match session.doc.tab(it.tab).map(|t| &t.content) {
                 Some(TabContent::PartStudio(ps)) => {
+                    // A revision typed before the first release that the scheme doesn't have (live: a yellow band).
+                    let typed = it.part.as_ref().and_then(|b| ps.part_properties.get(b)).and_then(|p| p.revision.clone()).map(|r| r.trim().to_string()).filter(|r| !r.is_empty());
+                    if let Some(r) = typed {
+                        let log = crate::release::release_log(session);
+                        if log.revisions(&it.part_number).is_empty() && log.scheme.index(&r).is_none() {
+                            let next = log.next_revision(&it.part_number);
+                            v.push(Issue::Notice(format!("{r} is not a valid revision in your company revision scheme. The next available revision for this scheme is {next}.")));
+                        }
+                    }
                     if on[FEATURE_ERRORS] {
                         let failed = *studio_errors.entry((it.tab, it.config.clone())).or_insert_with(|| {
                             let mut values = ps.configuration.defaults();
@@ -53,8 +64,8 @@ pub fn condition_issues(session: &Session, items: &[ReleaseItem]) -> Vec<Vec<Iss
                             prevented(&mut v, "The Part Studio feature list contains errors.");
                         }
                     }
-                    if on[ROLLED_BACK] && ps.rollback.is_some_and(|r| r < ps.features.len()) {
-                        prevented(&mut v, "The Part Studio feature list is not rolled to the end.");
+                    if ps.rollback.is_some_and(|r| r < ps.features.len()) {
+                        held(&mut v, on[ROLLED_BACK], "Part belongs to a Part Studio with a Feature list that is in a rolled back state.");
                     }
                 }
                 Some(TabContent::Assembly(asm)) => {
@@ -83,8 +94,8 @@ pub fn condition_issues(session: &Session, items: &[ReleaseItem]) -> Vec<Vec<Iss
                         .collect();
                     // "Pending reference updates": a reference to another
                     // document's version with a newer one out (the update icons).
-                    if on[PENDING_REFERENCES] && pinned.iter().any(|(r, _)| r.path != *own && crate::derived::newer_version(r).is_some()) {
-                        prevented(&mut v, "The Assembly has pending reference updates.");
+                    if pinned.iter().any(|(r, _)| r.path != *own && crate::derived::newer_version(r).is_some()) {
+                        held(&mut v, on[PENDING_REFERENCES], "Assembly has pending reference updates.");
                     }
                     if on[OBSOLETE_REFERENCES] && pinned.iter().any(|(r, body)| references_obsolete(&r.path, r.microversion, &r.tab, body.as_ref())) {
                         prevented(&mut v, "The item references obsolete revisions.");
@@ -92,8 +103,8 @@ pub fn condition_issues(session: &Session, items: &[ReleaseItem]) -> Vec<Vec<Iss
                 }
                 Some(TabContent::Drawing(drawing)) => {
                     // The update icon's state: a source changed since the views were made.
-                    if on[DRAWING_UPDATE] && crate::drawing::old_state(session, drawing).is_some() {
-                        prevented(&mut v, "The Drawing has a pending update.");
+                    if crate::drawing::old_state(session, drawing).is_some() {
+                        held(&mut v, on[DRAWING_UPDATE], "Drawing has a pending update");
                     }
                     if on[OBSOLETE_REFERENCES] {
                         let own = &session.path;
