@@ -1,19 +1,19 @@
 {
  "scenario": "ver-linked-selective-update",
- "recorded": "2026-11-09T09:35:01.101Z",
+ "recorded": "2026-11-14T02:25:06.398Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.2"
  },
  "live": {
-  "document": "78e6fe74b691cf2e56b16847",
-  "workspace": "c6c374210c37d8626e6352ee",
-  "element": "022b85b85bc71d983972113d",
+  "document": "54f8672d1eed3e99cf45a859",
+  "workspace": "d425c6a956af76d3c889c1e8",
+  "element": "f4ed8ec0f7fdce879301d4fc",
   "start": "doc-linked",
-  "startElement": "022b85b85bc71d983972113d",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "f4ed8ec0f7fdce879301d4fc",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -62,6 +62,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -98,7 +125,7 @@
    "ok": true,
    "at": [
     381,
-    976
+    1063
    ],
    "state": {
     "focus": {
@@ -142,6 +169,15 @@
        "cls": "is-instance"
       },
       {
+       "name": "Simulation features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
        "name": "Mate features (0)",
        "state": "ok",
        "selected": false,
@@ -162,6 +198,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 57.142,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.034155,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -186,7 +249,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 33026
+   "t": 34701
   },
   {
    "step": 2,
@@ -278,6 +341,15 @@
        "cls": "is-instance"
       },
       {
+       "name": "Simulation features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
        "name": "Mate features (0)",
        "state": "ok",
        "selected": false,
@@ -298,6 +370,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 57.142,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.034155,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -322,7 +421,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 38041
+   "t": 37598
   },
   {
    "step": 3,
@@ -420,6 +519,15 @@
        "cls": "is-instance"
       },
       {
+       "name": "Simulation features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
        "name": "Mate features (0)",
        "state": "ok",
        "selected": false,
@@ -440,6 +548,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 57.142,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.034155,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -464,7 +599,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 40889
+   "t": 39857
   },
   {
    "step": 4,
@@ -476,12 +611,20 @@
    },
    "ok": true,
    "at": [
-    416,
-    190
+    260,
+    198
    ],
    "state": {
     "focus": {
-     "kind": "none"
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "on",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
     },
     "dialog": {
      "title": "Reference manager",
@@ -505,12 +648,12 @@
       {
        "label": "uip Source",
        "kind": "boolean",
-       "checked": false,
+       "checked": true,
        "text": "V1 ⇨ V2"
       }
      ],
      "error": null,
-     "ok": "disabled",
+     "ok": "enabled",
      "okLabel": "Update selected"
     },
     "dialogs": [],
@@ -522,7 +665,7 @@
       "inputs": [
        {
         "placeholder": null,
-        "value": false
+        "value": true
        }
       ]
      }
@@ -562,6 +705,15 @@
        "cls": "is-instance"
       },
       {
+       "name": "Simulation features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
        "name": "Mate features (0)",
        "state": "ok",
        "selected": false,
@@ -582,6 +734,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 57.142,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.034155,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -606,7 +785,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 44212
+   "t": 42076
   },
   {
    "step": 5,
@@ -649,7 +828,7 @@
       {
        "label": "uip Source",
        "kind": "boolean",
-       "checked": false,
+       "checked": true,
        "text": "V1 ⇨ V2"
       },
       {
@@ -659,7 +838,7 @@
       }
      ],
      "error": null,
-     "ok": "disabled",
+     "ok": "enabled",
      "okLabel": "Update selected"
     },
     "dialogs": [],
@@ -671,7 +850,7 @@
       "inputs": [
        {
         "placeholder": null,
-        "value": false
+        "value": true
        }
       ]
      }
@@ -721,6 +900,15 @@
        "cls": "is-instance"
       },
       {
+       "name": "Simulation features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
        "name": "Mate features (0)",
        "state": "ok",
        "selected": false,
@@ -741,6 +929,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 57.142,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.034155,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -765,7 +980,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 46990
+   "t": 44281
   },
   {
    "step": 6,
@@ -863,6 +1078,15 @@
        "cls": "is-instance"
       },
       {
+       "name": "Simulation features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
        "name": "Mate features (0)",
        "state": "ok",
        "selected": false,
@@ -883,6 +1107,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 57.142,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.034155,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -907,7 +1158,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 50418
+   "t": 47234
   },
   {
    "step": 7,
@@ -1005,6 +1256,15 @@
        "cls": "is-instance"
       },
       {
+       "name": "Simulation features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
        "name": "Mate features (0)",
        "state": "ok",
        "selected": false,
@@ -1025,6 +1285,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      20.039,
+      14.933,
+      5.045
+     ],
+     "eye_mm": [
+      33.248,
+      -7.946,
+      20.297
+     ],
+     "width_mm": 57.142,
+     "height_mm": 33.233,
+     "mmPerPixel": 0.034155,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -1049,7 +1336,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 65006
+   "t": 61135
   }
  ]
 }
