@@ -2285,4 +2285,39 @@ fn a_flange_beside_a_side_running_on_tears_the_plate() {
     let region = 46.0 * 20.0 - (400.0 - std::f64::consts::PI * 100.0);
     let want = (region - 26.0 * 4.0) * 3.0 + std::f64::consts::PI / 4.0 * 15.0 * 26.0 + 21.0 * 26.0 * 3.0;
     assert!((got - want).abs() < 1e-3, "volume {got:.6} mm³, want {want:.6}");
+    // In the flat the plate's corner, past its bend edge, meets the flange's end (live's info).
+    let st = r.display.features.last().expect("Flange's status");
+    assert!(matches!(st.status, FeatureStatus::Info) && st.message.as_deref() == Some("Collision in sheet metal flat pattern."), "{:?} {:?}", st.status, st.message);
+}
+
+/// A partial flange with a Tear relief: in the flat the plate beyond the flange's end touches only the bend's own strip,
+/// no collision (live fs sm5d, all OK).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_partial_flange_with_a_tear_relief_has_no_flat_collision() {
+    let mut s = plate("2 mm");
+    let r = s.ok();
+    let edge = edge_at(&r, DVec3::new(30.0, 40.0, 2.0));
+    let model = s.ps.features.iter().find(|f| f.type_id == "sheetMetalStart").map(|f| f.id).expect("model");
+    if let Some(f) = s.ps.features.iter_mut().find(|f| f.id == model) {
+        f.params.set("defaultBendReliefStyle", en("TEAR"));
+    }
+    for alignment in ["OUTER", "INNER", "MIDDLE"] {
+        let mut s = Studio { ps: s.ps.clone(), units: s.units };
+        let edge = edge.clone();
+        s.add("sheetMetalFlange", move |p| {
+            p.set("edges", ParamValue::Query(vec![edge]));
+            p.set("flangeAlignment", en(alignment));
+            p.set("distance", expr("20 mm"));
+            p.set("isPartialFlange", ParamValue::Bool(true));
+            p.set("firstBoundType", en("BLIND"));
+            p.set("firstBoundOffset", expr("10 mm"));
+            p.set("hasSecondBound", ParamValue::Bool(true));
+            p.set("secondBoundType", en("BLIND"));
+            p.set("secondBoundOffset", expr("10 mm"));
+        });
+        let r = s.ok();
+        let st = r.display.features.last().expect("Flange's status");
+        assert!(matches!(st.status, FeatureStatus::Ok), "{alignment}: {:?} {:?}", st.status, st.message);
+    }
 }

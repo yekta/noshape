@@ -2466,6 +2466,15 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             }
         }
     }
+    // A flat whose pieces collide: live's info on the feature, over an info it has (config-assembly 08590a: Flange 1,
+    // Hole 1, Extrude 1, Fillet 1 (not its "use Corner break") and Mirror 1, each rebuilding that part), not over a
+    // warning or error.
+    let top: FsId = id.iter().take(1).cloned().collect();
+    let quiet = st.status.get(&top).is_none_or(|v| v.get("statusType").as_str().is_some_and(|t| &*t == "INFO"));
+    if built.iter().any(|b| b.3.as_ref().is_some_and(|f| f.collides)) && quiet {
+        let message = super::std_enum("errorstringenum.gen.fs", "ErrorStringEnum", "SHEET_METAL_SELF_INTERSECTING_FLAT").unwrap_or_else(|| Value::str("SHEET_METAL_SELF_INTERSECTING_FLAT"));
+        st.status.insert(top, Value::map_from([("statusType", Value::str("INFO")), ("statusEnum", message)]));
+    }
     for (n, part_id, (faces, edges, vertices), flat, data, wires) in built {
         i.check_deadline()?;
         let Some((body_ref, dfaces, dedges, dverts, _)) = def_refs.get(n) else { continue };
@@ -2859,6 +2868,8 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
     let thickness = def.front + def.back;
     let frame = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
     let mut pieces = Vec::new();
+    // Each piece's walls: its own, or the two a bend strip joins (for the collision check).
+    let mut owners: Vec<[usize; 2]> = Vec::new();
     let mut heads = Vec::new();
     for (fi, face) in wall_flats {
         if k::thread_cancelled() {
@@ -2893,6 +2904,7 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
             }
         }
         pieces.push(k::transform(&face, &k::Transform::Matrix(*m), true).ok()?.shape);
+        owners.push([*fi, *fi]);
     }
     // Forms: their footprint fills the flat, outlined with a center mark (as the native route).
     let mut flat_forms = Vec::new();
@@ -2939,7 +2951,10 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
             && let Ok(fill) = fill.translated(-n * mid)
             && let Ok(fill) = k::transform(&fill, &k::Transform::Matrix(*m), true)
         {
-            pieces.extend(fill.shape.faces());
+            for f in fill.shape.faces() {
+                pieces.push(f);
+                owners.push([*fi, *fi]);
+            }
         }
         // A form with a flat sketch shows only that (live 1623), centred on
         // the form's point; else its tools' widest sections.
@@ -2998,6 +3013,7 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
         }).unwrap_or_else(|| vec![b[1], a[1]]));
         if let Ok(face) = k::make_polyline(&outline, true).and_then(|w| k::make_face_from_wire(&w, true)) {
             pieces.push(face);
+            owners.push([s.wall_a, s.wall_b]);
         }
         // Wall b rises toward the viewer (+z) when it lies on the side wall a's
         // flat normal points away from.
@@ -3024,7 +3040,12 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
             bend: n,
         });
     }
+    // (Two bend strips aren't compared: ours overlap where adjacent bends' middle wall is gone, a jog's at its
+    // reduced angle, which live's flat doesn't (its "Updating bend angle" info, no collision).)
+    let joined = |i: usize, j: usize| owners[i].iter().any(|w| owners[j].contains(w)) || (owners[i][0] != owners[i][1] && owners[j][0] != owners[j][1]);
+    let collides = crate::sheetmetal::flat::pieces_collide(&pieces, &frame, joined);
     let mut flat = crate::sheetmetal::flat::flat_from_pieces(frame, &pieces, lines, thickness).ok()?;
+    flat.collides = collides;
     flat.forms = flat_forms;
     flat.heads = heads;
     flat.place = flat_place(def, topo, &unfolded);

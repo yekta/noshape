@@ -79,6 +79,9 @@ pub struct FlatPattern {
     pub built_for: Option<[f64; 8]>,
     /// Where live lays the flat out, when known ([`FlatPlace`]).
     pub place: Option<FlatPlace>,
+    /// Pieces not joined by a bend overlap or touch along an edge (live: "Collision in sheet metal flat pattern.").
+    #[serde(default)]
+    pub collides: bool,
 }
 
 /// Live 2468: the flat is laid out by its fixed face (the first sketch segment's): a point p of that face goes to
@@ -517,7 +520,7 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
     let shape = shape.map(|s| split_bend_zones(&s, &frame, &lines));
-    Ok(FlatPattern { frame, loops, bend_lines: lines, forms, heads, shape, thickness: t, warnings, built_for: None, place: None })
+    Ok(FlatPattern { frame, loops, bend_lines: lines, forms, heads, shape, thickness: t, warnings, built_for: None, place: None, collides: false })
 }
 
 /// A flat pattern from planar pieces already laid flat in `frame` (walls and
@@ -551,7 +554,7 @@ pub fn flat_from_pieces(frame: k::Plane, pieces: &[Shape], bend_lines: Vec<FlatB
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
     let shape = shape.map(|s| split_bend_zones(&s, &frame, &bend_lines));
-    Ok(FlatPattern { frame, loops, bend_lines, forms: Vec::new(), heads: Vec::new(), shape, thickness, warnings, built_for: None, place: None })
+    Ok(FlatPattern { frame, loops, bend_lines, forms: Vec::new(), heads: Vec::new(), shape, thickness, warnings, built_for: None, place: None, collides: false })
 }
 
 /// The flat region split along both sides of every bend zone (the strip
@@ -603,6 +606,88 @@ fn local_bounds(frame: &k::Plane, shapes: &[Shape]) -> (DVec2, DVec2) {
         }
     }
     (lo, hi)
+}
+
+/// Whether flat pieces that `joined` doesn't pair (a wall and its bends' strips, its form fills) overlap or share an
+/// edge (live: "Collision in sheet metal flat pattern."; config-assembly 08590a's Flange 1, the plate's corner past its
+/// bend edge against the flange). Touching at a point is no collision; a tear's plate against its own strip neither
+/// (live fs sm5d: a partial flange's Tear relief, OK).
+pub fn pieces_collide(pieces: &[Shape], frame: &k::Plane, joined: impl Fn(usize, usize) -> bool) -> bool {
+    if pieces.len() < 2 {
+        return false;
+    }
+    // Each piece's box in the flat's plane, its loops (holes too: inside is by crossings) only when it has a neighbour.
+    let boxes: Vec<(DVec2, DVec2)> = pieces
+        .iter()
+        .map(|p| match p.bounding_box(false) {
+            Ok(b) => [b.min, b.max, DVec3::new(b.min.x, b.max.y, b.min.z), DVec3::new(b.max.x, b.min.y, b.max.z)].iter().map(|c| frame.to_local(*c)).fold((DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY)), |(lo, hi), q| (lo.min(q), hi.max(q))),
+            Err(_) => (DVec2::splat(f64::NAN), DVec2::splat(f64::NAN)),
+        })
+        .collect();
+    let loops: Vec<std::cell::OnceCell<Vec<Vec<DVec2>>>> = pieces.iter().map(|_| std::cell::OnceCell::new()).collect();
+    let loops_of = |i: usize| loops[i].get_or_init(|| pieces[i].faces().iter().flat_map(|f| f.wires()).map(|w| wire_loop(&w, frame)).filter(|l| l.len() >= 3).collect());
+    let scale = boxes.iter().filter(|b| b.0.x.is_finite()).map(|(lo, hi)| (*hi - *lo).length()).fold(0.0, f64::max).max(1e-3);
+    let tol = 1e-7 * scale.max(1.0);
+    let segments = |ls: &Vec<Vec<DVec2>>| -> Vec<(DVec2, DVec2)> { ls.iter().flat_map(|l| (0..l.len()).map(move |i| (l[i], l[(i + 1) % l.len()]))).filter(|(a, b)| a.distance(*b) > tol).collect() };
+    let cross = |a: DVec2, b: DVec2| a.x * b.y - a.y * b.x;
+    // Strictly inside (by crossings), farther than `tol` from every edge.
+    let inside = |p: DVec2, segs: &[(DVec2, DVec2)]| {
+        let mut odd = false;
+        for (a, b) in segs {
+            let d = *b - *a;
+            let t = ((p - *a).dot(d) / d.length_squared()).clamp(0.0, 1.0);
+            if (*a + d * t).distance(p) <= 10.0 * tol {
+                return false;
+            }
+            if (a.y > p.y) != (b.y > p.y) && p.x < a.x + (p.y - a.y) / (b.y - a.y) * (b.x - a.x) {
+                odd = !odd;
+            }
+        }
+        odd
+    };
+    let segs: Vec<std::cell::OnceCell<Vec<(DVec2, DVec2)>>> = pieces.iter().map(|_| std::cell::OnceCell::new()).collect();
+    let segs_of = |i: usize| segs[i].get_or_init(|| segments(loops_of(i)));
+    for i in 0..pieces.len() {
+        for j in i + 1..pieces.len() {
+            let ((alo, ahi), (blo, bhi)) = (boxes[i], boxes[j]);
+            // (A NaN box, a piece without one, compares false: checked.)
+            if joined(i, j) || alo.x > bhi.x + tol || blo.x > ahi.x + tol || alo.y > bhi.y + tol || blo.y > ahi.y + tol {
+                continue;
+            }
+            if k::thread_cancelled() {
+                return false;
+            }
+            for &(a0, a1) in segs_of(i) {
+                let da = a1 - a0;
+                let la = da.length();
+                let u = da / la;
+                for &(b0, b1) in segs_of(j) {
+                    let db = b1 - b0;
+                    let (off0, off1) = (cross(u, b0 - a0), cross(u, b1 - a0));
+                    if off0.abs() <= tol && off1.abs() <= tol {
+                        // On one line: an edge shared over a length.
+                        let (t0, t1) = ((b0 - a0).dot(u), (b1 - a0).dot(u));
+                        if t0.max(t1).min(la) - t0.min(t1).max(0.0) > 1e-6 * scale {
+                            return true;
+                        }
+                        continue;
+                    }
+                    // A proper crossing (each segment's ends strictly either side of the other): overlap.
+                    let (c0, c1) = (cross(da, b0 - a0), cross(da, b1 - a0));
+                    let (c2, c3) = (cross(db, a0 - b0), cross(db, a1 - b0));
+                    let m = tol * (la + db.length());
+                    if ((c0 > m && c1 < -m) || (c0 < -m && c1 > m)) && ((c2 > m && c3 < -m) || (c2 < -m && c3 > m)) {
+                        return true;
+                    }
+                }
+            }
+            // One within the other.
+            if loops_of(i).iter().flatten().any(|p| inside(*p, segs_of(j))) || loops_of(j).iter().flatten().any(|p| inside(*p, segs_of(i))) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// Fuse coplanar faces and merge them into maximal faces.
@@ -753,6 +838,32 @@ fn chain_loop(mut segs: Vec<Vec<DVec3>>) -> Vec<DVec3> {
 mod tests {
     use super::*;
     use k::Segment2d as S;
+
+    /// Flat pieces collide when, not joined, they overlap or share an edge over a length; touching at a point, or a
+    /// wall against its own bend's strip, doesn't count (live 08590a's Flange 1 / fs sm5d's Tear relief).
+    #[test]
+    fn flat_pieces_collide_by_overlap_or_a_shared_edge() {
+        let frame = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+        let rect = |x0: f64, y0: f64, x1: f64, y1: f64| {
+            let v = DVec2::new;
+            let segs = [S::Line { a: v(x0, y0), b: v(x1, y0) }, S::Line { a: v(x1, y0), b: v(x1, y1) }, S::Line { a: v(x1, y1), b: v(x0, y1) }, S::Line { a: v(x0, y1), b: v(x0, y0) }];
+            k::make_face_from_wire(&k::make_wire_2d(&frame, &segs).unwrap(), true).unwrap()
+        };
+        let a = rect(0.0, 0.0, 0.02, 0.01);
+        let apart = |_: usize, _: usize| false;
+        let cases = [
+            ("a shared edge", rect(0.02, 0.005, 0.03, 0.02), true),
+            ("a corner touching", rect(0.02, 0.01, 0.03, 0.02), false),
+            ("overlapping", rect(0.015, 0.005, 0.03, 0.02), true),
+            ("inside", rect(0.005, 0.002, 0.01, 0.004), true),
+            ("apart", rect(0.021, 0.0, 0.03, 0.01), false),
+        ];
+        for (name, b, want) in cases {
+            assert_eq!(pieces_collide(&[a.clone(), b], &frame, apart), want, "{name}");
+        }
+        let joined = |_: usize, _: usize| true;
+        assert!(!pieces_collide(&[a.clone(), rect(0.02, 0.0, 0.03, 0.01)], &frame, joined), "a wall and its own strip");
+    }
 
     /// A face's area from its lines and arcs equals the Gauss integral's: a D shape (a 270° arc and two lines), the
     /// same with a round hole, a slot (two half circles) and a plate with a circle cut out, on a tilted plane.

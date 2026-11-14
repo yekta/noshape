@@ -256,6 +256,7 @@ mod tests {
             warnings: Vec::new(),
             built_for: None,
             place: None,
+            collides: false,
         }
     }
 
