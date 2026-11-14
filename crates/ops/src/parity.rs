@@ -3456,7 +3456,16 @@ impl<'a> Translator<'a> {
             }
             return Err(format!("COPY: no part of pattern {pattern}'s instance {index} copies {seed}"));
         }
-        let code = if index >= 0 { (2 * index) as u32 } else { (-2 * index - 1) as u32 };
+        // (A Transform's or a Mirror's one copy is our instance 1, whatever live calls it: asm-infento-subs' studio
+        // 1dc32b, Transform 12's rotated copy under Boolean 7 / Extrude 39 / 40, Mirror 4 / 5's parts.)
+        let single = self.features.iter().any(|f| f["featureId"] == pattern && (f["featureType"] == "transform" || f["featureType"] == "mirror"));
+        let code = if single && index == 1 {
+            1
+        } else if index >= 0 {
+            (2 * index) as u32
+        } else {
+            (-2 * index - 1) as u32
+        };
         fn back(n: &TopoName, code: u32) -> TopoName {
             match n {
                 TopoName::Face { role: Role::Copy { instance, of }, .. } if *instance == code => (**of).clone(),
