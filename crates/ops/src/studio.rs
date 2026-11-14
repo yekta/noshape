@@ -413,10 +413,10 @@ pub fn auto_operation(ps: &PartStudio, display: &noshape_model::display::StudioD
     if ty == "thicken" && !hosts.is_empty() && !scope_user && p.query("booleanScope").is_empty() {
         changes.push(("booleanScope", ParamValue::Query(hosts.iter().map(|b| Reference::Body(b.clone())).collect())));
     }
-    // thickenEditLogic's canSetBooleanFlip: a user-picked Remove points the
-    // wall into the part, Add out of it.
-    if ty == "thicken" && op_user && !flip_user && !hosts.is_empty() && matches!(op.as_str(), "ADD" | "REMOVE") {
-        let into = op == "REMOVE";
+    // thickenEditLogic's canSetBooleanFlip: a user-picked Remove or Intersect flips the wall (into the part), New or
+    // Add back, faces picked or not (live thicken-remove-keep-tools); not once Thickness 2 or the scope was set.
+    if ty == "thicken" && op_user && !flip_user && !scope_user && !user_set("thickness2") {
+        let into = matches!(op.as_str(), "REMOVE" | "INTERSECT");
         if flipped != into {
             changes.push(("oppositeDirection", ParamValue::Bool(into)));
         }

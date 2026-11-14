@@ -151,7 +151,7 @@ fn rows() -> Vec<Row> {
         Row { id: "drag / the angle step", live: "5° within 2° (radius ≤ 573 px), free in between: 42.4154 stays, 43.5 → 45", gap: false, check: |_| {
             expect((snap_degrees(42.4154, 300.), snap_degrees(43.5, 300.)), (42.4154, 45.0), "angles")
         } },
-        Row { id: "fields / a selected entity clicked again leaves the field", live: "[Face of Extrude 2] -> [] -> [Face of Extrude 2]", gap: true, check: |cx| {
+        Row { id: "fields / a selected entity clicked again leaves the field", live: "[Face of Extrude 2] -> [] -> [Face of Extrude 2]", gap: false, check: |cx| {
             let (window, view) = block(cx, "dlg-toggle");
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
             draw(cx, window);

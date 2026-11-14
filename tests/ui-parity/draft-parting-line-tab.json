@@ -4,6 +4,13 @@
  "area": "psui",
  "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
  "start": "block",
+ "remembered": {
+  "draft": {
+   "angle:Degree": {
+    "angle": "7 deg"
+   }
+  }
+ },
  "steps": [
   {
    "do": "click",

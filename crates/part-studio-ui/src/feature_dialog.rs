@@ -248,6 +248,11 @@ pub struct FeatureDialog {
     completion: Option<crate::var_complete::VarCompletion>,
     /// The dialog takes the keyboard at its next render (see `set_value`).
     focus_dialog_pending: bool,
+    /// The empty selection field the last edit brought up and activated: (it, the field active before, the control
+    /// edited, whether the keyboard was outside). The editing logic filling it in undoes that (`set_value_logic`).
+    auto_activated: Option<(String, Option<String>, String, bool)>,
+    /// A select takes the keyboard back at the next render.
+    focus_select_pending: Option<String>,
     /// A pick filled the active field and moved on: the next field takes the keyboard at the next render (Onshape's
     /// autoAdvanceToNextControl focuses it; live ui-parity draft-on-side-face).
     focus_active_pending: bool,
@@ -443,6 +448,8 @@ impl FeatureDialog {
             quiet_text: None,
             edit_focus: None,
             focus_dialog_pending: false,
+            auto_activated: None,
+            focus_select_pending: None,
             focus_active_pending: false,
             mc_mode: None,
             keyboard_left: false,
@@ -585,8 +592,10 @@ impl FeatureDialog {
         self.dirty = true;
         let shown = self.visible_selection_fields();
         let active = self.active_query.clone();
+        let left = self.keyboard_left;
         self.set_value_auto(path, v, cx);
         self.focus_new_empty_field(&shown);
+        self.auto_activated = self.active_query.clone().filter(|q| active.as_ref() != Some(q) && !shown.contains(&q.as_str())).map(|q| (q, active.clone(), path.to_string(), left));
         // A selection field the edit brought up and activated takes the keyboard from the control clicked (live 1983,
         // by hand, per control): from a tab always (Remove: Merge scope focused); from a checkbox when the field
         // active before went away (Hollow: "Parts to hollow" focused; Second direction: the checkbox keeps it); from
@@ -597,11 +606,15 @@ impl FeatureDialog {
         // (A dropdown replacing the active field with one that picks geometry passes it on: Face mirror's "Faces to
         // mirror", live mirror-face-type; a feature list leaves it on the select: Feature mirror.)
         let picks_geometry = self.active_query.as_deref().and_then(|q| self.spec_for_path(q)).is_some_and(|s| matches!(s.kind, ParamKind::Query { filter, .. } if filter.0 & !QueryFilter::FEATURE.0 != 0));
-        let takes = match kind {
-            Some((true, true)) => true,
-            Some((true, false)) => !before_gone || picks_geometry,
-            _ => before_gone,
-        };
+        // A FOCUS_ON_VISIBLE query takes it whatever brought it up (live loft-guides-checkbox: Path's query; Guides'
+        // array leaves it on the checkbox).
+        let eager = self.active_query.as_deref().and_then(|q| self.spec_for_path(q)).is_some_and(|s| s.hints.has(Hints::FOCUS_ON_VISIBLE) && matches!(s.kind, ParamKind::Query { .. }));
+        let takes = eager
+            || match kind {
+                Some((true, true)) => true,
+                Some((true, false)) => !before_gone || picks_geometry,
+                _ => before_gone,
+            };
         if takes && self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str())) {
             self.focus_dialog_pending = true;
             // (A tab that brings the field up doesn't leave the keyboard outside: live extrude-surface-tab.)
@@ -672,6 +685,19 @@ impl FeatureDialog {
     /// field shows it too (its input is made again from the value; the Tab's
     /// Subtraction offset kept "0 mm" after std set 0.02 mm).
     pub fn set_value_logic(&mut self, path: &str, v: ParamValue, cx: &mut Context<Self>) {
+        // Live (move-face-translate): a field the edit brought up that the logic fills isn't a new empty field: the
+        // active one stays, the keyboard on the control edited.
+        if let ParamValue::Query(q) = &v
+            && !q.is_empty()
+            && self.selection_empty(path)
+            && let Some((_, before, control, left)) = self.auto_activated.take_if(|a| a.0 == path)
+        {
+            self.active_query = before;
+            self.keyboard_left = left;
+            if !std::mem::take(&mut self.focus_dialog_pending) {
+                self.focus_select_pending = Some(control);
+            }
+        }
         if matches!(v, ParamValue::Expr(_)) {
             self.inputs.remove(path);
         }
@@ -821,6 +847,7 @@ impl FeatureDialog {
     /// to the next selection field (`autoAdvanceToNextControl` on the confirmed edit: any limit, not only 1).
     /// Returns false if no field is active.
     pub fn add_picks(&mut self, refs: impl IntoIterator<Item = Reference>, cx: &mut Context<Self>) -> bool {
+        self.auto_activated = None;
         let Some((path, _filter, max)) = self.active_filter() else { return false };
         // The field's mate connector button on: each pick (a face, an edge, a vertex, an inference point) becomes a
         // mate connector made inside the feature, the field naming it (live 1851: chip "Mate connector").
@@ -2887,9 +2914,15 @@ impl FeatureDialog {
                             .when(selected, |d| d.text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
                             .when(!selected, |d| d.text_color(pal.text).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.border)).hover(|d| d.text_color(pal.text)))
                             .child(div().min_w_0().truncate().child(crate::ui::spec_text(label)))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                // A tab takes no keyboard focus (live: the page has it after a tab click).
-                                this.keyboard_left = true;
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                // A tab takes no keyboard focus (live: the page has it after a tab click, also from a
+                                // selection field: loft-surface-thin-tabs), but Extrude's and Revolve's Thin leave it on
+                                // the field (live extrude-thin-tab, revolve-thin).
+                                let thin = id_s == "THIN" && matches!(this.feature.type_id.as_str(), "extrude" | "revolve");
+                                if !thin {
+                                    window.focus(&this.focus, cx);
+                                    this.keyboard_left = true;
+                                }
                                 this.set_value(&path_s, ParamValue::Enum(id_s.clone()), cx)
                             }))
                     }));
@@ -4183,6 +4216,10 @@ impl Render for FeatureDialog {
         let _t = noshape_render::perf::scope("fd.render");
         if std::mem::take(&mut self.focus_dialog_pending) {
             window.focus(&self.focus, cx);
+        }
+        if let Some(s) = self.focus_select_pending.take().and_then(|p| self.selects.get(&p).cloned()) {
+            let h = s.update(cx, |s, cx| s.focus_handle(cx));
+            window.focus(&h, cx);
         }
         if std::mem::take(&mut self.focus_active_pending)
             && let Some(q) = self.active_query.clone()

@@ -177,7 +177,9 @@ impl PartStudioView {
         let appearances = self.studio(cx).map(|s| s.appearances.clone()).unwrap_or_default();
         let own: std::collections::HashSet<FeatureId> = self.studio(cx).map(|s| s.features.iter().map(|f| f.id).collect()).unwrap_or_default();
         let curvature = self.ui.curvature_map.as_ref().map(|c| (c.kind, c.bar.palette, c.bar.bounds));
-        let key = (Arc::as_ptr(&self.display) as usize, format!("{:?}{:?}{:?}", appearances, self.ui.analysis, curvature));
+        // Deviation's Surface map: its data, palette, bounds and dimming.
+        let deviation = self.ui.analysis_tool.as_ref().filter(|t| t.options.surface).and_then(|t| Some((Arc::as_ptr(t.result.as_ref()?.deviation_map.as_ref()?) as usize, t.bar.palette, t.bar.bounds, t.dim)));
+        let key = (Arc::as_ptr(&self.display) as usize, format!("{:?}{:?}{:?}{:?}", appearances, self.ui.analysis, curvature, deviation));
         if let Some((k, v)) = &self.ui.vcolor_cache
             && *k == key
         {
@@ -217,6 +219,21 @@ impl PartStudioView {
             };
             if let Some(c) = colors {
                 map.insert(b.id.clone(), Arc::new(c));
+            }
+        }
+        if deviation.is_some()
+            && let Some(dev) = self.ui.analysis_tool.as_ref().and_then(|t| t.result.as_ref()?.deviation_map.clone())
+        {
+            let k = 1.0 / self.doc.read(cx).session.doc.settings.units.length.meters();
+            for (body, verts) in dev.iter() {
+                let Some(b) = self.display.bodies.iter().find(|b| &b.id == body) else { continue };
+                let mut colors = map.get(body).map(|c| c.to_vec()).unwrap_or_else(|| vec![[0, 0, 0, 0]; b.mesh.positions.len()]);
+                for &(i, d) in verts {
+                    if let Some(c) = colors.get_mut(i as usize) {
+                        *c = self.bar_color(super::thickness::Bar::Deviation, d * k, cx);
+                    }
+                }
+                map.insert(body.clone(), Arc::new(colors));
             }
         }
         let v = (!map.is_empty()).then(|| Arc::new(map));

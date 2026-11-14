@@ -2439,6 +2439,10 @@ impl PartStudioView {
                     }
                     None => {}
                 }
+                // The readout's measurement starts with the click, not at the next frame (`ui_busy` then waits for it).
+                if self.edit.is_none() && !self.selection.is_empty() {
+                    let _ = self.selection_readout(cx);
+                }
                 cx.notify();
             }
             ViewportEvent::BoxSelect { modifiers, crossing, rect, .. } => {
@@ -6448,7 +6452,10 @@ struct SceneJob {
 impl SceneJob {
     fn build(self, cache: &parking_lot::Mutex<GpuCache>, up: &noshape_render::renderer::Uploader) -> (BuiltScene, Option<BuiltScene>) {
         let mut cache = cache.lock();
-        let built = scene_builder::build(&self.shown, &self.opts, &mut cache, up);
+        let mut built = scene_builder::build(&self.shown, &self.opts, &mut cache, up);
+        if let Some((d, _)) = &self.base {
+            scene_builder::add_consumed_edge_picks(&mut built, d, up);
+        }
         let base = self.base.map(|(d, o)| scene_builder::build(&d, &o, &mut cache, up));
         (built, base)
     }
@@ -6957,6 +6964,7 @@ impl PartStudioView {
         if matches!(self.ui.analysis, Some(analysis::Analysis::Curvature)) {
             overlay.extend(self.render_color_bar(thickness::Bar::Curvature, cx));
         }
+        overlay.extend(self.render_color_bar(thickness::Bar::Deviation, cx));
         overlay.extend(self.render_draft_legend());
         overlay.extend(self.render_draft_hover(cx));
         overlay.extend(self.render_thickness_progress());

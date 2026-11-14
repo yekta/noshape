@@ -156,6 +156,20 @@ release, llvmpipe, Mesa's shader cache off, 3 opens each, held / early: dock fir
 1088 / 1016 ms; hat15 1142 / 1038, 1039 / 1075, 1054 / 1094 ms; the window created at ~120 ms either way: no cost on an
 8-core box. On the Mac the compile moved off the first frame's path (built 104 ms after start against 963); the cold
 first-frame number there waits for a window the lead arranges.
+**11-14 04:34:** the dialogs matrix's click-again row (failed skasm's, blend's and core's lands under load) waited for
+nothing: the second click raced the first's Fillet preview. Made deterministic (bb587644, queued with the prewarm
+commit), then the real bug it hid fixed: a preview's consumed edges had no pick (`builder::add_consumed_edge_picks`:
+pick-only lines from the base model, `BuiltScene::consumed` for the overlay). Live's coverage batches 1 / 3 / 4 / 5
+(37 scenarios): 18 / 37 at first, then remembered values seeded (live's account remembers Fillet 1 mm, Draft 7 deg), the
+measure readout counted in `ui_busy` and a sketch's selection readout recorded, Thicken's flip on Remove / Intersect
+with no faces (canSetBooleanFlip), a field the editing logic fills isn't a new empty field (Move face Translate's
+Direction), FOCUS_ON_VISIBLE queries take the keyboard (Loft Path), a tab click takes it off a selection field (not
+Extrude's / Revolve's Thin). Left: three sketch readouts off by under a pixel (live's points sit on pixel centres:
+9.858 for 10), part-menu-boolean (live re-took it with managed workflows off). Deviation analysis as live's capture
+(behaviours "psui (Deviation analysis panel, in full)"): a face preselected opens Surface (Source), else Curve with both
+chains empty, the tab not remembered; Max / Min read-only in both tabs; To measure's points against the Source (11.18
+/ 5 mm on overlap, ours had them swapped); the Viridis colour map on To measure's faces with live's bar (`Bar::Deviation`).
+Open: Absolute values changes nothing (unsigned distances; live's capture also all positive).
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's

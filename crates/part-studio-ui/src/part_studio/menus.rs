@@ -1005,7 +1005,7 @@ impl PartStudioView {
     }
 
     /// A measured value as the status-bar readout shows it (document units).
-    fn measure_fmt(&self, q: Quantity, cx: &App) -> String {
+    pub(super) fn measure_fmt(&self, q: Quantity, cx: &App) -> String {
         measure_fmt_in(q, &self.doc.read(cx).session.doc.settings.units)
     }
 
@@ -1040,7 +1040,7 @@ impl PartStudioView {
     /// The live measurement of the selection left of the evaluation tools
     /// (live part-studio/81: "Perp planes angle: 90.000 deg", the number in
     /// monospace; a point reads "Point: X↘ … Y↗ … Z↑ …" with colored axes).
-    fn selection_readout(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(super) fn selection_readout(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         self.ui.measure_readout.clear();
         // None while a feature dialog is open (live ui-parity dialog-enter-commits-new, edge-rclick-fillet: measure null).
         if self.edit.is_some() {
@@ -2399,6 +2399,8 @@ impl PartStudioView {
             let _ = this.update(cx, |this, cx| {
                 let Some(c) = this.measure_cache.as_mut().filter(|c| c.selection == key) else { return };
                 c.results = Some(results);
+                // The readout (and the state's) from the result at once, not at the next frame.
+                let _ = this.selection_readout(cx);
                 this.ui.measure_lines = None;
                 this.refresh_scene(false, cx);
                 cx.notify();

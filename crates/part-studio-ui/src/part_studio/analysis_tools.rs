@@ -15,7 +15,7 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::analysis::{Comb, Continuity};
-use noshape_model::reference::Reference;
+use noshape_model::reference::{BodyId, Reference};
 use noshape_render::{Drawable, Instance, LineData, LineSegment, PointData, PointSprite};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -102,6 +102,9 @@ pub struct ToolOptions {
     pub scale: f32,
     /// Deviation: Surface tab (else Curve).
     pub surface: bool,
+    /// Deviation: the max and min lines and their values drawn; distances shown unsigned.
+    pub minmax_location: bool,
+    pub absolute: bool,
     /// Connection: which classes are shown (No connection, G0…G3).
     pub show_class: [bool; 5],
     pub tolerances: noshape_model::analysis::ContinuityTolerances,
@@ -112,9 +115,12 @@ pub struct ToolOptions {
 impl Default for ToolOptions {
     // Fresh defaults as live (behaviours "skasm (2026-10-31, P3 workflow-analysis 18)" (a)).
     fn default() -> Self {
-        Self { combs: true, show_u: true, show_v: true, u_curves: 8, v_curves: 8, inflections: false, min_radius: true, extend: false, control_points: false, knots: false, details: false, radians: false, threshold: false, high_deg: 180.0, low_deg: 0.0, scale: 0.3, surface: false, show_class: [false, true, true, true, true], tolerances: Default::default(), zebra: Default::default(), reflection: Default::default() }
+        Self { combs: true, show_u: true, show_v: true, u_curves: 8, v_curves: 8, inflections: false, min_radius: true, extend: false, control_points: false, knots: false, details: false, radians: false, threshold: false, high_deg: 180.0, low_deg: 0.0, scale: 0.3, surface: false, minmax_location: true, absolute: false, show_class: [false, true, true, true, true], tolerances: Default::default(), zebra: Default::default(), reflection: Default::default() }
     }
 }
+
+/// Deviation's colour map: per body, its To-measure vertices (mesh index) and their distance to the Source (m).
+pub type DeviationMap = Vec<(BodyId, Vec<(u32, f64)>)>;
 
 /// Computed geometry of the open tool.
 #[derive(Clone, Default)]
@@ -133,6 +139,8 @@ pub struct ToolResult {
     pub dihedral: Option<(f64, f64)>,
     /// Deviation minimum and maximum (distance, point on 1, point on 2).
     pub deviation: Option<(noshape_model::analysis::Extremum, noshape_model::analysis::Extremum)>,
+    /// Deviation's Surface tab: each To-measure vertex's distance to the Source (meters), per body.
+    pub deviation_map: Option<Arc<DeviationMap>>,
     /// Interference detection: the overlaps (with the two parts' names) and their red meshes.
     pub interferences: Vec<(noshape_model::interference::Interference, String, String)>,
     pub interference_meshes: Vec<noshape_render::MeshHandle>,
@@ -163,6 +171,9 @@ pub struct AnalysisTool {
     /// Interference detection: the model changed while it was open; the
     /// Refresh row shows and the old result stays until it is clicked.
     pub stale: bool,
+    /// Deviation's colour bar (live: Colors Viridis, Dim color scale) over its Surface map.
+    pub bar: super::thickness::BarUi,
+    pub dim: bool,
 }
 
 /// Selections of each tool, kept for the next time it opens.
@@ -221,7 +232,9 @@ impl PartStudioView {
         self.close_analysis_tool(cx);
         let key = kind.title();
         // A preselection replaces the remembered selection.
-        let pre: Vec<Reference> = self.selection.iter().filter(|r| self.analysis_accepts(kind, r)).filter_map(|r| self.tool_entity(kind, r)).collect();
+        // (Deviation takes preselected faces only, into the Surface tab: live doesn't take edges.)
+        let takes = |r: &Reference| if kind == ToolKind::Deviation { matches!(r, Reference::Face(_)) } else { self.analysis_accepts(kind, r) };
+        let pre: Vec<Reference> = self.selection.iter().filter(|r| takes(r)).filter_map(|r| self.tool_entity(kind, r)).collect();
         // A bend line selected in the flat view (live request 1622: Shift+C
         // opens the panel with "Edge").
         let pre = if pre.is_empty() && kind == ToolKind::CurveSurface { self.ui.sm_flat_bend.and_then(|b| self.bend_line_edge(b)).into_iter().collect() } else { pre };
@@ -270,11 +283,13 @@ impl PartStudioView {
             this.refresh_scene(false, cx);
             cx.notify();
         });
-        // Deviation with two curves preselected: one per chain (Onshape).
-        let mut selection2 = Vec::new();
-        if kind == ToolKind::Deviation && selection.len() == 2 {
-            selection2 = vec![selection.remove(1)];
+        // Live (behaviours "psui (Deviation analysis panel, in full)"): the tab isn't remembered; a face preselected
+        // opens Surface with the faces as the Source, else Curve with both chains empty (preselected edges aren't taken).
+        if kind == ToolKind::Deviation {
+            options.surface = had_pre;
+            selection.retain(|_| had_pre);
         }
+        let selection2 = Vec::new();
         let second_active = kind == ToolKind::Deviation && !selection.is_empty() && selection2.is_empty();
         let (mut tolerance_inputs, mut input_subs) = (Vec::new(), Vec::new());
         // Onshape's number fields (quantity_field): units appended, invalid
@@ -381,7 +396,7 @@ impl PartStudioView {
         }
         // Interference detection keeps the top it opened at (live psb 10-19 i).
         let anchor_top = (kind == ToolKind::Interference).then(|| ((self.viewport.read(cx).size().y as f32) - 401.).max(0.));
-        self.ui.analysis_tool = Some(AnalysisTool { kind, selection, selection2, second_active, options, result: None, slider, _slider_sub: sub, tolerance_inputs, _input_subs: input_subs, units, anchor_top, stale: false });
+        self.ui.analysis_tool = Some(AnalysisTool { kind, selection, selection2, second_active, options, result: None, slider, _slider_sub: sub, tolerance_inputs, _input_subs: input_subs, units, anchor_top, stale: false, bar: Default::default(), dim: false });
         self.recompute_analysis_tool(cx);
         if kind.is_view_mode() {
             self.rebuild_scene(cx);
@@ -475,6 +490,28 @@ impl PartStudioView {
                 check(&mut text, &mut fields, "Blur environment", r.blur);
                 check(&mut text, &mut fields, "Lock environment", r.lock);
             }
+            ToolKind::Deviation => {
+                let units = self.doc.read(cx).session.doc.settings.units;
+                let fmt_len = |v: f64| noshape_units::format_quantity(noshape_units::Quantity::new(v, noshape_units::Dim::LENGTH), &units);
+                let (c1, c2) = if o.surface { ("Source", "To measure") } else { ("Chain 1", "Chain 2") };
+                text.extend(["Curve".to_string(), "Surface".into(), c1.into()]);
+                chips(&mut text, &t.selection);
+                text.push(c2.into());
+                chips(&mut text, &t.selection2);
+                let (hi, lo) = t.result.as_ref().and_then(|r| r.deviation).map_or((String::new(), String::new()), |(min, max)| (fmt_len(max.0), fmt_len(min.0)));
+                for (label, v) in [("Max", hi), ("Min", lo)] {
+                    text.push(label.into());
+                    if !v.is_empty() {
+                        text.push(v.clone());
+                    }
+                    fields.push(json!({ "label": label, "kind": "input", "value": v }));
+                }
+                if o.surface {
+                    check(&mut text, &mut fields, "Max and min location", o.minmax_location);
+                    check(&mut text, &mut fields, "Absolute values", o.absolute);
+                }
+                text.push("Scale".into());
+            }
             _ => return None,
         }
         Some(json!({ "kind": "panel", "title": t.kind.title(), "text": text, "fields": fields }))
@@ -496,7 +533,7 @@ impl PartStudioView {
             }
             _ => {}
         }
-        if t.kind.is_view_mode() || t.kind == ToolKind::Interference {
+        if t.kind.is_view_mode() || matches!(t.kind, ToolKind::Interference | ToolKind::Deviation) {
             self.rebuild_scene(cx);
         }
         if t.kind.keeps_selection() {
@@ -665,9 +702,23 @@ impl PartStudioView {
                     }
                 }
                 ToolKind::Deviation if o.surface => {
-                    let pts: Vec<DVec3> = sel.iter().flat_map(|r| self.face_triangles(r)).flatten().collect();
-                    let tris: Vec<[DVec3; 3]> = sel2.iter().flat_map(|r| self.face_triangles(r)).collect();
+                    // Live (qdev/b: Part 2's top against Part 1's, Max 11.18 / Min 5 mm): To measure's points against
+                    // the Source.
+                    let pts: Vec<DVec3> = sel2.iter().flat_map(|r| self.face_triangles(r)).flatten().collect();
+                    let tris: Vec<[DVec3; 3]> = sel.iter().flat_map(|r| self.face_triangles(r)).collect();
                     res.deviation = noshape_model::analysis::surface_deviation(&pts, &tris);
+                    // The colour map on To measure's faces (live qdev/b).
+                    let mut map: DeviationMap = Vec::new();
+                    for (body, verts) in sel2.iter().filter_map(|r| self.face_vertices(r)) {
+                        let at: Vec<DVec3> = verts.iter().map(|(_, p)| *p).collect();
+                        let d = noshape_model::analysis::point_deviations(&at, &tris);
+                        let vals = verts.iter().map(|(i, _)| *i).zip(d);
+                        match map.iter_mut().find(|(b, _)| *b == body) {
+                            Some((_, v)) => v.extend(vals),
+                            None => map.push((body, vals.collect())),
+                        }
+                    }
+                    res.deviation_map = (!tris.is_empty() && !map.is_empty()).then(|| Arc::new(map));
                 }
                 ToolKind::Deviation => {
                     let a = densify(&sel.iter().flat_map(|r| self.curve_points(r)).collect::<Vec<_>>(), 400);
@@ -690,7 +741,7 @@ impl PartStudioView {
                 }
                 ToolKind::Zebra | ToolKind::Reflection | ToolKind::Flatten | ToolKind::Draft => {}
                 ToolKind::Interference => {
-                    let ids: Vec<noshape_model::reference::BodyId> = sel.iter().filter_map(|r| if let Reference::Body(b) = r { Some(b.clone()) } else { None }).collect();
+                    let ids: Vec<BodyId> = sel.iter().filter_map(|r| if let Reference::Body(b) = r { Some(b.clone()) } else { None }).collect();
                     let bodies: Vec<&noshape_model::regen::context::Body> = ids.iter().filter_map(|id| ctx.bodies.iter().find(|b| b.id == *id).map(|b| &**b)).collect();
                     let shapes: Vec<noshape_kernel::Shape> = bodies.iter().map(|b| b.shape.clone()).collect();
                     let up = self.gpu.uploader();
@@ -728,6 +779,10 @@ impl PartStudioView {
         if kind == ToolKind::Interference {
             self.ui.interference_hover = None;
             self.ui.interference_picked = None;
+            self.rebuild_scene(cx);
+        }
+        // Deviation's colour map is the scene's vertex colours.
+        if kind == ToolKind::Deviation {
             self.rebuild_scene(cx);
         }
         self.refresh_scene(false, cx);
@@ -844,7 +899,7 @@ impl PartStudioView {
         }
         // Deviation: minimum (blue) and maximum (red) between the two.
         let mut dev_pts = Vec::new();
-        if let Some((min, max)) = res.deviation {
+        if let Some((min, max)) = res.deviation.filter(|_| t.options.minmax_location) {
             for ((_, a, b), c) in [(min, V_CURVES), (max, U_CURVES)] {
                 lines.push_polyline(&[f(a), f(b)], c, 0, 2.0, LineSegment::ON_TOP);
                 dev_pts.push((a, c));
@@ -943,7 +998,7 @@ impl PartStudioView {
             crate::overlay_labels::value_box(window, cx, &b, at)
         };
         let mut out = Vec::new();
-        if let Some((min, max)) = t.result.as_ref().and_then(|r| r.deviation) {
+        if let Some((min, max)) = t.result.as_ref().and_then(|r| r.deviation).filter(|_| t.options.minmax_location) {
             for ((d, a, b), label, color) in [(min, "Min", 0x2858dcu32), (max, "Max", 0xdc3228)] {
                 let off = 10.0 + 120.0 * t.options.scale;
                 out.extend(value(&format!("{label}: {}", fmt_len(d)), color, [off, -10.], (a + b) * 0.5));
@@ -1106,15 +1161,27 @@ impl PartStudioView {
                         this.recompute_analysis_tool(cx);
                     }))
             };
-            let (c1, c2) = if o.surface { ("Surface 1", "Surface 2") } else { ("Chain 1", "Chain 2") };
+            let (c1, c2) = if o.surface { ("Source", "To measure") } else { ("Chain 1", "Chain 2") };
             body = body
                 .child(h_flex().child(tab("Curve", false, !o.surface, cx)).child(tab("Surface", true, o.surface, cx)))
                 .child(field("at-sel", c1, &t.selection, false, !t.second_active, cx))
                 .child(field("at-sel2", c2, &t.selection2, true, t.second_active, cx));
-            if let Some((min, max)) = t.result.as_ref().and_then(|r| r.deviation) {
+            // Live (qdev/b): read-only Max / Min, the label left, the value right on an underline; Surface adds two
+            // checkboxes over the Scale slider.
+            let (hi, lo) = t.result.as_ref().and_then(|r| r.deviation).map_or((String::new(), String::new()), |(min, max)| (fmt_len(max.0), fmt_len(min.0)));
+            for (label, v) in [("Max", hi), ("Min", lo)] {
+                body = body.child(
+                    h_flex()
+                        .h(px(26.))
+                        .text_size(px(12.))
+                        .child(div().w(px(28.)).text_color(pal.text_muted).child(label))
+                        .child(h_flex().flex_1().h(px(22.)).justify_end().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).text_size(px(13.33)).text_color(pal.text).child(v)),
+                );
+            }
+            if o.surface {
                 body = body
-                    .child(div().text_size(px(12.)).text_color(pal.text).child(format!("Min: {}", fmt_len(min.0))))
-                    .child(div().text_size(px(12.)).text_color(pal.text).child(format!("Max: {}", fmt_len(max.0))));
+                    .child(check("at-minmax", "Max and min location", o.minmax_location, |o, v| o.minmax_location = v, cx))
+                    .child(check("at-abs", "Absolute values", o.absolute, |o, v| o.absolute = v, cx));
             }
         } else if kind == ToolKind::Flatten {
             if let Some(b) = self.render_flatten_body(cx) {
@@ -1469,7 +1536,7 @@ impl PartStudioView {
         // moves them away from the curves (Onshape). Drawn in the 3D frame
         // (`analysis_labels`) unless NOSHAPE_GPUI_LABELS.
         let gpui_labels = crate::overlay_labels::gpui_labels();
-        if gpui_labels && let Some((min, max)) = t.result.as_ref().and_then(|r| r.deviation) {
+        if gpui_labels && let Some((min, max)) = t.result.as_ref().and_then(|r| r.deviation).filter(|_| t.options.minmax_location) {
             let vp = self.viewport.read(cx);
             for ((d, a, b), label, color) in [(min, "Min", 0x2858dcu32), (max, "Max", 0xdc3228)] {
                 let mid = (a + b) * 0.5;
@@ -1590,7 +1657,19 @@ impl PartStudioView {
     }
 
     /// Triangles of a part face (display tessellation).
-    fn face_triangles(&self, r: &Reference) -> Vec<[DVec3; 3]> {
+    /// A face's body and its mesh vertices (index, position), each once.
+    fn face_vertices(&self, r: &Reference) -> Option<(BodyId, Vec<(u32, DVec3)>)> {
+        let b = self.display.bodies.iter().find(|b| b.face_refs.contains(r))?;
+        let fi = b.face_refs.iter().position(|x| x == r)?;
+        let &(first, count) = b.mesh.face_ranges.get(fi)?;
+        let mut idx: Vec<u32> = b.mesh.indices.get(first as usize..(first + count) as usize)?.to_vec();
+        idx.sort_unstable();
+        idx.dedup();
+        let verts = idx.into_iter().filter_map(|i| b.mesh.positions.get(i as usize).map(|p| (i, DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)))).collect();
+        Some((b.id.clone(), verts))
+    }
+
+    pub(super) fn face_triangles(&self, r: &Reference) -> Vec<[DVec3; 3]> {
         let p3 = |p: [f32; 3]| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64);
         self.display
             .bodies

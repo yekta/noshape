@@ -435,6 +435,11 @@ pub fn surface_deviation(a_points: &[DVec3], b_tris: &[[DVec3; 3]]) -> Option<(E
     Some((min?, max?))
 }
 
+/// Each point's distance to the nearest of `tris` (Deviation analysis' colour map).
+pub fn point_deviations(points: &[DVec3], tris: &[[DVec3; 3]]) -> Vec<f64> {
+    points.iter().map(|p| tris.iter().map(|t| closest_on_triangle(*p, t[0], t[1], t[2]).distance(*p)).fold(f64::INFINITY, f64::min)).collect()
+}
+
 /// Principal curvatures (k1 ≥ k2, signed: positive where the surface bends
 /// away from its normal, like a convex part) at each vertex of a triangle
 /// mesh with vertex normals, by fitting each triangle's second fundamental
