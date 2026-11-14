@@ -2214,7 +2214,13 @@ impl FeatureDialog {
     /// Whether ✓ is disabled (live `canSubmit`): until the dialog is dirty (an edit, or a regeneration without an
     /// error), and while an applied value doesn't evaluate.
     pub(crate) fn ok_blocked(&self) -> bool {
-        self.applied_value_error().is_some() || !self.dirty
+        self.applied_value_error().is_some() || !self.dirty || self.number_field_failed()
+    }
+
+    /// A number field the regeneration's error names (live hem-type-tear-drop: Total length too short, ✓ off; every
+    /// recorded red number field has ✓ off).
+    fn number_field_failed(&self) -> bool {
+        self.faulty.iter().any(|f| self.spec_for_path(f).is_some_and(|s| matches!(s.kind, ParamKind::Num(_))) && self.field_error(f).is_some())
     }
 
     fn applied_value_error(&self) -> Option<(&'static str, String)> {

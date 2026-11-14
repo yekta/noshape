@@ -170,6 +170,23 @@ Extrude's / Revolve's Thin). Left: three sketch readouts off by under a pixel (l
 chains empty, the tab not remembered; Max / Min read-only in both tabs; To measure's points against the Source (11.18
 / 5 mm on overlap, ours had them swapped); the Viridis colour map on To measure's faces with live's bar (`Bar::Deviation`).
 Open: Absolute values changes nothing (unsigned distances; live's capture also all positive).
+**11-14 07:18:** landed bb587644 (the dialogs-matrix flake); 64b71d9e (Deviation, consumed picks, coverage 1/3/4/5) in
+the queue. Next commit: live's batches 6/7/9 (12 / 24 at first): sheet metal seeds (corner relief 3 mm, hem 8 mm; the
+account's remembered values: live's checker seeds them from batch 17 on), std's tear-drop minimum (2 × (R + sheet),
+`sheetmetal_flange::tear_drop`), a number field the regeneration blames turns ✓ off (`number_field_failed`), a select
+beside an icon has no label (Hole's tip angle), External thread: a new feature's remembered values reach std's logic
+as changes after its load run (`std_remembered`: live's 3/8 refills the chamfer 1.152 mm and the undercut 7.221 /
+3.175 mm), the body of a line held at the origin doesn't drag (`Sketch::drag`, live2's recheck), folders four deep
+(New folder greyed; folder rows drag with their features, a drop past four levels refused: `folder_fits_in`), "(Search
+assemblies)" lower case (asm). Open: Fill's edge rows (live reads a Continuity select per edge; capture asked of
+live2), an Enter on an unchanged retyped value is an undo step in live (one take: external-thread-new-edit-reedit),
+gusset-new-edit-reedit picks Part 2's copy of the corner edge (frame part order, core's), the see-through outline
+(studios' `Instance::outline_through`, then the Part Studio's selected bodies; hover needs the hover-mask path).
+Flaky on vibe6 under load (green too, not from these changes): a first graphics pick into a dialog sometimes records
+the active selection field still focused (shell-*, boolean-new-edit-reedit, move-face-translate, mirror-face-type,
+linear-pattern-centered-skip, loft-*) or the title red one step early (move-face-new-edit-reedit); alone they pass. The
+press path (`on_viewport_event` focuses the dialog root, `keyboard_left`) looks right; suspect: the runner's "window is
+not active" warning on a loaded X server. Not chased further yet.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's

@@ -501,6 +501,11 @@ pub fn flange(ev: &mut EvalCtx) -> FResult<()> {
 
 /// Tear drop: bend angle and straight length for a total length and tip gap.
 fn tear_drop(r: f64, t: f64, gap: f64, total: f64) -> FResult<(f64, f64)> {
+    // std (sheetMetalHem.fs): at least twice the inner radius plus the sheet (live hem-type-tear-drop: 8 mm with R 2.3
+    // on a 2 mm plate is refused).
+    if total < 2.0 * (r + t) + 1e-12 {
+        return crate::regen::eval::err_at(&["length"], "Cannot create hem, increase total length.");
+    }
     if gap >= r {
         return crate::regen::eval::err_at(&["tipGap"], "Cannot create hem, decrease gap.");
     }
@@ -582,4 +587,18 @@ pub fn hem(ev: &mut EvalCtx) -> FResult<()> {
         put_data(ev, bi, data);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// std's sheetMetalHem.fs: a tear drop needs a total length of at least twice the inner radius plus the sheet (live
+    /// hem-type-tear-drop: 8 mm at R 2.3 on a 2 mm plate is refused, Total length marked).
+    #[test]
+    fn a_tear_drop_shorter_than_twice_radius_and_sheet_is_refused() {
+        let (r, t, gap) = (0.0023, 0.002, 0.0005);
+        assert!(tear_drop(r, t, gap, 0.008).is_err());
+        assert!(tear_drop(r, t, gap, 0.0125).is_ok());
+    }
 }

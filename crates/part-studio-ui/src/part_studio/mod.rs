@@ -2514,7 +2514,9 @@ impl PartStudioView {
         }
         let index = studio.rollback_index();
         let units = self.doc.read(cx).session.doc.settings.units;
+        let defaults = feature.params.clone();
         self.apply_remembered(&mut feature, &units);
+        self.ui.std_remembered = defaults.0.into_iter().filter(|(k, v)| feature.params.get(k) != Some(v)).collect();
         // Preselection fills the first compatible selection field (Onshape behavior).
         let mut preselected = false;
         if let Some(ty) = features::get(type_id) {
@@ -2941,6 +2943,7 @@ impl PartStudioView {
             self.ui.std_edit_task = None;
             self.ui.std_logic_first = None;
             self.ui.std_edit_old = None;
+            self.ui.std_remembered.clear();
             self.ui.std_edit_run_old = None;
             self.ui.preview_task = None;
             self.ui.preview_cancel.abort();
@@ -4227,6 +4230,7 @@ impl PartStudioView {
         let errors = studio.features.iter().filter(|f| failed(f.id)).count()
             + usize::from(self.edit_invalid(cx) && !editing_id.is_some_and(|id| studio.features.iter().any(|f| f.id == id && failed(f.id))));
         let dialog_open = self.edit.is_some();
+        let folder_fits = self.studio(cx).is_none_or(|s| s.new_folder_fits(&self.selected_features));
         let paused = self.ui.regen_paused.is_some();
         let viewing_version = self.doc.read(cx).session.viewing_version().is_some();
         let filter_input = self.ui.filter.as_ref().map(|(st, _)| st.clone());
@@ -4366,6 +4370,8 @@ impl PartStudioView {
                     header_btn("new-folder-btn", "new-folder", false, cx)
                         .debug_selector(|| "button:New folder".into())
                         .when(dialog_open, |d| d.opacity(0.4).cursor_default())
+                        // Live2 (11-14): a fifth folder level is refused, the button at 0.5, no message.
+                        .when(!dialog_open && !folder_fits, |d| d.opacity(0.5).cursor_default())
                         // Live (585–590): "New folder", always enabled; the
                         // "Folder name" popup comes first.
                         .tooltip(crate::ui::tooltip("New folder"))
@@ -4373,7 +4379,8 @@ impl PartStudioView {
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             // Live (feel/featurelist.json): with only default geometry selected nothing happens.
                             let only_default = this.selected_features.is_empty() && !this.selection.is_empty() && this.selection.iter().all(|r| matches!(r, Reference::Origin | Reference::Plane(_)));
-                            if this.edit.is_some() || only_default {
+                            let fits = this.studio(cx).is_none_or(|s| s.new_folder_fits(&this.selected_features));
+                            if this.edit.is_some() || only_default || !fits {
                                 return;
                             }
                             let ids = this.selected_features.clone();
@@ -5250,6 +5257,13 @@ impl PartStudioView {
         // The bar at this folder's top after its own Roll to here (the same
         // index as a bar right above the folder, which keeps Roll to here).
         let at_top = self.ui.rollback_folder_top.is_some_and(|(f, at)| f == id && self.studio(cx).is_some_and(|s| s.rollback_index() == at));
+        // Dragging the row carries the folder with its features (live2 11-14); the folders it can't go into turn the
+        // drop line red.
+        let drag = self.studio(cx).and_then(|s| {
+            let first = *s.folder_features(id).first()?;
+            let refused: Vec<u32> = s.folders.iter().map(|f| f.id).filter(|t| !s.folder_fits_in(id, Some(*t))).collect();
+            Some(FeatureDrag { id: first, name: fd.name.clone().into(), folder: Some(id), refused: std::rc::Rc::new(refused) })
+        });
         let row = crate::ui::tree_row(SharedString::from(format!("folder-{id}")), selected)
             .mr(px(5.))
             // Live `related-highlight`: #ECF0F4 with a 1 px #90CEF1 line under it.
@@ -5279,6 +5293,15 @@ impl PartStudioView {
                     .into_any_element(),
             })
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.select_folder(id, cx)))
+            .when_some(drag, |row, d| {
+                let (slot, xs) = (self.ui.feature_drop.clone(), self.ui.feature_drop_x.clone());
+                row.on_drag(d, move |d, grab, window, cx| {
+                    let x = f32::from(window.mouse_position().x);
+                    slot.set(None);
+                    xs.set(Some((x, x)));
+                    cx.new(|_| FeatureDragPill(grab, d.name.clone()))
+                })
+            })
             // Dropping features on it puts them in as its first children (live
             // qa4 r5 s8 (6)); the row lights up under the dragged feature.
             // Live (feel/featurelist.json): a collapsed folder's middle third drops inside (at its end), its top and
@@ -5300,7 +5323,9 @@ impl PartStudioView {
             }))
             .drag_over::<FeatureDrag>({
                 let drop = self.ui.folder_drop.clone();
-                move |s, _, _, _| match drop.get() {
+                move |s, d: &FeatureDrag, _, _| match drop.get() {
+                    // A folder that can't go in: a red line on the row's top edge, no box (live2 11-14).
+                    Some((f, 1)) if f == id && d.refused.contains(&id) => s.border_t_2().border_color(gpui_kit::rgb(0xd32f2f)),
                     Some((f, 0)) if f == id => s.border_t_2().border_color(p().accent),
                     Some((f, 2)) if f == id => s.border_b_2().border_color(p().accent),
                     _ => s.bg(gpui_kit::rgb(0xe0f0fb)).border_1().border_color(p().accent),
@@ -5308,6 +5333,9 @@ impl PartStudioView {
             })
             .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| {
                 let zone = this.ui.folder_drop.take().filter(|(f, _)| *f == id).map(|(_, z)| z).unwrap_or(1);
+                if let Some(f) = d.folder {
+                    return this.drop_folder_on_folder(f, id, zone, cx);
+                }
                 match zone {
                     0 => this.drop_beside_folder(d.id, id, false, cx),
                     2 => this.drop_beside_folder(d.id, id, true, cx),
@@ -5955,6 +5983,8 @@ impl PartStudioView {
                         n if n > 1 => format!("{n} items").into(),
                         _ => name.clone().into(),
                     },
+                    folder: None,
+                    refused: Default::default(),
                 },
                 {
                     let (slot, xs) = (self.ui.feature_drop.clone(), self.ui.feature_drop_x.clone());
@@ -5992,6 +6022,9 @@ impl PartStudioView {
             })
             .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| {
                 let after = this.ui.feature_drop.take().is_some_and(|(r, a)| r == i && a);
+                if let Some(f) = d.folder {
+                    return this.drop_folder_at(f, i, after, cx);
+                }
                 this.drop_features(d.id, i, after, cx);
             }));
         // No row tooltips while a row is dragged: one scheduled over a row the
@@ -6508,6 +6541,10 @@ impl Render for RollbackDragPill {
 struct FeatureDrag {
     id: FeatureId,
     name: SharedString,
+    /// A folder row dragged (its features go with it), and the folders it can't go into (itself, its own, past four
+    /// levels: live2's red line).
+    folder: Option<u32>,
+    refused: std::rc::Rc<Vec<u32>>,
 }
 
 /// A feature drag's badge: the "Rollback bar" pill with the feature's name.

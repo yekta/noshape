@@ -8979,8 +8979,8 @@ mod tests {
     }
 
     /// Live (feel/sketch.json "drag" A-first, mm): a free line's end follows the pointer, its body moves it whole; a
-    /// horizontal line's end takes the start along (level kept, its x kept), its body moves it whole; the free end of a
-    /// line from the origin follows.
+    /// horizontal line's end takes the start along (level kept, its x kept), its body moves it whole; a line from the origin
+    /// doesn't move by its body, its free end follows.
     #[test]
     fn drags_move_lines_as_live() {
         let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
@@ -9017,12 +9017,18 @@ mod tests {
         if !close(ends(&d, l), (s + delta, e + delta)) {
             wrong.push(("horizontal-body", ends(&d, l)));
         }
-        // From the origin (drawn with the Line tool from it): the end follows.
+        // From the origin (drawn with the Line tool from it): its body doesn't move (live2's recheck, 3 takes: no swing),
+        // its end follows.
         let (mut ed, mut d) = editor(Tool::Line);
         click(&mut ed, &mut d, v(0.0, 0.0));
         click(&mut ed, &mut d, mm(40.2033, 25.1959));
         ed.set_tool(Tool::Select);
         let l = d.sketch.entities().find(|x| x.kind() == EntityKind::Line && !x.reference_only).map(|x| x.id).unwrap();
+        let before = ends(&d, l);
+        drag(&mut ed, &mut d, (before.0 + before.1) * 0.5, (before.0 + before.1) * 0.5 + mm(10.0, -12.0));
+        if !close(ends(&d, l), before) {
+            wrong.push(("fromOrigin-body", ends(&d, l)));
+        }
         drag(&mut ed, &mut d, mm(40.2033, 25.1959), mm(51.2179, 8.674));
         if !close(ends(&d, l), (v(0.0, 0.0), mm(51.2179, 8.674))) {
             wrong.push(("fromOrigin-end", ends(&d, l)));

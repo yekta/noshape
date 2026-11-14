@@ -208,6 +208,15 @@ impl List {
         }
     }
 
+    /// Each folder's name and its parent's.
+    fn parents(&self, cx: &mut TestAppContext) -> Vec<(String, Option<String>)> {
+        cx.update(|cx| {
+            let v = self.view.read(cx);
+            let Some(s) = v.studio(cx) else { return Vec::new() };
+            s.folders.iter().filter(|f| !f.name.chars().last().is_some_and(|c| c.is_ascii_digit())).map(|f| (f.name.clone(), f.parent.and_then(|p| s.folder(p)).map(|p| p.name.clone()))).collect()
+        })
+    }
+
     fn dragging(&self, cx: &mut TestAppContext) -> bool {
         cx.update(|cx| cx.has_active_drag())
     }
@@ -618,6 +627,19 @@ fn rows() -> Vec<Row> {
                 "folders after the first drop; folders and order after the second",
             )
         } },
+        Row { id: "folders / a folder dragged onto another", live: "its features go with it, into the other folder at its end (live2 11-14, feel/nest-drags-single.png)", gap: false, check: |l, cx| {
+            nest(l, cx, &[("B", &["Sketch 2", "Extrude 2"], 1), ("A", &["Sketch 3", "Extrude 3"], 1)]);
+            let (from, to) = (l.at(cx, "folder:A"), l.at(cx, "folder:B"));
+            l.drag(cx, from, to, true);
+            expect((l.parents(cx), l.order(cx)), (vec![("B".to_string(), None), ("A".to_string(), Some("B".to_string()))], names(&["Sketch 1", "Extrude 1", "Sketch 2", "Extrude 2", "Sketch 3", "Extrude 3", "Plane 1"])), "parents, order")
+        } },
+        Row { id: "folders / a drop past four levels does nothing", live: "a 4-deep chain onto another folder's middle: a red line, the drop does nothing, no message (live2 11-14)", gap: false, check: |l, cx| {
+            nest(l, cx, &[("B", &["Sketch 2", "Extrude 2"], 1), ("A", &["Sketch 3", "Extrude 3"], 4)]);
+            let before = (l.parents(cx), l.order(cx));
+            let (from, to) = (l.at(cx, "folder:A"), l.at(cx, "folder:B"));
+            l.drag(cx, from, to, true);
+            expect((l.parents(cx), l.order(cx)), before, "parents, order")
+        } },
         Row { id: "Parts list / click toggles, Shift range, Ctrl adds", live: "plain click toggles; Shift+click the range from the anchor; Ctrl+click adds like a plain click, no menu", gap: false, check: |l, cx| {
             l.click(cx, "part:Part 1", NONE);
             l.click(cx, "part:Part 3", SHIFT);
@@ -639,6 +661,34 @@ fn rows() -> Vec<Row> {
             expect(l.selected(cx), names(&[]), "selected")
         } },
     ]
+}
+
+/// Folders made in the model: each (name, its features, levels): `levels` folders nested round the features, the
+/// outer one named `name` (the inner ones "<name>2"…), all collapsed.
+fn nest(l: &List, cx: &mut TestAppContext, folders: &[(&str, &[&str], usize)]) {
+    cx.update(|cx| {
+        l.view.update(cx, |v, cx| {
+            let tab = v.tab;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "folders", cx, |ps| {
+                    for (name, features, levels) in folders {
+                        let ids: Vec<noshape_model::FeatureId> = features.iter().filter_map(|n| ps.features.iter().find(|f| f.name == *n).map(|f| f.id)).collect();
+                        let mut made = Vec::new();
+                        for _ in 0..*levels {
+                            made.push(ps.new_folder(&ids, None));
+                        }
+                        for (k, id) in made.iter().enumerate() {
+                            if let Some(f) = ps.folder_mut(*id) {
+                                f.name = if k == 0 { name.to_string() } else { format!("{name}{}", k + 1) };
+                                f.collapsed = true;
+                            }
+                        }
+                    }
+                });
+            });
+        })
+    });
+    draw(cx, l.window);
 }
 
 /// Sketch 3 and Extrude 3 in a new folder (collapsed), nothing selected after.

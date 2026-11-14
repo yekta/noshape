@@ -28,6 +28,7 @@ GPU `feel::presses_orbit_box_and_open_the_menu_as_live`).
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
 | Pick area | a square of 5 px each way | the same (`PickBuffer::pick`, `PICK_RADIUS`) | matrix | = |
+| A part hidden behind another, selected or hovered | its orange silhouette (selected) or light-orange outline (list-row hover, a face's hover) is drawn through the part in front; the fill only where it shows (live2 11-14, feel/hidden-part-selection.png) | depth-tested, hidden behind the front part; studios is adding a no-depth-test outline flag for assemblies, then the Part Studio's selected and hovered bodies and faces | – | ≠ |
 | Priority | sketch point > sketch line > mate connector > vertex > edge > origin > sketch region > face > plane; the nearest within it | the same (`PickKind::priority`) | matrix (a sketch line over a part edge, a sketch point on a vertex) | = |
 | Edge (over the background or its face) | lights at 6–7 px; stays lit to 9–10 | 6; 9 (a line picks at least 3 px wide, 9 hovered itself; the shaders' `picking`) | matrix; GPU `feel::a_click_beside_an_edge_selects_what_is_lit` | = |
 | Vertex | 7 px across, 9 diagonally; stays lit to 7–8 | 7 / 9; 7 (a point picks at most 5 px wide) | matrix | = |
@@ -66,7 +67,7 @@ two zooms, A 0.2754 / B 0.2316 mm/px; where they differ both are given).
 | Snap target look | yellow-orange square, 17 px, round a point / midpoint; none on a line | the same (`SNAP_SQUARE_*`) | scene, same | = |
 | Inference glyph | ≈ 30 px right, 30 below the pointer (28, 28 mid-drag); same frame as the preview (35–60 ms) | its 20 px box centred 29 right, 31 below the snapped point | – | ≈ (within live2's ±2 px) |
 | A dragged end onto an end / a midpoint / a line / a circle's rim | 9 (A) / 7 (B) / 6 / ≤ 7 / 6 (A), 3 (B) px; no H/V during a drag | 8.5 / 6 / 7.5 / 7.5 on screen (`point_drop_target`) | GPUI `a_dragged_point_lands_on_a_line_within_7_px` | = (rim: ≈) |
-| Drags: free line end / body; held lines; dimensioned; rectangle; circle | see behaviours "feel (sketch)" (2); a horizontal line's end takes its start along, level | free end / body, horizontal end / body, a from-origin line's end: the same | scene `drags_move_lines_as_live` | = (from-origin body: live2's record has no press point, asked; rectangle corner: live also moves the far side 2.8 mm, its solver's weighting) |
+| Drags: free line end / body; held lines; dimensioned; rectangle; circle | see behaviours "feel (sketch)" (2); a horizontal line's end takes its start along, level; a line from the origin doesn't move by its body (live2 recheck) | the same (a body drag with a held point leaves the curve: `Sketch::drag`) | scene `drags_move_lines_as_live` | = (rectangle corner: live also moves the far side 2.8 mm, its solver's weighting) |
 | Click vs drag threshold | ≈ 5 px from the press, not time-based | 5 px on screen (`DRAG_START_PX`) | scene `a_press_drags_from_5_px` | = |
 | Hover of a sketch entity = what a click takes | a line lights within 8 (A) / 7 (B) px; sketch-offset hits a line 3 mm off | one reach for the hover, the click and the fallback pick (`sketch_hover_id`, `sketch_pick_at`, `in_sketch_reach`) | GPUI `a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach`, `a_line_in_reach_lights_and_is_clicked_when_the_gpu_pick_misses_it`; GPU `feel::the_dimension_tool_takes_the_hovered_line` | = (px: –) |
 | Hover timing (no tool) | the highlight ≈ 270–300 ms after the pointer stops; with the Dimension tool ≈ 30 ms | as the GPU pick arrives | – | – |
@@ -77,7 +78,7 @@ two zooms, A 0.2754 / B 0.2316 mm/px; where they differ both are given).
 | …a circle, a spline | radius free: blue, centre black; a spline blue while any point is free | the same | – | = |
 | Selection: click / Shift / Ctrl | a click adds, a click on a selected one removes; Shift the same; Ctrl+click opens the context menu | the same (Ctrl+click: `open_sketch_context_menu`) | GPUI `ctrl_click_in_a_sketch_opens_its_context_menu` | = |
 | Clearing; double-click | a click on empty space clears, Escape doesn't; a double-click on a line selects then deselects (no chain) | the same (two toggles) | – | = |
-| Box select | left → right: window, blue fill and border; right → left: crossing, yellow dashed; it adds | window / crossing (`#789ad1` / `#ffdc74` dashed) | – | – |
+| Box select | left → right: window, blue fill and border; right → left: crossing, yellow dashed; it adds | window / crossing (`#789ad1` / `#ffdc74` dashed) | scene `a_box_selects_on_the_screen`, `a_box_adds_to_the_selection` | = |
 | Dimension tool | one line: aligned; two points: H / V / aligned by the pointer against their bounding box; two lines: the angle of the pointer's quadrant; a circle: Ø; the text centred on the pointer; the value box 100 × 26, ~33 px left of and 5 above the click | the hovered entity within reach | scene `two_points_dimension_as_live_by_where_the_pointer_is` (live2's 48 pointer positions) | = |
 
 ## Drawings (studios, from 2026-11-13)
@@ -326,11 +327,12 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Folders: New folder | nothing selected: an empty folder above the rollback bar; features and a part: the features; only default geometry: nothing; Escape: none | the same (default geometry alone opened the popover) | = (fixed) |
 | Folders: dropping on a collapsed folder | top third before it, middle inside at its end, bottom third after it | the same (every drop went inside, first) | = (fixed) |
 | Folders: dropping on an expanded folder | top half before it, bottom half inside as its first child | the same | = |
+| Folders: nesting | four levels: under a fourth-level folder New folder greys (0.5, no message, a click does nothing); a feature still drops into the fourth; a folder chain dropped deeper than four only shows the line and nothing happens (live2 11-14, feel/nest-*.png) | the same: New folder (`PartStudio::new_folder_fits`; the agent API's feature_add_folder says why); a folder row drags with its features, into another folder's middle or between rows (`move_folder`), a drop past four levels a red line and nothing (`folder_fits_in`) | = (list matrix "folders / a folder dragged onto another", "… past four levels …"; e2e `feature_folders_dependencies_and_dynamic_suppression`) |
 | Folders: a drop between its children | inside the folder | the moved feature kept its own folder and the folder lost the children before it; now the folder at the drop (`behaviors::drop_folder`) | = (fixed) |
 | A drag off the list | the drop line stays at its last spot; released over the canvas: nothing | the line went with the pointer's row (drawn by `drag_over`); now from the drop slot | = (fixed) |
 | Folders: sideways | every 19 px sideways in the slot steps a level: a last child's bottom half 19 px left drops after the folder, outside | no levels; now 19 px a level from where the pointer came onto the slot (`LIST_LEVEL_PX`) | = (fixed) |
 | Multi-part Properties… | one "2 selected" dialog, both parts listed, Name "Multiple values", shared fields editable (live 08:18, 2962) | the first part's Properties; now live's dialog (`open_parts_properties`; list `several_parts_share_one_properties_dialog`) | = (fixed 11-13) |
-| Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); 4 levels of nesting at most; an empty new folder's caret (live2's new-folder-empty, queued); the insertion line's look | – | – |
+| Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); an empty new folder's caret (live2's new-folder-empty, queued); the insertion line's look | – | – |
 
 ## Measure (matrix)
 

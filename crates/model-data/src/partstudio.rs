@@ -194,6 +194,9 @@ impl ScopeRule {
     }
 }
 
+/// Folders nest at most four deep (live2 11-14).
+pub const MAX_FOLDER_DEPTH: usize = 4;
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Folder {
     pub id: u32,
@@ -800,6 +803,30 @@ impl PartStudio {
         out
     }
 
+    /// The folder a new folder of `ids` nests in: theirs, when they all share one.
+    pub fn new_folder_parent(&self, ids: &[FeatureId]) -> Option<u32> {
+        let first_folder = ids.first().and_then(|i| self.feature(*i)).and_then(|f| f.folder);
+        first_folder.filter(|p| ids.iter().all(|i| self.feature(*i).is_some_and(|f| f.folder == Some(*p))))
+    }
+
+    /// Whether a new folder of `ids` stays within Onshape's nesting limit (live2 11-14: with a feature of a fourth
+    /// level folder selected, New folder is greyed).
+    pub fn new_folder_fits(&self, ids: &[FeatureId]) -> bool {
+        self.folder_chain(self.new_folder_parent(ids)).len() < MAX_FOLDER_DEPTH
+    }
+
+    /// Levels a folder spans: 1, plus its deepest nested folder's.
+    pub fn folder_height(&self, folder: u32) -> usize {
+        1 + self.folders.iter().filter(|f| f.parent == Some(folder) && f.id != folder).map(|f| self.folder_height(f.id)).max().unwrap_or(0)
+    }
+
+    /// Whether `folder` can move into `parent` (None: the top level): not into itself or a folder inside it, and
+    /// within Onshape's nesting limit (live2 11-14: a drop deeper than four does nothing).
+    pub fn folder_fits_in(&self, folder: u32, parent: Option<u32>) -> bool {
+        let chain = self.folder_chain(parent);
+        !chain.contains(&folder) && chain.len() + self.folder_height(folder) <= MAX_FOLDER_DEPTH
+    }
+
     /// Put features into a new folder; returns its id.
     pub fn new_folder(&mut self, ids: &[FeatureId], name: Option<String>) -> u32 {
         self.next_folder_id = self.next_folder_id.max(self.folders.iter().map(|f| f.id + 1).max().unwrap_or(0));
@@ -813,8 +840,7 @@ impl PartStudio {
             format!("Folder {n}")
         });
         // A folder made from features of one folder nests inside it.
-        let first_folder = ids.first().and_then(|i| self.feature(*i)).and_then(|f| f.folder);
-        let parent = first_folder.filter(|p| ids.iter().all(|i| self.feature(*i).is_some_and(|f| f.folder == Some(*p))));
+        let parent = self.new_folder_parent(ids);
         // Live (part-studio/587–590): a new folder is collapsed; an empty one
         // sits at the rollback bar.
         let after = if ids.is_empty() { self.rollback_index().checked_sub(1).and_then(|i| self.features.get(i)).map(|f| f.id) } else { None };

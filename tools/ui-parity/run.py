@@ -520,7 +520,7 @@ def kept_index(rows, hl, dropped, kept, hl_row):
 
 
 # The Insert dialog's fixed text (live reads its rows too, but its lane document holds other runs' studios).
-INSERT_FIXED = {"Current document", "Other documents", "Standard content", "Part Studios", "Assemblies", "(Search Part Studios)", "(Search Assemblies)"}
+INSERT_FIXED = {"Current document", "Other documents", "Standard content", "Part Studios", "Assemblies", "(Search Part Studios)", "(Search assemblies)"}
 # Panels live's recorder read only from these times on: ours isn't compared against older takes there.
 PANELS_READ_SINCE = {"Insert parts and assemblies": "2026-11-09T00:00", "Named views": "2026-11-12T00:00", "Material": "2026-11-12T00:00", "Dependencies of": "2026-11-12T00:00"}
 

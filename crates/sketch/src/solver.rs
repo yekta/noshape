@@ -1614,6 +1614,12 @@ impl Sketch {
             *self = start;
             return self.collapse_report(report, &collapsed);
         }
+        // Live (live2's fromOrigin-body, 3 takes): a curve's body drag translates it whole; with a point held (on the
+        // origin, an external or a fixed point) nothing moves, it doesn't swing round the held end.
+        if handles.iter().any(|(h, _)| matches!(*h, DragHandle::Entity { id, .. } if self.body_drag_held(id))) {
+            *self = start;
+            return SolveReport { drag_solved: false, ..report };
+        }
         if report.drag_solved {
             return report;
         }
@@ -1653,6 +1659,24 @@ impl Sketch {
                 report
             }
         }
+    }
+
+    /// Whether a body drag of curve `id` (not a circle or an arc: those resize) can't translate it: one of its points is
+    /// fixed, external, or coincident with a fixed or external point.
+    fn body_drag_held(&self, id: EntityId) -> bool {
+        let Some(e) = self.entity(id) else { return false };
+        if matches!(e.geometry, Geometry::Point { .. } | Geometry::Circle { .. } | Geometry::Arc { .. }) {
+            return false;
+        }
+        let fixed = |p: EntityId| self.entity(p).is_some_and(|x| x.external) || self.constraints().any(|c| matches!(c.kind, ConstraintKind::Fix { entity } if entity == p || entity == id));
+        e.point_refs().iter().any(|&p| {
+            fixed(p)
+                || self.constraints().any(|c| match c.kind {
+                    ConstraintKind::Coincident { a, b } if a == p => fixed(b),
+                    ConstraintKind::Coincident { a, b } if b == p => fixed(a),
+                    _ => false,
+                })
+        })
     }
 
     /// A drag's `light` / `still`: dimensioned curves (a Length, Radius or

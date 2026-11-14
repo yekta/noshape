@@ -4262,6 +4262,13 @@ fn feature_folders_dependencies_and_dynamic_suppression() {
     let l = call(&mut ctx, "ui_list", json!({ "action": "filter", "text": "" }));
     assert!(l.get("shown_features").is_none(), "{l}");
     assert_eq!(try_call(&mut ctx, "ui_list", json!({ "action": "expand", "items": ["Nope"] })).unwrap_err().param.as_deref(), Some("items[0]"));
+    // Folders nest four deep (live2 11-14: New folder greyed under a fourth level): Base holds Extrude 1, three more
+    // around it, then a fifth is refused.
+    for k in 2..=4 {
+        let f = call(&mut ctx, "feature_add_folder", json!({ "features": ["Extrude 1"], "name": format!("L{k}") }));
+        assert!(f["parent"].is_number(), "level {k} nests: {f}");
+    }
+    assert_eq!(try_call(&mut ctx, "feature_add_folder", json!({ "features": ["Extrude 1"] })).unwrap_err().param.as_deref(), Some("features"));
 }
 
 #[test]

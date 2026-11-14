@@ -4,6 +4,13 @@
  "area": "psui",
  "source": "live coverage audit 2026-11-14 (sheet metal dialog options with no recorded scenario)",
  "start": "sm-box",
+ "remembered": {
+  "sheetMetalCorner": {
+   "length:Millimeter": {
+    "squareReliefWidth": "3 mm"
+   }
+  }
+ },
  "steps": [
   {
    "do": "click",

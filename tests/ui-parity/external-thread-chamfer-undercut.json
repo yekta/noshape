@@ -4,6 +4,20 @@
  "area": "psui",
  "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
  "start": "pin",
+ "remembered": {
+  "externalThread": {
+   "length:Millimeter": {
+    "threadDepth": "5 mm"
+   },
+   "": {
+    "branchOfStandard": [
+     "ANSI",
+     "3/8",
+     "16 tpi"
+    ]
+   }
+  }
+ },
  "steps": [
   {
    "do": "click",

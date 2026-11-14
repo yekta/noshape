@@ -28,8 +28,9 @@ impl FeatureDialog {
         // A select's closed field or its open list (live: its hidden input, no label), a selection field, a checkbox
         // or a button.
         if let Some((path, _)) = self.selects.iter().find(|(_, s)| s.read(cx).has_focus(window) || s.read(cx).is_open()) {
-            // A select drawn with its label reads it (Fillet's Measurement); Extrude's end type has none.
-            let label = self.spec_for_path(path).filter(|s| s.hints.has(Hints::SHOW_LABEL)).map(|s| crate::i18n::spec(s.label));
+            // A select drawn with its label reads it (Fillet's Measurement); Extrude's end type has none, nor one
+            // beside its icon (live hole-tip-angle-flat: Hole's tip angle).
+            let label = self.spec_for_path(path).filter(|s| s.hints.has(Hints::SHOW_LABEL) && super::param_icon(self.ty.id, s.id).is_none()).map(|s| crate::i18n::spec(s.label));
             return Some(json!({ "kind": "field", "label": label, "text": "", "selection": [0, 0], "all": false }));
         }
         // (The Sketch dialog's plane field holds a Tab stop but live never shows it focused.)

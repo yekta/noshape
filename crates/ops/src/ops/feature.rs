@@ -947,6 +947,10 @@ fn add_folder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let ps = doc::studio(od.doc(), tab)?;
     let ids = if a.get("features").is_some() { features_arg(ps, a, "features")? } else { Vec::new() };
     let name = a.opt_str("name")?.unwrap_or(studio::NEW_FOLDER_NAME).to_string();
+    // Onshape's New folder is greyed for a fifth level (it says nothing; the agent API says why).
+    if !ps.new_folder_fits(&ids) {
+        return Err(OpError::invalid(format!("folders nest at most {} deep: these features are in a folder at that depth", noshape_model::partstudio::MAX_FOLDER_DEPTH)).with_param("features"));
+    }
     let mut folder = 0;
     edit_studio(od, tab, studio::ADD_FOLDER_DESCRIPTION, |ps| {
         folder = studio::add_folder(ps, &ids, &name);

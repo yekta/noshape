@@ -544,6 +544,10 @@ pub struct UiState {
     /// The edited feature's parameters when std's editing logic last ran
     /// (its `oldDefinition`; empty for a new feature's first change).
     pub std_edit_old: Option<noshape_model::params::ParamValues>,
+    /// A new feature's remembered values with their defaults: std's logic first runs on load, and Onshape puts the
+    /// remembered values in after it, so its next run sees them as changes (live external-thread-chamfer-undercut: the
+    /// remembered 3/8 counts as a size change, the chamfer and undercut follow the thread).
+    pub std_remembered: Vec<(String, noshape_model::params::ParamValue)>,
     /// std's editing logic running off the UI thread (std Extrude runs a
     /// whole trial extrude for its boolean heuristics).
     pub std_edit_task: Option<Task<()>>,
@@ -921,6 +925,7 @@ impl UiState {
             before_context: None,
             decal_sized: None,
             std_edit_old: None,
+            std_remembered: Vec::new(),
             std_edit_task: None,
             std_edit_run_old: None,
             std_logic_first: None,
@@ -4022,6 +4027,55 @@ impl PartStudioView {
         });
     }
 
+    /// A dragged folder dropped (live2 11-14, feel/nest-drags-single.png): its features move together, `to` (a row and
+    /// whether after it) placing them, and the folder goes into `parent`. Past four levels, or into itself, nothing
+    /// happens (the drag showed a red line).
+    pub(super) fn move_folder(&mut self, folder: u32, parent: Option<u32>, to: Option<(usize, bool)>, cx: &mut Context<Self>) {
+        let Some(studio) = self.studio(cx) else { return };
+        if !studio.folder_fits_in(folder, parent) {
+            return;
+        }
+        let moving = studio.folder_features(folder);
+        let order = to.and_then(|(to, after)| interaction::reordered_at(&studio.features, &moving, to, after));
+        let desc = noshape_ops::studio::move_description(studio, &moving);
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, &desc, cx, |ps| {
+                if let Some(order) = &order {
+                    interaction::apply_order(ps, order);
+                }
+                if let Some(f) = ps.folder_mut(folder) {
+                    f.parent = parent;
+                }
+            });
+        });
+    }
+
+    /// A dragged folder dropped between feature rows: into the folder the drop lands in ([`drop_folder`]).
+    pub(super) fn drop_folder_at(&mut self, folder: u32, to: usize, after: bool, cx: &mut Context<Self>) {
+        let Some(studio) = self.studio(cx) else { return };
+        let moving = studio.folder_features(folder);
+        let steps = self.ui.feature_drop_x.take().map_or(0, |(x0, x)| (x / LIST_LEVEL_PX).floor() as i32 - (x0 / LIST_LEVEL_PX).floor() as i32);
+        let parent = drop_folder(studio, &moving, to, after, steps);
+        self.move_folder(folder, parent, Some((to, after)), cx);
+    }
+
+    /// A dragged folder dropped on folder row `target`: into it at its end (`zone` 1), or beside it in its parent.
+    pub(super) fn drop_folder_on_folder(&mut self, folder: u32, target: u32, zone: u8, cx: &mut Context<Self>) {
+        let Some(studio) = self.studio(cx) else { return };
+        if folder == target {
+            return;
+        }
+        let moving = studio.folder_features(folder);
+        let inside: Vec<FeatureId> = studio.folder_features(target).into_iter().filter(|f| !moving.contains(f)).collect();
+        let edge = |last: bool| if last { inside.last() } else { inside.first() }.and_then(|f| studio.index_of(*f));
+        let (parent, to) = match zone {
+            0 => (studio.folder(target).and_then(|f| f.parent), edge(false).map(|i| (i, false))),
+            2 => (studio.folder(target).and_then(|f| f.parent), edge(true).map(|i| (i, true))),
+            _ => (Some(target), edge(true).map(|i| (i, true))),
+        };
+        self.move_folder(folder, parent, to, cx);
+    }
+
     /// What a drag of `pressed` carries (live feel/featurelist.json): the selected features and the pressed row, in
     /// list order (pressing doesn't clear the selection).
     pub(super) fn dragged_features(&self, pressed: FeatureId, cx: &App) -> Vec<FeatureId> {
@@ -4335,7 +4389,15 @@ impl PartStudioView {
         let with_subs = { dialog.read(cx).feature.clone() };
         // A std button the user clicked runs the logic with it (clickedButton).
         let clicked = dialog.update(cx, |d, _| d.clicked_button.take()).unwrap_or_default();
-        let prev = self.ui.std_edit_old.replace(params.clone()).unwrap_or_default();
+        let first = self.ui.std_edit_old.is_none();
+        let mut prev = self.ui.std_edit_old.replace(params.clone()).unwrap_or_default();
+        if !first {
+            for (k, default) in std::mem::take(&mut self.ui.std_remembered) {
+                if prev.get(&k) == params.get(&k) {
+                    prev.set(&k, default);
+                }
+            }
+        }
         if prev == params && clicked.is_empty() {
             if self.ui.std_logic_first.take() == Some(true) {
                 self.schedule_regen(window, cx);
