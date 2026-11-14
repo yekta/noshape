@@ -332,6 +332,18 @@ fn assembly_with_mates() {
     call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "simulation_connection": true }));
     let list = call(&mut ctx, "assembly_list", json!({}));
     assert_eq!(list["mates"].as_array().unwrap().iter().find(|x| x["name"] == "Revolute 1").unwrap()["simulation_connection"], true);
+    // Its Faces to connect: a face of the pin, kept; gone with the checkbox.
+    let face = pin_faces["faces"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "simulation_faces": [{ "instance": pin_i, "entity": face }] }));
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let mj = list["mates"].as_array().unwrap().iter().find(|x| x["name"] == "Revolute 1").unwrap().clone();
+    assert_eq!(mj["simulation_faces"], json!([{ "instance": pin_i, "entity": face }]), "{mj}");
+    let e = try_call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "simulation_faces": "x" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("simulation_faces"), "{e:?}");
+    call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "simulation_connection": false }));
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    assert!(list["mates"].as_array().unwrap().iter().find(|x| x["name"] == "Revolute 1").unwrap().get("simulation_faces").is_none());
+    call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "simulation_connection": true }));
     // Mate menu › Reset: its rotation back to 0, one edit.
     call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "reset": true }));
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));

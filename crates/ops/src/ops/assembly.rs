@@ -111,6 +111,7 @@ pub fn ops() -> Vec<Op> {
                 opt("limits", json!({ "type": "object" }), "Limits: {\"<axis>\": {\"min\": expr, \"max\": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel z; Ball cone)."),
                 opt("tangent_propagation", json!({ "type": "boolean", "default": true }), "Tangent mates: Tangent propagation."),
                 opt("simulation_connection", json!({ "type": "boolean", "default": false }), "Simulation connection (stored; every mate but Pin slot, Parallel, Tangent and Width)."),
+                opt("simulation_faces", json!({ "type": "array", "items": { "type": "object" } }), "With simulation_connection: its Faces to connect, each {\"instance\", \"entity\"} as `a` (stored; replaces the list)."),
                 opt("solve_all", json!({ "type": "boolean" }), "Solve every mate (the dialog's Solve) instead of only moving this mate's first instance."),
                 opt("reset", json!({ "type": "boolean" }), "With `mate`: the mate menu's Reset, its degrees of freedom back to 0 (\"Reset : <mate>\"; not Fastened, Tangent or Width)."),
                 opt("apply_limit", json!({ "type": "object", "properties": { "axis": { "type": "string", "enum": ["rz", "x", "y", "z"] }, "end": { "type": "string", "enum": ["min", "max"] } } }), "With `mate`: the mate menu's Apply limit position ▸ Min / Max <axis> limit: the mate moved to that limit, the others as they are (\"Apply limit position : <mate>\"); `message` is live's toast (\"Min Z angle limit has been applied to Revolute 1\"). `axis` defaults to the mate's first limited one."),
@@ -340,6 +341,9 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
             }
             if m.mate_type.has_simulation_connection() {
                 v["simulation_connection"] = json!(m.simulation_connection);
+            }
+            if !m.simulation_faces.is_empty() {
+                v["simulation_faces"] = m.simulation_faces.iter().map(|c| json!({ "instance": format!("inst:{}", c.instance.0), "entity": refs::to_id(&c.reference) })).collect();
             }
             v
         })
@@ -921,6 +925,18 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     m.tangent_propagation = a.bool_or("tangent_propagation", m.tangent_propagation)?;
     m.simulation_connection = a.bool_or("simulation_connection", m.simulation_connection)? && mate_type.has_simulation_connection();
+    // Faces to connect (the dialog's box under Simulation connection: stored, gone with the checkbox).
+    if let Some(list) = a.get("simulation_faces") {
+        let Some(items) = list.as_array() else { return Err(OpError::param("simulation_faces", "a list of {\"instance\", \"entity\"}")) };
+        let mut faces = Vec::new();
+        for (i, v) in items.iter().enumerate() {
+            faces.push(parse_connector(&asm, od, tab, v, &format!("simulation_faces[{i}]"))?);
+        }
+        m.simulation_faces = faces;
+    }
+    if !m.simulation_connection {
+        m.simulation_faces.clear();
+    }
     if mate_type == MateType::Width {
         let c = conn("c")?.or_else(|| m.extra.first().cloned()).ok_or_else(|| OpError::param("c", "Two width mate connectors are required."))?;
         let d = conn("d")?.or_else(|| m.extra.get(1).cloned());

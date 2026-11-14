@@ -2730,6 +2730,7 @@ Examples:
 | `limits` | object |  | Limits: {"<axis>": {"min": expr, "max": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel z; Ball cone). |
 | `tangent_propagation` | boolean |  | Tangent mates: Tangent propagation. |
 | `simulation_connection` | boolean |  | Simulation connection (stored; every mate but Pin slot, Parallel, Tangent and Width). |
+| `simulation_faces` | array of object |  | With simulation_connection: its Faces to connect, each {"instance", "entity"} as `a` (stored; replaces the list). |
 | `solve_all` | boolean |  | Solve every mate (the dialog's Solve) instead of only moving this mate's first instance. |
 | `reset` | boolean |  | With `mate`: the mate menu's Reset, its degrees of freedom back to 0 ("Reset : <mate>"; not Fastened, Tangent or Width). |
 | `apply_limit` | object |  | With `mate`: the mate menu's Apply limit position ▸ Min / Max <axis> limit: the mate moved to that limit, the others as they are ("Apply limit position : <mate>"); `message` is live's toast ("Min Z angle limit has been applied to Revolute 1"). `axis` defaults to the mate's first limited one. |
