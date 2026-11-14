@@ -22,6 +22,22 @@ drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 - dx-chain9 (base vs dx-1dc / tvc variants on the new data) restarted 09:23 with 90 min a run (infento took over 45 min
   on the sketch solves: the first base run timed out); read sk-*.log, land per the rules below.
 
+## 11-14 14:25 UTC: dx-1dc, dx-tvc-b and dx-arcs landed; dx-tvc-a re-gating on main; studios rerun
+- Landed: dx-1dc + dx-tvc-b as one batch (79f4af8a): infento on the sketch-solve data held at 152/167, 77/193 mates
+  with 1dc (base ops-b0612 the same); tvc-b took tvc-mount from 3 to 4/10 mates and scissor-lift from 205 to 208/242
+  occurrences. dx-arcs (f196c4919): an extrude's arcs of one circle join into one side face whatever else meets the
+  joint (e2e `arcs_of_one_circle_extrude_to_one_side_face`; models 80/87, 870/947 as main). core told 14:24: infento's
+  up-to sliver is theirs.
+- dx-tvc-a measured on the old base: infento 77 -> 86/193 mates, tvc-mount as base. It conflicts with asm's
+  maker-first part mapping (a499b7e68), so it was redone on the creator fallback only (worktree dx-land, uncommitted)
+  and is re-gating on vibe7 (unit dx-gtvca2, ~/tmp/dx/gtvca2.out: ops-base1 vs ops-tvcA2 on tvc-mount, then on
+  infento). Land it if infento holds.
+- Studios on main + arcs (vibe6 unit dx-st10, ~/tmp/dx/st10.out, sk10-st-*.log): 1dc32b's first difference was Boolean
+  2's "Large wheel tyre" (392 faces, live 391; radius 169 vs live 171.77 mm); bjr 5d8bc1's was Extrude 55's "vanity
+  plate front" (369 faces, live 365).
+- Export dialog ui-parity (live batches 27-28, export-*: 23 scenarios) on green bf7169fa0: vibe6 unit dx-uipexp,
+  out ~/tmp/dx/uip-exp.
+
 ## 11-14 08:45 UTC: live fetched every assembly studio's sketch solve (08:37); runs restarted on it
 - All 14 assemblies' studio JSONs now carry "sketches" (live 08:37, synced to vibe5/6/7 every 10 min). Earlier
   infento / tvc numbers were on the old data: vibe6 unit dx-chain9 (log ~/tmp/dx/chain9.out, sk-<binary>-<asm>.log)
