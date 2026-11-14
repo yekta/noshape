@@ -91,7 +91,26 @@ pub struct Sides {
     pub ratio: f64,
     /// Tangent hold lines (live 2233): where one is nearer the edge than the radius, the section is the circle touching
     /// its face at the hold line (measured in the section plane) and the other face; elsewhere the plain round.
-    pub hold: Vec<Shape>,
+    pub hold: Vec<HoldLine>,
+}
+
+/// A tangent hold line's edge with its points at even parameters, sampled once and read at every station.
+#[derive(Clone, Debug)]
+pub struct HoldLine {
+    edge: Shape,
+    t: (f64, f64),
+    pts: Vec<DVec3>,
+}
+
+impl HoldLine {
+    const N: usize = 32;
+
+    pub fn new(edge: Shape) -> FResult<Self> {
+        let info = edge.edge_info()?;
+        let t = (info.first_param, info.last_param);
+        let pts = (0..=Self::N).map(|i| edge.point_at(t.0 + (t.1 - t.0) * i as f64 / Self::N as f64)).collect::<Result<Vec<_>, _>>()?;
+        Ok(HoldLine { edge, t, pts })
+    }
 }
 
 /// A partial fillet bound along the selected chain (position 0 = the chain's
@@ -1691,37 +1710,56 @@ fn conic_contacts(ev: &EvalCtx, before: &Shape, chain: &[Shape], conics: &[k::Co
 
 /// The radius a hold line sets at a station: the circle touching the face the hold line is on at its crossing of the
 /// section plane (through `p` across `tangent`) and the other face. None where no hold line crosses the section.
-fn hold_radius(hold: &[Shape], p: DVec3, tangent: DVec3, f: &Frame, scale: f64) -> FResult<Option<f64>> {
+fn hold_radius(hold: &[HoldLine], p: DVec3, tangent: DVec3, f: &Frame, scale: f64) -> FResult<Option<f64>> {
     Ok(hold_of(hold, p, tangent, f, scale)?.map(|(r, _)| r))
 }
 
 /// [`hold_radius`] and the hold line's edge (its index in `hold`) that sets it.
-fn hold_of(hold: &[Shape], p: DVec3, tangent: DVec3, f: &Frame, scale: f64) -> FResult<Option<(f64, usize)>> {
+fn hold_of(hold: &[HoldLine], p: DVec3, tangent: DVec3, f: &Frame, scale: f64) -> FResult<Option<(f64, usize)>> {
     let mut best: Option<(f64, usize)> = None;
-    for (ei, e) in hold.iter().enumerate() {
-        let info = e.edge_info()?;
-        let (t0, t1) = (info.first_param, info.last_param);
+    for (ei, h) in hold.iter().enumerate() {
+        let (e, (t0, t1)) = (&h.edge, h.t);
         let g = |t: f64| -> FResult<f64> { Ok((e.point_at(t)? - p).dot(tangent)) };
-        const N: usize = 32;
+        let n = HoldLine::N;
+        let gs: Vec<f64> = h.pts.iter().map(|q| (*q - p).dot(tangent)).collect();
         // Where the section's plane crosses it, and an end on the plane (a hold line ending where the chain's edges
         // meet: the sign test misses an end at 0 to rounding).
-        let mut at: Vec<f64> = [t0, t1].into_iter().filter(|&t| g(t).is_ok_and(|v| v.abs() <= scale * 1e-9)).collect();
-        let mut prev = (t0, g(t0)?);
-        for i in 1..=N {
-            let t = t0 + (t1 - t0) * i as f64 / N as f64;
-            let cur = (t, g(t)?);
+        let mut at: Vec<f64> = [(t0, gs[0]), (t1, gs[n])].into_iter().filter(|(_, v)| v.abs() <= scale * 1e-9).map(|(t, _)| t).collect();
+        let mut prev = (t0, gs[0]);
+        for (i, &gi) in gs.iter().enumerate().skip(1) {
+            let cur = (t0 + (t1 - t0) * i as f64 / n as f64, gi);
             if (prev.1 <= 0.0) != (cur.1 <= 0.0) || cur.1 == 0.0 {
-                let (mut a, mut b) = (prev, cur);
+                // (Illinois: regula falsi halving the end that stays, ~6 evaluations to a point on the plane.)
+                let (mut a, mut b, mut kept) = (prev, cur, 0i8);
+                let mut root = if prev.1.abs() < cur.1.abs() { prev.0 } else { cur.0 };
                 for _ in 0..60 {
-                    let m = 0.5 * (a.0 + b.0);
+                    if b.1 == a.1 {
+                        break;
+                    }
+                    let m = (a.0 * b.1 - b.0 * a.1) / (b.1 - a.1);
+                    if !(m > a.0.min(b.0) && m < a.0.max(b.0)) || (b.0 - a.0).abs() <= (t1 - t0).abs() * 1e-15 {
+                        break;
+                    }
                     let gm = g(m)?;
+                    root = m;
                     if (gm <= 0.0) == (a.1 <= 0.0) {
                         a = (m, gm);
+                        if kept == 1 {
+                            b.1 *= 0.5;
+                        }
+                        kept = 1;
                     } else {
                         b = (m, gm);
+                        if kept == -1 {
+                            a.1 *= 0.5;
+                        }
+                        kept = -1;
+                    }
+                    if gm.abs() <= scale * 1e-15 {
+                        break;
                     }
                 }
-                at.push(0.5 * (a.0 + b.0));
+                at.push(root);
             }
             prev = cur;
         }

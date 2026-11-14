@@ -730,7 +730,8 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
             false => Vec::new(),
         };
         let hold: Vec<Shape> = hold_edges.iter().filter_map(|&e| body.shape.sub_shape(ShapeType::Edge, e).ok()).collect();
-        let spec = super::blend_section::BlendSpec { sides: Some(super::blend_section::Sides { side1: a.clone(), ratio, hold: hold.clone() }), ..spec };
+        let hold_lines = hold.iter().map(|e| super::blend_section::HoldLine::new(e.clone())).collect::<FResult<Vec<_>>>()?;
+        let spec = super::blend_section::BlendSpec { sides: Some(super::blend_section::Sides { side1: a.clone(), ratio, hold: hold_lines }), ..spec };
         if ev.bool("propagation") && ev.is("propagationType", "TANGENT") {
             edges = super::detail::propagate_tangent(&body.shape, &edges);
         }
