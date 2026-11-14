@@ -172,12 +172,34 @@ bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, double tol)
   return on(b, a) || on(a, b);
 }
 
+// A projector onto face `f`'s surface made once (its search grid takes ms on a dense or an offset surface, and a
+// loop projected hundreds of points: c2-impeller-loft's flange round, 2.3 s), over the surface's own bounds (the
+// face's, a span past them, where those are infinite).
+std::unique_ptr<GeomAPI_ProjectPointOnSurf> projector(const TopoDS_Face& f)
+{
+  const occ::handle<Geom_Surface> s = BRep_Tool::Surface(f);
+  double                          a0, a1, b0, b1, u0, u1, v0, v1;
+  s->Bounds(a0, a1, b0, b1);
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  if (Precision::IsInfinite(a0))
+    a0 = u0 - (u1 - u0);
+  if (Precision::IsInfinite(a1))
+    a1 = u1 + (u1 - u0);
+  if (Precision::IsInfinite(b0))
+    b0 = v0 - (v1 - v0);
+  if (Precision::IsInfinite(b1))
+    b1 = v1 + (v1 - v0);
+  auto p = std::make_unique<GeomAPI_ProjectPointOnSurf>();
+  p->Init(s, a0, a1, b0, b1);
+  return p;
+}
+
 // Whether free-form face `t` (a lofted tool's side) lies on part face `g` where it covers it: of its sample points over
 // `g` near its surface (within 50 atol: farther ones are other parts of `t`), at least three and every one within `atol`,
 // normals within 0.02 rad (a loft's side spans a wall's planes and cylinders, each only approximately:
 // c2-variable-fillet-faceblend's held face blend, ~0.005 mm and ~0.009 rad off). Its largest distance in `dev`. (`gbox`:
-// `g`'s box; points off it are not projected.)
-bool lies_on(const TopoDS_Face& t, const TopoDS_Face& g, const Bnd_Box& gbox, double atol, double& dev)
+// `g`'s box; points off it are not projected. `pg`: a projector onto `g`'s surface, made here when null.)
+bool lies_on(const TopoDS_Face& t, const TopoDS_Face& g, const Bnd_Box& gbox, double atol, double& dev, std::unique_ptr<GeomAPI_ProjectPointOnSurf>& pg)
 {
   const GeomAbs_SurfaceType k = BRepAdaptor_Surface(t, false).GetType();
   if (k != GeomAbs_BSplineSurface && k != GeomAbs_BezierSurface)
@@ -204,8 +226,11 @@ bool lies_on(const TopoDS_Face& t, const TopoDS_Face& g, const Bnd_Box& gbox, do
       st->D1(uv.X(), uv.Y(), q, du, dv);
       if (near_g.IsOut(q))
         continue;
-      GeomAPI_ProjectPointOnSurf pr(q, sg);
-      if (pr.NbPoints() == 0 || pr.LowerDistance() > 50 * atol)
+      if (!pg)
+        pg = projector(gf);
+      GeomAPI_ProjectPointOnSurf& pr = *pg;
+      pr.Perform(q);
+      if (!pr.IsDone() || pr.NbPoints() == 0 || pr.LowerDistance() > 50 * atol)
         continue;
       double ug, vg;
       pr.LowerDistanceParameters(ug, vg);
@@ -859,6 +884,8 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     if (dbg && !internal.IsEmpty())
       std::fprintf(stderr, "blend direct: %d faces where tools meet\n", internal.Extent());
   }
+  // (One projector per part face, made when first needed.)
+  std::vector<std::unique_ptr<GeomAPI_ProjectPointOnSurf>> projectors(pfaces.Extent() + 1);
   for (size_t i = 0; i < tools.size(); ++i)
   {
     ShapeIMap strips;
@@ -876,7 +903,7 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
         double dev = 0;
         // (Only faces its box reaches: the generic same-surface test projects points, ~ms a pair.)
         bool   here = !fb.IsOut(pboxes[j]) && same_surface(t, TopoDS::Face(pfaces(j)), 10 * tol);
-        if (!here && !fb.IsOut(pboxes[j]) && lies_on(t, TopoDS::Face(pfaces(j)), pboxes[j], 1e-4 * size, dev))
+        if (!here && !fb.IsOut(pboxes[j]) && lies_on(t, TopoDS::Face(pfaces(j)), pboxes[j], 1e-4 * size, dev, projectors[j]))
         {
           here = true;
           approx.emplace_back(t, j, dev);
@@ -943,14 +970,17 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
           // (On a face the side only approximates: the stretches of the curve near its surface, each projected; a
           // loop round a wall would also bring the opposite wall's stretch onto a plane.)
           const occ::handle<Geom_Surface> sg = BRep_Tool::Surface(g);
+          if (!projectors[j])
+            projectors[j] = projector(g);
+          GeomAPI_ProjectPointOnSurf* const pr = projectors[j].get();
           constexpr int                   M  = 400;
           double                          from = 0;
           bool                            open = false;
           for (int m = 0; m <= M; ++m)
           {
-            const double               t = c.f + (c.l - c.f) * m / M;
-            GeomAPI_ProjectPointOnSurf pr(c.c3->Value(t), sg);
-            const bool                 close = pr.NbPoints() > 0 && pr.LowerDistance() < 5e-3 * size;
+            const double t = c.f + (c.l - c.f) * m / M;
+            pr->Perform(c.c3->Value(t));
+            const bool close = pr->IsDone() && pr->NbPoints() > 0 && pr->LowerDistance() < 5e-3 * size;
             if (close && !open)
               from = m == 0 ? c.f : c.f + (c.l - c.f) * (m - 1) / M;
             if ((!close || m == M) && open)
