@@ -1,6 +1,6 @@
 {
  "scenario": "drw-insert-view-scale-absolute",
- "recorded": "2026-11-14T10:57:35.439Z",
+ "recorded": "2026-11-14T16:18:13.202Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -8,12 +8,12 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "1d14b7ea47b01978d9e41a36",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "e91a74fcd26416ee63c2390a",
   "start": "block-drawing-empty",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -41,7 +41,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 2",
+   "tab": "Part 1 Drawing 1",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -147,7 +147,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -158,7 +158,7 @@
      "selection": []
     }
    },
-   "t": 159617
+   "t": 159240
   },
   {
    "step": 2,
@@ -246,7 +246,7 @@
      {
       "id": "_OSDRAWINGVIEW",
       "title": "Select a part or assembly",
-      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-1 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / start block-broken / start block-fillet / start config-block-drawing / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / start plate (",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-2 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / start block-broken / start block-fillet / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / start plate (ui) / start two-blocks / star",
       "inputs": [
        {
         "placeholder": "Search parts or sketches",
@@ -273,7 +273,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -284,7 +284,7 @@
      "selection": []
     }
    },
-   "t": 182106
+   "t": 181728
   },
   {
    "step": 3,
@@ -367,7 +367,7 @@
      {
       "id": "_OSDRAWINGVIEW",
       "title": "Select a part or assembly",
-      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-1 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / Part 1 / start block-broken / start block-fillet / start config-block-drawing / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / star",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-2 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / Part 1 / start block-broken / start block-fillet / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / start plate (ui) / start two-bloc",
       "inputs": [
        {
         "placeholder": "Search parts or sketches",
@@ -394,7 +394,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -405,7 +405,7 @@
      "selection": []
     }
    },
-   "t": 204500
+   "t": 204109
   },
   {
    "step": 4,
@@ -508,7 +508,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -519,7 +519,7 @@
      "selection": []
     }
    },
-   "t": 226999
+   "t": 226428
   },
   {
    "step": 5,
@@ -617,7 +617,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -628,7 +628,7 @@
      "selection": []
     }
    },
-   "t": 250663
+   "t": 249473
   },
   {
    "step": 6,
@@ -732,7 +732,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -743,7 +743,7 @@
      "selection": []
     }
    },
-   "t": 262206
+   "t": 260929
   },
   {
    "step": 7,
@@ -846,7 +846,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -857,7 +857,7 @@
      "selection": []
     }
    },
-   "t": 274382
+   "t": 273429
   },
   {
    "step": 8,
@@ -957,7 +957,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -968,7 +968,7 @@
      "selection": []
     }
    },
-   "t": 298408
+   "t": 296100
   },
   {
    "step": 9,
@@ -1012,7 +1012,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1040,7 +1040,7 @@
      ]
     }
    },
-   "t": 324414
+   "t": 321733
   },
   {
    "step": 10,
@@ -1083,7 +1083,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1106,7 +1106,7 @@
      "selection": []
     }
    },
-   "t": 350430
+   "t": 347656
   }
  ]
 }

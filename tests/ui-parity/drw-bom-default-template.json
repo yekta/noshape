@@ -1,0 +1,50 @@
+{
+  "name": "drw-bom-default-template",
+  "about": "BOM table with Template Onshape Default BOM, placed",
+  "area": "drawing",
+  "source": "live2 11-14: drawing field-level coverage (panel options no scenario touched; lead: the asm/drawing half of the coverage audit)",
+  "start": "pin-block-asm-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "BOM table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Follow assembly"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Onshape Default BOM"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          260,
+          200
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
