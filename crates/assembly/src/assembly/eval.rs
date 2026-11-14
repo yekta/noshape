@@ -1498,7 +1498,8 @@ pub fn limit_keys(t: MateType) -> &'static [&'static str] {
         MateType::Cylindrical => &["z", "rz"],
         MateType::PinSlot => &["x", "rz"],
         MateType::Planar => &["x", "y", "rz"],
-        MateType::Parallel => &["z"],
+        // Live (live2 13:47, asm-parallel-limits): X, Y and Z distance, then the axial Z angle.
+        MateType::Parallel => &["x", "y", "z", "rz"],
         MateType::Ball => &["cone"],
         _ => &[],
     }

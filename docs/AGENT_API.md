@@ -2727,7 +2727,7 @@ Examples:
 | `reorient_secondary` | integer |  | Reorient secondary axis: quarter turns about the primary axis (the dialog's button clicks, 0-3). |
 | `offset` | object |  | Offset: {"x", "y", "z": length, "rotation": angle} expressions where the mate type allows them. |
 | `rotation_axis` | one of `x`, `y`, `z` |  | Axis of the rotation offset (a new mate's: x, as the dialog's "Rotate about X"). |
-| `limits` | object |  | Limits: {"<axis>": {"min": expr, "max": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel z; Ball cone). |
+| `limits` | object |  | Limits: {"<axis>": {"min": expr, "max": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel x, y, z, rz; Ball cone). |
 | `tangent_propagation` | boolean |  | Tangent mates: Tangent propagation. |
 | `simulation_connection` | boolean |  | Simulation connection (stored; every mate but Pin slot, Parallel, Tangent and Width). |
 | `simulation_faces` | array of object |  | With simulation_connection: its Faces to connect, each {"instance", "entity"} as `a` (stored; replaces the list). |

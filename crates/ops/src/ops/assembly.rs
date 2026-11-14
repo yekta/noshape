@@ -108,7 +108,7 @@ pub fn ops() -> Vec<Op> {
                 opt("reorient_secondary", json!({ "type": "integer", "minimum": 0, "maximum": 3 }), "Reorient secondary axis: quarter turns about the primary axis (the dialog's button clicks, 0-3)."),
                 opt("offset", json!({ "type": "object" }), "Offset: {\"x\", \"y\", \"z\": length, \"rotation\": angle} expressions where the mate type allows them."),
                 opt("rotation_axis", json!({ "type": "string", "enum": ["x", "y", "z"], "default": "x" }), "Axis of the rotation offset (a new mate's: x, as the dialog's \"Rotate about X\")."),
-                opt("limits", json!({ "type": "object" }), "Limits: {\"<axis>\": {\"min\": expr, \"max\": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel z; Ball cone)."),
+                opt("limits", json!({ "type": "object" }), "Limits: {\"<axis>\": {\"min\": expr, \"max\": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel x, y, z, rz; Ball cone)."),
                 opt("tangent_propagation", json!({ "type": "boolean", "default": true }), "Tangent mates: Tangent propagation."),
                 opt("simulation_connection", json!({ "type": "boolean", "default": false }), "Simulation connection (stored; every mate but Pin slot, Parallel, Tangent and Width)."),
                 opt("simulation_faces", json!({ "type": "array", "items": { "type": "object" } }), "With simulation_connection: its Faces to connect, each {\"instance\", \"entity\"} as `a` (stored; replaces the list)."),

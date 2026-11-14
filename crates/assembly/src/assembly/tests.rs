@@ -6731,3 +6731,9 @@ fn standard_content_frames_and_connectors_as_live() {
         }
     }
 }
+
+/// Parallel limits X, Y and Z distance and the axial Z angle, in live's order (live2: its eight limit rows).
+#[test]
+fn parallel_limits_its_three_distances_and_the_axial_angle() {
+    assert_eq!(eval::limit_keys(MateType::Parallel), ["x", "y", "z", "rz"]);
+}
