@@ -62,6 +62,14 @@ scratch /root/bool-scratch.
   geometry: a face swept from the marched 89-pole cubic (C2 at every knot, so no C2 breaks) integrated in 16 steps,
   8e-5 short (prism of the 1356.908 mm2 cap: 1356.796); common.cpp surface_breaks / face_moments now split an
   extrusion's (revolution's) integral at its B-spline curve's knots: both curves then measure 1356.9094.
+- asm-hand-drill-pinslot e53bba Extrude 11 (core 11-14 22:xx, with core's band-end patch; recordings vibe5
+  ~/agents/core-keep/e53bba-rec, copies vibe7 ~/agents/bool-keep/e53): the fuse b23b1d286fe7d731 took OCCT's glued
+  fallback (on_anothers_cylinder + plain fuse invalid), whose volumes "add up" over a real 3 mm3 overlap: guarded by
+  the tools' points not in the part (c108ebca9, test a_tool_reaching_into_the_part_is_not_glued_on). Its cause: the
+  unify of 057b2c9828530384 (5 tools, ours, whole path) closes the r12.07 band round onto itself along an end arc's
+  piece (-0.54..-2.5 mm at y -12) and keeps that arc as the merged face's seam (closed, two pcurves, not a ruling):
+  ours then declines "a seam off a ruling", OCCT's fuse goes invalid. Next: after USD, re-cut such a face along a
+  ruling (the arc gone), as Parasolid has no seam.
 - Then c2-fan-blade-sweep's Boolean 2 offset: the bolt's picked faces 9,10,11,13,16-21,23 (flanks 10, 11 B-spline;
   flank 12 unpicked), so a Shell wall from the picked faces would leave rims where live extends the neighbours.
 
