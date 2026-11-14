@@ -1,19 +1,19 @@
 {
  "scenario": "export-tab-no-geometry",
- "recorded": "2026-11-14T07:46:02.282Z",
+ "recorded": "2026-11-14T15:16:36.871Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.8"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
-  "document": "38e54affc51d506498f8ecd2",
-  "workspace": "24db5f467e1ccbd8d405a2a9",
-  "element": "66e2ad58dd0667aeb7b84119",
-  "start": "empty",
-  "startElement": "12aecfd4ec44bf7b75c44ad8",
-  "runner": "live2 .nstate-uip-4.json"
+  "document": "f5e50f40e55bb276d7985339",
+  "workspace": "0e5bc22058e96be60500ef29",
+  "element": "01d53df3e18d11695d14da1d",
+  "start": "fs-studio",
+  "startElement": "01d53df3e18d11695d14da1d",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -28,18 +28,8 @@
    "items": []
   },
   "features": {
-   "rows": [
-    {
-     "name": "Sketch 1",
-     "state": "ok",
-     "selected": false,
-     "editing": false,
-     "related": false,
-     "hidden": false,
-     "cls": ""
-    }
-   ],
-   "rollbackAfter": "Sketch 1"
+   "rows": [],
+   "rollbackAfter": "Default geometry"
   },
   "parts": [],
   "partsHeading": "Parts (0)",
@@ -63,25 +53,388 @@
     0.866025
    ],
    "target_mm": [
-    -12.295,
-    -11.914,
-    -7.222
+    0,
+    0,
+    0
    ],
    "eye_mm": [
-    80.589,
-    -172.795,
-    100.032
+    68.58,
+    -118.784,
+    79.189
    ],
-   "width_mm": 541.662,
-   "height_mm": 286.857,
-   "mmPerPixel": 0.323767,
+   "width_mm": 468.057,
+   "height_mm": 247.877,
+   "mmPerPixel": 0.279771,
    "orthographic": true
   },
-  "measure": null
+  "measure": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    },
+    {
+     "name": "Feature Studio 1",
+     "kind": "featurestudio",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
  },
  "steps": [
   {
    "step": 1,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 3000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": "Default geometry"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      68.58,
+      -118.784,
+      79.189
+     ],
+     "width_mm": 468.057,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.279771,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 40803
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "doc_tab": "Assembly 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    381,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 468.057,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.279771,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 46667
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 3000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 468.057,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.279771,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 51857
+  },
+  {
+   "step": 4,
    "do": {
     "do": "rclick",
     "on": {
@@ -90,7 +443,7 @@
    },
    "ok": true,
    "at": [
-    140,
+    179,
     976
    ],
    "state": {
@@ -125,19 +478,36 @@
     "features": {
      "rows": [
       {
-       "name": "Sketch 1",
+       "name": "Assembly 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
        "cls": ""
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
       }
      ],
-     "rollbackAfter": "Sketch 1"
+     "rollbackAfter": null
     },
     "parts": [],
-    "partsHeading": "Parts (0)",
     "undo": {
      "undo": false,
      "redo": false
@@ -158,26 +528,54 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      80.589,
-      -172.795,
-      100.032
+      900,
+      -1558.846,
+      1039.23
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 468.057,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.279771,
      "orthographic": true
     },
-    "measure": null
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": true
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
    },
-   "t": 38355
+   "t": 54404
   },
   {
-   "step": 2,
+   "step": 5,
    "do": {
     "do": "click",
     "on": {
@@ -250,12 +648,40 @@
      "mmPerPixel": 0.279771,
      "orthographic": true
     },
-    "measure": null
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
    },
-   "t": 57392
+   "t": 70009
   },
   {
-   "step": 3,
+   "step": 6,
    "do": {
     "do": "wait",
     "until": "ms",
@@ -323,16 +749,44 @@
      "mmPerPixel": 0.279771,
      "orthographic": true
     },
-    "measure": null
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
    },
-   "t": 71635
+   "t": 84099
   },
   {
-   "step": 4,
+   "step": 7,
    "do": {
     "do": "click",
     "on": {
-     "button": "Cancel"
+     "button": "modal-cancel"
     }
    },
    "ok": true,
@@ -392,12 +846,40 @@
      "mmPerPixel": 0.279771,
      "orthographic": true
     },
-    "measure": null
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
    },
-   "t": 84848
+   "t": 97115
   },
   {
-   "step": 5,
+   "step": 8,
    "do": {
     "do": "wait",
     "until": "ms",
@@ -456,9 +938,37 @@
      "mmPerPixel": 0.279771,
      "orthographic": true
     },
-    "measure": null
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
    },
-   "t": 97996
+   "t": 110043
   }
  ]
 }

@@ -1,10 +1,26 @@
 {
  "name": "export-tab-no-geometry",
- "about": "empty: the Part Studio tab's Export\u2026 on a tab with no parts: the dialog says \"Selected tab contains no supported geometry for export.\" with only Cancel",
+ "about": "fs-studio: with Assembly 1 active, the empty Part Studio 1 tab's right-click menu has Export\u2026 (an inactive tab always shows it); the dialog says \"Selected tab contains no supported geometry for export.\" with only Cancel",
  "area": "psui",
- "source": "live coverage audit 2026-11-14 (panel and dialog controls no recorded scenario touched)",
- "start": "empty",
+ "source": "live coverage audit 2026-11-14 (retaken on a whole-document start after dx's note; live: the ACTIVE Part Studio tab shows Export\u2026 only when it has parts)",
+ "start": "fs-studio",
  "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
+  },
   {
    "do": "rclick",
    "on": {
@@ -25,7 +41,7 @@
   {
    "do": "click",
    "on": {
-    "button": "Cancel"
+    "button": "modal-cancel"
    }
   },
   {

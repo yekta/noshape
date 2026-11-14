@@ -1,10 +1,15 @@
 {
  "name": "fs-ps-show-code",
- "about": "Part Studio 1 tab right-click › Show code (read-only FeatureScript), Esc",
+ "about": "Part Studio 1 tab right-click \u203a Show code (read-only FeatureScript), Esc",
  "area": "studios",
  "source": "universe feature-studio fs-ps-show-code (studios 11-08, coverage batch 3)",
  "start": "fs-studio",
  "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
+  },
   {
    "do": "rclick",
    "on": {

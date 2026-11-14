@@ -1,16 +1,16 @@
 {
  "scenario": "sketch-linear-pattern-click-commit",
- "recorded": "2026-11-14T08:11:08.759Z",
+ "recorded": "2026-11-14T15:06:12.710Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.10"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "38e54affc51d506498f8ecd2",
   "workspace": "24db5f467e1ccbd8d405a2a9",
-  "element": "98122b9bc389ed662ac143c5",
+  "element": "338e90787785cd9e5ee18f03",
   "start": "empty",
   "startElement": "12aecfd4ec44bf7b75c44ad8",
   "runner": "live2 .nstate-uip-4.json"
@@ -28,18 +28,8 @@
    "items": []
   },
   "features": {
-   "rows": [
-    {
-     "name": "Sketch 1",
-     "state": "ok",
-     "selected": false,
-     "editing": false,
-     "related": false,
-     "hidden": false,
-     "cls": ""
-    }
-   ],
-   "rollbackAfter": "Sketch 1"
+   "rows": [],
+   "rollbackAfter": "Default geometry"
   },
   "parts": [],
   "partsHeading": "Parts (0)",
@@ -63,18 +53,18 @@
     0.866025
    ],
    "target_mm": [
-    -12.295,
-    -11.914,
-    -7.222
+    0,
+    0,
+    0
    ],
    "eye_mm": [
-    80.589,
-    -172.795,
-    100.032
+    67.5,
+    -116.913,
+    77.942
    ],
-   "width_mm": 541.662,
-   "height_mm": 286.857,
-   "mmPerPixel": 0.323767,
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
    "orthographic": true
   },
   "measure": null
@@ -98,7 +88,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "error",
      "kind": "sketch",
      "tabs": [],
@@ -122,7 +112,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "error",
       "kind": "sketch",
       "tabs": [],
@@ -155,15 +145,6 @@
      "rows": [
       {
        "name": "Sketch 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
        "state": "error",
        "selected": true,
        "editing": true,
@@ -172,7 +153,7 @@
        "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -202,23 +183,23 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      80.589,
-      -172.795,
-      100.032
+      67.5,
+      -116.913,
+      77.942
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 33659
+   "t": 28573
   },
   {
    "step": 2,
@@ -238,7 +219,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -264,7 +245,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -300,15 +281,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
@@ -316,7 +288,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -346,23 +318,23 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 38267
+   "t": 33469
   },
   {
    "step": 3,
@@ -384,7 +356,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -410,7 +382,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -446,15 +418,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
@@ -462,7 +425,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -492,23 +455,23 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 41342
+   "t": 36184
   },
   {
    "step": 4,
@@ -526,15 +489,15 @@
     "IB"
    ],
    "at": [
-    1134,
-    493
+    1083,
+    519
    ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -560,7 +523,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -596,15 +559,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
@@ -612,7 +566,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -641,23 +595,23 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 49229
+   "t": 43227
   },
   {
    "step": 5,
@@ -673,15 +627,15 @@
    "ok": true,
    "hover": [],
    "at": [
-    1147,
-    497
+    1098,
+    524
    ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -707,7 +661,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -743,15 +697,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
@@ -759,7 +704,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -792,23 +737,23 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 59121
+   "t": 52323
   },
   {
    "step": 6,
@@ -819,8 +764,8 @@
    "ok": true,
    "pointer": {
     "at": [
-     1147,
-     497
+     1098,
+     523
     ],
     "hover": [],
     "element": "canvas#canvas"
@@ -830,7 +775,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -856,7 +801,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -892,15 +837,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
@@ -908,7 +844,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -941,23 +877,23 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 62817
+   "t": 55940
   },
   {
    "step": 7,
@@ -968,8 +904,8 @@
    "ok": true,
    "pointer": {
     "at": [
-     1147,
-     497
+     1098,
+     523
     ],
     "hover": [],
     "element": "canvas#canvas"
@@ -979,7 +915,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -1005,7 +941,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -1041,15 +977,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
@@ -1057,7 +984,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -1090,23 +1017,23 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 66513
+   "t": 59627
   },
   {
    "step": 8,
@@ -1126,7 +1053,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -1152,7 +1079,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -1188,15 +1115,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
@@ -1204,7 +1122,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -1237,23 +1155,23 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 69714
+   "t": 62728
   },
   {
    "step": 9,
@@ -1268,18 +1186,18 @@
    },
    "ok": true,
    "hover": [
-    "JGB"
+    "JFB"
    ],
    "at": [
-    1147,
-    497
+    1098,
+    524
    ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -1305,7 +1223,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -1338,7 +1256,7 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JGB"
+       "id": "JFB"
       }
      ]
     },
@@ -1347,15 +1265,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": true,
@@ -1363,7 +1272,7 @@
        "cls": "related-highlight edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -1396,32 +1305,32 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": {
      "readout": [
       {
        "name": "Diameter",
-       "value": "9.831",
+       "value": "9.618",
        "units": "mm"
       }
      ],
      "panel": null
     }
    },
-   "t": 74285
+   "t": 67082
   },
   {
    "step": 10,
@@ -1435,7 +1344,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -1461,7 +1370,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -1494,7 +1403,7 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JGB"
+       "id": "JFB"
       }
      ]
     },
@@ -1503,15 +1412,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": true,
@@ -1519,7 +1419,7 @@
        "cls": "related-highlight edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -1552,32 +1452,32 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": {
      "readout": [
       {
        "name": "Diameter",
-       "value": "9.831",
+       "value": "9.618",
        "units": "mm"
       }
      ],
      "panel": null
     }
    },
-   "t": 79034
+   "t": 71759
   },
   {
    "step": 11,
@@ -1597,7 +1497,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -1623,7 +1523,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -1659,15 +1559,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
@@ -1675,7 +1566,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -1722,23 +1613,23 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 82348
+   "t": 74887
   },
   {
    "step": 12,
@@ -1752,7 +1643,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -1778,7 +1669,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -1814,15 +1705,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
@@ -1830,7 +1712,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -1877,23 +1759,23 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 87002
+   "t": 79464
   },
   {
    "step": 13,
@@ -1915,7 +1797,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 2",
+     "title": "Sketch 1",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -1941,7 +1823,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 2",
+      "title": "Sketch 1",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -1977,15 +1859,6 @@
       {
        "name": "Sketch 1",
        "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
@@ -1993,7 +1866,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Sketch 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -2040,23 +1913,23 @@
       0.866025
      ],
      "target_mm": [
-      -12.295,
-      -11.914,
-      -7.222
+      0,
+      0,
+      0
      ],
      "eye_mm": [
-      115.722,
-      -233.646,
-      140.6
+      98.537,
+      -170.671,
+      113.781
      ],
-     "width_mm": 541.662,
-     "height_mm": 286.857,
-     "mmPerPixel": 0.323767,
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 90739
+   "t": 83084
   }
  ]
 }
