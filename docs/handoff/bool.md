@@ -4,7 +4,18 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-14 10:40 UTC; restart from here)
+## bool, now (11-14 15:40 UTC; restart from here)
+- Landed 11:16 as b21f4343: whole-turn tori kept by a pattern's rotation (symmetry found), clear_inside not asked on
+  free-form faces (the pair's own sections): the infento tyre's cut 1.9-2.1 -> 0.85-1.4 s, the same result.
+- infento tyre topology (392 vs live 391 faces): the model's unify is k::unify_same_domain (eval.rs boolean_into_with),
+  which leaves 426 faces with no merge on OCCT's or our cut (probe_unmerged_faces / probe_split_round_faces): the 392 is
+  the suite's shown-topology count, so the extra face is in what that counts (a periodic face OCCT splits?), not a merge
+  our unify misses. Next there: the parity counting path (crates/ops parity / shown_topology).
+- blend 11-14: c2-hunting-knife +55 ms (1210 -> 1265, Mac) since core's a3e9fb3db (Loft 3 one cubic, as live): our
+  sections ahead on the new loft surface about double (plane∩B-spline: bool2's marcher; told bool2).
+- bool2 took c2-gamma-imported / c2-wire-clip-imported's two declines (f68f4393, 678f4bf2) 11-14 10:5x.
+
+## bool, earlier (11-14 10:40 UTC)
 - Landed: 80f1d37e (cylinder bands: gamma union 914 -> 889, live 884), d41b7664 (the dock's seam slot walls: 9 more
   ours).
 - **asm-infento-subs studio 1dc32b's Boolean 2 (dx 09:00; tyre cut by 32 tread tools; ours = OCCT's volume; inputs as
