@@ -1,0 +1,63 @@
+{
+ "name": "gusset-rectangle-aligned",
+ "about": "frame-l: Gusset on the corner edge, type Triangle → Rectangle, position Centered → Aligned, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "frame-l",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Gusset"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     12.7,
+     -12.7,
+     5
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Triangle",
+    "pick": "Rectangle"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Centered",
+    "pick": "Aligned"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
