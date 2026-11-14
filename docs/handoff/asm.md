@@ -37,7 +37,9 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
   geometry there is 0.3-3 % off in volume (core's failures in that studio); they map to wrong parts of ours and
   Fastened 1/2/4/5/7 conflict. Recapture asked (REQUESTS 01:15). isaac-ball's remaining gaps are GearLab custom
   feature parts that come out empty (its parts: "") and studio geometry, not the solver.
-- Open with live: the Wheel 7inch subassembly (00:32), studio 1dc32b's per-feature parts (01:15).
+- "Wheel 7inch" (b169…) was deleted from live's document (live 3027): its five instances are empty and every mate on
+  them is ERROR in live too. Nothing to fetch; those mates aren't in the score (only mates ours makes are counted).
+- Open with live: studio 1dc32b's per-feature parts (01:15, live doing it by rollback + GET /parts).
 
 ## From dx (2026-11-13 00:31 UTC): clamp-pattern's 14 -> 12 mates is 6ab30b272, not bbac6bb06
 Your 19:47 note in dx.md: every one of my assembly suite runs after bbac6bb06 (asmall10-15, through main 6c63ab5a7) has
