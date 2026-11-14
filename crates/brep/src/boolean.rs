@@ -5734,6 +5734,35 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 lsrc.push(si);
             }
         }
+        // (A straight edge along a whole cylinder's or cone's seam that isn't the seam (a slot's wall cut at the seam
+        // angle, the private dock's funnel): on the side of it its loop is on. Placed on the other, both its ends are left
+        // alone in the plane (an odd number of curves at each) where its vertices' other places are too: moved there.)
+        if let Surf::Cyl { r, th0, .. } = cx.faces[f].s {
+            let mut degree = vec![0usize; pts.len()];
+            for (e, _) in &lsegs {
+                degree[e[0] as usize] += 1;
+                degree[e[1] as usize] += 1;
+            }
+            let on = |x: f64| (x - r * th0).abs() <= tol || (x - r * (th0 + TAU)).abs() <= tol;
+            for k in 0..lsegs.len() {
+                let si = lsrc[k];
+                let ([a, b], C2::Seg { a: pa, b: pb }) = lsegs[k].clone() else { continue };
+                if seams.contains(&si) || a == b || !on(pa.x) || !on(pb.x) || (pa.x - pb.x).abs() > tol || degree[a as usize].is_multiple_of(2) || degree[b as usize].is_multiple_of(2) {
+                    continue;
+                }
+                let v = sedges[si].seg.v;
+                let side = pa.x > r * (th0 + PI);
+                let (Some(&a2), Some(&b2)) = (local.get(&(v[0], !side)), local.get(&(v[1], !side))) else { continue };
+                if a2 == a || b2 == b || degree[a2 as usize].is_multiple_of(2) || degree[b2 as usize].is_multiple_of(2) {
+                    continue;
+                }
+                for (from, to) in [(a, a2), (b, b2)] {
+                    degree[from as usize] -= 1;
+                    degree[to as usize] += 1;
+                }
+                lsegs[k] = ([a2, b2], C2::Seg { a: pts[a2 as usize], b: pts[b2 as usize] });
+            }
+        }
         let boundary: HashSet<u32> = cx.faces[f].edges.iter().flat_map(|&(e, _)| edge_pieces[e].iter().flat_map(|x| sedges[x.0].seg.v)).collect();
         let mut inner: Vec<u32> = local.keys().map(|k| k.0).filter(|w| !boundary.contains(w)).collect();
         inner.sort_unstable();

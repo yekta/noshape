@@ -2533,3 +2533,33 @@ fn stacked_holes_framed_apart_unify_into_one_wall() {
     let (v, vf) = (u.volume().unwrap(), fused.volume().unwrap());
     assert!((v - vf).abs() <= 1e-9 * vf.abs(), "volume {v} against the fuse's {vf}");
 }
+
+/// A post with a slot cut down its side whose wall lies on the post's seam (the private dock's funnel: its cable slot
+/// at the seam angle), then cut again across: the wall's edge belongs on the seam's other side in the face's
+/// parameters, where its loop is ("a face lost" before). Ours, as OCCT's.
+#[test]
+fn a_slot_wall_on_the_seam_cut_as_occt() {
+    let opts = k::BooleanOptions::default();
+    let post = k::make_cylinder(&k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 0.016, 0.008, std::f64::consts::TAU).unwrap();
+    // (The slot: x 5..20 mm, y 0..3 mm, so its wall y = 0 runs along the seam at angle 0, the face's material on the
+    // seam's far side, the end of its turn.)
+    let slot = k::make_box_corners(DVec3::new(0.005, 0.0, 0.0001), DVec3::new(0.02, 0.003, 0.01)).unwrap();
+    k::set_rust_boolean(Some(false));
+    let slotted = k::boolean(k::BooleanOp::Cut, &[post], &[slot], &opts).unwrap().shape;
+    k::set_rust_boolean(None);
+    // (A groove on the post's far side: the face is split, away from the seam.)
+    let groove = k::make_box_corners(DVec3::new(-0.02, -0.002, 0.003), DVec3::new(-0.01, 0.002, 0.004)).unwrap();
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&slotted), std::slice::from_ref(&groove), &opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let occt = k::boolean(k::BooleanOp::Cut, &[slotted], &[groove], &opts).unwrap();
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid());
+    let counts = |s: &k::Shape| (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge), s.count(k::ShapeType::Vertex));
+    assert_eq!(counts(&r.shape), counts(&occt.shape));
+    let (v, vo) = (r.shape.volume().unwrap(), occt.shape.volume().unwrap());
+    assert!((v - vo).abs() <= 1e-9 * vo, "volume {v} against OCCT's {vo}");
+}
