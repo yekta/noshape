@@ -4815,15 +4815,28 @@ impl<'a> Translator<'a> {
             };
             let mut entities: Vec<String> = Vec::new();
             let mut external = false;
+            // Each slot local or model geometry (`externalEntity1` where `localEntity1` would be: a midpoint between
+            // two model vertices, cf-sheet-metal-hem's derived Sketch 3 centring its circle), in the slots' order.
+            let param = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned();
+            let mut placed: Vec<String> = Vec::new();
             for n in order {
                 if let Some(v) = par(n) {
                     match self.sketch_entities.get(&(oid.to_string(), v)) {
                         Some(e) => entities.push(e.clone()),
                         None => external = true,
                     }
+                    continue;
+                }
+                let ext = n.replacen("local", "external", 1);
+                if let Some(p) = param(&ext).filter(|p| p["queries"].as_array().is_some_and(|q| !q.is_empty())) {
+                    placed.push(ext);
+                    match self.external_ref(k, &p) {
+                        Some(e) => entities.push(e),
+                        None => external = true,
+                    }
                 }
             }
-            for p in c["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external"))) {
+            for p in c["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external") && !placed.iter().any(|x| x == n))) {
                 match self.external_ref(k, p) {
                     Some(e) => entities.push(e),
                     None => external = true,
