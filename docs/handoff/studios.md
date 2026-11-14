@@ -28,6 +28,20 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-14 01:09 UTC: live2's 11-13 / 11-14 answers in
+- Drawings: a click on the empty sheet closes the dimension palette (2578 (4) was wrong); a table's Bring to front greys
+  only with no note / dimension / table on the sheet (views don't count); a reference pinned to this document's version
+  reads like another document's (In progress, V1; Pin reference, Update linked document...); the Reference manager is
+  a feature dialog in live's recorder since 11-13 (two 11-10 takes re-recorded); drw-ref / drw-sheet-ref 7 / 7.
+- Feature Studio: the completion list 250 ms after the key (`fs_complete::LIST_DELAY`; at once while it shows).
+- Assembly: Section view opens empty with the blue hint; mate toolbar 12 / 14 px off the second pick; Animate's
+  "Reverse playback"; the Insert preview's hidden edges through other parts (`xray_tops`; its own back edges show faintly
+  too: a renderer limit); ✓ commits a pending instance at identity; the Insert dialog's `inserted` (run.py lifts live's
+  panels[].inserted). Snap insert of standard content: live puts a screw's shank into the face (asm's flip stays).
+  Matrices: mates 26 / 28, views 14 / 15, instance list 21 / 22, 3D 9 / 10.
+- Open "?": list row tooltip (live2 ~70 ms at 30 fps vs the feature list's 160 ms), a selected instance's outline
+  through other parts in explode mode, a Revolute-constrained drag's grab point.
+
 ### 2026-11-13 18:10 UTC: the assembly UI's feel is studios' (lead 11-13; asm keeps the mate solver)
 - docs/parity/interaction-feel.md "Assembly": four matrices from live's mates.json, asm-views.json, fields.json's
   instance list and 3d.json's assembly section: mates 24 / 28, views 13 / 15, instance list 17 / 22, 3D 9 / 10. The
