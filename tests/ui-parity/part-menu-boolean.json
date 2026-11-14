@@ -1,0 +1,49 @@
+{
+ "name": "part-menu-boolean",
+ "about": "overlap: Part 1 and Part 2 in the Parts list, right-click › Boolean (the Boolean dialog with both parts), Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (an uncovered menu item; sketch shortcuts with one recorded scenario)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Boolean"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

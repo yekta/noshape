@@ -1,0 +1,99 @@
+{
+ "name": "sketch-key-concentric-two-circles",
+ "about": "empty, sketch on Top: two circles (centre (0,0) r10, centre (30,0) r5), select both, Shift+O: the second becomes concentric with the first",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (an uncovered menu item; sketch shortcuts with one recorded scenario)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "c"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "c"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     35,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     5
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+o"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

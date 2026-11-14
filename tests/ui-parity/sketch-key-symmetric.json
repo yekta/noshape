@@ -1,0 +1,108 @@
+{
+ "name": "sketch-key-symmetric",
+ "about": "empty, sketch on Top: a vertical line x = 0 (−20…20) and points at (−10,5) and (12,6); select both points and the line, Shift+Q: the points become symmetric about it",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (an uncovered menu item; sketch shortcuts with one recorded scenario)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     -20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "shift+s"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     -10,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     12,
+     6
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     -10,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     12,
+     6
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     -15
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+q"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

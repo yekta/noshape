@@ -1,0 +1,90 @@
+{
+ "name": "sketch-key-midpoint",
+ "about": "empty, sketch on Top: a line (0,0)–(40,0) and a point at (10,10); select the point and the line, Shift+M: the point moves to the line's midpoint",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (an uncovered menu item; sketch shortcuts with one recorded scenario)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "shift+s"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+m"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

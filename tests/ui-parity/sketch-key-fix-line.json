@@ -1,0 +1,64 @@
+{
+ "name": "sketch-key-fix-line",
+ "about": "empty, sketch on Top: a line (5,5)–(30,15), select it, Shift+J: Fix",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (an uncovered menu item; sketch shortcuts with one recorded scenario)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     5,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     15
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     17.5,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+j"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
