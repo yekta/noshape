@@ -1,0 +1,85 @@
+{
+ "name": "sketch-mirror-model-edge",
+ "about": "hole-sketch: a new sketch on Top (the box below it, z -10..0), a line right of the box; Mirror, the box's top edge at x 40 as the mirror line, then the line; Escape",
+ "area": "psui",
+ "source": "live 2026-11-14 (lead: Mirror is the user's open complaint; feel/mirror.json)",
+ "start": "hole-sketch",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     45,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     55,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     40,
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     50,
+     12.5
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

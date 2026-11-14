@@ -1058,5 +1058,6 @@
    "template": "ANSI_A_INCH.dwt",
    "views": "suggested"
   }
- }
+ },
+ "boss-block": {"units": "mm", "features": [{"type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{"corner_rectangle": [[-20, -15], [20, 15]]}]}, {"type": "extrude", "name": "Extrude 1", "params": {"entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW"}}, {"type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{"circle": [[10, 0], [14, 0]]}]}, {"type": "extrude", "name": "Extrude 2", "params": {"entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "ADD", "defaultScope": true}}], "about": "a 40 x 30 x 10 block centred on the origin (x -20..20, y -15..15, z 0..10) with a boss of diameter 8 at (10, 0) rising to z 20 (Sketch 2 on Top, Extrude 2 adds 20 mm): Feature / Face mirror sources"}
 }

@@ -1,0 +1,88 @@
+{
+ "name": "mirror-part-entities-mate-connector",
+ "about": "boss-block plus Mate connector 1 on the block's top face; Part mirror: Mate connector 1 clicked in the feature list with Entities to mirror focused (does the field take it?), then Part 1, the Right plane; OK",
+ "area": "psui",
+ "source": "live 2026-11-14 (lead: Mirror is the user's open complaint; feel/mirror.json)",
+ "start": "boss-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mate connector"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     -10,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Mate connector 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Mirror plane"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Right"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

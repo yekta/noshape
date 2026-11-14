@@ -1,6 +1,6 @@
 {
  "name": "sketch-box-select-delete",
- "about": "two lines, drag a box over one, Delete",
+ "about": "two lines, drag a box over one, Delete (view normal to the sketch first (n): in the isometric view the screen box between those sketch points holds neither line)",
  "area": "skasm",
  "source": "everyday (lead 11-03: sketch everyday use)",
  "start": "empty",
@@ -16,6 +16,10 @@
    "on": {
     "plane": "Top"
    }
+  },
+  {
+   "do": "key",
+   "key": "n"
   },
   {
    "do": "key",

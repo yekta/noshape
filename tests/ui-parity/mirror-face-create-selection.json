@@ -1,0 +1,52 @@
+{
+ "name": "mirror-face-create-selection",
+ "about": "boss-block: Mirror, type Face mirror, Faces to mirror's Create selection button: its panel (Faces | Edges, Protrusion), then the boss's top face: Selection 'Face of Extrude 2', '2 faces selected'; Escape. (Add selection's result is in live/feel/mirror.json, shot 56: it fills Faces to mirror; the recorder's click on it adds nothing, so it isn't a step here)",
+ "area": "psui",
+ "source": "live 2026-11-14 (lead: Mirror is the user's open complaint; feel/mirror.json)",
+ "start": "boss-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part mirror",
+    "pick": "Face mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create selection"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10,
+     0,
+     20
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

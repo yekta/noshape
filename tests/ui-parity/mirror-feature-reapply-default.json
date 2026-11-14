@@ -1,0 +1,54 @@
+{
+ "name": "mirror-feature-reapply-default",
+ "about": "boss-block: Mirror, type Feature mirror, Extrude 2 (the boss) in Features to mirror, Right plane; Reapply features left as it opens (off); OK",
+ "area": "psui",
+ "source": "live 2026-11-14 (lead: Mirror is the user's open complaint; feel/mirror.json)",
+ "start": "boss-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part mirror",
+    "pick": "Feature mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Mirror plane"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Right"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,18 +1,19 @@
 {
  "scenario": "sketch-box-select-delete",
- "recorded": "2026-11-03T20:46:40.933Z",
+ "recorded": "2026-11-14T23:28:15.184Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.0 backfilled"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "93aa09eee65f0805febd6bdd",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "f34868571e7c777b09c25ece",
   "start": "empty",
-  "startElement": "16c3ef729d456774c1da81b8"
+  "startElement": "3cf6c82ee0b538276398f1f1",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -20,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -37,7 +39,35 @@
   },
   "message": null,
   "tooltip": null,
-  "sketch": null
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -105,6 +135,7 @@
       "ok": "disabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -138,9 +169,37 @@
      "constraints": null,
      "dimensions": null,
      "error": "sketch model not reached"
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 61472
+   "t": 29951
   },
   {
    "step": 2,
@@ -211,6 +270,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -244,17 +304,53 @@
      "constraints": null,
      "dimensions": null,
      "error": "sketch model not reached"
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 72942
+   "t": 34174
   },
   {
    "step": 3,
    "do": {
     "do": "key",
-    "key": "l"
+    "key": "n"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1889,
+     932
+    ],
+    "hover": [],
+    "element": "button.btn.btn-secondary"
+   },
    "state": {
     "focus": {
      "kind": "none"
@@ -311,6 +407,144 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": null,
+     "constraints": null,
+     "dimensions": null,
+     "error": "sketch model not reached"
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      0,
+      0,
+      227.562
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 36806
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "key",
+    "key": "l"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     1889,
+     932
+    ],
+    "hover": [],
+    "element": "button.btn.btn-secondary"
+   },
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -344,12 +578,40 @@
      "constraints": null,
      "dimensions": null,
      "error": "sketch model not reached"
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      0,
+      0,
+      227.562
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 77387
+   "t": 39048
   },
   {
-   "step": 4,
+   "step": 5,
    "do": {
     "do": "click",
     "on": {
@@ -364,7 +626,7 @@
     "IB"
    ],
    "at": [
-    1082,
+    1083,
     519
    ],
    "state": {
@@ -423,6 +685,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -455,12 +718,40 @@
      "entities": [],
      "constraints": [],
      "dimensions": []
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      0,
+      0,
+      227.562
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 89312
+   "t": 45485
   },
   {
-   "step": 5,
+   "step": 6,
    "do": {
     "do": "click",
     "on": {
@@ -473,8 +764,8 @@
    "ok": true,
    "hover": [],
    "at": [
-    1142,
-    536
+    1155,
+    519
    ],
    "state": {
     "focus": {
@@ -532,6 +823,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -569,17 +861,53 @@
       "HORIZONTAL"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      0,
+      0,
+      227.562
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 95905
+   "t": 54137
   },
   {
-   "step": 6,
+   "step": 7,
    "do": {
     "do": "key",
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1155,
+     519
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
@@ -636,6 +964,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -673,17 +1002,53 @@
       "HORIZONTAL"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      0,
+      0,
+      227.562
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 97721
+   "t": 57436
   },
   {
-   "step": 7,
+   "step": 8,
    "do": {
     "do": "key",
     "key": "l"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1155,
+     519
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
@@ -740,6 +1105,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -777,12 +1143,40 @@
       "HORIZONTAL"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      0,
+      0,
+      227.562
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 99703
+   "t": 59277
   },
   {
-   "step": 8,
+   "step": 9,
    "do": {
     "do": "click",
     "on": {
@@ -797,8 +1191,8 @@
     "IB"
    ],
    "at": [
-    1117,
-    489
+    1083,
+    446
    ],
    "state": {
     "focus": {
@@ -856,6 +1250,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -893,12 +1288,40 @@
       "HORIZONTAL"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      0,
+      0,
+      227.562
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 105361
+   "t": 65026
   },
   {
-   "step": 9,
+   "step": 10,
    "do": {
     "do": "click",
     "on": {
@@ -911,8 +1334,8 @@
    "ok": true,
    "hover": [],
    "at": [
-    1176,
-    506
+    1155,
+    446
    ],
    "state": {
     "focus": {
@@ -970,6 +1393,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -1010,17 +1434,53 @@
       "VERTICAL"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      0,
+      0,
+      227.562
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 116410
+   "t": 73465
   },
   {
-   "step": 10,
+   "step": 11,
    "do": {
     "do": "key",
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1155,
+     446
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
@@ -1077,6 +1537,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -1117,12 +1578,40 @@
       "VERTICAL"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      0,
+      0,
+      227.562
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 118283
+   "t": 76757
   },
   {
-   "step": 11,
+   "step": 12,
    "do": {
     "do": "drag",
     "from": {
@@ -1141,12 +1630,12 @@
    "ok": true,
    "at": [
     [
-     1093,
-     492
+     1064,
+     465
     ],
     [
-     1200,
-     503
+     1173,
+     428
     ]
    ],
    "state": {
@@ -1205,10 +1694,17 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFF"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -1217,9 +1713,9 @@
        "state": "ok",
        "selected": true,
        "editing": true,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": "related-highlight edited selected"
       }
      ],
      "rollbackAfter": "Sketch 1"
@@ -1245,17 +1741,62 @@
       "VERTICAL"
      ],
      "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      0,
+      0,
+      227.562
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Length",
+       "value": "20.102",
+       "units": "mm"
+      }
+     ],
+     "panel": null
     }
    },
-   "t": 145297
+   "t": 84191
   },
   {
-   "step": 12,
+   "step": 13,
    "do": {
     "do": "key",
     "key": "Delete"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1173,
+     428
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
@@ -1312,6 +1853,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -1342,19 +1884,44 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "line",
       "line"
      ],
      "constraints": [
       "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "VERTICAL"
+      "HORIZONTAL"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      0,
+      0,
+      227.562
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 147094
+   "t": 86190
   }
  ]
 }

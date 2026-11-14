@@ -1,0 +1,68 @@
+{
+ "name": "mirror-face-boss-faces",
+ "about": "boss-block: Mirror, type Face mirror, the boss's side and top faces picked in Faces to mirror, Right plane; preview; OK",
+ "area": "psui",
+ "source": "live 2026-11-14 (lead: Mirror is the user's open complaint; feel/mirror.json)",
+ "start": "boss-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part mirror",
+    "pick": "Face mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     14,
+     0,
+     15
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10,
+     0,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Mirror plane"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Right"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

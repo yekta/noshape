@@ -1,0 +1,58 @@
+{
+ "name": "mirror-face-pick-feature-in-list",
+ "about": "boss-block: Mirror, type Face mirror, Faces to mirror focused, Extrude 2 (the boss) clicked in the feature list: the field takes the feature (all its faces); Right plane; OK",
+ "area": "psui",
+ "source": "live 2026-11-14 (lead: Mirror is the user's open complaint; feel/mirror.json)",
+ "start": "boss-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part mirror",
+    "pick": "Face mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 2"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Mirror plane"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Right"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
