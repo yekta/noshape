@@ -295,6 +295,21 @@ impl<'a> Translator<'a> {
         for c in doc["configuration"]["configurationParameters"].as_array().into_iter().flatten() {
             self.config_input(c);
         }
+        // Live regenerates in its current configuration: its configuration variables' values there (cf-sheet-metal-
+        // model-plus's #asdf, 5 mm where its default is 15: Sketch 3's distance to it).
+        let variables: Vec<&str> = doc["configuration"]["configurationParameters"].as_array().into_iter().flatten().filter(|c| c["btType"].as_str().is_some_and(|t| t.starts_with("BTMConfigurationParameterQuantity"))).filter_map(|c| c["parameterId"].as_str()).collect();
+        let current: serde_json::Map<String, Value> = doc["configuration"]["currentConfiguration"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|v| v["btType"].as_str().is_some_and(|t| t.starts_with("BTMParameterQuantity")))
+            .filter_map(|v| Some((v["parameterId"].as_str().filter(|id| variables.contains(id))?.to_string(), json!(v["expression"].as_str()?))))
+            .collect();
+        if !current.is_empty()
+            && let Err(e) = self.call("config_activate", json!({ "tab": self.tab, "values": current }))
+        {
+            self.notes.push(format!("current configuration: {e}"));
+        }
         for table in doc["variables"].as_array().into_iter().flatten().filter(|v| v["variableStudioReference"].is_object()) {
             self.variable_studio(table);
         }
@@ -5174,6 +5189,12 @@ impl<'a> Translator<'a> {
                 args["label"] = json!(l.map(|x| format!("{} mm", x * 1e3)));
             }
             if let Some(v) = value {
+                // A negative distance is live's flip, done: its geometry is already on that side, as ours keeps it with
+                // the size alone (typed, ours flips and keeps the size: c2-impeller-loft's Sketch Ansaugflansch, -10 mm).
+                let v = match v.trim().strip_prefix('-') {
+                    Some(size) if kind.ends_with("distance") && !size.trim().is_empty() => size.trim().to_string(),
+                    _ => v,
+                };
                 args["value"] = json!(v);
             }
             let driven = c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "driven" && p["value"] == true);
