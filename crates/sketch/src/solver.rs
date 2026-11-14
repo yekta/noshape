@@ -307,9 +307,12 @@ impl System {
                 light_reps.insert(find(&mut self.uf, i as u32));
             }
         }
+        // (Sets: a big drag's `still` lists thousands of points, scanned once per parameter.)
+        let still: HashSet<EntityId> = opts.still.iter().copied().collect();
+        let across: HashSet<(EntityId, u8)> = opts.still_across.iter().copied().collect();
         for i in 0..self.p.owner.len() {
             if let Owner::Ent(id, k) = self.p.owner[i]
-                && (opts.still.contains(&id) || opts.still_across.contains(&(id, k)))
+                && (still.contains(&id) || across.contains(&(id, k)))
             {
                 light_reps.remove(&find(&mut self.uf, i as u32));
             }
@@ -549,6 +552,10 @@ impl System {
         let mut r = vec![0.0; m];
         let mut rows: Vec<SparseRow> = vec![SmallVec::new(); m];
         self.eval(comp, &cols, &mut r, Some(&mut rows));
+        // Already within tolerance (a drag's untouched components): no factorisation set up.
+        if r.iter().all(|v| v.abs() <= opts.tolerance) {
+            return CompSolve { converged: true, iterations: 0, residual: r, rows };
+        }
 
         let min_norm = m <= n;
         // sparsity pattern (constant across iterations)
