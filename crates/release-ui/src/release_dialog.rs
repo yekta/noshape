@@ -1486,6 +1486,25 @@ impl ReleaseDialog {
             .into_any_element()
     }
 
+    /// Help reviewreleasedialog: "Review Release" alone once applied or submitted (the name stays in its field).
+    fn title(&self) -> &'static str {
+        match self.mode {
+            Mode::Release if self.applied => "Review Release",
+            Mode::Release => "Create Release candidate",
+            Mode::Review => "Review Release",
+            Mode::Obsolete => "Create Obsolete candidate",
+        }
+    }
+
+    /// Help (typical release workflow): an item's name opens its tab in another browser tab (here a window); the
+    /// dialog stays for Refresh.
+    fn open_item(&self, i: usize, cx: &mut App) {
+        let Some(row) = self.rows.get(i) else { return };
+        if let Err(e) = crate::release_hooks::open_tab_window(self.doc.clone(), row.item.tab, cx) {
+            self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+        }
+    }
+
     /// Release (or Obsolete): record the package at a new version.
     fn commit(&mut self, cx: &mut Context<Self>) -> bool {
         let kind = if self.mode == Mode::Obsolete { PackageKind::Obsoletion } else { PackageKind::Release };
@@ -1829,15 +1848,7 @@ impl Render for ReleaseDialog {
                                 .flex_1()
                                 .min_w_0()
                                 .child(h_flex().gap(px(4.)).child(crate::assets::icon(icon, 16., cx)).child({
-                                    // Help (typical release workflow): the name opens the item's tab in another browser
-                                    // tab (here a window); the dialog stays for Refresh.
-                                    let t = row.item.tab;
-                                    let doc = self.doc.clone();
-                                    div().id(SharedString::from(format!("rel-name-{i}"))).truncate().cursor_pointer().hover(|d| d.underline()).child(row.item.name.clone()).on_click(move |_, _, cx| {
-                                        if let Err(e) = crate::release_hooks::open_tab_window(doc.clone(), t, cx) {
-                                            doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
-                                        }
-                                    })
+                                    div().id(SharedString::from(format!("rel-name-{i}"))).truncate().cursor_pointer().hover(|d| d.underline()).child(row.item.name.clone()).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.open_item(i, cx)))
                                 })
                                 // Help (add-item-version2): an item linked from another
                                 // version shows the version icon after its name.
@@ -2184,13 +2195,7 @@ impl Render for ReleaseDialog {
             (None, Some(by)) if self.mode == Mode::Review => Some(format!("Approved by {by}")),
             _ => None,
         };
-        // Help reviewreleasedialog: the title alone, the name stays in its field.
-        let title = match self.mode {
-            Mode::Release if self.applied => "Review Release",
-            Mode::Release => "Create Release candidate",
-            Mode::Review => "Review Release",
-            Mode::Obsolete => "Create Obsolete candidate",
-        };
+        let title = self.title();
         // The ui-parity state's `dialog`: the title, a field per item (its revision and part number), the release name.
         crate::ui_script::note_dialog(|| {
             let mut fields: Vec<serde_json::Value> = self
@@ -2540,3 +2545,7 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
             .footer(os::modal_footer().child(os::modal_cancel(os::cancel_button("rh-close", "Close", cx))))
     });
 }
+
+#[cfg(test)]
+#[path = "release_ui_tests.rs"]
+mod ui_tests;

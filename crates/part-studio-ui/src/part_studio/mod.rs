@@ -4770,8 +4770,8 @@ impl PartStudioView {
                         let t = targets(this, &b12);
                         this.open_export_dialog(t, w, cx);
                     }))))
-                    // Live: Release… after Export… (the selected parts).
-                    .item(item("Release…", Box::new({
+                    // Live: Release… after Export… (the selected parts); none with managed workflows off.
+                    .when(noshape_ops::release_settings::managed_workflows(), |m| m.item(item("Release…", Box::new({
                         let b = b.clone();
                         move |this, w, cx| {
                             let t = targets(this, &b);
@@ -4779,7 +4779,7 @@ impl PartStudioView {
                             let items = crate::part_studio_hooks::release_part_items(this.doc.read(cx), this.tab, &t, &names, &this.config_values);
                             crate::part_studio_hooks::open_release_candidate(this.doc.clone(), items, w, cx);
                         }
-                    })));
+                    }))));
                 if has_revisions && let Some(pn) = part_number.clone() {
                     m = m.item(item("Revision history", Box::new(move |this, w, cx| crate::part_studio_hooks::open_revision_history(this.doc.clone(), pn.clone(), w, cx))));
                 }
@@ -7933,11 +7933,13 @@ fn several_parts_menu(menu: crate::os_menu::OsMenu, view: &Entity<PartStudioView
         .item(item("Make transparent…".into(), selecting(|this, w, cx| this.isolate(behaviors::IsolateMode::Transparent, w, cx))))
         .separator()
         .item(item("Export…".into(), all(|this, t, w, cx| this.open_export_dialog(t, w, cx))))
-        .item(item("Release…".into(), all(|this, t, w, cx| {
-            let names: Vec<String> = t.iter().map(|id| this.display.body(id).map(|d| d.name.clone()).unwrap_or_default()).collect();
-            let items = crate::part_studio_hooks::release_part_items(this.doc.read(cx), this.tab, &t, &names, &this.config_values);
-            crate::part_studio_hooks::open_release_candidate(this.doc.clone(), items, w, cx);
-        })))
+        .when(noshape_ops::release_settings::managed_workflows(), |m| {
+            m.item(item("Release…".into(), all(|this, t, w, cx| {
+                let names: Vec<String> = t.iter().map(|id| this.display.body(id).map(|d| d.name.clone()).unwrap_or_default()).collect();
+                let items = crate::part_studio_hooks::release_part_items(this.doc.read(cx), this.tab, &t, &names, &this.config_values);
+                crate::part_studio_hooks::open_release_candidate(this.doc.clone(), items, w, cx);
+            })))
+        })
         .separator()
         .item(item("Delete".into(), selecting(|this, w, cx| this.start_feature("deleteBodies", w, cx))).icon_name("menu-delete"))
 }

@@ -206,7 +206,19 @@ pub fn release_settings() -> ReleaseSettings {
     s
 }
 
+/// Workflows › Enable managed workflows (cached: menus read it as they open). Off, Release…, the Versions rows'
+/// Releases and the panel's Create release candidate are gone (live2 2026-11-14, a Professional company).
+pub fn managed_workflows() -> bool {
+    managed_flag().load(std::sync::atomic::Ordering::Relaxed)
+}
+
+fn managed_flag() -> &'static std::sync::atomic::AtomicBool {
+    static ON: std::sync::OnceLock<std::sync::atomic::AtomicBool> = std::sync::OnceLock::new();
+    ON.get_or_init(|| std::sync::atomic::AtomicBool::new(release_settings().managed_workflows))
+}
+
 pub fn set_release_settings(s: &ReleaseSettings) {
+    managed_flag().store(s.managed_workflows, std::sync::atomic::Ordering::Relaxed);
     let _ = std::fs::write(settings_path(), serde_json::to_vec_pretty(s).unwrap_or_default());
     noshape_model::drawing::tables::set_revision_template(Some(s.revision_table.clone()));
     noshape_model::drawing::tables::set_unreleased_suffix(Some(s.unreleased_suffix.clone()));

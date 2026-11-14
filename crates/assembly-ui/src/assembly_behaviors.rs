@@ -1465,7 +1465,7 @@ impl AssemblyView {
         // Live qa5 CA2: Release… after Export… (the instances' parts; a subassembly's own release items, live
         // asm-menu-dissolve-subassembly).
         // (Another document's part too, at its version: live 2464, without the Free plan's [Upgrade].)
-        if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. } | InstanceSource::External { body: Some(_), .. }) {
+        if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. } | InstanceSource::External { body: Some(_), .. }) && noshape_ops::release_settings::managed_workflows() {
             let tg = targets.clone();
             m.push(item("Release…", move |t, w, cx| t.release_instances(tg.clone(), w, cx)));
         }
@@ -2279,10 +2279,12 @@ impl AssemblyView {
         m.push(MenuEntry::Sep);
         m.push(item("Export…", |t, w, cx| t.open_asm_export(None, w, cx)));
         // Live (qa5 CA2): Release… after Export… (the assembly's release items).
-        m.push(item("Release…", |t, w, cx| {
-            let items = crate::assembly_hooks::release_tab_items(t.doc.read(cx), t.tab);
-            crate::assembly_hooks::open_release_candidate(t.doc.clone(), items, w, cx);
-        }));
+        if noshape_ops::release_settings::managed_workflows() {
+            m.push(item("Release…", |t, w, cx| {
+                let items = crate::assembly_hooks::release_tab_items(t.doc.read(cx), t.tab);
+                crate::assembly_hooks::open_release_candidate(t.doc.clone(), items, w, cx);
+            }));
+        }
         m.push(MenuEntry::Sep);
         m.push(item("Expand all", |t, _, cx| t.expand_all(true, cx)));
         m.push(item("Collapse all", |t, _, cx| t.expand_all(false, cx)));
@@ -2601,7 +2603,7 @@ impl AssemblyView {
         m.push(item("Move to new subassembly", move |t, _, cx| t.move_occurrence_to_new_subassembly(p.clone(), cx)));
         let p = path.clone();
         m.push(item("Export…", move |t, w, cx| t.open_occurrence_export(Some(vec![p.clone()]), w, cx)));
-        if matches!(inst.source, InstanceSource::Part { .. }) {
+        if matches!(inst.source, InstanceSource::Part { .. }) && noshape_ops::release_settings::managed_workflows() {
             let i = inst.clone();
             m.push(item("Release…", move |t, w, cx| t.release_of(vec![i.clone()], w, cx)));
         }
@@ -2731,7 +2733,7 @@ impl AssemblyView {
             let tg = copies.clone();
             m.push(item("Move to new subassembly", move |t, w, cx| t.move_to_new_subassembly(tg.clone(), w, cx)));
         }
-        if parts {
+        if parts && noshape_ops::release_settings::managed_workflows() {
             let tg = copies.clone();
             m.push(item("Release…", move |t, w, cx| t.release_instances(tg.clone(), w, cx)));
         }

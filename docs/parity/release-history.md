@@ -5,12 +5,12 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
 - **History panel** (Versions and history, compare, merge, workspaces, version properties): ui-parity `ver-*`
   takes, 134 / 137 scenarios, 681 / 685 states (vibe6, 2026-11-14). Misses: ver-vrow-releases (live's take is the
   Free plan's upsell; re-record asked), ver-filter-tab (the start document's history: ours commits each sketch
-  constraint, live's start has one "Add feature" per feature), ver-linked-selective-update (a click on the row's
-  checkbox; asked).
+  constraint, live's start has one "Add feature" per feature), ver-linked-selective-update (live's take missed the
+  checkbox; re-recorded 11-14).
 - **Release management**: until 2026-11-14 live's account was on the Free plan (Release… opened only the upsell), so the
   rows below come from Onshape's help pages and images (sources in the key below). The account is on Professional now:
   live2 is capturing them (REQUESTS / message 2026-11-14), and each row moves to live's data as it comes in.
-  Rows: 138; = 96, ≠ 21, missing 9, ? 6, cloud 6 (left out: other users, notifications).
+  Rows: 138; = 97, ≠ 20, missing 9, ? 6, cloud 6 (left out: other users, notifications).
 
 Key: `RD` crates/release-ui/src/release_dialog.rs, `RP` release_prefs.rs, `OPS` crates/ops/src/release.rs, `RC`
 crates/ops/src/release_conditions.rs, `RS` crates/ops/src/release_settings.rs, `ML` crates/model-core/src/release.rs, `HP`
@@ -141,7 +141,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 |---|---|---|---|---|
 | Header "Release management settings for objects in documents owned by …" | accounts_co-rm-02.png | RP:502 | – | = |
 | Save release settings at top and bottom, disabled until a change | RMS; image (pale) | RP:253-254, RP:503, RP:512 | – | = |
-| Enable managed workflows; off = tools off | RMS/SETUP "This turns Release management tools off" | RP:304 checkbox; `managed_workflows` read nowhere else (Release… menus stay) | RS test old_settings_files_keep_their_values_and_get_the_defaults | ≠ (no effect) |
+| Enable managed workflows; off = tools off | live2 2026-11-14 (Professional): off, a part's menu has no Release… (no upsell), Versions rows no Releases, no Create release candidate; Properties has no release icon and State is a plain dropdown | `managed_workflows()` gates the part / tab / instance menus, Releases, the panel button, the Properties icon; State a select when off | RS test old_settings_files_keep_their_values_and_get_the_defaults | = (live 11-14; ours starts on, live's new company starts off: asked) |
 | Release workflow / Obsoletion workflow tabs with diagrams + description | relmgmt-workflows-13/-04.png | RP:271-308, RP:600-686 | RP test the_workflow_charts_parse | = |
 | "Onshape default release workflow ↗" View in document link | RMS "external link icon … opens the workflow document" | RP:289 title only, no ↗ | – | missing |
 | Enterprise custom workflows (Active, Published date/by, Unpublish, preview) | RMS, CW | – | – | missing (Enterprise) |

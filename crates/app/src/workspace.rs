@@ -1978,10 +1978,10 @@ impl Workspace {
                             let (d1, d2) = (view.read(cx).doc.clone(), view.read(cx).doc.clone());
                             let pn = crate::release_dialog::tab_part_number(d1.read(cx), id);
                             let has_revisions = !pn.is_empty() && !crate::release_dialog::release_log(d1.read(cx)).revisions(&pn).is_empty();
-                            let menu = menu.item(I::new("Release…").on_click(move |_, w, cx| {
+                            let menu = menu.when(noshape_ops::release_settings::managed_workflows(), |m| m.item(I::new("Release…").on_click(move |_, w, cx| {
                                 let items = crate::release_dialog::tab_items(d1.read(cx), id);
                                 crate::release_dialog::open_release_candidate(d1.clone(), items, w, cx)
-                            }));
+                            })));
                             if has_revisions && matches!(kind, "assembly" | "drawing" | "variables") {
                                 menu.item(I::new("Revision history").on_click(move |_, w, cx| crate::release_dialog::open_revision_history(d2.clone(), pn.clone(), w, cx)))
                             } else {
@@ -2236,11 +2236,13 @@ fn file_tab_menu(menu: crate::os_menu::OsMenu, view: &Entity<Workspace>, id: Tab
         let v7 = view.clone();
         menu = menu.item(I::new("Export…").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.export_file(id, w, cx)))).separator();
     }
-    menu.item(I::new("Release…").on_click(move |_, w, cx| {
-            let items = crate::release_dialog::tab_items(d4.read(cx), id);
-            crate::release_dialog::open_release_candidate(d4.clone(), items, w, cx)
-        }))
-        .separator()
+    menu.when(noshape_ops::release_settings::managed_workflows(), |m| {
+            m.item(I::new("Release…").on_click(move |_, w, cx| {
+                let items = crate::release_dialog::tab_items(d4.read(cx), id);
+                crate::release_dialog::open_release_candidate(d4.clone(), items, w, cx)
+            }))
+            .separator()
+        })
         .item(I::new("Download").on_click(move |_, w, cx| {
             let doc = v5.read(cx).doc.clone();
             crate::file_tab_view::download(&doc, id, w, cx)

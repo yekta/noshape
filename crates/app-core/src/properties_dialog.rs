@@ -1004,7 +1004,9 @@ impl Render for MetaForm {
         let state_ix = self.state.as_deref().and_then(|s| RELEASE_STATES.iter().position(|x| *x == s)).unwrap_or(0);
         let unit = self.unit.clone().unwrap_or_else(|| DEFAULT_UNIT.to_string());
         let unit_ix = UNITS_OF_MEASURE.iter().position(|u| *u == unit).unwrap_or(0);
-        let release = self.on_release.clone().map(|f| {
+        // No release icon with managed workflows off (live2 feel/release/part-properties-workflows-off.png).
+        let managed = noshape_ops::release_settings::managed_workflows();
+        let release = self.on_release.clone().filter(|_| managed).map(|f| {
             h_flex().child(
                 div()
                     .id("props-release")
@@ -1063,8 +1065,23 @@ impl Render for MetaForm {
             form = form
                 .child(group(label("Part number", false), self.field("Part number", &self.part_number, cx)))
                 .child(group(label("Revision", false), self.field("Revision", &self.revision, cx)))
-                // State is set by the release workflow (a greyed select).
-                .child(group(label("State", true), gray_box(RELEASE_STATES[state_ix].to_string(), true).into_any_element()));
+                // State is set by the release workflow (a greyed select); with managed workflows off it is chosen
+                // by hand (live2 part-properties-workflows-off).
+                .child(group(
+                    label("State", true),
+                    if managed {
+                        gray_box(RELEASE_STATES[state_ix].to_string(), true).into_any_element()
+                    } else {
+                        let v = view.clone();
+                        crate::os_ui::select_field("meta-state", RELEASE_STATES.iter().map(|s| s.to_string()).collect(), state_ix, move |i, _, cx| {
+                            v.update(cx, |this, cx| {
+                                this.state = Some(RELEASE_STATES[i].to_string());
+                                this.changed(cx);
+                            })
+                        })
+                        .into_any_element()
+                    },
+                ));
         }
         if sourced {
             form = form

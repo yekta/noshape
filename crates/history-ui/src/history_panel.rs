@@ -1450,6 +1450,9 @@ impl Render for HistoryPanel {
                 let (dr0, row_packages) = (d.clone(), row_packages.clone());
                 // A version row always lists Releases (live ver-version-menu); with none, its submenu says so.
                 let releases = move |m: crate::os_menu::OsMenu, version_row: bool, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>| {
+                    if !noshape_ops::release_settings::managed_workflows() {
+                        return m;
+                    }
                     if row_packages.is_empty() {
                         return if version_row { m.submenu("Releases", window, cx, |sm, _, _| sm.item(crate::os_menu::OsMenuItem::new("No releases").disabled(true))) } else { m };
                     }
@@ -1630,14 +1633,15 @@ impl Render for HistoryPanel {
                     // Live order (document/22): release, create version, compare, ×.
                     // Release management: a candidate with the active tab's objects
                     // (Release__typical_release_workflow).
-                    .child(crate::ui::icon_button("hist-release", "release-create", 30., false, cx).tooltip("Create release candidate").map(|d| crate::ui_script::mark(d, || "button:Create release candidate".into())).on_click({
+                    // (None with managed workflows off: live2 2026-11-14.)
+                    .when(noshape_ops::release_settings::managed_workflows(), |d| d.child(crate::ui::icon_button("hist-release", "release-create", 30., false, cx).tooltip("Create release candidate").map(|d| crate::ui_script::mark(d, || "button:Create release candidate".into())).on_click({
                         let doc = self.doc.clone();
                         move |_, window, cx| {
                             let tab = doc.read(cx).session.active_tab;
                             let items = tab.map(|t| crate::release_dialog::tab_items(doc.read(cx), t)).unwrap_or_default();
                             crate::release_dialog::open_release_candidate(doc.clone(), items, window, cx)
                         }
-                    }))
+                    })))
                     .child(crate::ui::icon_button("hist-create-version", "version", 30., false, cx).tooltip("Create version…").map(|d| crate::ui_script::mark(d, || "button:Create version…".into())).on_click(move |_, window, cx| open_create_version(doc2.clone(), window, cx)))
                     // Help "Comparing": pick two history entries (blue, then red).
                     .child(crate::ui::icon_button("hist-compare", "compare", 30., crate::compare_mode::picking(&self.doc, cx), cx).tooltip("Compare history entries").map(|d| crate::ui_script::mark(d, || "button:Compare history entries".into())).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
