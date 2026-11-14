@@ -974,12 +974,21 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
   if (!approx.empty())
     snap *= 2;
   const occ::handle<IntTools_Context> ctx = new IntTools_Context();
-  BRepClass3d_SolidClassifier in_part(P);
-  const double                eps = 1e-5 * size;
+  // (A clean ray first, as for the tools; OCCT's classifier only where no ray was clean.)
+  std::unique_ptr<BRepClass3d_SolidClassifier> in_part;
+  std::unique_ptr<RayClassifier>               rays_part;
+  const double                                 eps = 1e-5 * size;
   auto in_p = [&](const gp_Pnt& q) {
-    const KernelTimer t1("blend.direct.classify.part");
-    in_part.Perform(q, tol);
-    return in_part.State() == TopAbs_IN;
+    const KernelTimer  t1("blend.direct.classify.part");
+    if (!rays_part)
+      rays_part = std::make_unique<RayClassifier>(P, tol, 10 * tol);
+    const TopAbs_State by_rays = rays_part->Perform(q);
+    if (by_rays == TopAbs_IN || by_rays == TopAbs_OUT)
+      return by_rays == TopAbs_IN;
+    if (!in_part)
+      in_part = std::make_unique<BRepClass3d_SolidClassifier>(P);
+    in_part->Perform(q, tol);
+    return in_part->State() == TopAbs_IN;
   };
   // Each tool taken away (it lies in the part: a convex edge's round) or added (outside it: a concave edge's): by a
   // point just inside it beside a face it shares with the part.
