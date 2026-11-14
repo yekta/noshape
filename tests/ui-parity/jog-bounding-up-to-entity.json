@@ -1,0 +1,39 @@
+{
+ "name": "jog-bounding-up-to-entity",
+ "about": "plate-bend: Jog, Bounding type Up to entity, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "plate-bend",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Jog"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Blind",
+    "pick": "Up to entity"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

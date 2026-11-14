@@ -1,0 +1,50 @@
+{
+ "name": "jog-alignment-outer-inner",
+ "about": "plate-bend: Jog, Bend alignment Outer, then Inner, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "plate-bend",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Jog"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Bend line",
+    "pick": "Outer"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Outer",
+    "pick": "Inner"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
