@@ -1194,11 +1194,27 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
     }
     let contained = |tb: &Option<crate::reference::Reference>, gb: &Option<crate::reference::Reference>| inside.iter().any(|(t, g, _)| Some(t) == tb.as_ref() && Some(g) == gb.as_ref());
+    // A planar face's plane (a point, its unit normal), found once when asked: a shape whose box lies wholly on one
+    // side of it, past the touching gap, is apart from it (no distance to measure: 2 ms a pair of
+    // cf-sheet-metal-model-plus' walls in its Extrude 4).
+    type PlaneOf = std::cell::OnceCell<Option<(DVec3, DVec3)>>;
+    let (tplane, gplane): (Vec<PlaneOf>, Vec<PlaneOf>) = (ts.iter().map(|_| PlaneOf::new()).collect(), gs.iter().map(|_| PlaneOf::new()).collect());
+    let plane_of = |s: &k::Shape| s.face_plane().ok().flatten().map(|p| (p.origin, p.normal.normalize()));
+    let beside = |pl: &Option<(DVec3, DVec3)>, b: &Option<k::BoundingBox>| {
+        let (Some((o, n)), Some(b)) = (pl, b) else { return false };
+        let side = |c: DVec3| (c - *o).dot(*n);
+        let corners = (0..8).map(|k| DVec3::new([b.min.x, b.max.x][k & 1], [b.min.y, b.max.y][k >> 1 & 1], [b.min.z, b.max.z][k >> 2]));
+        let (lo, hi) = corners.map(side).fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), d| (lo.min(d), hi.max(d)));
+        lo > BOX_GAP || hi < -BOX_GAP
+    };
     let mut out = Vec::new();
     let mut touched = std::collections::HashSet::new();
-    for ((tr, tb, t, ts_solid), tx) in ts.iter().zip(&tbox) {
-        for ((gr, gb, g, gs_solid), gx) in gs.iter().zip(&gbox) {
+    for (((tr, tb, t, ts_solid), tx), tp) in ts.iter().zip(&tbox).zip(&tplane) {
+        for (((gr, gb, g, gs_solid), gx), gp) in gs.iter().zip(&gbox).zip(&gplane) {
             if t.is_same(g) || !meet(tx, gx) {
+                continue;
+            }
+            if beside(tp.get_or_init(|| plane_of(t)), gx) || beside(gp.get_or_init(|| plane_of(g)), tx) {
                 continue;
             }
             i.check_deadline()?;
