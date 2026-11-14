@@ -2802,6 +2802,7 @@ pub fn coaxial_round(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) -> FR
     let ef = shape.edge_faces()?;
     let feature = ev.feature;
     let (mut cuts, mut adds) = (Vec::new(), Vec::new());
+    let (mut cut_edges, mut add_edges) = (Vec::new(), Vec::new());
     for &e in edges {
         let edge = shape.sub_shape(ShapeType::Edge, e)?;
         let info = edge.edge_info()?;
@@ -2924,7 +2925,30 @@ pub fn coaxial_round(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) -> FR
             })
             .collect();
         let named = NamedShape::new(tool.shape, names);
-        if convex { cuts.push(named) } else { adds.push(named) }
+        if convex {
+            cuts.push(named);
+            cut_edges.push(edge);
+        } else {
+            adds.push(named);
+            add_edges.push(edge);
+        }
+    }
+    // Built directly where they can be (the tools' touch circles put on the part's faces, no Boolean: cf-snap-hook's
+    // Fillet 5, the bosses' rounds into the floor, its Boolean 50 of 64 ms).
+    {
+        let tools: Vec<Shape> = cuts.iter().chain(&adds).map(|t| t.shape.clone()).collect();
+        let rims: Vec<Shape> = cut_edges.iter().chain(&add_edges).cloned().collect();
+        if let Ok(res) = k::blend_direct(shape, &tools, &rims)
+            && res.shape.count(ShapeType::Solid) == 1
+        {
+            let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), Some(&super::detail::blend_role));
+            let un = k::unify_same_domain(&res.shape)?;
+            if un.shape.is_valid() && un.shape.count(ShapeType::Solid) == 1 {
+                let names = ev.name_result(&[&crate::regen::eval::names_for(&res.shape, names)], &un.history, &un.shape, &BTreeMap::new(), None);
+                ev.replace_body(bi, un.shape, names);
+                return Ok(true);
+            }
+        }
     }
     let mut named = body_named(&body);
     for (op, tools) in [(k::BooleanOp::Cut, cuts), (k::BooleanOp::Fuse, adds)] {

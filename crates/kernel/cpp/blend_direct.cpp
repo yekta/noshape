@@ -44,6 +44,8 @@
 #include <Geom_TrimmedCurve.hxx>
 #include <GeomLib.hxx>
 #include <GeomProjLib.hxx>
+#include <Geom2d_Line.hxx>
+#include <Geom_Circle.hxx>
 #include <Geom_BoundedCurve.hxx>
 #include <Geom_Curve.hxx>
 #include <IntTools_Context.hxx>
@@ -105,44 +107,69 @@ bool tangent_along_shared_circle(const TopoDS_Face& a, const TopoDS_Face& b, dou
 bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, double tol)
 {
   const BRepAdaptor_Surface sa(a, false), sb(b, false);
-  if (sa.GetType() != sb.GetType())
+  // (A surface of revolution or extrusion may be another's cylinder or cone: a boss's wall revolved, its round's tool's
+  // side a cylinder; those by their points.)
+  const auto swept = [](GeomAbs_SurfaceType k) { return k == GeomAbs_SurfaceOfRevolution || k == GeomAbs_SurfaceOfExtrusion; };
+  const auto round = [](GeomAbs_SurfaceType k) { return k == GeomAbs_Cylinder || k == GeomAbs_Cone; };
+  const bool by_points = (swept(sa.GetType()) && (swept(sb.GetType()) || round(sb.GetType()))) || (swept(sb.GetType()) && round(sa.GetType()));
+  if (sa.GetType() != sb.GetType() && !by_points)
     return false;
+  // (Turned about one axis or not the same: the axes first, cheap; a projection onto a surface of revolution takes ~ms.)
+  if (by_points)
+  {
+    const auto axis = [](const BRepAdaptor_Surface& x) -> std::optional<gp_Ax1> {
+      switch (x.GetType())
+      {
+        case GeomAbs_Cylinder: return x.Cylinder().Axis();
+        case GeomAbs_Cone: return x.Cone().Axis();
+        case GeomAbs_SurfaceOfRevolution: return x.AxeOfRevolution();
+        default: return std::nullopt;
+      }
+    };
+    const std::optional<gp_Ax1> xa = axis(sa), xb = axis(sb);
+    if (xa && xb && (!xa->Direction().IsParallel(xb->Direction(), 1e-9) || gp_Lin(*xa).Distance(xb->Location()) > tol))
+      return false;
+  }
   if (sa.GetType() == GeomAbs_Plane)
   {
     const gp_Pln pa = sa.Plane(), pb = sb.Plane();
     return pa.Axis().Direction().IsParallel(pb.Axis().Direction(), 1e-9) && pa.Distance(pb.Location()) < tol;
   }
-  if (sa.GetType() == GeomAbs_Cylinder)
+  if (sa.GetType() == GeomAbs_Cylinder && sb.GetType() == GeomAbs_Cylinder)
   {
     const gp_Cylinder ca = sa.Cylinder(), cb = sb.Cylinder();
     return std::abs(ca.Radius() - cb.Radius()) < tol && ca.Axis().Direction().IsParallel(cb.Axis().Direction(), 1e-9) &&
            gp_Lin(ca.Axis()).Distance(cb.Location()) < tol;
   }
-  if (sa.GetType() != GeomAbs_Cone && sa.GetType() != GeomAbs_Torus && sa.GetType() != GeomAbs_Sphere)
+  if (!by_points && sa.GetType() != GeomAbs_Cone && sa.GetType() != GeomAbs_Torus && sa.GetType() != GeomAbs_Sphere)
     return false;
-  // (Others: b's points at its parameter box's corners and middle on a's surface, normals parallel.)
-  double u0, u1, v0, v1;
-  BRepTools::UVBounds(b, u0, u1, v0, v1);
-  const occ::handle<Geom_Surface> ga = BRep_Tool::Surface(a), gb = BRep_Tool::Surface(b);
-  for (const auto& [u, v] : {std::make_pair(u0, v0), std::make_pair(u1, v0), std::make_pair(u0, v1), std::make_pair(u1, v1),
-                             std::make_pair(0.5 * (u0 + u1), 0.5 * (v0 + v1))})
-  {
-    gp_Pnt q;
-    gp_Vec du, dv;
-    gb->D1(u, v, q, du, dv);
-    GeomAPI_ProjectPointOnSurf pr(q, ga);
-    if (pr.NbPoints() == 0 || pr.LowerDistance() > tol)
-      return false;
-    double ua, va;
-    pr.LowerDistanceParameters(ua, va);
-    gp_Pnt qa;
-    gp_Vec dua, dva;
-    ga->D1(ua, va, qa, dua, dva);
-    const gp_Vec nb = du.Crossed(dv), na = dua.Crossed(dva);
-    if (nb.Magnitude() < 1e-300 || na.Magnitude() < 1e-300 || !gp_Dir(nb).IsParallel(gp_Dir(na), 1e-7))
-      return false;
-  }
-  return true;
+  // (Others: one face's points at its parameter box's corners and middle on the other's surface, normals parallel;
+  // either way round: a revolved arc's surface ends with its arc, so the bigger face's points can fall off it.)
+  const auto on = [tol](const TopoDS_Face& from, const TopoDS_Face& onto) {
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(from, u0, u1, v0, v1);
+    const occ::handle<Geom_Surface> gf = BRep_Tool::Surface(from), go = BRep_Tool::Surface(onto);
+    for (const auto& [u, v] : {std::make_pair(u0, v0), std::make_pair(u1, v0), std::make_pair(u0, v1), std::make_pair(u1, v1),
+                               std::make_pair(0.5 * (u0 + u1), 0.5 * (v0 + v1))})
+    {
+      gp_Pnt q;
+      gp_Vec du, dv;
+      gf->D1(u, v, q, du, dv);
+      GeomAPI_ProjectPointOnSurf pr(q, go);
+      if (pr.NbPoints() == 0 || pr.LowerDistance() > tol)
+        return false;
+      double uo, vo;
+      pr.LowerDistanceParameters(uo, vo);
+      gp_Pnt qo;
+      gp_Vec duo, dvo;
+      go->D1(uo, vo, qo, duo, dvo);
+      const gp_Vec nf = du.Crossed(dv), no = duo.Crossed(dvo);
+      if (nf.Magnitude() < 1e-300 || no.Magnitude() < 1e-300 || !gp_Dir(nf).IsParallel(gp_Dir(no), 1e-7))
+        return false;
+    }
+    return true;
+  };
+  return on(b, a) || on(a, b);
 }
 
 // Whether free-form face `t` (a lofted tool's side) lies on part face `g` where it covers it: of its sample points over
@@ -637,6 +664,39 @@ bool cut_of(const TopoDS_Edge& e, const TopoDS_Face& face, Cut& c)
   c.c2 = BRep_Tool::CurveOnSurface(e, face, f2, l2);
   if (!c.c2.IsNull() && std::abs(f2 - f) < 1e-9 && std::abs(l2 - l) < 1e-9)
     return true;
+  // A circle about a surface of revolution's own axis: a line of constant v there, its u the circle's angle (a projection
+  // onto a revolved surface takes ~3 ms: cf-snap-hook's Fillet 5, 16 of them).
+  const BRepAdaptor_Surface sf(face, false);
+  if (sf.GetType() == GeomAbs_SurfaceOfRevolution)
+    if (const occ::handle<Geom_Circle> circle = occ::down_cast<Geom_Circle>(c.c3); !circle.IsNull())
+    {
+      const gp_Ax1 ax = sf.AxeOfRevolution();
+      const gp_Ax1 ca = circle->Axis();
+      const double tol = std::max(BRep_Tool::Tolerance(e), 1e-9);
+      if (ca.Direction().IsParallel(ax.Direction(), 1e-9) && gp_Lin(ax).Distance(ca.Location()) < tol)
+      {
+        const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(face);
+        GeomAPI_ProjectPointOnSurf      pr(c.c3->Value(f), surf);
+        if (pr.NbPoints() > 0 && pr.LowerDistance() < tol)
+        {
+          double u0, v0;
+          pr.LowerDistanceParameters(u0, v0);
+          gp_Pnt q;
+          gp_Vec du, dv, t;
+          surf->D1(u0, v0, q, du, dv);
+          c.c3->D1(f, q, t);
+          const double s = du.Dot(t) < 0 ? -1.0 : 1.0;
+          const occ::handle<Geom2d_Curve> line(new Geom2d_Line(gp_Pnt2d(u0 - s * f, v0), gp_Dir2d(s, 0)));
+          const double                    m = 0.5 * (f + l);
+          const gp_Pnt2d                  uv = line->Value(m);
+          if (surf->Value(uv.X(), uv.Y()).Distance(c.c3->Value(m)) < tol)
+          {
+            c.c2 = line;
+            return true;
+          }
+        }
+      }
+    }
   c.c2 = GeomProjLib::Curve2d(c.c3, f, l, BRep_Tool::Surface(face));
   return !c.c2.IsNull();
 }
@@ -814,7 +874,8 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
       for (int j = 1; j <= pfaces.Extent(); ++j)
       {
         double dev = 0;
-        bool   here = same_surface(t, TopoDS::Face(pfaces(j)), 10 * tol);
+        // (Only faces its box reaches: the generic same-surface test projects points, ~ms a pair.)
+        bool   here = !fb.IsOut(pboxes[j]) && same_surface(t, TopoDS::Face(pfaces(j)), 10 * tol);
         if (!here && !fb.IsOut(pboxes[j]) && lies_on(t, TopoDS::Face(pfaces(j)), pboxes[j], 1e-4 * size, dev))
         {
           here = true;
@@ -995,6 +1056,27 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
         const bool in_inner = in_p(q.Translated(n * -eps)), in_outer = in_p(q.Translated(n * eps));
         if (in_inner == in_outer)
           continue;
+        added[i] = in_outer;
+        known    = true;
+      }
+    }
+    // (No grid point on a strip (a thin ring on a plane, its parameter box mostly hole): a point inside each.)
+    for (TopExp_Explorer x(tools[i], TopAbs_FACE); x.More() && !known; x.Next())
+    {
+      const TopoDS_Face t = TopoDS::Face(x.Current());
+      gp_Pnt            q;
+      gp_Vec            n;
+      if (std::find(blends[i].begin(), blends[i].end(), t) != blends[i].end() || !point_in(t, q, n, ctx))
+        continue;
+      if (const std::optional<bool> by_face = added_by_face(i, t, q, n))
+      {
+        added[i] = *by_face;
+        known    = true;
+        break;
+      }
+      const bool in_inner = in_p(q.Translated(n * -eps)), in_outer = in_p(q.Translated(n * eps));
+      if (in_inner != in_outer)
+      {
         added[i] = in_outer;
         known    = true;
       }
