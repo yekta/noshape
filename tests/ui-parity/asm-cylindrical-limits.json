@@ -1,0 +1,59 @@
+{
+  "name": "asm-cylindrical-limits",
+  "about": "Cylindrical mate pin in hole › Limits ticked, then Escape",
+  "area": "assembly",
+  "source": "live2 11-14: asm field-level coverage (dialog options no scenario touched; lead: the asm/drawing half of the coverage audit)",
+  "start": "pin-block",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Cylindrical mate"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "face": [
+          65,
+          0,
+          15
+        ],
+        "instance": "Part 2 <1>"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "face": [
+          5,
+          0,
+          10
+        ],
+        "instance": "Part 1 <1>"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Limits"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

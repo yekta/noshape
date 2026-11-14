@@ -1,0 +1,37 @@
+{
+  "name": "asm-tangent-propagation",
+  "about": "Tangent mate dialog › Tangent propagation toggled, then Escape",
+  "area": "assembly",
+  "source": "live2 11-14: asm field-level coverage (dialog options no scenario touched; lead: the asm/drawing half of the coverage audit)",
+  "start": "two-blocks",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Tangent mate"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "dialog"
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Tangent propagation"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

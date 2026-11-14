@@ -1,0 +1,59 @@
+{
+  "name": "asm-parallel-limits",
+  "about": "Parallel mate › Limits ticked, then Escape",
+  "area": "assembly",
+  "source": "live2 11-14: asm field-level coverage (dialog options no scenario touched; lead: the asm/drawing half of the coverage audit)",
+  "start": "two-blocks",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Parallel mate"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "face": [
+          70,
+          10,
+          10
+        ],
+        "instance": "Part 2 <1>"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "face": [
+          20,
+          20,
+          20
+        ],
+        "instance": "Part 1 <1>"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Limits"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

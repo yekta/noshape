@@ -1,0 +1,55 @@
+{
+  "name": "asm-rack-pinion-distance-reverse",
+  "about": "Rack and pinion relation › Distance per revolution 5, Reverse direction, then Escape",
+  "area": "assembly",
+  "source": "live2 11-14: asm field-level coverage (dialog options no scenario touched; lead: the asm/drawing half of the coverage audit)",
+  "start": "pin-block",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Rack and pinion relation"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "dialog"
+    },
+    {
+      "do": "click",
+      "on": {
+        "field": "Distance per revolution"
+      }
+    },
+    {
+      "do": "type",
+      "text": "5"
+    },
+    {
+      "do": "key",
+      "key": "Tab"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "click",
+      "on": {
+        "checkbox": "Reverse direction"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "asm-mate-connector-between-entities",
+  "about": "Mate connector dialog: its type dropdown On entity › Between entities, then Escape",
+  "area": "assembly",
+  "source": "live2 11-14: asm field-level coverage (dialog options no scenario touched; lead: the asm/drawing half of the coverage audit)",
+  "start": "two-blocks",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Mate connector"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "dialog"
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "On entity",
+        "pick": "Between entities"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}
