@@ -270,10 +270,10 @@ struct RowsClip {
     clip: (f32, f32),
 }
 
-/// The rows (by their place in the list) to build: those on screen and a screen's margin; before the list's place is
-/// known, a window's height of them.
+/// The rows (by their place in the list) to build: those on screen and two wheel steps' margin (the probe builds the
+/// rest as they come into sight); before the list's place is known, a window's height of them.
 fn rows_on_screen(clip: Option<RowsClip>) -> (usize, usize) {
-    rows_within(clip, 600.)
+    rows_within(clip, 240.)
 }
 
 /// The rows (by index) within `margin` px of the visible part of the list.
@@ -923,7 +923,7 @@ impl StartView {
         let heading = |label: String| h_flex().h(px(32.)).gap(px(8.)).text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text)).child(label);
         // Only the rows in sight are built (2,000 selected took ~15 ms of layout a frame); the others are one spacer.
         const SEL_ROW_H: f32 = 36.;
-        let built = rows_of(self.sel_clip.get(), 300., SEL_ROW_H);
+        let built = rows_of(self.sel_clip.get(), 100., SEL_ROW_H);
         let probe = {
             let clip = self.sel_clip.clone();
             let panel = self.panel_slice.as_ref().map(|p| p.entity_id());

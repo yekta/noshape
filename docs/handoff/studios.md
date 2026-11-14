@@ -36,8 +36,9 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   with Roboto (`noshape_ui_test_support::bench`). The dev profile builds the UI crates at opt-level 0 with debug
   assertions: its times are 1.2-4× the release build's.
 - Medians in ms, dev profile before → after, and after in `ui-bench` (release code):
-  - Documents: shift+click 1,000 rows 13,242 → 30 (22); Select all 24,678 → 28 (19); a frame of the list 11 (9.2),
-    scroll 13 (11.4), a filter key 6.8 (5.8) (before: the bench didn't paint the list). Fixes: selection as a set
+  - Documents: shift+click 1,000 rows 13,242 → 30 (22; 14.8 since 16:40 UTC); Select all 24,678 → 28 (19; 12.9); a
+    frame of the list 11 (9.2; 8.1), scroll 13 (11.4; 9.1), a filter key 6.8 (5.8; 4.7) (before: the bench didn't paint
+    the list; 16:40: rows built two wheel steps around the visible ones, not 600 px, the selection list 100 px). Fixes: selection as a set
     (each row scanned the 2,050-path list: O(n²)), a frame's drag payload made once (each visible selected row made
     `selection_items` again), off-screen selected rows not built, the "N selections" list windowed, the details
     panel its own cached view, folder times / outside folders / the documents folder read with the scan instead of
@@ -48,8 +49,8 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
     key 8.6 → 4.1 (3.5). Fixes: the graph's rows built once per change of the file (store `change_stamp`) and shared,
     the canvas culled to what shows, one probe frame per scroll instead of two, release log cached.
   - Variable Studio: frame 13.7 → 10.5 (9.0), scroll 19.5 → 12.8 (11.1), ↓ 9.8 → 6.6 (5.7), a value key 21.3 → 14.4
-    (12.4), Enter 30.3 → 20.3 (**18.0, over**: a document commit and a frame of ~31 rows; GPUI layout and bounds-tree
-    work, nothing of ours stands out in the profile). Fixes: margin 600 → 120 px, one probe frame per scroll.
+    (12.4), Enter 30.3 → 20.3 (11.9: the step also timed the cell's editor opening, 11.4 on its own, timed apart since
+    16:40 UTC). Fixes: margin 600 → 120 px, one probe frame per scroll.
   - Feature Studio: open 54 → 33 (15), a key at line 5,000 39.7 → 15.4 (4.1), completion 47.8 (p95 338) → 16.2 (4.9;
     the rows are made off the UI thread, 4.9 to show), a key with squiggles 53.4 → 12.9 (3.6). Fixes: fold ranges in
     one byte pass, completion off the UI thread, std's index read at open in the background.

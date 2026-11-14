@@ -99,12 +99,21 @@ fn variable_studio_at_scale() {
         let keys = ["0", " ", "m", "m", "backspace", "backspace", "backspace"];
         let mut k = keys.iter().cycle();
         step("a key typed in a value", bench::time(21, || key(cx, window, k.next().unwrap())));
-        let mut n = 0;
-        step("Enter commits a value (every later one follows)", bench::time(10, || {
-            n += 1;
+        // Enter in an open editor: the key (the document's edit, every later value following) and the frame after
+        // it. (The editor opens with the first typed key: its own step above.)
+        let (mut opens, mut enters) = (Vec::new(), Vec::new());
+        for n in 1..=10 {
+            let t = std::time::Instant::now();
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_cell_edit("e1", Some(format!("{} mm", 10 + n)), w, cx))).unwrap();
-            key(cx, window, "enter");
-        }));
+            draw(cx, window);
+            opens.push(t.elapsed().as_secs_f64() * 1e3);
+            let t = std::time::Instant::now();
+            cx.update_window(window, |_, w, cx| w.dispatch_keystroke(Keystroke::parse("enter").unwrap(), cx)).unwrap();
+            draw(cx, window);
+            enters.push(t.elapsed().as_secs_f64() * 1e3);
+        }
+        step("a value's editor opened by a key", bench::Times::from_ms(opens));
+        step("Enter commits a value (every later one follows)", bench::Times::from_ms(enters));
         let slow: Vec<&str> = fits.iter().filter(|(_, ok)| !ok).map(|(n, _)| n.as_str()).collect();
         assert!(slow.is_empty(), "over a frame: {slow:?}");
     });
