@@ -1,0 +1,48 @@
+{
+ "name": "export-format-3mf",
+ "about": "block: the part's Export\u2026 dialog, Format 3MF, Cancel",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (Export dialog formats and options with no recorded scenario)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Format",
+    "pick": "3MF"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  }
+ ]
+}

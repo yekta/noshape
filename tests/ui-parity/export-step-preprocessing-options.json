@@ -1,0 +1,73 @@
+{
+ "name": "export-step-preprocessing-options",
+ "about": "block: the part's Export\u2026 dialog (opens on STL), Format STEP, Preprocessing Automatic, custom units on, derived tolerances off, custom annotation text height on, Cancel",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (Export dialog formats and options with no recorded scenario)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Format",
+    "pick": "STEP"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Preprocessing",
+    "pick": "Automatic"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Use custom units for export"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Include derived tolerances in export"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Use custom annotation text height for MBD export"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  }
+ ]
+}

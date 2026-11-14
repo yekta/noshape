@@ -1,0 +1,62 @@
+{
+ "name": "export-stl-text-inch-fine",
+ "about": "block: the part's Export\u2026 dialog (opens on STL), STL: STL Format Text, Units Inch, Resolution Fine, Cancel",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (Export dialog formats and options with no recorded scenario)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "STL Format",
+    "pick": "Text"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Units",
+    "pick": "Inch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Resolution",
+    "pick": "Fine"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  }
+ ]
+}

@@ -1,0 +1,61 @@
+{
+ "name": "export-rhino-version-7",
+ "about": "block: the part's Export\u2026 dialog (opens on STL), Format RHINO, Use latest version off, Version 7, Cancel",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (Export dialog formats and options with no recorded scenario)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Format",
+    "pick": "RHINO"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Use latest version"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Version",
+    "pick": "7"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  }
+ ]
+}
