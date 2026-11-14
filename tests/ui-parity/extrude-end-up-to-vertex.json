@@ -1,0 +1,46 @@
+{
+ "name": "extrude-end-up-to-vertex",
+ "about": "block: top face, Extrude, End type Blind → Up to vertex (its vertex field appears, waiting for a pick), Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (field-level gaps in the recorded suite)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Blind",
+    "pick": "Up to vertex"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

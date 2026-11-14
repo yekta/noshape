@@ -1,0 +1,45 @@
+{
+ "name": "extrude-intersect-tab",
+ "about": "block: top face, Extrude (Shift+E), the Intersect tab (the extrusion intersected with Part 1), Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (field-level gaps in the recorded suite)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Intersect"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,77 @@
+{
+ "name": "revolve-remove-and-surface",
+ "about": "block: Revolve the y = 0 side face about the x = 0 vertical edge, the Remove tab, then the Surface tab, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (field-level gaps in the recorded suite)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Revolve"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Revolve axis"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     0,
+     0,
+     3
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Remove"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Surface"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
