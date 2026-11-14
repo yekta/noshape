@@ -1,19 +1,19 @@
 {
  "scenario": "asm-triad-rotate-90-undo",
- "recorded": "2026-11-13T07:54:00.178Z",
+ "recorded": "2026-11-14T18:59:03.886Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "55714b3baa4df434681980d2",
+  "document": "38e54affc51d506498f8ecd2",
+  "workspace": "24db5f467e1ccbd8d405a2a9",
+  "element": "7685988fe3eb3cdadbfc9f9f",
   "start": "two-blocks",
-  "startElement": "fbd9c2146a18cf5cba6d5b3a",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "b11e7a0a114b5691dc6ef38e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -348,7 +348,7 @@
      "panel": null
     }
    },
-   "t": 33974
+   "t": 34964
   },
   {
    "step": 2,
@@ -387,13 +387,14 @@
       "Use best available tessellation",
       "Copy Part 2 <1>",
       "Create Drawing of Part 2…",
-      "Create Drawing of start two-blocks asm Copy 1…",
+      "Create Drawing of start two-blocks asm Copy 2…",
       "Export…",
       "Edit in context",
       "Find in instance list",
       "Add mate connector to instance origin…",
       "Replace Part 2 <1>…",
       "Switch to start two-blocks",
+      "Where used for Part 2…",
       "Clear selection",
       "Select other…",
       "Add comment",
@@ -560,7 +561,7 @@
      "panel": null
     }
    },
-   "t": 37970
+   "t": 38464
   },
   {
    "step": 3,
@@ -596,7 +597,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 1",
+       "name": "start two-blocks asm Copy 2",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -738,7 +739,7 @@
      "panel": null
     }
    },
-   "t": 43535
+   "t": 44040
   },
   {
    "step": 4,
@@ -753,7 +754,7 @@
      14
     ],
     "hover": [],
-    "element": "button.btn.btn-secondary"
+    "element": "svg"
    },
    "state": {
     "focus": {
@@ -918,7 +919,7 @@
      "panel": null
     }
    },
-   "t": 46062
+   "t": 47121
   }
  ]
 }
