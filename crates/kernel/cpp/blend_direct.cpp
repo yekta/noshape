@@ -1394,9 +1394,8 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     on_blend[pr.k].insert(on_blend[pr.k].end(), pr.on_b.begin(), pr.on_b.end());
   }
   // Inside a tool / the part.
-  std::vector<std::unique_ptr<BRepClass3d_SolidClassifier>> in_tool;
-  for (const TopoDS_Shape& t : tools)
-    in_tool.push_back(std::make_unique<BRepClass3d_SolidClassifier>(t));
+  // (Made when first asked: rays answer most points.)
+  std::vector<std::unique_ptr<BRepClass3d_SolidClassifier>> in_tool(tools.size());
   std::vector<Bnd_Box> tool_boxes(tools.size());
   for (size_t i = 0; i < tools.size(); ++i)
   {
@@ -1404,8 +1403,8 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     tool_boxes[i].Enlarge(snap);
   }
   // Inside another tool of the same kind (taken away / added).
-  // (OCCT's IN checked by rays: its classifier puts a family of points inside a lofted tool now and then, its ray through
-  // one of the tool's edges (c2-variable-fillet-faceblend's pocket walls); a clean ray's OUT wins.)
+  // (A clean ray decides: OCCT's classifier puts a family of points inside a lofted tool now and then, its ray through
+  // one of the tool's edges (c2-variable-fillet-faceblend's pocket walls); OCCT's only where no ray was clean.)
   std::vector<std::unique_ptr<RayClassifier>> rays_in(tools.size());
   // Whether `p`, just off part face `j`, is beside one of tool `i`'s strips on that face (where the tool meets the face:
   // its blends cross only the part's other faces).
@@ -1441,12 +1440,18 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
           continue;
         }
         const KernelTimer t1("blend.direct.classify.tool");
-        in_tool[i]->Perform(p, tol);
-        if (in_tool[i]->State() != TopAbs_IN)
-          continue;
+        // (A ray ~0.1 ms, OCCT's classifier ~3 on a lofted tool.)
         if (!rays_in[i])
           rays_in[i] = std::make_unique<RayClassifier>(tools[i], tol, 10 * tol);
-        if (rays_in[i]->Perform(p) != TopAbs_OUT)
+        const TopAbs_State by_rays = rays_in[i]->Perform(p);
+        if (by_rays == TopAbs_IN)
+          return true;
+        if (by_rays == TopAbs_OUT)
+          continue;
+        if (!in_tool[i])
+          in_tool[i] = std::make_unique<BRepClass3d_SolidClassifier>(tools[i]);
+        in_tool[i]->Perform(p, tol);
+        if (in_tool[i]->State() == TopAbs_IN)
           return true;
       }
     return false;
