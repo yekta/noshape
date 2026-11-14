@@ -91,7 +91,15 @@ struct Row {
 
 pub struct HistoryPanel {
     doc: Entity<DocModel>,
-    graph: Option<VersionGraph>,
+    graph: Option<Rc<VersionGraph>>,
+    /// The file's change stamp the graph was read at.
+    graph_stamp: Option<(u64, i64)>,
+    /// The graph's rows, built with it (not every frame).
+    rows: Option<Rc<Vec<Rc<Row>>>>,
+    /// A version (or the workspace: `None`) being opened: its row shows selected while it's read.
+    opening: Option<(Option<MicroversionId>, Task<()>)>,
+    /// The document's releases, read with the graph (not every frame).
+    releases: Option<noshape_model::release::ReleaseLog>,
     search: Entity<InputState>,
     query: String,
     /// The search Enter applied (live: typing alone doesn't search).
@@ -134,8 +142,8 @@ impl HistoryPanel {
     pub fn new(doc: Entity<DocModel>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search history"));
         let mut subs = vec![
-            cx.subscribe_in(&doc, window, |this: &mut Self, _, _ev: &DocEvent, _, cx| {
-                this.graph = None;
+            // (The graph is read again when the file's change stamp moves: `graph`.)
+            cx.subscribe_in(&doc, window, |_: &mut Self, _, _ev: &DocEvent, _, cx| {
                 cx.notify();
             }),
             cx.subscribe_in(&search, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
@@ -161,6 +169,10 @@ impl HistoryPanel {
         Self {
             doc,
             graph: None,
+            graph_stamp: None,
+            rows: None,
+            opening: None,
+            releases: None,
             search,
             query: String::new(),
             applied_query: String::new(),
@@ -378,15 +390,21 @@ impl HistoryPanel {
             .into_any_element()
     }
 
-    fn graph(&mut self, cx: &App) -> VersionGraph {
-        if self.graph.is_none() {
-            self.graph = self.doc.read(cx).session.store.graph().ok();
+    /// The document's versions and changes, read again only when the file changed since (opening a version
+    /// doesn't: 500 versions took ~10 ms to read and lay out).
+    fn graph(&mut self, cx: &App) -> Rc<VersionGraph> {
+        let store = &self.doc.read(cx).session.store;
+        let stamp = store.change_stamp().ok();
+        if self.graph.is_none() || stamp.is_none() || stamp != self.graph_stamp {
+            self.graph = store.graph().ok().map(Rc::new);
+            self.graph_stamp = stamp;
+            self.rows = None;
+            self.releases = None;
         }
-        self.graph.clone().unwrap_or(VersionGraph { microversions: vec![], branches: vec![], versions: vec![] })
+        self.graph.clone().unwrap_or_else(|| Rc::new(VersionGraph { microversions: vec![], branches: vec![], versions: vec![] }))
     }
 
     fn after_change(&mut self, cx: &mut Context<Self>) {
-        self.graph = None;
         self.doc.update(cx, |d, cx| d.reloaded(cx));
         cx.notify();
     }
@@ -395,12 +413,34 @@ impl HistoryPanel {
         self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
     }
 
+    /// Opens a version (`mv`) or the workspace (`None`): its row is selected at once, the state is read off the UI
+    /// thread (a big document's takes a while), then shown.
     fn view_mv(&mut self, mv: Option<MicroversionId>, cx: &mut Context<Self>) {
-        let r = self.doc.update(cx, |d, _| d.session.view_microversion(mv));
-        match r {
-            Ok(()) => self.after_change(cx),
-            Err(e) => self.error(e, cx),
-        }
+        let session = &self.doc.read(cx).session;
+        let at = match mv.map(Ok).unwrap_or_else(|| session.head()) {
+            Ok(at) => at,
+            Err(e) => return self.error(e, cx),
+        };
+        // (Its own read-only connection, opened there too.)
+        let path = session.store.path().to_path_buf();
+        let task = cx.spawn(async move |this, cx| {
+            let read = cx.background_spawn(async move { crate::session::Session::read_state(&noshape_store::Document::open_read_only(&path)?, at) }).await;
+            let _ = this.update(cx, |this, cx| {
+                this.opening = None;
+                // The workspace moved on meanwhile: read it as it is now.
+                let stale = mv.is_none() && this.doc.read(cx).session.head().ok() != Some(at);
+                match read {
+                    Ok(doc) if !stale => {
+                        this.doc.update(cx, |d, _| d.session.view_read(mv, at, doc));
+                        this.after_change(cx);
+                    }
+                    Ok(_) => this.view_mv(mv, cx),
+                    Err(e) => this.error(e, cx),
+                }
+            });
+        });
+        self.opening = Some((mv, task));
+        cx.notify();
     }
 
     /// Compare: the document enters compare mode between what the window
@@ -486,9 +526,13 @@ fn history_time(ms: i64) -> String {
 /// The part of the rows (px from their top) to build: what's on screen and 300 px around it, in 100 px steps (a
 /// small scroll keeps the same rows); before the list's place is known, a window's height.
 fn rows_in_view(clip: Option<(f32, f32, f32)>) -> (f32, f32) {
-    const MARGIN: f32 = 300.;
+    rows_within(clip, 300.)
+}
+
+/// The list's y range (px from its top) within `margin` of what shows.
+fn rows_within(clip: Option<(f32, f32, f32)>, margin: f32) -> (f32, f32) {
     let Some((top, a, b)) = clip else { return (0., 1200.) };
-    (((a - top - MARGIN) / 100.).floor() * 100., ((b - top + MARGIN) / 100.).ceil() * 100.)
+    (((a - top - margin) / 100.).floor() * 100., ((b - top + margin) / 100.).ceil() * 100.)
 }
 
 fn build_rows(graph: &VersionGraph, lanes: &[BranchId]) -> Vec<Row> {
@@ -1009,7 +1053,7 @@ const CHANGES_PAGE: usize = 50;
 
 /// A row laid out at `y` (its top); `change` rows are 26 px high.
 struct Placed {
-    row: Row,
+    row: Rc<Row>,
     y: f32,
     change: bool,
 }
@@ -1020,11 +1064,11 @@ impl Render for HistoryPanel {
         let graph = self.graph(cx);
         let session = &self.doc.read(cx).session;
         let current_branch = session.branch;
-        let viewing = session.viewing;
+        let viewing = self.opening.as_ref().map_or(session.viewing, |(mv, _)| *mv);
         let current_name = graph.branches.iter().find(|b| b.id == current_branch).map(|b| b.name.clone()).unwrap_or_else(|| "Main".into());
         let mut lanes: Vec<BranchId> = graph.branches.iter().filter(|b| !b.deleted).map(|b| b.id).collect();
         lanes.sort_by_key(|b| !graph.branches.iter().any(|x| x.id == *b && x.is_default));
-        let rows = build_rows(&graph, &lanes);
+        let rows = self.rows.get_or_insert_with(|| Rc::new(build_rows(&graph, &lanes).into_iter().map(Rc::new).collect())).clone();
         let info: HashMap<MicroversionId, &noshape_store::MicroversionInfo> = graph.microversions.iter().map(|m| (m.id, m)).collect();
         let q = self.applied_query.trim().to_lowercase();
 
@@ -1050,7 +1094,7 @@ impl Render for HistoryPanel {
             for m in found {
                 let lane = lanes.iter().position(|b| *b == m.branch).unwrap_or(0);
                 let c = Row { kind: RowKind::Change, mv: m.id, lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", m.id.short()), changes: vec![] };
-                placed.push(Placed { row: c, y, change: true });
+                placed.push(Placed { row: Rc::new(c), y, change: true });
                 y += CHANGE_H;
             }
         }
@@ -1058,15 +1102,18 @@ impl Render for HistoryPanel {
         for r in rows.iter().filter(|_| !results) {
             placed.push(Placed { row: r.clone(), y, change: false });
             y += ROW_H;
+            if !self.expanded.contains(&r.key) {
+                continue;
+            }
             // Hide merges (on by default) drops merge microversions from the change lists.
             let changes: Vec<MicroversionId> = r.changes.iter().filter(|mv| info.get(*mv).is_some_and(|m| !(hide_merges && m.parents.len() > 1))).copied().collect();
-            if self.expanded.contains(&r.key) && !changes.is_empty() {
+            if !changes.is_empty() {
                 // 50 at a time, then "Show more changes…" (live rp-900).
                 let limit = CHANGES_PAGE + self.more_changes.get(&r.key).copied().unwrap_or(0);
                 for mv in changes.iter().take(limit) {
                     let Some(m) = info.get(mv) else { continue };
                     let c = Row { kind: RowKind::Change, mv: *mv, lane: r.lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", mv.short()), changes: vec![] };
-                    placed.push(Placed { row: c, y, change: true });
+                    placed.push(Placed { row: Rc::new(c), y, change: true });
                     y += CHANGE_H;
                 }
                 if changes.len() > limit {
@@ -1100,7 +1147,7 @@ impl Render for HistoryPanel {
         // Releases: versions with a release package get a triangle (solid;
         // with a dot when it contains an obsoletion; open for a Pending or
         // Rejected candidate).
-        let releases = crate::release_dialog::release_log(self.doc.read(cx));
+        let releases = self.releases.get_or_insert_with(|| crate::release_dialog::release_log(self.doc.read(cx))).clone();
         let mut packages_at: HashMap<MicroversionId, Vec<noshape_model::release::Package>> = HashMap::new();
         let mut candidates_at: HashSet<MicroversionId> = HashSet::new();
         for v in &graph.versions {
@@ -1127,7 +1174,12 @@ impl Render for HistoryPanel {
                 let o = bounds.origin;
                 let pt = |x: f32, y: f32| point(o.x + px(x), o.y + px(y));
                 let color = |l: usize| rgb(LANES[l % LANES.len()]);
-                for &(l, a, b) in &segs {
+                // Only what the scrolled list shows is tessellated (500 versions: a frame's paths were most of it).
+                let clip = window.content_mask().bounds;
+                let (top, bottom) = (f32::from(clip.origin.y - o.y) - 30., f32::from(clip.origin.y + clip.size.height - o.y) + 30.);
+                let shown = |a: f32, b: f32| a.min(b) <= bottom && a.max(b) >= top;
+                for &(l, a, b) in segs.iter().filter(|(_, a, b)| shown(*a, *b)) {
+                    let (a, b) = (a.max(top), b.min(bottom));
                     let mut pb = PathBuilder::stroke(px(4.));
                     pb.move_to(pt(lane_x(l), a));
                     pb.line_to(pt(lane_x(l), b));
@@ -1135,7 +1187,7 @@ impl Render for HistoryPanel {
                         window.paint_path(path, color(l));
                     }
                 }
-                for &(l, parent, from_y, to_y) in &forks {
+                for &(l, parent, from_y, to_y) in forks.iter().filter(|(_, _, a, b)| shown(*a, *b)) {
                     let (x0, x1) = (lane_x(l), lane_x(parent));
                     let mid = (to_y - 13.).max(from_y);
                     let mut pb = PathBuilder::stroke(px(4.));
@@ -1151,7 +1203,7 @@ impl Render for HistoryPanel {
                     let t = i as f32 / 24. * std::f32::consts::TAU;
                     point(c.x + px(r * t.cos()), c.y + px(r * t.sin()))
                 }).collect::<Vec<_>>();
-                for &(l, y, kind, release) in &nodes {
+                for &(l, y, kind, release) in nodes.iter().filter(|(_, y, _, _)| shown(*y, *y)) {
                     let c = pt(lane_x(l), y);
                     if release > 0 {
                         // Release ▲ (with a white dot: contains obsoletion; a candidate's △ white inside).
@@ -1582,7 +1634,7 @@ impl Render for HistoryPanel {
             list.push(div().h(px(skipped)).flex_none().into_any_element());
         }
         // The rows' place and the visible list around them, read as they're painted: a scroll or a resize that shows
-        // other rows draws again.
+        // rows not built draws again (within the margin, the rows built already show).
         let probe = {
             let clip = self.rows_clip.clone();
             canvas(
@@ -1590,7 +1642,8 @@ impl Render for HistoryPanel {
                     let mask = window.content_mask().bounds;
                     let now = (f32::from(b.top()), f32::from(mask.top()), f32::from(mask.bottom()));
                     clip.set(Some(now));
-                    if rows_in_view(Some(now)) != in_view {
+                    let seen = rows_within(Some(now), 0.);
+                    if seen.0 < in_view.0 || seen.1 > in_view.1 {
                         window.request_animation_frame();
                     }
                 },
@@ -1786,3 +1839,7 @@ impl Render for HistoryPanel {
             )
     }
 }
+
+#[cfg(test)]
+#[path = "history_bench.rs"]
+mod bench;

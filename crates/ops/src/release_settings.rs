@@ -204,11 +204,46 @@ fn settings_path() -> std::path::PathBuf {
     noshape_scene::config_dir().join("release_settings.json")
 }
 
+/// A settings file kept in memory and read again only when its modified time changes (another process wrote it):
+/// menus and frames ask for the settings many times a second.
+pub(crate) struct Cached<T>(std::sync::Mutex<Option<(std::path::PathBuf, Option<std::time::SystemTime>, T)>>);
+
+impl<T: Clone + Default + serde::de::DeserializeOwned> Cached<T> {
+    pub(crate) const fn new() -> Self {
+        Self(std::sync::Mutex::new(None))
+    }
+
+    /// The file's value, and whether it was read now.
+    pub(crate) fn get(&self, path: std::path::PathBuf) -> (T, bool) {
+        let mtime = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+        let mut c = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((p, m, v)) = c.as_ref()
+            && *p == path
+            && *m == mtime
+        {
+            return (v.clone(), false);
+        }
+        let v: T = std::fs::read(&path).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        *c = Some((path, mtime, v.clone()));
+        (v, true)
+    }
+
+    /// After `v` was written to `path`.
+    pub(crate) fn wrote(&self, path: std::path::PathBuf, v: &T) {
+        let mtime = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = Some((path, mtime, v.clone()));
+    }
+}
+
+static SETTINGS: Cached<ReleaseSettings> = Cached::new();
+
 pub fn release_settings() -> ReleaseSettings {
-    let s: ReleaseSettings = std::fs::read(settings_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
-    // Drawings' revision tables follow the company template and unreleased suffix.
-    noshape_model::drawing::tables::set_revision_template(Some(s.revision_table.clone()));
-    noshape_model::drawing::tables::set_unreleased_suffix(Some(s.unreleased_suffix.clone()));
+    let (s, read) = SETTINGS.get(settings_path());
+    if read {
+        // Drawings' revision tables follow the company template and unreleased suffix.
+        noshape_model::drawing::tables::set_revision_template(Some(s.revision_table.clone()));
+        noshape_model::drawing::tables::set_unreleased_suffix(Some(s.unreleased_suffix.clone()));
+    }
     s
 }
 
@@ -226,6 +261,7 @@ fn managed_flag() -> &'static std::sync::atomic::AtomicBool {
 pub fn set_release_settings(s: &ReleaseSettings) {
     managed_flag().store(s.managed_workflows, std::sync::atomic::Ordering::Relaxed);
     let _ = std::fs::write(settings_path(), serde_json::to_vec_pretty(s).unwrap_or_default());
+    SETTINGS.wrote(settings_path(), s);
     noshape_model::drawing::tables::set_revision_template(Some(s.revision_table.clone()));
     noshape_model::drawing::tables::set_unreleased_suffix(Some(s.unreleased_suffix.clone()));
 }

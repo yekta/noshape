@@ -648,6 +648,20 @@ impl Session {
     }
 
     /// Show a historical microversion read-only (None returns to the branch head).
+    /// The document as it was at `mv`, read through `reader` (another handle on this document's store:
+    /// `store.reader()`), so a background thread can read it; [`Session::view_read`] then shows it.
+    pub fn read_state(reader: &Store, mv: MicroversionId) -> Result<Document> {
+        Ok(Document::from_blobs(&reader.read_all(mv)?)?)
+    }
+
+    /// [`Session::view_microversion`] with the state read already ([`Session::read_state`] of `at`: `mv`, or the
+    /// head for the workspace).
+    pub fn view_read(&mut self, mv: Option<MicroversionId>, at: MicroversionId, doc: Document) {
+        self.doc = doc;
+        self.seen = at;
+        self.viewing = mv;
+    }
+
     pub fn view_microversion(&mut self, mv: Option<MicroversionId>) -> Result<()> {
         let target = match mv {
             Some(m) => m,

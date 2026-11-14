@@ -105,6 +105,14 @@ lto = "thin"
 codegen-units = 1
 debug = "line-tables-only"
 
+# The UI benches (docs/TESTS.md "UI benches"): the release build's code (optimised, no debug assertions) without its
+# link-time optimisation, so they build in minutes. `cargo test --profile ui-bench -p <crate> --lib bench:: -- --ignored`.
+[profile.ui-bench]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true
+
 # NOSHAPE PATCH: gpui's Linux platform with application image cursors on
 # Wayland (Onshape's selection-count cursor). Only the files marked
 # "NOSHAPE PATCH" differ from the published 0.3.9; see

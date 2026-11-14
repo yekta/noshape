@@ -18,3 +18,8 @@ parking_lot.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
+
+[dev-dependencies]
+# UI tests and benches on GPUI's test platform (docs/TESTS.md "UI keystroke tests"); `gpui` by name for `#[gpui::test]`.
+noshape-ui-test-support = { path = "../ui-test-support" }
+gpui = { package = "gpui-pre", version = "=0.3.9" }

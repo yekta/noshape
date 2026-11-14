@@ -10,3 +10,7 @@ description = "Turns on what UI keystroke tests need (docs/TESTS.md): GPUI's tes
 gpui = { package = "gpui-pre", version = "=0.3.9", features = ["test-support"] }
 # `Renderer::noop` / `Gpu::headless` need wgpu's no-op backend.
 wgpu = { workspace = true, features = ["noop"] }
+
+# The benches shape text as the app does on Linux (bench.rs).
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
+gpui-pre-wgpu = { version = "=0.3.9", default-features = false }

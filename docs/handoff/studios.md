@@ -28,6 +28,37 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-14 13:24 UTC: speed at scale (lead 11-14): five T2 UI benches, before / after
+- Benches (docs/TESTS.md "UI benches"): start-ui `bench::documents_page_at_scale` (2,000 documents, 50 folders),
+  history-ui `version_graph_at_scale` (500 versions, 21 workspaces), variable-studio-ui `variable_studio_at_scale`
+  (500 chained variables), feature-studio-ui `feature_studio_at_scale` (10,000 lines), drawing-ui `drawing_of_20_views`.
+  Run `cargo test --profile ui-bench -p <crate> --lib bench:: -- --ignored --nocapture`; text is shaped by cosmic-text
+  with Roboto (`noshape_ui_test_support::bench`). The dev profile builds the UI crates at opt-level 0 with debug
+  assertions: its times are 1.2-4× the release build's.
+- Medians in ms, dev profile before → after, and after in `ui-bench` (release code):
+  - Documents: shift+click 1,000 rows 13,242 → 30 (22); Select all 24,678 → 28 (19); a frame of the list 11 (9.2),
+    scroll 13 (11.4), a filter key 6.8 (5.8) (before: the bench didn't paint the list). Fixes: selection as a set
+    (each row scanned the 2,050-path list: O(n²)), a frame's drag payload made once (each visible selected row made
+    `selection_items` again), off-screen selected rows not built, the "N selections" list windowed, the details
+    panel its own cached view, folder times / outside folders / the documents folder read with the scan instead of
+    `std::fs` per frame. The documents page's frames are full redraws in the bench (its cached body isn't redrawn on
+    notify in a test window), so with everything selected it is an upper bound.
+  - Version graph: frame 14.0 → 6.2 (5.0), scroll 15.6 → 7.9 (6.4), hover 7.9 → 4.0 (3.3), a click opening a version
+    27.9 → 15.7 (12.9) with the version read off the UI thread (Session::read_state / view_read; 9.6 to show), search
+    key 8.6 → 4.1 (3.5). Fixes: the graph's rows built once per change of the file (store `change_stamp`) and shared,
+    the canvas culled to what shows, one probe frame per scroll instead of two, release log cached.
+  - Variable Studio: frame 13.7 → 10.5 (9.0), scroll 19.5 → 12.8 (11.1), ↓ 9.8 → 6.6 (5.7), a value key 21.3 → 14.4
+    (12.4), Enter 30.3 → 20.3 (**18.0, over**: a document commit and a frame of ~31 rows; GPUI layout and bounds-tree
+    work, nothing of ours stands out in the profile). Fixes: margin 600 → 120 px, one probe frame per scroll.
+  - Feature Studio: open 54 → 33 (15), a key at line 5,000 39.7 → 15.4 (4.1), completion 47.8 (p95 338) → 16.2 (4.9;
+    the rows are made off the UI thread, 4.9 to show), a key with squiggles 53.4 → 12.9 (3.6). Fixes: fold ranges in
+    one byte pass, completion off the UI thread, std's index read at open in the background.
+  - Drawing (20 views): every step ≤ 2 ms (frame 0.8, zoom 0.5, pan 0.4, Update 1.9); views made in 57 ms and Update's
+    in 4 ms off the UI thread. Nothing to fix.
+- Also: release settings and numbering schemes are read once and again only when their file changes (each read was
+  a disk read and a JSON parse; menus and frames asked many times); the ops tests keep their settings inside the run's
+  directory.
+
 ### 2026-11-14 01:09 UTC: live2's 11-13 / 11-14 answers in
 - Drawings: a click on the empty sheet closes the dimension palette (2578 (4) was wrong); a table's Bring to front greys
   only with no note / dimension / table on the sheet (views don't count); a reference pinned to this document's version

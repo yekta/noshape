@@ -273,10 +273,19 @@ struct RowsClip {
 /// The rows (by their place in the list) to build: those on screen and a screen's margin; before the list's place is
 /// known, a window's height of them.
 fn rows_on_screen(clip: Option<RowsClip>) -> (usize, usize) {
-    const MARGIN: f32 = 600.;
+    rows_within(clip, 600.)
+}
+
+/// The rows (by index) within `margin` px of the visible part of the list.
+fn rows_within(clip: Option<RowsClip>, margin: f32) -> (usize, usize) {
+    rows_of(clip, margin, DOC_ROW_H)
+}
+
+/// [`rows_within`] for rows `row_h` px high.
+fn rows_of(clip: Option<RowsClip>, margin: f32, row_h: f32) -> (usize, usize) {
     let Some(c) = clip else { return (0, 40) };
-    let row = |y: f32| ((y - c.top) / DOC_ROW_H).max(0.);
-    (row(c.clip.0 - MARGIN).floor() as usize, row(c.clip.1 + MARGIN).ceil() as usize)
+    let row = |y: f32| ((y - c.top) / row_h).max(0.);
+    (row(c.clip.0 - margin).floor() as usize, row(c.clip.1 + margin).ceil() as usize)
 }
 
 fn prefs_path() -> PathBuf {
@@ -328,6 +337,16 @@ pub struct StartView {
     docs: Vec<DocEntry>,
     loaded: bool,
     folders: Vec<PathBuf>,
+    /// Folders added from outside the documents folder, and every folder's last change (unix ms): read with each scan,
+    /// off the UI thread.
+    outside: Vec<PathBuf>,
+    dir_modified: std::collections::HashMap<PathBuf, i64>,
+    /// A frame's drag of the selection (`drag_items`): made once, cleared as the next frame starts.
+    drag_share: RefCell<Option<DragItems>>,
+    /// The details panel, drawn as its own cached view.
+    panel_slice: Option<Entity<crate::cached_slice::Slice<StartView>>>,
+    /// Where the "N selections" list was last painted (its rows built around it).
+    sel_clip: Rc<std::cell::Cell<Option<RowsClip>>>,
     source: Source,
     view: ViewMode,
     sort: SortKey,
@@ -378,6 +397,8 @@ pub struct StartView {
     renaming: Option<(PathBuf, Entity<InputState>, Subscription)>,
     /// Where the documents list's rows started and what of it was visible, at the last paint (`rows_on_screen`).
     rows_clip: Rc<std::cell::Cell<Option<RowsClip>>>,
+    /// The rows the list built last (by index).
+    rows_built: std::cell::Cell<(usize, usize)>,
     folders_open: bool,
     /// "Last opened by me" is expanded.
     recent_open: bool,
@@ -591,6 +612,7 @@ impl StartView {
             folders_open: prefs.folders_open,
             renaming: None,
             rows_clip: Default::default(),
+            rows_built: Default::default(),
             recent_open: true,
             notifications_open: false,
             sub_open: true,
@@ -605,6 +627,11 @@ impl StartView {
             me: my_names(),
             trash: crate::start_trash::Trash::load(),
             dirs: Vec::new(),
+            outside: Vec::new(),
+            dir_modified: Default::default(),
+            drag_share: Default::default(),
+            panel_slice: None,
+            sel_clip: Default::default(),
             placeholder: String::new(),
             adv,
             adv_open: false,
@@ -634,13 +661,16 @@ impl StartView {
         }
         let library = self.library.clone();
         self.scan_task = Some(cx.spawn(async move |this, cx| {
-            let (input, result) = cx
+            let (input, result, outside, dir_modified) = cx
                 .background_spawn(async move {
                     let t = std::time::Instant::now();
                     let input = ScanInput::current();
                     let result = library.scan(&input);
+                    let outside = outside_folders();
+                    let modified = |f: &Path| std::fs::metadata(f).and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64);
+                    let dir_modified: std::collections::HashMap<PathBuf, i64> = result.dirs.iter().chain(&outside).filter_map(|f| Some((f.clone(), modified(f)?))).collect();
                     log::info!(target: "perf", "documents page: {} documents read in {:.0} ms", result.docs.len(), t.elapsed().as_secs_f32() * 1e3);
-                    (input, result)
+                    (input, result, outside, dir_modified)
                 })
                 .await;
             let _ = this.update(cx, |t, cx| {
@@ -651,6 +681,8 @@ impl StartView {
                 }
                 t.docs = result.docs;
                 t.dirs = result.dirs;
+                t.outside = outside;
+                t.dir_modified = dir_modified;
                 t.trash = crate::start_trash::Trash::load();
                 t.folders = input.folders;
                 if let Source::Folder(f) = &t.source
@@ -711,17 +743,20 @@ impl StartView {
 
     /// Documents shown: current source, filtered by the search, sorted.
     fn visible(&self) -> Vec<DocEntry> {
+        self.visible_refs().into_iter().cloned().collect()
+    }
+
+    fn visible_refs(&self) -> Vec<&DocEntry> {
         let q = self.query.trim().to_lowercase();
-        let mut v: Vec<DocEntry> = self
+        let mut v: Vec<&DocEntry> = self
             .docs
             .iter()
             .filter(|d| self.in_source(d, &self.source))
             .filter(|d| self.adv_matches(d))
             .filter(|d| q.is_empty() || d.name.to_lowercase().contains(&q) || d.path.file_name().is_some_and(|n| n.to_string_lossy().to_lowercase().contains(&q)))
-            .cloned()
             .collect();
         match self.sort {
-            SortKey::Name => v.sort_by_key(|d| d.name.to_lowercase()),
+            SortKey::Name => v.sort_by_cached_key(|d| d.name.to_lowercase()),
             SortKey::Modified => v.sort_by_key(|d| d.modified),
         }
         if self.descending {
@@ -757,11 +792,17 @@ impl StartView {
 
     /// The rows the page lists, in order: folders, then documents.
     fn page_order(&self) -> Vec<PathBuf> {
-        self.folder_tiles().into_iter().map(|(f, _)| f).chain(self.visible().into_iter().map(|d| d.path)).collect()
+        self.folder_tiles().into_iter().map(|(f, _)| f).chain(self.visible_refs().into_iter().map(|d| d.path.clone())).collect()
     }
 
     fn is_selected(&self, p: &Path) -> bool {
         self.selected.as_deref() == Some(p) || (self.also_of.is_some() && self.also_of == self.selected && self.also.iter().any(|q| q == p))
+    }
+
+    /// Every selected row, to test many rows against (a frame lists 2,000 rows with all of them selected).
+    fn selection_set(&self) -> std::collections::HashSet<&Path> {
+        let also = (self.also_of.is_some() && self.also_of == self.selected).then_some(&self.also);
+        self.selected.iter().chain(also.into_iter().flatten()).map(PathBuf::as_path).collect()
     }
 
     /// Every selected row, the last clicked first.
@@ -797,12 +838,13 @@ impl StartView {
 
     /// The selected rows as the commands take them: (path, name, folder), the page's order.
     fn selection_items(&self) -> Vec<(PathBuf, String, bool)> {
-        let sel = self.selection();
+        let sel = self.selection_set();
+        let names: std::collections::HashMap<&Path, &str> = self.docs.iter().map(|d| (d.path.as_path(), d.name.as_str())).collect();
         self.page_order()
             .into_iter()
-            .filter(|p| sel.contains(p))
-            .map(|p| match self.docs.iter().find(|d| d.path == p) {
-                Some(d) => (p, d.name.clone(), false),
+            .filter(|p| sel.contains(p.as_path()))
+            .map(|p| match names.get(p.as_path()) {
+                Some(name) => (p, name.to_string(), false),
                 None => {
                     let name = folder_label(&p);
                     (p, name, true)
@@ -868,19 +910,47 @@ impl StartView {
         let items = self.selection_items();
         let view = cx.entity();
         let heading = |label: String| h_flex().h(px(32.)).gap(px(8.)).text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text)).child(label);
-        let rows = v_flex().mt(px(6.)).border_1().border_color(rgb(0xcccccc)).children(items.iter().enumerate().map(|(i, (path, name, folder))| {
-            let (v, p1) = (view.clone(), path.clone());
-            h_flex()
-                .h(px(36.))
-                .px(px(10.))
-                .gap(px(8.))
-                .when(i > 0, |d| d.border_t_1().border_color(rgb(0xcccccc)))
-                .text_size(px(14.))
-                .text_color(pal.text)
-                .child(os::glyph(if *folder { os::GLYPH_FOLDER } else { os::GLYPH_DOCUMENT }, 18., pal.text))
-                .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())))
-                .child(div().id(("sel-remove", i)).cursor_pointer().child(os::glyph(os::GLYPH_CLOSE, 14., rgb(0x666666))).on_click(move |_, _, cx| v.update(cx, |t, cx| t.deselect(&p1, cx))))
-        }));
+        // Only the rows in sight are built (2,000 selected took ~15 ms of layout a frame); the others are one spacer.
+        const SEL_ROW_H: f32 = 36.;
+        let built = rows_of(self.sel_clip.get(), 300., SEL_ROW_H);
+        let probe = {
+            let clip = self.sel_clip.clone();
+            let panel = self.panel_slice.as_ref().map(|p| p.entity_id());
+            canvas(
+                move |b, window, cx| {
+                    let mask = window.content_mask().bounds;
+                    let now = RowsClip { top: f32::from(b.top()), clip: (f32::from(mask.top()), f32::from(mask.bottom())) };
+                    clip.set(Some(now));
+                    let seen = rows_of(Some(now), 0., SEL_ROW_H);
+                    if seen.0 < built.0 || seen.1 > built.1 {
+                        if let Some(panel) = panel {
+                            cx.notify(panel);
+                        }
+                        window.request_animation_frame();
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .w_full()
+            .h(px(0.))
+        };
+        let spacer = |n: usize| div().h(px(SEL_ROW_H * n as f32)).flex_none().into_any_element();
+        let mut list: Vec<AnyElement> = vec![probe.into_any_element()];
+        let mut skipped = 0;
+        for (i, item) in items.iter().enumerate() {
+            if !(built.0..built.1).contains(&i) {
+                skipped += 1;
+                continue;
+            }
+            if skipped > 0 {
+                list.push(spacer(std::mem::take(&mut skipped)));
+            }
+            list.push(Self::selection_row(&view, i, item));
+        }
+        if skipped > 0 {
+            list.push(spacer(skipped));
+        }
+        let rows = v_flex().mt(px(6.)).border_1().border_color(rgb(0xcccccc)).children(list);
         let button = |id: &'static str| h_flex().id(id).h(px(32.)).px(px(10.)).gap(px(6.)).rounded(px(3.)).border_1().border_color(rgb(0xaaaaaa)).bg(rgb(0xffffff)).cursor_pointer().text_size(px(14.)).text_color(pal.text).map(move |d| crate::ui_script::mark(d, move || format!("button:{}", if id == "sel-trash" { "Trash" } else { "Deselect all" })));
         let (v1, v2) = (view.clone(), view.clone());
         let docs: Vec<PathBuf> = items.iter().filter(|i| !i.2).map(|i| i.0.clone()).collect();
@@ -901,12 +971,32 @@ impl StartView {
             .into_any_element()
     }
 
+    /// A row of the "N selections" list: icon, name, ✕.
+    fn selection_row(view: &Entity<StartView>, i: usize, (path, name, folder): &(PathBuf, String, bool)) -> AnyElement {
+        let pal = p();
+        let (v, p1) = (view.clone(), path.clone());
+        h_flex()
+            .h(px(36.))
+            .px(px(10.))
+            .gap(px(8.))
+            .when(i > 0, |d| d.border_t_1().border_color(rgb(0xcccccc)))
+            .text_size(px(14.))
+            .text_color(pal.text)
+            .child(os::glyph(if *folder { os::GLYPH_FOLDER } else { os::GLYPH_DOCUMENT }, 18., pal.text))
+            .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())))
+            .child(div().id(("sel-remove", i)).cursor_pointer().child(os::glyph(os::GLYPH_CLOSE, 14., rgb(0x666666))).on_click(move |_, _, cx| v.update(cx, |t, cx| t.deselect(&p1, cx))))
+            .into_any_element()
+    }
+
     /// What a drag from `row` carries: the selection if the row is in a multiple one, else the row.
-    fn drag_items(&self, row: &Path, name: &str, folder: bool) -> DocsDrag {
-        if self.is_selected(row) && self.selection().len() > 1 {
-            return DocsDrag::new(self.selection_items());
+    /// `selected`: the row is. (A frame builds each visible row's drag at once: the selection's items are made once a
+    /// frame and shared.)
+    fn drag_items(&self, selected: bool, row: &Path, name: &str, folder: bool) -> DocsDrag {
+        let many = self.selected.is_some() && self.also_of == self.selected && !self.also.is_empty();
+        if selected && many {
+            return DocsDrag::new(self.drag_share.borrow_mut().get_or_insert_with(|| Rc::new(self.selection_items())).clone());
         }
-        DocsDrag::new(vec![(row.to_path_buf(), name.to_string(), folder)])
+        DocsDrag::new(Rc::new(vec![(row.to_path_buf(), name.to_string(), folder)]))
     }
 
     /// Dragged rows dropped on folder `dir`: moved into it (those already there, and a folder onto itself, stay).
@@ -930,7 +1020,7 @@ impl StartView {
             Self::notify(window, cx, AlertKind::Warning, format!("{name}: Close the document's window before moving it to the trash"));
             return;
         }
-        self.confirm_trash(drag.items.clone(), window, cx);
+        self.confirm_trash(drag.items.to_vec(), window, cx);
     }
 
     /// Send to trash on the selected rows (none of them open).
@@ -3106,7 +3196,7 @@ impl StartView {
             return None;
         }
         Some(match &self.source {
-            Source::Folder(f) if canon(f) == canon(&crate::file_dialogs::documents_dir()) => "Owned by me".into(),
+            Source::Folder(f) if canon(f) == docs_root().1 => "Owned by me".into(),
             _ => self.source_title(),
         })
     }
@@ -3138,9 +3228,9 @@ impl StartView {
         let crumbs: Vec<PathBuf> = match &self.source {
             Source::Folder(f) => {
                 let f = canon(f);
-                let docs = canon(&crate::file_dialogs::documents_dir());
-                let top = outside_folders().into_iter().find(|o| f.starts_with(o));
-                let mut v: Vec<PathBuf> = f.ancestors().take_while(|a| *a != docs && top.as_deref().is_none_or(|t| a.starts_with(t))).map(Path::to_path_buf).collect();
+                let docs = &docs_root().1;
+                let top = self.outside.iter().find(|o| f.starts_with(o));
+                let mut v: Vec<PathBuf> = f.ancestors().take_while(|a| *a != docs.as_path() && top.is_none_or(|t| a.starts_with(t))).map(Path::to_path_buf).collect();
                 v.reverse();
                 v
             }
@@ -3235,9 +3325,9 @@ impl StartView {
     fn folder_tiles(&self) -> Vec<(PathBuf, Option<String>)> {
         let mut tiles: Vec<(PathBuf, Option<String>)> = match &self.source {
             Source::All => {
-                let root = canon(&crate::file_dialogs::documents_dir());
+                let root = &docs_root().1;
                 let mut v: Vec<(PathBuf, Option<String>)> = self.dirs.iter().filter(|d| d.parent() == Some(root.as_path())).map(|d| (d.clone(), None)).collect();
-                let extra: Vec<PathBuf> = outside_folders().into_iter().filter(|f| !v.iter().any(|(d, _)| d == f)).collect();
+                let extra: Vec<PathBuf> = self.outside.iter().filter(|f| !v.iter().any(|(d, _)| d == *f)).cloned().collect();
                 v.extend(extra.into_iter().map(|f| (f, None)));
                 v.sort_by_key(|(d, _)| folder_label(d).to_lowercase());
                 v
@@ -3258,7 +3348,7 @@ impl StartView {
                 tiles.sort_by_key(name);
                 tiles.reverse();
             }
-            FolderSort::Modified => tiles.sort_by_key(|(d, _)| std::cmp::Reverse(std::fs::metadata(d).and_then(|m| m.modified()).ok())),
+            FolderSort::Modified => tiles.sort_by_key(|(d, _)| std::cmp::Reverse(self.dir_modified.get(d).copied())),
         }
         tiles
     }
@@ -3279,9 +3369,10 @@ impl StartView {
         let folder_rows = if list_view && !tiles_list.is_empty() { Some(self.render_folder_rows(&tiles_list, cx)) } else { None };
         let has_tiles = !tiles_list.is_empty();
         let mut tiles = div().flex().flex_wrap().gap(px(12.)).pl(px(18.)).pr(px(10.));
+        let sel = self.selection_set();
         for (i, (f, trash_id)) in tiles_list.into_iter().enumerate() {
             let view = cx.entity();
-            let selected = self.is_selected(&f);
+            let selected = sel.contains(f.as_path());
             let name = trash_id.as_ref().and_then(|id| self.trash.get(id)).map(|t| t.name.clone()).unwrap_or_else(|| folder_label(&f));
             let (f1, f2) = (f.clone(), f.clone());
             tiles = tiles.child(
@@ -3303,7 +3394,7 @@ impl StartView {
                     .child(self.inline_rename_field(&f, cx).unwrap_or_else(|| div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())).into_any_element()))
                     .when(trash_id.is_none(), |t| {
                         let target = f.clone();
-                        t.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(&f, &name, true), start_docs_drag(cx.entity().downgrade()))
+                        t.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(selected, &f, &name, true), start_docs_drag(cx.entity().downgrade()))
                             .drag_over::<DocsDrag>(|st, d, _, _| folder_drop_style(st, d))
                             .on_drop(cx.listener(move |this, drag: &DocsDrag, window, cx| this.drop_into_folder(drag, &target, window, cx)))
                     })
@@ -3479,10 +3570,11 @@ impl StartView {
             .child(head("fh-mod", "Modified", 200., sort == FolderSort::Modified, true, FolderSort::Modified, cx))
             .child(head("fh-modby", "Modified by", 200., false, false, sort, cx));
         let mut rows = v_flex().child(header);
+        let sel = self.selection_set();
         for (i, (f, trash_id)) in tiles.iter().enumerate() {
-            let selected = self.is_selected(f);
+            let selected = sel.contains(f.as_path());
             let name = trash_id.as_ref().and_then(|id| self.trash.get(id)).map(|t| t.name.clone()).unwrap_or_else(|| folder_label(f));
-            let modified = std::fs::metadata(f).and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+            let modified = self.dir_modified.get(f).copied().unwrap_or(0);
             let (f1, f2, f3, v) = (f.clone(), f.clone(), f.clone(), cx.entity());
             let tid = trash_id.clone();
             let menu_name = name.clone();
@@ -3503,7 +3595,7 @@ impl StartView {
                     .child(div().w(px(200.)).flex_none().pl(px(16.)).child("me"))
                     .when(trash_id.is_none(), |r| {
                         let target = f.clone();
-                        r.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(f, &name_for_drag, true), start_docs_drag(cx.entity().downgrade()))
+                        r.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(selected, f, &name_for_drag, true), start_docs_drag(cx.entity().downgrade()))
                             .drag_over::<DocsDrag>(|st, d, _, _| folder_drop_style(st, d))
                             .on_drop(cx.listener(move |this, drag: &DocsDrag, window, cx| this.drop_into_folder(drag, &target, window, cx)))
                     })
@@ -3987,8 +4079,11 @@ impl StartView {
             self.hit_rows(hits, &cols, cx)
         } else {
             let mut rows = Vec::new();
+            let sel = self.selection_set();
+            let alone = sel.len() == 1;
             for (k, d) in docs.iter().enumerate() {
-                let keep = (on_screen.0..on_screen.1).contains(&k) || self.is_selected(&d.path) || self.renaming.as_ref().is_some_and(|r| r.0 == d.path);
+                // (Off screen only the row clicked last is built, not every selected one.)
+                let keep = (on_screen.0..on_screen.1).contains(&k) || self.selected.as_ref() == Some(&d.path) || self.renaming.as_ref().is_some_and(|r| r.0 == d.path);
                 if !keep {
                     skipped += 1;
                     continue;
@@ -3998,9 +4093,9 @@ impl StartView {
                     skipped = 0;
                 }
                 rows.push({
-                let selected = self.is_selected(&d.path);
+                let selected = sel.contains(d.path.as_path());
                 // The quick actions show on the one selected row only.
-                let alone = selected && self.selection().len() == 1;
+                let alone = selected && alone;
                 let open = crate::doc_files::is_document_open(&d.path, cx);
                 let v2 = cx.entity();
                 let (d1, d2) = (d.clone(), d.clone());
@@ -4091,7 +4186,7 @@ impl StartView {
                                 }))),
                         )
                     })
-                    .when(!d.trashed, |r| r.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(&d.path, &d.name, false), start_docs_drag(cx.entity().downgrade())))
+                    .when(!d.trashed, |r| r.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(selected, &d.path, &d.name, false), start_docs_drag(cx.entity().downgrade())))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
                     // Right-click selects the row too (live documents/25); the
                     // menu's own handler stops propagation, so select here.
@@ -4116,15 +4211,21 @@ impl StartView {
         };
         let empty = rows.is_empty();
         // The rows' place and the visible list around them, read as they're painted: a scroll or a resize that shows
-        // other rows draws again.
+        // rows not built builds them (the list is in the cached body: it is told so).
+        self.rows_built.set(on_screen);
         let probe = {
             let clip = self.rows_clip.clone();
+            let body = self.body.as_ref().map(|b| b.entity_id());
             canvas(
-                move |b, window, _| {
+                move |b, window, cx| {
                     let mask = window.content_mask().bounds;
                     let now = RowsClip { top: f32::from(b.top()), clip: (f32::from(mask.top()), f32::from(mask.bottom())) };
                     clip.set(Some(now));
-                    if rows_on_screen(Some(now)) != on_screen {
+                    let seen = rows_within(Some(now), 0.);
+                    if seen.0 < on_screen.0 || seen.1 > on_screen.1 {
+                        if let Some(body) = body {
+                            cx.notify(body);
+                        }
                         window.request_animation_frame();
                     }
                 },
@@ -4247,12 +4348,17 @@ impl StartView {
 impl StartView {
     /// Sidebar, documents and the details panel (see `body`).
     fn render_body(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        self.drag_share.get_mut().take();
         let docs = self.visible();
         let header = self.render_header(cx);
         // Searching hides the folder area, except an advanced search for folders.
         let folders = if self.query.trim().is_empty() && self.adv_query.as_ref().is_none_or(|q| q.folders_only()) { self.render_folders(cx) } else { None };
         let strip = self.render_strip(cx);
-        let panel = self.render_doc_panel(cx);
+        // The details panel is a cached view of its own: a scroll of the list leaves it (2,000 selected rows) as it was.
+        let panel = self.panel.is_some().then(|| {
+            let slice = self.panel_slice.get_or_insert_with(|| crate::cached_slice::Slice::new(&cx.entity(), |this, _, cx| this.render_doc_panel(cx).unwrap_or_else(|| div().into_any_element()), cx)).clone();
+            slice.cached(StyleRefinement::default().w(px(340.)).h_full().flex_none())
+        });
         let content = self.render_list(&docs, cx);
         h_flex()
             .flex_1()
@@ -4403,13 +4509,16 @@ impl Render for StartView {
     }
 }
 
+/// Dragged rows: (path, name, folder).
+type DragItems = Rc<Vec<(PathBuf, String, bool)>>;
+
 /// A documents-page message: kind, an optional bold lead (a document
 /// name), the text, and the trash item its Restore link brings back.
 /// Documents and folders dragged on the documents page: the selection when the grabbed row is part of it, else that
 /// row; dropped on a folder (row, tile or breadcrumb) they move into it.
 #[derive(Clone)]
 struct DocsDrag {
-    items: Vec<(PathBuf, String, bool)>,
+    items: DragItems,
     /// Where the row was grabbed (the ghost sits 10 px left of and 8 px above the pointer).
     offset: Point<Pixels>,
     /// Over a target this frame (the ghost's move icon, else ⊘).
@@ -4417,7 +4526,7 @@ struct DocsDrag {
 }
 
 impl DocsDrag {
-    fn new(items: Vec<(PathBuf, String, bool)>) -> Self {
+    fn new(items: DragItems) -> Self {
         Self { items, offset: Point::default(), over: Rc::default() }
     }
 }
@@ -4683,8 +4792,19 @@ fn click_rows(sel: &[PathBuf], anchor: Option<&Path>, order: &[PathBuf], row: &P
     (vec![row.to_path_buf()], Some(row.to_path_buf()))
 }
 
+/// The documents folder as given and canonical, read once (the page asks for it many times a frame; each read makes
+/// sure the folder exists).
+fn docs_root() -> &'static (PathBuf, PathBuf) {
+    static ROOT: std::sync::OnceLock<(PathBuf, PathBuf)> = std::sync::OnceLock::new();
+    ROOT.get_or_init(|| {
+        let d = crate::file_dialogs::documents_dir();
+        let c = canon(&d);
+        (d, c)
+    })
+}
+
 fn folder_label(f: &Path) -> String {
-    if f == crate::file_dialogs::documents_dir() {
+    if f == docs_root().0 {
         "Noshape documents".to_string()
     } else {
         f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| f.display().to_string())
@@ -4772,8 +4892,8 @@ fn canon(p: &Path) -> PathBuf {
 
 /// Folders added from outside the documents folder (shown at the top level).
 fn outside_folders() -> Vec<PathBuf> {
-    let root = canon(&crate::file_dialogs::documents_dir());
-    crate::doc_files::watched_folders().into_iter().map(|f| canon(&f)).filter(|f| !f.starts_with(&root) && f.is_dir()).collect()
+    let root = &docs_root().1;
+    crate::doc_files::watched_folders().into_iter().map(|f| canon(&f)).filter(|f| !f.starts_with(root) && f.is_dir()).collect()
 }
 
 impl Location {
@@ -5186,6 +5306,10 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
         })
     });
 }
+
+#[cfg(test)]
+#[path = "start_bench.rs"]
+mod bench;
 
 #[cfg(test)]
 mod tests {

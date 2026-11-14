@@ -11,6 +11,8 @@ use noshape_app_core::*;
 use noshape_ui_test_support as _;
 #[cfg(test)]
 mod drawing_ui_tests;
+#[cfg(test)]
+mod drawing_bench;
 
 pub mod drawing_aux;
 pub mod drawing_break;

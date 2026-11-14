@@ -163,6 +163,21 @@ worker on wgpu's no-op backend), keys through GPUI's dispatch. Example: part-stu
   `on_viewport_event`), since the viewport's own hit testing needs real frames.
 - Assert on the model (the sketch's constraints, the document), not on pixels. Each test well under a second.
 
+## UI benches
+
+The studios' views at scale (T2, `#[ignore = "T2: bench, …"]`), one per case: the documents page (2,000 documents,
+50 folders), the version graph (500 versions, 20 workspaces), a Variable Studio (500 variables), the Feature Studio on
+a 10,000-line file and a drawing of 20 views. Each opens the real view in a test window through
+`noshape_ui_test_support::bench::run`, whose text is shaped as the app's (Linux: cosmic-text with the app's Roboto;
+GPUI's default test platform shapes nothing), and times each step on the UI thread: the handler (a key, a click, a
+scroll) and the frame after it (`Window::draw`). Work a step hands to a background task isn't in its time; the step
+must show that it is busy, and the bench prints how long the background work took. A step's median must fit a frame
+(16 ms) as the release build runs it (debug builds only print their times): `cargo test --profile ui-bench -p <crate> --lib bench:: -- --ignored --nocapture`
+(lines `BENCH <case> | <step>`; the dev profile builds the UI crates unoptimised, with debug assertions, several
+times slower);
+`NOSHAPE_BENCH_REPEAT=<k>` repeats every step k times, for a profiler (`perf record -g`) to see the steps rather than
+the document being made.
+
 ## T2 deep
 
 Marked `#[ignore = "T2: <reason>"]`; `tools/tiers/t2-names.py` lists them and `t2.sh` runs exactly those (other

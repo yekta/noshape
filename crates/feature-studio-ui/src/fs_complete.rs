@@ -676,6 +676,35 @@ pub struct Completions {
 /// How long after a keystroke the list first shows.
 pub const LIST_DELAY: std::time::Duration = std::time::Duration::from_millis(250);
 
+/// The list's rows at `offset`: outside every function the snippets and keywords (live 2331), inside std's names.
+fn completion_items(text: &gpui_kit::component::input::Rope, offset: usize) -> Vec<gpui_kit::component::input::lsp_types::CompletionItem> {
+    use gpui_kit::component::input::RopeExt as _;
+    use gpui_kit::component::input::lsp_types::{CompletionItem, CompletionTextEdit, Documentation, InsertTextFormat, LSPAny, MarkupContent, MarkupKind, Range, TextEdit};
+    let row = text.offset_to_position(offset).line as usize;
+    let line_start = text.line_start_offset(row);
+    let line = text.slice(line_start..offset).to_string();
+    let indent: String = line.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+    let top = at_top_level(&text.slice(0..offset).to_string());
+    if top { complete_top_level(&line) } else { complete_at(&line, line.len()) }
+        .map(|(start, rows)| {
+            let range = Range { start: text.offset_to_position(line_start + start), end: text.offset_to_position(offset) };
+            rows.into_iter()
+                .map(|m| CompletionItem {
+                    label: m.entry.name.clone(),
+                    detail: Some(ace_meta(&m.entry.name, &m.entry.kind)),
+                    // A function's call as an Ace snippet (its values selected in turn by Tab).
+                    text_edit: Some(CompletionTextEdit::Edit(TextEdit { range, new_text: indented(&m.entry.template, &indent) })),
+                    insert_text_format: (m.entry.template != m.entry.snippet).then_some(InsertTextFormat::SNIPPET),
+                    documentation: (!m.entry.doc.is_empty()).then(|| Documentation::MarkupContent(MarkupContent { kind: MarkupKind::Markdown, value: m.entry.doc.clone() })),
+                    // The letters the list highlights (the menu's `ace` look reads them).
+                    data: Some(LSPAny::from(m.hits.iter().map(|r| LSPAny::from(vec![r.start as u64, r.end as u64])).collect::<Vec<_>>())),
+                    ..Default::default()
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 impl gpui_kit::component::input::CompletionProvider for Completions {
     fn completions(
         &self,
@@ -685,41 +714,17 @@ impl gpui_kit::component::input::CompletionProvider for Completions {
         _window: &mut gpui_kit::Window,
         cx: &mut gpui_kit::App,
     ) -> gpui_kit::Task<anyhow::Result<gpui_kit::component::input::lsp_types::CompletionResponse>> {
-        use gpui_kit::component::input::RopeExt as _;
-        use gpui_kit::component::input::lsp_types::{CompletionItem, CompletionResponse, CompletionTextEdit, Documentation, InsertTextFormat, LSPAny, MarkupContent, MarkupKind, Range, TextEdit};
-        let row = text.offset_to_position(offset).line as usize;
-        let line_start = text.line_start_offset(row);
-        let line = text.slice(line_start..offset).to_string();
-        let indent: String = line.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
-        // Outside every function the snippets and keywords (live 2331), inside std's names.
-        let top = at_top_level(&text.slice(0..offset).to_string());
-        let items: Vec<CompletionItem> = if top { complete_top_level(&line) } else { complete_at(&line, line.len()) }
-            .map(|(start, rows)| {
-                let range = Range { start: text.offset_to_position(line_start + start), end: text.offset_to_position(offset) };
-                rows.into_iter()
-                    .map(|m| CompletionItem {
-                        label: m.entry.name.clone(),
-                        detail: Some(ace_meta(&m.entry.name, &m.entry.kind)),
-                        // A function's call as an Ace snippet (its values selected in turn by Tab).
-                        text_edit: Some(CompletionTextEdit::Edit(TextEdit { range, new_text: indented(&m.entry.template, &indent) })),
-                        insert_text_format: (m.entry.template != m.entry.snippet).then_some(InsertTextFormat::SNIPPET),
-                        documentation: (!m.entry.doc.is_empty()).then(|| Documentation::MarkupContent(MarkupContent { kind: MarkupKind::Markdown, value: m.entry.doc.clone() })),
-                        // The letters the list highlights (the menu's `ace` look reads them).
-                        data: Some(LSPAny::from(m.hits.iter().map(|r| LSPAny::from(vec![r.start as u64, r.end as u64])).collect::<Vec<_>>())),
-                        ..Default::default()
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        let wait = !self.showing.get();
-        if items.is_empty() {
-            self.showing.set(false);
-            return gpui_kit::Task::ready(Ok(CompletionResponse::Array(items)));
-        }
-        let showing = self.showing.clone();
+        use gpui_kit::component::input::lsp_types::CompletionResponse;
+        // Matched off the UI thread (std's thousands of names, a long file's text before the caret).
+        let (text, wait, showing, asked) = (text.clone(), !self.showing.get(), self.showing.clone(), std::time::Instant::now());
         cx.spawn(async move |cx| {
+            let items = cx.background_executor().spawn(async move { completion_items(&text, offset) }).await;
+            if items.is_empty() {
+                showing.set(false);
+                return Ok(CompletionResponse::Array(items));
+            }
             if wait {
-                cx.background_executor().timer(LIST_DELAY).await;
+                cx.background_executor().timer(LIST_DELAY.saturating_sub(asked.elapsed())).await;
             }
             showing.set(true);
             Ok(CompletionResponse::Array(items))

@@ -296,9 +296,9 @@ impl VariableStudioView {
     /// units of its type.
     fn scope_above(&self, row: usize, cx: &App) -> (std::collections::BTreeMap<String, noshape_units::Quantity>, Option<noshape_units::Dim>) {
         let Some(studio) = self.studio(cx) else { return Default::default() };
-        let below: Vec<&str> = studio.variables.iter().skip(row).map(|v| v.name.as_str()).collect();
+        let below: std::collections::HashSet<&str> = studio.variables.iter().skip(row).map(|v| v.name.as_str()).collect();
         let eval = noshape_model::variables::studio_evaluation(&self.doc.read(cx).session.doc, self.tab);
-        let scope = eval.values.iter().filter(|(n, _)| !below.contains(&n.as_str())).map(|(n, q)| (n.clone(), *q)).collect();
+        let scope = eval.values.iter().filter(|(n, _)| !below.contains(n.as_str())).map(|(n, q)| (n.clone(), *q)).collect();
         (scope, studio.variables.get(row).and_then(|v| v.kind).and_then(|k| k.dim()))
     }
 
@@ -715,15 +715,19 @@ struct RowsClip {
 
 /// Rows drawn before the table's place is known (a window's height of them).
 const FIRST_ROWS: usize = 60;
-/// Rows drawn above and below the visible ones (px), for a wheel step before the next frame.
-const ROWS_MARGIN: f32 = 600.;
+/// Rows drawn above and below the visible ones (px), for wheel steps before the next frame.
+const ROWS_MARGIN: f32 = 120.;
 
 /// The rows (by their place in the table) to build: those on screen and a margin (a 500-variable table built every row
 /// each frame, ~250 ms).
 fn rows_on_screen(clip: Option<RowsClip>) -> (usize, usize) {
+    rows_within(clip, ROWS_MARGIN)
+}
+
+fn rows_within(clip: Option<RowsClip>, margin: f32) -> (usize, usize) {
     let Some(c) = clip else { return (0, FIRST_ROWS) };
     let row = |y: f32| ((y - c.top) / ROW_H).max(0.);
-    (row(c.clip.0 - ROWS_MARGIN).floor() as usize, row(c.clip.1 + ROWS_MARGIN).ceil() as usize)
+    (row(c.clip.0 - margin).floor() as usize, row(c.clip.1 + margin).ceil() as usize)
 }
 
 fn cell_div(c: usize) -> Div {
@@ -1357,16 +1361,16 @@ impl VariableStudioView {
             rows.push(div().h(px(ROW_H * skipped as f32)).flex_none().into_any_element());
         }
         // The rows' place and the visible window around them, read as they're painted: a scroll or a resize that
-        // shows other rows draws again.
+        // shows rows not built draws again (within the margin, the rows built already show).
         let probe = {
             let clip = self.rows_clip.clone();
             canvas(
                 move |b, window, _| {
                     let mask = window.content_mask().bounds;
                     let now = RowsClip { top: f32::from(b.top()), clip: (f32::from(mask.top()), f32::from(mask.bottom())) };
-                    let wanted = rows_on_screen(Some(now));
+                    let seen = rows_within(Some(now), 0.);
                     clip.set(Some(now));
-                    if wanted != on_screen {
+                    if seen.0 < on_screen.0 || seen.1 > on_screen.1 {
                         window.request_animation_frame();
                     }
                 },
@@ -1758,3 +1762,7 @@ mod tests {
         assert_eq!(grid_tab("new", false, 0).as_deref(), Some("new"), "no rows: the add row keeps it");
     }
 }
+
+#[cfg(test)]
+#[path = "variable_bench.rs"]
+mod bench;

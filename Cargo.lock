@@ -4839,6 +4839,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "gpui-kit",
+ "gpui-pre",
  "log",
  "noshape-app-core",
  "noshape-feature-studio-ui",
@@ -4848,6 +4849,7 @@ dependencies = [
  "noshape-render",
  "noshape-scene",
  "noshape-store",
+ "noshape-ui-test-support",
  "noshape-units",
  "noshape-workspace-hack",
  "parking_lot",
@@ -5119,6 +5121,7 @@ dependencies = [
  "anyhow",
  "dirs 6.0.0",
  "gpui-kit",
+ "gpui-pre",
  "log",
  "noshape-app-core",
  "noshape-model",
@@ -5127,6 +5130,7 @@ dependencies = [
  "noshape-release-ui",
  "noshape-render",
  "noshape-store",
+ "noshape-ui-test-support",
  "noshape-workspace-hack",
  "serde",
  "serde_json",
@@ -5152,6 +5156,7 @@ name = "noshape-ui-test-support"
 version = "0.0.0-dev"
 dependencies = [
  "gpui-pre",
+ "gpui-pre-wgpu",
  "wgpu",
 ]
 
@@ -5188,11 +5193,13 @@ version = "0.0.0-dev"
 dependencies = [
  "anyhow",
  "gpui-kit",
+ "gpui-pre",
  "log",
  "noshape-app-core",
  "noshape-model",
  "noshape-ops",
  "noshape-store",
+ "noshape-ui-test-support",
  "noshape-units",
  "noshape-workspace-hack",
  "parking_lot",

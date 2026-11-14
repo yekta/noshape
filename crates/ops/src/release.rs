@@ -19,11 +19,14 @@ fn numbering_path() -> std::path::PathBuf {
 
 /// Company settings › Numbering schemes.
 pub fn numbering_schemes() -> NumberingSchemes {
-    std::fs::read(numbering_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+    NUMBERING.get(numbering_path()).0
 }
+
+static NUMBERING: crate::release_settings::Cached<NumberingSchemes> = crate::release_settings::Cached::new();
 
 pub fn set_numbering_schemes(s: &NumberingSchemes) {
     let _ = std::fs::write(numbering_path(), serde_json::to_vec_pretty(s).unwrap_or_default());
+    NUMBERING.wrote(numbering_path(), s);
 }
 
 /// Generates the next number of a sequential scheme (`pick` chooses the

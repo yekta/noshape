@@ -692,6 +692,11 @@ impl FeatureStudioView {
         }));
         let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, _subs: subs };
         this.recompile(source, cx);
+        // std's names, read for the completion list off the UI thread before the first key needs them.
+        cx.background_spawn(async {
+            crate::fs_complete::index();
+        })
+        .detach();
         this
     }
 
@@ -2240,31 +2245,47 @@ const KEYWORDS: &[&str] = &[
 /// one, or a leading `/*`, closes on a later line. The fold hides the lines after it through the closing one (Ace
 /// shows that line's rest after `{...}`), so the caret steps over them.
 fn fold_lines(src: &str, tokens: &[(Range<usize>, Tok)]) -> Vec<gpui_kit::component::input::FoldRange> {
-    let token_at = |at: usize| tokens.get(tokens.partition_point(|(r, _)| r.end <= at)).filter(|(r, _)| r.start <= at);
-    let quoted = |at: usize| token_at(at).is_some_and(|(_, t)| matches!(t, Tok::Comment | Tok::String));
-    let starts: Vec<usize> = std::iter::once(0).chain(src.match_indices('\n').map(|(i, _)| i + 1)).collect();
-    let line_of = |at: usize| starts.partition_point(|&s| s <= at) - 1;
+    // One pass over the bytes (it runs on every keystroke; a 10,000-line file took ~20 ms with a search per
+    // character): line starts, and each opening bracket's closing one outside comments and strings.
+    let b = src.as_bytes();
+    let mut starts = vec![0];
     let mut close_of = std::collections::HashMap::new();
     let mut open: [Vec<usize>; 3] = Default::default();
-    for (i, c) in src.char_indices() {
-        let Some(k) = "{[(".find(c).or_else(|| "}])".find(c)) else { continue };
-        if quoted(i) {
+    let mut t = 0;
+    for (i, &c) in b.iter().enumerate() {
+        let k = match c {
+            b'\n' => {
+                starts.push(i + 1);
+                continue;
+            }
+            b'{' | b'}' => 0,
+            b'[' | b']' => 1,
+            b'(' | b')' => 2,
+            _ => continue,
+        };
+        while t < tokens.len() && tokens[t].0.end <= i {
+            t += 1;
+        }
+        if tokens.get(t).is_some_and(|(r, tok)| r.start <= i && matches!(tok, Tok::Comment | Tok::String)) {
             continue;
         }
-        if "{[(".contains(c) {
+        if matches!(c, b'{' | b'[' | b'(') {
             open[k].push(i);
         } else if let Some(o) = open[k].pop() {
             close_of.insert(o, i);
         }
     }
+    let token_at = |at: usize| tokens.get(tokens.partition_point(|(r, _)| r.end <= at)).filter(|(r, _)| r.start <= at);
+    let line_of = |at: usize| starts.partition_point(|&s| s <= at) - 1;
     let mut out = Vec::new();
     for (line, &start) in starts.iter().enumerate() {
-        let text = &src[start..starts.get(line + 1).map_or(src.len(), |e| e - 1)];
-        let end = if text.trim_start().starts_with("/*") {
-            token_at(start + text.len() - text.trim_start().len()).filter(|(_, t)| matches!(t, Tok::Comment)).map(|(r, _)| line_of(r.end.saturating_sub(1)))
+        let text = &b[start..starts.get(line + 1).map_or(b.len(), |e| e - 1)];
+        let indent = text.iter().take_while(|c| c.is_ascii_whitespace()).count();
+        let end = if text[indent..].starts_with(b"/*") {
+            token_at(start + indent).filter(|(_, t)| matches!(t, Tok::Comment)).map(|(r, _)| line_of(r.end.saturating_sub(1)))
         } else {
-            let after = text.rfind(['}', ']', ')']).map_or(0, |i| i + 1);
-            text[after..].find(['{', '[', '(']).and_then(|i| close_of.get(&(start + after + i))).map(|&c| line_of(c))
+            let after = text.iter().rposition(|c| matches!(c, b'}' | b']' | b')')).map_or(0, |i| i + 1);
+            text[after..].iter().position(|c| matches!(c, b'{' | b'[' | b'(')).and_then(|i| close_of.get(&(start + after + i))).map(|&c| line_of(c))
         };
         if let Some(end) = end.filter(|e| *e > line) {
             out.push(gpui_kit::component::input::FoldRange::new(line, end + 1));
@@ -2521,3 +2542,7 @@ mod import_notice_tests {
         assert!(notices.iter().all(|n| !n.error), "{:?}", notices.iter().map(|n| &n.message).collect::<Vec<_>>());
     }
 }
+
+#[cfg(test)]
+#[path = "feature_studio_bench.rs"]
+mod bench;

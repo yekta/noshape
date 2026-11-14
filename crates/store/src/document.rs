@@ -951,6 +951,14 @@ impl Document {
     }
 
     /// The full DAG: all microversions, branches and versions.
+    /// Changes when anything in the file may have: this handle's writes, or another connection's (another
+    /// process). Cheap, for a view to know whether its copy of the [`Document::graph`] is still current.
+    pub fn change_stamp(&self) -> Result<(u64, i64)> {
+        let c = self.conn()?;
+        let other: i64 = c.query_row("PRAGMA data_version", [], |r| r.get(0))?;
+        Ok((c.total_changes(), other))
+    }
+
     pub fn graph(&self) -> Result<VersionGraph> {
         let mut stmt = self.conn()?.prepare_cached(&format!(
             "SELECT {MV_COLS} FROM microversions m ORDER BY m.seq"
