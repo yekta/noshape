@@ -116,6 +116,9 @@ impl Render for MateDrag {
 
 /// A section plane (origin, normal, offset along it, flipped) and its
 /// in-plane X axis (the rotate handles turn it about X and Y).
+/// The Section view dialog's prompt while it has no plane (live part-studio/1024; the assembly's the same).
+const SELECT_SECTION_PLANE: &str = "Select a plane, planar face, cylinder, cone, or mate connector.";
+
 #[derive(Clone, Debug)]
 pub struct AsmSectionPlane {
     pub origin: DVec3,
@@ -3946,7 +3949,8 @@ impl AssemblyView {
                     .mx(px(-3.))
                     .child(div().w(px(84.)).flex_none().pl(px(5.)).whitespace_nowrap().text_size(px(12.)).text_color(pal.text_muted).child("Playback type"))
                     .child(div().w(px(110.)).flex_none().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(playback))
-                    .child(icon_btn("anim-reverse", "flip-circular-opposite", "Reverse", reversed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    // Live2 (REQUESTS 18:30): an icon button, its tooltip "Reverse playback".
+                    .child(icon_btn("anim-reverse", "flip-circular-opposite", "Reverse playback", reversed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(a) = &mut this.anim {
                             a.dir = -a.dir;
                         }
@@ -5285,6 +5289,10 @@ impl AssemblyView {
         {
             planes.push(AsmSectionPlane::new(f.origin, f.z(), f.x()));
         }
+        // Live2 (REQUESTS 18:20 (4)): opened empty, the blue hint at the top centre, as the Part Studio's.
+        if planes.is_empty() {
+            self.message = Some((false, SELECT_SECTION_PLANE.into()));
+        }
         let active = planes.len().saturating_sub(1);
         self.ui.section = Some(AsmSection { planes, include: false, items: Vec::new(), dialog: Some(AsmSectionDialog { items_active: false, active, chosen: true, saved, popup: None, popup_plane: None }) });
         self.rebuild_scene(false, cx);
@@ -5319,6 +5327,9 @@ impl AssemblyView {
 
     /// ✓ keeps the section, ✕ / Esc restores what was there before.
     pub(super) fn close_section_dialog(&mut self, accept: bool, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.message.as_ref().is_some_and(|(_, m)| m == SELECT_SECTION_PLANE) {
+            self.message = None;
+        }
         let Some(s) = &mut self.ui.section else { return };
         let Some(d) = s.dialog.take() else { return };
         if !accept {
@@ -5350,6 +5361,9 @@ impl AssemblyView {
             && s.planes.len() < MAX_SECTION_PLANES
         {
             pl.number = crate::section_dialog::next_plane_number(s.planes.iter().map(|p| p.number));
+            if self.message.as_ref().is_some_and(|(_, m)| m == SELECT_SECTION_PLANE) {
+                self.message = None;
+            }
             s.planes.push(pl);
             if let Some(d) = &mut s.dialog {
                 d.active = s.planes.len() - 1;

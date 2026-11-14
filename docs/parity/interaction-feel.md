@@ -148,9 +148,9 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 Live: live/feel/mates.json, asm-views.json, fields.json `assemblyInstanceList`, 3d.json `assembly` (live and live2,
 11-13). The UI is studios'; asm keeps the mate solver and landed the ring snap, the ▶ preview, Insert's Esc / ✓ and the
 drag thresholds (their commits below). Menus leave out "Add comment" (comments are cloud). Counts are matched / total
-per matrix (17:18 UTC): **mates 25 / 28, views 14 / 15, instance list 20 / 22, 3D 9 / 10**.
+per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3D 9 / 10**.
 
-### Mate dialog, mate list, Insert (mates.json): 25 / 28
+### Mate dialog, mate list, Insert (mates.json): 26 / 28
 
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
@@ -171,7 +171,7 @@ per matrix (17:18 UTC): **mates 25 / 28, views 14 / 15, instance list 20 / 22, 3
 | ▶ preview | 90 frames out and back from the mate's zero (a turn, ¼ of the view's width) | the same (asm 43736c55, e9941770) | asm's tests | = |
 | Mate row hover | both parts outlined, the marker, a flyout with the name and parameters | the same (`list_hover_mate`, `mate_tooltip`) | – | = |
 | Mate menu | Rename … Delete | the same | `two_selected_mates_have_lives_menu`, ui-parity | = |
-| Animate… | … Playback type Reciprocate with a loop toggle | a "Reverse" toggle there | – | ≠ |
+| Animate… | … Playback type Reciprocate ▾ and an icon button "Reverse playback" (live2 18:30) | the same | – | = |
 | Named positions, empty | the how-to text and its help link, Add named position | the same (17:18) | – | = |
 | Insert dialog | tabs, Part Studios / Assemblies, search, "Undo to remove instances", "Inserted: N" | the same | ui-parity asm-insert-* | = |
 | Insert preview | the instance follows the pointer, solid orange; a click drops it | the same | – | = |
@@ -198,18 +198,18 @@ per matrix (17:18 UTC): **mates 25 / 28, views 14 / 15, instance list 20 / 22, 3
 | Row menus | collapsed: Activate, Rename, Reset starting position, Duplicate, Delete; active: Collapse, Rename, Show / Hide all explode lines, Delete | the same | ui-parity asm-explode-row-menu, -row-menu-editing | = |
 | Activate | the exploded state, editing again; a hovered step row outlines its instances | the same (17:18: the outline, `step_hover`) | – | = |
 | Camera menu | Isometric … Section view… | the same (camera_menu.rs) | – | = |
-| Section view… | opens empty (live2 18:20, correcting asm-views.json); Exclude / Include; Items to exclude | the same | – | = |
+| Section view… | opens empty with the blue hint "Select a plane, planar face, cylinder, cone, or mate connector." (live2 18:20); Exclude / Include; Items to exclude | the same (the Part Studio's hint) | – | = |
 | Section: a face click | adds a plane through the face (live2 18:20) | the same (`section_pick`) | – | = |
 | Section Esc | cancels | the same | – | = |
 | Named views | New view name + "+", No views created, Select a view + ⊗ | the same (named_views_dialog.rs) | – | = |
 
-### Instance list (fields.json): 20 / 22
+### Instance list (fields.json): 21 / 22
 
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
 | Hovered row | light blue, an eye at the right end | the same | – | = |
 | Row tooltip | ~70 ms (a 30 fps recording) | 160 ms, as the feature list's rows (`ROW_TIP_DELAY`: live featurelist.json's 160–390 ms) | – | ? (two live numbers) |
-| 3D highlight on hover | ~0.85 s after the pointer arrives | at once | – | ? (live2's software-GL machine, as psui's sketch hover) |
+| 3D highlight on hover | ~0.85 s after the pointer arrives on live2's software-GL host; its graphics hover takes ~0.73 s too (live2 18:20 (6)): the host, not a delay of Onshape's | at once | – | = |
 | Plain click | toggles the row | the same (`list_click`) | ui-parity asm-select-mate-row | = |
 | Ctrl+click | opens the context menu (live2 18:20; behaviours "skb (10-24)" (3)) | the same | – | = |
 | Shift+click | the range from the last clicked row, added; after a deselecting click from the top row | the same (17:18: the top row) | – | = |
