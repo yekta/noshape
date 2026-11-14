@@ -4,20 +4,21 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-14 15:40 UTC; restart from here)
-- Landed 11:16 as b21f4343: whole-turn tori kept by a pattern's rotation (symmetry found), clear_inside not asked on
-  free-form faces (the pair's own sections): the infento tyre's cut 1.9-2.1 -> 0.85-1.4 s, the same result.
-- infento tyre topology (392 vs live 391 faces): the model's unify is k::unify_same_domain (eval.rs boolean_into_with),
-  which leaves 426 faces with no merge on OCCT's or our cut (probe_unmerged_faces / probe_split_round_faces): the 392 is
-  the suite's shown-topology count, so the extra face is in what that counts (a periodic face OCCT splits?), not a merge
-  our unify misses. probe_shown_counts (xprobe) gives 392/1251/793 on ours + unify (the suite: 392/1183/793). Tried,
-  no change: face_joins (common.cpp shown_topology) joining two separate elementary surfaces in one frame across a
-  seam. Candidates by probe_split_round_faces: faces 0 / 32 (two 113.5 mm2 pieces of one cylinder at (-0.4, -7.3,
-  -168.8) mm) and the tyre's torus 33 / 34 (42391 + 52 mm2) / 35 / 36: adjacent on one surface, not across a seam;
-  which one live has as one face needs live's faces (a live capture of the tyre after Boolean 2).
-- blend 11-14: c2-hunting-knife +55 ms (1210 -> 1265, Mac) since core's a3e9fb3db (Loft 3 one cubic, as live): our
-  sections ahead on the new loft surface about double (plane∩B-spline: bool2's marcher; told bool2).
-- bool2 took c2-gamma-imported / c2-wire-clip-imported's two declines (f68f4393, 678f4bf2) 11-14 10:5x.
+## bool, now (11-14 17:55 UTC; restart from here)
+- Queued 17:54 as 17e65775 (common.cpp): shown_topology joins two faces of one periodic surface whose shared iso line
+  lies whole periods apart on them (the edge as each face holds it; same_frame for copies of one elementary surface):
+  the tyre's tread across its r169 cylinder at u = pi (input cylinder from pi to 3pi); and two B-spline sections
+  between the same two analytic faces (within 0.05 rad) as one edge (23 vertices on the tyre's torus, left where a
+  unify took away a tool face's edge). infento tyre 391/1158/768 = live (392/1183/793). Models suite with and without:
+  80/87, 870/947 both. self_intersects' 1 s check runs with the feature's budget record detached (else the sweep's
+  Boolean stopped at once: asm-hand-drill-pinslot's 7ed710 Sweep 2 / bb72f3 Sweep 1 "BOPAlgo_AlertIntersectionFailed";
+  hand-drill differences 62 -> 60). Their placement was core's helix (fixed by core).
+- Next: c2-rings-loft's Shell 1 (bool2 11-14: ~1 s a regeneration in op_shell_solid; live 235 ms; dump vibe5
+  ~/agents/bool-cases/rl-dump/shell-9): by_quadrics 1.03 s on loaded vibe5: repair 351 ms (the first wall invalid:
+  traces 116, splits 94, joins 78), self-interference (CheckerSI edges x faces) 226, edges 152 (GeomAPI_IntSS of
+  offsets, shell.cpp 5072), faces 122 (ValueOfUV in eval_grad_near 6441/6447), check 42, thin 40, volumes 36.
+- Then c2-fan-blade-sweep's Boolean 2 offset: the bolt's picked faces 9,10,11,13,16-21,23 (flanks 10, 11 B-spline;
+  flank 12 unpicked), so a Shell wall from the picked faces would leave rims where live extends the neighbours.
 
 ## bool, earlier (11-14 10:40 UTC)
 - Landed: 80f1d37e (cylinder bands: gamma union 914 -> 889, live 884), d41b7664 (the dock's seam slot walls: 9 more
