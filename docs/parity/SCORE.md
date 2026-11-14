@@ -214,9 +214,24 @@ c2-rings-loft, c2-sm-corner-break, cf-part-draft; none the other way.
 | cf-lighten | 129 ms | 114 ms | 1.1 | 229 ms |
 | c2-bottle-split | 49 ms | 40 ms | 1.2 | 92 ms |
 
-Same CLI (v0.4.48 Linux) and scripts on vibe7, 07:24–07:40, **under load 7–24 (median 10.8, other agents' builds; 8 cores),
-not comparable**: hats 7.1–10.0 s cold / 0.56–0.87 s reopen, the dock 25.7 / 5.8 s, 36 of 84 faster than live. The same run
-in the quiet 02:00 window (bin/w7-cli-window.sh, armed) replaces it.
+Like for like (lead 11-13): the same v0.4.48 CLI (Linux build) and the same scripts on vibe7 (8 cores), 11-14 02:01–02:11, nothing
+else running (load 0.5–3.1 for the opens, 2.3–3.4 for the models: the CLI's own threads). An earlier run under load 7–24 (11-13
+07:24) is dropped.
+
+| v0.4.48 CLI, median of 3 | Mac cold | vibe7 cold | Mac reopen | vibe7 reopen |
+|---|---|---|---|---|
+| hat8, Mac mini hat | 2.37 s | 5.12 s | 0.11 s | 0.31 s |
+| hat15, Mac mini hat | 2.42 s | 5.17 s | 0.11 s | 0.31 s |
+| hat15b, Mac mini hat | 2.44 s | 5.25 s | 0.13 s | 0.31 s |
+| the dock, all 8 Part Studios | 7.85 s | 17.72 s | 1.08 s | 4.02 s |
+
+| model suite, v0.4.48 CLI | Mac | vibe7 |
+|---|---|---|
+| documents faster than live, of 84 | **73** | 52 |
+| sum of our regenerations (live 41.1 s) | 25.2 s | 54.7 s |
+
+Mac / vibe7 per document: median 0.43. The ten furthest behind live on the Mac, vibe7's time: impeller 14783 ms, knife 1425,
+faceblend 454, valve 685, helical sweep 148, snap hook 820, tpd fillet 168, michael 267, lighten 317, bottle split 129.
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
