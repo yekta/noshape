@@ -218,6 +218,18 @@ pointer; a crossing holds while the pointer is in both zones (live's reach: alon
 the direction the line's 15 px band; a tangent line touching its circle keeps the 15 px point); glyphs by the pointer;
 the line landed on lit with the reference; guides to every aligned point. Open with live2: glyph order with an
 alignment (perpAlign's crop shows none), parEdge without PARALLEL (Lb not woken?), tanLine's arcs (probe artefact).
+live2 batch 2 settled those: glyph order is the created constraints' (ours), a single glyph +20 / +20, a parallel
+never meets a model edge, glyph-less crops were a stale live session.
+**11-14 21:24 (user: Mirror, "ours is missing some stuff", "UI looks weird"; live/feel/mirror.json + 67 shots):**
+sketch Mirror now constrains as live: a mirror (symmetric) constraint per copied line / arc / circle / point plus a
+segment's ends, no centre or EQUAL of their own, nothing when the image is already there. Looks, pixel-compared
+(NOSHAPE_UI_SHOTS=<dir> screenshots each scenario step; /root/psui-scratch/mshots.sh, scenarios in
+/root/psui-scratch/mshots/scen): Mirror's prompts as Onshape's blue prompt 6 px under the toolbar (was small text at
+the bottom); a plane picked in a dialog field 20 % amber (`Highlighting { dialog }`; a selected plane keeps its
+amber); a focused select's 1 px #1651b0 line (was a glow); a focused checkbox's 2 px #3e94ff ring; a filled field
+beside the mate connector button 43 px (1 px taller). Dialog fields, tabs, labels, icons otherwise match to the
+pixel. Open: the type list's search caret (live shows none in its shot; caret blink?), Part mirror's preview body
+colour, Face mirror's built preview (52b) and the Create selection panel (54b) not compared yet.
 **11-14 18:16 (viewport speed, Linux numbers):** vibe7 (load ~16), release, llvmpipe, 60 samples, mode-700 copies
 deleted after. Pointer / click to the frame with its highlight or selection, p50: dock hover 370 ms, pick 620; hat15
 hover 381-856, pick 1074: llvmpipe drawing the models. To its submission p50 0.4-1.9 ms; the maxima (69-985 ms, one
