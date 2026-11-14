@@ -248,6 +248,12 @@ fn jog_preserve_material_off_and_errors() {
     let r = s.ok();
     let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
     assert!(near(bb.max.z - bb.min.z, mm(3.0) + t, 1e-6), "{bb:?}");
+    // The two bends meet with no wall between: in the flat their zones follow each other, the plate's length kept
+    // (they lay 0.73 mm over each other, the end wall laid out on its own).
+    let fp = flat(&r, 0);
+    let (len, width) = sorted_size(&fp);
+    assert!(near(len, mm(100.0), 1e-6) && near(width, mm(40.0), 1e-9), "flat {len} x {width}");
+    assert!(near(fp.area(), mm(100.0) * mm(40.0), 1e-9), "flat area {}", fp.area());
 }
 
 /// Derived provider over pre-regenerated studios (tab id -> context).

@@ -2868,8 +2868,9 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
     let thickness = def.front + def.back;
     let frame = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
     let mut pieces = Vec::new();
-    // Each piece's walls: its own, or the two a bend strip joins (for the collision check).
-    let mut owners: Vec<[usize; 2]> = Vec::new();
+    // Each piece's walls: its own, or the two a bend strip joins and a rolled bend's own face (two rolled bends meeting
+    // with no wall between join each other), for the collision check.
+    let mut owners: Vec<[usize; 3]> = Vec::new();
     let mut heads = Vec::new();
     for (fi, face) in wall_flats {
         if k::thread_cancelled() {
@@ -2904,7 +2905,7 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
             }
         }
         pieces.push(k::transform(&face, &k::Transform::Matrix(*m), true).ok()?.shape);
-        owners.push([*fi, *fi]);
+        owners.push([*fi, *fi, *fi]);
     }
     // Forms: their footprint fills the flat, outlined with a center mark (as the native route).
     let mut flat_forms = Vec::new();
@@ -2953,7 +2954,7 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
         {
             for f in fill.shape.faces() {
                 pieces.push(f);
-                owners.push([*fi, *fi]);
+                owners.push([*fi, *fi, *fi]);
             }
         }
         // A form with a flat sketch shows only that (live 1623), centred on
@@ -3013,7 +3014,7 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
         }).unwrap_or_else(|| vec![b[1], a[1]]));
         if let Ok(face) = k::make_polyline(&outline, true).and_then(|w| k::make_face_from_wire(&w, true)) {
             pieces.push(face);
-            owners.push([s.wall_a, s.wall_b]);
+            owners.push([s.wall_a, s.wall_b, s.rolled.unwrap_or(s.wall_a)]);
         }
         // Wall b rises toward the viewer (+z) when it lies on the side wall a's
         // flat normal points away from.
@@ -3040,9 +3041,7 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
             bend: n,
         });
     }
-    // (Two bend strips aren't compared: ours overlap where adjacent bends' middle wall is gone, a jog's at its
-    // reduced angle, which live's flat doesn't (its "Updating bend angle" info, no collision).)
-    let joined = |i: usize, j: usize| owners[i].iter().any(|w| owners[j].contains(w)) || (owners[i][0] != owners[i][1] && owners[j][0] != owners[j][1]);
+    let joined = |i: usize, j: usize| owners[i].iter().any(|w| *w != usize::MAX && owners[j].contains(w));
     let collides = crate::sheetmetal::flat::pieces_collide(&pieces, &frame, joined);
     let mut flat = crate::sheetmetal::flat::flat_from_pieces(frame, &pieces, lines, thickness).ok()?;
     flat.collides = collides;
@@ -3154,17 +3153,40 @@ fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: 
         // a's tangent line, then moved out by the developed length.
         for (&fi, &radius) in &def.rolled {
             let Some(st) = rolled_strip(topo, fi, radius) else { continue };
-            let (w2, line1, line2) = if st.wall_a == w1 { (st.wall_b, st.a, st.b) } else if st.wall_b == w1 { (st.wall_a, st.b, st.a) } else { continue };
+            // (Bends meeting with no wall between, a jog's at its reduced angle: a bend placed from its neighbour lies on
+            // their common tangent plane, from which it turns on to the wall past it.)
+            let through = w1 == fi;
+            let (w2, line1, line2, from) = if st.wall_a == w1 {
+                (st.wall_b, st.a, st.b, w1)
+            } else if st.wall_b == w1 {
+                (st.wall_a, st.b, st.a, w1)
+            } else if through && def.rolled.contains_key(&st.wall_a) {
+                (st.wall_b, st.a, st.b, st.wall_a)
+            } else if through && st.wall_b != usize::MAX && def.rolled.contains_key(&st.wall_b) {
+                (st.wall_a, st.b, st.a, st.wall_b)
+            } else {
+                continue;
+            };
             if w2 == usize::MAX || walls.contains_key(&w2) {
                 continue;
             }
             let axis = st.axis.normalize();
+            // Into face `f` from its line through `at`, on its tangent plane there (a cylinder's: radial at the line).
             let into = |f: usize, at: DVec3| -> FResult<DVec3> {
-                let (p, n) = face_normal(&topo.faces[f])?;
+                let (p, mut n) = face_normal(&topo.faces[f])?;
+                if let Ok(k::Surface::Cylinder { origin, axis: ca, .. }) = topo.faces[f].face_surface() {
+                    let ca = ca.normalize();
+                    n = (at - (origin + ca * (at - origin).dot(ca))).normalize_or(n);
+                }
                 let a = n.cross(axis).normalize();
                 Ok(if (p - at).dot(a) < 0.0 { -a } else { a })
             };
-            let (a1, a2) = (into(w1, line1[0])?, into(w2, line2[0])?);
+            // Through a bend: from the tangent plane, away from the bend itself.
+            let a1 = if through { -into(fi, line1[0])? } else { into(w1, line1[0])? };
+            let a2 = into(w2, line2[0])?;
+            if through {
+                walls.entry(from).or_insert(base);
+            }
             let developed = st.angle * (radius + k_factor * thickness);
             let turned = |s: f64| glam::DMat4::from_axis_angle(axis, s * st.angle).transform_vector3(a2).dot(-a1);
             let sign = if turned(1.0) >= turned(-1.0) { 1.0 } else { -1.0 };
