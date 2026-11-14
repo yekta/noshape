@@ -4002,7 +4002,7 @@ impl PartStudioView {
             && let Some(inf) = &ed.inference
             && let Some((x, y)) = project(inf.position)
         {
-            let icons: Vec<&'static str> = if inf.kind == noshape_sketch::InferenceKind::AlignBoth { vec!["horizontal", "vertical"] } else { vec![crate::sketch_mode::inference_icon(inf.kind)] };
+            let icons = ed.snap_icons();
             // Live (sketch/51, 52; part-studio/1032; SKETCH-GLYPH-LAYOUT-LOST,
             // 7fa4f33d + 74dc1f8c): the constraint icon in `#333` on a 20 px
             // box of 40 % white (unseen on the white plane), centred 30 px

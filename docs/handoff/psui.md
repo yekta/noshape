@@ -198,6 +198,20 @@ the active selection field still focused (shell-*, boolean-new-edit-reedit, move
 linear-pattern-centered-skip, loft-*) or the title red one step early (move-face-new-edit-reedit); alone they pass. The
 press path (`on_viewport_event` focuses the dialog root, `keyboard_left`) looks right; suspect: the runner's "window is
 not active" warning on a loaded X server. Not chased further yet.
+**11-14 16:37:** landed Where used… (ad056d37); queued b1bde994 (a part selected whole outlined through the parts in
+front, the face menu's Where used for Part 1…, the 3 point arc's semicircle snap). Then: a pressed analysis checkbox
+holds the keyboard as live's (Deviation's options, Zebra's Flip stripes, Draft's Show undercut regions: focus is the
+checkbox until the next press), a Section view tab click leaves no field focused, and a hovered part's outline follows
+its whole silhouette through the parts in front (the hover mask ignores depth; offscreen
+`a_hovered_part_is_outlined_through_the_part_in_front`). The sketch readouts off by under a pixel (sketch-key-midpoint
+9.858 / 10.134, concentric 19.471 / 20.024, symmetric) follow no one rounding rule (half a pixel each way, then 0.96
+against 0.04 px): live's sub-pixel camera after Sketch on Top, not our pointer; left as recorded.
+**11-14 (user P0, a chain on hat15's face):** the square to the last segment ending where it crosses the lit model
+edge already took both constraints (Perpendicular + coincident with the used edge: GPUI
+`a_square_to_the_last_segment_crossing_a_lit_model_edge_takes_and_shows_both`); only the feedback was missing: one glyph.
+Now one glyph per constraint created (`sketch_mode::inference_icons`, the direction's first). Asked live2 for the
+glyphs' order, spacing, the dashed guides of combinations, which wins of three, and direction x direction (not H/V)
+crossings; refine against that.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's

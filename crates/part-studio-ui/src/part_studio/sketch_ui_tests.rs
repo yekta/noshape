@@ -4374,6 +4374,71 @@ fn a_line_ending_on_a_lit_model_edge_lands_on_it(cx: &mut TestAppContext) {
     assert!(perpendicular, "the direction inferred kept");
 }
 
+/// User P0 11-14 (hat15, a chain on a face): the next segment square to the previous one, ending where that square
+/// crosses the lit model edge, takes both (Perpendicular to the previous segment, coincident with the edge's used
+/// curve) and shows both glyphs by the pointer, the direction's first (live: a compound shows each glyph). The
+/// previous segment at 30 deg to the edge, so no horizontal or vertical competes.
+#[gpui::test]
+fn a_square_to_the_last_segment_crossing_a_lit_model_edge_takes_and_shows_both(cx: &mut TestAppContext) {
+    let (window, view, _edge, pick, a, b) = sketch_on_top_face(cx, "square-onto-model-edge", Tool::Line);
+    let along = (b - a).normalize();
+    let inward = {
+        let centre = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().frame.to_local(glam::DVec3::ZERO));
+        let n = along.perp();
+        if (centre - a).dot(n) > 0.0 { n } else { -n }
+    };
+    let wpp = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
+    let (c30, s30) = (30f64.to_radians().cos(), 30f64.to_radians().sin());
+    let u = along * c30 + inward * s30;
+    let s0 = (a + b) * 0.5 + along * 40.0 * wpp + inward * 50.0 * wpp;
+    let s1 = s0 - u * 60.0 * wpp;
+    // Square to it, toward the edge, from its end: where it crosses the edge.
+    let sq = if u.perp().dot(inward) < 0.0 { u.perp() } else { -u.perp() };
+    let crossing = s0 + sq * ((a - s0).dot(inward) / sq.dot(inward));
+    let (p1, p0) = (on_screen(cx, &view, s1), on_screen(cx, &view, s0));
+    click(cx, window, &view, (p1.x, p1.y));
+    click(cx, window, &view, (p0.x, p0.y));
+    // 2 px past the crossing along the edge and 2 px beyond it.
+    let target = on_screen(cx, &view, crossing + along * 2.0 * wpp - inward * 2.0 * wpp);
+    let first = cx.update(|cx| {
+        let data = view.read(cx).sketch_data(cx).unwrap();
+        data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line && !e.external && !e.construction).map(|e| e.id).max().unwrap()
+    });
+    let icons = cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            vp.update(cx, |vp, _| vp.place_pointer(target));
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: target, modifiers: Modifiers::default() }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::Hover(Some(pick)), w, cx);
+            v.sketch.as_ref().unwrap().snap_icons()
+        })
+    })
+    .unwrap();
+    assert_eq!(icons, vec!["perpendicular", "coincident"], "both glyphs by the pointer");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: target, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: target, modifiers: Modifiers::default() }, w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    let (off, on_edge, square) = cx.update(|cx| {
+        let data = view.read(cx).sketch_data(cx).unwrap();
+        let line = data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line && !e.external && !e.construction).map(|e| e.id).max().unwrap();
+        let (_, end) = data.sketch.endpoints(line).unwrap();
+        let q = data.sketch.point(end).unwrap();
+        let on_edge = data.sketch.constraints().any(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Coincident { a: x, b: y } if (x == end && data.sketch.entity(y).is_some_and(|e| e.external)) || (y == end && data.sketch.entity(x).is_some_and(|e| e.external))));
+        let square = data.sketch.constraints().any(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Perpendicular { a: x, b: y } if (x == line && y == first) || (x == first && y == line)));
+        ((q - a).perp_dot(along).abs(), on_edge, square)
+    });
+    // (Against the display mesh's f32 edge; the solver may nudge the free previous segment to keep both.)
+    assert!(off < 1e-6, "the end is on the edge: {off} m off");
+    assert!(on_edge, "coincident with the edge's used curve");
+    assert!(square, "perpendicular to the previous segment");
+}
+
 /// The same user P0: an existing point dragged onto a model edge of the sketch's face, released 3 px off it, lands
 /// on it, coincident with its used curve (live2 "feel (sketch)" (2): onto a line from 7 px).
 #[gpui::test]

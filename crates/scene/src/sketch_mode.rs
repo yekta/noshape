@@ -1180,6 +1180,36 @@ pub fn inference_icon(k: InferenceKind) -> &'static str {
     }
 }
 
+/// The glyph of a constraint an inference creates.
+fn auto_icon(c: &AutoConstraint) -> &'static str {
+    match c {
+        AutoConstraint::CoincidentPoint(_) | AutoConstraint::OnCurve(_) | AutoConstraint::QuadrantOf(..) => "coincident",
+        AutoConstraint::MidpointOf(_) => "midpoint",
+        AutoConstraint::HorizontalWith(_) | AutoConstraint::HorizontalLine => "horizontal",
+        AutoConstraint::VerticalWith(_) | AutoConstraint::VerticalLine => "vertical",
+        AutoConstraint::PerpendicularTo(_) => "perpendicular",
+        AutoConstraint::ParallelTo(_) => "parallel",
+        AutoConstraint::TangentTo(_) => "tangent",
+        AutoConstraint::ConcentricTo(_) => "concentric",
+    }
+}
+
+/// The glyphs shown by the pointer for inference `inf`: one per constraint it creates, in its order (a combined snap
+/// shows both: the direction's, then the curve's), and coincident for a model edge it ends on (linked at the click);
+/// an inference creating nothing shows its kind's.
+pub fn inference_icons(inf: &Inference, on_model_edge: bool) -> Vec<&'static str> {
+    let mut icons: Vec<&'static str> = Vec::new();
+    for i in inf.constraints.iter().map(auto_icon).chain(on_model_edge.then_some("coincident")) {
+        if !icons.contains(&i) {
+            icons.push(i);
+        }
+    }
+    if icons.is_empty() {
+        icons.push(inference_icon(inf.kind));
+    }
+    icons
+}
+
 impl SketchEditor {
     pub fn new(feature: FeatureId, frame: PlaneFrame) -> Self {
         let opened_options = sketch_options();
@@ -1570,6 +1600,12 @@ impl SketchEditor {
     fn below_drag_start(&self, d: DVec2) -> bool {
         let seen = self.screen_metric().map_or(d.length(), |m| m.len(d));
         seen < self.world_per_px * DRAG_START_PX
+    }
+
+    /// The glyphs by the pointer for the snap now ([`inference_icons`]).
+    pub fn snap_icons(&self) -> Vec<&'static str> {
+        let Some(inf) = &self.inference else { return Vec::new() };
+        inference_icons(inf, matches!(self.external_snap, Some(ExternalSnap::Edge { midpoint: false, .. })))
     }
 
     /// The point being dragged, if a point drag is in progress.
@@ -8173,6 +8209,24 @@ mod tests {
         ed.drag_handle(&d.sketch.clone(), PatternHandle::Center, v(0.0, 0.0));
         ed.follow_transform_selection(&d.sketch);
         assert!(ed.pattern_center.length() < 1e-6, "a dragged center stays put");
+    }
+
+    /// User P0 11-14: a combined snap shows a glyph for each constraint it creates, the direction's first; a model
+    /// edge it ends on (linked at the click) adds coincident; a snap creating nothing shows its kind's.
+    #[test]
+    fn a_combined_snap_shows_each_glyph() {
+        let (l, e) = (EntityId(3), EntityId(4));
+        let inf = |kind, constraints: Vec<AutoConstraint>| Inference { kind, position: DVec2::ZERO, entity: None, reference: None, constraints, distance: 0.0, priority: 1 };
+        let both = inf(InferenceKind::Perpendicular, vec![AutoConstraint::PerpendicularTo(l), AutoConstraint::OnCurve(e)]);
+        assert_eq!(inference_icons(&both, false), vec!["perpendicular", "coincident"]);
+        assert_eq!(inference_icons(&both, true), vec!["perpendicular", "coincident"], "one coincident");
+        let square = inf(InferenceKind::Perpendicular, vec![AutoConstraint::PerpendicularTo(l)]);
+        assert_eq!(inference_icons(&square, false), vec!["perpendicular"]);
+        assert_eq!(inference_icons(&square, true), vec!["perpendicular", "coincident"], "onto a lit model edge");
+        let aligned = inf(InferenceKind::AlignBoth, vec![AutoConstraint::HorizontalWith(l), AutoConstraint::VerticalWith(e)]);
+        assert_eq!(inference_icons(&aligned, false), vec!["horizontal", "vertical"]);
+        assert_eq!(inference_icons(&inf(InferenceKind::OnCurve, vec![]), true), vec!["coincident"], "a model edge alone");
+        assert_eq!(inference_icons(&inf(InferenceKind::Midpoint, vec![]), false), vec!["midpoint"]);
     }
 
     /// qa5 SK3: a dimension to a model edge adds no visible sketch
