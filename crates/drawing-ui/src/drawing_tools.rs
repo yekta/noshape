@@ -502,9 +502,35 @@ impl DrawingEditor {
         }
     }
 
-    /// The view the active view tool would create at the cursor.
+    /// Places the pending section or detail view (its tool's last click, or the depth entity picked for a section
+    /// view placed before it).
+    pub fn place_section(&mut self, cx: &mut Context<Self>) {
+        let Some(mut v) = self.pending_view() else { return };
+        if let (ViewKind::Section { label, .. }, Some(l)) = (&mut v.kind, self.section_label(cx)) {
+            *label = l;
+        }
+        let name = if matches!(self.tool, Tool::Section { .. }) { "Section view" } else { "Detail view" };
+        let picked = if matches!(self.tool, Tool::Detail { .. }) { self.detail_dlg.as_ref().map(|d| d.picked.clone()).unwrap_or_default() } else { Vec::new() };
+        self.edit_sheet(name, cx, |s| {
+            s.views.push(v);
+            if !picked.is_empty() {
+                s.sketch.sketch.remove_entities(&picked);
+                let _ = s.sketch.sketch.solve();
+            }
+        });
+        self.tool = Tool::Select;
+        // A newly placed view is not selected (live 2068).
+        self.selection.clear();
+    }
+
+    /// The view the active view tool would create at the cursor (a section view placed before its depth entity:
+    /// where it was placed).
     pub fn pending_view(&self) -> Option<DrawingView> {
-        let mut v = self.pk().pending_view(&self.view_options())?;
+        let mut pk = self.pk();
+        if let (Tool::Section { .. }, Some(at)) = (&self.tool, self.section_dlg.as_ref().and_then(|d| d.placed)) {
+            pk.cursor = at;
+        }
+        let mut v = pk.pending_view(&self.view_options())?;
         // An assembly's view: no automatic centermarks / centerlines (live: they're the parts' defaults).
         if let ViewKind::Base { source, .. } = &v.kind
             && self.sources.iter().any(|(k, s)| k.tab == *source && s.assembly)
@@ -801,7 +827,7 @@ impl DrawingEditor {
         self.pk().extend_cut(pid, a, e)
     }
 
-    fn tool_click(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn tool_click(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         // Centermark dialog: Single places at once, Circular / Linear collect circles.
         if matches!(self.tool, Tool::Centermark) && self.centermark_click(cx) {
             return;
@@ -953,25 +979,7 @@ impl DrawingEditor {
                 }
                 self.update_preview(cx);
             }
-            Tool::Section { line: Some(_), .. } | Tool::Detail { radius: Some(_), .. } => {
-                if let Some(mut v) = self.pending_view() {
-                    if let (ViewKind::Section { label, .. }, Some(l)) = (&mut v.kind, self.section_label(cx)) {
-                        *label = l;
-                    }
-                    let name = if matches!(self.tool, Tool::Section { .. }) { "Section view" } else { "Detail view" };
-                    let picked = if matches!(self.tool, Tool::Detail { .. }) { self.detail_dlg.as_ref().map(|d| d.picked.clone()).unwrap_or_default() } else { Vec::new() };
-                    self.edit_sheet(name, cx, |s| {
-                        s.views.push(v);
-                        if !picked.is_empty() {
-                            s.sketch.sketch.remove_entities(&picked);
-                            let _ = s.sketch.sketch.solve();
-                        }
-                    });
-                    self.tool = Tool::Select;
-                    // A newly placed view is not selected (live 2068).
-                    self.selection.clear();
-                }
-            }
+            Tool::Section { line: Some(_), .. } | Tool::Detail { radius: Some(_), .. } => self.place_section(cx),
             Tool::Detail { center: None, .. } => {
                 let pick = self.snap_at(c).or_else(|| self.view_at(c).and_then(|v| self.placement(v).map(|pl| PickedPoint { view: v, p: pl.to_view(c), r: None })));
                 if let Some(pp) = pick {

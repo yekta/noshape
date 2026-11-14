@@ -41,6 +41,9 @@ pub struct SectionDlg {
     pub anchor: Option<noshape_model::drawing::PointRef>,
     /// Which field takes clicks: 1 = depth entity, 2 = excluded parts.
     pub picking: u8,
+    /// Where a click placed the view while its depth entity is still to pick (live drw-section-view-section-depth:
+    /// the view waits there, the mode tabs gone; picking the entity makes it).
+    pub placed: Option<[f64; 2]>,
     /// Angular: "Cut angle" (degrees from horizontal) and its field,
     /// "Opposite direction".
     pub angle: f64,
@@ -84,7 +87,7 @@ impl DrawingEditor {
                 let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
                 // Live drawing/20: the dialog opens with the label selected.
                 label.update(cx, |s, cx| s.focus(window, cx));
-                self.section_dlg = Some(SectionDlg { mode: 0, label, label_focused: true, select_label: true, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, offset: None, offset_value: None, offset_flip: false, exclude: Vec::new(), anchor: None, picking: 0, angle: 45.0, angle_input: None, opposite: false, flip: false, cut_from: true });
+                self.section_dlg = Some(SectionDlg { mode: 0, label, label_focused: true, select_label: true, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, offset: None, offset_value: None, offset_flip: false, exclude: Vec::new(), anchor: None, picking: 0, placed: None, angle: 45.0, angle_input: None, opposite: false, flip: false, cut_from: true });
             }
             (Some(_), false) => self.section_dlg = None,
             _ => {}
@@ -139,15 +142,35 @@ impl DrawingEditor {
     /// entity) or a part to exclude from the cut. True when used.
     pub fn section_field_click(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(picking) = self.section_dlg.as_ref().map(|d| d.picking).filter(|p| *p != 0) else { return false };
+        // The depth entity is picked once the cutting line is placed (live drw-section-view-section-depth).
+        let line_done = matches!(self.tool, Tool::Section { line: Some(_), .. });
+        if picking == 1 && !line_done {
+            return false;
+        }
         if picking == 1 {
             let Some(r) = self.snap_at(self.cursor).and_then(|p| p.r) else {
-                self.status = Some("Select a vertex or circle center for the section depth".into());
+                // A click off the views places the view (it waits for the entity).
+                if self.view_at(self.cursor).is_none() {
+                    let c = self.cursor;
+                    if let Some(d) = &mut self.section_dlg {
+                        d.placed = Some(c);
+                    }
+                } else {
+                    self.status = Some("Select a vertex or circle center for the section depth".into());
+                }
+                self.update_preview(cx);
                 cx.notify();
                 return true;
             };
-            if let Some(d) = &mut self.section_dlg {
+            let placed = self.section_dlg.as_mut().and_then(|d| {
                 d.depth_ref = Some(r);
                 d.picking = 0;
+                d.placed
+            });
+            if placed.is_some() {
+                self.place_section(cx);
+                cx.notify();
+                return true;
             }
         } else if let Some(body) = self.edge_body_at(self.cursor)
             && let Some(d) = &mut self.section_dlg
@@ -178,7 +201,7 @@ impl DrawingEditor {
         Some(g.model_edges.get(m as usize)?.body.clone())
     }
 
-    fn toggle_section_depth(&mut self, on: bool, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn toggle_section_depth(&mut self, on: bool, window: &mut Window, cx: &mut Context<Self>) {
         let mm = self.drawing.units_mm;
         let Some(d) = &mut self.section_dlg else { return };
         if !on {
@@ -231,7 +254,7 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    fn set_section_mode(&mut self, mode: u8, cx: &mut Context<Self>) {
+    pub(crate) fn set_section_mode(&mut self, mode: u8, cx: &mut Context<Self>) {
         if let Some(d) = &mut self.section_dlg {
             d.mode = mode;
         }
@@ -254,6 +277,7 @@ impl DrawingEditor {
             _ => self.current_sheet().views.iter().any(|v| noshape_model::drawing::views::view_source(self.current_sheet(), v.id).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly)),
         };
         let line_done = matches!(self.tool, Tool::Section { line: Some(_), .. });
+        let awaiting_entity = d.depth.is_some() && d.up_to && d.depth_ref.is_none();
         let jogged = matches!(&self.tool, Tool::Section { jogs, .. } if !jogs.is_empty());
         // "Cut from section": sectioning a section view (not a broken-out one).
         let of_section = match &self.tool {
@@ -281,7 +305,10 @@ impl DrawingEditor {
         };
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings"; live 2063).
-            let mut text = vec!["Section view", "Vertical", "Horizontal", "Angular"];
+            let mut text = vec!["Section view"];
+            if d.placed.is_none() {
+                text.extend(["Vertical", "Horizontal", "Angular"]);
+            }
             if mode == 2 && d.angle_input.is_some() {
                 text.push("Cut angle");
             }
@@ -327,7 +354,8 @@ impl DrawingEditor {
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Section view"))
                         // ✓ is enabled once the section view can be placed.
-                        .child(div().w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).when(!line_done, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::drawing_chrome::ok_check(18.)))
+                        // ✓ waits for Up to entity's entity too (live drw-section-view-section-depth).
+                        .child(div().w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).when(!line_done || awaiting_entity, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::drawing_chrome::ok_check(18.)))
                         .child(
                             div()
                                 .id("ds-cancel")
@@ -344,7 +372,7 @@ impl DrawingEditor {
                 .child(
                     v_flex()
                         .p(px(3.))
-                        .child(h_flex().child(tab("ds-vert", "Vertical", 0, cx)).child(tab("ds-horiz", "Horizontal", 1, cx)).child(tab("ds-ang", "Angular", 2, cx)))
+                        .when(d.placed.is_none(), |e| e.child(h_flex().child(tab("ds-vert", "Vertical", 0, cx)).child(tab("ds-horiz", "Horizontal", 1, cx)).child(tab("ds-ang", "Angular", 2, cx))))
                         // Live drawing/20: focused, a 2 px blue underline 2 px higher.
                         .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).h(px(25.)).capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
                             // The focused label field still lets Esc close the tool.
@@ -493,6 +521,7 @@ impl DrawingEditor {
                             e.child(
                                 div()
                                     .id("ds-upto-field")
+                                    .tooltip(crate::ui::tooltip("Up to geometry"))
                                     .mx(px(6.))
                                     .my(px(3.))
                                     .h(px(26.))

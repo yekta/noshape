@@ -626,3 +626,57 @@ fn a_revision_tables_menus_are_lives(cx: &mut TestAppContext) {
     });
     assert_eq!(cells, ["Size", "Resize...", "Copy"]);
 }
+
+/// Live2 drw-section-view-section-depth: with Section depth on (Up to entity, nothing picked), a click off the views
+/// once the cutting line is placed places the view without making it: the mode tabs go and ✓ waits; picking the
+/// depth entity then makes the view there.
+#[gpui::test]
+fn a_section_view_waits_where_it_was_placed_for_its_depth_entity(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Tool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "section-depth-placed");
+    real_sheet(cx, window, &editor);
+    // The document's views (the sheet shown has the pending one too).
+    let views = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing.sheets[0].views.len());
+    let before = views(cx);
+    let (centre, corner) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let corner = g.snaps.iter().map(|s| pl.to_sheet(s.p)).min_by(|a, b| (a[0] + a[1]).total_cmp(&(b[0] + b[1]))).expect("a vertex");
+        ([(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0], corner)
+    });
+    let click = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, w, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = at;
+                e.update_preview(cx);
+                e.tool_click(w, cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+    };
+    cx.update_window(window, |_, w, cx| {
+        editor.update(cx, |e, cx| {
+            e.set_tool(Tool::Section { parent: None, p0: None, line: None, partial: false, jogs: vec![] }, cx);
+            e.sync_section_dlg(w, cx);
+            e.set_section_mode(1, cx);
+            e.toggle_section_depth(true, w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    click(cx, centre);
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Section { line: Some(_), .. })), "the cutting line is placed");
+    // An empty corner of the sheet, inside its frame.
+    click(cx, [30.0, 30.0]);
+    assert_eq!(views(cx), before, "no view before its depth entity");
+    assert_eq!(cx.update(|cx| editor.read(cx).section_dlg.as_ref().and_then(|d| d.placed)), Some([30.0, 30.0]));
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    assert!(vcx.debug_bounds("ds-horiz").is_none(), "the mode tabs are gone");
+    click(cx, corner);
+    assert_eq!(views(cx), before + 1, "the depth entity makes the view");
+    let placed = cx.update(|cx| editor.read(cx).drawing.sheets[0].views.last().map(|v| v.position)).unwrap();
+    assert!((placed[1] - 30.0).abs() < 1e-6, "the view at the placement's height: {placed:?}");
+}
