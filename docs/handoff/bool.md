@@ -10,7 +10,11 @@ scratch /root/bool-scratch.
 - infento tyre topology (392 vs live 391 faces): the model's unify is k::unify_same_domain (eval.rs boolean_into_with),
   which leaves 426 faces with no merge on OCCT's or our cut (probe_unmerged_faces / probe_split_round_faces): the 392 is
   the suite's shown-topology count, so the extra face is in what that counts (a periodic face OCCT splits?), not a merge
-  our unify misses. Next there: the parity counting path (crates/ops parity / shown_topology).
+  our unify misses. probe_shown_counts (xprobe) gives 392/1251/793 on ours + unify (the suite: 392/1183/793). Tried,
+  no change: face_joins (common.cpp shown_topology) joining two separate elementary surfaces in one frame across a
+  seam. Candidates by probe_split_round_faces: faces 0 / 32 (two 113.5 mm2 pieces of one cylinder at (-0.4, -7.3,
+  -168.8) mm) and the tyre's torus 33 / 34 (42391 + 52 mm2) / 35 / 36: adjacent on one surface, not across a seam;
+  which one live has as one face needs live's faces (a live capture of the tyre after Boolean 2).
 - blend 11-14: c2-hunting-knife +55 ms (1210 -> 1265, Mac) since core's a3e9fb3db (Loft 3 one cubic, as live): our
   sections ahead on the new loft surface about double (plane∩B-spline: bool2's marcher; told bool2).
 - bool2 took c2-gamma-imported / c2-wire-clip-imported's two declines (f68f4393, 678f4bf2) 11-14 10:5x.
