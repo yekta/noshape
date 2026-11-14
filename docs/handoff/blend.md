@@ -1,5 +1,26 @@
 # Blends (agent "blend")
 
+## 11-14 13:25 UTC: three branches gating; the Mac ranking; projectors made once
+
+Mac dev, per feature against live (main 5d31020b1): c2-impeller-loft's Fillet Flansch zum Stroemungskanal 2507 vs 67
+ms (!), knife Chamfer 1 158 vs 19, Fillet 3 79 vs 11, Fillet 2 67 vs 10, rings Chamfer 1 89 vs 30, michael Fillet 2 88
+vs 46, snap-hook Fillet 6 32 vs 8. Documents under live on the Mac: rings, faceblend, snap-hook (271 / 274), michael
+(94 / 96), motor-mount, pipeflange, bracket03, stef, setback; over: knife 1180 / 408, impeller 7402 / 2773, tpd 78 / 44.
+
+Branches (systemd units here; flags /root/blend-scratch/*.done):
+- blend6 `blend-projonce` 924b4f76b: blend_direct's lies_on and its approximate-strip loop projected every point with
+  a new GeomAPI_ProjectPointOnSurf (a grid each, ms on the impeller's offset faces): one projector per part face.
+  Impeller flange round 2517 -> 451 ms, document 9.0 -> 5.4 s (Mac dev), its DIFF list unchanged. Left in that
+  feature: lies_on's 144 samples x 70 tool/part pairs (192 ms). Unit blend-projonce-gates6: g++-13, pair (vibe6).
+- blend4 `blend-halfround` 6455c2410 (skasm's asm-config-assembly Arm Cover, Fillet 4 12/27/18 vs live 11/24/16):
+  merge_full_rounds takes two tori too, one surface either way along its axis, only where they meet along a circle
+  about it (a full round's halves; pipeflange's split round pieces stay true_ball_over_rims's). T1
+  a_full_round_over_a_rounded_end_is_one_torus. Unit blend-halfround-gates (vibe5: g++-13, model tests, pair against
+  blend10 = a6a966cd3), blend-halfround-asm7 (vibe7). Tell skasm when it lands.
+- blend5 `blend-frameside`, blend2 `blend-partrays`: their asms (same main ad056d370) differ only in asm-corexy
+  (partrays 42/62, frameside 58/62 occurrences). Units blend-cx-base6 (main, corexy only) and blend-cx-br7 (both
+  again): if main is 58 and partrays 42 on a rerun, partrays breaks corexy.
+
 ## 11-14 12:10 UTC: partrays measured; tried and dropped: variable rounds direct, looser IntSS tolerance
 
 - blend2 `blend-partrays` 2ebdff531: release alternation (vibe5) rings Chamfer 1 193 / 166 -> 114 / 116 ms, its 42
