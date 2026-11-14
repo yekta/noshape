@@ -231,7 +231,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   argument's (a split face's still first; other fuses, cuts and commons the first argument's: a part fused with its
   mirror unifies whole): shfall back to its known 2 (a7ab967d equivalent), every corpus and parity56
   at 0 differences. T1 kernel bool_patterns::a_slab_fuse_merges_its_corner_edge_whole.
-- [ ] P1 DISPLACEMENT-MAP (dx, lead 11-04 13:08, the user's case) the public Displacement map FeatureScript
+- [x] (dx 2026-11-14 00:43 UTC, main 46f163606 on vibe7 through the CLI, Ø50 × 60, leather.csv, degree 5, 0 → 1 mm: the feature 2.52 / 2.67 / 3.07 / 2.77 s (side off / on, top off / on; live 11.14 / 11.22 / 11.17 / 12.15 s), volumes as before (side on 123,041.279, top on 118,922.256 mm³, inside live's bands); query_parts 3-10 s (was 59 s on the top)) P1 DISPLACEMENT-MAP (dx, lead 11-04 13:08, the user's case) the public Displacement map FeatureScript
   (Evan Reese's, FeatureScript 3044; repro /root/lead-scratch/disp/displacementMap.fs and leather.csv, 512×512 pixel
   values) fails in noshape: a cylinder (Sketch circle + Extrude), the CSV imported as a tab, the custom feature on the
   cylinder's face, degree 5, black 0 mm, white 1 mm: "Regeneration timed out" in createPointsTable at `parameters =
