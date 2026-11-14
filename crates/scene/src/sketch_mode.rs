@@ -1194,6 +1194,13 @@ fn auto_icon(c: &AutoConstraint) -> &'static str {
     }
 }
 
+/// Where the first of `n` snap glyphs (20 px boxes, 2 px apart) sits from the point, in px right and down: a single
+/// one at (19, 21); a combined snap's row 4 px left and 4 px lower (live2 combo-perpEdge 3x crops: +15 / +25, a
+/// single coincident +19 / +21 beside it).
+pub fn glyph_offset(n: usize) -> (f32, f32) {
+    if n > 1 { (15.0, 25.0) } else { (19.0, 21.0) }
+}
+
 /// The glyphs shown by the pointer for inference `inf`: one per constraint it creates, in its order (a combined snap
 /// shows both: the direction's, then the curve's), and coincident for a model edge it ends on (linked at the click);
 /// an inference creating nothing shows its kind's.
@@ -8227,6 +8234,7 @@ mod tests {
         assert_eq!(inference_icons(&aligned, false), vec!["horizontal", "vertical"]);
         assert_eq!(inference_icons(&inf(InferenceKind::OnCurve, vec![]), true), vec!["coincident"], "a model edge alone");
         assert_eq!(inference_icons(&inf(InferenceKind::Midpoint, vec![]), false), vec!["midpoint"]);
+        assert_eq!((glyph_offset(1), glyph_offset(2)), ((19.0, 21.0), (15.0, 25.0)), "live2's crops");
     }
 
     /// qa5 SK3: a dimension to a model edge adds no visible sketch

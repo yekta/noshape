@@ -4003,6 +4003,7 @@ impl PartStudioView {
             && let Some((x, y)) = project(inf.position)
         {
             let icons = ed.snap_icons();
+            let (dx, dy) = crate::sketch_mode::glyph_offset(icons.len());
             // Live (sketch/51, 52; part-studio/1032; SKETCH-GLYPH-LAYOUT-LOST,
             // 7fa4f33d + 74dc1f8c): the constraint icon in `#333` on a 20 px
             // box of 40 % white (unseen on the white plane), centred 30 px
@@ -4011,8 +4012,8 @@ impl PartStudioView {
             out.push(
                 h_flex()
                     .absolute()
-                    .left(px(x + 19.0))
-                    .top(px(y + 21.0))
+                    .left(px(x + dx))
+                    .top(px(y + dy))
                     .gap_0p5()
                     .children(icons.into_iter().map(|i| div().size(px(20.)).flex().items_center().justify_center().bg(gpui_kit::rgba_static(0xffffff66)).child(icon_px(i, 18.0, gpui_kit::rgb_static(0x333333)))))
                     .into_any_element(),
