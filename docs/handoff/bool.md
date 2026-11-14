@@ -4,7 +4,22 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-14 06:00 UTC; restart from here)
+## bool, now (11-14 10:40 UTC; restart from here)
+- Landed: 80f1d37e (cylinder bands: gamma union 914 -> 889, live 884), d41b7664 (the dock's seam slot walls: 9 more
+  ours).
+- **asm-infento-subs studio 1dc32b's Boolean 2 (dx 09:00; tyre cut by 32 tread tools; ours = OCCT's volume; inputs as
+  live; live's box is loose):** speed: ours 2.7-3.0 s (vibe5), live's feature 186 ms. `Ctx::kept_by` answers false for
+  free-form faces, so the tyre's tori never take moved sections. Branch bool-tyre (worktree bool-hat, committed with
+  tori + spheres + revolutions: gate FAILED, 7 shell slab cases and 2 tests decline "a curve on a free-form face");
+  /root/bool-scratch/tyre-torus-kept.patch narrows it to whole-turn tori: tyre 1.5-1.7 s, the 7 cases back, but
+  bool_patterns::pattern_copies_overlapping_one_another_fused_as_occt (c2-rings-loft's 8 rings) still declines that
+  way: moved curves don't always map onto a whole torus. Next: map moved curves robustly, or fall back to the pair's
+  own OCCT section when mapping fails. The rest of the cut: tool-to-tool pairs (each tool has 3 tori; pattern::families
+  leaves tools with tori / spheres out on purpose: copies_of_a_filleted_tool_cut_as_occt). Topology: ours 392/1183/793,
+  live 391/1158/768 (one face left split, 25 edges / vertices more: the unify, after the cut; OCCT's cut + plain USD
+  gives 426 faces, the model's unify 392). Case: vibe5 ~/agents/bool-keep/tyre1/5874ed7740fe6eed (exact .bin).
+
+## bool, earlier (11-14 06:00 UTC)
 - In the land queue since 05:14 (c55c2f37 = 1cb56e3f5, branch bool-bands): the unify's cylinder bands (gamma union
   914 -> 889 faces; gate CHECK, knurls only; alternated on vibe7 no slower: corner-break 4160/3752 vs 4150/4251 ms,
   surface-pattern 11752/11400 vs 10666, rings 8965/8797 vs 8229). Its old test a_merge_after_usd_left_invalid_is_dropped
