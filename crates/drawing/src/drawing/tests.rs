@@ -727,7 +727,7 @@ fn hole_table_over_two_views_lists_each_hole_once() {
     (second.id, second.position) = (ViewId(91), [pos[0], pos[1] - 120.0]);
     drawing.sheets[0].views.push(second);
     let more = vec![HoleView { view: ViewId(91), origin, origin_ref: None, flip_x: false, flip_y: false, exclude: Vec::new(), x_dir: None }];
-    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more }, [410.0, 120.0]));
+    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, collapse_tags: false, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more }, [410.0, 120.0]));
     let mut sources = regenerate_sources(&doc, &drawing);
     plate_holes_as_hole_features(&drawing, &mut sources, ViewId(2));
     let cache = ViewCache::new();
@@ -740,6 +740,19 @@ fn hole_table_over_two_views_lists_each_hole_once() {
     assert_eq!(rows.iter().map(|r| r.tag.as_str()).collect::<Vec<_>>(), ["A1", "B1", "B2", "B3", "C1"]);
 }
 
+/// Collapse tags with location data off (live2 feel/holetable.json): the view's tags are the size letters alone.
+#[test]
+fn collapsed_hole_tags_are_the_size_letters() {
+    let (doc, mut drawing) = demo();
+    let origin = [-0.05, -0.03];
+    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: false, collapse_tags: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() }, [410.0, 120.0]));
+    let mut sources = regenerate_sources(&doc, &drawing);
+    plate_holes_as_hole_features(&drawing, &mut sources, ViewId(2));
+    let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    let t = texts(&built);
+    assert!(t.iter().any(|x| x == "A") && !t.iter().any(|x| x == "A1" || x == "B2"), "letters alone: {t:?}");
+}
+
 #[test]
 fn bom_hole_table_and_linked_balloons() {
     let (doc, mut drawing) = demo();
@@ -750,7 +763,7 @@ fn bom_hole_table_and_linked_balloons() {
     drawing.sheets[si].tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source: None }, [410.0, 287.0]));
     // Hole table of the plate's top view on sheet 1.
     let origin = [-0.05, -0.03];
-    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() }, [410.0, 120.0]));
+    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, collapse_tags: false, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() }, [410.0, 120.0]));
     let mut sources = regenerate_sources(&doc, &drawing);
     plate_holes_as_hole_features(&drawing, &mut sources, ViewId(2));
     let src = &sources[&SourceKey::studio(asm)];

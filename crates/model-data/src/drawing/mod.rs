@@ -1573,6 +1573,10 @@ pub enum TableKind {
         /// Hole table › ☑ Show location data (the X LOC / Y LOC columns).
         #[serde(default = "yes_hole", skip_serializing_if = "is_true")]
         show_location: bool,
+        /// ☑ Collapse tags (shown with location data off): a row per size tagged by its letter alone, the view's tags
+        /// too (live2 feel/holetable.json).
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        collapse_tags: bool,
         /// Order: Bottom to top.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         bottom_to_top: bool,

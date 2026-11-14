@@ -319,6 +319,11 @@ fn padding(drawing: &Drawing) -> [f64; 2] {
     [drawing.props.table_h_padding, drawing.props.table_v_padding]
 }
 
+/// A hole tag's letter ("B" of "B2").
+pub fn tag_letter(tag: &str) -> &str {
+    tag.trim_end_matches(|c: char| c.is_ascii_digit())
+}
+
 /// One hole of a hole table.
 #[derive(Clone, Debug, PartialEq)]
 pub struct HoleRow {
@@ -563,7 +568,7 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
             }
             TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden, ..Default::default() }
         }
-        TableKind::Hole { precision, origin: stored, flip_x, flip_y, show_location, bottom_to_top, exclude, x_dir, .. } => {
+        TableKind::Hole { precision, origin: stored, flip_x, flip_y, show_location, collapse_tags, bottom_to_top, exclude, x_dir, .. } => {
             // Live (behaviours 1983): TAG | X LOC | Y LOC | SIZE | QTY, a
             // size's SIZE and QTY cells merged down its rows; ☐ Show
             // location data drops X / Y LOC.
@@ -585,10 +590,12 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
                     _ => groups.push((i, 1)),
                 }
             }
+            // Collapse tags (location data off): a size's holes are one row, tagged by its letter (live2: "A", not "A1-A3").
+            let collapse = *collapse_tags && !*show_location;
             let mut rows: Vec<Vec<String>> = Vec::new();
             for &(s, n) in &groups {
-                for (k, h) in holes[s..s + n].iter().enumerate() {
-                    let mut r = vec![h.tag.clone()];
+                for (k, h) in holes[s..s + n].iter().enumerate().take(if collapse { 1 } else { n }) {
+                    let mut r = vec![if collapse { tag_letter(&h.tag).to_string() } else { h.tag.clone() }];
                     if *show_location {
                         r.extend([num(h.x * sx), num(h.y * sy)]);
                     }
@@ -609,6 +616,7 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
                     rows.push(r);
                 }
             }
+            let groups: Vec<(usize, usize)> = if collapse { (0..groups.len()).map(|i| (i, 1)).collect() } else { groups };
             let (size_col, nrows) = (header.len() - 2, rows.len());
             if *bottom_to_top {
                 rows.reverse();

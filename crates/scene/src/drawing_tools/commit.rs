@@ -623,7 +623,7 @@ pub fn view_table(id: u64, kind: TableTool, view: ViewId, origin: Option<PickedP
     let tk = match kind {
         TableTool::Bom => TableKind::Bom { view, structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source: None },
         TableTool::CutList => TableKind::CutList { view, bottom_to_top: false, config: None, source: None },
-        _ => TableKind::Hole { view, origin: origin.as_ref().map(|o| o.p).unwrap_or([0.0; 2]), origin_ref: origin.and_then(|o| o.r), precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() },
+        _ => TableKind::Hole { view, origin: origin.as_ref().map(|o| o.p).unwrap_or([0.0; 2]), origin_ref: origin.and_then(|o| o.r), precision: None, flip_x: false, flip_y: false, show_location: true, collapse_tags: false, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() },
     };
     let name = match kind {
         TableTool::Bom => "BOM table",

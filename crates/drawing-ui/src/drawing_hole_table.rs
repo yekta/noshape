@@ -80,8 +80,8 @@ impl DrawingEditor {
     /// choices; ✓ applies them (one edit), ✕ leaves the table as it was.
     pub fn open_hole_table_props(&mut self, id: u64, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(id) else { return };
-        let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, ref exclude, x_dir, .. } = t.kind else { return };
-        self.hole_dlg = Some(HoleTableDlg { show_location, collapse_tags: false, precision, bottom_to_top, corner: t.corner, table: Some(id), flip_x, flip_y, exclude: exclude.clone(), picking: false, x_dir, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false, placing: false });
+        let TableKind::Hole { show_location, collapse_tags, precision, bottom_to_top, flip_x, flip_y, ref exclude, x_dir, .. } = t.kind else { return };
+        self.hole_dlg = Some(HoleTableDlg { show_location, collapse_tags, precision, bottom_to_top, corner: t.corner, table: Some(id), flip_x, flip_y, exclude: exclude.clone(), picking: false, x_dir, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false, placing: false });
         cx.notify();
     }
 
@@ -91,11 +91,11 @@ impl DrawingEditor {
         // HOLE-TABLE-MENU (2)).
         self.cell_sel = None;
         if let (true, Some(id)) = (accept, d.table) {
-            let (sl, pr, bt, corner, fx, fy) = (d.show_location, d.precision, d.bottom_to_top, d.corner, d.flip_x, d.flip_y);
+            let (sl, ct, pr, bt, corner, fx, fy) = (d.show_location, d.collapse_tags, d.precision, d.bottom_to_top, d.corner, d.flip_x, d.flip_y);
             let (excluded, xd) = (d.exclude.clone(), d.x_dir);
             self.edit_table(id, "Hole table properties", cx, move |t| {
-                if let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, exclude, x_dir, .. } = &mut t.kind {
-                    (*show_location, *precision, *bottom_to_top, *flip_x, *flip_y) = (sl, pr, bt, fx, fy);
+                if let TableKind::Hole { show_location, collapse_tags, precision, bottom_to_top, flip_x, flip_y, exclude, x_dir, .. } = &mut t.kind {
+                    (*show_location, *collapse_tags, *precision, *bottom_to_top, *flip_x, *flip_y) = (sl, ct, pr, bt, fx, fy);
                     *exclude = excluded;
                     *x_dir = xd;
                 }
@@ -108,8 +108,8 @@ impl DrawingEditor {
     /// A hole table just made by the tool takes the dialog's choices.
     pub fn apply_hole_table_dlg(&self, table: &mut noshape_model::drawing::Table) {
         let Some(d) = &self.hole_dlg else { return };
-        if let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, exclude, x_dir, .. } = &mut table.kind {
-            (*show_location, *precision, *bottom_to_top, *flip_x, *flip_y) = (d.show_location, d.precision, d.bottom_to_top, d.flip_x, d.flip_y);
+        if let TableKind::Hole { show_location, collapse_tags, precision, bottom_to_top, flip_x, flip_y, exclude, x_dir, .. } = &mut table.kind {
+            (*show_location, *collapse_tags, *precision, *bottom_to_top, *flip_x, *flip_y) = (d.show_location, d.collapse_tags, d.precision, d.bottom_to_top, d.flip_x, d.flip_y);
             exclude.clone_from(&d.exclude);
             *x_dir = d.x_dir;
         }

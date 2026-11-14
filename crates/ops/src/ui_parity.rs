@@ -14,8 +14,15 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Result<Value, String> {
 
 /// A selection as the start names it: "Sketch 1 region 0" (the sketch's
 /// region by index), "edge through [20, 0, 10]" (also face / vertex; mm),
-/// "Sketch 1 edges" (all its curves: a Frame's path).
+/// "Sketch 1 edges" (all its curves: a Frame's path), "Sketch 2 circle centre at [20, 10]" (a circle's centre point,
+/// sketch mm: a Hole's location).
 fn entity(ctx: &mut Ctx, name: &str) -> Result<Value, String> {
+    if let Some((sketch, at)) = name.split_once(" circle centre at ") {
+        let at: [f64; 2] = serde_json::from_str(at).map_err(|e| format!("`{name}`: {e}"))?;
+        let got = call(ctx, "sketch_get", json!({ "sketch": sketch }))?;
+        let near = |e: &Value| e["center"].as_array().is_some_and(|c| c.len() == 2 && (c[0].as_f64().unwrap_or(f64::NAN) - at[0]).hypot(c[1].as_f64().unwrap_or(f64::NAN) - at[1]) < 1e-6);
+        return got["entities"].as_array().into_iter().flatten().find(|e| e["type"] == "circle" && near(e)).and_then(|e| e["center_point"].as_str()).map(|id| json!(id)).ok_or_else(|| format!("`{name}`: no circle there in {sketch}"));
+    }
     if let Some(sketch) = name.strip_suffix(" edges") {
         let got = call(ctx, "sketch_get", json!({ "sketch": sketch }))?;
         let ids: Vec<Value> = got["entities"].as_array().into_iter().flatten().filter(|e| !matches!(e["type"].as_str(), Some("point")) && e["construction"] != true).filter_map(|e| e["id"].as_str().map(|id| json!(id))).collect();
@@ -43,7 +50,7 @@ fn entity(ctx: &mut Ctx, name: &str) -> Result<Value, String> {
 /// Selections named in a feature's params, resolved to ours.
 fn resolve(ctx: &mut Ctx, v: &Value) -> Result<Value, String> {
     match v {
-        Value::Array(items) if items.iter().all(Value::is_string) && items.iter().any(|s| s.as_str().is_some_and(|s| s.contains(" region ") || s.contains(" through ") || s.ends_with(" edges"))) => {
+        Value::Array(items) if items.iter().all(Value::is_string) && items.iter().any(|s| s.as_str().is_some_and(|s| s.contains(" region ") || s.contains(" through ") || s.ends_with(" edges") || s.contains(" circle centre at "))) => {
             // ("Sketch 1 edges" stands for several.)
             let mut out = Vec::new();
             for s in items {
@@ -338,7 +345,14 @@ fn add_features(ctx: &mut Ctx, features: &Value) -> Result<(), String> {
         } else {
             let mut params = serde_json::Map::new();
             for (p, v) in f["params"].as_object().into_iter().flatten() {
-                params.insert(p.clone(), resolve(ctx, v).map_err(what)?);
+                // A Hole's parameters as live's starts name them (FeatureScript's older names; ours are std's newer ones).
+                let p = match (ty, p.as_str()) {
+                    ("hole", "holeDiameter") => "holeDiameterV3",
+                    ("hole", "endStyle") => "endStyleV2",
+                    ("hole", "holeDepth") => "holeDepthV3",
+                    (_, p) => p,
+                };
+                params.insert(p.to_string(), resolve(ctx, v).map_err(what)?);
             }
             let mut args = json!({ "type": ty, "params": params });
             if let Some(n) = f["name"].as_str() {
@@ -414,6 +428,25 @@ mod tests {
         assert_eq!(names, ["V1"], "no version of its own: {h}");
         let rh = call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-001" })).unwrap();
         assert_eq!(rh["revisions"][0]["version"], "V1", "{rh}");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// live2's holes-plate-drawing start: Hole features at a sketch's circle centres, with live's parameter names.
+    #[test]
+    fn a_starts_holes_sit_at_its_circle_centres() {
+        let start = json!({ "units": "mm", "features": [
+            { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+            { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
+            { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[10, 10], [12.5, 10]] }, { "circle": [[50, 30], [52.5, 30]] }] },
+            { "type": "hole", "name": "Hole 1", "params": { "locations": ["Sketch 2 circle centre at [10, 10]", "Sketch 2 circle centre at [50, 30]"], "holeDiameter": "5 mm", "endStyle": "BLIND", "holeDepth": "12 mm" } }
+        ] });
+        let dir = std::env::temp_dir().join(format!("noshape-uip-holes-{}", std::process::id()));
+        let path = dir.join("holes.noshape");
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &path, &start).unwrap();
+        let list = call(&mut ctx, "feature_list", json!({})).unwrap();
+        let hole = list["features"].as_array().unwrap().iter().find(|f| f["name"] == "Hole 1").cloned();
+        assert!(hole.is_some(), "{list}");
         let _ = std::fs::remove_dir_all(dir);
     }
 

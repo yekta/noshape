@@ -5401,7 +5401,7 @@ The table context menus, one edit each. Cells are (`row`, `column`) counted from
 - `resize`: Resize… column `column`'s `width` and the row `height` (mm) ("Resize cell").
 - BOM, cut list, hole and custom tables: `split` below displayed row `row` ("Split table"; the reply's `table` is the new part), `unsplit` ("Unsplit table").
 - Hole tables: `flip_x`, `flip_y`, `precision` (`decimals` 0–4 or null for the drawing's).
-- `order` (`to` top_to_bottom | bottom_to_top; BOM, cut list and hole tables), `show_location` (`on`: a hole table's X LOC / Y LOC columns, Show location data), `bom_type` (`to` flattened | structured_top_level | structured_multi_level; structured is Multi level).
+- `order` (`to` top_to_bottom | bottom_to_top; BOM, cut list and hole tables), `show_location` (`on`: a hole table's X LOC / Y LOC columns, Show location data), `collapse_tags` (`on`: with location data off, a row per hole size tagged by its letter, the view's tags too; Collapse tags), `bom_type` (`to` flattened | structured_top_level | structured_multi_level; structured is Multi level).
 - `fixed_corner` (`to` top_right | top_left | bottom_right | bottom_left; the table stays put), `text_height` (`to` 2.5 | 3 | 3.5 | 5 mm), `fit` (Fit to content).
 
 Examples:
@@ -5418,7 +5418,7 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `table` | integer | required | Table id (drawing_get). |
-| `action` | one of `format_cell`, `merge_right`, `merge_below`, `merge`, `unmerge`, `insert`, `remove`, `duplicate`, `columns_equally`, `rows_equally`, `resize`, `split`, `unsplit`, `flip_x`, `flip_y`, `precision`, `show_location`, `order`, `bom_type`, `fixed_corner`, `text_height`, `fit` | required | The menu action. |
+| `action` | one of `format_cell`, `merge_right`, `merge_below`, `merge`, `unmerge`, `insert`, `remove`, `duplicate`, `columns_equally`, `rows_equally`, `resize`, `split`, `unsplit`, `flip_x`, `flip_y`, `precision`, `show_location`, `collapse_tags`, `order`, `bom_type`, `fixed_corner`, `text_height`, `fit` | required | The menu action. |
 | `row` | integer |  | The cell's row (0 = header / first row). |
 | `column` | integer |  | The cell's column. |
 | `to_row` | integer |  | A block's last row (default `row`). |
@@ -5432,7 +5432,7 @@ Examples:
 | `at` | one of `column_left`, `column_right`, `row_above`, `row_below` |  | insert. |
 | `what` | one of `columns`, `rows` |  | remove, duplicate. |
 | `decimals` | integer or null |  | precision. |
-| `on` | boolean |  | show_location. |
+| `on` | boolean |  | show_location, collapse_tags. |
 | `to` | string or number |  | order, bom_type, fixed_corner, text_height: the choice. |
 
 #### drawing_annotation_edit
