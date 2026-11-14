@@ -1485,6 +1485,22 @@ impl Sketch {
             .collect()
     }
 
+    /// Whether this sketch solves with `opts` (and then solved): a constructive placement's trial, its sketch used
+    /// only when it does. One solve: no constructive pass, no conflicting constraints set aside (a solve that needs
+    /// that isn't Solved), no homotopy walk (over the live fuzz cases and real sketches it rescued 1 trial of 40,000,
+    /// without changing any placement; the walks were most of a regeneration's solve: 5-49 ms a sketch, user docs).
+    pub(crate) fn solve_trial(&mut self, opts: &SolveOptions) -> bool {
+        let snapshot = self.clone();
+        if !run_ext(self, opts, &[], false).is_solved() {
+            return false;
+        }
+        if !opts.allow_collapse && !self.collapsed_lines(&snapshot).is_empty() {
+            *self = snapshot;
+            return false;
+        }
+        true
+    }
+
     fn solve_inner(&mut self, opts: &SolveOptions) -> SolveReport {
         let dims = self.walk_dims();
         // Nothing to walk (every dimension already measures its value): a

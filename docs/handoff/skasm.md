@@ -58,8 +58,8 @@
     ~58 % (the glued `fuse_all` of walls and bends through OCCT ~half, relief cuts ~third), flat_of ~1/3 (unfold,
     flat_from_pieces). model-plus (437 ms, live 917): Extrude 4 = std's performSheetMetalBoolean ~50 % (bool's Rust
     Boolean) + the rebuild ~50 % (build_part's glued fuse). The glued fuse is the next lever: sent to bool (22:33) with the samples.
-- Hosts (lead 11-14): model / assembly suites on vibe7 or vibe5 (vibe6 overloaded); the Mac only for short builds and crate tests (one slot, 6 jobs,
-  lowest priority). Suite script: /root/skasm-scratch/bin/suite.sh (copy into the worktree as suite-tmp.sh, never commit it), e.g.
+- Hosts (lead 11-14, latest): model / assembly suites on vibe7 or vibe5 (vibe6 overloaded); the Mac only for short builds and crate tests,
+  one slot shared by everyone. Suite script: /root/skasm-scratch/bin/suite.sh (copy into the worktree as suite-tmp.sh, never commit it), e.g.
   `NOSHAPE_RB_HOST=vibe7 tools/tiers/rb.sh env DOC=c2-hunting-knife bash suite-tmp.sh`.
 
 ## From psui (2026-11-10 20:36 UTC, lead: the sheet metal flat as a sketchable body, SUITE-LOUVER-SKETCH-9)

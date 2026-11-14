@@ -20,7 +20,7 @@ use crate::constraints::ConstraintKind;
 use crate::entities::{EntityKind, Geometry};
 use crate::ids::EntityId;
 use crate::sketch::Sketch;
-use crate::solver::{SolveOptions, SolveStatus};
+use crate::solver::SolveOptions;
 use glam::DVec2;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -371,7 +371,7 @@ impl Sketch {
                 }
             }
             held.insert(k);
-            match self.sub_sketch(comp, cons, &|_| true, &held).map(|mut sub| (matches!(sub.solve_with(&opts).status, SolveStatus::Solved), sub)) {
+            match self.sub_sketch(comp, cons, &|_| true, &held).map(|mut sub| (sub.solve_trial(&opts), sub)) {
                 Some((true, sub)) => done = Some(sub),
                 _ => {
                     for (p, g) in was {
@@ -396,7 +396,7 @@ impl Sketch {
             let shared = enough && anchors.iter().all(|a| *a == anchors[0] || self.coincident_class(anchors[0]).contains(a));
             if shared
                 && let Some(mut sub) = self.sub_sketch(comp, cons, &|_| true, &BTreeSet::from([anchors[0]]))
-                && matches!(sub.solve_with(&opts).status, SolveStatus::Solved)
+                && sub.solve_trial(&opts)
             {
                 held.insert(anchors[0]);
                 done = Some(sub);
@@ -409,7 +409,7 @@ impl Sketch {
             let holds: HashMap<crate::ids::ConstraintId, bool> = cons.iter().map(|(c, _)| (*c, !unheld.contains(c))).collect();
             if let Some(p) = comp.iter().find_map(|u| self.stem_anchor(*u, cons, &unit_of, &holds))
                 && let Some(mut sub) = self.sub_sketch(comp, cons, &|_| true, &BTreeSet::from([p]))
-                && matches!(sub.solve_with(&opts).status, SolveStatus::Solved)
+                && sub.solve_trial(&opts)
             {
                 held.insert(p);
                 done = Some(sub);
@@ -420,7 +420,7 @@ impl Sketch {
             let mut with = held.clone();
             with.insert(u);
             let Some(mut sub) = self.sub_sketch(comp, cons, &|_| true, &with) else { continue };
-            if matches!(sub.solve_with(&opts).status, SolveStatus::Solved) {
+            if sub.solve_trial(&opts) {
                 held = with;
                 done = Some(sub);
             }
@@ -920,17 +920,17 @@ impl Sketch {
                     }
                 }
                 let opts = SolveOptions { light, still: still.into_iter().collect(), analyze: false, constructive: false, ..Default::default() };
-                let st = sub.solve_with(&opts).status;
+                let solved = sub.solve_trial(&opts);
                 // With its neighbours let go: only when each of them can
                 // follow, stretching along itself or carried by a neighbour
                 // that can (live fuzz s5: a rectangle's right side moves out
                 // whole, the top stretches; s8: a triangle side tied to a
                 // turned line turns too, its other end stays; probe t1: the
                 // top doesn't move sideways, the left side couldn't follow).
-                if hold == 0 && shape >= 1 && matches!(st, SolveStatus::Solved) && !held.is_empty() && !self.neighbours_follow(&sub, u, &held, &before, &placed, cons) {
+                if hold == 0 && shape >= 1 && solved && !held.is_empty() && !self.neighbours_follow(&sub, u, &held, &before, &placed, cons) {
                     continue;
                 }
-                if matches!(st, SolveStatus::Solved) {
+                if solved {
                     done = Some(sub);
                     if slide {
                         slid = sliding.clone();
@@ -991,7 +991,7 @@ impl Sketch {
                         None => g.iter().filter_map(|x| self.anchor(*x)).collect(),
                     };
                     let opts = SolveOptions { light: g.iter().copied().collect(), still, analyze: false, constructive: false, ..Default::default() };
-                    if matches!(sub.solve_with(&opts).status, SolveStatus::Solved) {
+                    if sub.solve_trial(&opts) {
                         done = Some(sub);
                         group = g.into_iter().collect();
                         break;
@@ -1095,7 +1095,7 @@ impl Sketch {
             return false;
         }
         let opts = SolveOptions { light: vec![u], still: probe.anchor(u).into_iter().collect(), analyze: false, constructive: false, ..Default::default() };
-        if !matches!(sub.solve_with(&opts).status, SolveStatus::Solved) {
+        if !sub.solve_trial(&opts) {
             return false;
         }
         let neighbours: BTreeSet<EntityId> = cons.iter().filter(|(c, us)| us.contains(&u) && self.connective(*c)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u && !placed.contains(x)).collect();
@@ -2076,7 +2076,7 @@ impl Sketch {
             }
         }
         let opts = SolveOptions { light: group.iter().copied().collect(), analyze: false, constructive: false, ..Default::default() };
-        if !matches!(sub.solve_with(&opts).status, SolveStatus::Solved) {
+        if !sub.solve_trial(&opts) {
             return;
         }
         for p in points_of(self, group) {
