@@ -229,6 +229,18 @@ The suite's per-feature kernel profiles count its own measuring (props_surface v
 Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **11-14 18:3x UTC, lead's speed rows (measured alone on quiet vibe6, not 3 at a time as the recordings were):**
+  cf-surface-pattern 3.98 s (live 4.18), cf-spur-gear 1.26 (live 2.11): already under live; c2-rings-loft 2.76 (live
+  1.56) the one over (Shell ~1 s a regeneration: bool's, queued there; Booleans ~1.3 s). Landed 3d64c478 (torus face
+  vs plane apart test, vertex lookup by the axis with fewest: no measurable document change).
+  - rings-loft's cut 3c0b53fe runs 3 rounds (vertices to merge first): 194 then 291 groups, all from two split points
+    nearer along a curve than the tolerance (split_params); the restarts waste ~0.28 s of 1.0 s (round 0's OCCT
+    sections are reused). Foreseeing round 1's groups means simulating the merges inside a round: not done.
+  - Marcher revived (lead 18:0x), plane x B-spline only (worktree /root/projects/noshape-wt/bool2-march, branch
+    bool2-march2, ff869016a, gating): measured on 3c0b53fe's 187 such pairs 4.3x OCCT's time, OCCT's curves on ours
+    within 1.2e-6; 11 pairs ours ran past the faces (extra curves outside), 1 found none where OCCT had one. Safety net:
+    OCCT's section where the march finds none or a curve neither closes nor ends on either face's boundary.
+    T1 brep march::tests::a_plane_across_a_bicubic_patch.
 - **11-14 11:10 UTC: landed 8bb1a09d (fan-blade bolt cut, impeller mirror fuse, arcs in the result check). Fresh
   per-document recordings (vibe6 ~/agents/bool2-keep/bydoc2/rec, today's main): 875/945 ours, 22 OCCT.** Left:
   - c2-gamma-imported / c2-wire-clip-imported f68f4393 (Boolean 1, 87 tools, 7.4-7.7 s) and 678f4bf2 (Boolean 2, 1.9
