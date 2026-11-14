@@ -8954,6 +8954,30 @@ mod tests {
         assert!(ed.selection.contains(&l), "a screen window around it selects it");
     }
 
+    /// Live (feel/sketch.json "dimension.pointToPointType": two points 50.1165 × 30.0148 mm apart, the pointer R px
+    /// from their middle at each 15°, zoom A 0.2754 mm/px): above or below their box horizontal, beside it vertical,
+    /// inside it or off a corner aligned.
+    #[test]
+    fn two_points_dimension_as_live_by_where_the_pointer_is() {
+        let mut sk = Sketch::new();
+        let (a, b) = (sk.add_point(v(0.0, 0.0)), sk.add_point(v(0.0501165, 0.0300148)));
+        let mid = v(0.0501165, 0.0300148) * 0.5;
+        let live: &[(u32, u32, char)] = &[(90, 0, 'A'), (90, 15, 'A'), (90, 30, 'A'), (90, 45, 'H'), (90, 60, 'H'), (90, 75, 'H'), (90, 90, 'H'), (90, 105, 'H'), (90, 120, 'H'), (90, 135, 'H'), (90, 150, 'A'), (90, 165, 'A'), (90, 180, 'A'), (90, 195, 'A'), (90, 210, 'A'), (90, 225, 'H'), (90, 240, 'H'), (90, 255, 'H'), (90, 270, 'H'), (90, 285, 'H'), (90, 300, 'H'), (90, 315, 'H'), (90, 330, 'A'), (90, 345, 'A'), (180, 0, 'V'), (180, 15, 'V'), (180, 30, 'A'), (180, 45, 'A'), (180, 60, 'H'), (180, 75, 'H'), (180, 90, 'H'), (180, 105, 'H'), (180, 120, 'H'), (180, 135, 'A'), (180, 150, 'A'), (180, 165, 'V'), (180, 180, 'V'), (180, 195, 'V'), (180, 210, 'A'), (180, 225, 'A'), (180, 240, 'H'), (180, 255, 'H'), (180, 270, 'H'), (180, 285, 'H'), (180, 300, 'H'), (180, 315, 'A'), (180, 330, 'A'), (180, 345, 'V')];
+        let mut wrong = Vec::new();
+        for &(r, deg, want) in live {
+            let cursor = mid + DVec2::from_angle(f64::from(deg).to_radians()) * (f64::from(r) * 0.0002754);
+            let got = match smart_dimension(&sk, &[a, b], cursor) {
+                Some(ConstraintKind::HorizontalDistance { .. }) => 'H',
+                Some(ConstraintKind::VerticalDistance { .. }) => 'V',
+                _ => 'A',
+            };
+            if got != want {
+                wrong.push((r, deg, got, want));
+            }
+        }
+        assert!(wrong.is_empty(), "(R, deg, ours, live): {wrong:?}");
+    }
+
     /// Live (feel/sketch.json "boxA": A selected, then a right-to-left box over B): a box adds to the selection.
     #[test]
     fn a_box_adds_to_the_selection() {

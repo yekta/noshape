@@ -64,7 +64,7 @@ two zooms, A 0.2754 / B 0.2316 mm/px; where they differ both are given).
 | Tangent (from an arc's end; ending on a circle) | 6–7 px; ending on a circle within 6 px of the tangent point | 7.5 px | – | – |
 | Two at once | horizontal + on a line both; a point snap beats horizontal; a point beats its line | – | – | – |
 | Snap target look | yellow-orange square, 17 px, round a point / midpoint; none on a line | the same (`SNAP_SQUARE_*`) | scene, same | = |
-| Inference glyph | ≈ 30 px right, 30 below the pointer (28, 28 mid-drag); same frame as the preview (35–60 ms) | its 20 px box centred 29 right, 31 below the snapped point | – | – (pixel check pending) |
+| Inference glyph | ≈ 30 px right, 30 below the pointer (28, 28 mid-drag); same frame as the preview (35–60 ms) | its 20 px box centred 29 right, 31 below the snapped point | – | ≈ (within live2's ±2 px) |
 | A dragged end onto an end / a midpoint / a line / a circle's rim | 9 (A) / 7 (B) / 6 / ≤ 7 / 6 (A), 3 (B) px; no H/V during a drag | 8.5 / 6 / 7.5 / 7.5 on screen (`point_drop_target`) | GPUI `a_dragged_point_lands_on_a_line_within_7_px` | = (rim: ≈) |
 | Drags: free line end / body; held lines; dimensioned; rectangle; circle | see behaviours "feel (sketch)" (2) | – | – | – |
 | Click vs drag threshold | ≈ 5 px from the press, not time-based | 5 px on screen (`DRAG_START_PX`) | scene `a_press_drags_from_5_px` | = |
@@ -78,7 +78,7 @@ two zooms, A 0.2754 / B 0.2316 mm/px; where they differ both are given).
 | Selection: click / Shift / Ctrl | a click adds, a click on a selected one removes; Shift the same; Ctrl+click opens the context menu | the same (Ctrl+click: `open_sketch_context_menu`) | GPUI `ctrl_click_in_a_sketch_opens_its_context_menu` | = |
 | Clearing; double-click | a click on empty space clears, Escape doesn't; a double-click on a line selects then deselects (no chain) | the same (two toggles) | – | = |
 | Box select | left → right: window, blue fill and border; right → left: crossing, yellow dashed; it adds | window / crossing (`#789ad1` / `#ffdc74` dashed) | – | – |
-| Dimension tool | one line: aligned; two points: H / V / aligned by the pointer against their bounding box; two lines: the angle of the pointer's quadrant; a circle: Ø; the text centred on the pointer; the value box 100 × 26, ~33 px left of and 5 above the click | the hovered entity within reach | GPU `feel::the_dimension_tool_takes_the_hovered_line` | – |
+| Dimension tool | one line: aligned; two points: H / V / aligned by the pointer against their bounding box; two lines: the angle of the pointer's quadrant; a circle: Ø; the text centred on the pointer; the value box 100 × 26, ~33 px left of and 5 above the click | the hovered entity within reach | scene `two_points_dimension_as_live_by_where_the_pointer_is` (live2's 48 pointer positions) | = |
 
 ## Drawings (studios, from 2026-11-13)
 
@@ -612,5 +612,5 @@ live2's feedback.json (11-13 09:39, for psui and studios). part-studio-ui `feedb
    whether it is Onshape's or the recording Chrome's slow redraws before copying a delay.
 3. ~~3D reach, priority, press thresholds~~ (psui 11-13). Left: mate connector reach, box select's rules, double-click
    on a face, the held edge against its own vertex.
-4. Inference glyph position against the pointer (live ≈ 30, 30).
-5. Dimension tool placement rules (H / V / aligned by the bounding box, angle quadrant, Ø): a test each.
+4. ~~Inference glyph position against the pointer (live ≈ 30, 30)~~: within 2 px (psui 11-14).
+5. ~~Dimension tool placement rules~~: two points' H / V / aligned by the box, 48 / 48 of live2's positions (psui 11-14); the angle quadrant and Ø have their own tests.
