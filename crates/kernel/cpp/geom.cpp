@@ -2,6 +2,8 @@
 #include "internal.hpp"
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <BRepClass_FaceClassifier.hxx>
+#include <deque>
+#include <memory>
 #include <Poly_Triangulation.hxx>
 
 #include <BRepAdaptor_Curve.hxx>
@@ -740,6 +742,47 @@ bool face_contains_uv(const OcShape& fs, double u, double v, double tol)
   return fc.State() == TopAbs_IN || fc.State() == TopAbs_ON;
 }
 
+// A free-form face's projector, set up over its parameter box (the Extrema sample grid: 0.6-3 ms to build) and kept
+// for the next point on the same face: the last 16 faces asked about on this thread (a sheet metal rebuild probes a
+// rolled wall hundreds of times: cf-sheet-metal-model-plus' 704 probes of such faces took 0.43 s).
+static GeomAPI_ProjectPointOnSurf* face_projector(const TopoDS_Face& f)
+{
+  // (Kept for the same face on the same surface and parameter box: a face edited in place gets a new projector.)
+  struct Kept
+  {
+    TopoDS_Face                                 face;
+    const Geom_Surface*                         stored;
+    TopLoc_Location                             loc;
+    double                                      box[4];
+    std::unique_ptr<GeomAPI_ProjectPointOnSurf> pr;
+  };
+  // (Never destroyed: OCCT's allocator may be gone when a thread's statics go.)
+  thread_local std::deque<Kept>& kept   = *new std::deque<Kept>;
+  TopLoc_Location                 loc;
+  const Geom_Surface* const       stored = BRep_Tool::Surface(f, loc).get();
+  if (stored == nullptr)
+    return nullptr;
+  double box[4];
+  BRepTools::UVBounds(f, box[0], box[1], box[2], box[3]);
+  for (auto it = kept.begin(); it != kept.end(); ++it)
+    if (it->stored == stored && it->face.IsEqual(f) && it->loc.IsEqual(loc) && std::equal(box, box + 4, it->box))
+    {
+      if (it != kept.begin())
+      {
+        Kept k = std::move(*it);
+        kept.erase(it);
+        kept.push_front(std::move(k));
+      }
+      return kept.front().pr.get();
+    }
+  auto pr = std::make_unique<GeomAPI_ProjectPointOnSurf>();
+  pr->Init(BRep_Tool::Surface(f), box[0], box[1], box[2], box[3]);
+  kept.push_front(Kept{f, stored, loc, {box[0], box[1], box[2], box[3]}, std::move(pr)});
+  if (kept.size() > 16)
+    kept.pop_back();
+  return kept.front().pr.get();
+}
+
 bool face_contains_point(const OcShape& fs, P3 p, double tol)
 {
   const TopoDS_Face&        f    = as_face(fs.shape, "shape");
@@ -759,20 +802,18 @@ bool face_contains_point(const OcShape& fs, P3 p, double tol)
   }
   // Free-form: the surface's feet within the face's parameter box (a point on the face has one at 0), each classified.
   {
-    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(f);
-    if (surf.IsNull())
+    GeomAPI_ProjectPointOnSurf* const pr = face_projector(f);
+    if (pr == nullptr)
       return face_project_point(fs, p).distance <= tol;
-    double u0, u1, v0, v1;
-    BRepTools::UVBounds(f, u0, u1, v0, v1);
-    GeomAPI_ProjectPointOnSurf pr(to_pnt(p), surf, u0, u1, v0, v1);
-    if (!pr.IsDone())
+    pr->Perform(to_pnt(p));
+    if (!pr->IsDone())
       return face_project_point(fs, p).distance <= tol;
-    for (int k = 1; k <= pr.NbPoints(); ++k)
+    for (int k = 1; k <= pr->NbPoints(); ++k)
     {
-      if (pr.Distance(k) > tol)
+      if (pr->Distance(k) > tol)
         continue;
       double u, v;
-      pr.Parameters(k, u, v);
+      pr->Parameters(k, u, v);
       BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), std::max(tol, BRep_Tool::Tolerance(f)));
       if (fc.State() == TopAbs_IN || fc.State() == TopAbs_ON)
         return true;
@@ -823,23 +864,20 @@ ProjPoint face_project_point(const OcShape& fs, P3 p)
   // off it goes on below (another extremum could be nearer, PROJ-RULED).
   if (kind != GeomAbs_Plane && kind != GeomAbs_Cylinder && kind != GeomAbs_Cone && kind != GeomAbs_Sphere && kind != GeomAbs_Torus)
   {
-    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(f);
-    double                          u0, u1, v0, v1;
-    BRepTools::UVBounds(f, u0, u1, v0, v1);
-    if (!surf.IsNull())
+    if (GeomAPI_ProjectPointOnSurf* const pr = face_projector(f))
     {
-      GeomAPI_ProjectPointOnSurf pr(to_pnt(p), surf, u0, u1, v0, v1);
-      const double               tol = BRep_Tool::Tolerance(f);
-      if (pr.IsDone() && pr.NbPoints() > 0 && pr.LowerDistance() <= tol)
+      pr->Perform(to_pnt(p));
+      const double tol = BRep_Tool::Tolerance(f);
+      if (pr->IsDone() && pr->NbPoints() > 0 && pr->LowerDistance() <= tol)
       {
         double u, v;
-        pr.LowerDistanceParameters(u, v);
+        pr->LowerDistanceParameters(u, v);
         BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), tol);
         if (fc.State() == TopAbs_IN || fc.State() == TopAbs_ON)
         {
           ProjPoint r{};
-          r.point    = from_pnt(pr.NearestPoint());
-          r.distance = pr.LowerDistance();
+          r.point    = from_pnt(pr->NearestPoint());
+          r.distance = pr->LowerDistance();
           r.u        = u;
           r.v        = v;
           return r;
