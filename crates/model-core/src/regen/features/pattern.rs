@@ -2037,7 +2037,8 @@ fn transform_of(ev: &EvalCtx) -> FResult<Option<k::Transform>> {
             let by_distance = ty == "TRANSLATION_DISTANCE";
             let field: &'static str = if by_distance { "transformDirection" } else { "transformLine" };
             let refs = ev.query(field);
-            let is_vertex = |r: &&Reference| matches!(r, Reference::Vertex(_)) || matches!(r, Reference::SketchEntity { .. } if ev.resolve_vertex_point(r).is_some());
+            // (The origin is a point too: asm-infento-subs' studio 74d3d6, Transform 19 from the origin to a sketch point.)
+            let is_vertex = |r: &&Reference| matches!(r, Reference::Vertex(_) | Reference::Origin | Reference::SketchCurveEnd { .. }) || matches!(r, Reference::SketchEntity { .. } if ev.resolve_vertex_point(r).is_some());
             let pts: Vec<DVec3> = refs.iter().filter(is_vertex).filter_map(|r| ev.resolve_vertex_point(r)).collect();
             let edges: Vec<&Reference> = refs.iter().filter(|r| !is_vertex(r) && matches!(r, Reference::Edge(_) | Reference::SketchEntity { .. })).collect();
             let coincident = |v: DVec3| if v.length() <= 1e-8 { err("Two or more points are coincident.") } else { Ok(v) };

@@ -1574,3 +1574,23 @@ fn transform_by_distance_along_a_construction_line() {
     assert!(near(bb.min.z, 0.020, 1e-6) && near(bb.max.z, 0.045, 1e-6), "moved up 20 mm: {bb:?}");
     assert!(near(bb.min.x, 0.0, 1e-6) && near(bb.min.y, 0.0, 1e-6), "only along the line: {bb:?}");
 }
+
+/// Transform by two points where one is the origin (asm-infento-subs' studio 74d3d6, Transform 19): from the origin to
+/// the sketch point.
+#[test]
+fn transform_from_the_origin_to_a_sketch_point() {
+    let mut s = block();
+    let r = s.ok();
+    let id = r.context.bodies[0].id.clone();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.03, 0.01));
+    let sketch = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.add("transform", move |pv| {
+        pv.set("entities", ParamValue::Query(vec![Reference::Body(id)]));
+        pv.set("transformType", ParamValue::Enum("TRANSLATION_ENTITY".into()));
+        pv.set("transformLine", ParamValue::Query(vec![Reference::Origin, Reference::SketchEntity { sketch, entity: p.0 }]));
+    });
+    let r = s.ok();
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.min.x, 0.030, 1e-6) && near(bb.min.y, 0.010, 1e-6) && near(bb.min.z, 0.0, 1e-6), "moved by (30, 10, 0) mm: {bb:?}");
+}
