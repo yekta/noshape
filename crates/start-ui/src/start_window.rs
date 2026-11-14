@@ -799,10 +799,21 @@ impl StartView {
         self.selected.as_deref() == Some(p) || (self.also_of.is_some() && self.also_of == self.selected && self.also.iter().any(|q| q == p))
     }
 
-    /// Every selected row, to test many rows against (a frame lists 2,000 rows with all of them selected).
-    fn selection_set(&self) -> std::collections::HashSet<&Path> {
+    /// Every selected row, to test many rows against (a frame lists 2,000 rows with all of them selected). By the
+    /// paths' text: a `Path` hashes component by component, several times slower (the page's paths are canonical).
+    fn selection_set(&self) -> std::collections::HashSet<&std::ffi::OsStr> {
         let also = (self.also_of.is_some() && self.also_of == self.selected).then_some(&self.also);
-        self.selected.iter().chain(also.into_iter().flatten()).map(PathBuf::as_path).collect()
+        self.selected.iter().chain(also.into_iter().flatten()).map(|p| p.as_os_str()).collect()
+    }
+
+    /// How many rows are selected (without listing them).
+    fn selection_len(&self) -> usize {
+        let also = if self.also_of.is_some() && self.also_of == self.selected { self.also.len() } else { 0 };
+        usize::from(self.selected.is_some()) + also
+    }
+
+    fn many_selected(&self) -> bool {
+        self.selection_len() > 1
     }
 
     /// Every selected row, the last clicked first.
@@ -827,7 +838,7 @@ impl StartView {
 
     /// A right-click on `row`: it alone selected unless it is part of a multiple selection, which the menu acts on.
     fn context_select(&mut self, row: &Path) -> bool {
-        if self.selection().len() > 1 && self.is_selected(row) {
+        if self.many_selected() && self.is_selected(row) {
             return true;
         }
         self.select_all = false;
@@ -839,11 +850,11 @@ impl StartView {
     /// The selected rows as the commands take them: (path, name, folder), the page's order.
     fn selection_items(&self) -> Vec<(PathBuf, String, bool)> {
         let sel = self.selection_set();
-        let names: std::collections::HashMap<&Path, &str> = self.docs.iter().map(|d| (d.path.as_path(), d.name.as_str())).collect();
+        let names: std::collections::HashMap<&std::ffi::OsStr, &str> = self.docs.iter().map(|d| (d.path.as_os_str(), d.name.as_str())).collect();
         self.page_order()
             .into_iter()
-            .filter(|p| sel.contains(p.as_path()))
-            .map(|p| match names.get(p.as_path()) {
+            .filter(|p| sel.contains(p.as_os_str()))
+            .map(|p| match names.get(p.as_os_str()) {
                 Some(name) => (p, name.to_string(), false),
                 None => {
                     let name = folder_label(&p);
@@ -856,7 +867,7 @@ impl StartView {
     /// The menu of a multiple selection: what applies to every row in it.
     /// Live (feel/documents.json `contextMenuForN`): Details, Labels…, Move selected (N) to…, Send to trash.
     fn selection_menu(view: Entity<StartView>, menu: OsMenu, cx: &App) -> OsMenu {
-        let n = view.read(cx).selection().len();
+        let n = view.read(cx).selection_len();
         let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view);
         menu.list_no_icons()
             .item(OsMenuItem::new("Details").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.show_selection_panel(false, cx))))
@@ -907,7 +918,7 @@ impl StartView {
     /// rows (each with its ✕), Trash and Deselect all, then "⌄ Labels" with the label checklist for all of them.
     fn render_selection_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let items = self.selection_items();
+        let items = self.frame_selection_items();
         let view = cx.entity();
         let heading = |label: String| h_flex().h(px(32.)).gap(px(8.)).text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text)).child(label);
         // Only the rows in sight are built (2,000 selected took ~15 ms of layout a frame); the others are one spacer.
@@ -971,6 +982,11 @@ impl StartView {
             .into_any_element()
     }
 
+    /// [`Self::selection_items`], made once a frame (each visible selected row's drag and the "N selections" list).
+    fn frame_selection_items(&self) -> DragItems {
+        self.drag_share.borrow_mut().get_or_insert_with(|| Rc::new(self.selection_items())).clone()
+    }
+
     /// A row of the "N selections" list: icon, name, ✕.
     fn selection_row(view: &Entity<StartView>, i: usize, (path, name, folder): &(PathBuf, String, bool)) -> AnyElement {
         let pal = p();
@@ -992,9 +1008,8 @@ impl StartView {
     /// `selected`: the row is. (A frame builds each visible row's drag at once: the selection's items are made once a
     /// frame and shared.)
     fn drag_items(&self, selected: bool, row: &Path, name: &str, folder: bool) -> DocsDrag {
-        let many = self.selected.is_some() && self.also_of == self.selected && !self.also.is_empty();
-        if selected && many {
-            return DocsDrag::new(self.drag_share.borrow_mut().get_or_insert_with(|| Rc::new(self.selection_items())).clone());
+        if selected && self.many_selected() {
+            return DocsDrag::new(self.frame_selection_items());
         }
         DocsDrag::new(Rc::new(vec![(row.to_path_buf(), name.to_string(), folder)]))
     }
@@ -2299,7 +2314,7 @@ impl StartView {
     fn render_doc_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let panel = self.panel?;
         let pal = p();
-        let many = self.selection().len() > 1;
+        let many = self.many_selected();
         if many && !self.select_all && panel == DocPanel::Details {
             let body = self.render_selection_panel(cx);
             return Some(self.doc_panel_frame("Details", body, cx).into_any_element());
@@ -3372,7 +3387,7 @@ impl StartView {
         let sel = self.selection_set();
         for (i, (f, trash_id)) in tiles_list.into_iter().enumerate() {
             let view = cx.entity();
-            let selected = sel.contains(f.as_path());
+            let selected = sel.contains(f.as_os_str());
             let name = trash_id.as_ref().and_then(|id| self.trash.get(id)).map(|t| t.name.clone()).unwrap_or_else(|| folder_label(&f));
             let (f1, f2) = (f.clone(), f.clone());
             tiles = tiles.child(
@@ -3572,7 +3587,7 @@ impl StartView {
         let mut rows = v_flex().child(header);
         let sel = self.selection_set();
         for (i, (f, trash_id)) in tiles.iter().enumerate() {
-            let selected = sel.contains(f.as_path());
+            let selected = sel.contains(f.as_os_str());
             let name = trash_id.as_ref().and_then(|id| self.trash.get(id)).map(|t| t.name.clone()).unwrap_or_else(|| folder_label(f));
             let modified = self.dir_modified.get(f).copied().unwrap_or(0);
             let (f1, f2, f3, v) = (f.clone(), f.clone(), f.clone(), cx.entity());
@@ -4093,7 +4108,7 @@ impl StartView {
                     skipped = 0;
                 }
                 rows.push({
-                let selected = sel.contains(d.path.as_path());
+                let selected = sel.contains(d.path.as_os_str());
                 // The quick actions show on the one selected row only.
                 let alone = selected && alone;
                 let open = crate::doc_files::is_document_open(&d.path, cx);
