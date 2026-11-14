@@ -1,0 +1,52 @@
+{
+ "name": "helix-start-point",
+ "about": "block-fillet: Helix on the fillet face, Start condition Start angle → Start point, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Helix"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0.586,
+     9.414
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Start angle",
+    "pick": "Start point"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

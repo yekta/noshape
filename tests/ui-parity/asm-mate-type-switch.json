@@ -1,0 +1,71 @@
+{
+ "name": "asm-mate-type-switch",
+ "about": "two-blocks: Fastened between the two tops, the type dropdown Fastened → Revolute, then → Slider, Escape",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fastened mate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     20,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Fastened",
+    "pick": "Revolute"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Revolute",
+    "pick": "Slider"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

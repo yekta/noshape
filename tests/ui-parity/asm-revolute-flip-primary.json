@@ -1,0 +1,59 @@
+{
+ "name": "asm-revolute-flip-primary",
+ "about": "pin-block-apart: Revolute pin in hole, the dialog's flip (Opposite direction) icon: the pin flips end for end, Escape",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "pin-block-apart",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Revolute mate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     63.54,
+     -3.54,
+     15
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     -3.54,
+     3.54,
+     18
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Opposite direction"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
