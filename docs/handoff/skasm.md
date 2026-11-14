@@ -1,5 +1,14 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-14 23:44 UTC): sketch Mirror, sketch side (lead: the user's priority)
+- Split with psui (4d0a82b2): psui owns the tool's flow (model-edge / plane / other-sketch line as mirror line, box
+  select, preselected batch, preview) and had landed live's constraint set for lines / arcs / circles / points
+  (f2dce9629). Mine: a mirrored spline as live's: one MIRROR on the curve + begCons / endCons; its inner fit points and
+  handles held through the curve (live's coi0 / coi1 tie Onshape's separate end points: ours are the fit points
+  themselves, nothing to add). The solver takes Symmetric between two splines (BSpline / FitSpline / Conic, pointwise).
+  Impeller's Stefevenrohr Führung: its spline MIRROR (was "1 MIRROR rejected") now translates; still 1.9 µm.
+- psui runs live's 10 sketch-mirror-* takes when they land and sends me sketch-side rows that differ. Next: P2 fuzz.
+
 ## Resume here (2026-11-14 20:07 UTC): sketch differences in the model suite (lead: after the jog)
 - Jog at its reduced angle: fixed (the unfold goes through two rolled bends that meet; flat 100 mm, no overlap);
   REQUESTS 11-14 19:30 asks live for that jog's flat to confirm. The collision check compares bend zones again.
