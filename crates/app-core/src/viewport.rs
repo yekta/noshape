@@ -1885,10 +1885,12 @@ impl Viewport {
         let clicks = b.frames.min(60) as usize;
         if b.click_ms.len() >= clicks {
             let n = b.click_ms.len();
+            // (Before the stats sort them: which one took the UI thread longest.)
+            let slowest = b.click_submit_ms.iter().enumerate().max_by(|x, y| x.1.total_cmp(y.1)).map_or(0, |(i, _)| i);
             let st = noshape_render::perf::Stats::of(&mut b.click_ms);
             let sub = noshape_render::perf::Stats::of(&mut b.click_submit_ms);
             let (kind, each, until) = if b.kind == BenchKind::Hover { ("hover", "rests", "pointer to the frame with its highlight") } else { ("pick", "clicks", "click to the frame with its selection") };
-            log::info!(target: "perf", "BENCH SUMMARY {kind}: {n} {each}, {instances} instances | {until} mean {:.1} p50 {:.1} p95 {:.1} max {:.1} ms | to its submission (UI thread) mean {:.1} p50 {:.1} p95 {:.1} max {:.1} ms", st.mean, st.p50, st.p95, st.max, sub.mean, sub.p50, sub.p95, sub.max);
+            log::info!(target: "perf", "BENCH SUMMARY {kind}: {n} {each}, {instances} instances | {until} mean {:.1} p50 {:.1} p95 {:.1} max {:.1} ms | to its submission (wall time: a pick pass waits for the GPU thread) mean {:.1} p50 {:.1} p95 {:.1} max {:.1} ms (sample {slowest})", st.mean, st.p50, st.p95, st.max, sub.mean, sub.p50, sub.p95, sub.max);
             noshape_render::perf::flush();
             self.bench = None;
             return false;

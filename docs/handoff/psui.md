@@ -212,6 +212,12 @@ edge already took both constraints (Perpendicular + coincident with the used edg
 Now one glyph per constraint created (`sketch_mode::inference_icons`, the direction's first). Asked live2 for the
 glyphs' order, spacing, the dashed guides of combinations, which wins of three, and direction x direction (not H/V)
 crossings; refine against that.
+**11-14 18:16 (viewport speed, Linux numbers):** vibe7 (load ~16), release, llvmpipe, 60 samples, mode-700 copies
+deleted after. Pointer / click to the frame with its highlight or selection, p50: dock hover 370 ms, pick 620; hat15
+hover 381-856, pick 1074: llvmpipe drawing the models. To its submission p50 0.4-1.9 ms; the maxima (69-985 ms, one
+sample a run, not repeating: hat15 7 ms max on a second run) are wall time waiting for a pick pass behind an llvmpipe
+frame, not UI-thread work (the summary said "UI thread": now "wall time", and names the slowest sample). Nothing of
+ours to cut on Linux; the Mac numbers above (11-14 02:07) meet PLAN 2.7.
 
 **08:31 UTC: the measure matrix** (interaction-feel.md "Measure", part-studio-ui `measure::`) 18 / 18 on live's own
 document: two circles read Min, Max, Center (`quick_line`), a summary value's click toggles 5 decimals, the runner's
