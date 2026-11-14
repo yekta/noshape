@@ -1,0 +1,37 @@
+{
+ "name": "asm-triad-move-to-origin-free",
+ "about": "two-blocks: click Part 2's top face at (70, 10, 10) (the triad appears at the pick point), right-click the triad's origin \u203a Move to origin: the free instance moves so the triad origin lands on the world origin (its translation = minus the triad's origin)",
+ "area": "asm",
+ "source": "live, asm 3087 (triad pivot)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "triad": "origin"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move to origin"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ]
+}
