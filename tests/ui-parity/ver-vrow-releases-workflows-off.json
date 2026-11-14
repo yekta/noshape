@@ -1,0 +1,26 @@
+{
+  "name": "ver-vrow-releases-workflows-off",
+  "about": "With 'Enable managed workflows' OFF: a version row's menu has no Releases",
+  "area": "studios",
+  "source": "live2 11-14: the off state on file (studios 11-14)",
+  "start": "doc-branches",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "button": "Versions and history"
+      }
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "history_row": "V1"
+      }
+    }
+  ],
+  "config_files": {
+    "release_settings.json": {
+      "managed_workflows": false
+    }
+  }
+}

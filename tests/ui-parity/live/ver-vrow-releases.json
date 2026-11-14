@@ -1,19 +1,19 @@
 {
  "scenario": "ver-vrow-releases",
- "recorded": "2026-11-09T08:17:32.296Z",
+ "recorded": "2026-11-14T03:09:44.174Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.4"
  },
  "live": {
-  "document": "680e35fae4f0bf4bf72ce8d7",
-  "workspace": "0b91ae3835897e2e9e6c0ff9",
-  "element": "9ae00f5450777ba06a2b8800",
+  "document": "cf8b0df9a5397c42129225a6",
+  "workspace": "18eceee9eacd9980465e435e",
+  "element": "bedb9ec712fcfcd85b1bb4bc",
   "start": "doc-branches",
-  "startElement": "9ae00f5450777ba06a2b8800",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "bedb9ec712fcfcd85b1bb4bc",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -81,6 +81,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -185,6 +212,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 323.961,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": [
@@ -230,7 +284,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 42745
+   "t": 28440
   },
   {
    "step": 2,
@@ -327,6 +381,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 323.961,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": [
@@ -372,7 +453,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 47449
+   "t": 30753
   },
   {
    "step": 3,
@@ -390,21 +471,46 @@
    "state": {
     "focus": {
      "kind": "other",
-     "tag": "div"
+     "tag": "a"
     },
-    "dialog": {
-     "kind": "modal",
-     "title": "",
-     "fields": [],
-     "buttons": [
-      "Chat now to learn more",
-      "Start Professional Trial"
-     ],
-     "text": "Explore Onshape's premium features Simulation Render Studio PCB Studio CAM Studio Private documents Release management Customizable release workflows Projects with role-based access Automated part numbering Advanced product definition Arena connection Search and Where Used Enterprise analytics Company IP control Single sign-on Release management PRO ENT Onshape provides built-in release workflows for managing approval procedures and maintaining revision control of parts, assemblies, drawings, an"
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "V1 release"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "lists": [
+     {
+      "kind": "context-menu",
+      "rows": [
+       "Open",
+       "Open in new browser tab",
+       "Branch to create workspace…",
+       "Copy link",
+       "Compare",
+       "View in repair",
+       "Restore to Main…",
+       "Properties…",
+       "Releases",
+       "Publish FeatureScript…"
+      ],
+      "highlighted": null,
+      "disabled": []
+     },
+     {
+      "kind": "context-menu",
+      "rows": [
+       "V1 release"
+      ],
+      "highlighted": null,
+      "disabled": []
+     }
+    ],
     "selection": {
      "count": 0,
      "items": []
@@ -463,6 +569,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 323.961,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": [
@@ -508,7 +641,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 51416
+   "t": 33683
   }
  ]
 }

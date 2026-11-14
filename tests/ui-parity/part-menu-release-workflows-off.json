@@ -1,0 +1,20 @@
+{
+  "name": "part-menu-release-workflows-off",
+  "about": "Company release management with 'Enable managed workflows' OFF (a new Professional company's state): a part's context menu has no Release… and no Revision history…",
+  "area": "psui",
+  "source": "live2 11-14: the off state on file (studios 11-14)",
+  "start": "block",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "part": "Part 1"
+      }
+    }
+  ],
+  "config_files": {
+    "release_settings.json": {
+      "managed_workflows": false
+    }
+  }
+}
