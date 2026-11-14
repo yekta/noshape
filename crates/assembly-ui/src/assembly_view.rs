@@ -161,11 +161,17 @@ type ListRowFn = Rc<dyn Fn(&mut AssemblyView, &mut Context<AssemblyView>) -> Any
 /// and its Mate features folder (collapsed).
 const NESTED_PATTERN_BIT: u64 = 1 << 62;
 const NESTED_MATES_COLLAPSED: InstanceId = InstanceId(u64::MAX - 1);
-actions!(assembly_view, [RelationValueTab]);
+actions!(assembly_view, [RelationValueTab, PatternCountTab]);
 
-/// Tab in the relation dialog's value field (bindings outrank key listeners, and the field's own Tab would win).
+/// Tab in the relation dialog's value field and in a pattern's Instance count (bindings outrank key listeners, and
+/// the field's own Tab would win).
 pub fn bind_keys(cx: &mut App) {
-    cx.bind_keys([KeyBinding::new("tab", RelationValueTab, Some("RelationValue")), KeyBinding::new("tab", RelationValueTab, Some("RelationValue > Input"))]);
+    cx.bind_keys([
+        KeyBinding::new("tab", RelationValueTab, Some("RelationValue")),
+        KeyBinding::new("tab", RelationValueTab, Some("RelationValue > Input")),
+        KeyBinding::new("tab", PatternCountTab, Some("PatternCount")),
+        KeyBinding::new("tab", PatternCountTab, Some("PatternCount > Input")),
+    ]);
 }
 
 /// The relation dialog's types, in the live select's order.
@@ -2085,9 +2091,16 @@ impl AssemblyView {
     }
 
     /// Undo / redo in an open pattern dialog: its toggles. False when no pattern dialog is open.
-    fn pattern_undo(&mut self, redo: bool, cx: &mut Context<Self>) -> bool {
+    fn pattern_undo(&mut self, redo: bool, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let Some(p) = &mut self.pattern else { return false };
         if p.undo_toggle(redo) {
+            // The number fields show their restored values.
+            let fields: Vec<_> = p.value_fields().into_iter().cloned().zip(p.values_seen.clone()).collect();
+            for (q, text) in fields {
+                if q.read(cx).text() != text {
+                    q.update(cx, |q, cx| q.set_text(text, window, cx));
+                }
+            }
             // The Instances box follows the selection: it shows the restored picks.
             self.selected = p.seeds.clone();
             self.update_pattern_preview(cx);
@@ -6960,12 +6973,12 @@ impl AssemblyView {
             .on_action(cx.listener(Self::on_accept))
             // Live 1962: in an open mate dialog Undo / Redo take its connector picks back (the dialog stays).
             .on_action(cx.listener(|this, _: &Undo, window, cx| {
-                if !this.mate_undo(false, cx) && !this.mc_undo(false, window, cx) && !this.group_undo(false, cx) && !this.pattern_undo(false, cx) && !this.relation_undo(false, window, cx) && this.ui.np_driver.is_none() {
+                if !this.mate_undo(false, cx) && !this.mc_undo(false, window, cx) && !this.group_undo(false, cx) && !this.pattern_undo(false, window, cx) && !this.relation_undo(false, window, cx) && this.ui.np_driver.is_none() {
                     cx.propagate();
                 }
             }))
             .on_action(cx.listener(|this, _: &Redo, window, cx| {
-                if !this.mate_undo(true, cx) && !this.mc_undo(true, window, cx) && !this.group_undo(true, cx) && !this.pattern_undo(true, cx) && !this.relation_undo(true, window, cx) && this.ui.np_driver.is_none() {
+                if !this.mate_undo(true, cx) && !this.mc_undo(true, window, cx) && !this.group_undo(true, cx) && !this.pattern_undo(true, window, cx) && !this.relation_undo(true, window, cx) && this.ui.np_driver.is_none() {
                     cx.propagate();
                 }
             }))

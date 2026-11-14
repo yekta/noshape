@@ -178,6 +178,9 @@ pub struct PatternToggles {
     pub axes: [Option<MateConnectorRef>; 3],
     /// Replicate's scope and its field (a scope pick is a step too: live asm-replicate-match-features).
     pub scope: (Option<noshape_model::assembly::ReplicateScope>, Vec<noshape_model::assembly::ScopeEntity>),
+    /// The number fields' texts as last committed (Distance / Angle, Instance count, the second's, the third's): a
+    /// value edit is a step of the open dialog too (live asm-circular-pattern-angle-count).
+    pub values: [String; 6],
 }
 
 impl PatternSession {
@@ -192,7 +195,13 @@ impl PatternSession {
             seeds: self.seeds.clone(),
             axes: [self.axis.clone(), self.axis2.clone(), self.axis3.clone()],
             scope: (self.scope, self.scope_refs.clone()),
+            values: self.values_seen.clone(),
         }
+    }
+
+    /// The number fields, in [`PatternToggles::values`]' order.
+    pub fn value_fields(&self) -> [&Entity<crate::quantity_field::QuantityInput>; 6] {
+        [&self.distance, &self.count, &self.distance2, &self.count2, &self.distance3, &self.count3]
     }
 
     fn set_toggles(&mut self, t: PatternToggles) {
@@ -204,6 +213,7 @@ impl PatternSession {
         self.seeds = t.seeds;
         [self.axis, self.axis2, self.axis3] = t.axes;
         (self.scope, self.scope_refs) = t.scope;
+        self.values_seen = t.values;
     }
 
     /// Before a toggle: remember the state for Undo (and enable ✓).
@@ -265,6 +275,8 @@ pub struct PatternSession {
     /// The dialog's own Undo / Redo while it is open (live: a toggled checkbox is undoable): toggles before each
     /// change, and the undone ones.
     pub toggle_history: (Vec<PatternToggles>, Vec<PatternToggles>),
+    /// The number fields' texts at the last commit (see [`PatternToggles::values`]).
+    pub values_seen: [String; 6],
     /// Seed mate (part pattern / replicate).
     pub mate: Option<MateId>,
     /// Replicate: the match scope (None: the default for the seed mate's
@@ -1170,6 +1182,15 @@ impl AssemblyView {
             // changed value applies it, the next Enter accepts the pattern.
             subs.push(cx.subscribe(&q, |this: &mut Self, _, ev: &QuantityEvent, cx| match ev {
                 QuantityEvent::Committed(_) => {
+                    // A value edit turns ✓ on with nothing picked yet and is an Undo step of the open dialog (live
+                    // asm-circular-pattern-angle-count).
+                    if let Some(s) = &mut this.pattern {
+                        let now: [String; 6] = s.value_fields().map(|q| q.read(cx).text().to_string());
+                        if now != s.values_seen {
+                            s.note_toggle();
+                            s.values_seen = now;
+                        }
+                    }
                     this.update_pattern_preview(cx);
                     cx.notify();
                 }
@@ -1215,6 +1236,7 @@ impl AssemblyView {
             cfg_pending: Vec::new(),
             touched: false,
             toggle_history: Default::default(),
+            values_seen: Default::default(),
             mate: None,
             scope: None,
             scope_refs: Vec::new(),
@@ -1249,6 +1271,7 @@ impl AssemblyView {
         if kind.matched() {
             s.mate = self.seed_mate(&s.seeds, cx);
         }
+        s.values_seen = s.value_fields().map(|q| q.read(cx).text().to_string());
         self.pattern = Some(s);
         self.update_pattern_preview(cx);
         self.update_capture(cx);
@@ -1333,6 +1356,7 @@ impl AssemblyView {
         // an edit opens with its stored queries and ignores the selection,
         // which becomes the feature's own Instances while the dialog is open.
         self.selected = s.seeds.clone();
+        s.values_seen = s.value_fields().map(|q| q.read(cx).text().to_string());
         self.pattern = Some(s);
         self.update_pattern_preview(cx);
         self.update_capture(cx);
@@ -1777,10 +1801,20 @@ impl AssemblyView {
                     (false, true) => "flip-direction",
                 };
                 let (pd, pc) = if circular { (noshape_model::assembly::config::param::ANGLE, "pat-cfg-angle") } else { (noshape_model::assembly::config::param::DISTANCE, "pat-cfg-distance") };
+                // Tab from Instance count: the keyboard on the flip icon beside it (live asm-circular-pattern-angle-count).
+                let count_row = div()
+                    .key_context("PatternCount")
+                    .on_action(cx.listener(|this, _: &PatternCountTab, window, cx| {
+                        this.ui.checkbox_focus = Some("");
+                        window.focus(&this.focus, cx);
+                        cx.notify();
+                    }))
+                    .child(value_row("Instance count", &s.count))
+                    .into_any_element();
                 body = body
                     .child(div().h(px(5.)))
                     .child(configurable(self, pc, &s.distance, value_row(if circular { "Angle" } else { "Distance" }, &s.distance).into_any_element(), pd, cx))
-                    .child(h_flex().child(configurable(self, "pat-cfg-count", &s.count, value_row("Instance count", &s.count).into_any_element(), noshape_model::assembly::config::param::COUNT, cx)).child(toggle("pat-opp", flip, opposite, cx, |this| {
+                    .child(h_flex().child(configurable(self, "pat-cfg-count", &s.count, count_row, noshape_model::assembly::config::param::COUNT, cx)).child(toggle("pat-opp", flip, opposite, cx, |this| {
                         if let Some(p) = &mut this.pattern {
                             p.note_toggle();
                         p.opposite = !p.opposite;
