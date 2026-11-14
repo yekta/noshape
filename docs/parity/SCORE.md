@@ -233,28 +233,29 @@ else running (load 0.5–3.1 for the opens, 2.3–3.4 for the models: the CLI's 
 Mac / vibe7 per document: median 0.43. The ten furthest behind live on the Mac, vibe7's time: impeller 14783 ms, knife 1425,
 faceblend 454, valve 685, helical sweep 148, snap hook 820, tpd fillet 168, michael 267, lighten 317, bottle split 129.
 
-### Interaction latency (qa, 2026-11-14 02:40; live2's live/feel/latency.json; provisional)
+### Interaction latency (qa 2026-11-14 05:30; live/feel/latency.json "calibrated_2026-11-14T03:40Z")
 
-v0.4.49's Linux app on the same host as live2's Onshape runs (16-vCPU Xeon VM, Xvfb 1920x1080, software rendering: llvmpipe
-for ours, SwiftShader for Chrome), live2's harness (xdotool input, ffmpeg x11grab 60 fps, lat.py), median of 5 after a warm-up;
-block 40x30x10, Extrude 1 10 -> 15 mm. **The harness's own delay is large and moves:** a window move the X server draws itself
-shows up 0.3-1.2 s later, growing through a recording (frame stamps by frame count drift; with `-use_wallclock_as_timestamps`
-the delay is Xvfb's and ffmpeg's queue under load 10-14). Ours below has each trial's own calibration move subtracted; live's
-are raw and carry that delay too, so the columns are **not comparable yet** (asked live2 to re-run with the calibration).
+Ours: v0.4.49's Linux app. (a) On live2's host and harness (16-vCPU Xeon VM, Xvfb, software rendering: llvmpipe for ours,
+SwiftShader for Chrome; xdotool, x11grab 60 fps), each trial's xmessage calibration move subtracted, as live2's re-run.
+(b) The app's own input -> first presented frame (`NOSHAPE_FRAME_LOG`), vibe7, load 9-13, release build of the same code. Median
+of 5 after a warm-up; block 40x30x10, Extrude 1 10 -> 15 mm. Ours (a)'s calibration drifted within trials (0.3-1.2 s), so
+(a) is ± ~100 ms. Toolbar items' settle includes the tooltip (pointer left on the icon), so only their first change counts.
 
-| item | ours, ms (calibrated) | Onshape, ms (in-page where live2 has it; else screen, raw) |
-|---|---|---|
-| tool click -> dialog: Extrude / Fillet | 139 / 108 | **317 in-page** (Extrude) / 1107 screen |
-| sketch enter / exit | 138 / 149 | 992 / 898 |
-| ✓ -> model / undo -> model | 371 / 272 | 736 first, 1281 settled / 888 |
-| right-click -> menu | 194 | 210 |
-| hover -> face highlight | 514 | 544 |
-| view cube Top / Front, settled | 960 / 1094 | 2759 / 2998 |
+| item | Onshape, calibrated (ms) | ours (a) screen, calibrated | ours (b) input -> first frame / settled |
+|---|---|---|---|
+| tool click -> dialog: Extrude / Fillet / Sketch | 950 / 1083 / 933 (Extrude in-page 317) | 139 / 108 / – | 43 / 81 / – |
+| sketch enter / exit | 884 / 1133 | 138 / 149 | 77 / 80 |
+| ✓ -> model, first / settled | 650 / 933 | 371 | 60 / 180 |
+| undo -> model | 850 | 272 | 99 / 240 |
+| right-click -> menu | 184 | 194 | 81 |
+| hover -> face highlight | 600 | 514 | 214 / 392 |
+| view cube Top / Front, settled | 1500 / 1600 | 960 / 1094 | 1189 / 1202 |
+| tab switch settled: Drawing->PS / PS->Asm / Asm->Drawing | 2975 / 1691 / 2450 | – | – |
+| configuration Small -> Large | 2650 (regenerates) | – | – |
+| document open: toolbar / interactive | 3.8 s / 15.4 s (in-page) | – | – |
 
-Onshape's document open in-page: toolbar 3.8 s, interactive 15.4 s (ours not timed yet). Provisional (lead 11-14): live2's
-in-page timings now; its re-run with the fixed recording replaces the screen columns. Not timed yet: tab switches, document
-open, configuration switch. The Mac can't be timed this way (no screen capture over
-ssh); it needs in-app timing (input -> first presented frame).
+Not timed yet: tabs, configuration, document open (ours), and the Mac (NOSHAPE_FRAME_LOG through the app's UI-script runner, no
+OS input permission needed; waits for a release with the frame log, v0.4.50 if it lands before the cut).
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
