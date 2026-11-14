@@ -10429,6 +10429,62 @@ static std::vector<TopoDS_Shape> projectable_curves(const TopoDS_Shape& s)
   return out;
 }
 
+// `projected` (edges a projection made on `target`) where `target` is one face on a linear extrusion and an edge lies in
+// a plane square to its direction: that edge on the exact section, the extrusion's curve projected into the plane
+// (a B-spline's poles), between the same ends. OCCT's projection approximates it (c2-hunting-knife's Split 3: live's
+// guide one cubic, ours a degree-5 curve 1-2 um off it, its parameters another).
+static TopoDS_Shape exact_on_extrusion(const TopoDS_Shape& projected, const TopoDS_Shape& target)
+{
+  ShapeIMap faces;
+  TopExp::MapShapes(target, TopAbs_FACE, faces);
+  if (faces.Extent() != 1)
+    return projected;
+  TopLoc_Location                 loc;
+  occ::handle<Geom_Surface>       s = BRep_Tool::Surface(TopoDS::Face(faces(1)), loc);
+  if (const auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(s); !t.IsNull())
+    s = t->BasisSurface();
+  const occ::handle<Geom_SurfaceOfLinearExtrusion> ex = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(s);
+  if (ex.IsNull())
+    return projected;
+  const gp_Trsf tr = loc.Transformation();
+  const gp_Dir  dir = ex->Direction().Transformed(tr);
+  occ::handle<Geom_Curve> basis = occ::down_cast<Geom_Curve>(ex->BasisCurve()->Transformed(tr));
+  BRepTools_ReShape rs;
+  bool              changed = false;
+  for (TopExp_Explorer x(projected, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge e = TopoDS::Edge(x.Current());
+    BRepAdaptor_Curve  c(e);
+    const double       f = c.FirstParameter(), l = c.LastParameter();
+    const gp_Pnt       a = c.Value(f), b = c.Value(l);
+    const double       h = gp_Vec(a.XYZ()).Dot(gp_Vec(dir));
+    const double       tol = std::max(1e-9, 1e-7 * a.Distance(b));
+    bool               flat = true;
+    for (int i = 1; i < 8 && flat; ++i)
+      flat = std::abs(gp_Vec(c.Value(f + (l - f) * i / 8).XYZ()).Dot(gp_Vec(dir)) - h) <= tol;
+    if (!flat || std::abs(gp_Vec(b.XYZ()).Dot(gp_Vec(dir)) - h) > tol)
+      continue;
+    const occ::handle<Geom_Plane> plane = new Geom_Plane(gp_Pnt(gp_Vec(dir).XYZ() * h), dir);
+    const occ::handle<Geom_Curve> sec   = GeomProjLib::ProjectOnPlane(basis, plane, dir, true);
+    if (sec.IsNull())
+      continue;
+    GeomAPI_ProjectPointOnCurve pa(a, sec), pb(b, sec);
+    if (pa.NbPoints() == 0 || pb.NbPoints() == 0 || pa.LowerDistance() > 1e-6 * (1 + a.Distance(b)) || pb.LowerDistance() > 1e-6 * (1 + a.Distance(b)))
+      continue;
+    double u0 = pa.LowerDistanceParameter(), u1 = pb.LowerDistanceParameter();
+    const bool reversed = u0 > u1;
+    if (reversed)
+      std::swap(u0, u1);
+    BRepBuilderAPI_MakeEdge mk(sec, u0, u1);
+    if (!mk.IsDone())
+      continue;
+    const TopoDS_Edge ne = mk.Edge();
+    rs.Replace(e, ne.Oriented(reversed == (e.Orientation() == TopAbs_REVERSED) ? TopAbs_FORWARD : TopAbs_REVERSED));
+    changed = true;
+  }
+  return changed ? rs.Apply(projected) : projected;
+}
+
 std::unique_ptr<OcShape> project_along(const OcShape& curves, const OcShape& target, P3 dir)
 {
   require_non_null(curves.shape, "curves");
@@ -10445,7 +10501,7 @@ std::unique_ptr<OcShape> project_along(const OcShape& curves, const OcShape& tar
       continue;
     TopoDS_Shape r = pr.Shape();
     if (!r.IsNull())
-      results.push_back(r);
+      results.push_back(exact_on_extrusion(r, target.shape));
   }
   if (results.empty())
     fail_op("projection failed (curves do not project onto the target)");

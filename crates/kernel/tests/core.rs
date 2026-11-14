@@ -1030,3 +1030,27 @@ fn a_guided_lofts_lined_up_joints_are_corners() {
         assert_eq!(shown_faces(&s), sides + 2, "turned {turned}: the caps and {sides} side faces");
     }
 }
+
+/// A curve projected along a direction onto a linear extrusion, the projection sweeping a plane square to the
+/// extrusion: the section is the extruded curve itself in that plane (c2-hunting-knife's Split 3: live's Loft 3 guide is
+/// the sketch's cubic, one Bézier; OCCT's projection gave a degree-5 approximation 1-2 µm off it).
+#[test]
+fn a_line_projected_onto_an_extruded_cubic_gives_the_cubic() {
+    let poles = [DVec3::new(-50.0, 0.0, -19.0), DVec3::new(-80.0, 0.0, -18.6), DVec3::new(-105.0, 0.0, -12.2), DVec3::new(-114.3, 0.0, 3.0)];
+    let cubic = BSplineCurveData { poles: poles.to_vec(), weights: None, knots: vec![0.0, 1.0], mults: vec![4, 4], degree: 3, periodic: false };
+    let side = extrude(&make_bspline_edge(&cubic).unwrap(), DVec3::new(0.0, 4.0, 0.0)).unwrap().shape;
+    let face = side.faces()[0].clone();
+    let line = make_line(DVec3::new(-120.0, 1.75, 50.0), DVec3::new(-40.0, 1.75, 50.0)).unwrap();
+    let projected = project_curves(&line, &face, Some(DVec3::NEG_Z)).unwrap();
+    let edges = projected.edges();
+    assert_eq!(edges.len(), 1);
+    let got = edges[0].edge_bspline().unwrap();
+    assert_eq!((got.degree, got.poles.len()), (3, 4), "one cubic Bézier");
+    let mut want: Vec<DVec3> = poles.iter().map(|p| DVec3::new(p.x, 1.75, p.z)).collect();
+    if got.poles[0].distance(want[0]) > 1e-6 {
+        want.reverse();
+    }
+    for (g, w) in got.poles.iter().zip(&want) {
+        assert!(g.distance(*w) < 1e-9, "{g} against {w}");
+    }
+}
