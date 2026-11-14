@@ -155,7 +155,10 @@ After (lead 11-14: no more app benches on the user's Mac without a window from t
 release, llvmpipe, Mesa's shader cache off, 3 opens each, held / early: dock first frame 1348 / 993, 1017 / 1045,
 1088 / 1016 ms; hat15 1142 / 1038, 1039 / 1075, 1054 / 1094 ms; the window created at ~120 ms either way: no cost on an
 8-core box. On the Mac the compile moved off the first frame's path (built 104 ms after start against 963); the cold
-first-frame number there waits for a window the lead arranges.
+first-frame number there waits for a window the lead arranges. Mac, 11-14 10:09 UTC (one open through ~/noshape-env.sh, release from main 13eca2ba + Where used, the dock copy deleted
+after): window 295 ms, first viewport frame presented 415 ms (was 1.09 s cold / 1.30 s), pipelines 6 ms (Metal's
+shader cache keys by source, so a new binary isn't cold; a truly cold run would mean clearing the system's Metal
+cache, not ours to touch), RSS 418 MB.
 **11-14 04:34:** the dialogs matrix's click-again row (failed skasm's, blend's and core's lands under load) waited for
 nothing: the second click raced the first's Fillet preview. Made deterministic (bb587644, queued with the prewarm
 commit), then the real bug it hid fixed: a preview's consumed edges had no pick (`builder::add_consumed_edge_picks`:

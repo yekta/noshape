@@ -266,6 +266,9 @@ struct Click {
     inference: Option<Inference>,
 }
 
+/// How near (screen px) a 3 point arc's third click takes the semicircle over its ends (live2 arcmid: 7.5 yes, 8 no).
+const ARC3_SEMICIRCLE_PX: f64 = 7.75;
+
 #[derive(Clone, Debug)]
 enum DragState {
     /// Pressed on an entity; becomes a geometry drag when moved.
@@ -3138,7 +3141,8 @@ impl SketchEditor {
                     return EditOutcome::redraw();
                 }
                 let c: Vec<Click> = std::mem::take(&mut self.clicks);
-                match sk.three_point_arc(c[0].pos, c[2].pos, c[1].pos) {
+                let semicircle = self.arc3_semicircle(c[0].pos, c[1].pos, c[2].pos);
+                match sk.three_point_arc(c[0].pos, semicircle.unwrap_or(c[2].pos), c[1].pos) {
                     Ok(arc) => {
                         if let Some((s, e)) = sk.endpoints(arc) {
                             let near = |q: DVec2, p: DVec2| (q - p).length();
@@ -3146,6 +3150,12 @@ impl SketchEditor {
                             let (cs, ce) = if near(c[0].pos, ps) < near(c[1].pos, ps) { (&c[0], &c[1]) } else { (&c[1], &c[0]) };
                             attach(sk, s, Some(arc), cs);
                             attach(sk, e, Some(arc), ce);
+                        }
+                        // Live (live2 arcmid): snapped to the semicircle, the centre is held at the ends' midpoint.
+                        if semicircle.is_some()
+                            && let Some(noshape_sketch::Geometry::Arc { center, start, end }) = sk.entity(arc).map(|e| e.geometry.clone())
+                        {
+                            let _ = sk.add_constraint(ConstraintKind::MidpointOf { point: center, a: start, b: end });
                         }
                         rim_autos(sk, arc, &c[2]);
                         self.finish_create(data, &[arc]);
@@ -3405,6 +3415,15 @@ impl SketchEditor {
             }
             _ => EditOutcome::none(),
         }
+    }
+
+    /// A 3 point arc's third point snapped onto the semicircle over its ends (live2 arcmid: within 7.5 px of it, inside
+    /// or out, anywhere along it; the arc then gets a MIDPOINT: its centre at the ends' midpoint).
+    fn arc3_semicircle(&self, a: DVec2, b: DVec2, p: DVec2) -> Option<DVec2> {
+        let m = (a + b) * 0.5;
+        let r = (b - a).length() * 0.5;
+        let d = p - m;
+        (r > 1e-12 && ((d.length() - r).abs() <= ARC3_SEMICIRCLE_PX * self.world_per_px)).then(|| m + d.try_normalize().unwrap_or(DVec2::Y) * r)
     }
 
     /// One-line measurement of the sketch selection for the status area at
@@ -5452,6 +5471,7 @@ impl SketchEditor {
                 Tool::Arc3 => match anchors.len() {
                     1 => poly(&[anchors[0], c], preview_color, true),
                     2 => {
+                        let c = self.arc3_semicircle(anchors[0], anchors[1], c).unwrap_or(c);
                         if let Some((ctr, r)) = noshape_sketch::shapes::circle_through(anchors[0], c, anchors[1]) {
                             let a0 = (anchors[0] - ctr).to_angle();
                             let a1 = (anchors[1] - ctr).to_angle();
@@ -8976,6 +8996,28 @@ mod tests {
             }
         }
         assert!(wrong.is_empty(), "(R, deg, ours, live): {wrong:?}");
+    }
+
+    /// Live (live2 arcmid): a 3 point arc's third click within 7.5 px of the semicircle over its ends draws that
+    /// semicircle, its centre held at the ends' midpoint (MIDPOINT); 10 px out the arc goes through the click.
+    #[test]
+    fn a_three_point_arc_snaps_to_the_semicircle() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let arc = |third: DVec2| {
+            let (mut ed, mut d) = editor(Tool::Arc3);
+            for p in [mm(0.0, 0.0), mm(20.0, 0.0), third] {
+                click(&mut ed, &mut d, p);
+            }
+            let a = d.sketch.entities().find(|e| e.kind() == EntityKind::Arc).map(|e| e.id).expect("an arc");
+            let Some(noshape_sketch::Geometry::Arc { center, .. }) = d.sketch.entity(a).map(|e| e.geometry.clone()) else { panic!("no arc") };
+            let mid = d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::MidpointOf { point, .. } if point == center));
+            (d.sketch.point(center).unwrap(), mid)
+        };
+        // PX is 0.1 mm: 5 px outside the r 10 semicircle, then 10 px.
+        let (c, mid) = arc(mm(10.0, 10.5));
+        assert!(mid && (c - mm(10.0, 0.0)).length() < 1e-9, "snapped: centre {c:?}, midpoint {mid}");
+        let (c, mid) = arc(mm(10.0, 11.0));
+        assert!(!mid && (c - mm(10.0, 0.0)).length() > 1e-6, "free: centre {c:?}, midpoint {mid}");
     }
 
     /// Live (feel/sketch.json "drag" A-first, mm): a free line's end follows the pointer, its body moves it whole; a
