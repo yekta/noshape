@@ -1,0 +1,39 @@
+{
+ "name": "corner-relief-rectangle-scaled",
+ "about": "sm-box: Corner, relief type Square - Sized → Rectangle - Scaled, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (sheet metal dialog options with no recorded scenario)",
+ "start": "sm-box",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Corner"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Square - Sized",
+    "pick": "Rectangle - Scaled"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,53 @@
+{
+ "name": "flange-angle-from-direction",
+ "about": "plate: Flange on the y = 0 edge, the angle control Bend angle → Angle from direction, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (sheet metal dialog options with no recorded scenario)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Flange"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     2
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Bend angle",
+    "pick": "Angle from direction"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

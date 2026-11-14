@@ -1,0 +1,69 @@
+{
+ "name": "jog-anchor-nominal",
+ "about": "plate-bend: Jog, Jog offset anchor Inside → Nominal, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (sheet metal dialog options with no recorded scenario)",
+ "start": "plate-bend",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Jog"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     30,
+     -4,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Sheet metal face to bend"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     20,
+     2
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Inside",
+    "pick": "Nominal"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
