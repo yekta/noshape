@@ -30,6 +30,8 @@ finished run's occurrences and mates (~/qa-parity/asm-totals.txt on vibe6 / vibe
 (`systemctl list-units 'qa-*'`).
 
 ## Release checks: the app spot-check list (lead 11-13; from docs/parity/interaction-feel.md's "=" rows)
+**Per release (lead 11-14):** the user's cases, plus 8 rows in rotation (all 42 in about five releases: rows 1-8 next, then
+9-16, …; note the last rows run below), plus any row whose area changed in that release.
 Run on the released app (Linux tar.gz, vibe3 :63 or vibe7 :481, xdotool) after the documents, at DPR 1; a row fails when the
 app differs from its live column there. The user's cases first (hat15 mode-700 copy with #fan_control_board_depth = 2.4 mm,
 #fan_control_board_wall_length = 12 mm and a dimensioned sketch after them; bin/planes-rclick.sh for the planes).
