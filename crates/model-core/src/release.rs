@@ -557,6 +557,12 @@ impl ReleaseLog {
         self.packages.iter().filter(|p| p.version.as_deref() == Some(version)).collect()
     }
 
+    /// A Pending or Rejected candidate was submitted at a version (Help release_management: "marked with an open
+    /// triangle").
+    pub fn candidate_at_version(&self, version: &str) -> bool {
+        self.candidates.iter().any(|c| c.version.as_deref() == Some(version) && matches!(c.state, Some(CandidateState::Pending | CandidateState::Rejected)))
+    }
+
     /// Company settings › Revision tools › Find revisions: the revisions of
     /// `part_number` released as `kind`, newest first (Help revision_tools).
     pub fn typed_revisions(&self, part_number: &str, kind: ItemKind) -> Vec<TypedRevision> {
@@ -732,6 +738,21 @@ mod tests {
 
     fn package(kind: PackageKind, name: &str, items: Vec<ReleaseItem>) -> Package {
         Package { id: 0, kind, name: name.into(), notes: String::new(), created: 0, version: Some(format!("v-{name}")), items, re_releasable: false, approvers: Vec::new(), observers: Vec::new(), state: None, decided_by: None, comments: Vec::new() }
+    }
+
+    /// Help release_management: a version with a Pending or Rejected candidate is marked with an open triangle; a
+    /// discarded or approved one is not.
+    #[test]
+    fn pending_and_rejected_candidates_mark_their_version() {
+        let mut log = ReleaseLog::default();
+        log.submit(package(PackageKind::Release, "P", vec![item("PN", "A")]));
+        log.submit(package(PackageKind::Release, "R", vec![item("PQ", "A")]));
+        log.submit(package(PackageKind::Release, "D", vec![item("PS", "A")]));
+        assert!(log.reject("R", "me") && log.discard("D"));
+        assert!(log.candidate_at_version("v-P") && log.candidate_at_version("v-R"));
+        assert!(!log.candidate_at_version("v-D"), "discarded");
+        log.take_pending("P");
+        assert!(!log.candidate_at_version("v-P"), "approved: a release now");
     }
 
     #[test]

@@ -1098,18 +1098,25 @@ impl Render for HistoryPanel {
             }
         }
         // Releases: versions with a release package get a triangle (solid;
-        // with a dot when it contains an obsoletion).
+        // with a dot when it contains an obsoletion; open for a Pending or
+        // Rejected candidate).
         let releases = crate::release_dialog::release_log(self.doc.read(cx));
         let mut packages_at: HashMap<MicroversionId, Vec<noshape_model::release::Package>> = HashMap::new();
+        let mut candidates_at: HashSet<MicroversionId> = HashSet::new();
         for v in &graph.versions {
-            for pkg in releases.at_version(&v.id.to_string()) {
+            let id = v.id.to_string();
+            for pkg in releases.at_version(&id) {
                 packages_at.entry(v.microversion).or_default().push(pkg.clone());
+            }
+            if releases.candidate_at_version(&id) {
+                candidates_at.insert(v.microversion);
             }
         }
         let mark = |mv: &MicroversionId| -> u8 {
             match packages_at.get(mv) {
                 Some(p) if p.iter().any(|p| p.kind == noshape_model::release::PackageKind::Obsoletion) => 2,
                 Some(_) => 1,
+                None if candidates_at.contains(mv) => 3,
                 None => 0,
             }
         };
@@ -1147,11 +1154,20 @@ impl Render for HistoryPanel {
                 for &(l, y, kind, release) in &nodes {
                     let c = pt(lane_x(l), y);
                     if release > 0 {
-                        // Release ▲ (with a white dot: contains obsoletion).
+                        // Release ▲ (with a white dot: contains obsoletion; a candidate's △ white inside).
+                        let tri = [point(c.x, c.y - px(6.)), point(c.x + px(6.), c.y + px(4.5)), point(c.x - px(6.), c.y + px(4.5))];
                         let mut f = PathBuilder::fill();
-                        f.add_polygon(&[point(c.x, c.y - px(6.)), point(c.x + px(6.), c.y + px(4.5)), point(c.x - px(6.), c.y + px(4.5))], true);
+                        f.add_polygon(&tri, true);
                         if let Ok(path) = f.build() {
                             window.paint_path(path, color(l));
+                        }
+                        if release == 3 {
+                            let inner = [point(c.x, c.y - px(3.)), point(c.x + px(3.4), c.y + px(3.)), point(c.x - px(3.4), c.y + px(3.))];
+                            let mut f = PathBuilder::fill();
+                            f.add_polygon(&inner, true);
+                            if let Ok(path) = f.build() {
+                                window.paint_path(path, rgb(0xffffff));
+                            }
                         }
                         if release == 2 {
                             let mut f = PathBuilder::fill();

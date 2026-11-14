@@ -10,7 +10,7 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
 - **Release management**: until 2026-11-14 live's account was on the Free plan (Release… opened only the upsell), so the
   rows below come from Onshape's help pages and images (sources in the key below). The account is on Professional now:
   live2 is capturing them (REQUESTS / message 2026-11-14), and each row moves to live's data as it comes in.
-  Rows: 138; = 94, ≠ 22, missing 10, ? 6, cloud 6 (left out: other users, notifications).
+  Rows: 138; = 96, ≠ 21, missing 9, ? 6, cloud 6 (left out: other users, notifications).
 
 Key: `RD` crates/release-ui/src/release_dialog.rs, `RP` release_prefs.rs, `OPS` crates/ops/src/release.rs, `RC`
 crates/ops/src/release_conditions.rs, `RS` crates/ops/src/release_settings.rs, `ML` crates/model-core/src/release.rs, `HP`
@@ -150,7 +150,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Revision scheme id + Copy to clipboard | image (Alphabetical id 59f7562a39d71809e38162e5) | RP:388-396; id is our FNV hash (RS:180-189) | RS test scheme_ids_are_stable_and_distinct | ≠ (id value) |
 | Unreleased revision suffix, default "*" | RMS | RP:397-398, RS:130 | – | = |
 | Revision table template row + "Click here to go to release management part number generation settings" | image | RP:399-410 | – | = |
-| Access: 3 checkboxes, first checked by default | relmgmt-workflows-15.png; TRW "By default … Only administrators can edit … is checked" | RP:414-419; default all off (RS:146) | – | ≠ (default; no effect locally, user is admin) |
+| Access: 3 checkboxes, first checked by default | relmgmt-workflows-15.png; TRW "By default … Only administrators can edit … is checked" | RS `default_access`: the first checked | ops old_settings_files_keep_their_values_and_get_the_defaults | = (fixed 11-14) |
 | Actions: Require a new revision when an item's properties have changed | RMS (BUNDLE label "have changed") | RP:420-426; used RD:1757 | – | = |
 | Watermarks: Show watermark for drawings / Hide … not revision managed / Edit watermarks | watermark-options-01.png | RP:429-446 | – | = |
 | Watermarks dialog: 6 states, defaults (Released empty), 64 chars, no Unicode, Save changes / Cancel | watermarks-dialog.png; RMS | RP:160-226, RS:34-36 | RP test the_workflow_charts_parse (64/ASCII) | = |
@@ -196,7 +196,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Properties dialog release icon (top left) | TRW "From any Properties dialog … part, Part Studio, Assembly, Drawing, Variable Studio, or File" | part (part_studio/menus.rs:866-869), assembly (assembly_props.rs:1300-1309), drawing/VS/file (app/src/doc_dialogs.rs:664, 753); Part Studio tab Properties has none (doc_dialogs.rs:750-752) | – | ≠ (Part Studio) |
 | Versions and history header › Create release candidate (active tab's objects) | TRW | HP:1617-1624 | ui-parity ver-vh-header-release | = |
 | Version graph: released version solid ▲ | RM | HP:1150-1158 (lane colour) | – | = |
-| Version graph: Pending / Rejected candidate open △ | RM "marked with an open triangle" | candidates aren't in `packages` (ML:556) so their versions draw a plain dot (HP:1102-1115) | – | missing |
+| Version graph: Pending / Rejected candidate open △ | RM "marked with an open triangle" | HP release marks: open △ (`ReleaseLog::candidate_at_version`) | model-core pending_and_rejected_candidates_mark_their_version | = (fixed 11-14) |
 | Version graph: obsoletion ▲ with dot | RM | HP:1159-1165 | – | = |
 | Legend: Release candidate, Release, Contains obsoletion | RM; live legend | HP:1756-1757 | – | = |
 | Version row › Releases ▸ submenu | live ver-vrow-releases | HP:1436-1448 ("No releases" / "<name> [Released]") | ui-parity ver-vrow-releases | = (item format ?) |

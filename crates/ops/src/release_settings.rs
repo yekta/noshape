@@ -86,8 +86,8 @@ pub struct ReleaseSettings {
     /// Workflows › Enable managed workflows.
     #[serde(default = "yes")]
     pub managed_workflows: bool,
-    /// Access, as [`ACCESS`].
-    #[serde(default)]
+    /// Access, as [`ACCESS`] (help: the first is checked by default).
+    #[serde(default = "default_access")]
     pub access: [bool; 3],
     /// Actions › Require a new revision when an item's properties have changed.
     #[serde(default)]
@@ -132,6 +132,10 @@ fn yes() -> bool {
     true
 }
 
+fn default_access() -> [bool; 3] {
+    [true, false, false]
+}
+
 fn default_suffix() -> String {
     "*".into()
 }
@@ -147,7 +151,7 @@ impl Default for ReleaseSettings {
             custom_schemes: Vec::new(),
             unreleased_suffix: default_suffix(),
             managed_workflows: true,
-            access: [false; 3],
+            access: default_access(),
             require_new_revision: false,
             show_watermark: false,
             hide_watermark_unmanaged: false,
@@ -217,6 +221,8 @@ mod tests {
         let s: ReleaseSettings = serde_json::from_str(r#"{"scheme":"Alphabetical","unreleased_suffix":"-"}"#).unwrap();
         assert_eq!(s.unreleased_suffix, "-");
         assert!(s.managed_workflows && s.allow_other_documents && !s.require_note);
+        assert_eq!(s.access, [true, false, false], "help: only the first Access box is checked by default");
+        assert_eq!(ReleaseSettings::default().access, s.access);
         assert_eq!(s.watermarks.get(0), "In progress");
         assert_eq!(s.display_name(1), "Release notes");
         let named = ReleaseSettings { custom_display_names: true, display_names: ["ECO".into(), String::new(), String::new(), String::new()], ..s };
