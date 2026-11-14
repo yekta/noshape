@@ -21,6 +21,8 @@ const PRECISIONS: [(&str, Option<u8>); 8] = [("0", Some(0)), ("0.1", Some(1)), (
 /// The Hole table dialog's choices.
 pub struct HoleTableDlg {
     pub show_location: bool,
+    /// With location data off: ☐ Collapse tags (live2 drw-hole-table-no-location; its effect on the table is asked).
+    pub collapse_tags: bool,
     pub precision: Option<u8>,
     pub bottom_to_top: bool,
     /// Live: the 2nd corner icon is pressed at first.
@@ -55,7 +57,7 @@ pub struct HoleTableDlg {
 
 impl Default for HoleTableDlg {
     fn default() -> Self {
-        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight, table: None, flip_x: false, flip_y: false, exclude: Vec::new(), picking: false, x_dir: None, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false, placing: false }
+        Self { show_location: true, collapse_tags: false, precision: None, bottom_to_top: false, corner: TableCorner::TopRight, table: None, flip_x: false, flip_y: false, exclude: Vec::new(), picking: false, x_dir: None, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false, placing: false }
     }
 }
 
@@ -367,19 +369,32 @@ impl DrawingEditor {
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings"; live 2131): the selects' options, a picked
             // view's and origin's chips with their ×.
-            let mut text: Vec<String> = vec!["Hole table".into(), "Show location data".into(), "Location precision".into()];
-            text.extend(PRECISIONS.iter().map(|(l, _)| l.to_string()));
+            let mut text: Vec<String> = vec!["Hole table".into(), "Show location data".into()];
+            // Location off: Collapse tags instead of the precision, no origin or directions (live2
+            // drw-hole-table-no-location).
+            if show {
+                text.push("Location precision".into());
+                text.extend(PRECISIONS.iter().map(|(l, _)| l.to_string()));
+            } else {
+                text.push("Collapse tags".into());
+            }
             text.push("Views".into());
             if let Some(name) = &view_name {
                 text.extend([name.clone(), "×".into()]);
             }
             // Editing (live drw-hole-table-properties): no origin, directions or holes to exclude.
             if view_name.is_some() && editing.is_none() {
-                text.push("Origin".into());
-                if first_origin {
-                    text.extend(["Point".into(), "×".into()]);
+                if show {
+                    text.push("Origin".into());
+                    if first_origin {
+                        text.extend(["Point".into(), "×".into()]);
+                    }
+                    text.extend(["X direction", "Y direction"].map(String::from));
                 }
-                text.extend(["X direction", "Y direction", "Holes to exclude", "X", "Y"].map(String::from));
+                text.push("Holes to exclude".into());
+                if show {
+                    text.extend(["X", "Y"].map(String::from));
+                }
             }
             text.push("Sheet".into());
             text.extend(self.drawing.sheets.iter().map(|s| s.name.clone()));
@@ -441,6 +456,14 @@ impl DrawingEditor {
                     }))),
                 )
                 .when(show, |v| v.child(row("Location precision", select("hole-table-precision", precision_label, 112., precisions).into_any_element())))
+                .when(!show, |v| {
+                    v.child(h_flex().px(px(8.)).h(px(26.)).gap(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("hole-table-collapse").label("Collapse tags").checked(d.collapse_tags).on_click(cx.listener(|this, on: &bool, _, cx| {
+                        if let Some(d) = &mut this.hole_dlg {
+                            d.collapse_tags = *on;
+                        }
+                        cx.notify();
+                    }))))
+                })
                 // Live drawing-hole-table-dialog: the Views field's tooltip.
                 // A click on it with a view picked takes another view of the
                 // same part (live request 1744).
@@ -458,11 +481,11 @@ impl DrawingEditor {
                             }))
                         }),
                 )
-                .when(view.is_some() && editing.is_none(), |v| v.child(field(if first_origin { "Origin: Point".into() } else { "Origin: a vertex or circle center".into() }, !first_origin)))
+                .when(view.is_some() && editing.is_none() && show, |v| v.child(field(if first_origin { "Origin: Point".into() } else { "Origin: a vertex or circle center".into() }, !first_origin)))
                 // Live 1985 / 1682: X direction and Y direction, each a
                 // straight edge of the view; setting one hides the other (the
                 // other axis is square to it); a click on a set one clears it.
-                .when(view.is_some() && editing.is_none(), |v| {
+                .when(view.is_some() && editing.is_none() && show, |v| {
                     let axis = |id: &'static str, label: &'static str, y: bool, cx: &mut Context<Self>| {
                         let on = if y { d.y_picking } else { d.x_picking };
                         let set = d.x_dir.is_some() && d.y_set == y;
@@ -500,7 +523,7 @@ impl DrawingEditor {
                     if d.x_dir.is_some() && !d.y_set { v } else { v.child(axis("hole-table-y-dir", "Y direction", true, cx)) }
                 })
                 // Live 1609: the X / Y flip icons and Holes to exclude.
-                .when(view.is_some() && editing.is_none(), |v| {
+                .when(view.is_some() && editing.is_none() && show, |v| {
                     let flip = |id: &'static str, label: &'static str, on: bool, f: fn(&mut HoleTableDlg), cx: &mut Context<Self>| {
                         div()
                             .id(id)

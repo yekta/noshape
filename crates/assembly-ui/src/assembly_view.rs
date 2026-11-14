@@ -2050,6 +2050,20 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// A length relation's bare number takes the document's unit as it is applied (live asm-screw-relation-distance:
+    /// "3" reads "3 mm" after Tab).
+    fn relation_value_units(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let unit = self.doc.read(cx).session.doc.settings.units.length.symbol();
+        let Some(r) = &self.relation else { return };
+        if !matches!(r.kind, RelationType::Screw | RelationType::RackAndPinion) {
+            return;
+        }
+        let text = r.ratio.read(cx).value().trim().to_string();
+        if text.parse::<f64>().is_ok() {
+            r.ratio.update(cx, |st, cx| st.set_value(format!("{text} {unit}"), window, cx));
+        }
+    }
+
     /// Undo / redo in an open relation dialog. False when none is open.
     fn relation_undo(&mut self, redo: bool, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let Some(r) = &mut self.relation else { return false };
@@ -5763,6 +5777,7 @@ impl AssemblyView {
             value_label,
             crate::ui_script::mark(
                 div().w_full().key_context("RelationValue").on_action(cx.listener(|this, _: &RelationValueTab, window, cx| {
+                    this.relation_value_units(window, cx);
                     if let Some(r) = &mut this.relation {
                         r.apply_ratio(cx);
                         r.ratio_focused = false;

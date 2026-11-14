@@ -1575,6 +1575,7 @@ impl AssemblyView {
             if let Some(p) = &mut this.pattern {
                 p.active = None;
             }
+            this.ui.keyboard_away = false;
             this.update_capture(cx);
             cx.notify();
         }));
@@ -1616,6 +1617,8 @@ impl AssemblyView {
                     if let Some(p) = &mut this.pattern {
                         p.active = Some(field);
                     }
+                    // A click on the field brings the keyboard back to it (live asm-linear-pattern-commit step 4).
+                    this.ui.keyboard_away = false;
                     this.update_capture(cx);
                     this.refresh_scene(false, cx);
                     cx.notify();

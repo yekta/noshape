@@ -177,7 +177,8 @@ impl AssemblyView {
         // A new mate's row while its dialog is open: selected, red until both connectors are picked.
         let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id));
         // Live: related (with the folder) once a connector is picked.
-        let picked = new_mate.is_some_and(|d| d.a.is_some() || d.b.is_some());
+        // (Not while Faces to connect takes the picks: live asm-slider-simulation-connection.)
+        let picked = new_mate.is_some_and(|d| (d.a.is_some() || d.b.is_some()) && !d.faces_active);
         if let Some(d) = new_mate {
             items.push((d.id, row(&d.name, if d.a.is_some() && d.b.is_some() && !d.same_instance() { "ok" } else { "error" }, true, true, picked, !self.show_mates)));
         }

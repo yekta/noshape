@@ -285,12 +285,22 @@ impl DrawingEditor {
             if mode == 2 && d.angle_input.is_some() {
                 text.push("Cut angle");
             }
-            text.push("Show cut geometry only");
+            // Live (drw-section-view-cut-geometry-only, -section-depth): the two exclude each other.
+            if d.depth.is_none() {
+                text.push("Show cut geometry only");
+            }
             if of_section {
                 text.push("Cut from section");
             }
-            if !jogged {
+            if !jogged && !d.cut_only {
                 text.push("Section depth");
+                if d.depth.is_some() {
+                    text.extend(["Up to entity", "Blind"]);
+                    text.push(if d.up_to { "Depth of section cut" } else { "Depth" });
+                    if d.up_to {
+                        text.push("Offset");
+                    }
+                }
             }
             if assembly {
                 text.push("Exclude from cut");
@@ -421,13 +431,13 @@ impl DrawingEditor {
                                     ),
                             )
                         })
-                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-only").label("Show cut geometry only").checked(d.cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        .when(d.depth.is_none(), |e| e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-only").label("Show cut geometry only").checked(d.cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
                             if let Some(d) = &mut this.section_dlg {
                                 d.cut_only = *v;
                             }
                             this.update_preview(cx);
                             cx.notify();
-                        }))))
+                        })))))
                         .when(of_section, |e| {
                             e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-from").label("Cut from section").checked(d.cut_from).on_click(cx.listener(|this, v: &bool, _, cx| {
                                 if let Some(d) = &mut this.section_dlg {
@@ -439,7 +449,7 @@ impl DrawingEditor {
                         })
                         // Live (behaviours "Section view, Vertical"): Section depth
                         // goes once the cut has a jog.
-                        .when(!jogged, |e| e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-depth").label("Section depth").checked(d.depth.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_depth(*v, w, cx))))))
+                        .when(!jogged && !d.cut_only, |e| e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-depth").label("Section depth").checked(d.depth.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_depth(*v, w, cx))))))
                         .when(d.depth.is_some() && !jogged, |e| {
                             let up_to = d.up_to;
                             // Live request 1737: an End type select [Up to entity | Blind].
