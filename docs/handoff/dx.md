@@ -5,6 +5,52 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-14 08:30 UTC: session end (Bbedward at 99 %): what's landed, gating, queued, next
+Landed today: STEP closed shell -> solid (570317ea), the translator's id-only mirror plane (f7eaf6a9), sheet metal
+probes by parameters (a27f8202), hose x_t as OFFSET_SURF + split tolerant rings (23eca675, live imports the hoses),
+STL as live's Export dialog (acaee305: live 3052's mm presets in every unit, ceil(sweep / angle), Minimum facet width,
+chord capped at a twentieth of the part), free-form projector kept per thread (57f01bc3: model-plus' point queries
+-30 / -43 %), evCollisionDetection's plane pre-check (900a25bc: model-plus' distances 220 -> 105 ms; model suite 134
+-> 114 s on vibe6). Model suite as main after each (80/87, 870/947).
+
+Branch dx-1dc (worktree /root/projects/noshape-wt/dx, 2 commits on d58368558), for asm's infento studio 1dc32b:
+- `circle_distances`: a DISTANCE to circles' near sides predicted as our solver measures it (nested circles: the gap,
+  |r1 - r2| - d). "large wheel side" kept its 70 mm-moving constraints back before.
+- zero-length sketch lines (a sketch fillet's leftover sides, `.left` / `.right`) drawn as a point, only their ends
+  mapped (the line itself, a direction, not).
+- Gates: model suite none worse for both (vibe6 models-1dc.log, models-1dc3.log). Infento with the circle fix alone:
+  152/167 occurrences, 115/193 mates (asm-ops-1dc-infento.log); the same-base baseline (ops-b0612 = d58368558) and
+  the zero-length run (asm-ops-1dc3-infento.log) were running on vibe6 (units dx-gbase, dx-g1dc3). Land dx-1dc if
+  infento's numbers are none worse than ops-b0612's (squash, `diff --stat`, land.sh).
+- The rest of 1dc32b's cascade is data, not code (core 08:2x): the corpus' assembly studios have no live sketch solve
+  (GET /sketches geomEntities as the c2 corpus' "sketches"), so Use projections stay where stored (Treads' tyre lines
+  at ±33.25 mm, live re-projects them to ±34: every tread 0.375 mm off, Extrude 7's parts swapped, ~30 features
+  after). Asked live 08:29 to fetch them for every assembly studio, infento-subs and bjr-config first (counts: infento
+  0/14, bjr 0/10, pinslot 0/14, clamp 0/11, gearbox 0/8, xdev 10/63 ...). Rerun infento once they're in.
+
+asm-tvc-mount mapping (lead's next): with live's sketches (3026) main is 43/43 occurrences, 3/10 mates. dx-tvc's two
+changes split: dx-tvc-a (creator fallback never gives one of ours twice) and dx-tvc-b (a Derived from a sibling studio
+the assembly fetched builds from it: 7bc9d8's Derived 2 "Part Studio 41b795 of another document not fetched", and
+Sketch 40's lines on its faces). infento has no Derived features, so its -2 mates with both came from dx-tvc-a. Runs
+queued on vibe6 (dx-gtvcA: tvc-mount + infento with ops-tvcA; dx-gtvcB: tvc-mount + scissor-lift with ops-tvcB),
+logs ~/tmp/dx/asm-ops-tvc{A,B}-<asm>.log. Land B if none worse; A only if infento holds.
+
+Then asm's bjr-config studio 5d8bc1 (asm 08:0x: Sweep 1 = live's PlateCover fails "Could not create valid swept body",
+"side triangle" Extrude 16 volume off, Fastened 1/2/3/18 and 7/10/13/19-22 unresolved; Shell 1, Extrude 9/11/14,
+Rib 1, Flange 1, Extrude 22, Decal 1 fail; Sketch 29 DIAMETER; Extrude 4's sketch not built). Studio-alone model run
+started on vibe6 (unit dx-st5d8, log ~/tmp/dx/st5d8.log; model dir ~/agents/dx-keep/m5d8/st-5d8bc1). Likely the same
+missing sketch solve: check after live's fetch.
+
+Other open items: SM-BOOLEAN-SPEED's rest is the sheet metal rebuild's checked-glue fuse_all (8 calls, 853 ms a
+model-plus run; told bool 06:2x, not touched). live2's revision table menu findings (drw-revision-*) passed to
+studios 08:2x (the coverage entries follow their removals). live's Export… recordings (batches 27-28): check ours
+once landed (face menu opens on STL without unique-parts / hidden-instances; Version disabled until "Use latest
+version" is unticked). Daily model run before 18:00 (pm-daily.sh, on main).
+
+Hosts: vibe6 / vibe7 have 29 GB and earlyoom: one assembly / exchange suite at a time, `free -g` first; binaries in
+~/agents/dx-keep (vibe6: ops-daily, ops-1dc, ops-1dc3, ops-b0612, ops-tvcA, ops-tvcB, cli-stl). Studio-alone runs:
+copy <element>.json -> features.json, .live.jsonl -> live.jsonl, .sketches.json -> sketches.json, studios/ symlink.
+
 ## 11-14 05:21 UTC: hose x_t, STEP closed shells, mirror planes, sheet metal probes; STL on live 3052
 - Landed 570317ea: a STEP surface model's closed shell reads as a solid (FreeCAD's SHELL_BASED_SURFACE_MODEL; only
   asm-infento-subs' files have them; its suite 142/167, 107/182 as main). Queued: the hose x_t (e9f2fb63: inner walls
