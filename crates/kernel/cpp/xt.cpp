@@ -39,6 +39,8 @@
 
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepTools_Modifier.hxx>
+#include <BRepTools_Modification.hxx>
+#include <Geom_OffsetSurface.hxx>
 #include <ShapeCustom_SweptToElementary.hxx>
 #include <BRepClass3d.hxx>
 #include <BRepLProp_SLProps.hxx>
@@ -788,6 +790,20 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
   return ps;
 }
 
+// Whether face `F` on `fs` goes round without a seam in XT: an analytic periodic surface, or (`periodic_splines`) a
+// B-surface made periodic, or an offset of one (a Shell's wall restored as its offset: offsets_restored).
+bool periodic_face(const occ::handle<Geom_Surface>& fs, const TopoDS_Face& F, bool periodic_splines)
+{
+  bool up, vp;
+  if (periodic_analytic(fs))
+    return true;
+  if (!periodic_splines)
+    return false;
+  if (auto off = occ::down_cast<Geom_OffsetSurface>(fs))
+    return !periodic_bsurface(basis_surface(off->BasisSurface()), F, up, vp).IsNull();
+  return !periodic_bsurface(fs, F, up, vp).IsNull();
+}
+
 // A closed edge's B-spline as a ring edge's curve (Parasolid writes a closed
 // spline edge whole, without a vertex: live 1836): periodic already, or closed
 // with a tangent seam (G1) and made so. Null for anything else (it is split).
@@ -1117,10 +1133,41 @@ struct BodyWriter
       };
       return xs;
     }
-    // Anything else: a B-spline surface, periodic where the face goes round
-    // it (Parasolid's form: unclamped, its first degree rows of poles repeated
-    // at the end), otherwise over the face's range (other closed faces were
-    // split beforehand).
+    // An offset of a B-surface (offsets_restored): the basis its own B_SURFACE (the body's, periodic where the face
+    // goes round it), the offset Parasolid's OFFSET_SURF over it (live's hose: sense +, check U, not a true offset,
+    // no scale).
+    if (auto off = occ::down_cast<Geom_OffsetSurface>(s))
+    {
+      const int                        basis = w.alloc();
+      const occ::handle<Geom_BSplineSurface> b = b_surface(basis_surface(off->BasisSurface()), f, basis, w.next_id++, body);
+      chain_surface.push_back(basis);
+      Node& nd = head(60);
+      nd.fields.insert(nd.fields.end(), {fc('U'), fl(false), fp(basis), ff(off->Offset()), ff_null()});
+      depend(basis, idx);
+      xs.natural = [b](const gp_Pnt&, double u, double v) {
+        gp_Pnt q;
+        gp_Vec du, dv;
+        b->D1(u, v, q, du, dv);
+        return du.Crossed(dv);
+      };
+      return xs;
+    }
+    // Anything else: a B-spline surface (b_surface).
+    const occ::handle<Geom_BSplineSurface> b = b_surface(s, f, idx, id, face_index);
+    xs.natural = [b](const gp_Pnt&, double u, double v) {
+      gp_Pnt q;
+      gp_Vec du, dv;
+      b->D1(u, v, q, du, dv);
+      return du.Crossed(dv);
+    };
+    return xs;
+  }
+
+  // A B_SURFACE node `idx` (owner `owner`) for `s`, periodic where face `f` goes round it (Parasolid's form:
+  // unclamped, its first degree rows of poles repeated at the end), otherwise over the face's range (other closed
+  // faces were split beforehand). The B-spline written.
+  occ::handle<Geom_BSplineSurface> b_surface(const occ::handle<Geom_Surface>& s, const TopoDS_Face& f, int idx, int id, int owner)
+  {
     bool                             up = false, vp = false;
     occ::handle<Geom_BSplineSurface> b = periodic_bsurface(s, f, up, vp);
     if (up)
@@ -1165,16 +1212,11 @@ struct BodyWriter
     ns.fields    = {fl(up), fl(vp), fn(b->UDegree()), fn(b->VDegree()), fd(b->NbUPoles()), fd(b->NbVPoles()), fu(1), fu(1),
                     fd(b->NbUKnots()), fd(b->NbVKnots()), fl(rat), fl(up || b->IsUClosed()), fl(vp || b->IsVClosed()), fu(1),
                     fn(rat ? 4 : 3), fp(verts), fp(um), fp(vm), fp(uk), fp(vk)};
-    Node& nd = head(124);
+    Node& nd = w.add(124, idx);
+    Writer::geom_head(nd, id, owner, '+');
     nd.fields.push_back(fp(nurbs));
     nd.fields.push_back(fp(0));
-    xs.natural = [b](const gp_Pnt&, double u, double v) {
-      gp_Pnt q;
-      gp_Vec du, dv;
-      b->D1(u, v, q, du, dv);
-      return du.Crossed(dv);
-    };
-    return xs;
+    return b;
   }
 
   // ---- curves
@@ -1400,7 +1442,15 @@ struct BodyWriter
       if (d.Magnitude() < 1e-12)
         return false;
       gp_Pnt2d p1 = q1->Value(t), p2 = q2->Value(t);
-      return on_both(a1, a2, p1, p2, x0 ? *x0 : p, d.Normalized(), out);
+      // (Newton may run off a surface's domain and its evaluation throw: an offset face's edge, cf-hose-routing.)
+      try
+      {
+        return on_both(a1, a2, p1, p2, x0 ? *x0 : p, d.Normalized(), out);
+      }
+      catch (const Standard_Failure&)
+      {
+        return false;
+      }
     };
     for (int n = 64; n <= 1024; n *= 2)
     {
@@ -1952,6 +2002,131 @@ TopoDS_Shape swept_to_elementary(const TopoDS_Shape& s)
 // revolved ones too unless `keep_spun` (and all of them when one has a profile
 // the writer can't keep), and faces closed on a surface that isn't periodic
 // split (B-surfaces made periodic are kept with `periodic_splines`).
+// Faces given new surfaces (`surfaces`, by the forward face), their edges' curves on them kept as they are.
+class FaceSurfaces : public BRepTools_Modification
+{
+public:
+  NCollection_DataMap<TopoDS_Shape, occ::handle<Geom_Surface>, TopTools_ShapeMapHasher> surfaces;
+
+  bool NewSurface(const TopoDS_Face& F, occ::handle<Geom_Surface>& S, TopLoc_Location& L, double& Tol, bool& RevWires, bool& RevFace) override
+  {
+    const TopoDS_Shape key = F.Oriented(TopAbs_FORWARD);
+    if (!surfaces.IsBound(key))
+      return false;
+    S = surfaces(key);
+    BRep_Tool::Surface(F, L);
+    Tol      = BRep_Tool::Tolerance(F);
+    RevWires = RevFace = false;
+    return true;
+  }
+  bool NewCurve(const TopoDS_Edge&, occ::handle<Geom_Curve>&, TopLoc_Location&, double&) override { return false; }
+  bool NewPoint(const TopoDS_Vertex&, gp_Pnt&, double&) override { return false; }
+  bool NewCurve2d(const TopoDS_Edge& E, const TopoDS_Face& F, const TopoDS_Edge& NewE, const TopoDS_Face&, occ::handle<Geom2d_Curve>& C, double& Tol) override
+  {
+    if (!surfaces.IsBound(F.Oriented(TopAbs_FORWARD)) && E.IsSame(NewE))
+      return false;
+    double f, l;
+    C = BRep_Tool::CurveOnSurface(E, F, f, l);
+    if (C.IsNull())
+      return false;
+    C   = occ::down_cast<Geom2d_Curve>(C->Copy());
+    Tol = BRep_Tool::Tolerance(E);
+    return true;
+  }
+  bool NewParameter(const TopoDS_Vertex&, const TopoDS_Edge&, double&, double&) override { return false; }
+  GeomAbs_Shape Continuity(const TopoDS_Edge& E, const TopoDS_Face& F1, const TopoDS_Face& F2, const TopoDS_Edge&, const TopoDS_Face&, const TopoDS_Face&) override
+  {
+    return BRep_Tool::Continuity(E, F1, F2);
+  }
+};
+
+// A closed B-surface face that won't go round periodic, made by approximating another face's surface offset over
+// that surface's own (u, v) (a Shell's wall: cf-hose-routing's inner walls, degree-12 sections of the outer walls'
+// offsets; Parasolid dropped their bodies periodic, live 2452 / 2975): that offset itself, as Parasolid writes it
+// (live's own hose: OFFSET_SURF over the outer wall). Within 1e-7 at a 9 x 9 grid of its domain, else left.
+TopoDS_Shape offsets_restored(const TopoDS_Shape& s)
+{
+  occ::handle<FaceSurfaces> mod = new FaceSurfaces;
+  std::vector<TopoDS_Face>  bsurfs;
+  for (TopExp_Explorer ef(s, TopAbs_FACE); ef.More(); ef.Next())
+    if (!occ::down_cast<Geom_BSplineSurface>(BRep_Tool::Surface(TopoDS::Face(ef.Current()))).IsNull())
+      bsurfs.push_back(TopoDS::Face(ef.Current().Oriented(TopAbs_FORWARD)));
+  for (const TopoDS_Face& F : bsurfs)
+  {
+    TopLoc_Location                         lf;
+    const occ::handle<Geom_BSplineSurface> sf = occ::down_cast<Geom_BSplineSurface>(BRep_Tool::Surface(F, lf));
+    bool                                    up, vp, seam = false;
+    for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More() && !seam; ee.Next())
+      seam = BRep_Tool::IsClosed(TopoDS::Edge(ee.Current()), F);
+    if (!seam || !periodic_bsurface(sf, F, up, vp).IsNull() || mod->surfaces.IsBound(F))
+      continue;
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(F, u0, u1, v0, v1);
+    for (const TopoDS_Face& G : bsurfs)
+    {
+      TopLoc_Location                         lg;
+      const occ::handle<Geom_BSplineSurface> sg = occ::down_cast<Geom_BSplineSurface>(BRep_Tool::Surface(G, lg));
+      if (G.IsSame(F) || !lg.IsEqual(lf) || mod->surfaces.IsBound(G))
+        continue;
+      double a0, a1, b0, b1;
+      sg->Bounds(a0, a1, b0, b1);
+      if (u0 < a0 - 1e-9 || u1 > a1 + 1e-9 || v0 < b0 - 1e-9 || v1 > b1 + 1e-9)
+        continue;
+      // The offset at each sample: along G's normal, the same everywhere, nothing across.
+      std::vector<double> ds;
+      double              across = 0;
+      for (int i = 0; i <= 8 && across < 1e-7; ++i)
+        for (int j = 0; j <= 8 && across < 1e-7; ++j)
+        {
+          const double u = u0 + (u1 - u0) * i / 8, v = v0 + (v1 - v0) * j / 8;
+          gp_Pnt       q;
+          gp_Vec       du, dv;
+          sg->D1(u, v, q, du, dv);
+          const gp_Vec n = du.Crossed(dv);
+          if (n.Magnitude() < 1e-12)
+          {
+            across = 1;
+            break;
+          }
+          const gp_Vec d(q, sf->Value(u, v));
+          const double along = d.Dot(n) / n.Magnitude();
+          across             = std::max(across, (d - n.Normalized() * along).Magnitude());
+          ds.push_back(along);
+        }
+      if (across >= 1e-7 || ds.empty())
+        continue;
+      const auto [lo, hi] = std::minmax_element(ds.begin(), ds.end());
+      const double d      = (*lo + *hi) / 2;
+      if (*hi - *lo > 2e-7 || std::abs(d) < 1e-6)
+        continue;
+      // (Kept only where it evaluates everywhere: a basis with a pole or a kink has no normal there.)
+      try
+      {
+        const occ::handle<Geom_OffsetSurface> off = new Geom_OffsetSurface(sg, d, true);
+        for (int i = 0; i <= 16; ++i)
+          for (int j = 0; j <= 16; ++j)
+          {
+            gp_Pnt q;
+            gp_Vec du, dv;
+            off->D1(u0 + (u1 - u0) * i / 16, v0 + (v1 - v0) * j / 16, q, du, dv);
+          }
+        mod->surfaces.Bind(F, off);
+      }
+      catch (const Standard_Failure&)
+      {
+        continue;
+      }
+      if (std::getenv("NOSHAPE_XT_DEBUG"))
+        std::fprintf(stderr, "xt-debug offset restored: %g\n", d);
+      break;
+    }
+  }
+  if (mod->surfaces.IsEmpty())
+    return s;
+  BRepTools_Modifier m(s, mod);
+  return m.IsDone() ? m.ModifiedShape(s) : s;
+}
+
 TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splines)
 {
   TopoDS_Shape r = swept_to_elementary(s);
@@ -1966,14 +2141,14 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splin
   }
   // (Extrusions of ellipses and splines stay: XT swept surfaces, exact. The others are written as B-surfaces.)
   r = ShapeCustom::ConvertToBSpline(r, false, !keep_spun, true, false);
-  bool split     = false;
+  if (periodic_splines)
+    r = offsets_restored(r);
+  bool split = false;
   for (TopExp_Explorer ef(r, TopAbs_FACE); ef.More() && !split; ef.Next())
   {
     const TopoDS_Face& F = TopoDS::Face(ef.Current());
     TopLoc_Location    loc;
-    const occ::handle<Geom_Surface> fs = basis_surface(BRep_Tool::Surface(F, loc));
-    bool                            up, vp;
-    if (periodic_analytic(fs) || (periodic_splines && !periodic_bsurface(fs, F, up, vp).IsNull()))
+    if (periodic_face(basis_surface(BRep_Tool::Surface(F, loc)), F, periodic_splines))
       continue;
     for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More() && !split; ee.Next())
       split = BRep_Tool::IsClosed(TopoDS::Edge(ee.Current()), F);
@@ -1989,6 +2164,8 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splin
   // curve on an open basis may not start where it ends (Onshape G13: the
   // closed intersection loops of two cylinders). Split the others.
   bool closed = false;
+  NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef;
+  TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
   for (TopExp_Explorer ee(r, TopAbs_EDGE); ee.More() && !closed; ee.Next())
   {
     const TopoDS_Edge& e = TopoDS::Edge(ee.Current());
@@ -1999,6 +2176,25 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splin
     while (auto t = occ::down_cast<Geom_TrimmedCurve>(c))
       c = t->BasisCurve();
     closed = c.IsNull() || (occ::down_cast<Geom_Circle>(c).IsNull() && occ::down_cast<Geom_Ellipse>(c).IsNull() && ring_bspline(c, f, l).IsNull());
+    // (Nor one off its faces by more than the precision: a tolerant edge has no curve of its own, and Parasolid
+    // dropped the hoses whose inner walls' end rings were such, closed on one vertex: live 2975, 3016; split, 3054.)
+    if (!closed && ef.Contains(e))
+      for (NCollection_List<TopoDS_Shape>::Iterator it(ef.FindFromKey(e)); it.More() && !closed; it.Next())
+      {
+        const TopoDS_Face&              F = TopoDS::Face(it.Value());
+        double                          pf, pl;
+        const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, F, pf, pl);
+        TopLoc_Location                 loc;
+        const occ::handle<Geom_Surface> sf = BRep_Tool::Surface(F, loc);
+        if (pc.IsNull() || sf.IsNull())
+          continue;
+        occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, f, l);
+        for (int i = 0; i <= 20 && !closed; ++i)
+        {
+          const gp_Pnt2d uv = pc->Value(pf + (pl - pf) * i / 20.0);
+          closed = c3->Value(f + (l - f) * i / 20.0).Distance(sf->Value(uv.X(), uv.Y()).Transformed(loc.Transformation())) > kPrecision;
+        }
+      }
   }
   if (closed)
   {
@@ -2029,8 +2225,7 @@ std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& F, bool 
 {
   TopLoc_Location                 loc;
   const occ::handle<Geom_Surface> fs = basis_surface(BRep_Tool::Surface(F, loc));
-  bool                            up, vp;
-  const bool periodic = periodic_analytic(fs) || (periodic_splines && !periodic_bsurface(fs, F, up, vp).IsNull());
+  const bool periodic = periodic_face(fs, F, periodic_splines);
   std::vector<TopoDS_Edge> mine;
   for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More(); ee.Next())
   {
