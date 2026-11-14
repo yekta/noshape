@@ -1841,3 +1841,31 @@ fn a_loose_step_files_edges_on_a_cone_read_back_tight() {
     let got: f64 = back.iter().map(|p| surface_properties(&p.shape).unwrap().mass).sum();
     assert!((got - want).abs() < 1e-6 * want, "area {} mm², the part's {}", got / (mm * mm), want / (mm * mm));
 }
+
+/// A STEP surface model of one closed shell (FreeCAD's: SHELL_BASED_SURFACE_MODEL, no MANIFOLD_SOLID_BREP) reads as a
+/// solid, as live reads it (asm-infento-subs' shaft, lever, halfClutch); an open shell stays a surface.
+#[test]
+fn a_step_surface_models_closed_shell_reads_as_a_solid() {
+    let s = part();
+    let want = volume_properties(&s).unwrap().mass;
+    let shell = s.shells().into_iter().next().unwrap();
+    let dir = std::env::temp_dir().join(format!("noshape-shell-model-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("shell.step");
+    write_step(&path, &[ExportShape { shape: shell.clone(), name: Some("shaft".into()), color: None }], LengthUnit::Meter).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("SHELL_BASED_SURFACE_MODEL") && !text.contains("MANIFOLD_SOLID_BREP"), "written as a surface model");
+    let back = read_step(&path, LengthUnit::Meter).unwrap();
+    assert_eq!(back.len(), 1);
+    assert_eq!(back[0].shape.solids().len(), 1, "the closed shell a solid");
+    let v = volume_properties(&back[0].shape).unwrap().mass;
+    assert!((v - want).abs() < 1e-6 * want, "{v} vs {want}");
+    // Without one face: open, a surface.
+    let faces = shell.faces();
+    let open = sew(&faces[1..], 1e-7, false).unwrap().shape;
+    let path = dir.join("open.step");
+    write_step(&path, &[ExportShape { shape: open, name: None, color: None }], LengthUnit::Meter).unwrap();
+    let back = read_step(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(back[0].shape.solids().is_empty(), "an open shell stays a surface");
+}

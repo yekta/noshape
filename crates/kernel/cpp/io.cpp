@@ -22,6 +22,7 @@
 #include <Geom2d_TrimmedCurve.hxx>
 #include <Precision.hxx>
 #include <ShapeFix_Edge.hxx>
+#include <ShapeFix_Solid.hxx>
 #include <TopExp_Explorer.hxx>
 #include <algorithm>
 #include <array>
@@ -469,6 +470,55 @@ void refine_freeform_pcurves(const std::vector<TopoDS_Shape>& shapes)
   }
 }
 
+// A surface model's closed shells as solids (a FreeCAD STEP: SHELL_BASED_SURFACE_MODEL of one CLOSED_SHELL, no
+// MANIFOLD_SOLID_BREP; live reads it as a solid part: asm-infento-subs' shaft, lever, halfClutch): each shell outside a
+// solid whose every edge bounds two of its faces (or is a seam or degenerate), made a solid facing out. Open shells
+// stay surfaces; the faces and their order (and colours) stay.
+void solids_from_closed_shells(std::vector<TopoDS_Shape>& shapes)
+{
+  for (TopoDS_Shape& s : shapes)
+  {
+    if (s.IsNull())
+      continue;
+    ShapeIMap in_solid;
+    for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next())
+      TopExp::MapShapes(e.Current(), TopAbs_SHELL, in_solid);
+    const occ::handle<BRepTools_ReShape> rs  = new BRepTools_ReShape;
+    bool                                 any = false;
+    for (TopExp_Explorer e(s, TopAbs_SHELL); e.More(); e.Next())
+    {
+      const TopoDS_Shell sh = TopoDS::Shell(e.Current());
+      if (in_solid.Contains(sh) || rs->IsRecorded(sh))
+        continue;
+      NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef;
+      TopExp::MapShapesAndAncestors(sh, TopAbs_EDGE, TopAbs_FACE, ef);
+      bool closed = ef.Extent() > 0;
+      for (int i = 1; i <= ef.Extent() && closed; ++i)
+      {
+        const TopoDS_Edge& ed = TopoDS::Edge(ef.FindKey(i));
+        const int          n  = ef(i).Extent();
+        closed = BRep_Tool::Degenerated(ed) || n == 2 || (n == 1 && BRep_Tool::IsClosed(ed, TopoDS::Face(ef(i).First())));
+      }
+      if (!closed)
+        continue;
+      try
+      {
+        ShapeFix_Solid     fix;
+        const TopoDS_Solid so = fix.SolidFromShell(sh);
+        if (so.IsNull())
+          continue;
+        rs->Replace(sh, so);
+        any = true;
+      }
+      catch (const Standard_Failure&)
+      {
+      }
+    }
+    if (any)
+      s = rs->Apply(s);
+  }
+}
+
 // STEP files carry no pcurves for most edges and OCCT's projection goes
 // wrong next to a surface's pole: on I1's blends (rational B-spline
 // patches that close to a point at one u) the edges along v = 0 / 1 got
@@ -767,6 +817,7 @@ StepImport read_step(rust::Str path)
   }
   if (out.shapes->items.empty())
     fail_io("STEP file contains no shapes: " + p);
+  solids_from_closed_shells(out.shapes->items);
   fix_pole_pcurves(out.shapes->items);
   refine_freeform_pcurves(out.shapes->items);
   clock.lap("step pole pcurves");
@@ -985,6 +1036,7 @@ StepTree read_step_tree(rust::Str path)
   clock.lap("step tree walk");
   app->Close(doc);
   clock.lap("step tree close");
+  solids_from_closed_shells(out.parts.shapes->items);
   fix_pole_pcurves(out.parts.shapes->items);
   refine_freeform_pcurves(out.parts.shapes->items);
   clock.lap("step tree pole pcurves");
