@@ -242,16 +242,18 @@ shows up 0.3-1.2 s later, growing through a recording (frame stamps by frame cou
 the delay is Xvfb's and ffmpeg's queue under load 10-14). Ours below has each trial's own calibration move subtracted; live's
 are raw and carry that delay too, so the columns are **not comparable yet** (asked live2 to re-run with the calibration).
 
-| item | ours, ms (calibrated) | Onshape, ms (raw) |
+| item | ours, ms (calibrated) | Onshape, ms (in-page where live2 has it; else screen, raw) |
 |---|---|---|
-| tool click -> dialog: Extrude / Fillet | 139 / 108 | 1097 / 1107 (DOM-visible ~320) |
+| tool click -> dialog: Extrude / Fillet | 139 / 108 | **317 in-page** (Extrude) / 1107 screen |
 | sketch enter / exit | 138 / 149 | 992 / 898 |
 | ✓ -> model / undo -> model | 371 / 272 | 736 first, 1281 settled / 888 |
 | right-click -> menu | 194 | 210 |
 | hover -> face highlight | 514 | 544 |
 | view cube Top / Front, settled | 960 / 1094 | 2759 / 2998 |
 
-Not timed yet: tab switches, document open, configuration switch. The Mac can't be timed this way (no screen capture over
+Onshape's document open in-page: toolbar 3.8 s, interactive 15.4 s (ours not timed yet). Provisional (lead 11-14): live2's
+in-page timings now; its re-run with the fixed recording replaces the screen columns. Not timed yet: tab switches, document
+open, configuration switch. The Mac can't be timed this way (no screen capture over
 ssh); it needs in-app timing (input -> first presented frame).
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
