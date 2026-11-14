@@ -5,6 +5,23 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-14 11:16 UTC)
+- **Landed 167ddfb6** (09:45): Delete face runs OCCT's defeaturing on a copy (it raised its input's tolerances in place:
+  the same delete run twice gave valid, then invalid). T1 features::deleting_faces_leaves_its_input_as_it_was (data
+  tests/data/defeature/impeller-delete-face-2.brep). Fillets checked the same way (impeller dumps): none changes its input.
+- **Landed b736c33e** (10:15): sheet metal tracking takes each body's boxes once a call and skips bodies whose box
+  can't hold a match (a mutex lookup per entity before). vibe5 A/B (4 runs each): louver 3337 -> 3129 ms, Extrude 3
+  378 -> 294, Extrude 4 279 -> 281, Flange 9 263 -> 216. Attribute filters were already off the all-entities path
+  (2cb34c6c: 2126 of 2166 calls); per extrude ~20 ms of them left. What's left in Extrude 3 / 4 is std's sheet metal
+  Boolean: evCollisionDetection ~57 ms, opBoolean, updateSheetMetalGeometry, opCreateOutline (skasm's build_part).
+- **Impeller tolerant vertex (Boolean 9522310b, 1.14 mm):** OCCT's 0.8 mm fillet (fillet-33: Fillet Ansaugflansch zum
+  Gehaeuse) along Delete face 2's OCCT outline (B-splines of degree 7 with up to 584 poles; its vertices 0.0924 mm)
+  makes eight 1.1446 mm vertices at z -3.6 (and one 1.756). Today's code gives the same on those dumps
+  (vibe5 ~/agents/core-keep/impb0ce, chain/). The state only exists past Boolean 3's divergence (feature 34: 35 faces,
+  live 64; the flange a body of its own, 8 parts against live's 1): not in live. Delete face 2's outline on the right
+  input waits for the impeller's upstream (bool2).
+- REQUESTS 2979 closed: live stores oppositeDirection true after Remove, false after a flip (info, no cut), as ours.
+
 ## core state (11-14 08:43 UTC)
 - **Landed 900a25bc** (08:25): guided loft joints as live (3°, lined-up joints), C1-joined side face, knife Extrude 10 /
   Fillet 8 build, up-to a B-spline face on its surface, translator normal / loft INTERSECT / query cache (suite 1075 ->
