@@ -1,6 +1,25 @@
 # Blends (agent "blend")
 
-## 11-14 11:40 UTC: secwires landed; frameside and partrays gating; knife Fillet 8 is core's input
+## 11-14 12:10 UTC: partrays measured; tried and dropped: variable rounds direct, looser IntSS tolerance
+
+- blend2 `blend-partrays` 2ebdff531: release alternation (vibe5) rings Chamfer 1 193 / 166 -> 114 / 116 ms, its 42
+  part classifications 48-50 -> 5 ms. Its asm (main ad056d370) differs from older runs everywhere (main's: occurrences
+  1532 -> 1588); frameside's asm on the same main (vibe7, unit blend-frameside-asm7) is the comparison for both. Land
+  both when they agree.
+- Dropped, variable rounds through blend_direct (parked/vardirect-wip.patch): tpd's Fillet 1 declines at "two blends'
+  section": two lofted rounds meeting near-tangentially at a corner, the run-on doubles the section and its points are
+  3-14 µm off the other blend (tol 0.16 µm); a failed direct try costs ~100 ms before the Boolean. Needs exact corner
+  sections first.
+- Dropped, IntSS at max(1e-7 size, Precision::Confusion()) instead of 1e-7 size: no change (Mac dev, two alternations:
+  sections 62 vs 61-65 ms over snap-hook, rings, knife, faceblend).
+- Mac dev per feature (live): knife Chamfer 1 163 (19), Fillet 3 84 (11: OCCT 24 run only to see its round split,
+  blend_direct 28, lofts 19 summed), Fillet 2 77 (10); rings Chamfer 1 91 (30); faceblend Face blend 1 37 (25);
+  snap-hook Fillet 6 33 (8), Fillet 3 13 (7). In a feature's kernel profile, props_surface / props_volume /
+  bounding_box / mesh rows are background (a 0.2 ms sketch shows 43 ms of props_surface).
+- michael's Fillet 2 is by_tools' need_ball path (mitre corner tools, no direct build): two Rust Booleans 106 ms, rim
+  seams 28, unify 15 (vibe5 release). A direct build of corner tools is the open idea.
+
+## 11-14 11:30 UTC: secwires landed; frameside and partrays gating; knife Fillet 8 is core's input
 
 Landed: secwires (66cc9880). In flight (systemd units here, flags in /root/blend-scratch/*.done):
 - blend5 `blend-frameside` 1 commit: pair on vibe6 870 = 870, no differences (snap-hook 1686 -> 767 ms dev). Unit
