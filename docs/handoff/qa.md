@@ -5,6 +5,10 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 
 
+## 11-14 02:50: the GUI fuzz moved to vibe5 (lead: vibe3 at load 17 with the watcher)
+bin/fzloop.sh :61 runs on vibe5 (~/qa there, niced, seeds from 9352, the v0.4.49 app at ~/qa/rel/noshape-green); results
+~/qa/fz*-result.txt on vibe5. vibe3 runs only the watcher-side checks qa needs (relsmoke, GUI rows).
+
 ## 11-14 00:35: compat alerts reach the lead
 The compat loop's ALERT-<sha> files went unread for an hour on 11-13 (qa stopped polling). bin/compat-loop.sh now also
 appends one line per worsened feature, with its document, to /tmp/lead/qa-alerts (fixes are not alerted). qa's local loops
