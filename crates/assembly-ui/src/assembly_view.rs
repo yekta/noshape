@@ -6818,11 +6818,9 @@ impl AssemblyView {
             if !p.cfg_pending.is_empty() {
                 self.ui.cfg_toast = None;
             }
-            // Live: cancelling an edit leaves nothing selected (nor its row).
-            if p.editing.is_some() {
-                self.selected.clear();
-                self.selected_mate = None;
-            }
+            // Live: cancelling leaves nothing selected (an edit's row, a new one's picks: asm-mirror-two-picks).
+            self.selected.clear();
+            self.selected_mate = None;
             cx.notify();
         } else if self.ui.group.is_some() {
             self.ui.group = None;
