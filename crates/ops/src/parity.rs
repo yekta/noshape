@@ -6904,14 +6904,13 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         tabs.insert(element.clone(), t.tab.clone().unwrap_or(name.clone()));
         // Our parts (name, volume m³): live's part names come from its Part Studio's properties, which translation
         // doesn't carry ("Housing" here is our "Part 1"); such a part is ours by its only part or its volume band.
-        let solids: Vec<(String, f64, String)> = t
-            .call("query_parts", json!({}))
-            .map(|q| {
-                let k = per_unit(&q["units"]);
-                q["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid").filter_map(|p| Some((p["name"].as_str()?.to_string(), p["volume"].as_f64().unwrap_or(0.0) * k * k * k, p["id"].as_str()?.to_string()))).collect()
-            })
-            .unwrap_or_default();
+        let queried = t.call("query_parts", json!({})).ok();
+        let k = queried.as_ref().map_or(1.0, |q| per_unit(&q["units"]));
+        let queried: Vec<&Value> = queried.iter().flat_map(|q| q["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid")).collect();
+        let solids: Vec<(String, f64, String)> = queried.iter().filter_map(|p| Some((p["name"].as_str()?.to_string(), p["volume"].as_f64().unwrap_or(0.0) * k * k * k, p["id"].as_str()?.to_string()))).collect();
         let ours_parts: Vec<(String, f64)> = solids.iter().map(|(n, v, _)| (n.clone(), *v)).collect();
+        // Their centroids (m).
+        let centroids: HashMap<String, glam::DVec3> = queried.iter().filter_map(|p| Some((p["name"].as_str()?.to_string(), glam::DVec3::from(f3(&p["centroid"])?) * k))).collect();
         let our_ids: Vec<String> = solids.iter().map(|(_, _, id)| id.clone()).collect();
         // Parts of the same volume are taken one each (alike parts place alike), then shared. Those whose volume
         // fits one of ours first; the others then by the feature that made them (ids in creation order), not taking
@@ -6921,6 +6920,19 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         };
         let listed: Vec<&Value> = parts.as_array().into_iter().flatten().filter(|p| p["partId"].is_string() && p["name"].is_string()).collect();
         let fitting: Vec<String> = listed.iter().flat_map(|p| fits_of(p)).collect();
+        // Off in volume, ours at live's centroid (within 1 mm, its volume within 5 %): asm-infento-subs' "7\" Wheel asm",
+        // our Composite part 4, 0.3 % off.
+        let by_centroid = |p: &Value, taken: &[String]| -> Option<String> {
+            let c = glam::DVec3::from(f3(&p["centroid"])?);
+            let (lo, hi) = volume_band(p)?;
+            ours_parts
+                .iter()
+                .filter(|(n, v)| !taken.contains(n) && !fitting.contains(n) && *v >= lo * 0.95 && *v <= hi * 1.05)
+                .filter_map(|(n, _)| Some((n, centroids.get(n)?.distance(c))))
+                .filter(|(_, d)| *d < 1e-3)
+                .min_by(|a, b| a.1.total_cmp(&b.1))
+                .map(|(n, _)| n.clone())
+        };
         let mut taken: Vec<String> = Vec::new();
         // By the list's entries (a configured studio lists a part id once per configuration), a later one winning.
         let mut chosen: Vec<Option<String>> = vec![None; listed.len()];
@@ -6946,6 +6958,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     n.clone()
                 } else if pass {
                     continue;
+                } else if let Some(n) = by_centroid(p, &taken) {
+                    n
                 } else {
                     // The feature whose live line first lists the part made it (a composite part, renamed and off in
                     // volume: asm-infento-subs' "Toothed belt pulley 46T"): the one part of ours that our copy made.

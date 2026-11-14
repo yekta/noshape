@@ -2313,11 +2313,13 @@ fn parity_assemblies() {
                 // With live's volume band (m³) from <element>.mass.json, to find the part when ours has another name.
                 let mass = read(&dir.join("studios").join(format!("{element}.mass.json")));
                 let band = |p: &str| mass.as_ref().and_then(|m| m["bodies"][p]["volume"].as_array().cloned()).filter(|v| v.len() >= 3).map(|v| serde_json::json!([v[1], v[2]]));
+                // And its centroid (m), to find it when its volume is off (asm-infento-subs' "7\" Wheel asm").
+                let centroid = |p: &str| mass.as_ref().and_then(|m| m["bodies"][p]["centroid"].as_array().cloned()).filter(|c| c.len() >= 3).map(|c| serde_json::json!(c[..3]));
                 // Every final part of the studio (the instanced ones named), for the part ids' creation order.
-                let mut list: Vec<Value> = seen.iter().map(|(p, n)| serde_json::json!({ "partId": p, "name": n, "volume": band(p) })).collect();
+                let mut list: Vec<Value> = seen.iter().map(|(p, n)| serde_json::json!({ "partId": p, "name": n, "volume": band(p), "centroid": centroid(p) })).collect();
                 for p in mass.as_ref().and_then(|m| m["bodies"].as_object()).into_iter().flat_map(|b| b.keys()) {
                     if !seen.contains_key(p) {
-                        list.push(serde_json::json!({ "partId": p, "volume": band(p) }));
+                        list.push(serde_json::json!({ "partId": p, "volume": band(p), "centroid": centroid(p) }));
                     }
                 }
                 (!seen.is_empty()).then_some(Value::Array(list))
