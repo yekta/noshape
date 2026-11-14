@@ -1898,6 +1898,29 @@ impl PartStudioView {
     }
 
     /// Font, bold, italic (and flip for existing texts) controls.
+    /// The sketch Text dialog as live's recorder reads it (runner 2026-11-14.11): the font, the B / I toggles its font
+    /// has (Inter has no Italic: left out), the flips, the text and "n/250 characters".
+    pub(super) fn sketch_text_ui_state(&self, cx: &App) -> Option<serde_json::Value> {
+        use noshape_sketch::text::{SKETCH_DEFAULT_FONT, SKETCH_FONTS};
+        use serde_json::json;
+        let ed = self.sketch.as_ref().filter(|e| e.text_dialog_open())?;
+        let font = SKETCH_FONTS.iter().find(|f| f.name == ed.text_font).or_else(|| SKETCH_FONTS.iter().find(|f| f.name == SKETCH_DEFAULT_FONT));
+        let (has_bold, has_italic) = font.map_or((true, true), |f| (f.bold, f.italic));
+        let toggle = |label: &str, on: bool| json!({ "label": label, "kind": "toggle", "checked": on });
+        let mut fields = vec![json!({ "label": "Font", "kind": "select", "value": font.map_or(ed.text_font.as_str(), |f| f.name) })];
+        if has_bold {
+            fields.push(toggle("Bold", ed.text_bold));
+        }
+        if has_italic {
+            fields.push(toggle("Italic", ed.text_italic));
+        }
+        fields.push(toggle("Flip horizontal", ed.text_flip_horizontal));
+        fields.push(toggle("Flip vertical", ed.text_flip_vertical));
+        let text = self.ui_ref().and_then(|u| u.opts.get("text.text")).map_or_else(|| ed.text_string.clone(), |i| i.read(cx).value().to_string());
+        fields.push(json!({ "label": "Text", "kind": "input", "value": text }));
+        Some(json!({ "kind": "sketch-text", "title": "Text", "fields": fields, "count": format!("{}/250 characters", ed.text_string.chars().count()) }))
+    }
+
     fn text_style_row(&self, font: &str, bold: bool, italic: bool, flips: Option<(bool, bool)>, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let view = cx.entity();
@@ -4987,7 +5010,9 @@ impl PartStudioView {
                             this.apply_outcome(out, window, cx);
                         }
                     }
-                    E::Pattern => this.apply_pattern(window, cx),
+                    // Live (sketch-linear / circular-pattern-click-commit): Enter doesn't commit a pattern; a click on
+                    // empty space does.
+                    E::Pattern => {}
                     E::Offset => {
                         if let Some(out) = this.with_sketch(cx, |ed, data| ed.commit_offset(data)) {
                             this.apply_outcome(out, window, cx);

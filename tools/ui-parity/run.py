@@ -551,6 +551,23 @@ def reference_manager_as_panel(a, b):
     return dict(b, dialog={"kind": "panel", "title": "Reference manager", "text": [t for t in text if t is not None]})
 
 
+def material_as_panel(a, b):
+    """Live's recorder reads the Material panel in full (kind "material": tabs, fields, "assigned", the list's choices) in
+    its recordings from runner 2026-11-14.11 on; before, as a panel of texts (its tabs, the picker's text, "No material
+    assigned"): ours' put in that form when live's is."""
+    da, db = (a or {}).get("dialog"), (b or {}).get("dialog")
+    if not (isinstance(da, dict) and isinstance(db, dict) and da.get("kind") == "panel" and da.get("title") == "Material"
+            and db.get("kind") == "material"):
+        return b
+    text = ["Library", "Custom"]
+    custom = any(t.get("selected") for t in db.get("tabs") or [] if t.get("label") == "Custom")
+    if not custom:
+        text += [f.get("value") for f in db.get("fields") or [] if f.get("label") == "Material"]
+        if db.get("assigned"):
+            text.append(db["assigned"])
+    return dict(b, dialog={"kind": "panel", "title": "Material", "text": text})
+
+
 def camera_compared(state):
     """`camera` (live's recorder since 2026-11-12): compared by where it looks from, its view direction and up to 3
     decimals, and its projection; zoom and the window's size are each side's own."""
@@ -681,7 +698,7 @@ def compare(live, ours, whole_document=True):
         # with `url`: docs-*, prefs-*) reads it.
         tip_blanked = isinstance(a, dict) and "url" not in a and (step or {}).get("do") != "hover"
         a = insert_panel(runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True))
-        b = insert_panel(runner_names(old_workspace_labels(a, reference_manager_as_panel(a, json.loads(json.dumps(b)))), start_name, False))
+        b = insert_panel(runner_names(old_workspace_labels(a, reference_manager_as_panel(a, material_as_panel(a, json.loads(json.dumps(b))))), start_name, False))
         a = unknown_picks(a, b)
         a, b = camera_compared(a), camera_compared(b)
         bd = (b or {}).get("dialog")

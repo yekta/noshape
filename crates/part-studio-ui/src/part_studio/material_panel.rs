@@ -55,11 +55,6 @@ pub struct MaterialPanel {
 }
 
 impl MaterialPanel {
-    /// The Custom tab is showing.
-    pub(super) fn is_custom(&self) -> bool {
-        self.custom
-    }
-
     /// The picked library material's name.
     pub(super) fn picked_name(&self) -> Option<String> {
         self.picked.as_ref().map(|e| e.name.clone())
@@ -214,6 +209,51 @@ impl PartStudioView {
             });
         });
         cx.notify();
+    }
+
+    /// The panel as live's recorder reads it (runner 2026-11-14.11, README "Part Studio panels"): its tabs, the
+    /// Library and Material selects, the property rows (read-only from a library, editable on Custom), "assigned"
+    /// while nothing is picked, and with the list open its shown choices (up to 40) and the search text.
+    pub(super) fn material_ui_state(&self, cx: &App) -> Option<serde_json::Value> {
+        use serde_json::json;
+        let m = self.ui.material_panel.as_ref()?;
+        let tabs = json!([{ "label": "Library", "selected": !m.custom }, { "label": "Custom", "selected": m.custom }]);
+        let mut fields = Vec::new();
+        if m.custom {
+            for (i, f) in FIELDS.iter().enumerate() {
+                fields.push(json!({ "label": f, "kind": "input", "value": m.custom_fields[i].read(cx).value().to_string(), "readonly": false }));
+            }
+        } else {
+            let library = self.material_sources(cx).into_iter().nth(m.library).map(|(_, n)| n).unwrap_or_default();
+            fields.push(json!({ "label": "Library", "kind": "select", "value": library }));
+            let picked = m.picked_name().unwrap_or_else(|| "- None -".to_string());
+            fields.push(json!({ "label": "Material", "kind": "select", "value": picked, "open": m.is_list_open() }));
+            if let Some(e) = &m.picked {
+                let density = noshape_units::to_fixed(e.density / LB_IN3, 3).trim_end_matches('0').trim_end_matches('.').to_string();
+                let vals: Vec<String> = std::iter::once(e.name.clone()).chain(std::iter::once(density)).chain(e.extra.iter().cloned()).collect();
+                for (i, f) in FIELDS.iter().enumerate() {
+                    fields.push(json!({ "label": f, "kind": "input", "value": vals.get(i).cloned().unwrap_or_default(), "readonly": true }));
+                }
+            }
+        }
+        let assigned = (!m.custom && m.picked.is_none() && !m.list_open).then_some("No material assigned");
+        let mut state = json!({ "kind": "material", "title": "Material", "tabs": tabs, "fields": fields, "assigned": assigned });
+        if m.list_open && !m.custom {
+            let choices: Vec<serde_json::Value> = self
+                .material_rows(cx)
+                .iter()
+                .take(40)
+                .enumerate()
+                .map(|(i, e)| {
+                    let name = e.as_ref().map_or_else(|| "- None -".to_string(), |e| e.name.clone());
+                    let density = e.as_ref().map_or_else(|| "0.000e+0 lb/in³".to_string(), |e| e.density_text.clone()).replace('³', "3");
+                    json!({ "name": name, "density": density, "active": i == m.active })
+                })
+                .collect();
+            state["choices"] = json!(choices);
+            state["search"] = json!(m.search.read(cx).value().to_string());
+        }
+        Some(state)
     }
 
     pub(super) fn render_material_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {

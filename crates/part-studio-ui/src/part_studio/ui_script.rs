@@ -251,7 +251,8 @@ impl PartStudioView {
         let message = message.map(|m| if self.canceled_edit.as_ref().is_some_and(|c| c.3 == m) { format!("{m} Restore") } else { crate::doc_model::notice_text(&self.doc, m, cx) });
         // The parts list's heading, as drawn (render_parts_list).
         let parts_heading = format!("Parts ({})", self.display.bodies.iter().filter(|b| super::part_section(b) == "parts").count());
-        let dialog_state = dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.section_dialog_state()).or_else(|| self.appearance_dialog_state(cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.insert_go_state(cx)).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(|| self.panel_ui_state(cx)).or_else(crate::ui_script::open_dialog);
+        // The sketch Text dialog over the Sketch dialog reads as itself (live's recorder since 2026-11-14.11).
+        let dialog_state = self.sketch_text_ui_state(cx).or_else(|| dialog.map(|d| d.ui_state(window, cx))).or_else(|| self.section_dialog_state()).or_else(|| self.appearance_dialog_state(cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.insert_go_state(cx)).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(|| self.panel_ui_state(cx)).or_else(crate::ui_script::open_dialog);
         // The dialog the focused field is in (live `focus.dialog`; the Create variable popup stands for its dialog).
         let mut focus = focus;
         // Mass properties' Face tab: its faces field has the keyboard (live ui-parity mass-properties-face-tab).
@@ -400,16 +401,8 @@ impl PartStudioView {
             let v = st.read(cx).value().to_string();
             return Some(json!({ "kind": "panel", "title": "Folder name", "text": [v], "fields": [{ "label": "Folder name", "kind": "input", "value": v }] }));
         }
-        if let Some(m) = &self.ui.material_panel {
-            // Live: its tabs, the picker's text and, with none picked, "No material assigned".
-            let mut text = vec!["Library".to_string(), "Custom".to_string()];
-            if !m.is_custom() {
-                text.push(m.picked_name().unwrap_or_else(|| "- None -".into()));
-                if m.picked_name().is_none() && !m.is_list_open() {
-                    text.push("No material assigned".into());
-                }
-            }
-            return panel("Material".into(), text);
+        if let Some(state) = self.material_ui_state(cx) {
+            return Some(state);
         }
         None
     }

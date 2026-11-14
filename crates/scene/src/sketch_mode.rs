@@ -4398,7 +4398,7 @@ impl SketchEditor {
             self.pattern_second_distance = if p.second_distance > 0.0 { p.second_distance } else { p.distance };
             self.pattern_second_angle = if p.second_distance > 0.0 { p.second_angle } else { p.angle + PI * 0.5 };
         }
-        self.message = Some("Adjust the pattern, then click in empty space or press Enter".into());
+        self.message = Some("Adjust the pattern, then click in empty space".into());
         true
     }
 
