@@ -1,5 +1,18 @@
 # Blends (agent "blend")
 
+## 11-14 21:24 UTC: knife Fillet 8 against live 3093; mitretools / fsorder gates clean, their asms running
+
+- mitretools (blend6 ec0b0f78a) and fsorder (blend4 be588685f): tests and pairs clean (870 = 870, no differences).
+  Their asms: mitre on vibe7 (unit blend-mitre-asm7b; the earlier ones never ran: a stale asm-host.blend6 = skip,
+  now removed), fsorder on vibe5 (blend-fsorder-gates5). Land both when the asms show nothing worse.
+- Knife Fillet 8, live 3093 (behaviours "blend (3093)", blend/q3093/out.json): live's ring is one closed edge (ours two:
+  core's Revolve 1 sphere seam, core fixing); live makes one round face, its dome edge one closed edge, its spring line
+  on the lofted side split at 6 vertices. Those 6 sit exactly on our side surface's C1 joints (double knots u 0.61249,
+  0.90090, 0.96975, 1.03025, 1.09910, 1.38751; dump Mac ~/noshape-host/tmp-blend/kdump/fillet-51), but not at the
+  double knot u 1.0 (the y = 0 symmetry plane, where the surface is curvature-continuous): Parasolid splits a blend's
+  edge on its support where the support's curvature breaks (G2) across a knot line. Next, after core's ring fix:
+  split blend edges on B-spline supports at such knot lines (check other blends on lofted faces first: one data point).
+
 ## 11-14 20:31 UTC: floorplane landed; mitretools and fsorder gating; knife Fillet 8 builds (core)
 
 Landed: floorplane 4a9bee22. Gating (systemd units here, flags /root/blend-scratch/*.done):
