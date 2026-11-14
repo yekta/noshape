@@ -494,7 +494,7 @@ fn hover_outlined(st: u32) -> bool {
     return (st & (HOVER | OUTLINE)) == (HOVER | OUTLINE) && (st & SELECTED) == 0u;
 }
 
-/// The mask of a hovered outlined part's visible faces, against the color pass's depth.
+/// The mask of a hovered outlined part's whole image (depth ignored: its outline shows through the parts in front).
 @fragment
 fn fs_hover_mask(i: MeshOut) -> @location(0) vec4<f32> {
     load_inst(i.slot);

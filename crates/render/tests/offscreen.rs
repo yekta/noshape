@@ -2338,6 +2338,80 @@ fn on_top_meshes_show_through_the_model() {
     assert!(shown_r > shown_g + 60, "on top: ({shown_r}, {shown_g})");
 }
 
+/// A hovered part behind another (live2 11-14, feel/hidden-part-selection.png: a list row's or a face's hover): its
+/// outline follows its whole silhouette, drawn over the part in front where that hides it.
+#[test]
+fn a_hovered_part_is_outlined_through_the_part_in_front() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let boxes = [([-0.02f32, -0.01, -0.005], [0.02f32, 0.01, 0.005]), ([-0.005f32, -0.01, 0.007], [0.035f32, 0.01, 0.017])];
+    let meshes: Vec<_> = boxes.iter().enumerate().map(|(k, (lo, hi))| r.upload_mesh(&primitives::box_mesh(*lo, *hi, 1 + 6 * k as u32))).collect();
+    let (w, h) = (400u32, 300u32);
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(-1.0, 1.0, -1.0), glam::DVec3::Z), ..Default::default() };
+    cam.fit_box(glam::DVec3::new(-0.02, -0.01, -0.005), glam::DVec3::new(0.035, 0.01, 0.017), w as f64 / h as f64);
+    let mut frame = |only: Option<usize>, hover: Option<usize>| {
+        let mut scene = Scene::default();
+        for (k, m) in meshes.iter().enumerate() {
+            if only.is_none_or(|o| o == k) {
+                // Two colours: where one part covers the other, its pixels tell which.
+                let c = if k == 0 { srgb(0x9a, 0xb4, 0xcc) } else { srgb(0xcc, 0xa8, 0x9a) };
+                scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(c));
+            }
+        }
+        if let Some(k) = hover {
+            for id in 1..=6 {
+                scene.set_state(id + 6 * k as u32, state::HOVER | state::OUTLINE);
+            }
+            scene.hover_outline = true;
+        }
+        r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap().bgra
+    };
+    let rest = frame(None, None);
+    let px = |b: &[u8], i: usize| -> [u8; 3] { [b[i * 4 + 2], b[i * 4 + 1], b[i * 4]] };
+    let background = px(&rest, 0);
+    let orange = |c: [u8; 3]| (c[0] as i32 - 255).abs() <= 3 && (c[1] as i32 - 198).abs() <= 3 && (c[2] as i32 - 133).abs() <= 3;
+    // The part whose own image loses the most pixels to the other is the one behind.
+    let alone: Vec<Vec<u8>> = (0..2).map(|k| frame(Some(k), None)).collect();
+    // A part's pixel is hidden where both parts cover it and the frame is nearer the other part's colour (ambient
+    // occlusion shades the visible one near the other, so not exact equality).
+    let dist = |a: [u8; 3], b: [u8; 3]| (0..3).map(|c| (a[c] as i32 - b[c] as i32).abs()).sum::<i32>();
+    let hidden = |k: usize, i: usize| {
+        let (mine, other) = (px(&alone[k], i), px(&alone[1 - k], i));
+        mine != background && other != background && dist(px(&rest, i), other) < dist(px(&rest, i), mine)
+    };
+    let count = |k: usize| (0..(w * h) as usize).filter(|&i| hidden(k, i)).count();
+    let back = if count(0) >= count(1) { 0 } else { 1 };
+    assert!(count(back) > 500, "the parts overlap on screen");
+    // Hidden pixels well away (over 3 px) from the part's visible ones: a depth-tested band never reaches them.
+    let visible = |x: i32, y: i32| (0..w as i32).contains(&x) && (0..h as i32).contains(&y) && {
+        let i = (y as u32 * w + x as u32) as usize;
+        px(&alone[back], i) != background && !hidden(back, i)
+    };
+    let hovered = frame(None, Some(back));
+    let through = (0..(w * h) as usize)
+        .filter(|&i| {
+            let (x, y) = ((i as u32 % w) as i32, (i as u32 / w) as i32);
+            hidden(back, i) && orange(px(&hovered, i)) && !(-3..=3).any(|dy| (-3..=3).any(|dx| visible(x + dx, y + dy)))
+        })
+        .count();
+    if let Ok(dir) = std::env::var("NOSHAPE_TEST_OUT") {
+        for (name, b) in [("rest", &rest), ("hover", &hovered), ("a", &alone[0]), ("b", &alone[1])] {
+            let mut rgba = b.clone();
+            for p in rgba.as_chunks_mut::<4>().0 {
+                p.swap(0, 2);
+            }
+            image::save_buffer(format!("{dir}/hover_through_{name}.png"), &rgba, w, h, image::ExtendedColorType::Rgba8).unwrap();
+        }
+    }
+    assert!(through > 100, "only {through} outline pixels over the part in front, away from its visible image");
+}
+
 /// PART-HOVER-RED look (live behaviours "psui (2026-10-27, P2) PART-HOVER-RED look", psui/parthover crops): a hovered
 /// whole part's outline is its silhouette line redrawn in solid hover orange, the part's boundary pixel and the one
 /// outside it (2 px at 1×); the faces keep their colours and nothing is drawn farther out.

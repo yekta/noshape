@@ -7087,6 +7087,7 @@ impl Render for PartStudioView {
             .key_context(if in_sketch { "PartStudio Sketch" } else { "PartStudio" })
             .track_focus(&self.focus)
             .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                this.ui.panel_check_focus = None;
                 // Keep keyboard shortcuts working after clicking the viewport or lists,
                 // without stealing focus from an input that just took it.
                 // (The tool search closes itself on clicks outside it.)

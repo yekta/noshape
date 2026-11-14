@@ -2799,8 +2799,8 @@ impl Renderer {
         let image_soft = lazy(LayoutKind::Image, P { label: "image-soft", vs: "vs_image", fs: "fs_image_soft", buffers: IMAGE_BUFFERS, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }, PLAIN);
         let image_blend = lazy(LayoutKind::Image, P { label: "image-blend", vs: "vs_image", fs: "fs_image_blend", buffers: IMAGE_BUFFERS, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }, PLAIN);
         let compare_dn = lazy(LayoutKind::Main, P { label: "compare-dn", vs: "vs_mesh", fs: "fs_compare_dn", buffers: MESH_BUFFERS, format: COMPARE_DN_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }, PLAIN);
-        // Against the color pass's depth, with its faces' bias (the same depths: GreaterEqual passes).
-        let mesh_hover_mask = lazy(LayoutKind::Main, P { label: "hover-mask", vs: "vs_mesh", fs: "fs_hover_mask", buffers: MESH_BUFFERS, format: crate::hover_outline::MASK_FORMAT, blend: None, depth: Some((false, ge)), bias: face, samples: msaa }, PLAIN);
+        // The whole silhouette, depth ignored: live draws a hovered part's outline through the parts in front.
+        let mesh_hover_mask = lazy(LayoutKind::Main, P { label: "hover-mask", vs: "vs_mesh", fs: "fs_hover_mask", buffers: MESH_BUFFERS, format: crate::hover_outline::MASK_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: face, samples: msaa }, PLAIN);
         let compare_mix = lazy(LayoutKind::Main, P { label: "compare-mix", vs: "vs_background", fs: "fs_compare_mix", buffers: &[], format: PRESENT_FORMAT, blend: alpha, depth: None, bias: none, samples: 1 }, PLAIN);
         self.pipelines = Some(Pipelines {
             background,

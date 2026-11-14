@@ -550,6 +550,8 @@ pub struct UiState {
     /// remembered values in after it, so its next run sees them as changes (live external-thread-chamfer-undercut: the
     /// remembered 3/8 counts as a size change, the chamfer and undercut follow the thread).
     pub std_remembered: Vec<(String, noshape_model::params::ParamValue)>,
+    /// The analysis panel checkbox last pressed: it holds the keyboard until the next press elsewhere.
+    pub panel_check_focus: Option<String>,
     /// std's editing logic running off the UI thread (std Extrude runs a
     /// whole trial extrude for its boolean heuristics).
     pub std_edit_task: Option<Task<()>>,
@@ -929,6 +931,7 @@ impl UiState {
             decal_sized: None,
             std_edit_old: None,
             std_remembered: Vec::new(),
+            panel_check_focus: None,
             std_edit_task: None,
             std_edit_run_old: None,
             std_logic_first: None,

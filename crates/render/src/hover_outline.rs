@@ -1,5 +1,6 @@
 //! A hovered whole part's outline drawn on the part side of its image's boundary (see `hover_outline.wgsl`): the
-//! color pass's depth, a mask pass of the hovered part's visible faces (`fs_hover_mask`), then a band over the
+//! color pass's depth, a mask pass of the hovered part's whole image, depth ignored as live draws it through the parts
+//! in front (`fs_hover_mask`), then a band over the
 //! resolved color where the mask meets uncovered pixels.
 
 use bytemuck::{Pod, Zeroable};

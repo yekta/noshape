@@ -1,7 +1,7 @@
 // A hovered whole part's outline (live behaviours "psui (2026-10-27, P2) PART-HOVER-RED look", psui/parthover
 // crops): the silhouette line along its image's boundary redrawn in the hover colour, solid, no antialiasing, its two
 // pixels at 1× (the part's boundary pixel and the one outside it); the faces keep their colours. A full-screen pass
-// over the resolved color reading the mask of the hovered part's visible pixels (`fs_hover_mask` in shaders.wgsl,
+// over the resolved color reading the mask of the hovered part's pixels, hidden ones too (`fs_hover_mask` in shaders.wgsl,
 // resolved: partial coverage at the boundary).
 
 struct U {

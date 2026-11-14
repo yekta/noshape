@@ -279,7 +279,7 @@ impl PartStudioView {
                         d.undercut = *v;
                     }
                     this.sync_draft(cx);
-                }))))
+                })), cx))
                 .into_any_element(),
         )
     }

@@ -72,6 +72,9 @@ impl PartStudioView {
         } else if self.ui.measure_pinned && self.focus.is_focused(window) {
             // [ › Measure: its selection field has the keyboard (live key-bracket-measure).
             json!({ "kind": "field", "label": "Select entities to measure", "text": null, "selection": null, "all": false })
+        } else if let Some(l) = self.ui.panel_check_focus.as_ref().filter(|_| (self.ui.draft.is_some() || self.ui.analysis_tool.is_some()) && self.focus.is_focused(window)) {
+            // A pressed analysis checkbox (live analysis-zebra-flip-edges, analysis-draft-undercut-off).
+            json!({ "kind": "field", "label": l, "text": null, "selection": null, "all": false })
         } else if let Some(d) = self.ui.draft.as_ref().filter(|_| self.focus.is_focused(window)) {
             // Draft analysis: its active field has the keyboard (live analysis-draft: "Entities to check" once the
             // pull direction is picked).

@@ -422,6 +422,8 @@ impl PartStudioView {
             Action::Cancel => self.end_section_dialog(false, w, cx),
             Action::Include(include) => {
                 if let Some(d) = &mut self.ui.section_dialog {
+                    // A tab takes no keyboard focus (live section-view-include-tab: none focused after).
+                    d.keyboard_left = true;
                     d.include = include;
                     if !d.items.is_empty() {
                         self.ui.section_parts = Some((include, d.items.clone()));

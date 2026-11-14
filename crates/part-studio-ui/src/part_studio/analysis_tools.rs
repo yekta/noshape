@@ -1053,12 +1053,13 @@ impl PartStudioView {
         let (kind, o, stale) = (t.kind, t.options.clone(), t.stale);
         let fmt_len = |v: f64| noshape_units::format_quantity(noshape_units::Quantity::new(v, noshape_units::Dim::LENGTH), &units);
         let check = |id: &'static str, label: &'static str, on: bool, set: fn(&mut ToolOptions, bool), cx: &mut Context<Self>| {
-            marked_check(label, gpui_kit::component::checkbox::Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+            let cb = gpui_kit::component::checkbox::Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                 if let Some(t) = &mut this.ui.analysis_tool {
                     set(&mut t.options, *v);
                 }
                 this.recompute_analysis_tool(cx);
-            })))
+            }));
+            marked_check(label, cb, cx)
         };
         let stepper = |id: &'static str, label: &'static str, value: String, step: fn(&mut ToolOptions, i32), cx: &mut Context<Self>| {
             let btn = |sid: String, glyph: &'static str, d: i32, cx: &mut Context<Self>| {
@@ -1325,8 +1326,8 @@ impl PartStudioView {
                     );
                 }
                 body = body
-                    .child(marked_check("Flip stripes", gpui_kit::component::checkbox::Checkbox::new("at-zflip").label("Flip stripes").checked(z.flip).on_click(cx.listener(set(|z, v| z.flip = v)))))
-                    .child(marked_check("Show edges", gpui_kit::component::checkbox::Checkbox::new("at-zedges").label("Show edges").checked(z.show_edges).on_click(cx.listener(set(|z, v| z.show_edges = v)))));
+                    .child(marked_check("Flip stripes", gpui_kit::component::checkbox::Checkbox::new("at-zflip").label("Flip stripes").checked(z.flip).on_click(cx.listener(set(|z, v| z.flip = v))), cx))
+                    .child(marked_check("Show edges", gpui_kit::component::checkbox::Checkbox::new("at-zedges").label("Show edges").checked(z.show_edges).on_click(cx.listener(set(|z, v| z.show_edges = v))), cx));
             }
             ToolKind::Reflection => {
                 let r = o.reflection.clone();
@@ -1378,9 +1379,9 @@ impl PartStudioView {
                     );
                 }
                 body = body
-                    .child(marked_check("Show edges", gpui_kit::component::checkbox::Checkbox::new("at-redges").label("Show edges").checked(r.show_edges).on_click(cx.listener(set(|r, v| r.show_edges = v)))))
-                    .child(marked_check("Blur environment", gpui_kit::component::checkbox::Checkbox::new("at-rblur").label("Blur environment").checked(r.blur).on_click(cx.listener(set(|r, v| r.blur = v)))))
-                    .child(marked_check("Lock environment", gpui_kit::component::checkbox::Checkbox::new("at-rlock").label("Lock environment").checked(r.lock).on_click(cx.listener(set(|r, v| r.lock = v)))));
+                    .child(marked_check("Show edges", gpui_kit::component::checkbox::Checkbox::new("at-redges").label("Show edges").checked(r.show_edges).on_click(cx.listener(set(|r, v| r.show_edges = v))), cx))
+                    .child(marked_check("Blur environment", gpui_kit::component::checkbox::Checkbox::new("at-rblur").label("Blur environment").checked(r.blur).on_click(cx.listener(set(|r, v| r.blur = v))), cx))
+                    .child(marked_check("Lock environment", gpui_kit::component::checkbox::Checkbox::new("at-rlock").label("Lock environment").checked(r.lock).on_click(cx.listener(set(|r, v| r.lock = v))), cx));
             }
             ToolKind::Dihedral => {
                 // Live 10-27 (behaviours "psui (10-27, P2) Dihedral analysis
@@ -1687,8 +1688,17 @@ impl PartStudioView {
     }
 }
 
-/// A panel's checkbox the ui-parity runner finds by its label (`{"checkbox": "Flip stripes"}`, runner 2026-11-14.8).
-pub(super) fn marked_check(label: &str, cb: impl IntoElement) -> Div {
+/// A panel's checkbox the ui-parity runner finds by its label (`{"checkbox": "Flip stripes"}`, runner 2026-11-14.8);
+/// pressed, it holds the keyboard as live's does (analysis-zebra-flip-edges: the checkbox focused), read by
+/// [`PartStudioView::ui_state`] until the next press in the graphics.
+pub(super) fn marked_check(label: &str, cb: impl IntoElement, cx: &mut Context<PartStudioView>) -> Stateful<Div> {
     let name = format!("checkbox:{label}");
-    crate::ui_script::mark(div().child(cb), move || name)
+    let focused = label.to_string();
+    crate::ui_script::mark(div().id(SharedString::from(format!("mc-{label}"))).child(cb), move || name).on_mouse_down(
+        MouseButton::Left,
+        cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+            this.ui.panel_check_focus = Some(focused.clone());
+            window.focus(&this.focus, cx);
+        }),
+    )
 }
