@@ -1,19 +1,19 @@
 {
  "scenario": "ver-vh-header-release",
- "recorded": "2026-11-08T07:37:22.756Z",
+ "recorded": "2026-11-14T02:56:30.143Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.3"
  },
  "live": {
-  "document": "e2b33b6b503f09cbfd3fcaeb",
-  "workspace": "1c8d5d296593256e8a7bd230",
-  "element": "1fae2526d7f76d3b9e667d24",
+  "document": "5cd1d2368f70acc6e963ae73",
+  "workspace": "b4660c84cedf9ce45039ff8b",
+  "element": "7f5dcebae03c2097e6aac745",
   "start": "doc-branches",
-  "startElement": "1fae2526d7f76d3b9e667d24",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "7f5dcebae03c2097e6aac745",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -81,6 +81,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -185,6 +212,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 323.961,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": [
@@ -230,7 +284,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 40281
+   "t": 28122
   },
   {
    "step": 2,
@@ -242,7 +296,7 @@
    },
    "ok": true,
    "at": [
-    262,
+    263,
     59
    ],
    "state": {
@@ -252,13 +306,14 @@
     },
     "dialog": {
      "kind": "modal",
-     "title": "",
+     "title": "Create Release candidate",
      "fields": [],
      "buttons": [
-      "Chat now to learn more",
-      "Start Professional Trial"
+      "Undo",
+      "Redo",
+      "Close"
      ],
-     "text": "Explore Onshape's premium features Simulation Render Studio PCB Studio CAM Studio Private documents Release management Customizable release workflows Projects with role-based access Automated part numbering Advanced product definition Arena connection Search and Where Used Enterprise analytics Company IP control Single sign-on Release management PRO ENT Onshape provides built-in release workflows for managing approval procedures and maintaining revision control of parts, assemblies, drawings, an"
+     "text": "Create Release candidate Preparing Release candidate… Close"
     },
     "dialogs": [],
     "panels": null,
@@ -321,30 +376,36 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
-     "history": [
-      {
-       "name": "B1",
-       "kind": "workspace",
-       "selected": false
-      },
-      {
-       "name": "Main",
-       "kind": "workspace",
-       "selected": true
-      },
-      {
-       "name": "V1",
-       "kind": "version",
-       "selected": false
-      },
-      {
-       "name": "Start",
-       "kind": "start",
-       "selected": false
-      }
-     ],
+     "history": null,
      "compare": null,
      "tabs": [
       {
@@ -360,13 +421,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Versions and history",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 45647
+   "t": 30732
   }
  ]
 }
