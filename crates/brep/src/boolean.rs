@@ -26,6 +26,7 @@ use crate::fxhash::{HashMap, HashSet};
 use std::f64::consts::{PI, TAU};
 
 mod free;
+mod march;
 mod line;
 
 /// The Boolean operation: `args[0]` is the object, the other arguments the tools.
@@ -966,6 +967,9 @@ struct Ctx<'a> {
     /// Pairs of free-form faces of arguments that must only touch, sharing an edge: they meet there alone (else the
     /// arguments overlap, which the classification tells), so OCCT's section isn't asked.
     edge_only: HashSet<(usize, usize)>,
+    /// Pairs our own marching takes (`marched_pair`), by (argument, face), marched ahead on all threads: their
+    /// curves, None where it can't; kept over the Boolean's rounds (`boolean_with`).
+    marched: Marches,
     /// Edges as polylines (`edge_polyline`), made as asked.
     polylines: HashMap<usize, Arc<(Vec<DVec3>, f64)>>,
     /// Whether an edge lies on a face, where that takes points along it (`on_free_surface`), found ahead.
@@ -2559,11 +2563,18 @@ impl Ctx<'_> {
     /// edges'; or beside a long one: two grooves' flanks at the cylinder's end, from the bottom edges' crossing to the
     /// ridges' 32 um above).
     fn occt_sections(&mut self, src: &dyn SectionSource, a: (u32, u32), b: (u32, u32)) -> R<Vec<SectionCurve>> {
-        let mut secs: Vec<SectionCurve> = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
-        let face = |(arg, index): (u32, u32)| {
-            let k = self.faces.partition_point(|g| (g.arg, g.index) < (arg, index));
-            (k < self.faces.len() && (self.faces[k].arg, self.faces[k].index) == (arg, index)).then_some(k)
+        let own = match (self.face_of(a), self.face_of(b)) {
+            (Some(fa), Some(fb)) => self.own_sections(src, (fa, a), (fb, b)),
+            _ => None,
         };
+        let face = |x: (u32, u32)| self.face_of(x);
+        let mut secs: Vec<SectionCurve> = match own {
+            Some(s) => s,
+            None => src.sections(a, b)?,
+        }
+        .into_iter()
+        .filter(|c| c.t1 > c.t0)
+        .collect();
         let tol = self.tol;
         // (A curve along an edge of both faces, within the tolerance all along: that edge, already there (OCCT's
         // sections of two faces tangent across their common edge, c2-extension-spring's Mirror 1: seven lines 2-4 um
@@ -2601,6 +2612,83 @@ impl Ctx<'_> {
         let more: Vec<SectionCurve> = src.seeded(a, b, &ends)?.into_iter().filter(|c| c.t1 > c.t0 && secs.iter().all(|o| o.curve.param_of(c.curve.at(0.5 * (c.t0 + c.t1))).1 > 10.0 * tol)).collect();
         secs.extend(more);
         Ok(secs)
+    }
+
+    /// Which of faces `fa`, `fb` is an elementary surface our own marching takes against the other, a free-form face
+    /// (`march`): the elementary one's surface and whether it is `fa`.
+    fn marched_pair(&self, fa: usize, fb: usize) -> Option<(march::Implicit, bool)> {
+        // (A plane and a B-spline face only: 4.3 times OCCT's on c2-rings-loft's 187 such sections, its curves on ours
+        // within 1.2e-6.)
+        let implicit = |f: usize| match self.faces[f].s {
+            Surf::Plane { n, d, .. } => Some(march::Implicit::Plane { n, d }),
+            _ => None,
+        };
+        let free = |f: usize| matches!(self.faces[f].ns.as_deref(), Some(ns @ FreeSurface::Nurbs(_)) if !ns.periodic().iter().any(|&p| p));
+        if let (Some(i), true) = (implicit(fa), free(fb)) {
+            return Some((i, true));
+        }
+        if let (Some(i), true) = (implicit(fb), free(fa)) {
+            return Some((i, false));
+        }
+        None
+    }
+
+    /// The face that is face `index` of argument `arg`.
+    fn face_of(&self, (arg, index): (u32, u32)) -> Option<usize> {
+        let k = self.faces.partition_point(|g| (g.arg, g.index) < (arg, index));
+        (k < self.faces.len() && (self.faces[k].arg, self.faces[k].index) == (arg, index)).then_some(k)
+    }
+
+    /// Our own marching of faces `fa` and `fb` (`marched_pair`'s), None where it can't tell.
+    fn march(&self, fa: usize, fb: usize) -> Option<Vec<march::Marched>> {
+        let (imp, implicit_is_a) = self.marched_pair(fa, fb)?;
+        let (fi, ff) = if implicit_is_a { (fa, fb) } else { (fb, fa) };
+        let g = &self.faces[ff];
+        let reach = GREY * self.tol;
+        // (On a plane, within its face's box in the plane grown by a tenth of its size (a cylinder's whole): the runs' ends kept clear of
+        // the face's corners, where three faces' sections micrometres apart decide its vertices.)
+        let bx = self.face_box(fi);
+        let within = |_: DVec2, p: DVec3| bx.is_none_or(|(l, h)| {
+            let q = self.faces[fi].to2(p);
+            let m = reach.max(0.1 * (h - l).length());
+            q.x >= l.x - m && q.y >= l.y - m && q.x <= h.x + m && q.y <= h.y + m
+        });
+        let (lo, hi) = (self.faces[fi].lo, self.faces[fi].hi);
+        let near = |(l, h): (DVec3, DVec3)| (l - hi).max_element() <= reach && (lo - h).max_element() <= reach;
+        march::sections(g.ns.as_ref()?, g.uvbox, &imp, self.tol, &near, &within)
+    }
+
+    /// The sections of faces `fa` (`a`) and `fb` (`b`) by our own marching, where it takes them (`marched_pair`) and
+    /// the source keeps them for building the edges; else None (OCCT's asked).
+    fn own_sections(&mut self, src: &dyn SectionSource, (fa, a): (usize, (u32, u32)), (fb, b): (usize, (u32, u32))) -> Option<Vec<SectionCurve>> {
+        let (_, implicit_is_a) = self.marched_pair(fa, fb)?;
+        let key = if a < b { (a, b) } else { (b, a) };
+        let known = self.marched.lock().ok()?.get(&key).cloned();
+        let marched = match known {
+            Some(m) => m?,
+            None => std::sync::Arc::new(self.march(fa, fb)?),
+        };
+        let fi = if implicit_is_a { fa } else { fb };
+        let ff = if implicit_is_a { fb } else { fa };
+        // (OCCT's where it found none, or a curve neither closed nor ending on either face's boundary: a march that
+        // missed a curve or ran on past the faces is OCCT's to settle.)
+        let reach = GREY * self.tol;
+        let on_bound = |f: usize, p: DVec3| self.bound_distance(f, self.faces[f].to2(p)).is_ok_and(|d| d <= reach);
+        let ends_ok = |m: &march::Marched| {
+            let (p, q) = (m.curve.at(0.0), m.curve.at(m.t1));
+            (p - q).length() <= reach || [p, q].iter().all(|&x| on_bound(fi, x) || on_bound(ff, x))
+        };
+        if marched.is_empty() || !marched.iter().all(ends_ok) {
+            return None;
+        }
+        let mut out = Vec::with_capacity(marched.len());
+        for m in marched.iter() {
+            let tol = m.error.max(self.tol);
+            let id = src.own(a, b, &crate::OwnSection { free_is_a: !implicit_is_a, curve: &m.curve, uv: &m.uv, range: (0.0, m.t1), other: None, tol })?;
+            let on = [m.uv.clone(), m.uv.clone()];
+            out.push(SectionCurve { curve: m.curve.clone(), t0: 0.0, t1: m.t1, on, id, tol, accuracy: m.error });
+        }
+        Some(out)
     }
 
     /// Edge `e` as a polyline of 64 chords, and how far the curve may be from it (the largest of the chords'
@@ -3981,13 +4069,17 @@ fn pcb_probe(cx: &Ctx, sedges: &[SEdge]) {
 }
 
 /// The same; free-form (NURBS) faces taken where `src` gives their sections (else declined).
+/// The sections our own marching made, by pair of (argument, face): kept over a Boolean's rounds.
+type Marches = std::sync::Arc<std::sync::Mutex<HashMap<FacePair, Option<std::sync::Arc<Vec<march::Marched>>>>>>;
+
 pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option<&dyn SectionSource>) -> R<Output> {
     // (Done again with the groups of vertices found on the way merged from the start, as OCCT merges them before
     // anything else; at most 4 times.)
     let mut groups: Vec<(DVec3, f64)> = Vec::new();
+    let marched = Marches::default();
     for round in 0.. {
         let regroup = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-        let out = boolean_in(op, args, tol, touching_only, src, &groups, regroup.clone());
+        let out = boolean_in(op, args, tol, touching_only, src, Round { groups: &groups, regroup: regroup.clone(), marched: marched.clone() });
         let found = std::mem::take(&mut *regroup.lock().expect("a group"));
         if found.is_empty() {
             return out;
@@ -4006,7 +4098,16 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     unreachable!()
 }
 
-fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option<&dyn SectionSource>, groups: &[(DVec3, f64)], regroup: std::sync::Arc<std::sync::Mutex<Vec<(DVec3, f64)>>>) -> R<Output> {
+/// A round of a Boolean (`boolean_with`): the vertex groups found before, where this one puts more, the marched
+/// sections kept over them.
+struct Round<'a> {
+    groups: &'a [(DVec3, f64)],
+    regroup: std::sync::Arc<std::sync::Mutex<Vec<(DVec3, f64)>>>,
+    marched: Marches,
+}
+
+fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option<&dyn SectionSource>, this: Round) -> R<Output> {
+    let Round { groups, regroup, marched } = this;
     if args.len() < 2 {
         return Err(Decline("a Boolean needs an object and a tool"));
     }
@@ -4056,6 +4157,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         canon_secs: HashMap::default(),
         apart: HashMap::default(),
         edge_only: HashSet::default(),
+        marched,
         polylines: HashMap::default(),
         on_surface: HashMap::default(),
         ncurves: Vec::new(),
@@ -4713,9 +4815,16 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         })?;
         let mut ahead: Vec<FacePair> = Vec::new();
         let mut seen: HashSet<FacePair> = HashSet::default();
+        let mut ours: Vec<(FacePair, usize, usize)> = Vec::new();
         for (&(fs, ft), x) in pairs.iter().zip(apart) {
             cx.apart.insert((fs, ft), x);
             if x {
+                continue;
+            }
+            // (Ours to march: not asked of OCCT ahead, marched ahead below.)
+            if cx.marched_pair(fs, ft).is_some() && cx.moved_pair(fs, ft).is_none() {
+                let (a, b) = ((cx.faces[fs].arg, cx.faces[fs].index), (cx.faces[ft].arg, cx.faces[ft].index));
+                ours.push((if a < b { (a, b) } else { (b, a) }, fs, ft));
                 continue;
             }
             let (x, y) = (&cx.faces[fs], &cx.faces[ft]);
@@ -4732,6 +4841,15 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             }
         }
         src.ahead(&ahead);
+        ours.sort_unstable_by_key(|x| x.0);
+        ours.dedup_by_key(|x| x.0);
+        if let Ok(known) = cx.marched.lock() {
+            ours.retain(|x| !known.contains_key(&x.0));
+        }
+        let marched = par_map(ours.len(), &|k| cx.march(ours[k].1, ours[k].2).map(std::sync::Arc::new))?;
+        if let Ok(mut known) = cx.marched.lock() {
+            known.extend(ours.into_iter().map(|x| x.0).zip(marched));
+        }
     }
     let mut meets = vec![false; ns * ns];
     for s in 0..ns {
