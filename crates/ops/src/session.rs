@@ -122,6 +122,15 @@ pub struct Session {
     /// branch head has moved past it (another process wrote the file), a
     /// commit merges onto the head ([`Session::rebase`]).
     seen: MicroversionId,
+    /// [`Session::hold_commits`]: the tabs (and settings) edited since, and the first edit's description.
+    held: Option<Held>,
+}
+
+#[derive(Default)]
+struct Held {
+    tabs: Vec<TabId>,
+    settings: bool,
+    description: Option<String>,
 }
 
 /// Store names and their new content (None deletes the name).
@@ -152,7 +161,7 @@ impl Session {
         if let Some(dir) = noshape_model::regen::crash_guard::dir() {
             note_open(dir, &path);
         }
-        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false, seen })
+        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false, seen, held: None })
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
@@ -176,7 +185,7 @@ impl Session {
         noshape_model::custom::register();
         // Undo works across sessions: rebuild the stack from the history.
         let undo = UndoStack::from_history(&store, branch, 500).unwrap_or_else(|_| UndoStack::new(branch).with_limit(500));
-        let mut s = Self { path, store, doc, branch, undo, viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false, seen: head };
+        let mut s = Self { path, store, doc, branch, undo, viewing: None, active_tab: None, view_only: false, recovered: Vec::new(), protection_lifted: false, seen: head, held: None };
         if let Some(dir) = markers {
             s.recovered = s.recover_crashed_features(dir);
             note_open(dir, &s.path);
@@ -389,9 +398,33 @@ impl Session {
         self.commit_tabs(tabs, false, description, Undo::EvenUnchanged)
     }
 
+    /// Hold the following tab commits back as one microversion, written by [`Self::release_commits`] under the first
+    /// one's description (the ui-parity start documents: one history entry per sketch, as live's).
+    pub fn hold_commits(&mut self) {
+        self.held = Some(Held::default());
+    }
+
+    /// Write the edits held since [`Self::hold_commits`] (nothing when none).
+    pub fn release_commits(&mut self) -> Result<()> {
+        let Some(h) = self.held.take() else { return Ok(()) };
+        let Some(description) = h.description else { return Ok(()) };
+        self.commit_tabs(&h.tabs, h.settings, &description, Undo::Yes)?;
+        Ok(())
+    }
+
     fn commit_tabs(&mut self, tabs: &[TabId], settings: bool, description: &str, undo: Undo) -> Result<MicroversionId> {
         anyhow::ensure!(self.viewing.is_none(), "viewing history is read-only");
         self.ensure_unprotected()?;
+        if let Some(h) = &mut self.held {
+            for &t in tabs {
+                if !h.tabs.contains(&t) {
+                    h.tabs.push(t);
+                }
+            }
+            h.settings |= settings;
+            h.description.get_or_insert_with(|| description.to_string());
+            return Ok(self.seen);
+        }
         let mut changes: Vec<(String, Option<Vec<u8>>)> = Vec::new();
         for &t in tabs {
             changes.push((Document::blob_name(t), self.doc.tab_blob(t)));

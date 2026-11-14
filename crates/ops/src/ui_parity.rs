@@ -311,6 +311,8 @@ fn add_features(ctx: &mut Ctx, features: &Value) -> Result<(), String> {
             if let Some(n) = f["name"].as_str() {
                 args["name"] = json!(n);
             }
+            // One history entry for the sketch and its geometry, as live's start documents have.
+            ctx.doc(None).map_err(|e| what(e.message))?.session.hold_commits();
             let made = call(ctx, "sketch_create", args).map_err(what)?;
             let id = made["sketch"].clone();
             let shapes: Vec<Value> = f["shapes"]
@@ -324,6 +326,7 @@ fn add_features(ctx: &mut Ctx, features: &Value) -> Result<(), String> {
                 call(ctx, "sketch_draw", json!({ "sketch": id, "shapes": shapes })).map_err(what)?;
                 live_start_constraints(ctx, &id, &shapes).map_err(what)?;
             }
+            ctx.doc(None).map_err(|e| what(e.message))?.session.release_commits().map_err(|e| what(format!("{e:#}")))?;
         } else {
             let mut params = serde_json::Map::new();
             for (p, v) in f["params"].as_object().into_iter().flatten() {
@@ -401,6 +404,10 @@ mod tests {
         let names: Vec<&str> = rows.iter().map(|r| r.0.as_str()).collect();
         assert_eq!(names, ["Variable 1", "Sketch 1", "Fillet 1", "Extrude 1"], "{rows:?}");
         assert!(rows.iter().filter(|r| r.0 != "Fillet 1").all(|r| r.1 == "Ok"), "{rows:?}");
+        // Live's start documents: one history entry per sketch (its geometry and constraints with it).
+        let h = call(&mut ctx, "history_list", json!({ "limit": 50 })).unwrap();
+        let sketch: Vec<&str> = h["history"].as_array().into_iter().flatten().filter_map(|c| c["description"].as_str()).filter(|d| d.contains("Sketch 1")).collect();
+        assert_eq!(sketch.len(), 1, "{h}");
         let _ = std::fs::remove_dir_all(dir);
     }
 
