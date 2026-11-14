@@ -171,6 +171,8 @@ pub struct PatternToggles {
     /// The Instances and directions picked (a pick is a step of the open dialog: live asm-linear-pattern-commit).
     pub seeds: Vec<InstanceId>,
     pub axes: [Option<MateConnectorRef>; 3],
+    /// Replicate's scope and its field (a scope pick is a step too: live asm-replicate-match-features).
+    pub scope: (Option<noshape_model::assembly::ReplicateScope>, Vec<noshape_model::assembly::ScopeEntity>),
 }
 
 impl PatternSession {
@@ -184,6 +186,7 @@ impl PatternSession {
             cfg_pending: self.cfg_pending.clone(),
             seeds: self.seeds.clone(),
             axes: [self.axis.clone(), self.axis2.clone(), self.axis3.clone()],
+            scope: (self.scope, self.scope_refs.clone()),
         }
     }
 
@@ -195,6 +198,7 @@ impl PatternSession {
         self.cfg_pending = t.cfg_pending;
         self.seeds = t.seeds;
         [self.axis, self.axis2, self.axis3] = t.axes;
+        (self.scope, self.scope_refs) = t.scope;
     }
 
     /// Before a toggle: remember the state for Undo (and enable ✓).
@@ -435,11 +439,14 @@ impl AssemblyView {
             let between = id.as_ref() == "BETWEEN_ENTITIES";
             if let Some(m) = &mut this.mc {
                 m.between = between;
-                if between && m.extra[0].is_none() {
+                // (Origin entity keeps the picks until it has one: live asm-mate-connector-between-entities.)
+                if between && m.extra[0].is_none() && m.on.is_some() {
                     m.active = true;
                     m.slot = 1;
                 }
             }
+            // The type box keeps the keyboard (its unlabelled input).
+            this.ui.checkbox_focus = Some("");
             this.update_capture(cx);
             this.schedule_eval(window, cx);
             cx.notify();
@@ -1882,7 +1889,7 @@ impl AssemblyView {
                     let active = s.active == Some(2);
                     // Live (qa5 A19): empty, the field is red (label and border).
                     let scope_tip = s.scope_refs.is_empty().then(|| SharedString::from("A target scope must be selected."));
-                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("rep-parts", if scope == ReplicateScope::EdgesOnFace { "Faces to find match in" } else { "Parts to find match in" }, scope_tip, active, rows).when(s.scope_refs.is_empty(), os::query_box_error).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("rep-parts", replicate_scope_field(scope), scope_tip, active, rows).when(s.scope_refs.is_empty(), os::query_box_error).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
                             p.active = Some(2);
                         }
@@ -3450,6 +3457,8 @@ impl AssemblyView {
                     s.all = !s.all;
                     this.ui.eval_requested |= s.replacement.is_some();
                 }
+                // The clicked checkbox keeps the keyboard (live asm-replace-all-instances).
+                this.ui.checkbox_focus = Some("Replace all instances");
                 cx.notify();
             })))
             .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(super::props::help_dot()));
@@ -5012,4 +5021,15 @@ fn canon_dir(p: &std::path::Path) -> std::path::PathBuf {
 /// dialog's Mirror strategy… and title are red until then).
 fn mirror_pending(s: &PatternSession) -> bool {
     s.kind == PatternDialogKind::Mirror && s.seeds.iter().any(|id| s.mirror_rows.get(id).is_some_and(|r| r.derived && !r.created))
+}
+
+/// Replicate's third field, named by its scope (live asm-replicate-match-features, -match-individual-faces).
+pub(super) fn replicate_scope_field(scope: noshape_model::assembly::ReplicateScope) -> &'static str {
+    use noshape_model::assembly::ReplicateScope;
+    match scope {
+        ReplicateScope::FacesInFeatures => "Features to find match in",
+        ReplicateScope::IndividualFaces => "Individual faces to match",
+        ReplicateScope::EdgesOnFace => "Faces to find match in",
+        _ => "Parts to find match in",
+    }
 }

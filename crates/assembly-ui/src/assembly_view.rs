@@ -577,10 +577,15 @@ impl AssemblyView {
             let Some(o) = ReplicateScope::FACE.iter().chain(ReplicateScope::EDGE.iter()).copied().find(|o| o.label() == id.as_ref()) else { return };
             if let Some(p) = &mut this.pattern {
                 if p.scope != Some(o) {
+                    // Live (asm-replicate-match-features): an Undo step of the dialog, ✓ on, its field takes the next picks.
+                    p.note_toggle();
                     p.scope_refs.clear();
+                    p.active = Some(2);
                 }
                 p.scope = Some(o);
             }
+            // The scope box keeps the keyboard (its unlabelled input).
+            this.ui.checkbox_focus = Some("");
             this.update_pattern_preview(cx);
             cx.notify();
         }));

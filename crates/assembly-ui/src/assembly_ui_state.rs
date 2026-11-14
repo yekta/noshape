@@ -688,7 +688,6 @@ impl AssemblyView {
                 PatternDialogKind::PartPattern | PatternDialogKind::Replicate => {
                     fields.push(query("Mate to be matched", s.mate.map(mate_name).into_iter().collect(), false, false));
                     if s.kind == PatternDialogKind::Replicate {
-                        use noshape_model::assembly::ReplicateScope;
                         let scope = self.replicate_scope(s, cx);
                         fields.push(choice(scope.label()));
                         let refs: Vec<String> = s
@@ -704,7 +703,7 @@ impl AssemblyView {
                             })
                             .collect();
                         let empty = refs.is_empty();
-                        fields.push(query(if scope == ReplicateScope::EdgesOnFace { "Faces to find match in" } else { "Parts to find match in" }, refs, s.active == Some(2), empty));
+                        fields.push(query(super::replicate_scope_field(scope), refs, s.active == Some(2), empty));
                     }
                 }
             }
