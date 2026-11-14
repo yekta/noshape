@@ -2511,7 +2511,6 @@ fn a_flange_drawn_from_a_shells_wall_fused_as_live() {
     assert_eq!(slivers, 2, "live's two 6.8 mm² slivers");
 }
 
-
 /// Two imported parts stacked (c2-gamma-imported's Boolean 2, two of its 24 bodies clipped to 8 mm round a bolt hole):
 /// the hole's wall in each a whole band of one cylinder, the two cylinders framed a quarter turn apart and placed by
 /// their parts' locations. OCCT's fuse keeps a band each and its unify can't merge them; ours merges the two bands
@@ -2562,4 +2561,23 @@ fn a_slot_wall_on_the_seam_cut_as_occt() {
     assert_eq!(counts(&r.shape), counts(&occt.shape));
     let (v, vo) = (r.shape.volume().unwrap(), occt.shape.volume().unwrap());
     assert!((v - vo).abs() <= 1e-9 * vo, "volume {v} against OCCT's {vo}");
+}
+
+/// c2-fan-blade-sweep's blade cut by its two bolts (recorded fb562f41): each thread root a cylinder strip between two
+/// helices of a whole turn, whose angles cover the circle up to a rounding (a gap of 0 there, or one across the circle
+/// on the mirrored bolt). Taken by noshape's Boolean (OCCT's took 1.1 s), as OCCT's: 64 faces, 175 edges, its volume.
+#[test]
+fn bolts_with_whole_turn_thread_roots_cut_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "fb562f4133ea3624").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})")).shape;
+    assert!(r.is_valid());
+    assert_eq!((r.count(k::ShapeType::Face), r.count(k::ShapeType::Edge)), (64, 175));
+    let v = r.volume().unwrap();
+    assert!((v - 8.782836552303072e-5).abs() <= 1e-9 * v, "volume {v}, OCCT's 8.782836552303072e-5");
 }

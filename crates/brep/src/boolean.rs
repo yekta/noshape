@@ -4402,6 +4402,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         if let Surf::Cyl { o, x, y, full: false, .. } = cx.faces[f].s {
             // The angles its boundary covers; th0 in the gap.
             let mut covered: Vec<(f64, f64)> = Vec::new();
+            let mut helix_round = false;
             for &(e, _) in &cx.faces[f].edges {
                 if let Geo::Arc { k, a0, sweep } = cx.edges[e].g {
                     let w = k.at(a0) - o;
@@ -4426,10 +4427,12 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     if acc.abs() > 1e-9 {
                         covered.push(if acc > 0.0 { (first, acc) } else { (first + acc, -acc) });
                     }
+                    helix_round |= acc.abs() >= TAU - 0.05;
                 }
             }
-            let th0 = match gap(&covered) {
-                Some(th0) => th0,
+            // (A gap of a rounding between a helix's ends a whole turn apart: none, it goes round.)
+            let th0 = match gap(&covered).filter(|&(_, w)| w > 1e-9 || !helix_round) {
+                Some((th0, _)) => th0,
                 None => {
                     // Going round (a thread's helical face): between its rulings at one angle, th0 there; those
                     // its loop runs up (along its parameters' v) are on the far side.
@@ -6877,10 +6880,14 @@ impl std::ops::Index<usize> for Dense {
     }
 }
 
-/// An angle in the gap of the arcs `covered` (start, sweep > 0): the middle of the widest gap.
-fn gap(covered: &[(f64, f64)]) -> Option<f64> {
+/// An angle in the gap of the arcs `covered` (start, sweep > 0): the middle of the widest gap, and its width.
+fn gap(covered: &[(f64, f64)]) -> Option<(f64, f64)> {
     if covered.is_empty() {
         return None;
+    }
+    // (One going a whole turn round (a thread's helix): no gap but at its start.)
+    if let Some(&(s, _)) = covered.iter().find(|x| x.1 >= TAU - 1e-9) {
+        return Some((s.rem_euclid(TAU), 0.0));
     }
     let mut ends: Vec<(f64, f64)> = covered.iter().map(|&(s, w)| (s.rem_euclid(TAU), w)).collect();
     ends.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -6897,7 +6904,7 @@ fn gap(covered: &[(f64, f64)]) -> Option<f64> {
             best = Some((end, next));
         }
     }
-    best.map(|(end, w)| (end + w * 0.5).rem_euclid(TAU))
+    best.map(|(end, w)| ((end + w * 0.5).rem_euclid(TAU), w))
 }
 
 /// The signed volume of a closed shell, its arcs as chords: positive for a solid, negative for a void.
