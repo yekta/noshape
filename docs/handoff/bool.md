@@ -239,6 +239,14 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   - Left on OCCT from my recordings: c2-impeller-loft 9522310b (2.1 s): an input vertex of 1.14 mm tolerance 0.4 mm
     off plane face 7 (upstream: core's), and with the 1 mm cap raised it declines "a face lost"; b4a6c1dc (1.5 s, "a
     piece shorter than its vertices' distance": the mirrored halves' fuse at x 0).
+  - b4a6c1dc, looked at (11-14 07:5x UTC, lead): the halves' r 32.5 mm circle on the mirror plane is two arcs in one
+    argument and a whole circle in the other. `edge_in_face`'s `past_face` trim finds the face edge it leaves across
+    by the distance to each edge's curve, but takes the point clamped to the edge's range: an arc of that same
+    circle is 0 from it anywhere, its clamped point its far end, so the circle's piece ended 1.6 um past v1 named v0
+    (a 0.8 um piece from v1 to v0). Measuring to the clamped point (patch: /root/bool2-scratch/
+    impeller-b4a6-nearfix-debug.patch, with debug prints) makes ours take it in 0.35 s (OCCT 1.5 s), 33 faces as OCCT's,
+    but 0.0076 mm3 (8e-7) more volume and a different history: not landed. Next: where that volume comes from, or
+    live's volume for the fuse (impeller capture q2985) to see which is right.
 - **asm-hand-drill-pinslot's Sweep 1 (lead 11-13 00:35, 03:30), 11-13 05:33 UTC, queued to land (e23bc68f; gate CHECK, knurls only):**
   the thread's inner face is a B-spline on the shaft's r 4.1 mm cylinder (12 nm inside). Ours can't take it (read as
   that cylinder it winds round three times; our cylinder faces cover one turn); OCCT's plain fuse cuts the shaft in
