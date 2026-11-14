@@ -7089,19 +7089,23 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     // our copy made.
                     let first_line = studio["live"].as_array().into_iter().flatten().find(|l| l["parts"].as_array().is_some_and(|ps| ps.iter().any(|p| p["partId"] == pid)));
                     let maker = first_line.and_then(|l| l["featureId"].as_str()).or_else(|| studio["firstMakers"][pid]["featureId"].as_str());
-                    // (Several made by it, asm-suspension's Body from an Extrude of two regions: the one not taken
-                    // nearest live's volume.)
+                    let by_creator = || t.part_by_creator(t.len(), pid, &our_ids).and_then(|id| solids.iter().find(|s| s.2 == id).map(|s| s.0.clone()));
+                    // (Several made by it: the one its part id's order names, else the one not taken nearest live's
+                    // volume: asm-suspension's Body from an Extrude of two regions; asm-pattern-std's AR-S1 / AR-S2 of
+                    // one Extrude, alike in volume, by their ids.)
                     let by_maker = maker.and_then(|f| t.feature_ids.get(f)).and_then(|ours| {
                         let head = format!("body:{ours}.");
                         let made: Vec<_> = solids.iter().filter(|s| s.2.starts_with(&head)).collect();
                         if let [one] = made.as_slice() {
                             return Some(one.0.clone());
                         }
+                        if let Some(n) = by_creator().filter(|n| made.iter().any(|s| &s.0 == n)) {
+                            return Some(n);
+                        }
                         let (lo, hi) = volume_band(p)?;
                         let mid = (lo + hi) * 0.5;
                         made.into_iter().filter(|s| !taken.contains(&s.0)).min_by(|a, b| (a.1 - mid).abs().total_cmp(&(b.1 - mid).abs())).map(|s| s.0.clone())
                     });
-                    let by_creator = || t.part_by_creator(t.len(), pid, &our_ids).and_then(|id| solids.iter().find(|s| s.2 == id).map(|s| s.0.clone()));
                     match by_maker.or_else(|| by_centroid(p, &taken)) {
                         Some(n) => n,
                         None => match by_creator() {
