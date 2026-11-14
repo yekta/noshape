@@ -4740,6 +4740,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             }
         }
     }
+    // (Each solid's ones it may meet, in order.)
+    let meeting: Vec<Vec<usize>> = (0..ns).map(|s| (0..ns).filter(|&t| meets[s * ns + t]).collect()).collect();
     crate::check_cancel()?;
     // The sections' parts and the edges lying on faces: their places in the faces on all threads, their edges in
     // the order the faces were paired.
@@ -5982,13 +5984,14 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let f = pieces[pi].face;
         let s = cx.faces[f].solid;
         let arg = cx.faces[f].arg;
-        let mut states: Vec<(usize, State)> = Vec::with_capacity(cx.solids.len());
-        for t in 0..cx.solids.len() {
+        // (Only the solids its own meets, in order: any other it is outside (a fill pattern's 1735 disks, each piece
+        // against each).)
+        let mut states: Vec<(usize, State)> = Vec::new();
+        if at.is_nan() {
+            return Ok(states);
+        }
+        for &t in &meeting[s] {
             if cx.solids[t].arg == arg {
-                continue;
-            }
-            if !meets[s * ns + t] || at.is_nan() {
-                states.push((t, State::Out));
                 continue;
             }
             let mut st = None;
@@ -6165,8 +6168,10 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             if cx.solids[t].arg == arg {
                 continue;
             }
-            let i = st0.binary_search_by_key(&t0, |x| x.0).ok()?;
-            out.push((t, st0[i].1));
+            // (One it doesn't list, it is outside.)
+            if let Ok(i) = st0.binary_search_by_key(&t0, |x| x.0) {
+                out.push((t, st0[i].1));
+            }
         }
         Some(out)
     };
