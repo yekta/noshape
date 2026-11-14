@@ -849,6 +849,66 @@ void circles_on_revolutions(const TopoDS_Shape& s, const ShapeIMap& keep)
   }
 }
 
+namespace {
+// Kept pieces sharing a face (the target cut one region's prism in two that still touch): one solid each, the shared
+// faces gone and the faces they split whole again, as Onshape's one body per region (asm-bjr-config studio 5d8bc1's
+// Extrude 55: compounds of two solids made our Boolean decline). Their history merged into `hist`.
+std::vector<TopoDS_Shape> joined_pieces(const std::vector<TopoDS_Shape>& keep, HHist& hist)
+{
+  const size_t        n = keep.size();
+  std::vector<size_t> root(n);
+  for (size_t i = 0; i < n; ++i)
+    root[i] = i;
+  auto find = [&](size_t x) {
+    while (root[x] != x)
+      x = root[x] = root[root[x]];
+    return x;
+  };
+  std::vector<ShapeIMap> faces(n);
+  for (size_t i = 0; i < n; ++i)
+    TopExp::MapShapes(keep[i], TopAbs_FACE, faces[i]);
+  for (size_t i = 0; i < n; ++i)
+    for (size_t j = i + 1; j < n; ++j)
+      for (int k = 1; k <= faces[i].Extent(); ++k)
+        if (faces[j].Contains(faces[i](k)))
+        {
+          root[find(j)] = find(i);
+          break;
+        }
+  std::vector<TopoDS_Shape> out;
+  for (size_t i = 0; i < n; ++i)
+  {
+    if (find(i) != i)
+      continue;
+    std::vector<TopoDS_Shape> group;
+    for (size_t j = 0; j < n; ++j)
+      if (find(j) == i)
+        group.push_back(keep[j]);
+    if (group.size() == 1)
+    {
+      out.push_back(group[0]);
+      continue;
+    }
+    BRepAlgoAPI_Fuse fu;
+    fu.SetArguments(single(group[0]));
+    fu.SetTools(to_list(std::vector<TopoDS_Shape>(group.begin() + 1, group.end())));
+    fu.Build();
+    if (fu.HasErrors())
+    {
+      out.insert(out.end(), group.begin(), group.end());
+      continue;
+    }
+    merge_into(hist, history_of(group, fu));
+    ShapeUpgrade_UnifySameDomain u(fu.Shape(), true, true, false);
+    u.Build();
+    merge_into(hist, u.History());
+    for (TopExp_Explorer x(u.Shape(), TopAbs_SOLID); x.More(); x.Next())
+      out.push_back(x.Current());
+  }
+  return out;
+}
+} // namespace
+
 OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, double start_offset)
 {
   check_sweepable(profile.shape);
@@ -1022,6 +1082,8 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
     fail_op("up-to extrude produced no solid (is the profile a face?)");
   if (reachesEnd)
     fail_op("up-to target does not fully bound the extruded profile");
+  if (!sheet && keep.size() > 1)
+    keep = joined_pieces(keep, hist);
   TopoDS_Shape result = keep.size() == 1 ? keep[0] : compound_of(keep);
   if (sheet && keep.size() > 1)
   {

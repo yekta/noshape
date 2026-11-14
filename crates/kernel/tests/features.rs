@@ -299,6 +299,20 @@ fn extrude_variants() {
     assert!(close(u.shape.volume().unwrap(), 12.0, 1e-9));
 }
 
+/// A region partly inside the body it is extruded up to (the body crosses its sketch plane): its pieces below the body
+/// and inside it touch, one solid, as Onshape's one body per region (asm-bjr-config studio 5d8bc1's Extrude 55: two
+/// solids sharing a face made our Boolean decline the fuse).
+#[test]
+fn an_up_to_extrude_starting_inside_its_body_is_one_solid() {
+    let f = make_face_from_wire(&make_polyline(&[DVec3::ZERO, DVec3::new(10.0, 0.0, 0.0), DVec3::new(10.0, 10.0, 0.0), DVec3::new(0.0, 10.0, 0.0)], true).unwrap(), true).unwrap();
+    let crossing = make_box_corners(DVec3::new(-5.0, -5.0, -5.0), DVec3::new(5.0, 15.0, 5.0)).unwrap();
+    let above = make_box_corners(DVec3::new(-5.0, -5.0, 8.0), DVec3::new(15.0, 15.0, 12.0)).unwrap();
+    let r = extrude_up_to(&f, DVec3::Z, &Shape::compound(&[crossing, above]), 0.0).unwrap();
+    assert_eq!(r.shape.solids().len(), 1);
+    assert!(r.shape.is_valid());
+    assert!(close(r.shape.volume().unwrap(), 10.0 * 10.0 * 8.0, 1e-6), "{}", r.shape.volume().unwrap());
+}
+
 #[test]
 fn extrude_up_to_face_and_body() {
     // Inclined plane face as target.
