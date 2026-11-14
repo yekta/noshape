@@ -1743,6 +1743,24 @@ impl<'a> Translator<'a> {
         (by_creator.len() == ids.len() && by_creator.iter().collect::<std::collections::HashSet<_>>().len() == ids.len()).then_some(by_creator)
     }
 
+    /// A plane named by one id alone, without live's geometry (an assembly corpus' studio): the studio's one Plane
+    /// feature before the id's first use (asm-hand-drill-pinslot's Bearing: Mirror 1 across Plane 1, its mid-plane;
+    /// asm-scissor-lift's Mirror 1).
+    fn one_plane_before(&self, k: usize, queries: &[Value]) -> Option<String> {
+        let [q] = queries else { return None };
+        // (Onshape's plane ids end in C, as the default planes' JCC / JDC / JEC.)
+        let plane_id = q["deterministicIds"].as_array().is_some_and(|a| a.len() == 1 && a[0].as_str().is_some_and(|i| i.ends_with('C')));
+        if !plane_id || q["queryString"].as_str().is_some_and(|t| !t.trim().is_empty()) {
+            return None;
+        }
+        // (Made before the first feature naming it: asm-scissor-lift's Extrude 2 up to Plane 1, before Plane 2.)
+        let id = format!("\"{}\"", q["deterministicIds"][0].as_str()?);
+        let first = self.features[..k].iter().position(|f| f.to_string().contains(&id)).unwrap_or(k);
+        let mut planes = self.features[..first].iter().filter(|f| f["featureType"] == "cPlane" && f["suppressed"] != true);
+        let (Some(plane), None) = (planes.next(), planes.next()) else { return None };
+        Some(format!("fplane:{}", self.feature_ids.get(plane["featureId"].as_str()?)?))
+    }
+
     /// A revolve's axis named by id alone: the last sketch's one
     /// construction line (the usual centreline), if it has exactly one.
     fn last_sketch_axis(&mut self, k: usize, queries: &[Value]) -> Option<Vec<String>> {
@@ -1904,6 +1922,12 @@ impl<'a> Translator<'a> {
                     && let Some(all) = self.parts_by_count(k, &queries)
                 {
                     return Ok(Some(json!(all)));
+                }
+                if ids.is_empty()
+                    && only_planes(&p["filter"])
+                    && let Some(plane) = self.one_plane_before(k, &queries)
+                {
+                    return Ok(Some(json!([plane])));
                 }
                 if ids.is_empty() {
                     return Err(first);
@@ -5176,6 +5200,26 @@ fn top_level_items(rest: &str) -> Option<Vec<String>> {
     None
 }
 
+/// A query filter that takes planes and nothing else (a mirror plane: planar faces or mate connectors).
+fn only_planes(filter: &Value) -> bool {
+    fn walk<'a>(v: &'a Value, geometry: &mut Vec<&'a str>, entities: &mut usize) {
+        match v {
+            Value::Object(m) => {
+                if let Some(g) = m.get("geometryType").and_then(Value::as_str) {
+                    geometry.push(g);
+                }
+                *entities += m.contains_key("entityType") as usize;
+                m.values().for_each(|x| walk(x, geometry, entities));
+            }
+            Value::Array(a) => a.iter().for_each(|x| walk(x, geometry, entities)),
+            _ => {}
+        }
+    }
+    let (mut geometry, mut entities) = (Vec::new(), 0);
+    walk(filter, &mut geometry, &mut entities);
+    entities == 0 && !geometry.is_empty() && geometry.iter().all(|g| *g == "PLANE")
+}
+
 fn packed_strings_of(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(packed) = text.split("qCompressed(1.0,\"").nth(1).and_then(|r| r.split('"').next())
@@ -7475,6 +7519,19 @@ mod tests {
         let at: Vec<serde_json::Value> = rect.iter().map(|c| json!({ "point": (o + c[0] * x + c[1] * y).to_array() })).collect();
         let square = json!({ "bodies": [{ "vertices": at }, { "vertices": [], "faces": [{ "surface": { "normal": [0.0, 1.0, 0.0] } }] }] });
         assert_eq!(super::frame_from_bodies(&json!({ "entities": sides }), &square), None);
+    }
+
+    /// A mirror's plane filter (live's: a plane or a mate connector) takes planes only; a Plane feature's entities
+    /// (planes, points, lines…) and a face filter don't.
+    #[test]
+    fn a_mirror_planes_filter_takes_only_planes() {
+        let mirror = json!({ "btType": "BTOrFilter-167", "operand1": { "btType": "BTGeometryFilter-130", "geometryType": "PLANE" }, "operand2": { "btType": "BTMateConnectorFilter-163", "requiresOccurrence": false } });
+        assert!(super::only_planes(&mirror));
+        let cplane = json!({ "btType": "BTOrFilter-167", "operand1": { "btType": "BTGeometryFilter-130", "geometryType": "PLANE" }, "operand2": { "btType": "BTOrFilter-167", "operand1": { "btType": "BTEntityTypeFilter-124", "entityType": "VERTEX" }, "operand2": { "btType": "BTGeometryFilter-130", "geometryType": "LINE" } } });
+        assert!(!super::only_planes(&cplane));
+        let faces = json!({ "btType": "BTAndFilter-110", "operand1": { "btType": "BTEntityTypeFilter-124", "entityType": "FACE" }, "operand2": { "btType": "BTGeometryFilter-130", "geometryType": "PLANE" } });
+        assert!(!super::only_planes(&faces));
+        assert!(!super::only_planes(&Value::Null));
     }
 
     /// A written query's `var subQk=…;` definitions put in where they're used (subQ10 not read as subQ1 + "0"), and
