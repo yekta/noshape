@@ -11,6 +11,16 @@ pub fn ops() -> Vec<Op> {
     vec![
         Op {
             group: "part",
+            verb: "where_used",
+            summary: "Where a part is used (part menu › Where used…)",
+            description: "The assemblies, drawings and Derived features that use the part: in this document's workspace (version \"Main\") and in the other documents on this computer, each with the version of this document it uses. Live's panel lists versions only; this also reads the workspace.",
+            fields: vec![doc_field(), tab_field(), req("part", s(), "Part id (`body:…`) or name."), opt("documents", json!({ "type": "array", "items": { "type": "string" } }), "Other documents to search (paths; default: the recent documents and the documents folder).")],
+            mutates: false,
+            destructive: false,
+            run: where_used,
+        },
+        Op {
+            group: "part",
             verb: "rename",
             summary: "Rename a part (Parts list › Rename)",
             description: "The part's name in the parts list, BOMs and drawings (\"Rename : <name>\").",
@@ -97,6 +107,28 @@ fn part_by_key(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, key
     }
     let r = od.regenerate(tab, None)?;
     Ok(super::query::find_part(&r, key)?.id.clone())
+}
+
+fn where_used(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let body = part_arg(od, tab, a)?;
+    if !od.regenerate(tab, None)?.display.bodies.iter().any(|b| b.id == body) {
+        return Err(OpError::param("part", "no such part in the Part Studio"));
+    }
+    let others: Vec<std::path::PathBuf> = match a.opt_array("documents")? {
+        Some(list) => list.iter().filter_map(|v| v.as_str()).map(std::path::PathBuf::from).collect(),
+        None => {
+            let mut v = crate::doc_library::recent();
+            if let Ok(rd) = std::fs::read_dir(noshape_scene::documents_dir()) {
+                v.extend(rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")));
+            }
+            v
+        }
+    };
+    let (name, path) = (od.session.name(), od.session.path.clone());
+    let uses = crate::where_used::where_used(od.doc(), &name, &path, tab, &body, &others);
+    let rows: Vec<serde_json::Value> = uses.iter().map(|u| json!({ "document": u.document, "path": u.path.display().to_string(), "element": u.element, "kind": u.kind, "version": u.version })).collect();
+    Ok(json!({ "part": refs::to_id(&Reference::Body(body)), "uses": rows }).into())
 }
 
 fn rename(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

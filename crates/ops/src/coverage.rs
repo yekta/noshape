@@ -583,6 +583,8 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Paste sketch", Op("sketch_paste")),
     ("partStudio:Properties…", Op("part_set_properties")),
     ("partStudio:Release…", Op("release_create")),
+    ("partStudio:Where used…", Op("part_where_used")),
+    ("partStudio:Open in new browser tab", Op("document_open")),
     ("partStudio:Remove appearance", Op("part_remove_appearance")),
     ("partStudio:Rename", Op("feature_rename")),
     ("partStudio:Rename…", Op("part_rename")),

@@ -441,6 +441,8 @@ pub struct UiState {
     pub high_quality_seen: bool,
     /// Parts list › Assign material…: the Material panel.
     pub material_panel: Option<super::material_panel::MaterialPanel>,
+    /// Parts list › Where used…: its panel.
+    pub where_used: Option<super::where_used::WhereUsedPanel>,
     /// Where panel dialogs were moved by their title.
     pub panels: crate::ui::PanelOffsets,
     /// The Configurations block's height after its splitter was dragged.
@@ -875,6 +877,7 @@ impl UiState {
             high_quality_seen: false,
             create_selection: None,
             material_panel: None,
+            where_used: None,
             panels: Default::default(),
             cfg_box_h: None,
             menu_pos: Point::default(),

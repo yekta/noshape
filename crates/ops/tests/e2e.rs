@@ -1807,6 +1807,23 @@ fn drawing_views_and_dimensions() {
     assert!(bytes.windows(4).any(|w| w == b"----"), "no placeholder in the DXF");
 }
 
+/// Parts list › Where used… (live2 11-14, feel/whereused.json): nothing before the part is used; inserted into the
+/// assembly, that assembly in this document's workspace ("Main": live lists versions only, ours reads the workspace).
+#[test]
+fn part_where_used() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "where_used.noshape");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    let none = call(&mut ctx, "part_where_used", json!({ "tab": "Part Studio 1", "part": part, "documents": [] }));
+    assert!(none["uses"].as_array().unwrap().is_empty(), "{none}");
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": part }));
+    let u = call(&mut ctx, "part_where_used", json!({ "tab": "Part Studio 1", "part": part, "documents": [] }));
+    let uses = u["uses"].as_array().unwrap();
+    assert_eq!(uses.len(), 1, "{u}");
+    assert_eq!((&uses[0]["element"], &uses[0]["kind"], &uses[0]["version"]), (&json!("Assembly 1"), &json!("assembly"), &json!("Main")), "{u}");
+    assert_eq!(try_call(&mut ctx, "part_where_used", json!({ "tab": "Part Studio 1", "part": "Part 9", "documents": [] })).unwrap_err().param.as_deref(), Some("part"));
+}
+
 #[test]
 fn analysis_tools() {
     let mut ctx = Ctx::new();

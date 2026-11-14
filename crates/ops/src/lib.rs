@@ -51,6 +51,7 @@ pub mod registry;
 pub mod session;
 pub mod sheetmetal;
 pub mod shortcuts;
+pub mod where_used;
 pub mod show_code;
 pub mod sketch_export;
 pub mod sketch_use;

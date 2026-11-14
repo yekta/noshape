@@ -400,7 +400,7 @@ fn rows() -> Vec<Row> {
         } },
         Row { id: "menu / one part", live: "Rename | Properties… | Assign material… | Edit appearance… | Copy here… | Copy Part 1 | Create Drawing of Part 1… | Export… | Release… | Hide | Hide other parts | Hide all parts | Isolate… | Make transparent… | Zoom to selection | Delete…", gap: false, check: |l, cx| {
             l.right_click(cx, "part:Part 1");
-            expect(l.menu(cx), names(&["Rename", "Properties…", "Assign material…", "Edit appearance…", "Copy here…", "Copy Part 1", "Create Drawing of Part 1…", "Export…", "Release…", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Zoom to selection", "Delete…"]), "rows")
+            expect(l.menu(cx), names(&["Rename", "Properties…", "Assign material…", "Edit appearance…", "Copy here…", "Copy Part 1", "Create Drawing of Part 1…", "Export…", "Where used…", "Release…", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Zoom to selection", "Delete…"]), "rows")
         } },
         Row { id: "menu / two parts", live: "Properties… | Assign material for 2 parts… | Edit appearance for 2 parts… | Check interference for 2 parts… | Boolean | Copy 2 items | Hide | Hide other parts | Hide all parts | Isolate… | Make transparent… | Export… | Release… | Delete", gap: false, check: |l, cx| {
             l.click(cx, "part:Part 1", NONE);

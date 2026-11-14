@@ -209,6 +209,10 @@ CLOUD_ONLY = {"View support tickets", "App Store dev portal", "Sign out", "Add c
 # Rows live showed for a while and no longer has (live 2336: the + menu's "Create table" only in its 05:00–06:20
 # recordings, in no document since).
 LIVE_TRANSIENT_ROWS = {"Create table"}
+# Rows of live's Professional plan (the research account since 2026-11-14): ours always has them (offline, no plan);
+# older takes, recorded on the free plan, don't.
+PRO_SINCE = "2026-11-14T00:00"
+PRO_ROWS = {"Where used…"}
 
 
 def normalize_live(state):
@@ -701,6 +705,9 @@ def compare(live, ours, whole_document=True):
         b = insert_panel(runner_names(old_workspace_labels(a, reference_manager_as_panel(a, material_as_panel(a, json.loads(json.dumps(b))))), start_name, False))
         a = unknown_picks(a, b)
         a, b = camera_compared(a), camera_compared(b)
+        bl = (b or {}).get("list")
+        if isinstance(bl, dict) and isinstance(bl.get("rows"), list) and str(live.get("recorded", "")) < PRO_SINCE:
+            b = dict(b, list=dict(bl, rows=[r for r in bl["rows"] if r not in PRO_ROWS]))
         bd = (b or {}).get("dialog")
         if isinstance(bd, dict) and str(live.get("recorded", "")) < panel_read_since(bd.get("title")) and (a or {}).get("dialog") is None:
             b = dict(b, dialog=None)

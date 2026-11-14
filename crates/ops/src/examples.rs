@@ -162,6 +162,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("config_reorder_inputs", &[r##"{"input": "Lite", "to": "Size"}"##]),
     // parts, materials
     ("part_rename", &[r##"{"part": "Part 1", "name": "Base plate"}"##]),
+    ("part_where_used", &[r##"{"part": "Part 1"}"##, r##"{"part": "Part 1", "documents": ["~/Documents/noshape/Gearbox.noshape"]}"##]),
     ("part_set_properties", &[r##"{"part": "Part 1", "part_number": "BP-100", "revision": "A"}"##]),
     ("part_set_material", &[r##"{"parts": ["Part 1"], "material": "Aluminum - 6061"}"##]),
     ("part_set_appearance", &[r##"{"parts": ["Part 1"], "color": "#3b61b4"}"##, r##"{"faces": ["face:…"], "color": [200, 40, 40], "transparency": 0.3}"##]),

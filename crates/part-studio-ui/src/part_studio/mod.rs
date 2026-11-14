@@ -13,6 +13,7 @@ mod hole_callout;
 mod triad;
 mod material_data;
 mod material_panel;
+mod where_used;
 mod config_panel;
 mod custom_features;
 mod custom_tables;
@@ -4802,6 +4803,11 @@ impl PartStudioView {
                         let t = targets(this, &b12);
                         this.open_export_dialog(t, w, cx);
                     }))))
+                    // Live (Professional, part-menu-release-workflows-off): Where used… after Export…, for one part.
+                    .when(!others, |m| m.item(item("Where used…", Box::new({
+                        let b = b.clone();
+                        move |this, _, cx| this.open_where_used(b.clone(), cx)
+                    }))))
                     // Live: Release… after Export… (the selected parts); none with managed workflows off.
                     .when(noshape_ops::release_settings::managed_workflows(), |m| m.item(item("Release…", Box::new({
                         let b = b.clone();
@@ -7008,6 +7014,7 @@ impl PartStudioView {
         overlay.extend(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone().into_any_element()));
         overlay.extend(self.render_create_selection(cx));
         overlay.extend(self.render_material_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-material"))));
+        overlay.extend(self.render_where_used(cx));
         overlay.extend(self.render_variable_input(cx));
         overlay.extend(self.render_datum_dialog(cx));
         overlay.extend(self.render_default_tolerances_picker(cx));
