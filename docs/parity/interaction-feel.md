@@ -540,7 +540,7 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). part-studio-ui
 `dialogs::the_dialogs_matrix_matches_live` (T1, no GPU) on the block start, and `manipulators::snap_tests`.
 
-**Matched: 18 / 18** (11-14 00:29 UTC; 1 / 5 at the first run, then 11 rows added: 8 matching, 3 fixed).
+**Matched: 17 / 18** (11-14 04:13 UTC: the click-again row passed only when its second click beat the Fillet preview; 18 / 18 at 00:29 UTC; 1 / 5 at the first run, then 11 rows added: 8 matching, 3 fixed).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -550,7 +550,7 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | A dragged length's step | 10^(round(log10(100 px in the unit)) − 2) of the unit at the arrow (0.1 mm at 0.25 mm/px, 1 mm from 0.316); Shift: free | always 0.1 mm / 0.01 in, Shift ignored; now live's (`manipulators::linear_step`, our own and std arrows) | = (fixed) |
 | A dragged angle's step | 5° within 2° up to a 573 px radius, 1° up to 2865 px, then 0.1°; free between; Shift: free | always 5° within 2°; now by radius (the finer windows divided by 1 + level / 3: asked, REQUESTS 12:48) | = (fixed) |
 | Properties on opening | no field has the keyboard (live's recordings: a div / ul); typing does nothing | Name focused; now the modal itself (`MetaForm::focus`), document keys still off behind it | = (fixed) |
-| A selected entity clicked again | leaves the field (in, out, in) | the same | = |
+| A selected entity clicked again | leaves the field (in, out, in) | in, then nothing: once the preview is built a consumed edge has no pick (drawn as an overlay only), so the click can't reach it | ≠ |
 | Esc in a value field | the first discards the typed value and leaves the field, the dialog stays; a second cancels | the same | = |
 | Enter with the keyboard outside a field | commits the dialog | the same | = |
 | Typing in a value field | no preview while typing (none 3 s on); Enter, Tab or leaving the field sends it | the same | = |

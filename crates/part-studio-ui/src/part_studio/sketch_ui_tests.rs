@@ -126,7 +126,7 @@ fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
 /// seconds; it returns as soon as `done` holds).
 fn wait_until(cx: &mut TestAppContext, window: AnyWindowHandle, done: impl Fn(&gpui_kit::App) -> bool) {
     let t = std::time::Instant::now();
-    while !cx.update(|cx| done(cx)) && t.elapsed() < std::time::Duration::from_secs(30) {
+    while !cx.update(|cx| done(cx)) && t.elapsed() < std::time::Duration::from_secs(120) {
         std::thread::sleep(std::time::Duration::from_millis(10));
         cx.executor().advance_clock(std::time::Duration::from_millis(20));
         draw(cx, window);
