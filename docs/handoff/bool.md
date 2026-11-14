@@ -13,10 +13,55 @@ scratch /root/bool-scratch.
   80/87, 870/947 both. self_intersects' 1 s check runs with the feature's budget record detached (else the sweep's
   Boolean stopped at once: asm-hand-drill-pinslot's 7ed710 Sweep 2 / bb72f3 Sweep 1 "BOPAlgo_AlertIntersectionFailed";
   hand-drill differences 62 -> 60). Their placement was core's helix (fixed by core).
-- Next: c2-rings-loft's Shell 1 (bool2 11-14: ~1 s a regeneration in op_shell_solid; live 235 ms; dump vibe5
-  ~/agents/bool-cases/rl-dump/shell-9): by_quadrics 1.03 s on loaded vibe5: repair 351 ms (the first wall invalid:
-  traces 116, splits 94, joins 78), self-interference (CheckerSI edges x faces) 226, edges 152 (GeomAPI_IntSS of
-  offsets, shell.cpp 5072), faces 122 (ValueOfUV in eval_grad_near 6441/6447), check 42, thin 40, volumes 36.
+- **Lead 11-14 18:2x: our own offset-surface intersections and checks, staged, each landing through the gate, rings-loft's
+  Shell 1 reported after each** (same groundwork as fan-blade's free-form offset). Measured on vibe6 (shell-9 dump, now
+  also vibe6 ~/agents/bool-keep/rl): 0.86-0.97 s, live 235 ms: edges 156 (GeomAPI_IntSS of trimmed offsets, run ahead
+  in parallel), faces 109 (pcurves by projection), repair 290-330 (first wall invalid; traces 75-110), self-interference
+  185-215, volumes 55-66, thin 42, check 35. Tried, no gain (reverted): OBB pairs in the checker (254 ms), Gauss volumes
+  (102 ms), the mesh far-test on vertex-touching edge/face pairs (0 of 164 cleared: the offset edges run along the
+  neighbour's offset), trace starts seeded from the corner solves' feet (5-10 ms, noise), the existing 64-step march for
+  every free-form edge (slower, 205-244 ms, and "a marched edge's curve on its face failed": its projections).
+  - Stage 1 plan (offset x offset, offset x plane): march in the faces' parameters, not in space: per step solve
+    OA(ua, va) = OB(ub, vb) (offset = base + t N, its derivatives from the base's D2) with the plane across the
+    original edge at s, 4 unknowns, started from the original edge's pcurves at s; no projections at all. Points and
+    both (u, v) per step: the 3D curve and its two pcurves fitted at the same parameters (SameParameter by
+    construction, replacing the faces stage's projections for these edges). Steps adaptive by the chord's midpoint
+    error; ends snapped to the corners' offset vertices. Plane: its own (u, v).
+  - Stage 1 built (branch bool-hat ec7d490e4, gate running 19:36): quad::march_offsets (shell.cpp) for every edge with a
+    free-form face that isn't tangent / partly tangent / grouped, in the parallel run-ahead and the loop; OCCT's
+    intersection where it fails. Ends by Newton on (X - C(s)).C'(s) from the edge's own ends (outward corners lie past
+    them); points kept on the faces' own patches (past them the impeller's tangent extensions turn corners: first gate
+    moved c2-impeller-loft's Extrude Flansch 5427.638 -> 5427.183 mm3, live 5427.708). rings-loft shell-9: 32 of 36
+    such edges marched (4 run out of halvings), volume 474.8191 (OCCT's curves 474.8129; live 475.14, band wide);
+    same-run A/B on loaded vibe6: edges -30 %, faces -34 %, the Shell -13 %. Kernel tests 431 pass.
+  - Stage 2: the self-interference check from our own edge x offset intersections (the same Newton, 3 unknowns).
+  - Stage 3: the repair traces on the same marcher.
+- asm-bjr-config st-5d8bc1 Extrude 55 (core/dx 11-14; repro vibe5 + vibe7 ~/agents/bool-keep/m5d8, recorded fuse
+  vibe7 ~/agents/bool-keep/m5d8rec/115a4df00bb4db04): 4311 ms (live 333), 369/955/601 (live 365/943/593). The fuse of 130
+  up-to prisms (glue shift_checked) runs on OCCT: 10 tools are compounds of two solids sharing faces (prism_until keeps
+  both pieces a target cuts a region into), our B-rep declines "faces outside the solids" (flattened: "a shared shape
+  OCCT may keep or remake"). Core 19:3x: prism_until will give one solid per region (queued after its knife change).
+  The +4 faces: 4 r2 cylinders split where those pieces met; USD merges them (365 = live) but changes the volume by
+  -6.48e-12 m3 (real: adaptive integration agrees), over keeps_volume's 1e-9 of the box, so the fallback keeps periodic
+  faces apart. Recheck both after core's change.
+  - With core's join (core-prism 5fdb63f1e, binary vibe5 ~/agents/bool-keep/m5d8/core-branch; its fuse recorded vibe5
+    m5d8/rec2 + vibe7 ~/agents/bool-keep/m5d8rec2/cee9172049a1487c): every input converts; ours now declines "an ellipse
+    across a cylinder's seam" (boolean.rs Surf::Cyl Geo::Ell arm): full r1.875 / r2 cylinders (axis -z, th0 0), an
+    ellipse edge from -19.5 to +19.5 deg round the seam, ends on the +x side (e.g. p0 (31.768, -11.875, -16.677) mm,
+    centre (30, -12.5, -17.12)). Next: is it a tool edge on the plate's cylinder (another seam place) or a section not
+    split at the seam; split it at th0 where it crosses (as arcs would need too: "an arc across a cylinder's seam").
+  - 21:4x: it was another argument's ellipse edge on a full cylinder (Ctx's edge-on-face path splits circles and
+    B-splines at the seam, not ellipses): split added in the worktree (boolean.rs, after the circle's; not committed,
+    needs a test + the gate). Next decline: "a face lost": the triangular faces of tools 84 and 93 (wedges 0.10 / 0.44
+    mm3, 5 faces, valid) find no region inside their bound (of_face's inside2). Bisected (probe_tool_subset): the plate
+    + tools 84 and 88 alone decline so, with or without the ellipse split; apart (their common 0) but both with faces
+    on the z -0.15 mm sketch plane and the plate's tilted up-to plane; the lost faces are 84's 0.02 mm2 triangles on
+    those planes (coplanar faces of two tools + a sliver). Minimal case recorded: vibe7
+    ~/agents/bool-keep/m5d8min/d8f151345ec9e711 (failed-case record: replay ours only).
+- Stage 1 + a props fix (895791b69, gate running 21:22): c2-impeller-loft's Part 2 change was our volume integral, not
+  geometry: a face swept from the marched 89-pole cubic (C2 at every knot, so no C2 breaks) integrated in 16 steps,
+  8e-5 short (prism of the 1356.908 mm2 cap: 1356.796); common.cpp surface_breaks / face_moments now split an
+  extrusion's (revolution's) integral at its B-spline curve's knots: both curves then measure 1356.9094.
 - Then c2-fan-blade-sweep's Boolean 2 offset: the bolt's picked faces 9,10,11,13,16-21,23 (flanks 10, 11 B-spline;
   flank 12 unpicked), so a Shell wall from the picked faces would leave rims where live extends the neighbours.
 
