@@ -180,7 +180,8 @@ impl AssemblyView {
         // (Not while Faces to connect takes the picks: live asm-slider-simulation-connection.)
         let picked = new_mate.is_some_and(|d| (d.a.is_some() || d.b.is_some()) && !d.faces_active);
         if let Some(d) = new_mate {
-            items.push((d.id, row(&d.name, if d.a.is_some() && d.b.is_some() && !d.same_instance() { "ok" } else { "error" }, true, true, picked, !self.show_mates)));
+            let faces_missing = d.simulation_connection && d.simulation_faces.is_empty() && d.mate_type().has_simulation_connection();
+            items.push((d.id, row(&d.name, if d.a.is_some() && d.b.is_some() && !d.same_instance() && !faces_missing { "ok" } else { "error" }, true, true, picked, !self.show_mates)));
         }
         // A new relation, mate connector or group: its row while its dialog is open (live: selected, red until it has
         // what it needs; a group hidden as the mates are).
@@ -306,7 +307,17 @@ impl AssemblyView {
         }
         // The Group dialog's members are selected (live asm-group-two-instances).
         let group: &[InstanceId] = self.ui.group.as_ref().map_or(&[], |(_, ids)| ids.as_slice());
-        items.extend(asm.instances.iter().filter(|i| (self.selected.contains(&i.id) || group.contains(&i.id)) && !self.ui.entity_sel.iter().any(|(p, _)| p[0] == i.id)).map(|i| json!({ "kind": "INSTANCE", "owner": i.name })));
+        // A pattern's other field active: the selection is that field's pick, not the Instances (live
+        // asm-linear-pattern-commit: none once Direction is clicked, then its edge).
+        let pattern_field = self.pattern.as_ref().and_then(|p| p.active.map(|k| match k {
+            0 => p.axis.is_some(),
+            1 => p.axis2.is_some(),
+            _ => p.axis3.is_some(),
+        }));
+        if pattern_field == Some(true) {
+            items.push(json!({ "kind": null, "owner": null }));
+        }
+        items.extend(asm.instances.iter().filter(|i| pattern_field.is_none() && (self.selected.contains(&i.id) || group.contains(&i.id)) && !self.ui.entity_sel.iter().any(|(p, _)| p[0] == i.id)).map(|i| json!({ "kind": "INSTANCE", "owner": i.name })));
         // Origin of new Part Studio's pick is selected (live in-context-*: the Origin a FEATURE with its id).
         match self.ui.ps_in_context {
             Some(behaviors::PsOrigin::Origin) => items.push(json!({ "kind": "FEATURE", "owner": null, "id": "Origin" })),
