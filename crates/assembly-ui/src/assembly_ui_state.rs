@@ -433,7 +433,9 @@ impl AssemblyView {
         // unlabelled; asm-screw-relation-distance: "Distance per revolution").
         let focus = focus.or_else(|| {
             let title = dialog.as_ref().map(|d| d["title"].clone()).unwrap_or(Value::Null);
-            let mut f = if let Some(st) = self.mate.as_ref().and_then(|m| m.dialog.read(cx).focused_offset(cx)) {
+            // (A mate connector's Move boxes too: live asm-mate-connector-move-offset.)
+            let mc_box = self.mc.as_ref().and_then(|m| m.inputs.iter().find(|q| q.read(cx).is_focused()).map(|q| q.read(cx).state().clone()));
+            let mut f = if let Some(st) = self.mate.as_ref().and_then(|m| m.dialog.read(cx).focused_offset(cx)).or(mc_box) {
                 let mut f = input(None, &st);
                 f["label"] = Value::Null;
                 f
@@ -682,7 +684,8 @@ impl AssemblyView {
                     }
                 }
                 PatternDialogKind::Mirror => {
-                    fields.push(query("Mirror plane", axis(&s.axis, true), s.active == Some(0), false));
+                    // (Red once Instances is filled, as Direction: live asm-mirror-two-picks.)
+                    fields.push(query("Mirror plane", axis(&s.axis, true), s.active == Some(0), !s.seeds.is_empty() && s.axis.is_none()));
                     fields.push(other("Mirror strategy…"));
                 }
                 PatternDialogKind::PartPattern | PatternDialogKind::Replicate => {

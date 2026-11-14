@@ -695,6 +695,8 @@ impl AssemblyView {
                 if let Some(m) = &mut this.mc {
                     f(m, !on);
                 }
+                // The clicked checkbox keeps the keyboard (live asm-mate-connector-realign, -move-offset).
+                this.ui.checkbox_focus = Some(label);
                 this.update_capture(cx);
                 this.schedule_eval(window, cx);
                 cx.notify();
@@ -760,16 +762,17 @@ impl AssemblyView {
             .when(moving, |d| {
                 // Live (qa5/asm-043, MT8): X↘ Y↗ Z↑ axis icons, as the
                 // mate dialog's offsets.
-                let axis_row = |icon: &'static str, st: &Entity<crate::quantity_field::QuantityInput>, cx: &App| {
+                // (Each box unlabelled: the ui-parity runner finds it by its order, "field:#n", live asm-mate-connector-move-offset.)
+                let axis_row = |icon: &'static str, st: &Entity<crate::quantity_field::QuantityInput>, n: usize, cx: &App| {
                     h_flex()
                         .w(px(194.))
                         .h(px(29.))
                         .child(div().size(px(26.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(icon, 26., cx)))
-                        .child(div().w(px(168.)).h(px(26.)).child(st.clone()))
+                        .child(crate::ui_script::mark(div().w(px(168.)).h(px(26.)).child(st.clone()), move || format!("field:#{n}")))
                 };
-                d.child(cfg("mcd-cfg-x", axis_row("xyz-along-x", &s.inputs[0], cx).into_any_element(), cp::TRANSLATION[0], Some(s.inputs[0].read(cx).state().clone())))
-                    .child(cfg("mcd-cfg-y", axis_row("xyz-along-y", &s.inputs[1], cx).into_any_element(), cp::TRANSLATION[1], Some(s.inputs[1].read(cx).state().clone())))
-                    .child(cfg("mcd-cfg-z", axis_row("xyz-along-z", &s.inputs[2], cx).into_any_element(), cp::TRANSLATION[2], Some(s.inputs[2].read(cx).state().clone())))
+                d.child(cfg("mcd-cfg-x", axis_row("xyz-along-x", &s.inputs[0], 0, cx).into_any_element(), cp::TRANSLATION[0], Some(s.inputs[0].read(cx).state().clone())))
+                    .child(cfg("mcd-cfg-y", axis_row("xyz-along-y", &s.inputs[1], 1, cx).into_any_element(), cp::TRANSLATION[1], Some(s.inputs[1].read(cx).state().clone())))
+                    .child(cfg("mcd-cfg-z", axis_row("xyz-along-z", &s.inputs[2], 2, cx).into_any_element(), cp::TRANSLATION[2], Some(s.inputs[2].read(cx).state().clone())))
                     .child(cfg("mcd-cfg-axis", div().id("mcd-rot-axis-tt").w(px(194.)).h(px(28.)).tooltip(crate::ui::tooltip("Rotation axis")).child(s.axis_sel.clone()).into_any_element(), cp::ROTATION_AXIS, None))
                     .child(cfg("mcd-cfg-rot", value_row("Rotation angle", &s.inputs[3]).into_any_element(), cp::ROTATION, Some(s.inputs[3].read(cx).state().clone())))
             })
