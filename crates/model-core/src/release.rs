@@ -397,6 +397,22 @@ impl ReleaseLog {
     }
 
     /// The latest released revision of a part number.
+    /// An item's part number for its release history: its own, else the one it was last released with (a release
+    /// keeps its part numbers in its version, the workspace's part keeps none: live2 11_studios_abc).
+    pub fn released_part_number(&self, item: &ReleaseItem) -> String {
+        if !item.part_number.trim().is_empty() {
+            return item.part_number.clone();
+        }
+        self.packages
+            .iter()
+            .rev()
+            .filter(|p| p.kind == PackageKind::Release)
+            .flat_map(|p| p.items.iter())
+            .find(|i| i.tab == item.tab && i.part == item.part && i.document.is_none() && !i.part_number.is_empty())
+            .map(|i| i.part_number.clone())
+            .unwrap_or_default()
+    }
+
     pub fn latest_revision(&self, part_number: &str) -> Option<String> {
         self.revisions(part_number).last().map(|e| e.revision.clone())
     }

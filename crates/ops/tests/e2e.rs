@@ -7085,14 +7085,28 @@ fn release_parts_and_revision_history() {
     let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1", "notes": "first", "part_numbers": { "Part 1": "PRT-0001" } }));
     assert_eq!(r["items"][0]["revision"], "A", "{r}");
     assert_eq!(r["items"][0]["part_number"], "PRT-0001", "{r}");
+    // The release's part number, revision and state are the version's; the workspace keeps its own, empty (live2
+    // 11_studios_abc (c)).
     let parts = call(&mut ctx, "query_parts", json!({}));
-    assert_eq!(parts["parts"][0]["part_number"], "PRT-0001", "{parts}");
+    assert_eq!(parts["parts"][0]["part_number"].as_str().unwrap_or(""), "", "{parts}");
     let h = call(&mut ctx, "history_list", json!({ "limit": 3 }));
     assert!(h["versions"].as_array().unwrap().iter().any(|v| v["name"] == "R1"), "{h}");
-    // The part number stays; the next release is revision B.
-    let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R2" }));
+    call(&mut ctx, "history_view", json!({ "to": "R1" }));
+    let parts = call(&mut ctx, "query_parts", json!({}));
+    assert_eq!(parts["parts"][0]["part_number"], "PRT-0001", "{parts}");
+    // In the version: Description can be edited, Part number can't.
+    call(&mut ctx, "part_set_properties", json!({ "part": "Part 1", "description": "as released" }));
+    let e = try_call(&mut ctx, "part_set_properties", json!({ "part": "Part 1", "part_number": "X" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("part_number"));
+    call(&mut ctx, "history_view", json!({ "to": "workspace" }));
+    call(&mut ctx, "history_view", json!({ "to": "R1" }));
+    let parts = call(&mut ctx, "query_parts", json!({}));
+    assert_eq!((parts["parts"][0]["description"].as_str(), parts["parts"][0]["revision"].as_str(), parts["parts"][0]["state"].as_str()), (Some("as released"), Some("A"), Some("Released")), "the version keeps its edit: {parts}");
+    call(&mut ctx, "history_view", json!({ "to": "workspace" }));
+    // The next release names its part number again; it is revision B.
+    let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R2", "part_numbers": { "Part 1": "PRT-0001" } }));
     assert_eq!(r["items"][0]["revision"], "B", "{r}");
-    let e = try_call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R3", "revisions": { "Part 1": "A" } })).unwrap_err();
+    let e = try_call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R3", "revisions": { "Part 1": "A" }, "part_numbers": { "Part 1": "PRT-0001" } })).unwrap_err();
     assert!(e.message.contains("Part 1"), "a revision lower than the released B: {e:?}");
     let rh = call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0001" }));
     let revs = rh["revisions"].as_array().unwrap();
@@ -7207,7 +7221,8 @@ fn release_submit_approve_and_reject() {
     let rh = call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0100" }));
     assert_eq!(rh["revisions"][0]["revision"], "A", "{rh}");
     // A second candidate, rejected: it stays, Rejected, and can't be approved.
-    let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R2", "approvers": [me] }));
+    // (The released part number is R1's version's; the workspace's part has none: named again.)
+    let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R2", "part_numbers": { "Part 1": "PRT-0100" }, "approvers": [me] }));
     assert_eq!(r["state"], "Pending", "{r}");
     assert_eq!(call(&mut ctx, "release_reject", json!({ "name": "R2" }))["state"], "Rejected");
     let list = call(&mut ctx, "release_drafts", json!({}));
@@ -7223,7 +7238,7 @@ fn release_submit_approve_and_reject() {
     assert_eq!(list["candidates"][0]["comments"][0]["text"], "Wrong hole size.", "{list}");
     assert_eq!(try_call(&mut ctx, "release_discard", json!({ "name": "R2" })).unwrap_err().param.as_deref(), Some("name"));
     // Without approvers, Release releases at once.
-    let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R3" }));
+    let r = call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R3", "part_numbers": { "Part 1": "PRT-0100" } }));
     assert_eq!(r["state"], "Released", "{r}");
 }
 
@@ -7259,8 +7274,8 @@ fn release_leaves_out_a_drawing_made_from_another_workspace() {
     assert_eq!(r["drawings_left_out"].as_array().map(Vec::len), Some(1), "{r}");
 }
 
-/// A drawing's part number is its title block's (its Properties): the release candidate offers it, and the release
-/// writes its revision there (live: the title block reads DRW-1 / A once released).
+/// A drawing's part number is its title block's (its Properties): the release candidate offers it, and the released
+/// version's title block reads it with the revision, the releaser and the date (live2 11_studios_abc (b)).
 #[test]
 fn a_released_drawing_shows_its_number_and_revision() {
     let mut ctx = Ctx::new();
@@ -7273,8 +7288,14 @@ fn a_released_drawing_shows_its_number_and_revision() {
     let item = r["items"].as_array().unwrap().iter().find(|i| i["type"] == "Drawing").cloned().unwrap_or_default();
     assert_eq!(item["part_number"], "DRW-1", "the drawing's own number: {r}");
     call(&mut ctx, "release_create", json!({ "tab": drawing, "name": "R2", "notes": "first", "part_numbers": { "Part 1": "PRT-1" } }));
+    // Only in the released version (live2 11_studios_abc (b)): the workspace's drawing keeps its own.
+    let p = call(&mut ctx, "drawing_element_properties", json!({ "drawing": drawing }))["properties"].clone();
+    assert_eq!((p["part_number"].as_str(), p["revision"].as_str()), (Some("DRW-1"), Some("")), "{p}");
+    call(&mut ctx, "history_view", json!({ "to": "R2" }));
     let p = call(&mut ctx, "drawing_element_properties", json!({ "drawing": drawing }))["properties"].clone();
     assert_eq!((p["part_number"].as_str(), p["revision"].as_str()), (Some("DRW-1"), Some("A")), "{p}");
+    assert!(p["approver"].as_str().is_some_and(|a| !a.is_empty()) && p["approved"].is_string(), "the releaser and the date: {p}");
+    call(&mut ctx, "history_view", json!({ "to": "workspace" }));
 }
 
 /// qa DWG-DIM-TWO-EDGES: Line to line on two parallel view edges clicked at

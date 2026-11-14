@@ -790,8 +790,9 @@ fn since_release(doc: &DocModel, log: &ReleaseLog, item: &ReleaseItem) -> Option
     if item.document.is_some() {
         return None;
     }
-    let rev = log.latest_revision(&item.part_number)?;
-    let version = log.release_version_of(&item.part_number, &rev)?;
+    let pn = log.released_part_number(item);
+    let rev = log.latest_revision(&pn)?;
+    let version = log.release_version_of(&pn, &rev)?;
     let mv = doc.session.store.list_versions().ok()?.into_iter().find(|v| v.id.to_string() == version)?.microversion;
     // Both states loaded the same way (loading upgrades saved parameters,
     // so the in-memory document isn't comparable to a stored one).
@@ -1178,6 +1179,9 @@ impl ReleaseDialog {
         let log = release_log(self.doc.read(cx));
         let Some(r) = self.rows.get_mut(i) else { return };
         r.item.reverted = on;
+        if on {
+            r.item.part_number = log.released_part_number(&r.item);
+        }
         let rev = if on { log.latest_revision(&r.item.part_number).unwrap_or_default() } else { log.next_revision(&r.item.part_number) };
         r.revision.update(cx, |s, cx| s.set_value(rev, window, cx));
         r.revision_touched = false;
@@ -2645,9 +2649,11 @@ fn release_dialog_modal(dialog: gpui_kit::component::dialog::Dialog, view: &Enti
 
 /// Open "Create Release candidate" for items (parts list or versions panel).
 pub fn open_release_candidate(doc: Entity<DocModel>, items: Vec<ReleaseItem>, window: &mut Window, cx: &mut App) {
-    // The required Release name starts empty (Onshape fills it only with
-    // sequential release numbering set up).
-    open(doc, Mode::Release, items, String::new(), String::new(), window, cx);
+    // The required Release name starts empty (Onshape fills it only with sequential release numbering set up); in a
+    // version, it is the version's name (live2 11_studios_abc).
+    let session = &doc.read(cx).session;
+    let name = session.viewing.and_then(|mv| session.store.list_versions().ok()?.into_iter().find(|v| v.microversion == mv).map(|v| v.name)).unwrap_or_default();
+    open(doc, Mode::Release, items, name, String::new(), window, cx);
 }
 
 /// Review a recorded package.

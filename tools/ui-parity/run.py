@@ -86,6 +86,9 @@ def run_one(app, scenario, out, display, timeout):
         proc.kill()
         return "timed out"
     err = proc.stderr.read()
+    # NOSHAPE_UIP_LOGS=1: the app's own log (its UI-SCRIPT lines: where each step clicked) beside the recording.
+    if os.environ.get("NOSHAPE_UIP_LOGS"):
+        Path(str(out) + ".stderr").write_text(err)
     if not out.exists():
         lines = err.splitlines()
         # A panic first, with its message (the line after "panicked at"), then the steps that ran.
@@ -452,6 +455,17 @@ def cloud_menu(a, b):
     la, lb = (a or {}).get("list"), (b or {}).get("list")
     if isinstance(la, dict) and la.pop("moved", False) and isinstance(lb, dict):
         lb["highlighted"] = la.get("highlighted")
+
+
+def menu_badges(a, b):
+    """A menu row's badge (Releases ▸: "Released" on green) is read apart from its name, as `badges` (live2's recorder
+    from 2026-11-14 on; null for a row without one): compared only when live's take has them, all-null as none."""
+    la, lb = (a or {}).get("list"), (b or {}).get("list")
+    if not isinstance(la, dict) or not isinstance(lb, dict):
+        return
+    if not any(la.get("badges") or []):
+        la.pop("badges", None)
+        lb.pop("badges", None)
 
 
 # The scenarios' start documents (starts.json), read in main.
@@ -1010,6 +1024,7 @@ def compare(live, ours, whole_document=True):
         drawn_sizes(a, b)
         placed_alike(a, b)
         cloud_menu(a, b)
+        menu_badges(a, b)
         d = first_difference(a, b)
         if d is None:
             matched += 1

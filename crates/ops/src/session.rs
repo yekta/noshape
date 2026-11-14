@@ -660,6 +660,14 @@ impl Session {
         self.doc = doc;
         self.seen = at;
         self.viewing = mv;
+        self.apply_version_props();
+    }
+
+    /// A version shown with its own properties (`version_props`: a release's part numbers, edits made in it).
+    fn apply_version_props(&mut self) {
+        let Some(mv) = self.viewing else { return };
+        let props = crate::version_props::read(self, mv);
+        props.apply(&mut self.doc);
     }
 
     pub fn view_microversion(&mut self, mv: Option<MicroversionId>) -> Result<()> {
@@ -669,6 +677,7 @@ impl Session {
         };
         self.reload(target)?;
         self.viewing = mv;
+        self.apply_version_props();
         Ok(())
     }
 

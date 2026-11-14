@@ -8,6 +8,7 @@ use crate::session::Session;
 use noshape_model::configuration::ConfigValues;
 use noshape_model::document::{TabContent, TabId};
 use noshape_model::reference::BodyId;
+use noshape_model::partstudio::RELEASE_STATES;
 use noshape_model::release::{ItemKind, NumberingSchemes, Package, PackageKind, ReleaseItem, ReleaseLog};
 
 /// Store meta key of the document's release log.
@@ -257,13 +258,16 @@ pub fn release_description(pkg: &Package) -> String {
 /// after it; an obsoletion marks the version of the release it obsoletes.
 /// Returns the package as recorded (its version set).
 pub fn commit(session: &mut Session, pkg: Package) -> anyhow::Result<Package> {
-    let pkg = make_version(session, pkg)?;
+    let pkg = make_version(session, pkg, RELEASE_STATES[2])?;
     record_released(session, pkg)
 }
 
 /// Release from inside a version (its own Release…; live2 2026-11-14): the package is recorded at that version, no new
 /// version is made and nothing in the workspace changes.
 pub fn commit_at_version(session: &mut Session, mut pkg: Package, version: String) -> anyhow::Result<Package> {
+    if let Some(mv) = session.store.list_versions()?.into_iter().find(|x| x.id.to_string() == version).map(|x| x.microversion) {
+        write_release_props(session, mv, &pkg, RELEASE_STATES[2])?;
+    }
     pkg.version = Some(version);
     record_released(session, pkg)
 }
@@ -272,7 +276,7 @@ pub fn commit_at_version(session: &mut Session, mut pkg: Package, version: Strin
 /// object in it is from that version"): its part numbers written and its version made as a release's, then kept as
 /// Pending until its approver approves or rejects it.
 pub fn submit(session: &mut Session, pkg: Package) -> anyhow::Result<Package> {
-    let pkg = make_version(session, pkg)?;
+    let pkg = make_version(session, pkg, RELEASE_STATES[1])?;
     let mut log = release_log(session);
     log.submit(pkg.clone());
     save_log(session, &log)?;
@@ -285,6 +289,7 @@ pub fn approve(session: &mut Session, name: &str) -> anyhow::Result<Package> {
     let Some(mut pkg) = log.take_pending(name) else { anyhow::bail!("no pending release candidate `{name}`") };
     pkg.decided_by = Some(noshape_store::local_user_name());
     save_log(session, &log)?;
+    set_release_state(session, &pkg, RELEASE_STATES[2])?;
     record_released(session, pkg)
 }
 
@@ -321,7 +326,11 @@ pub fn reject(session: &mut Session, name: &str) -> anyhow::Result<()> {
     if !log.reject(name, &noshape_store::local_user_name()) {
         anyhow::bail!("no pending release candidate `{name}`");
     }
-    save_log(session, &log)
+    save_log(session, &log)?;
+    if let Some(pkg) = log.candidates.iter().rev().find(|c| c.name == name).cloned() {
+        set_release_state(session, &pkg, RELEASE_STATES[4])?;
+    }
+    Ok(())
 }
 
 /// Record a package whose version is made (a release, or an approved candidate).
@@ -335,70 +344,77 @@ fn record_released(session: &mut Session, pkg: Package) -> anyhow::Result<Packag
     Ok(pkg)
 }
 
-/// A package's part numbers written onto its items and its version made (an obsoletion: the version of the release it
-/// obsoletes).
-fn make_version(session: &mut Session, mut pkg: Package) -> anyhow::Result<Package> {
+/// A package's version made (an obsoletion: the version of the release it obsoletes), its items' part numbers,
+/// revisions and `state` written into that version's own properties: the workspace keeps its own (live2
+/// 11_studios_abc: the workspace's part number stays empty; the released drawing's title block shows DWG NO. and REV
+/// only in the released version).
+fn make_version(session: &mut Session, mut pkg: Package, state: &str) -> anyhow::Result<Package> {
     let kind = pkg.kind;
-    if kind == PackageKind::Release {
-        // Items linked from versions keep theirs (versions don't change).
-        let mut tabs: Vec<TabId> = pkg.items.iter().filter(|i| i.document.is_none()).map(|i| i.tab).collect();
-        tabs.dedup();
-        for tab in tabs {
-            let items: Vec<ReleaseItem> = pkg.items.iter().filter(|i| i.tab == tab && i.part.is_some() && i.document.is_none()).cloned().collect();
-            let changed = session.doc.tab(tab).is_some_and(|t| match &t.content {
-                TabContent::PartStudio(ps) => items.iter().any(|i| i.part.as_ref().and_then(|b| ps.part_properties.get(b)).and_then(|p| p.part_number.as_deref()) != Some(i.part_number.as_str())),
-                _ => false,
-            });
-            if changed {
-                session.edit_tab(tab, &release_description(&pkg), |c| {
-                    if let TabContent::PartStudio(ps) = c {
-                        for i in &items {
-                            if let Some(b) = &i.part {
-                                ps.part_properties.entry(b.clone()).or_default().part_number = Some(i.part_number.clone());
-                            }
-                        }
-                    }
-                })?;
-            }
-        }
-        // A drawing's title block shows its part number and revision (live: DRW-1 / A once released).
-        for i in pkg.items.iter().filter(|i| i.kind == ItemKind::Drawing && i.document.is_none()) {
-            let same = matches!(session.doc.tab(i.tab).map(|t| &t.content), Some(TabContent::Drawing(d)) if d.meta.number == i.part_number && d.meta.revision == i.revision);
-            if same {
-                continue;
-            }
-            let (pn, rev) = (i.part_number.clone(), i.revision.clone());
-            session.edit_tab(i.tab, &release_description(&pkg), |c| {
-                if let TabContent::Drawing(d) = c {
-                    (d.meta.number, d.meta.revision) = (pn, rev);
-                }
-            })?;
-        }
-        // Other tab items keep their part numbers: an Assembly in its
-        // Properties, other tabs in their metadata.
-        for i in pkg.items.iter().filter(|i| i.part.is_none() && i.document.is_none() && i.kind != ItemKind::Drawing) {
-            if tab_part_number(session, i.tab) == i.part_number {
-                continue;
-            }
-            let is_assembly = matches!(session.doc.tab(i.tab).map(|t| &t.content), Some(TabContent::Assembly(_)));
-            if is_assembly {
-                let pn = i.part_number.clone();
-                session.edit_tab(i.tab, &release_description(&pkg), |c| {
-                    if let TabContent::Assembly(a) = c {
-                        a.properties.part_number = Some(pn);
-                    }
-                })?;
-            } else {
-                session.store.set_meta(&format!("tab_part_number:{}", i.tab.0), Some(i.part_number.as_bytes()))?;
-            }
-        }
-    }
-    // An obsoletion marks the version of the release it obsoletes; a
-    // release creates a version named after it.
     let released_at = (kind == PackageKind::Obsoletion).then(|| release_log(session)).and_then(|log| pkg.items.iter().find_map(|i| log.release_version_of(&i.part_number, &i.revision)));
     pkg.version = Some(match released_at {
         Some(v) => v,
-        None => session.create_version(&pkg.name, &pkg.notes)?.to_string(),
+        None => {
+            let v = session.create_version(&pkg.name, &pkg.notes)?;
+            if kind == PackageKind::Release {
+                let mv = session.store.version(v)?.microversion;
+                write_release_props(session, mv, &pkg, state)?;
+            }
+            v.to_string()
+        }
     });
     Ok(pkg)
+}
+
+/// The release's values on its items in version state `mv`: part number, revision and `state`; a drawing's releaser
+/// and date as its approver (live2 (b): the APPROVED row shows them without an approver).
+fn write_release_props(session: &mut Session, mv: noshape_store::MicroversionId, pkg: &Package, state: &str) -> anyhow::Result<()> {
+    let mut props = crate::version_props::read(session, mv);
+    let releaser = noshape_store::local_user_name();
+    for i in pkg.items.iter().filter(|i| i.document.is_none()) {
+        let revision = (!i.not_revision_managed && !i.revision.is_empty()).then(|| i.revision.clone());
+        match session.doc.tab(i.tab).map(|t| &t.content) {
+            Some(TabContent::PartStudio(ps)) => {
+                let Some(b) = &i.part else { continue };
+                let mut p = ps.part_properties.get(b).cloned().unwrap_or_default();
+                p.part_number = Some(i.part_number.clone()).filter(|n| !n.is_empty());
+                p.revision = revision;
+                p.meta.state = Some(state.to_string());
+                props.set_part(i.tab, b.clone(), p);
+            }
+            Some(TabContent::Assembly(a)) => {
+                let mut p = (*a.properties).clone();
+                p.part_number = Some(i.part_number.clone()).filter(|n| !n.is_empty());
+                p.revision = revision;
+                p.meta.state = Some(state.to_string());
+                props.set_assembly(i.tab, p);
+            }
+            Some(TabContent::Drawing(d)) => {
+                let mut m = (*d.meta).clone();
+                (m.number, m.revision) = (i.part_number.clone(), revision.unwrap_or_default());
+                m.item.state = Some(state.to_string());
+                (m.approver, m.approved) = (releaser.clone(), Some(noshape_model::drawing::format::today()));
+                props.set_drawing(i.tab, m);
+            }
+            // (A Variable Studio's or a file's part number is the tab's own, kept in the document's metadata.)
+            _ => session.store.set_meta(&format!("tab_part_number:{}", i.tab.0), Some(i.part_number.as_bytes()))?,
+        }
+    }
+    crate::version_props::write(session, mv, &props)
+}
+
+/// A candidate's items in its version change state (approved: Released; rejected: Rejected).
+fn set_release_state(session: &mut Session, pkg: &Package, state: &str) -> anyhow::Result<()> {
+    let Some(v) = pkg.version.as_deref() else { return Ok(()) };
+    let Some(mv) = session.store.list_versions()?.into_iter().find(|x| x.id.to_string() == v).map(|x| x.microversion) else { return Ok(()) };
+    let mut props = crate::version_props::read(session, mv);
+    for p in &mut props.parts {
+        p.props.meta.state = Some(state.to_string());
+    }
+    for (_, a) in &mut props.assemblies {
+        a.meta.state = Some(state.to_string());
+    }
+    for (_, d) in &mut props.drawings {
+        d.item.state = Some(state.to_string());
+    }
+    crate::version_props::write(session, mv, &props)
 }

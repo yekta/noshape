@@ -844,6 +844,31 @@ impl PartStudioView {
                 }
             }
         }
+        // In a version: its own properties, live's locked fields greyed, no Reset all (live2 11_studios_abc (c)).
+        if self.doc.read(cx).session.viewing.is_some() {
+            let (doc, body) = (self.doc.clone(), body.clone());
+            crate::properties_dialog::open_properties_read_only(
+                spec,
+                vec!["Name", "Part number", "Revision", "State", "Not revision managed", "Override"],
+                move |v, _, cx| {
+                    let values = noshape_ops::studio::PartPropertyValues {
+                        name: v.name.clone(),
+                        description: v.description.clone(),
+                        part_number: v.part_number.clone(),
+                        revision: v.revision.clone(),
+                        meta: v.meta.clone(),
+                        mass_override: v.mass_override.as_deref().and_then(crate::properties_dialog::parse_mass),
+                    };
+                    doc.update(cx, |d, cx| match noshape_ops::version_props::set_part_values(&mut d.session, tab, &body, &values) {
+                        Ok(()) => d.reloaded(cx),
+                        Err(e) => cx.emit(crate::doc_model::DocEvent::Error(format!("{e:#}"))),
+                    });
+                },
+                window,
+                cx,
+            );
+            return;
+        }
         let kept = configured.clone();
         crate::properties_dialog::open_part_properties_configured(
             spec,

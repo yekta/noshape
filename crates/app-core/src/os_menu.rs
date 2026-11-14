@@ -70,7 +70,7 @@ pub enum MenuIcon {
 
 /// One row of an [`OsMenu`].
 pub enum OsMenuItem {
-    Item { label: SharedString, icon: Option<MenuIcon>, checked: bool, disabled: bool, handler: Option<Handler>, keys: Vec<SharedString>, user: bool, note: Option<SharedString> },
+    Item { label: SharedString, icon: Option<MenuIcon>, checked: bool, disabled: bool, handler: Option<Handler>, keys: Vec<SharedString>, user: bool, note: Option<SharedString>, badge: Option<(SharedString, u32)> },
     Separator,
     /// `disabled`: an empty submenu, greyed and never opened (live's greyed
     /// "Merge ▸" for one table cell).
@@ -79,7 +79,7 @@ pub enum OsMenuItem {
 
 impl OsMenuItem {
     pub fn new(label: impl Into<SharedString>) -> Self {
-        Self::Item { label: label.into(), icon: None, checked: false, disabled: false, handler: None, keys: Vec::new(), user: false, note: None }
+        Self::Item { label: label.into(), icon: None, checked: false, disabled: false, handler: None, keys: Vec::new(), user: false, note: None, badge: None }
     }
 
     /// A grey italic note after the label (live's contexts list: "Context 1" then its assembly's name); not part of
@@ -87,6 +87,15 @@ impl OsMenuItem {
     pub fn note(mut self, text: impl Into<SharedString>) -> Self {
         if let Self::Item { note, .. } = &mut self {
             *note = Some(text.into());
+        }
+        self
+    }
+
+    /// A coloured badge after the label, white text (live's Releases ▸ rows: "R1" then "Rejected" on red); not part of
+    /// the row's name (the list's state reads it apart: `badges`).
+    pub fn badge(mut self, text: impl Into<SharedString>, rgb: u32) -> Self {
+        if let Self::Item { badge, .. } = &mut self {
+            *badge = Some((text.into(), rgb));
         }
         self
     }
@@ -716,7 +725,7 @@ impl Render for OsMenu {
                 match item {
                     // Bootstrap dropdown dividers have 7 px margins.
                     OsMenuItem::Separator => div().h(px(1.)).w_full().when(dropdown, |d| d.my(px(7.))).when(sep_margin > 0., |d| d.my(px(sep_margin))).bg(gpui_kit::rgb(0xdddddd)).into_any_element(),
-                    OsMenuItem::Item { label, icon, checked, disabled, keys, user, note, .. } => self
+                    OsMenuItem::Item { label, icon, checked, disabled, keys, user, note, badge, .. } => self
                         .tips
                         .get(&ix)
                         .cloned()
@@ -737,6 +746,7 @@ impl Render for OsMenu {
                         // stays on one line, cut with "…"; fixed labels wrap.
                         .child(div().when(wraps || truncate, |d| d.flex_1().min_w_0()).when(wraps && (*user || crate::i18n::names_an_entity(label)), |d| d.truncate()).child(label_el(label, *user)))
                         .when_some(note.clone(), |d, n| d.child(div().ml(px(6.)).italic().text_color(gpui_kit::rgb(0x999999)).child(crate::ui::user_text(n))))
+                        .when_some(badge.clone(), |d, (b, c)| d.child(div().ml(px(4.)).px(px(3.)).h(px(16.)).flex().items_center().rounded(px(2.)).bg(gpui_kit::rgb(c)).text_size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)).child(b)))
                         .when(!keys.is_empty(), |d| {
                             let chip = |k: &SharedString| div().px(px(3.)).h(px(18.)).flex().items_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0x333333)).text_size(px(12.)).text_color(pal.text).child(k.clone());
                             d.child(div().flex_1().min_w(px(16.))).child(h_flex().gap(px(2.)).children(keys.iter().map(chip)))
@@ -957,10 +967,18 @@ fn state_of(menu: &Entity<OsMenu>, in_camera: bool, cx: &App) -> Option<serde_js
     }
     let mut rows = Vec::new();
     let (mut highlighted, mut disabled, mut flags, mut checks) = (None, Vec::new(), Vec::new(), Vec::new());
+    // A row's badge apart from its name (live2's recorder: a row's first line is its name, `badges` the rest).
+    let mut badges: Vec<Option<String>> = Vec::new();
     for (ix, item) in m.items.iter().enumerate() {
         let (label, off, on) = match item {
-            OsMenuItem::Item { label, disabled, checked, .. } => (label.split('\t').next().unwrap_or_default().to_string(), *disabled, *checked),
-            OsMenuItem::Submenu { label, disabled, .. } => (label.split('\t').next().unwrap_or_default().to_string(), *disabled, false),
+            OsMenuItem::Item { label, disabled, checked, badge, .. } => {
+                badges.push(badge.as_ref().map(|(b, _)| b.to_string()));
+                (label.split('\t').next().unwrap_or_default().to_string(), *disabled, *checked)
+            }
+            OsMenuItem::Submenu { label, disabled, .. } => {
+                badges.push(None);
+                (label.split('\t').next().unwrap_or_default().to_string(), *disabled, false)
+            }
             OsMenuItem::Separator => continue,
         };
         checks.push(on);
@@ -985,7 +1003,11 @@ fn state_of(menu: &Entity<OsMenu>, in_camera: bool, cx: &App) -> Option<serde_js
     if m.page || m.active_checked {
         highlighted = checks.iter().position(|c| *c);
     }
-    Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": highlighted, "disabled": disabled }))
+    let mut state = serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": highlighted, "disabled": disabled });
+    if badges.iter().any(Option::is_some) {
+        state["badges"] = serde_json::json!(badges);
+    }
+    Some(state)
 }
 
 /// Make `menu` a page's dropdown (see `OsMenu::page`), before it opens.

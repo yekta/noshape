@@ -62,6 +62,7 @@ pub mod tool_search;
 pub mod ui_parity;
 pub mod values;
 pub mod variable_studio;
+pub mod version_props;
 pub mod versions;
 pub mod vs_config;
 pub mod window;

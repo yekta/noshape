@@ -204,6 +204,11 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 if let Some(n) = &p.part_number {
                     v["part_number"] = json!(n);
                 }
+                for (k, x) in [("revision", &p.revision), ("description", &p.description), ("state", &p.meta.state)] {
+                    if let Some(x) = x {
+                        v[k] = json!(x);
+                    }
+                }
             }
             v
         })

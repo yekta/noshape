@@ -15,7 +15,7 @@ pub fn ops() -> Vec<Op> {
             group: "release",
             verb: "create",
             summary: "Release a tab or parts: part numbers, revisions, a version named after the release",
-            description: "Release… (a tab's menu, or a part's; only with Company settings' managed workflows on, see company_release_settings): the Release candidate dialog with its items, then Release. Items as the dialog lists them: a Part Studio's parts (or `parts` only), an Assembly with its Bill of Materials, a Drawing with what its views show, a Variable Studio or file itself; `include_drawings` adds the drawings showing them. Each item's part number is its own (Properties) unless `part_numbers` gives one ({item name or part id: number}); its revision is the next of the revision scheme (A, B, …; `revisions` overrides, {item name or part id: revision}). The dialog's checks refuse it with their messages (a part number missing, a revision too low, Company settings' release conditions). Releasing writes the part numbers onto the parts (\"Release <name>\"), records the release at a new version named `name`; with Company settings' automatic obsoletion on, a new revision obsoletes the part number's previous one.",
+            description: "Release… (a tab's menu, or a part's; only with Company settings' managed workflows on, see company_release_settings): the Release candidate dialog with its items, then Release. Items as the dialog lists them: a Part Studio's parts (or `parts` only), an Assembly with its Bill of Materials, a Drawing with what its views show, a Variable Studio or file itself; `include_drawings` adds the drawings showing them. Each item's part number is its own (Properties) unless `part_numbers` gives one ({item name or part id: number}); its revision is the next of the revision scheme (A, B, …; `revisions` overrides, {item name or part id: revision}). The dialog's checks refuse it with their messages (a part number missing, a revision too low, Company settings' release conditions). Releasing records the release at a new version named `name` with the items' part numbers, revisions and state Released as that version's properties (the workspace keeps its own: history_view the version to see them); with Company settings' automatic obsoletion on, a new revision obsoletes the part number's previous one.",
             fields: vec![
                 doc_field(),
                 opt("tab", s(), "The tab to release (name or id). Required unless `from_draft` gives the items."),
@@ -256,6 +256,7 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     for (i, v) in a.opt_array("revert")?.into_iter().flatten().enumerate() {
         let k = v.as_str().unwrap_or_default();
         let it = items.iter_mut().find(|it| it.part.as_ref().is_some_and(|b| crate::refs::body_id(b) == k) || it.name == k).ok_or_else(|| OpError::param(&format!("revert[{i}]"), &format!("no item `{k}`")))?;
+        it.part_number = log.released_part_number(it);
         let Some(rev) = log.latest_revision(&it.part_number) else { return Err(OpError::param(&format!("revert[{i}]"), &format!("`{k}` has no released revision"))) };
         it.reverted = true;
         it.revision = rev;

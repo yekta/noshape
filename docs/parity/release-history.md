@@ -8,7 +8,7 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
   constraint, live's start has one "Add feature" per feature), ver-linked-selective-update (live's take missed the
   checkbox; re-recorded 11-14).
 - **Release management**: live's account is on Professional since 2026-11-14 (before, Release… opened only the upsell).
-  The live matrix below is live2's capture (25 rows: = 23, ? 2); the help matrix keeps the rows live hasn't shown yet
+  The live matrix below is live2's capture (25 rows: = 25); the help matrix keeps the rows live hasn't shown yet
   (138: = 110, 17 settled by the live matrix, ≠ 0, missing 2, ? 1, cloud 8).
 
 ## Live (Professional company, live2 2026-11-14: live/feel/release.json, feel/release/*.png)
@@ -30,7 +30,7 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
 | Release | toast "Your action on <name> is being processed." | the same toast (DocEvent::Info) | – | = |
 | Submit | toast "… View the status of Releases in Action items." | the same toast | – | = |
 | Version graph | released ▲; Pending and Rejected open △ | the same | model-core pending_and_rejected_candidates_mark_their_version | = |
-| Versions row Releases ▸ | only on a version with candidates; state badges Pending #769fcc, Rejected #bd3039 | only with candidates; badge colours not compared | ui-parity ver-vrow-releases (re-recorded) | ? |
+| Versions row Releases ▸ | every candidate at the version, oldest first, each with its state badge (Rejected #bd3039, Released #35bc35, Pending #769fcc; live2 11_studios_abc) | the same; the badge apart from the row's name (`badges`) | ui-parity ver-vrow-releases | = |
 | Review (approver) | Comment * required, Apply, Release, Reject ▴ (Reject / Discard), Close; Reject as creator confirms "Reject and override other approvers" | the same: Comment * with (comment history), Apply, Release, Reject ▴ (Reject / Discard), the creator's override confirm | – | = |
 | Released review | no Release name field, notes read-only, Comment (comment history); Apply greyed, Clone (blue, "Recreate Release from the current workspace"), Close | the same | – | = |
 | Drafts | Release drafts panel (thumbnail, name, "by <user> <time>", "Double click to open a draft") | the same | – | = |
@@ -40,8 +40,8 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
 | Admin without required approvers | Release stays on; confirm "Release and override company policy" | the same | – | = |
 | Barred creator | not offered as approver; no asterisk | the same | – | = |
 | Assembly release | the assembly, its parts once (mirror adds none), linked parts In progress without fields ("Document is not owned by your company"), no standard content | the assembly and its parts once; no standard content or mirror items; linked parts left out (company ownership: none offline) | – | = (ownership: cloud) |
-| Drawing pending update | red band "Drawing has a pending update" blocks; after Update it releases, title block DRW-1 / A, tab menu Revision history… | the band (red with the condition on, yellow off: `RC` held); the release writes the drawing's number and revision into its title block; tab menu Revision history… | ops a_released_drawing_shows_its_number_and_revision | = |
-| Locking | released version: Name, Category, Part number, Revision, State, Material locked; workspace part keeps Part number editable | workspace: editable; a version: every field read-only (a version's document is read-only) | – | ? (live2: are a released version's other fields editable) |
+| Drawing pending update | red band "Drawing has a pending update" blocks; after Update it releases; the released version's title block DWG NO. / REV / APPROVED (the releaser and date, with no approver), the workspace's "----" / "-" / "--"; tab menu Revision history… | the band (red with the condition on, yellow off: `RC` held); the release's values are the version's own properties (`version_props`), the workspace keeps its own | ops a_released_drawing_shows_its_number_and_revision | = |
+| Locking | a version (released or not): Name, Category, Part number, Revision, State, Material, Not revision managed, Mass override greyed; Description, Vendor, Project, Product line, Titles, Exclude from all BOMs, Unit of measure editable and saved with the version, no Reset all; the workspace's Part number and Revision stay empty and editable (not written back) | the same for parts (`version_props`; ops part_set_properties in a version); a drawing's and an assembly's Properties in a version still read-only | ops release_parts_and_revision_history | = (parts) |
 
 ## Help (rows live hasn't shown yet; until 2026-11-14 all came from here)
 

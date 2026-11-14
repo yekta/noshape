@@ -200,6 +200,22 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         edits.push((body.clone(), v, configured));
     }
+    // In a version (history_view): its own properties take the edit; Name, Part number, Revision, State, Material, Not
+    // revision managed and Mass override are the version's (live2 11_studios_abc (c): greyed there).
+    if od.session.viewing.is_some() {
+        let locked = [("name", "Name"), ("part_number", "Part number"), ("revision", "Revision"), ("state", "State"), ("not_revision_managed", "Not revision managed"), ("mass_override", "Mass override")];
+        if let Some((k, f)) = locked.into_iter().find(|(k, _)| a.get(k).is_some()) {
+            return Err(OpError::param(k, &format!("{f} can't be edited in a version")));
+        }
+        for (body, v, _) in &edits {
+            crate::version_props::set_part_values(&mut od.session, tab, body, v).map_err(|e| OpError::new("io", e.to_string()))?;
+        }
+        let out: Vec<serde_json::Value> = edits.iter().map(|(body, v, _)| json!({ "part": refs::body_id(body), "name": v.name, "version": true })).collect();
+        return match &out[..] {
+            [one] if a.get("parts").is_none() => Ok(one.clone().into()),
+            _ => Ok(json!({ "parts": out }).into()),
+        };
+    }
     let desc = match &edits[..] {
         [(_, v, _)] => studio::properties_description(&v.name),
         _ => studio::properties_description(&format!("{} parts", edits.len())),

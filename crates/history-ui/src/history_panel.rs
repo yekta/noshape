@@ -1150,10 +1150,24 @@ impl Render for HistoryPanel {
         let releases = self.releases.get_or_insert_with(|| crate::release_dialog::release_log(self.doc.read(cx))).clone();
         let mut packages_at: HashMap<MicroversionId, Vec<noshape_model::release::Package>> = HashMap::new();
         let mut candidates_at: HashSet<MicroversionId> = HashSet::new();
+        // The Releases ▸ rows: every candidate made at the version, released, pending or rejected, oldest first
+        // (live2 11_studios_abc).
+        let mut listed_at: HashMap<MicroversionId, Vec<noshape_model::release::Package>> = HashMap::new();
         for v in &graph.versions {
             let id = v.id.to_string();
             for pkg in releases.at_version(&id) {
                 packages_at.entry(v.microversion).or_default().push(pkg.clone());
+            }
+            let mut listed: Vec<noshape_model::release::Package> = releases
+                .packages
+                .iter()
+                .chain(releases.candidates.iter().filter(|c| matches!(c.state, Some(noshape_model::release::CandidateState::Pending | noshape_model::release::CandidateState::Rejected))))
+                .filter(|p| p.version.as_deref() == Some(id.as_str()) && p.kind == noshape_model::release::PackageKind::Release)
+                .cloned()
+                .collect();
+            listed.sort_by_key(|p| (p.created, p.id));
+            if !listed.is_empty() {
+                listed_at.insert(v.microversion, listed);
             }
             if releases.candidate_at_version(&id) {
                 candidates_at.insert(v.microversion);
@@ -1394,7 +1408,7 @@ impl Render for HistoryPanel {
                 }
             });
             let (v, d, cur) = (view.clone(), doc.clone(), current_name.clone());
-            let row_packages = if r.kind == RowKind::Version { packages_at.get(&mv).cloned().unwrap_or_default() } else { Vec::new() };
+            let row_packages = if r.kind == RowKind::Version { listed_at.get(&mv).cloned().unwrap_or_default() } else { Vec::new() };
             let row = if pl.change {
                 h_flex()
                     .id(SharedString::from(format!("hist-{}", r.key)))
@@ -1509,8 +1523,13 @@ impl Render for HistoryPanel {
                     m.submenu("Releases", window, cx, move |mut sm, _, _| {
                         for p in pk.clone() {
                             let dr = dr.clone();
-                            // Live (ver-vrow-releases): a released package by its name (badges only on Pending / Rejected).
-                            sm = sm.item(crate::os_menu::OsMenuItem::new(p.name.clone()).on_click(move |_, window, cx| crate::release_dialog::open_review(dr.clone(), &p, window, cx)));
+                            // Live (live2 11_studios_abc): the name, then its state's badge, white on the state's colour.
+                            let (badge, rgb) = match p.state {
+                                Some(noshape_model::release::CandidateState::Pending) => ("Pending", 0x769fcc),
+                                Some(noshape_model::release::CandidateState::Rejected) => ("Rejected", 0xbd3039),
+                                _ => ("Released", 0x35bc35),
+                            };
+                            sm = sm.item(crate::os_menu::OsMenuItem::new(p.name.clone()).user().badge(badge, rgb).on_click(move |_, window, cx| crate::release_dialog::open_review(dr.clone(), &p, window, cx)));
                         }
                         sm
                     })

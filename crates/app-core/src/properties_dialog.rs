@@ -1073,7 +1073,7 @@ impl Render for MetaForm {
                 // by hand (live2 part-properties-workflows-off).
                 .child(group(
                     label("State", true),
-                    if managed {
+                    if managed || self.read_only.contains(&"State") {
                         gray_box(RELEASE_STATES[state_ix].to_string(), true).into_any_element()
                     } else {
                         let v = view.clone();

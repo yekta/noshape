@@ -200,7 +200,7 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
                     hover_after_menu(window);
                 });
                 let icon = icon.map(|n| crate::os_menu::MenuIcon::Named(SharedString::from(n)));
-                menu = menu.item(crate::os_menu::OsMenuItem::Item { label: label.clone(), icon, checked: *checked, disabled: *disabled, handler: Some(handler), keys: Vec::new(), user: false, note: None });
+                menu = menu.item(crate::os_menu::OsMenuItem::Item { label: label.clone(), icon, checked: *checked, disabled: *disabled, handler: Some(handler), keys: Vec::new(), user: false, note: None, badge: None });
             }
             MenuEntry::Separator => menu = menu.separator(),
             MenuEntry::Submenu(label, children) => {

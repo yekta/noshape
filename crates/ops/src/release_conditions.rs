@@ -40,7 +40,8 @@ pub fn condition_issues(session: &Session, items: &[ReleaseItem]) -> Vec<Vec<Iss
             // A condition live shows either way: red and blocking when on, a yellow notice when off.
             let held = |v: &mut Vec<Issue>, on: bool, text: &str| v.push(if on { Issue::Prevented(text.into()) } else { Issue::Notice(text.into()) });
             if !it.part_number.is_empty() && pending.contains(&it.part_number) {
-                prevented(&mut v, "The part number is included in another pending Release candidate.");
+                // Live2 11_studios_abc: "Part number(s): PRT-001 included in another pending Release candidate. View release".
+                prevented(&mut v, &format!("Part number(s): {} included in another pending Release candidate.", it.part_number));
             }
             match session.doc.tab(it.tab).map(|t| &t.content) {
                 Some(TabContent::PartStudio(ps)) => {
