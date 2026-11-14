@@ -13,7 +13,11 @@
     into "conflicting constraints" (48 -> 46/53): not landed. Next: why fan-blade's Sketch 5 conflicts with the line.
   - c2-impeller-loft's Sketch Bohrung Flansch (2.6 mm): not the solver. Its external KmZB / KmZD resolve to other edges
     (ours a 67.6 mm spline at x = 0 and a full R29.5 circle; live a 52.7 mm edge at x = −44 and a 33.2 mm arc): the
-    impeller's geometry differs from feature 12 on (core's).
+    impeller's geometry differs from feature 12 on (core's). Live (behaviours "skasm (11-14) point on a spline past
+    its end"): no spline extension and no µm tolerance for a point Coincident with a fixed spline (it fails), so our
+    clamp to the spline's range is right.
+- Jog at its reduced angle: live's capture (behaviours "skasm (11-14) reduced-angle jog flat") matches ours: flat
+  100 × 40 mm, 4000 mm², part 8014.3306 mm³ (features_c::jog_preserve_material_off_and_errors checks them).
 - Knife: its first difference (feature 24) is Curve pattern 1's 3 B-spline edges in live vs 3 lines in ours, not a
   sketch; for core.
 
