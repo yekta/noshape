@@ -1585,6 +1585,16 @@ impl ReleaseDialog {
 /// Items table columns (Help image savedraftbutton-relcandidatedialog,
 /// scaled to the 820 px dialog) and its grid lines.
 const COL_ITEM: f32 = 270.;
+
+thread_local! {
+    /// The item column's width: [`COL_ITEM`] until its splitter is dragged (live release.json 1_resize: ew-resize
+    /// between the items pane and the columns).
+    static RC_ITEM_W: std::cell::Cell<f32> = const { std::cell::Cell::new(COL_ITEM) };
+}
+
+fn col_item() -> f32 {
+    RC_ITEM_W.with(|c| c.get())
+}
 const COL_REVISION: f32 = 140.;
 const COL_STATE: f32 = 140.;
 const COL_PART_NUMBER: f32 = 150.;
@@ -1666,7 +1676,7 @@ impl Render for ReleaseDialog {
             .text_color(pal.text)
             .child(
                 h_flex()
-                    .w(px(COL_ITEM))
+                    .w(px(col_item()))
                     .flex_none()
                     .h_full()
                     .px(px(6.))
@@ -1909,7 +1919,7 @@ impl Render for ReleaseDialog {
                 .child(
                     h_flex()
                         .relative()
-                        .w(px(COL_ITEM))
+                        .w(px(col_item()))
                         .flex_none()
                         .h_full()
                         .pl(px(20.))
@@ -2018,7 +2028,7 @@ impl Render for ReleaseDialog {
                         }),
                 );
             // Live (release.json): a band under the row, Bootstrap's alert-warning / -danger / -info colours.
-            let note = |text: SharedString, (bg, fg): (u32, u32)| div().ml(px(COL_ITEM)).mr(px(8.)).mb(px(4.)).px(px(10.)).py(px(6.)).rounded(px(3.)).bg(gpui_kit::rgb(bg)).text_size(px(12.)).text_color(gpui_kit::rgb(fg)).child(text).into_any_element();
+            let note = |text: SharedString, (bg, fg): (u32, u32)| div().ml(px(col_item())).mr(px(8.)).mb(px(4.)).px(px(10.)).py(px(6.)).rounded(px(3.)).bg(gpui_kit::rgb(bg)).text_size(px(12.)).text_color(gpui_kit::rgb(fg)).child(text).into_any_element();
             rows_el.push(
                 v_flex()
                     .child(main)
@@ -2047,7 +2057,16 @@ impl Render for ReleaseDialog {
             .relative()
             .h(px(RC_SIZE.with(|c| c.get()).1))
             .flex_none()
-            .child(div().absolute().top_0().bottom_0().left(px(COL_ITEM)).w(px(1.)).bg(gpui_kit::rgb(GRID)))
+            .child(div().absolute().top_0().bottom_0().left(px(col_item())).w(px(1.)).bg(gpui_kit::rgb(GRID)))
+            .child(div().id("rel-col-split").absolute().top_0().bottom_0().left(px(col_item() - 3.)).w(px(6.)).cursor(CursorStyle::ResizeLeftRight).on_drag(RcResize::Column, |d, _, _, cx| cx.new(|_| *d)).on_drag_move(|e: &DragMoveEvent<RcResize>, window, cx| {
+                if *e.drag(cx) == RcResize::Column {
+                    let w = (col_item() + f32::from(e.event.position.x - e.bounds.center().x)).round().clamp(160., 520.);
+                    if w != col_item() {
+                        RC_ITEM_W.with(|c| c.set(w));
+                        window.refresh();
+                    }
+                }
+            }))
             .child(v_flex().id("rel-items").size_full().overflow_y_scroll().children(rows_el))
             .child(
                 div().id("rel-split").absolute().left_0().right_0().bottom(px(-3.)).h(px(6.)).cursor(CursorStyle::ResizeUpDown).on_drag(RcResize::Split, |d, _, _, cx| cx.new(|_| *d)).on_drag_move(|e: &DragMoveEvent<RcResize>, window, cx| {
@@ -2553,6 +2572,7 @@ enum RcResize {
     Height,
     Corner,
     Split,
+    Column,
 }
 
 impl Render for RcResize {

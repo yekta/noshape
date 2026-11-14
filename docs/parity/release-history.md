@@ -9,7 +9,7 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
   checkbox; re-recorded 11-14).
 - **Release management**: live's account is on Professional since 2026-11-14 (before, Release… opened only the upsell).
   The live matrix below is live2's capture (25 rows: = 21, ? 4); the help matrix keeps the rows live hasn't shown yet
-  (138: = 107, 17 settled by the live matrix, ≠ 3, missing 2, ? 2, cloud 7).
+  (138: = 108, 17 settled by the live matrix, ≠ 2, missing 2, ? 2, cloud 7).
   Rows: 138; = 97, ≠ 20, missing 9, ? 6, cloud 6 (left out: other users, notifications).
 
 ## Live (Professional company, live2 2026-11-14: live/feel/release.json, feel/release/*.png)
@@ -60,7 +60,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Refresh button left of title, creator only, while creating | "Refresh button to the left of the dialog title… only when creating" (TRW) | RD:2220 (Mode::Release only); tooltip "Refresh" (BUNDLE "Refresh Release candidate") | – | = (tooltip text ≠) |
 | ⋯ overflow at top right | image drawing-release-dialog-02; "View audit log", "View workflow" (CW) | RD:1655-1710 | – | = |
 | Header "Comments" button | not in the creator's or reviewer's dialog images (drawing-release-dialog-02, reviewreleasedialog) | RD:2226 (always shown) | – | see the live matrix |
-| Dialog and sections resizable | "You can resize this dialog and its sections by clicking and dragging an edge or corner" (TRW) | the right edge / corner resize (re-centred), the bottom edge and a list / form splitter (`RC_SIZE`); no vertical splitter yet | – | ≠ (vertical splitter) |
+| Dialog and sections resizable | "You can resize this dialog and its sections by clicking and dragging an edge or corner" (TRW) | the right edge / corner (re-centred), the bottom edge, the list / form splitter and the items / columns splitter (`RC_SIZE`, `RC_ITEM_W`) | – | = (live 11-14) |
 | Yellow triangle on new/modified fields | "New or modified fields are marked with a yellow triangle in the upper left corner" (TRW) | RD:1794, RD:1821 | – | = |
 | Undo / Redo buttons + OS hot keys | "use the Undo and Redo buttons or your operating system hot keys" (TRW); image: ↶ ↷ at bottom left | RD:2062-2063, keys RD:2202-2211 | – | = |
 | Item row: thumbnail, type icon + name, italic type, red × | image drawing-release-dialog-02 | the same ("Remove from release") | – | = |
