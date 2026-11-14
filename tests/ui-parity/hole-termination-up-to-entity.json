@@ -1,0 +1,38 @@
+{
+ "name": "hole-termination-up-to-entity",
+ "about": "hole-sketch: Hole, Termination Blind → Up to entity, Escape (Escape keeps the account's remembered Hole)",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "hole-sketch",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Blind",
+    "pick": "Up to entity"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

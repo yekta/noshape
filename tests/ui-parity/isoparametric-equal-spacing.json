@@ -1,0 +1,52 @@
+{
+ "name": "isoparametric-equal-spacing",
+ "about": "pin: Isoparametric curve on the pin's side face, Equal spacing on, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "pin",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Helix",
+    "menu": "Isoparametric curve"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     3,
+     -4,
+     15
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Equal spacing"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

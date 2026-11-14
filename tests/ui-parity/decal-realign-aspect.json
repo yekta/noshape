@@ -1,0 +1,48 @@
+{
+ "name": "decal-realign-aspect",
+ "about": "block: Decal, Realign on, Maintain aspect ratio off (separate Width and Height boxes), Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Transform",
+    "menu": "Decal"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Realign"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Maintain aspect ratio"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,72 @@
+{
+ "name": "fit-spline-match-curvature",
+ "about": "curves: 3D fit spline through (0,0,10) and (40,0,10), Match curvature at start on, Closed spline on, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "curves",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Helix",
+    "menu": "3D fit spline"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     0,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     40,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Match curvature at start"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Closed spline"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

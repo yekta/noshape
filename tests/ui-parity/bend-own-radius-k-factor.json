@@ -1,0 +1,62 @@
+{
+ "name": "bend-own-radius-k-factor",
+ "about": "plate-bend: Bend on the bend line, Use model bend radius off, Use model K Factor off, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "plate-bend",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Bend"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     30,
+     -4,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Use model bend radius"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Use model K Factor"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,63 @@
+{
+ "name": "offset-curve-scope-extend",
+ "about": "pin: Offset curve on the pin's top edge, Scope Offset → Offset and extend, Approximate on, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "pin",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Helix",
+    "menu": "Offset curve"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     3,
+     -4,
+     30
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Offset",
+    "pick": "Offset and extend"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Approximate"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

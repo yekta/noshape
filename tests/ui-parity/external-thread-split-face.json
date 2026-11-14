@@ -1,0 +1,44 @@
+{
+ "name": "external-thread-split-face",
+ "about": "block: External thread dialog, Split face on, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "External thread"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Split face"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "remembered": {
+  "externalThread": {
+   "length:Millimeter": {
+    "threadDepth": "5 mm"
+   }
+  }
+ }
+}

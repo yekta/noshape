@@ -1,0 +1,60 @@
+{
+ "name": "bridging-curve-magnitude-bias",
+ "about": "curves: Bridging curve from the edge at (5, 0, 10), Method Control points → Magnitude/bias, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "curves",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Helix",
+    "menu": "Bridging curve"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     5,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Control points",
+    "pick": "Magnitude/bias"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "remembered": {
+  "bridgingCurve": {
+   "": {
+    "editControlPoints": true
+   }
+  }
+ }
+}

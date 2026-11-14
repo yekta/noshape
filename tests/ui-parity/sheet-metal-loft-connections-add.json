@@ -1,0 +1,48 @@
+{
+ "name": "sheet-metal-loft-connections-add",
+ "about": "plate: Sheet metal loft, the Add tab, Connections on, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Sheet metal loft"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Add"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Connections"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,53 @@
+{
+ "name": "make-joint-bend",
+ "about": "sm-box: Make joint on the side face, Rip → Bend, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "sm-box",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Make joint"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     60,
+     -1,
+     14.5
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Rip",
+    "pick": "Bend"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

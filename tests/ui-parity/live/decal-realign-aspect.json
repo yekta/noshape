@@ -1,0 +1,1906 @@
+{
+ "scenario": "decal-realign-aspect",
+ "recorded": "2026-11-14T06:09:00.312Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.5"
+ },
+ "live": {
+  "document": "38e54affc51d506498f8ecd2",
+  "workspace": "24db5f467e1ccbd8d405a2a9",
+  "element": "f2deb16ba2f13b1f4685001a",
+  "start": "block",
+  "startElement": "ff2245ce846878221ff975e1",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Transform",
+     "menu": "Decal"
+    }
+   },
+   "ok": true,
+   "at": [
+    869,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Face",
+     "dialog": "Decal 1"
+    },
+    "dialog": {
+     "title": "Decal 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Image",
+       "kind": "other",
+       "text": "Image Select image…",
+       "state": "ok"
+      },
+      {
+       "label": "Face",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "0 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "U shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "V shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Realign",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Maintain aspect ratio",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Width",
+       "state": "ok"
+      },
+      {
+       "label": "Width",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Decal 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Image",
+        "kind": "other",
+        "text": "Image Select image…",
+        "state": "ok"
+       },
+       {
+        "label": "Face",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "0 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "U shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "V shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Realign",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Maintain aspect ratio",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Width",
+        "state": "ok"
+       },
+       {
+        "label": "Width",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Decal 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Decal 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 35085
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Face",
+     "dialog": "Decal 1"
+    },
+    "dialog": {
+     "title": "Decal 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Image",
+       "kind": "other",
+       "text": "Image Select image…",
+       "state": "ok"
+      },
+      {
+       "label": "Face",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "0 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "U shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "V shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Realign",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Maintain aspect ratio",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Width",
+       "state": "ok"
+      },
+      {
+       "label": "Width",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Decal 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Image",
+        "kind": "other",
+        "text": "Image Select image…",
+        "state": "ok"
+       },
+       {
+        "label": "Face",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "0 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "U shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "V shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Realign",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Maintain aspect ratio",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Width",
+        "state": "ok"
+       },
+       {
+        "label": "Width",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Decal 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Decal 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 39974
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "checkbox": "Realign"
+    }
+   },
+   "ok": true,
+   "at": [
+    290,
+    290
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Realign",
+     "text": "on",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false,
+     "dialog": "Decal 1"
+    },
+    "dialog": {
+     "title": "Decal 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Image",
+       "kind": "other",
+       "text": "Image Select image…",
+       "state": "ok"
+      },
+      {
+       "label": "Face",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "0 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "U shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "V shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Realign",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Placement origin",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Horizontal reference",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Maintain aspect ratio",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Width",
+       "state": "ok"
+      },
+      {
+       "label": "Width",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Decal 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Image",
+        "kind": "other",
+        "text": "Image Select image…",
+        "state": "ok"
+       },
+       {
+        "label": "Face",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "0 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "U shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "V shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Realign",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Placement origin",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Horizontal reference",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Maintain aspect ratio",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Width",
+        "state": "ok"
+       },
+       {
+        "label": "Width",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Decal 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Decal 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 43862
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Realign",
+     "text": "on",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false,
+     "dialog": "Decal 1"
+    },
+    "dialog": {
+     "title": "Decal 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Image",
+       "kind": "other",
+       "text": "Image Select image…",
+       "state": "ok"
+      },
+      {
+       "label": "Face",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "0 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "U shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "V shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Realign",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Placement origin",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Horizontal reference",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Maintain aspect ratio",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Width",
+       "state": "ok"
+      },
+      {
+       "label": "Width",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Decal 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Image",
+        "kind": "other",
+        "text": "Image Select image…",
+        "state": "ok"
+       },
+       {
+        "label": "Face",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "0 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "U shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "V shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Realign",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Placement origin",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Horizontal reference",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Maintain aspect ratio",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Width",
+        "state": "ok"
+       },
+       {
+        "label": "Width",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Decal 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Decal 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 48472
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "checkbox": "Maintain aspect ratio"
+    }
+   },
+   "ok": true,
+   "at": [
+    329,
+    385
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Maintain aspect ratio",
+     "text": "on",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false,
+     "dialog": "Decal 1"
+    },
+    "dialog": {
+     "title": "Decal 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Image",
+       "kind": "other",
+       "text": "Image Select image…",
+       "state": "ok"
+      },
+      {
+       "label": "Face",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "0 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "U shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "V shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Realign",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Placement origin",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Horizontal reference",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Maintain aspect ratio",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Width",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Height",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Decal 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Image",
+        "kind": "other",
+        "text": "Image Select image…",
+        "state": "ok"
+       },
+       {
+        "label": "Face",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "0 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "U shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "V shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Realign",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Placement origin",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Horizontal reference",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Maintain aspect ratio",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Width",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Height",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Decal 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Decal 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 51793
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Maintain aspect ratio",
+     "text": "on",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false,
+     "dialog": "Decal 1"
+    },
+    "dialog": {
+     "title": "Decal 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Image",
+       "kind": "other",
+       "text": "Image Select image…",
+       "state": "ok"
+      },
+      {
+       "label": "Face",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "0 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "U shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "V shift",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Realign",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Placement origin",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Horizontal reference",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Maintain aspect ratio",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Width",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Height",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Decal 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Image",
+        "kind": "other",
+        "text": "Image Select image…",
+        "state": "ok"
+       },
+       {
+        "label": "Face",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "0 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "U shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "V shift",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Realign",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Placement origin",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Horizontal reference",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Maintain aspect ratio",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Width",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Height",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Decal 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Decal 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 56385
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     329,
+     384
+    ],
+    "hover": [],
+    "element": "span.os-param-checkbox-label.ng-star-inserted"
+   },
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 60092
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 64640
+  }
+ ]
+}

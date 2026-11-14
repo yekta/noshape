@@ -1,0 +1,1608 @@
+{
+ "scenario": "sheet-metal-loft-connections-add",
+ "recorded": "2026-11-14T06:10:09.542Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.5"
+ },
+ "live": {
+  "document": "38e54affc51d506498f8ecd2",
+  "workspace": "24db5f467e1ccbd8d405a2a9",
+  "element": "79db44569aaf7df91ddad469",
+  "start": "plate",
+  "startElement": "8b2afdfe37345262e2e41efe",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Sheet metal model 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Sheet metal model 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Sheet metal model",
+     "menu": "Sheet metal loft"
+    }
+   },
+   "ok": true,
+   "at": [
+    1603,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Profile 1",
+     "dialog": "Sheet metal loft 1"
+    },
+    "dialog": {
+     "title": "Sheet metal loft 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Profile 1",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Profile 2",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Connections",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Chordal tolerance",
+       "kind": "number",
+       "text": "1 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "1.6 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Bend radius",
+       "kind": "number",
+       "text": "2.3 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip direction up",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sheet metal loft 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Profile 1",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Profile 2",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Connections",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Chordal tolerance",
+        "kind": "number",
+        "text": "1 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "1.6 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Bend radius",
+        "kind": "number",
+        "text": "2.3 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip direction up",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sheet metal loft 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Sheet metal loft 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 33880
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Profile 1",
+     "dialog": "Sheet metal loft 1"
+    },
+    "dialog": {
+     "title": "Sheet metal loft 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Profile 1",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Profile 2",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Connections",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Chordal tolerance",
+       "kind": "number",
+       "text": "1 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "1.6 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Bend radius",
+       "kind": "number",
+       "text": "2.3 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip direction up",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sheet metal loft 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Profile 1",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Profile 2",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Connections",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Chordal tolerance",
+        "kind": "number",
+        "text": "1 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "1.6 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Bend radius",
+        "kind": "number",
+        "text": "2.3 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip direction up",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sheet metal loft 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Sheet metal loft 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 38591
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "tab": "Add"
+    }
+   },
+   "ok": true,
+   "at": [
+    412,
+    121
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sheet metal loft 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": false
+      },
+      {
+       "label": "Add",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Profile 1",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Profile 2",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Connections",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Chordal tolerance",
+       "kind": "number",
+       "text": "1 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sheet metal loft 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": false
+       },
+       {
+        "label": "Add",
+        "selected": true
+       }
+      ],
+      "fields": [
+       {
+        "label": "Profile 1",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Profile 2",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Connections",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Chordal tolerance",
+        "kind": "number",
+        "text": "1 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sheet metal loft 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Sheet metal loft 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 42618
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sheet metal loft 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": false
+      },
+      {
+       "label": "Add",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Profile 1",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Profile 2",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Connections",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Chordal tolerance",
+       "kind": "number",
+       "text": "1 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sheet metal loft 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": false
+       },
+       {
+        "label": "Add",
+        "selected": true
+       }
+      ],
+      "fields": [
+       {
+        "label": "Profile 1",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Profile 2",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Connections",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Chordal tolerance",
+        "kind": "number",
+        "text": "1 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sheet metal loft 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Sheet metal loft 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 47425
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "checkbox": "Connections"
+    }
+   },
+   "ok": true,
+   "at": [
+    324,
+    217
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Connections",
+     "text": "on",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false,
+     "dialog": "Sheet metal loft 1"
+    },
+    "dialog": {
+     "title": "Sheet metal loft 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": false
+      },
+      {
+       "label": "Add",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Profile 1",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Profile 2",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Connections",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Match connections",
+       "kind": "other",
+       "text": "Match connections",
+       "state": "ok"
+      },
+      {
+       "label": "Chordal tolerance",
+       "kind": "number",
+       "text": "1 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sheet metal loft 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": false
+       },
+       {
+        "label": "Add",
+        "selected": true
+       }
+      ],
+      "fields": [
+       {
+        "label": "Profile 1",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Profile 2",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Connections",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Match connections",
+        "kind": "other",
+        "text": "Match connections",
+        "state": "ok"
+       },
+       {
+        "label": "Chordal tolerance",
+        "kind": "number",
+        "text": "1 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sheet metal loft 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Sheet metal loft 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 51514
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Connections",
+     "text": "on",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false,
+     "dialog": "Sheet metal loft 1"
+    },
+    "dialog": {
+     "title": "Sheet metal loft 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": false
+      },
+      {
+       "label": "Add",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Profile 1",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Profile 2",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Connections",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Match connections",
+       "kind": "other",
+       "text": "Match connections",
+       "state": "ok"
+      },
+      {
+       "label": "Chordal tolerance",
+       "kind": "number",
+       "text": "1 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sheet metal loft 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": false
+       },
+       {
+        "label": "Add",
+        "selected": true
+       }
+      ],
+      "fields": [
+       {
+        "label": "Profile 1",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Profile 2",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Connections",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Match connections",
+        "kind": "other",
+        "text": "Match connections",
+        "state": "ok"
+       },
+       {
+        "label": "Chordal tolerance",
+        "kind": "number",
+        "text": "1 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sheet metal loft 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Sheet metal loft 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 56838
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     324,
+     217
+    ],
+    "hover": [],
+    "element": "span.os-param-checkbox-label.ng-star-inserted"
+   },
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Sheet metal model 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 60721
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Sheet metal model 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 65420
+  }
+ ]
+}

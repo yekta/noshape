@@ -1,0 +1,52 @@
+{
+ "name": "end-cap-profile-internal",
+ "about": "frame-l: End cap on the end face, Match profile → Internal, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "frame-l",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "End cap"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     100,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Match profile",
+    "pick": "Internal"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
