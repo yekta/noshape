@@ -914,6 +914,13 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   check_sweepable(profile.shape);
   require_non_null(until.shape, "up-to target");
   gp_Dir                    dir  = to_dir(dirp, "extrude direction");
+  if (std::getenv("NOSHAPE_DUMP_OPS"))
+  {
+    std::ostringstream p;
+    p.precision(17);
+    p << "prism_until dir " << dir.X() << " " << dir.Y() << " " << dir.Z() << " start_offset " << start_offset << " (the profile, then the target)";
+    dump_op("prism_until", compound_of({profile.shape, until.shape}), {}, p.str());
+  }
   std::vector<TopoDS_Shape> args{profile.shape, until.shape};
   HHist                     hist;
   TopoDS_Shape              base = profile.shape;

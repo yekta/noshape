@@ -67,6 +67,10 @@ fn replay_as(name: &str, describe: bool) -> String {
             };
             shell_solid(&s, &subs, after(&p, "thickness", 1)[0], side, method)
         }
+        "prism_until" => {
+            let parts = s.children();
+            extrude_up_to(&parts[0], v3(&after(&p, "dir", 3)), &parts[1], after(&p, "start_offset", 1)[0])
+        }
         other => panic!("unknown op {other}"),
     };
     match r {

@@ -5,6 +5,20 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-14 22:04 UTC)
+- **Pattern tracing (lead's ask, queued abf209d3):** `NOSHAPE_PATTERN_TRACE=1` (docs/PARITY-SUITES.md §1): each
+  pattern's path, every instance's tool and what it alone adds, the parts before / after, and under the suite runners
+  live's change. **op_prism_until under NOSHAPE_DUMP_OPS** dumps its profile and target (`prism_until-N`), replayed by
+  `NOSHAPE_REPLAY=<dir>/prism_until-N cargo test -p noshape-kernel --test all crash_inputs::replay_one -- --ignored`.
+- **e53bba Extrude 8 / Circular pattern 1, traced:** on main the five re-applied instances add 22.41 mm³ each, +112.071
+  against live's +112.053 (only the end face's merge into the band differs). With Extrude 8 ending on the band's own
+  surface (`k::extend_face`: live's merged end, 182/501/321) the instance turned half round makes a 108.2 mm³ tool (it
+  ends on the band's far wall). Replayed from the dumps every instance's up-to is right, so it happens only in the
+  regeneration (in-memory: the target shares the band's surface handle). An end on a turned copy of the band's cylinder
+  (u 0..2π) gives five right tools, but the pattern's one fuse then crashes in OCCT's USD (UnionPCurves, from
+  boolean.cpp usd_kept_volume / op_unify). Next: find what differs for that instance in the regeneration (the target
+  face its query resolves to, its location), then the USD crash to bool if the merge still needs it.
+
 ## core state (11-14 20:07 UTC)
 - **Landed 0147815a** (19:50): a guided loft pairs its profiles' joints between two guides when both have as many there
   (live 3070: the handle's u knots are the means of A's and B's arc-length shares at paired joints), B's map eased C1 at
