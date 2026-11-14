@@ -1663,3 +1663,21 @@ fn an_edge_on_circle_projects_to_an_exact_line() {
         assert!(exact(a.x, c.x) && exact(b.x, c.x) && exact(lo, ends[0]) && exact(hi, ends[1]), "{name}: {a:?} {b:?}");
     }
 }
+
+/// A curve projected by samples (a circle's arc seen obliquely): each sample on the curve itself, not on the
+/// tessellation's chords up to 10 µm off it (a point Coincident with such a projection moved onto them:
+/// c2-impeller-loft's Stefevenrohr Führung).
+#[test]
+fn a_sampled_projection_lies_on_the_curve() {
+    use noshape_model::regen::features::sketch::{project_edge_any, SectionCurve};
+    let frame = noshape_model::display::PlaneFrame { origin: DVec3::ZERO, x: DVec3::X, y: DVec3::Y, normal: DVec3::Z };
+    let (r, tilt) = (0.0295, 0.6_f64);
+    let axis = DVec3::new(0.0, tilt.sin(), tilt.cos());
+    let arc = noshape_kernel::make_arc(DVec3::ZERO, axis, DVec3::X, r, 0.3, 2.2).unwrap();
+    let Some(SectionCurve::Sampled(pts)) = project_edge_any(&arc, &frame) else { panic!("not sampled") };
+    // On the ellipse x² + (y / cos tilt)² = r².
+    for p in &pts {
+        let off = (p.x * p.x + (p.y / tilt.cos()).powi(2)).sqrt() - r;
+        assert!(off.abs() < 1e-9, "a sample {:.3e} m off the curve: {p:?}", off);
+    }
+}
