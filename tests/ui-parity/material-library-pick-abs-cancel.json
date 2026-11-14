@@ -1,0 +1,53 @@
+{
+ "name": "material-library-pick-abs-cancel",
+ "about": "block: the face's Assign material\u2026, Material ABS from the list (its properties read-only), Cancel",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (Material panel and sketch Text dialog, read with runner .10)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Assign material for Part 1\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Material",
+    "pick": "ABS"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "cancel"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}

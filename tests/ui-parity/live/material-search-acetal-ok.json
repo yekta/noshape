@@ -1,0 +1,2179 @@
+{
+ "scenario": "material-search-acetal-ok",
+ "recorded": "2026-11-14T08:10:35.635Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.10"
+ },
+ "live": {
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "aa967aa4243880bd0dc158a8",
+  "start": "block",
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "face": [
+      20,
+      15,
+      10
+     ]
+    }
+   },
+   "ok": true,
+   "hover": [
+    "JHK"
+   ],
+   "at": [
+    1173,
+    482
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Edit Extrude 1…",
+      "Edit Sketch 1…",
+      "Show dimensions",
+      "Show dependencies of Extrude 1…",
+      "New sketch…",
+      "Offset plane…",
+      "Extrude…",
+      "Revolve…",
+      "Hide Part 1",
+      "Isolate…",
+      "Make transparent…",
+      "Section view…",
+      "Copy Part 1",
+      "Create Drawing of Part 1…",
+      "Export as DXF/DWG…",
+      "Export…",
+      "Where used for Part 1…",
+      "Select",
+      "Select other…",
+      "Add comment",
+      "Zoom to fit",
+      "Zoom to selection",
+      "View normal to",
+      "Delete Part 1…",
+      "Delete Extrude 1",
+      "Assign material for Part 1…",
+      "Edit appearance for Part 1…",
+      "Add appearance to face…"
+     ],
+     "highlighted": 21,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 31162
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Assign material for Part 1…"
+    }
+   },
+   "ok": true,
+   "at": [
+    1285,
+    574
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [],
+     "fields": [],
+     "assigned": "No material assigned"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material",
+      "inputs": []
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 35821
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": false
+      }
+     ],
+     "assigned": "No material assigned"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / - None - / No material assigned",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 39650
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Material"
+    }
+   },
+   "ok": true,
+   "at": [
+    424,
+    710
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "- None -",
+       "density": "0.000e+0 lb/in3",
+       "active": true
+      },
+      {
+       "name": "300 Series Stainless Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "400 Series Stainless Steel",
+       "density": "2.789e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A2 Stainless Steel",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A4 Stainless Steel",
+       "density": "2.887e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS",
+       "density": "3.801e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS M30",
+       "density": "3.757e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acetal (Delrin)",
+       "density": "4.899e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acrylic",
+       "density": "4.202e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alnico",
+       "density": "2.670e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alumina Oxide",
+       "density": "1.390e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1060",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1100",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 2024",
+       "density": "1.004e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 356",
+       "density": "9.700e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 380",
+       "density": "1.000e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 5052",
+       "density": "9.682e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 6061",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7050",
+       "density": "1.012e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7075",
+       "density": "1.015e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7178",
+       "density": "1.022e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum bronze (3-10% Al)",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum foil",
+       "density": "9.845e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Antimony",
+       "density": "2.417e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Ash, White",
+       "density": "2.384e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Babbitt",
+       "density": "2.627e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Balsa",
+       "density": "5.780e-3 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Basswood",
+       "density": "1.517e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beech, European",
+       "density": "2.601e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium",
+       "density": "6.647e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium copper",
+       "density": "2.953e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Birch",
+       "density": "2.529e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass",
+       "density": "3.067e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - casting",
+       "density": "3.089e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - rolled and drawn",
+       "density": "3.100e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass 60/40",
+       "density": "3.078e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brick",
+       "density": "6.376e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - lead",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - phosphorous",
+       "density": "3.197e-1 lb/in3",
+       "active": false
+      }
+     ],
+     "search": ""
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / - None - / Density: 0.000e+0 lb/in3 / 300 Series Stainless Steel / Density: 2.836e-1 lb/in3 / 400 Series Stainless Steel / Density: 2.789e-1 lb/in3 / A2 Stainless Steel / Density: 2.901e-1 lb/in3 / A4 Stainless Steel / Density: 2.887e-1 lb/in3 / ABS / Density: 3.801e-2 lb/in3 / ABS M30 / Density: 3.757e-2 lb/in3 / Acetal (Delrin) / Density: 4.899e-2 lb/in3 / Acrylic / Density: 4.202e-2 lb/in3 / Alnico / Density: 2.670e-1 lb/in3 / Alumina O",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 42708
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "- None -",
+       "density": "0.000e+0 lb/in3",
+       "active": true
+      },
+      {
+       "name": "300 Series Stainless Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "400 Series Stainless Steel",
+       "density": "2.789e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A2 Stainless Steel",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A4 Stainless Steel",
+       "density": "2.887e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS",
+       "density": "3.801e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS M30",
+       "density": "3.757e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acetal (Delrin)",
+       "density": "4.899e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acrylic",
+       "density": "4.202e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alnico",
+       "density": "2.670e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alumina Oxide",
+       "density": "1.390e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1060",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1100",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 2024",
+       "density": "1.004e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 356",
+       "density": "9.700e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 380",
+       "density": "1.000e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 5052",
+       "density": "9.682e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 6061",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7050",
+       "density": "1.012e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7075",
+       "density": "1.015e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7178",
+       "density": "1.022e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum bronze (3-10% Al)",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum foil",
+       "density": "9.845e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Antimony",
+       "density": "2.417e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Ash, White",
+       "density": "2.384e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Babbitt",
+       "density": "2.627e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Balsa",
+       "density": "5.780e-3 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Basswood",
+       "density": "1.517e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beech, European",
+       "density": "2.601e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium",
+       "density": "6.647e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium copper",
+       "density": "2.953e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Birch",
+       "density": "2.529e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass",
+       "density": "3.067e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - casting",
+       "density": "3.089e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - rolled and drawn",
+       "density": "3.100e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass 60/40",
+       "density": "3.078e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brick",
+       "density": "6.376e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - lead",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - phosphorous",
+       "density": "3.197e-1 lb/in3",
+       "active": false
+      }
+     ],
+     "search": ""
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / - None - / Density: 0.000e+0 lb/in3 / 300 Series Stainless Steel / Density: 2.836e-1 lb/in3 / 400 Series Stainless Steel / Density: 2.789e-1 lb/in3 / A2 Stainless Steel / Density: 2.901e-1 lb/in3 / A4 Stainless Steel / Density: 2.887e-1 lb/in3 / ABS / Density: 3.801e-2 lb/in3 / ABS M30 / Density: 3.757e-2 lb/in3 / Acetal (Delrin) / Density: 4.899e-2 lb/in3 / Acrylic / Density: 4.202e-2 lb/in3 / Alnico / Density: 2.670e-1 lb/in3 / Alumina O",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 45964
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "type",
+    "text": "Acetal"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "Acetal",
+     "selection": [
+      6,
+      6
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "Acetal (Delrin)",
+       "density": "4.899e-2 lb/in3",
+       "active": true
+      }
+     ],
+     "search": "Acetal"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / Acetal (Delrin) / Density: 4.899e-2 lb/in3 / No material assigned",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": "Acetal"
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 49311
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "Acetal",
+     "selection": [
+      6,
+      6
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "Acetal (Delrin)",
+       "density": "4.899e-2 lb/in3",
+       "active": true
+      }
+     ],
+     "search": "Acetal"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / Acetal (Delrin) / Density: 4.899e-2 lb/in3 / No material assigned",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": "Acetal"
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 52921
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     424,
+     709
+    ],
+    "hover": [],
+    "element": "input.form-control.ui-select-search"
+   },
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "Acetal (Delrin)",
+       "open": false
+      },
+      {
+       "label": "Name",
+       "kind": "input",
+       "value": "Acetal (Delrin)",
+       "readonly": true
+      },
+      {
+       "label": "Density (lb/in³)",
+       "kind": "input",
+       "value": "0.049",
+       "readonly": true
+      },
+      {
+       "label": "Poisson's ratio",
+       "kind": "input",
+       "value": "0.363",
+       "readonly": true
+      },
+      {
+       "label": "Young's modulus (Pa)",
+       "kind": "input",
+       "value": "2660000000",
+       "readonly": true
+      },
+      {
+       "label": "Tensile yield strength (Pa)",
+       "kind": "input",
+       "value": "59500000",
+       "readonly": true
+      },
+      {
+       "label": "Ultimate tensile strength (Pa)",
+       "kind": "input",
+       "value": "57600000",
+       "readonly": true
+      },
+      {
+       "label": "Compressive yield strength (Pa)",
+       "kind": "input",
+       "value": "60100000",
+       "readonly": true
+      },
+      {
+       "label": "Ultimate compressive strength (Pa)",
+       "kind": "input",
+       "value": "0",
+       "readonly": true
+      }
+     ],
+     "assigned": null
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / Acetal (Delrin) / Name / Density (lb/in³) / Poisson's ratio / Young's modulus (Pa) / Tensile yield strength (Pa) / Ultimate tensile strength (Pa) / Compressive yield strength (Pa) / Ultimate compressive strength (Pa)",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": "Acetal (Delrin)"
+       },
+       {
+        "placeholder": null,
+        "value": "0.049"
+       },
+       {
+        "placeholder": null,
+        "value": "0.363"
+       },
+       {
+        "placeholder": null,
+        "value": "2660000000"
+       },
+       {
+        "placeholder": null,
+        "value": "59500000"
+       },
+       {
+        "placeholder": null,
+        "value": "57600000"
+       },
+       {
+        "placeholder": null,
+        "value": "60100000"
+       },
+       {
+        "placeholder": null,
+        "value": "0"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 55216
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "Acetal (Delrin)",
+       "open": false
+      },
+      {
+       "label": "Name",
+       "kind": "input",
+       "value": "Acetal (Delrin)",
+       "readonly": true
+      },
+      {
+       "label": "Density (lb/in³)",
+       "kind": "input",
+       "value": "0.049",
+       "readonly": true
+      },
+      {
+       "label": "Poisson's ratio",
+       "kind": "input",
+       "value": "0.363",
+       "readonly": true
+      },
+      {
+       "label": "Young's modulus (Pa)",
+       "kind": "input",
+       "value": "2660000000",
+       "readonly": true
+      },
+      {
+       "label": "Tensile yield strength (Pa)",
+       "kind": "input",
+       "value": "59500000",
+       "readonly": true
+      },
+      {
+       "label": "Ultimate tensile strength (Pa)",
+       "kind": "input",
+       "value": "57600000",
+       "readonly": true
+      },
+      {
+       "label": "Compressive yield strength (Pa)",
+       "kind": "input",
+       "value": "60100000",
+       "readonly": true
+      },
+      {
+       "label": "Ultimate compressive strength (Pa)",
+       "kind": "input",
+       "value": "0",
+       "readonly": true
+      }
+     ],
+     "assigned": null
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / Acetal (Delrin) / Name / Density (lb/in³) / Poisson's ratio / Young's modulus (Pa) / Tensile yield strength (Pa) / Ultimate tensile strength (Pa) / Compressive yield strength (Pa) / Ultimate compressive strength (Pa)",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": "Acetal (Delrin)"
+       },
+       {
+        "placeholder": null,
+        "value": "0.049"
+       },
+       {
+        "placeholder": null,
+        "value": "0.363"
+       },
+       {
+        "placeholder": null,
+        "value": "2660000000"
+       },
+       {
+        "placeholder": null,
+        "value": "59500000"
+       },
+       {
+        "placeholder": null,
+        "value": "57600000"
+       },
+       {
+        "placeholder": null,
+        "value": "60100000"
+       },
+       {
+        "placeholder": null,
+        "value": "0"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 59262
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "at": [
+    523,
+    606
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 62766
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 66462
+  }
+ ]
+}

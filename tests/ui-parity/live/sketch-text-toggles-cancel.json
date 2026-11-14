@@ -1,0 +1,2692 @@
+{
+ "scenario": "sketch-text-toggles-cancel",
+ "recorded": "2026-11-14T08:18:16.970Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
+ },
+ "live": {
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "b8f2dabf1367e8648a3e0bcd",
+  "start": "empty",
+  "startElement": "3cf6c82ee0b538276398f1f1",
+  "runner": "live2 .nstate-uip-3.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": "Default geometry"
+  },
+  "parts": [],
+  "partsHeading": "Parts (0)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Sketch"
+    }
+   },
+   "ok": true,
+   "at": [
+    155,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "error",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "error",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "Select a sketch plane × Close",
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": null,
+     "constraints": null,
+     "dimensions": null,
+     "error": "sketch model not reached"
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 28705
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "plane": "Top"
+    }
+   },
+   "ok": true,
+   "at": [
+    1083,
+    568
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": null,
+     "constraints": null,
+     "dimensions": null,
+     "error": "sketch model not reached"
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 33090
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Text"
+    }
+   },
+   "ok": true,
+   "at": [
+    548,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 36210
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      0,
+      0
+     ]
+    }
+   },
+   "ok": true,
+   "hover": [
+    "IB"
+   ],
+   "at": [
+    1083,
+    519
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 43317
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      30,
+      10
+     ]
+    }
+   },
+   "ok": true,
+   "hover": [],
+   "at": [
+    1195,
+    531
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "textarea",
+     "label": null,
+     "text": "Default text",
+     "selection": [
+      0,
+      12
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "sketch-text",
+     "title": "Text",
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Flip horizontal",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Flip vertical",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Text",
+       "kind": "input",
+       "value": "Default text"
+      }
+     ],
+     "count": "12/250 characters"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": [
+     {
+      "id": "sketch-text-dialog",
+      "title": "Text",
+      "text": "Text / Allerta / Allerta Stencil / Arimo / Balthazar / Baumans / Bebas Neue / Comic Neue / Courier Prime / Didact Gothic / Droid Sans Mono / Inconsolata / Inter / Michroma / MPLUSRounded1c / Noto Sans / Noto Sans Chinese Simplified / Noto Sans Chinese Traditional / Noto Sans Japanese / Noto Sans Korean / Noto Serif / Open Sans / Orbitron / Oswald / Poppins / PTSans / Rajdhani / Roboto / Roboto Slab / Ropa Sans / Sofia Sans / Source Sans Pro / Tinos / B / I / 12/250 characters",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "Default text"
+       },
+       {
+        "placeholder": null,
+        "value": "Default text"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 52219
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "textarea",
+     "label": null,
+     "text": "Default text",
+     "selection": [
+      0,
+      12
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "sketch-text",
+     "title": "Text",
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Flip horizontal",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Flip vertical",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Text",
+       "kind": "input",
+       "value": "Default text"
+      }
+     ],
+     "count": "12/250 characters"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": [
+     {
+      "id": "sketch-text-dialog",
+      "title": "Text",
+      "text": "Text / Allerta / Allerta Stencil / Arimo / Balthazar / Baumans / Bebas Neue / Comic Neue / Courier Prime / Didact Gothic / Droid Sans Mono / Inconsolata / Inter / Michroma / MPLUSRounded1c / Noto Sans / Noto Sans Chinese Simplified / Noto Sans Chinese Traditional / Noto Sans Japanese / Noto Sans Korean / Noto Serif / Open Sans / Orbitron / Oswald / Poppins / PTSans / Rajdhani / Roboto / Roboto Slab / Ropa Sans / Sofia Sans / Source Sans Pro / Tinos / B / I / 12/250 characters",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "Default text"
+       },
+       {
+        "placeholder": null,
+        "value": "Default text"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 55880
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Bold"
+    }
+   },
+   "ok": true,
+   "at": [
+    516,
+    132
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "textarea",
+     "label": null,
+     "text": "Default text",
+     "selection": [
+      0,
+      12
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "sketch-text",
+     "title": "Text",
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Flip horizontal",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Flip vertical",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Text",
+       "kind": "input",
+       "value": "Default text"
+      }
+     ],
+     "count": "12/250 characters"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": [
+     {
+      "id": "sketch-text-dialog",
+      "title": "Text",
+      "text": "Text / Allerta / Allerta Stencil / Arimo / Balthazar / Baumans / Bebas Neue / Comic Neue / Courier Prime / Didact Gothic / Droid Sans Mono / Inconsolata / Inter / Michroma / MPLUSRounded1c / Noto Sans / Noto Sans Chinese Simplified / Noto Sans Chinese Traditional / Noto Sans Japanese / Noto Sans Korean / Noto Serif / Open Sans / Orbitron / Oswald / Poppins / PTSans / Rajdhani / Roboto / Roboto Slab / Ropa Sans / Sofia Sans / Source Sans Pro / Tinos / B / I / 12/250 characters",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "Default text"
+       },
+       {
+        "placeholder": null,
+        "value": "Default text"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 58496
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 600
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "textarea",
+     "label": null,
+     "text": "Default text",
+     "selection": [
+      0,
+      12
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "sketch-text",
+     "title": "Text",
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Flip horizontal",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Flip vertical",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Text",
+       "kind": "input",
+       "value": "Default text"
+      }
+     ],
+     "count": "12/250 characters"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": [
+     {
+      "id": "sketch-text-dialog",
+      "title": "Text",
+      "text": "Text / Allerta / Allerta Stencil / Arimo / Balthazar / Baumans / Bebas Neue / Comic Neue / Courier Prime / Didact Gothic / Droid Sans Mono / Inconsolata / Inter / Michroma / MPLUSRounded1c / Noto Sans / Noto Sans Chinese Simplified / Noto Sans Chinese Traditional / Noto Sans Japanese / Noto Sans Korean / Noto Serif / Open Sans / Orbitron / Oswald / Poppins / PTSans / Rajdhani / Roboto / Roboto Slab / Ropa Sans / Sofia Sans / Source Sans Pro / Tinos / B / I / 12/250 characters",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "Default text"
+       },
+       {
+        "placeholder": null,
+        "value": "Default text"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 61221
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Italic"
+    }
+   },
+   "ok": true,
+   "at": [
+    554,
+    132
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "textarea",
+     "label": null,
+     "text": "Default text",
+     "selection": [
+      0,
+      12
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "sketch-text",
+     "title": "Text",
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Flip horizontal",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Flip vertical",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Text",
+       "kind": "input",
+       "value": "Default text"
+      }
+     ],
+     "count": "12/250 characters"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": [
+     {
+      "id": "sketch-text-dialog",
+      "title": "Text",
+      "text": "Text / Allerta / Allerta Stencil / Arimo / Balthazar / Baumans / Bebas Neue / Comic Neue / Courier Prime / Didact Gothic / Droid Sans Mono / Inconsolata / Inter / Michroma / MPLUSRounded1c / Noto Sans / Noto Sans Chinese Simplified / Noto Sans Chinese Traditional / Noto Sans Japanese / Noto Sans Korean / Noto Serif / Open Sans / Orbitron / Oswald / Poppins / PTSans / Rajdhani / Roboto / Roboto Slab / Ropa Sans / Sofia Sans / Source Sans Pro / Tinos / B / I / 12/250 characters",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "Default text"
+       },
+       {
+        "placeholder": null,
+        "value": "Default text"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 63788
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 600
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "textarea",
+     "label": null,
+     "text": "Default text",
+     "selection": [
+      0,
+      12
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "sketch-text",
+     "title": "Text",
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Flip horizontal",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Flip vertical",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Text",
+       "kind": "input",
+       "value": "Default text"
+      }
+     ],
+     "count": "12/250 characters"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": [
+     {
+      "id": "sketch-text-dialog",
+      "title": "Text",
+      "text": "Text / Allerta / Allerta Stencil / Arimo / Balthazar / Baumans / Bebas Neue / Comic Neue / Courier Prime / Didact Gothic / Droid Sans Mono / Inconsolata / Inter / Michroma / MPLUSRounded1c / Noto Sans / Noto Sans Chinese Simplified / Noto Sans Chinese Traditional / Noto Sans Japanese / Noto Sans Korean / Noto Serif / Open Sans / Orbitron / Oswald / Poppins / PTSans / Rajdhani / Roboto / Roboto Slab / Ropa Sans / Sofia Sans / Source Sans Pro / Tinos / B / I / 12/250 characters",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "Default text"
+       },
+       {
+        "placeholder": null,
+        "value": "Default text"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 66571
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Flip horizontal"
+    }
+   },
+   "ok": true,
+   "at": [
+    590,
+    132
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "textarea",
+     "label": null,
+     "text": "Default text",
+     "selection": [
+      0,
+      12
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "sketch-text",
+     "title": "Text",
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Flip horizontal",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Flip vertical",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Text",
+       "kind": "input",
+       "value": "Default text"
+      }
+     ],
+     "count": "12/250 characters"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": [
+     {
+      "id": "sketch-text-dialog",
+      "title": "Text",
+      "text": "Text / Allerta / Allerta Stencil / Arimo / Balthazar / Baumans / Bebas Neue / Comic Neue / Courier Prime / Didact Gothic / Droid Sans Mono / Inconsolata / Inter / Michroma / MPLUSRounded1c / Noto Sans / Noto Sans Chinese Simplified / Noto Sans Chinese Traditional / Noto Sans Japanese / Noto Sans Korean / Noto Serif / Open Sans / Orbitron / Oswald / Poppins / PTSans / Rajdhani / Roboto / Roboto Slab / Ropa Sans / Sofia Sans / Source Sans Pro / Tinos / B / I / 12/250 characters",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "Default text"
+       },
+       {
+        "placeholder": null,
+        "value": "Default text"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 69146
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 600
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "textarea",
+     "label": null,
+     "text": "Default text",
+     "selection": [
+      0,
+      12
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "sketch-text",
+     "title": "Text",
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Flip horizontal",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Flip vertical",
+       "kind": "toggle",
+       "checked": false
+      },
+      {
+       "label": "Text",
+       "kind": "input",
+       "value": "Default text"
+      }
+     ],
+     "count": "12/250 characters"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": [
+     {
+      "id": "sketch-text-dialog",
+      "title": "Text",
+      "text": "Text / Allerta / Allerta Stencil / Arimo / Balthazar / Baumans / Bebas Neue / Comic Neue / Courier Prime / Didact Gothic / Droid Sans Mono / Inconsolata / Inter / Michroma / MPLUSRounded1c / Noto Sans / Noto Sans Chinese Simplified / Noto Sans Chinese Traditional / Noto Sans Japanese / Noto Sans Korean / Noto Serif / Open Sans / Orbitron / Oswald / Poppins / PTSans / Rajdhani / Roboto / Roboto Slab / Ropa Sans / Sofia Sans / Source Sans Pro / Tinos / B / I / 12/250 characters",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "Default text"
+       },
+       {
+        "placeholder": null,
+        "value": "Default text"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 72002
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Flip vertical"
+    }
+   },
+   "ok": true,
+   "at": [
+    626,
+    132
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "textarea",
+     "label": null,
+     "text": "Default text",
+     "selection": [
+      0,
+      12
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "sketch-text",
+     "title": "Text",
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Flip horizontal",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Flip vertical",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Text",
+       "kind": "input",
+       "value": "Default text"
+      }
+     ],
+     "count": "12/250 characters"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": [
+     {
+      "id": "sketch-text-dialog",
+      "title": "Text",
+      "text": "Text / Allerta / Allerta Stencil / Arimo / Balthazar / Baumans / Bebas Neue / Comic Neue / Courier Prime / Didact Gothic / Droid Sans Mono / Inconsolata / Inter / Michroma / MPLUSRounded1c / Noto Sans / Noto Sans Chinese Simplified / Noto Sans Chinese Traditional / Noto Sans Japanese / Noto Sans Korean / Noto Serif / Open Sans / Orbitron / Oswald / Poppins / PTSans / Rajdhani / Roboto / Roboto Slab / Ropa Sans / Sofia Sans / Source Sans Pro / Tinos / B / I / 12/250 characters",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "Default text"
+       },
+       {
+        "placeholder": null,
+        "value": "Default text"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 74561
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 600
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "textarea",
+     "label": null,
+     "text": "Default text",
+     "selection": [
+      0,
+      12
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "sketch-text",
+     "title": "Text",
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Flip horizontal",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Flip vertical",
+       "kind": "toggle",
+       "checked": true
+      },
+      {
+       "label": "Text",
+       "kind": "input",
+       "value": "Default text"
+      }
+     ],
+     "count": "12/250 characters"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": [
+     {
+      "id": "sketch-text-dialog",
+      "title": "Text",
+      "text": "Text / Allerta / Allerta Stencil / Arimo / Balthazar / Baumans / Bebas Neue / Comic Neue / Courier Prime / Didact Gothic / Droid Sans Mono / Inconsolata / Inter / Michroma / MPLUSRounded1c / Noto Sans / Noto Sans Chinese Simplified / Noto Sans Chinese Traditional / Noto Sans Japanese / Noto Sans Korean / Noto Serif / Open Sans / Orbitron / Oswald / Poppins / PTSans / Rajdhani / Roboto / Roboto Slab / Ropa Sans / Sofia Sans / Source Sans Pro / Tinos / B / I / 12/250 characters",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "Default text"
+       },
+       {
+        "placeholder": null,
+        "value": "Default text"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Text",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 77338
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "cancel"
+    }
+   },
+   "ok": true,
+   "at": [
+    636,
+    93
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 79904
+  },
+  {
+   "step": 16,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 82778
+  },
+  {
+   "step": 17,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     636,
+     93
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 86395
+  }
+ ]
+}

@@ -162,6 +162,21 @@ Studio, or the panel's bottom button: by their shared tooltip), `{"config_more":
 - The appearance editor's colour fields: `{"field": "#"}`, `{"field": "R"}`, `{"field": "G"}`, `{"field": "B"}`.
 - In context: `{"dropdown": "Context 1"}` the Assembly contexts section's selector (by the context it shows, or
   `"None"`), `{"context_more": "Context 1"}` its ⋯; an assembly's `{"instance": "Origin"}` is its Origin row.
+- The Material panel (live 11-14): `{"tab": "Library" | "Custom"}`, `{"dropdown": "Material", "pick": "ABS"}` (the
+  searchable list; `{"dropdown": "Material"}` alone opens it, then `type` searches), `{"dropdown": "Library", "pick"}`,
+  `{"button": "ok" | "cancel"}`. Its `dialog` is `{"kind": "material", "title": "Material", "tabs": [{"label",
+  "selected"}], "fields": [{"label": "Library", "kind": "select", "value"}, {"label": "Material", "kind": "select",
+  "value": "- None -", "open"}, then the property rows {"label": "Density (lb/in³)", "kind": "input", "value",
+  "readonly"}], "assigned": "No material assigned" | null}`, plus `"choices": [{"name", "density", "active"}]` (the
+  shown rows, at most 40) and `"search"` while the list is open.
+- The sketch Text dialog (live 11-14): `{"button": "Bold" | "Italic" | "Flip horizontal" | "Flip vertical" | "ok" |
+  "cancel"}`, `{"dropdown": "Font", "pick": "Inter"}`, `{"field": "Text"}` the text box. Its `dialog` (over the
+  Sketch dialog) is `{"kind": "sketch-text", "title": "Text", "fields": [{"label": "Font", "kind": "select", "value"},
+  {"label": "Bold", "kind": "toggle", "checked"}, … Italic, Flip horizontal, Flip vertical (a toggle the font hides,
+  Inter's Italic, is left out), {"label": "Text", "kind": "input", "value"}], "count": "12/250 characters"}`. The
+  font is remembered per account (OK with Inter makes Inter the next default).
+- Sketch linear / circular pattern have no panel in live: counts and spacing are drawn in the view, and a click on
+  empty canvas (`{"empty": true}`) commits the pattern; Enter doesn't.
 
 ### Drawings (dx, 11-05)
 A start may add `"drawing": {"part": "Part 1", "template": "ANSI_A_INCH.dwt", "views": "suggested" | "none"}`: Create

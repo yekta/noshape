@@ -1,0 +1,85 @@
+{
+ "name": "sketch-circular-pattern-click-commit",
+ "about": "empty: Sketch on Top, a circle, Circular pattern on it, a click on empty canvas commits the pattern (Enter doesn't)",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (Material panel and sketch Text dialog, read with runner .10)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "c"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     25,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Linear pattern",
+    "menu": "Circular pattern"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     25,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
