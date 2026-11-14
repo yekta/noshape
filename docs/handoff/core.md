@@ -5,6 +5,22 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-14 08:43 UTC)
+- **Landed 900a25bc** (08:25): guided loft joints as live (3°, lined-up joints), C1-joined side face, knife Extrude 10 /
+  Fillet 8 build, up-to a B-spline face on its surface, translator normal / loft INTERSECT / query cache (suite 1075 ->
+  387 s). Gate: vibe5 pair 87 = 87 documents, counts unchanged; up-to A/B no slower.
+- Knife after it: 3.6 s vs live 408 ms. Split 4 345-363 ms (was <= 140 with 5 handle faces): project_along's section
+  with the one big side face (BRepProj_Projection, 7 calls 250 ms); fewer rows per piece doesn't help; face_patches
+  would split the projected curves at patch borders (extra vertices). Mirror 1 192 ms vs live 29: op_unify (groups
+  merge 80 ms of cylinders split at the mirror plane, USD 56), Boolean 78, boxes 71, mesh 60: no single lever.
+  Handle 19/17 edges/vertices vs live 20/20 and +0.3 % volume: asked live (REQUESTS 05:37, after the FS quota).
+- dx's 1dc32b Extrude 7 (asm-infento-subs): sketch Treads' two USE construction lines stored at x ±33.25, live
+  re-projects them to the tyre's r139 circles at ±34; the model has no GET /sketches solve, so ours keep ±33.25 (regions
+  288.4 / 301.0 vs live 299.9 x 2). Sent to dx (fetch the solve). Repro vibe5 ~/agents/core-keep/m1dc-out.
+- asm's infento 74d3d6 Extrude 4 (Knurled disc 7/13/8 vs 4/4/0): dx's arcs-of-one-circle rule keeps 5 arcs (other
+  curves meet the circle) and the next body imprints a B-spline sliver in the up-to split; noshape's unify merges none.
+  Sent to dx / asm; the sliver is core's once the arcs rule is settled. Dump vibe5 ~/agents/core-keep/updump.
+
 ## core state (11-14 04:10 UTC)
 - **Branch core-loftcorner (worktree core-base), gating:** guided loft joints as live (REQUESTS 3023 / 3053: a joint
   under 3° is smoothed over unless a joint of the other profile lines up with it by arc length between the guides;
