@@ -3220,6 +3220,37 @@ fn an_open_composite_instance_is_meshed_once_at_the_display_quality() {
     assert!(std::sync::Arc::ptr_eq(&first.occurrences[1].mesh, &again.occurrences[1].mesh), "kept, not re-meshed");
 }
 
+/// An open composite's faces and edges are its members': a mate connector on one of them resolves on the composite's
+/// instance (asm-infento-subs' "7\" Wheel asm" composites: every mate on them read "Mate cannot resolve mate
+/// connectors.").
+#[test]
+fn a_mate_on_an_open_composite_instance_resolves() {
+    let units = UnitPrefs::default();
+    let mut ps = pin_studio();
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let pin = r.context.bodies[0].id.clone();
+    let mut c = ps.new_feature("compositePart", &units).unwrap();
+    c.params.set("bodies", ParamValue::Query(vec![Reference::Body(pin.clone())]));
+    ps.features.push(c);
+    let f = doc_with(vec![ps]);
+    let mut ev = AssemblyEvaluator::new();
+    let r = ev.studio(&f.doc, f.studios[0], &ConfigValues::default()).unwrap();
+    let comp = r.display.bodies.iter().find(|b| b.composite.as_ref().is_some_and(|c| !c.closed)).expect("an open composite").id.clone();
+    let mut asm = Assembly {
+        instances: vec![part_instance(1, "Pin <1>", f.studios[0], pin, DVec3::ZERO, true), part_instance(2, "Composite part 1 <1>", f.studios[0], comp, DVec3::new(0.05, 0.0, 0.0), false)],
+        ..Default::default()
+    };
+    let first = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let occ = &first.occurrences[1];
+    let edge = occ.edge_refs.first().expect("its members' edges").clone();
+    assert!(!eval::inference_candidates(&occ.context, Some(&occ.body), &edge, &units).is_empty(), "its edge offers connectors");
+    let pin_edge = first.occurrences[0].edge_refs[0].clone();
+    asm.mates.push(mate(10, MateType::Fastened, conn(1, pin_edge, Inference::CenterRim), conn(2, edge, Inference::CenterRim)));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let st = res.mates.iter().find(|m| m.id == MateId(10)).unwrap();
+    assert!(st.ok, "{:?}", st.message);
+}
+
 #[test]
 fn sketch_instances_are_wire_occurrences_with_edges() {
     let f = doc_with(vec![block_studio()]);

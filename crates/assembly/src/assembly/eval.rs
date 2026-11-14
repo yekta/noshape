@@ -1691,7 +1691,8 @@ impl ConnectorMemo {
 pub fn resolve_connector_aligned(ctx: &Arc<Context>, body: Option<&BodyId>, reference: &Reference, align: Option<&Reference>, units: &UnitPrefs) -> Option<Frame> {
     let mut c: Context = (**ctx).clone();
     if let Some(b) = body {
-        c.bodies.retain(|x| &x.id == b);
+        let keep = body_and_members(ctx, b);
+        c.bodies.retain(|x| keep.contains(&x.id));
     }
     let params = ParamValues::default();
     let vars = BTreeMap::new();
@@ -1845,7 +1846,8 @@ impl InferencePoint {
 pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Reference, units: &UnitPrefs) -> Vec<InferencePoint> {
     let implicit = |on: &Reference, inference: Inference| Reference::Implicit { on: Box::new(on.clone()), inference };
     let mut refs: Vec<(Reference, Option<Reference>)> = Vec::new();
-    let bodies = || ctx.bodies.iter().filter(move |b| body.is_none_or(|id| &b.id == id));
+    let keep: Option<Vec<BodyId>> = body.map(|b| body_and_members(ctx, b));
+    let bodies = || ctx.bodies.iter().filter(|b| keep.as_ref().is_none_or(|k| k.contains(&b.id)));
     match on {
         Reference::Face(n) => {
             let mut kind = None;
@@ -3425,9 +3427,20 @@ fn prepared_pose(stored: &HashMap<InstanceId, Frame>, prepared: &Prepared, body:
 fn studio_eval_ctx<'a>(ctx: &Arc<Context>, body: Option<&BodyId>, units: &'a UnitPrefs, params: &'a ParamValues, vars: &'a BTreeMap<String, noshape_units::Quantity>) -> EvalCtx<'a> {
     let mut c: Context = (**ctx).clone();
     if let Some(b) = body {
-        c.bodies.retain(|x| &x.id == b);
+        let keep = body_and_members(ctx, b);
+        c.bodies.retain(|x| keep.contains(&x.id));
     }
     EvalCtx::new(FeatureId(0), "", params, units, c, vars)
+}
+
+/// An instance's body and, for an open composite part, its members: its faces, edges and vertices are theirs
+/// (asm-infento-subs' "7\" Wheel asm", a composite of the tyre and hub: every mate connector on it read nothing).
+fn body_and_members(ctx: &Context, body: &BodyId) -> Vec<BodyId> {
+    let mut out = vec![body.clone()];
+    if let Some(c) = ctx.bodies.iter().find(|x| &x.id == body).and_then(|b| b.composite.as_ref()).filter(|c| !c.closed) {
+        out.extend(c.members.iter().cloned());
+    }
+    out
 }
 
 /// Analytic tangent geometry of a face shape (outward normal for planes).
