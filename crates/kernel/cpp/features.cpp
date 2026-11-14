@@ -4599,9 +4599,31 @@ static ShapeIMap faces_of_type(const TopoDS_Shape& s, GeomAbs_SurfaceType type)
 void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
 {
   const KernelTimer timer("blend.full_rounds");
-  const ShapeIMap cylinders = faces_of_type(r, GeomAbs_Cylinder);
-  if (cylinders.Extent() < 2)
+  ShapeIMap         rounds = faces_of_type(r, GeomAbs_Cylinder);
+  const ShapeIMap   tori   = faces_of_type(r, GeomAbs_Torus);
+  for (int i = 1; i <= tori.Extent(); ++i)
+    rounds.Add(tori(i));
+  if (rounds.Extent() < 2)
     return;
+  // One radius (two for a torus) on one axis, either way along it: one surface.
+  auto same_round = [](const BRepAdaptor_Surface& a, const BRepAdaptor_Surface& b) {
+    if (a.GetType() == GeomAbs_Cylinder && b.GetType() == GeomAbs_Cylinder)
+    {
+      const gp_Cylinder ca = a.Cylinder(), cb = b.Cylinder();
+      const double      ra = ca.Radius();
+      return std::abs(ra - cb.Radius()) <= 1e-6 * ra && ca.Axis().IsParallel(cb.Axis(), 1e-9) && gp_Lin(ca.Axis()).Distance(cb.Location()) <= 1e-6 * ra;
+    }
+    if (a.GetType() == GeomAbs_Torus && b.GetType() == GeomAbs_Torus)
+    {
+      // (Either way along it: a rounded end's two halves, one from each side, their centres 1e-9 apart; skasm's
+      // asm-config-assembly Arm Cover, live one face.)
+      const gp_Torus ta = a.Torus(), tb = b.Torus();
+      const double   ra = ta.MinorRadius();
+      return std::abs(ra - tb.MinorRadius()) <= 1e-6 * ra && std::abs(ta.MajorRadius() - tb.MajorRadius()) <= 1e-6 * ra && ta.Axis().IsParallel(tb.Axis(), 1e-9) &&
+             ta.Location().Distance(tb.Location()) <= 1e-6 * ra;
+    }
+    return false;
+  };
   ShapeAncMap ef;
   TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
   occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
@@ -4609,16 +4631,35 @@ void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
   for (int i = 1; i <= ef.Extent(); ++i)
   {
     const ShapeList& fs = ef(i);
-    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || done.Contains(fs.First()) || done.Contains(fs.Last()) || !cylinders.Contains(fs.First()) || !cylinders.Contains(fs.Last()) || kept_edge(ef.FindKey(i)))
+    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || done.Contains(fs.First()) || done.Contains(fs.Last()) || !rounds.Contains(fs.First()) || !rounds.Contains(fs.Last()) || kept_edge(ef.FindKey(i)))
       continue;
     const TopoDS_Face   fa = TopoDS::Face(fs.First()), fb = TopoDS::Face(fs.Last());
     BRepAdaptor_Surface a(fa), b(fb);
-    if (a.GetType() != GeomAbs_Cylinder || b.GetType() != GeomAbs_Cylinder)
+    if (!same_round(a, b))
       continue;
-    const gp_Cylinder ca = a.Cylinder(), cb = b.Cylinder();
-    const double      ra = ca.Radius();
-    if (std::abs(ra - cb.Radius()) > 1e-6 * ra || !ca.Axis().IsParallel(cb.Axis(), 1e-9) || gp_Lin(ca.Axis()).Distance(cb.Location()) > 1e-6 * ra)
-      continue;
+    const double ra = a.GetType() == GeomAbs_Torus ? a.Torus().MinorRadius() : a.Cylinder().Radius();
+    // Two tori only where they meet along a circle about their axis, as two halves of a full round do (a round's
+    // pieces OCCT split across the tube, pipeflange-steven's, are true_ball_over_rims's).
+    if (a.GetType() == GeomAbs_Torus)
+    {
+      const gp_Ax1      ax = a.Torus().Axis();
+      BRepAdaptor_Curve c(TopoDS::Edge(ef.FindKey(i)));
+      bool              parallel = true;
+      double            h0 = 0, r0 = 0;
+      for (int k = 0; k <= 4 && parallel; ++k)
+      {
+        const gp_Vec d(ax.Location(), c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 4));
+        const double h = d.Dot(gp_Vec(ax.Direction())), rr = (d - gp_Vec(ax.Direction()) * h).Magnitude();
+        if (k == 0)
+        {
+          h0 = h;
+          r0 = rr;
+        }
+        parallel = std::abs(h - h0) <= 1e-6 * ra && std::abs(rr - r0) <= 1e-6 * ra;
+      }
+      if (!parallel)
+        continue;
+    }
     // One face on a's cylinder bounded by both faces' other edges.
     occ::handle<NCollection_HSequence<TopoDS_Shape>> es = new NCollection_HSequence<TopoDS_Shape>(), ws;
     for (const TopoDS_Face& f : {fa, fb})
@@ -4628,14 +4669,23 @@ void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
     ShapeAnalysis_FreeBounds::ConnectEdgesToWires(es, 1e-6 * ra, false, ws);
     if (ws->Length() != 1)
       continue;
-    BRepBuilderAPI_MakeFace mf(BRep_Tool::Surface(fa), TopoDS::Wire(ws->Value(1)), true);
-    if (!mf.IsDone())
+    // On a's surface, else b's (a torus's loop can come out reversed on one: an invalid face).
+    auto on = [&](const TopoDS_Face& f) -> TopoDS_Face {
+      BRepBuilderAPI_MakeFace mf(BRep_Tool::Surface(f), TopoDS::Wire(ws->Value(1)), true);
+      if (!mf.IsDone())
+        return {};
+      ShapeFix_Face fix(mf.Face());
+      fix.FixOrientation();
+      fix.Perform();
+      TopoDS_Face m = fix.Face();
+      m.Orientation(f.Orientation());
+      return BRepCheck_Analyzer(m).IsValid() ? m : TopoDS_Face();
+    };
+    TopoDS_Face merged = on(fa);
+    if (merged.IsNull())
+      merged = on(fb);
+    if (merged.IsNull())
       continue;
-    ShapeFix_Face fix(mf.Face());
-    fix.FixOrientation();
-    fix.Perform();
-    TopoDS_Face merged = fix.Face();
-    merged.Orientation(fa.Orientation());
     rs->Replace(fa, merged);
     rs->Remove(fb);
     done.Add(fa);

@@ -121,6 +121,23 @@ fn blends_that_consume_faces() {
     assert!(res.shape.is_valid());
 }
 
+/// A full round over a rounded end (skasm's asm-config-assembly Arm Cover, live 11/24/16 with one face there): R5 on
+/// the side faces' edges of a 10 mm wide bar with a half-round end takes its top, bottom and end; the end's two torus
+/// halves, one from each side, are one face as the top's and the bottom's two cylinders are.
+#[test]
+fn a_full_round_over_a_rounded_end_is_one_torus() {
+    setup();
+    let end = make_cylinder(&Plane::from_normal(DVec3::new(-5.0, 40.0, 7.0) * MM, DVec3::X), 7.0 * MM, 10.0 * MM, std::f64::consts::TAU).unwrap();
+    let bar = unify_same_domain(&fuse(&bx([-5.0, 0.0, 0.0], [5.0, 40.0, 14.0]), &end).unwrap().shape).unwrap().shape;
+    let sides = edges_where(&bar, |i| (i.start.x.abs() - 5.0 * MM).abs() < 1e-9 && (i.end.x.abs() - 5.0 * MM).abs() < 1e-9 && i.start.y.max(i.end.y) > 1e-9);
+    let res = fillet_checked(&bar, &sides, &[5.0 * MM]).expect("R5").shape;
+    assert!(res.is_valid());
+    let kinds: Vec<String> = res.faces().iter().map(|f| format!("{:?}", f.face_surface().unwrap()).split([' ', '(']).next().unwrap().to_string()).collect();
+    assert_eq!(kinds.iter().filter(|k| *k == "Torus").count(), 1, "{kinds:?}");
+    assert_eq!(kinds.iter().filter(|k| *k == "Cylinder").count(), 2, "{kinds:?}");
+    assert_eq!(res.faces().len(), 6, "{kinds:?}");
+}
+
 /// Draft by wedges against OCCT's draft (where it works) and Onshape (D1).
 #[test]
 fn draft_wedges_like_onshape() {
