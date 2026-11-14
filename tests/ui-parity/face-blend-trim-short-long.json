@@ -1,0 +1,57 @@
+{
+ "name": "face-blend-trim-short-long",
+ "about": "block: Face blend, Trim type Short then Long, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fillet",
+    "menu": "Face blend"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Walls",
+    "pick": "Short"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Short",
+    "pick": "Long"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "remembered": {
+  "faceBlend": {
+   "length:Millimeter": {
+    "radius": "2 mm"
+   }
+  }
+ }
+}

@@ -1,0 +1,46 @@
+{
+ "name": "bridging-curve-match-flow",
+ "about": "curves: Bridging curve, Start Match flow (G3), Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "curves",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Helix",
+    "menu": "Bridging curve"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Match tangent",
+    "pick": "Match flow (G3)"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "remembered": {
+  "bridgingCurve": {
+   "": {
+    "editControlPoints": true
+   }
+  }
+ }
+}

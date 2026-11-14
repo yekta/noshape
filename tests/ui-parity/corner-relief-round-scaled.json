@@ -1,0 +1,46 @@
+{
+ "name": "corner-relief-round-scaled",
+ "about": "sm-box: Corner, relief type Round - Scaled, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "sm-box",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Corner"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Square - Sized",
+    "pick": "Round - Scaled"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "remembered": {
+  "sheetMetalCorner": {
+   "length:Millimeter": {
+    "squareReliefWidth": "3 mm"
+   }
+  }
+ }
+}
