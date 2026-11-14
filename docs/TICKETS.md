@@ -5687,7 +5687,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   every curve, the Ø10 and all four constraint badges red, nothing singled out. That sketch was posted whole over REST;
   what live's UI does when the 10 mm is added last (red over-defining dimension?) is not captured. Model:
   /root/parity/models-dx/live-hole-row (parity_models, NOSHAPE_PARITY_MODELS). (dx 2026-11-03)
-- [ ] P2 FS-OLD-STD-COMPAT (dx since 11-04, lead's decision; was core; dx's FeatureScript corpus 11-03,
+- [x] (dx 2026-11-14 00:45 UTC: the three left (cf-fix-pcb, cf-sheet-metal-hem, cf-sheet-metal-model-plus) match to the end on their pins (model suite 11-13); more releases come with `tools/std-pack.py --all` as live fetches them) P2 FS-OLD-STD-COMPAT (dx since 11-04, lead's decision; was core; dx's FeatureScript corpus 11-03,
   parity_feature_studios) **Lead 11-04: do what Onshape does: a studio compiles against the std of its own pin.**
   Ship more std releases beside 1963 and 3095 (the corpus pins and every other release live can fetch), serve each
   pin the newest shipped release at or below it, no compatibility shims in 1963; the extra releases small in the
