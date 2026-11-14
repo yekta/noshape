@@ -16,7 +16,10 @@
   took inch units: 1/4"). Every feature's geometry now matches but Fillet 4 (Arm Cover: two R5 fillets meeting across
   a 10 mm top, live merges their halves, 11 vs our 12 faces; handed to blend 11-14 12:20; blend landed 3a6fc428: 11/24/16 as live). The collision INFO: flat pieces not joined by a bend that overlap or share an edge (flat.rs `pieces_collide`); the studio is 42/42 run alone. Two bend strips aren't compared: in a jog at its reduced angle (bends adjacent, the middle wall gone) our flat lays
   the two strips 0.73 mm over each other (features_c::jog_preserve_material_off_and_errors' second case); live's
-  doesn't. Next for me: that flat layout.
+  doesn't. Cause: at the reduced angle the jog's definition has two middle faces, parallel but 0.79 mm apart, joined
+  by an edge, so `coplanar_rip` doesn't join them and `unfold` places them in two separate chains (from the plate and
+  from the end wall). Open: how our Jog builds that definition (a live capture of the reduced-angle jog's flat
+  length would pin the answer).
 - Knife Sketch 7 (live 3041: JTd the R750 blade arc, JIl a line): the 0.3 mm Distance to the arc took our centre mode;
   now inferred as for local circles (blade 9301.21 -> 9306.43 mm³, live 9306.25). The knife's first difference stays
   at feature 24 (3 lines / 3 "other" edges vs live, from Curve pattern 1's or the Loft's side, not the sketch).
