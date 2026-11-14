@@ -312,10 +312,13 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                         DisplayMode::ShadedWithEdges | DisplayMode::Shaded => inst,
                     };
                 }
+                if opts.xray_tops.contains(&o.top()) {
+                    inst = inst.see_through_self();
+                }
                 scene.instances.push(inst);
             }
             if opts.xray_tops.contains(&o.top()) {
-                scene.instances.push(Instance::new(Drawable::Lines(cached.edges.clone())).with_color(theme::lin(0xffc04c)).with_transform(t).unpickable().hidden_only().layer(1));
+                scene.instances.push(Instance::new(Drawable::Lines(cached.edges.clone())).with_color(theme::lin(0xffc04c)).with_transform(t).unpickable().hidden_only().see_through_self().layer(1));
             }
             if !dimmed && (!opts.hide_edges || sketch) {
                 let edge_color = if !sketch && mode == DisplayMode::HiddenLine { theme::lin(theme::viewport::EDGE_UNSHADED) } else { edge_color };

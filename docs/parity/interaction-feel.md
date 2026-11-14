@@ -150,7 +150,7 @@ Live: live/feel/mates.json, asm-views.json, fields.json `assemblyInstanceList`, 
 drag thresholds (their commits below). Menus leave out "Add comment" (comments are cloud). Counts are matched / total
 per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3D 10 / 10**.
 
-### Mate dialog, mate list, Insert (mates.json): 26 / 28
+### Mate dialog, mate list, Insert (mates.json): 27 / 28
 
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
@@ -175,7 +175,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Named positions, empty | the how-to text and its help link, Add named position | the same (17:18) | – | = |
 | Insert dialog | tabs, Part Studios / Assemblies, search, "Undo to remove instances", "Inserted: N" | the same | ui-parity asm-insert-* | = |
 | Insert preview | the instance follows the pointer, solid orange; a click drops it | the same | – | = |
-| Insert preview's hidden edges | outlined orange through other parts; nothing lit under the pointer | the same (`xray_tops`, hidden-only #ffc04c edges); its own back edges also show faintly through itself (the hidden-only pass can't tell self-occlusion) | – | ≠ (minor) |
+| Insert preview's hidden edges | outlined orange through other parts; nothing lit under the pointer | the same (`xray_tops`, hidden-only #ffc04c edges, `Instance::see_through_self`: not through the preview itself) | render `see_through_self_lines_skip_their_own_mesh` | = (fixed) |
 | Insert Esc, pending | drops only the instance on the pointer, keeps the dialog | the same (asm e9941770) | asm-insert-esc-pending (live take asked) | = |
 | Insert Esc, none pending | closes and removes the session's instances | the same (`cancel_insert`) | – | = |
 | Insert ✓ | keeps all, the pending one at identity; one undo step | the same (asm e9941770) | asm-insert-ok-pending (live take asked) | = |

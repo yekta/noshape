@@ -1356,6 +1356,44 @@ fn hidden_only_lines_show_only_behind_geometry() {
     assert!(visible[0] > 200 && visible[1] > 200, "the visible part is not: {visible:?}");
 }
 
+/// [`Instance::see_through_self`]: a mesh's `hidden_only` lines show behind other geometry, not behind the mesh itself
+/// (the assembly Insert preview's edges through other parts, live mates.json insert_dialog).
+#[test]
+fn see_through_self_lines_skip_their_own_mesh() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], 1)))).see_through_self());
+    // Another part in front (the front view looks along +Y).
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([0.03, -0.04, -0.01], [0.05, -0.02, 0.01], 1)))));
+    let mut line = LineData::default();
+    line.push_polyline(&[[-0.03, 0.02, 0.0], [0.06, 0.02, 0.0]], [255, 0, 0, 255], 0, 4.0, 0);
+    scene.instances.push(Instance::new(Drawable::Lines(r.upload_lines(&line))).per_primitive_color().unpickable().hidden_only().see_through_self());
+    let mut cam = Camera { rotation: Camera::rotation_for(StandardView::Front), ..Default::default() };
+    cam.fit_sphere(glam::DVec3::new(0.015, 0.0, 0.0), 0.05, 4.0 / 3.0);
+    let (w, h) = (400u32, 300u32);
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+    let vp = glam::DVec2::new(w as f64, h as f64);
+    let px = |p: glam::DVec3| {
+        let s = cam.project(p, vp, 0.05).unwrap();
+        let o = ((s.y as u32 * w + s.x as u32) * 4) as usize;
+        [f.bgra[o + 2], f.bgra[o + 1], f.bgra[o]]
+    };
+    let red = |c: [u8; 3]| c[0] > 200 && c[1] < 80;
+    let behind_other = px(glam::DVec3::new(0.04, 0.02, 0.0));
+    let behind_self = px(glam::DVec3::new(0.0, 0.02, 0.0));
+    let visible = px(glam::DVec3::new(0.02, 0.02, 0.0));
+    assert!(red(behind_other), "drawn behind the other part: {behind_other:?}");
+    assert!(!red(behind_self), "not behind its own mesh: {behind_self:?}");
+    assert!(!red(visible), "not where nothing hides it: {visible:?}");
+}
+
 /// Feature previews shade like Onshape's (live part-studio/230, default
 /// view, white background): the top and front faces alike, the right side
 /// lighter, flat (no highlight); the box is opaque in the preview blend's

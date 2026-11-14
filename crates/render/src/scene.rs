@@ -296,6 +296,9 @@ pub struct Instance {
     /// Lines / points drawn only where geometry hides them (color pass
     /// only): the active sketch's "underconstrained occluded" color.
     pub hidden_only: bool,
+    /// An opaque mesh and its `hidden_only` lines: the lines show through other geometry, not through the mesh
+    /// itself (the assembly Insert preview's edges through other parts, live mates.json insert_dialog).
+    pub see_through_self: bool,
     /// Opaque meshes drawn after the transparent ones (color pass), so
     /// see-through parts around them don't tint them: the red overlaps of
     /// Interference detection. Translucent ones go after the other
@@ -429,6 +432,7 @@ impl Instance {
             layer: 0,
             line_scale: 1.0,
             hidden_only: false,
+            see_through_self: false,
             over_transparent: false,
             over_lines: false,
             front_only: false,
@@ -488,6 +492,12 @@ impl Instance {
     /// Draw only the parts hidden behind other geometry (lines and points).
     pub fn hidden_only(mut self) -> Self {
         self.hidden_only = true;
+        self
+    }
+
+    /// See [`Instance::see_through_self`]: on the mesh and on its `hidden_only` lines.
+    pub fn see_through_self(mut self) -> Self {
+        self.see_through_self = true;
         self
     }
 
@@ -999,6 +1009,7 @@ impl Scene {
                     && a.preview == b.preview
                     && a.line_scale == b.line_scale
                     && a.hidden_only == b.hidden_only
+                    && a.see_through_self == b.see_through_self
                     && a.layer == b.layer
                     && a.pick_only == b.pick_only
                     && a.pick_base == b.pick_base
@@ -1095,7 +1106,7 @@ impl Scene {
             format!("{:?}{:?}", i.color_mode, i.zebra).hash(&mut h);
             (i.pickable, i.ignore_clip, i.no_bounds, i.back_silhouette, i.unlit, i.preview, i.selected_only, i.decal_selected, i.layer).hash(&mut h);
             (i.hidden_only, i.over_transparent, i.over_lines, i.front_only, i.closed, i.on_top, i.pick_only, i.pick_behind, i.pick_solid).hash(&mut h);
-            (i.pick_base, i.hatch_id, i.reflection.is_some(), i.compare, i.body, i.mesh_lod, i.line_lod, i.lod_box).hash(&mut h);
+            (i.pick_base, i.hatch_id, i.reflection.is_some(), i.compare, i.body, i.mesh_lod, i.line_lod, i.lod_box, i.see_through_self).hash(&mut h);
         }
         self.states.hash(&mut h);
         (self.hover_outline, self.no_occlusion, self.clip_selected, self.clip_hovered, self.section_interference).hash(&mut h);

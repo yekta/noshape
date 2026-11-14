@@ -687,6 +687,9 @@ struct DrawLists {
     /// Color pass only: `hidden_only` lines and points.
     lines_hidden: Vec<usize>,
     points_hidden: Vec<usize>,
+    /// Color pass only: [`Instance::see_through_self`] opaque meshes and `hidden_only` lines.
+    self_marks: Vec<usize>,
+    lines_hidden_self: Vec<usize>,
     culled: usize,
     /// The pass's instances in draw order (shader slots), each once: a
     /// list's run of copies sharing a buffer gets consecutive slots and is
@@ -916,6 +919,8 @@ impl DrawLists {
         self.points.clear();
         self.lines_hidden.clear();
         self.points_hidden.clear();
+        self.self_marks.clear();
+        self.lines_hidden_self.clear();
         self.culled = 0;
         self.boxes.clear();
         self.line_levels.clear();
@@ -1054,7 +1059,12 @@ impl DrawLists {
                     }
                 }
                 Drawable::Mesh(_) if !pick && inst.front_only && inst.color[3] < 0.999 => self.front_only.push(i),
-                Drawable::Mesh(_) if inst.color[3] >= 0.999 => self.opaque.push(i),
+                Drawable::Mesh(_) if inst.color[3] >= 0.999 => {
+                    self.opaque.push(i);
+                    if !pick && inst.see_through_self {
+                        self.self_marks.push(i);
+                    }
+                }
                 Drawable::Mesh(_) => self.transparent.push(i),
                 Drawable::Image(_) if inst.color[3] >= 0.999 => self.images.push(i),
                 Drawable::Image(_) => self.images_faded.push(i),
@@ -1063,6 +1073,7 @@ impl DrawLists {
                         self.silhouettes.push(i);
                     }
                 }
+                Drawable::Lines(_) if inst.hidden_only && inst.see_through_self => self.lines_hidden_self.push(i),
                 Drawable::Lines(_) if inst.hidden_only => self.lines_hidden.push(i),
                 Drawable::Points(_) if inst.hidden_only => self.points_hidden.push(i),
                 Drawable::Lines(_) => self.lines.push(i),
@@ -1093,8 +1104,8 @@ impl DrawLists {
         }
         self.order_solid(scene, pick);
         let inst = &scene.instances;
-        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, over_lines, front_only, on_top, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, slots, slot_of, .. } = self;
-        let all = [opaque, transparent, pick_priority, reflective, over_transparent, over_lines, front_only, on_top, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden];
+        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, over_lines, front_only, on_top, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, lines_hidden_self, slots, slot_of, .. } = self;
+        let all = [opaque, transparent, pick_priority, reflective, over_transparent, over_lines, front_only, on_top, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, lines_hidden_self];
         slots.clear();
         slot_of.clear();
         slot_of.resize(inst.len(), u32::MAX);
@@ -1356,6 +1367,13 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         // Hidden-only geometry right after the meshes, so only faces count
         // as hiding it (not hover outlines or overlays drawn over the same
         // curves); the visible lines come after.
+        if !lists.lines_hidden_self.is_empty() {
+            // Marks where a see-through-self mesh is front-most; its hidden lines skip those pixels.
+            pass.set_stencil_reference(1);
+            draw(pass, &lists.self_marks, &pipelines.mesh_self_mark);
+            draw(pass, &lists.lines_hidden_self, &pipelines.line_hidden_self);
+            pass.set_stencil_reference(0);
+        }
         draw(pass, &lists.lines_hidden, &pipelines.line_hidden);
         draw(pass, &lists.points_hidden, &pipelines.point_hidden);
         draw(pass, &lists.lines, &pipelines.line);
@@ -1668,9 +1686,37 @@ struct P {
 struct Extra {
     writes: wgpu::ColorWrites,
     cull: Option<wgpu::Face>,
+    stencil: Stencil,
 }
 
-const PLAIN: Extra = Extra { writes: wgpu::ColorWrites::ALL, cull: None };
+/// A color-pass pipeline's stencil use ([`Instance::see_through_self`]).
+#[derive(Clone, Copy)]
+enum Stencil {
+    Off,
+    /// Writes the reference where the depth test passes.
+    Mark,
+    /// Draws only where the stencil differs from the reference.
+    Unmarked,
+}
+
+impl Stencil {
+    fn state(self) -> wgpu::StencilState {
+        let face = |compare, pass_op| wgpu::StencilFaceState { compare, fail_op: wgpu::StencilOperation::Keep, depth_fail_op: wgpu::StencilOperation::Keep, pass_op };
+        match self {
+            Stencil::Off => Default::default(),
+            Stencil::Mark => {
+                let f = face(wgpu::CompareFunction::Always, wgpu::StencilOperation::Replace);
+                wgpu::StencilState { front: f, back: f, read_mask: 0xff, write_mask: 0xff }
+            }
+            Stencil::Unmarked => {
+                let f = face(wgpu::CompareFunction::NotEqual, wgpu::StencilOperation::Keep);
+                wgpu::StencilState { front: f, back: f, read_mask: 0xff, write_mask: 0 }
+            }
+        }
+    }
+}
+
+const PLAIN: Extra = Extra { writes: wgpu::ColorWrites::ALL, cull: None, stencil: Stencil::Off };
 
 #[derive(Clone, Copy)]
 enum LayoutKind {
@@ -1891,7 +1937,7 @@ impl PipelineMaker {
                 format: if p.format == PICK_FORMAT { PICK_DEPTH_FORMAT } else { depth_format() },
                 depth_write_enabled: Some(write),
                 depth_compare: Some(cmp),
-                stencil: Default::default(),
+                stencil: x.stencil.state(),
                 bias: p.bias,
             }),
             multisample: wgpu::MultisampleState { count: p.samples, mask: !0, alpha_to_coverage_enabled: false },
@@ -2008,6 +2054,9 @@ struct Pipelines {
     /// [`Self::mesh_solid`] culling back faces ([`Instance::closed`]).
     mesh_solid_closed: wgpu::RenderPipeline,
     point_hidden: Lazy,
+    /// [`Instance::see_through_self`]: its mesh marks the stencil where front-most, its hidden lines skip the marks.
+    mesh_self_mark: Lazy,
+    line_hidden_self: Lazy,
     mesh_pick: Lazy,
     mesh_pick_transparent: Lazy,
     mesh_pick_plane: Lazy,
@@ -2054,6 +2103,8 @@ impl Pipelines {
             &self.mesh_on_top,
             &self.line_hidden,
             &self.point_hidden,
+            &self.mesh_self_mark,
+            &self.line_hidden_self,
             &self.mesh_pick,
             &self.mesh_pick_transparent,
             &self.mesh_pick_plane,
@@ -2657,7 +2708,7 @@ impl Renderer {
             let background = s.spawn(|| first.make(LayoutKind::Main, P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }, PLAIN));
             let mesh_opaque = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }, PLAIN));
             let mesh_solid = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-solid", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }, PLAIN));
-            let mesh_solid_closed = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-solid-closed", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Back) }));
+            let mesh_solid_closed = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-solid-closed", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Back), stencil: Stencil::Off }));
             // Strictly in front: a transparent plane coplanar with a sketch
             // image (drawn just before, without bias) doesn't veil it. Opaque
             // faces carry FACE_DEPTH_BIAS, so coplanar planes still tint them.
@@ -2667,7 +2718,7 @@ impl Renderer {
             // hovered edge (EDGE-HIGHLIGHT-LOOK; live has none).
             let line = s.spawn(|| first.make(LayoutKind::Main, P { label: "line", vs: line_vs(), fs: line_fs(), buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
             // Front faces culled, like Onshape's pass (`setOverrideFaceCullingMode(FRONT)`).
-            let mesh_backsil = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-backsil", vs: "vs_backsil", fs: "fs_backsil", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) }));
+            let mesh_backsil = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-backsil", vs: "vs_backsil", fs: "fs_backsil", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front), stencil: Stencil::Off }));
             let silhouette = s.spawn(|| first.make(LayoutKind::Main, P { label: "silhouette", vs: "vs_silhouette", fs: "fs_line", buffers: SILHOUETTE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
             let point = s.spawn(|| first.make(LayoutKind::Main, P { label: "point", vs: "vs_point", fs: "fs_point", buffers: POINT_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: msaa }, PLAIN));
             let join = |h: std::thread::ScopedJoinHandle<wgpu::RenderPipeline>| h.join().expect("pipeline compile thread");
@@ -2680,7 +2731,7 @@ impl Renderer {
             Lazy::new(move || m.make(layout, p, x))
         };
         let mesh_outline = lazy(LayoutKind::Main, P { label: "mesh-outline", vs: "vs_outline", fs: "fs_outline", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((false, ge)), bias: face, samples: msaa }, PLAIN);
-        let mesh_outline_depth = lazy(LayoutKind::Main, P { label: "mesh-outline-depth", vs: "vs_mesh", fs: "fs_outline_depth", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }, Extra { writes: wgpu::ColorWrites::empty(), cull: None });
+        let mesh_outline_depth = lazy(LayoutKind::Main, P { label: "mesh-outline-depth", vs: "vs_mesh", fs: "fs_outline_depth", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }, Extra { writes: wgpu::ColorWrites::empty(), cull: None, stencil: Stencil::Off });
         // Every kept surface of a cut part adds its color, without depth
         // test or culling.
         let section_mask = lazy(LayoutKind::Main, P { label: "section-mask", vs: "vs_mesh", fs: "fs_section_mask", buffers: MESH_BUFFERS, format: mask_format, blend: Some(wgpu::BlendState { color: add, alpha: add }), depth: None, bias: none, samples: 1 }, PLAIN);
@@ -2690,11 +2741,13 @@ impl Renderer {
         let section_cap = lazy(LayoutKind::Cap, P { label: "section-cap", vs: "vs_section_cap", fs: "fs_section_cap", buffers: &[], format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: none, samples: msaa }, PLAIN);
         let section_cap_pick = lazy(LayoutKind::Cap, P { label: "section-cap-pick", vs: "vs_section_cap", fs: "fs_section_cap_pick", buffers: &[], format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }, PLAIN);
         let mesh_reflect = lazy(LayoutKind::Image, P { label: "mesh-reflect", vs: "vs_mesh", fs: "fs_mesh_reflect", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }, PLAIN);
-        let mesh_transparent_back = lazy(LayoutKind::Main, P { label: "mesh-t-back", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) });
-        let mesh_transparent_front = lazy(LayoutKind::Main, P { label: "mesh-t-front", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Back) });
+        let mesh_transparent_back = lazy(LayoutKind::Main, P { label: "mesh-t-back", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front), stencil: Stencil::Off });
+        let mesh_transparent_front = lazy(LayoutKind::Main, P { label: "mesh-t-front", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Back), stencil: Stencil::Off });
         let mesh_on_top = lazy(LayoutKind::Main, P { label: "mesh-top", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }, PLAIN);
         let silhouette_pulled = m.sil.is_some().then(|| lazy(LayoutKind::SilPulled, P { label: "silhouette-pulled", vs: "vs_silhouette_pulled", fs: "fs_line", buffers: &[], format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
         let line_hidden = lazy(LayoutKind::Main, P { label: "line-hidden", vs: "vs_line", fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN);
+        let line_hidden_self = lazy(LayoutKind::Main, P { label: "line-hidden-self", vs: "vs_line", fs: "fs_line", buffers: LINE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: EDGE_DEPTH_BIAS, samples: msaa }, Extra { stencil: Stencil::Unmarked, ..PLAIN });
+        let mesh_self_mark = lazy(LayoutKind::Main, P { label: "mesh-self-mark", vs: "vs_mesh", fs: "fs_self_mark", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((false, ge)), bias: face, samples: msaa }, Extra { writes: wgpu::ColorWrites::empty(), cull: None, stencil: Stencil::Mark });
         let point_hidden = lazy(LayoutKind::Main, P { label: "point-hidden", vs: "vs_point", fs: "fs_point", buffers: POINT_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: POINT_DEPTH_BIAS, samples: msaa }, PLAIN);
         let mesh_pick = lazy(LayoutKind::Main, P { label: "mesh-pick", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }, PLAIN);
         let mesh_pick_transparent = lazy(LayoutKind::Main, P { label: "mesh-pick-t", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((false, ge)), bias: none, samples: 1 }, PLAIN);
@@ -2736,6 +2789,8 @@ impl Renderer {
             silhouette_pulled,
             point,
             point_hidden,
+            mesh_self_mark,
+            line_hidden_self,
             mesh_pick,
             mesh_pick_transparent,
             mesh_pick_plane,

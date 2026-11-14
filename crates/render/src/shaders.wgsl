@@ -512,6 +512,14 @@ fn fs_outline_depth(i: MeshOut) -> @location(0) vec4<f32> {
     return vec4(0.0);
 }
 
+// A see-through-self mesh's front-most pixels, marked in the stencil (no color).
+@fragment
+fn fs_self_mark(i: MeshOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
+    if (clipped(i.world)) { discard; }
+    return vec4(0.0);
+}
+
 // ---------------------------------------------------------------- section caps
 //
 // Onshape's stencil-free capping (webgl bundle, kern G40): every kept surface
