@@ -8,7 +8,7 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
   constraint, live's start has one "Add feature" per feature), ver-linked-selective-update (live's take missed the
   checkbox; re-recorded 11-14).
 - **Release management**: live's account is on Professional since 2026-11-14 (before, Release… opened only the upsell).
-  The live matrix below is live2's capture (25 rows: = 21, ? 4); the help matrix keeps the rows live hasn't shown yet
+  The live matrix below is live2's capture (25 rows: = 22, ? 3); the help matrix keeps the rows live hasn't shown yet
   (138: = 108, 17 settled by the live matrix, ≠ 2, missing 2, ? 2, cloud 7).
   Rows: 138; = 97, ≠ 20, missing 9, ? 6, cloud 6 (left out: other users, notifications).
 
@@ -25,7 +25,7 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
 | Item row | thumbnail, icon + name, kind, yellow flag, red × "Remove from release" (top-level only) | the same ("Remove from release") | – | = |
 | Item name click | nothing (dialog stays, no tab) | nothing | – | = |
 | Columns | Revision (A, after a release "A ⟶ [B]"), State, Part number (red outline empty), Edit properties / Export… | the same | – | = |
-| Revision too low | yellow band "The next available revision for part number LV2-100 is B." | ? (our text not compared) | – | ? |
+| Revision too low | yellow band "The next available revision for part number LV2-100 is B." | the same text in a yellow band (`Issue::RevisionTooLow`) | model-core releases_obsolete_and_validate | = |
 | Form | Release name *, Release notes * (Require a note), Approvers (ⓘ "Required for action Submit", no *), Observers, both "Search users or teams" | the same | – | = |
 | Footer | undo / redo, Save draft (▴ Save draft / Delete draft on a draft), hint, Apply (blue), Submit (blue, needs approvers: "Submit requires Approvers"), Release (green #028502, #a2db7d disabled), Close | the same | – | = |
 | Release | toast "Your action on <name> is being processed." | the same toast (DocEvent::Info) | – | = |
