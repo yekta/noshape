@@ -932,6 +932,48 @@ fn a_mirrored_copy_shows_its_originals_faces() {
     assert_eq!(shown(&m), original, "raw faces {raw}, shown in the original {original}");
 }
 
+/// A ring revolved from half a turn round its profile above its axis (its cylinders' parameters running from π: the seam at −z) with two
+/// grooves cut either side of −z: the tread between them, split at that seam, is one face as live shows it (infento's
+/// tyre, Boolean 2: 392 faces for live's 391).
+#[test]
+fn a_tread_across_a_seam_at_half_a_turn_shows_one_face() {
+    let p = |x: f64, z: f64| DVec3::new(x, 0.0, z);
+    let edges = [make_line(p(0.0, 15.0), p(8.0, 15.0)).unwrap(), make_line(p(8.0, 15.0), p(8.0, 20.0)).unwrap(), make_line(p(8.0, 20.0), p(0.0, 20.0)).unwrap(), make_line(p(0.0, 20.0), p(0.0, 15.0)).unwrap()];
+    let profile = make_face_from_wire(&make_wire(&edges).unwrap(), true).unwrap();
+    let ring = revolve_between(&profile, DVec3::ZERO, DVec3::X, PI, 3.0 * PI).unwrap().shape;
+    let outer = ring.faces().into_iter().find(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { radius, .. }) if (radius - 20.0).abs() < 1e-9)).unwrap();
+    assert!((outer.uv_bounds().unwrap()[0] - PI).abs() < 1e-9, "the outer wall's parameters from π: {:?}", outer.uv_bounds());
+    let groove = |y: f64| make_box_corners(DVec3::new(-1.0, y - 0.5, -25.0), DVec3::new(9.0, y + 0.5, -18.0)).unwrap();
+    let cut = boolean(BooleanOp::Cut, &[ring], &[groove(-3.0), groove(3.0)], &BooleanOptions::default()).unwrap().shape;
+    let tread: Vec<Shape> = cut.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { radius, .. }) if (radius - 20.0).abs() < 1e-9)).collect();
+    assert_eq!(tread.len(), 3, "the outer wall in three: the rest and the tread's halves");
+    assert_eq!(shown_faces(&cut), cut.faces().len() - 1, "{} raw faces", cut.faces().len());
+}
+
+/// A 20-turn thread swept round a shaft and fused onto it in one feature (asm-hand-drill-pinslot's Sweep 2, live
+/// 28 ms): the sweep's self-intersection check gives up past its CPU second finding nothing, and the feature's budget
+/// isn't spent by it, else the fuse after it stopped at once ("BOPAlgo_AlertIntersectionFailed"). In metres.
+#[test]
+fn a_threads_self_intersection_check_leaves_the_features_budget() {
+    let mm = 1e-3;
+    let frame = Plane::xy();
+    let helix = make_helix(&frame, 4.0 * mm, 1.0 * mm, 20.0 * mm, false, 0.0).unwrap();
+    let p = |x: f64, z: f64| DVec3::new(x, 0.0, z) * mm;
+    let edges = [make_line(p(3.9, -0.3), p(4.5, 0.0)).unwrap(), make_line(p(4.5, 0.0), p(3.9, 0.3)).unwrap(), make_line(p(3.9, 0.3), p(3.9, -0.3)).unwrap()];
+    let profile = make_face_from_wire(&make_wire(&edges).unwrap(), true).unwrap();
+    let thread = sweep(&profile, &helix, &SweepOptions::default()).unwrap().shape;
+    let shaft = make_cylinder(&Plane::from_normal(DVec3::new(0.0, 0.0, -1.0) * mm, DVec3::Z), 4.0 * mm, 22.0 * mm, 2.0 * PI).unwrap();
+    let ((faulty, fused), spent) = with_budget_scope(|| {
+        let faulty = thread.self_intersects();
+        (faulty, boolean(BooleanOp::Fuse, std::slice::from_ref(&shaft), std::slice::from_ref(&thread), &BooleanOptions::default()))
+    });
+    assert!(!faulty && !spent, "self-intersects {faulty}, budget spent {spent}");
+    let fused = fused.unwrap().shape;
+    assert!(fused.is_valid() && fused.count(ShapeType::Solid) == 1);
+    let want = shaft.volume().unwrap() + thread.volume().unwrap();
+    assert!(fused.volume().unwrap() > shaft.volume().unwrap() && fused.volume().unwrap() < want, "{} of {want} m³", fused.volume().unwrap());
+}
+
 /// A guided loft between two smooth closed profiles (no corners on either: c2-hunting-knife's handle, Loft 1): one side
 /// face round the loop through the guides, as live, where ours refused ("Loft guides need a profile with corners yet").
 #[test]

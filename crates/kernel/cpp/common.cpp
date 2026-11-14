@@ -942,6 +942,34 @@ bool same_bspline(const occ::handle<Geom_Curve>& a, const occ::handle<Geom_Curve
       return false;
   return true;
 }
+
+// Two faces on one elementary surface held apart (each its own copy): the same kind, frame and radii, their
+// parameters alike.
+bool same_frame(const TopoDS_Face& a, const TopoDS_Face& b)
+{
+  const BRepAdaptor_Surface x(a, false), y(b, false);
+  if (x.GetType() != y.GetType())
+    return false;
+  auto same_ax3 = [](const gp_Ax3& p, const gp_Ax3& q) {
+    return p.Location().Distance(q.Location()) <= 1e-12 && p.Direction().IsEqual(q.Direction(), 1e-12) && p.XDirection().IsEqual(q.XDirection(), 1e-12) &&
+           p.YDirection().IsEqual(q.YDirection(), 1e-12);
+  };
+  auto same = [](double p, double q) { return std::abs(p - q) <= 1e-12 * std::max(1.0, std::abs(p)); };
+  switch (x.GetType())
+  {
+  case GeomAbs_Cylinder:
+    return same_ax3(x.Cylinder().Position(), y.Cylinder().Position()) && same(x.Cylinder().Radius(), y.Cylinder().Radius());
+  case GeomAbs_Cone:
+    return same_ax3(x.Cone().Position(), y.Cone().Position()) && same(x.Cone().RefRadius(), y.Cone().RefRadius()) && same(x.Cone().SemiAngle(), y.Cone().SemiAngle());
+  case GeomAbs_Torus:
+    return same_ax3(x.Torus().Position(), y.Torus().Position()) && same(x.Torus().MajorRadius(), y.Torus().MajorRadius()) && same(x.Torus().MinorRadius(), y.Torus().MinorRadius());
+  case GeomAbs_Sphere:
+    return same_ax3(x.Sphere().Position(), y.Sphere().Position()) && same(x.Sphere().Radius(), y.Sphere().Radius());
+  default:
+    return false;
+  }
+}
+
 } // namespace
 
 rust::Vec<uint8_t> shown_topology(const OcShape& s)
@@ -980,14 +1008,27 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       const TopoDS_Face& fb = TopoDS::Face(fm((int)two[1] + 1));
       TopLoc_Location    la, lb;
       const occ::handle<Geom_Surface> sa = BRep_Tool::Surface(fa, la), sb = BRep_Tool::Surface(fb, lb);
-      if (sa.IsNull() || sa != sb || !la.IsEqual(lb))
+      if (sa.IsNull() || sb.IsNull() || ((sa != sb || !la.IsEqual(lb)) && !same_frame(fa, fb)))
         continue;
-      // On the seam: an iso line of the periodic parameter at its period's start.
-      double f, l;
-      occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, fa, f, l);
-      while (const auto t = occ::down_cast<Geom2d_TrimmedCurve>(pc))
-        pc = t->BasisCurve();
-      const auto line = occ::down_cast<Geom2d_Line>(pc);
+      // On the seam: an iso line of the periodic parameter at its period's start, or where the two faces' curves of
+      // it lie whole periods apart (a seam of the surface the faces were cut from in another frame: infento's tyre
+      // tread across its r169 cylinder at u = π, one face in live).
+      // (The edge as the face holds it: on one surface the two faces' curves of it are its two, the edge closed on each.)
+      auto iso = [&](const TopoDS_Face& face) {
+        TopoDS_Edge held = e;
+        for (TopExp_Explorer x(face, TopAbs_EDGE); x.More(); x.Next())
+          if (x.Current().IsSame(e))
+          {
+            held = TopoDS::Edge(x.Current());
+            break;
+          }
+        double                    f, l;
+        occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(held, face, f, l);
+        while (const auto t = occ::down_cast<Geom2d_TrimmedCurve>(pc))
+          pc = t->BasisCurve();
+        return occ::down_cast<Geom2d_Line>(pc);
+      };
+      const auto line = iso(fa), other = iso(fb);
       if (line.IsNull())
         continue;
       double u1, u2, v1, v2;
@@ -998,8 +1039,16 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         const double r = std::fmod(x - x0, period);
         return std::min(std::abs(r), period - std::abs(r)) <= 1e-9 * std::max(1.0, period);
       };
-      const bool u_seam = sa->IsUPeriodic() && std::abs(d.X()) < 1e-12 && on_start(o.X(), u1, sa->UPeriod());
-      const bool v_seam = sa->IsVPeriodic() && std::abs(d.Y()) < 1e-12 && on_start(o.Y(), v1, sa->VPeriod());
+      auto periods_apart = [&](bool u, double period) {
+        if (other.IsNull())
+          return false;
+        const double a = u ? o.X() : o.Y(), b = u ? other->Location().X() : other->Location().Y();
+        const double db = u ? other->Direction().X() : other->Direction().Y();
+        return std::abs(db) < 1e-12 && std::abs(a - b) > 0.5 * period && on_start(a, b, period);
+      };
+      const bool u_iso = sa->IsUPeriodic() && std::abs(d.X()) < 1e-12, v_iso = sa->IsVPeriodic() && std::abs(d.Y()) < 1e-12;
+      const bool u_seam = u_iso && (on_start(o.X(), u1, sa->UPeriod()) || periods_apart(true, sa->UPeriod()));
+      const bool v_seam = v_iso && (on_start(o.Y(), v1, sa->VPeriod()) || periods_apart(false, sa->VPeriod()));
       if (!u_seam && !v_seam)
         continue;
       joining[(size_t)i] = true;
@@ -1078,11 +1127,34 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       // No seam through it: only B-spline or ellipse pieces the curve tests below find one curve, a seam a unify took
       // away with them left apart (c2-rings-loft's Extrude 5: 7 edges more than live), never a sketch's arcs or lines of
       // one curve, which live keeps apart (c2-impeller-loft's Loft Gehäuse: 3 arcs round its end, 10 edges).
+      bool sections = false;
       if (seams == 0 && !loop)
       {
         const GeomAbs_CurveType ta = BRepAdaptor_Curve(TopoDS::Edge(em(two[0]))).GetType(), tb = BRepAdaptor_Curve(TopoDS::Edge(em(two[1]))).GetType();
         if (ta != tb || (ta != GeomAbs_BSplineCurve && ta != GeomAbs_Ellipse))
           continue;
+        // Two sections of the same two analytic faces (their intersection one algebraic curve: OCCT approximated it in
+        // pieces, their ends a degree apart, where a unify took away the face edge that ended them): one edge in live
+        // (infento's tyre: a tread's rounds on its torus, 23 vertices more than live).
+        if (ta == GeomAbs_BSplineCurve)
+        {
+          auto analytic = [&](int j) {
+            for (uint32_t k = ef.first[(size_t)j - 1]; k < ef.first[(size_t)j]; ++k)
+              switch (BRepAdaptor_Surface(TopoDS::Face(fm((int)ef.second[k] + 1)), false).GetType())
+              {
+              case GeomAbs_Plane:
+              case GeomAbs_Cylinder:
+              case GeomAbs_Cone:
+              case GeomAbs_Sphere:
+              case GeomAbs_Torus:
+                break;
+              default:
+                return false;
+              }
+            return ef.first[(size_t)j] > ef.first[(size_t)j - 1];
+          };
+          sections = analytic(two[0]) && analytic(two[1]);
+        }
       }
       // Going on from each other: their directions away from the vertex opposite.
       const TopoDS_Vertex& v = TopoDS::Vertex(vm(i));
@@ -1096,7 +1168,7 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         return std::abs(t - c.FirstParameter()) < std::abs(t - c.LastParameter()) ? d : d.Reversed();
       };
       const gp_Vec a = away(two[0]), b = away(two[1]);
-      if (a.Magnitude() < 1e-12 || b.Magnitude() < 1e-12 || a.Normalized().Dot(b.Normalized()) > -1 + 1e-9)
+      if (a.Magnitude() < 1e-12 || b.Magnitude() < 1e-12 || a.Normalized().Dot(b.Normalized()) > (sections ? -std::cos(0.05) : -1 + 1e-9))
         continue;
       // Pieces of one curve (OCCT splits an edge into pieces of its curve; a circle may be made again), not two curves
       // meeting smoothly at a real vertex (a twisted vase's profile segments where its side's seam starts).
@@ -1107,7 +1179,7 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         const occ::handle<Geom_Curve>   cb = BRep_Tool::Curve(TopoDS::Edge(em(two[1])), lb, f, l);
         // (Across faces split at their surface's seam the pieces are one curve however OCCT made them: its section of a
         // cut is a curve on each side.)
-        bool                            one = loop || across || (!ca.IsNull() && !cb.IsNull() && la.IsEqual(lb) && (ca == cb || same_bspline(ca, cb, 1e-9)));
+        bool                            one = loop || across || sections || (!ca.IsNull() && !cb.IsNull() && la.IsEqual(lb) && (ca == cb || same_bspline(ca, cb, 1e-9)));
         if (!one)
         {
           BRepAdaptor_Curve xa(TopoDS::Edge(em(two[0]))), xb(TopoDS::Edge(em(two[1])));
@@ -1915,13 +1987,24 @@ GProp_GProps surface_props(const TopoDS_Shape& s)
 static bool self_intersects_unbudgeted(const TopoDS_Shape& shape);
 
 // (Within a CPU second: OCCT's analysis of a 20-turn thread's sweep ran for minutes, asm-hand-drill-pinslot's Sweep 2,
-// live's sweep 28 ms. Past it nothing is found: the sweep stands, as live's.)
+// live's sweep 28 ms. Past it nothing is found: the sweep stands, as live's, the feature's budget not spent by it, else
+// the sweep's Boolean after it stopped at its first check: "BOPAlgo_AlertIntersectionFailed".)
 bool self_intersects(const OcShape& s)
 {
   if (s.shape.IsNull())
     return false;
-  bool      faulty = false;
-  const int r      = run_budgeted(1.0, [&] { faulty = self_intersects_unbudgeted(s.shape); });
+  struct Detached
+  {
+    std::atomic<bool>* const spent = t_spent;
+    Detached() { t_spent = nullptr; }
+    ~Detached() { t_spent = spent; }
+  };
+  bool faulty = false;
+  int  r      = 0;
+  {
+    const Detached detached;
+    r = run_budgeted(1.0, [&] { faulty = self_intersects_unbudgeted(s.shape); });
+  }
   if (r == 2)
     fail_op("cancelled");
   return r == 0 && faulty;
