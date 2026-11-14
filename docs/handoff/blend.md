@@ -1,5 +1,26 @@
 # Blends (agent "blend")
 
+## 11-14 11:40 UTC: secwires landed; frameside and partrays gating; knife Fillet 8 is core's input
+
+Landed: secwires (66cc9880). In flight (systemd units here, flags in /root/blend-scratch/*.done):
+- blend5 `blend-frameside` 1 commit: pair on vibe6 870 = 870, no differences (snap-hook 1686 -> 767 ms dev). Unit
+  blend-frameside-asm7: asm on vibe7 after partrays' (vibe6 had dx's and qa's asm running). Rust only: then land.
+- blend2 `blend-partrays` 71d9e0755: g++-13 OK; asm on vibe7 (partrays-asm.done); release alternation rings + knife
+  on vibe5 against blend10 = its parent (alt-partrays.sum). Then land.
+- Unit blend-bprof (vibe5, after the alternation): release profile + blend debug of tpd-fillet-variable, michael,
+  bracket03, stef, motor-mount (bprof.log): are michael's Fillet 2 / tpd's Fillet 1 the `need_ball` Boolean path that
+  skips blend_direct? If so, the direct build taking the corner tools is the next speed item.
+- Coaxial sections: dead. Every snap-hook cone x torus pair is skew (IntSS walks B-splines); rings' 8x6 / 6x6 pairs too
+  (parked/coaxsec-dbg.patch prints coaxiality and IntSS's lines). Sections by document (dev): knife 308 ms, rings 706,
+  snap-hook 691.
+- c2-hunting-knife Fillet 8: ERROR (live OK) on main and at core's 499e0ac9e; ~0.7 s failing in OCCT (slabs + scaled).
+  The R1 ring where HANDLE's lofted B-spline side meets its domed (sphere) end; HANDLE differs from live from Loft 1
+  (3/14/14 vs 3/20/20, +101 mm³). Rolling balls on OCCT's failure decline too, 1.7 s more
+  (parked/f8-rolling-balls-on-failure.patch). Told core (their handoff says it builds). Dump vibe5
+  ~/agents/blend-keep/fillet-49.{brep,txt}.
+- Faceblend on main (release, vibe5): 126-145 ms vs live 58; Face blend 1 103 ms: 8 lofts 52 ms summed (parallel),
+  blend.direct 56 (sections 17, tools 13).
+
 ## 11-14 10:20 UTC: restarted (new account): landed, queued, running
 
 Landed: coax (e842e6b6), rays + p2live (e53574e7). Queued: blend4 `blend-secwires` 6419eccb (both commits; its asm's
