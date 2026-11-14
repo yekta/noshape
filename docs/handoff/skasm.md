@@ -1,5 +1,17 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-14 01:02 UTC): the 7 model-suite documents not matching (Mac 80/87, 870/947)
+- c2-hunting-knife, c2-impeller-loft: core's (the user's split). c2-fan-blade-sweep Boolean 2: bool (sent by core).
+  cf-setback-fillet: blend (SETBACK-FILL-PATCH). cf-surface-pattern Surface Pattern 3 (85-sphere cut): bool.
+- c2-gamma-imported / c2-wire-clip-imported (one model twice): Boolean 2's 24 import-tag queries had no live geometry.
+  f8918ece (landing): an id-less query takes only the refs.jsonl rows of its own query index (`LiveRef::query`), and an
+  import query resolved once (Transform 1 has live's boxes) names the same bodies later (`import_bodies`). Boolean 2
+  builds; its union is 914/2428/1344 vs live 884/2405/1344, +121 mm², -2.4 mm³ with all 88 inputs matching: sent to bool
+  (01:00).
+- Asked live (REQUESTS 01:02, P3): the knife's Sketch 7 externals JTd / JIl at rollback 21.
+- Suite pairs now need a fresh base: main moves (base worktree /root/projects/noshape-wt/skasm-base at origin/main;
+  rebase my branch first, else the patch reverts others' changes).
+
 ## Resume here (2026-11-13 21:04 UTC, restarted on a new account)
 - State of my area (qa's 16:41 suite, 0ff2c5e9): every sheet metal document matches to the end (louver 36/36,
   corner-break 11/11, model-plus 14/14, ...). Agreed with core (20:58): I take c2-hunting-knife's Sketch 7 / 8 /
