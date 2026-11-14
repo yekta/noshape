@@ -8,8 +8,8 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
   constraint, live's start has one "Add feature" per feature), ver-linked-selective-update (live's take missed the
   checkbox; re-recorded 11-14).
 - **Release management**: live's account is on Professional since 2026-11-14 (before, Release… opened only the upsell).
-  The live matrix below is live2's capture (25 rows: = 21, ≠ 0, ? 4); the help matrix keeps the rows live
-  hasn't shown yet.
+  The live matrix below is live2's capture (25 rows: = 21, ? 4); the help matrix keeps the rows live hasn't shown yet
+  (138: = 97, 17 settled by the live matrix, ≠ 7, missing 7, ? 4, cloud 6).
   Rows: 138; = 97, ≠ 20, missing 9, ? 6, cloud 6 (left out: other users, notifications).
 
 ## Live (Professional company, live2 2026-11-14: live/feel/release.json, feel/release/*.png)
@@ -59,12 +59,12 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Title | "Create Release candidate" (TRW, release-dialog2 / drawing-release-dialog-02.png) | RD:2182 | – | = |
 | Refresh button left of title, creator only, while creating | "Refresh button to the left of the dialog title… only when creating" (TRW) | RD:2220 (Mode::Release only); tooltip "Refresh" (BUNDLE "Refresh Release candidate") | – | = (tooltip text ≠) |
 | ⋯ overflow at top right | image drawing-release-dialog-02; "View audit log", "View workflow" (CW) | RD:1655-1710 | – | = |
-| Header "Comments" button | not in the creator's or reviewer's dialog images (drawing-release-dialog-02, reviewreleasedialog) | RD:2226 (always shown) | – | ≠ (extra button in header) |
+| Header "Comments" button | not in the creator's or reviewer's dialog images (drawing-release-dialog-02, reviewreleasedialog) | RD:2226 (always shown) | – | see the live matrix |
 | Dialog and sections resizable | "You can resize this dialog and its sections by clicking and dragging an edge or corner" (TRW) | fixed 820 px (RD:2286), list 212 px (RD:1956) | – | missing |
 | Yellow triangle on new/modified fields | "New or modified fields are marked with a yellow triangle in the upper left corner" (TRW) | RD:1794, RD:1821 | – | = |
 | Undo / Redo buttons + OS hot keys | "use the Undo and Redo buttons or your operating system hot keys" (TRW); image: ↶ ↷ at bottom left | RD:2062-2063, keys RD:2202-2211 | – | = |
 | Item row: thumbnail, type icon + name, italic type, red × | image drawing-release-dialog-02 | the same ("Remove from release") | – | = |
-| Red × removes item; tooltip | "clicking the red x" (TRW); BUNDLE tooltip "Remove from release" | RD:1855 tooltip "Remove" | – | ≠ (tooltip text) |
+| Red × removes item; tooltip | "clicking the red x" (TRW); BUNDLE tooltip "Remove from release" | RD:1855 tooltip "Remove" | – | see the live matrix |
 | Click item name opens it "in another browser tab" (dialog stays, then Refresh) | TRW "The appropriate tab will open in another browser tab… return… click Refresh" | RD name click: another window on the document at that tab (`release_hooks::open_tab_window`); the dialog stays | – | = (fixed 11-14) |
 | Search by name | "search … by name" (TRW, filter-object-list.png) | RD:1586, RD:1763 | – | = |
 | Filter icon expands type toggles + Clear | TRW "Click the Filter icon… type icons… Clear" | RD:1587, RD:1712-1753 (Part, Assembly, Drawing, Variable Studio, File) | – | ? (image release-type-filter-icons not saved; lead's note lists Assembly / Drawing / Part Studio only) |
@@ -76,7 +76,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Revision filled from scheme and earlier releases | TRW "Revision is automatically supplied … incremented automatically" | ML:396-403, OPS:78 | e2e release_parts_and_revision_history; ML test releases_obsolete_and_validate | = |
 | Revision can't go backward | TRW "if the previous revision is B … you may not change to A" | ML:438-448 (RevisionTooLow) | e2e release_parts_and_revision_history | = |
 | Imported revision kept on first release; mismatched scheme → warning and adjusted (e.g. 6 → A) | TRW (revision-update.png) | kept (OPS:76); a value outside the scheme is a blocking "Revision does not follow the revision scheme." (ML:345), not adjusted with a warning | – | ≠ |
-| Revision / part number error texts | BUNDLE "Revision must not be blank.", "Part number must be unique." | ML:344-347 "Revision does not follow the revision scheme.", "Part number is used by another item of this release." | ML test releases_obsolete_and_validate | ≠ |
+| Revision / part number error texts | BUNDLE "Revision must not be blank.", "Part number must be unique." | ML:344-347 "Revision does not follow the revision scheme.", "Part number is used by another item of this release." | ML test releases_obsolete_and_validate | see the live matrix |
 | State column: In progress (workspace), Released (linked released) | TRW "In progress… Pending… Released reflects previously-released, linked objects" | RD:1769-1774; linked released → reverted/Released (crates/release-ui/src/release_add_source.rs:160-176) | – | = |
 | State Pending for items linked to a pending release | TRW "If a linked object is linked to a release that is Pending … Pending state" | add_source only checks released packages (release_add_source.rs:163); shows In progress | – | ≠ |
 | Part number field per row, # "Generate next part number" (sequential on) | TRW; image (greyed when filled) | RD:1873-1892 | ML test sequential_numbers_share_the_counter | = |
@@ -97,14 +97,14 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Approvers listed → Submit: version made, candidate Pending | TRW "Submit (visible when approvers are listed) to create a version, and set … Pending" | RD:2119-2125, OPS:261-267 | e2e release_submit_approve_and_reject | = |
 | Footer buttons and colours: Apply (blue), Submit (blue), Close (grey) | images drawing-release-dialog-02, reviewreleasedialog | RD footer: Apply, Submit / Release #1651b0, Close grey | – | = (fixed 11-14) |
 | Save draft (bottom left) saves and closes | TRW "Save draft … saves … closes the dialog, and adds the new draft to the Release drafts panel" | RD:2064-2068 | e2e release_drafts_revert_and_generate | = |
-| Bubble after Save draft | BUNDLE "<b>name</b> release candidate is saved in your release drafts." | none (save_draft RD:1282-1300 emits nothing) | – | missing |
+| Bubble after Save draft | BUNDLE "<b>name</b> release candidate is saved in your release drafts." | none (save_draft RD:1282-1300 emits nothing) | – | see the live matrix |
 | Close closes without recording | TRW | RD:2172 | – | = |
 | Status text when blocked | BUNDLE "A field required by one or more actions is empty" | RD:2021 | – | = |
 | Submit/Release disabled while items need attention | refresh-03 note "Submit is disabled" | RD:2020 (blocked) | e2e release_parts_and_revision_history ("needs attention") | = |
 | Release conditions block with item messages | RMS "Release conditions"; refresh-03 text "Part belongs to a Part Studio with a Feature list that is in a rolled back state." | RC:28-114; texts e.g. "The Part Studio feature list is not rolled to the end." | RC test a_reference_to_an_obsoleted_release_is_obsolete | ≠ (message texts) |
 | Non-blocking notices when a condition is off (pending task, drawing pending update, references obsolete revision: obsolete-reference-01 warning) | RMS "If this condition is not checked … a message is still displayed"; TRW "Drawing has a pending update"; OBS "the following warning is displayed" | nothing when the condition is off (RC:29, 93, 98) | – | missing |
-| Admin override when company requires approvers ("…as an administrator you can override this setting and __transition__…") | BUNDLE | none: with Require approver + Do not allow creator as approver the local user can never release (RD:1414, 2019-2020) | – | missing |
-| Release from an Assembly lists its whole BOM incl. standard content (no revision) and linked parts (no new revision) | TRW "Releasing assemblies" | OPS:158-165 skips `External`, `Standard`, `MirroredPart` instances | – | ≠ |
+| Admin override when company requires approvers ("…as an administrator you can override this setting and __transition__…") | BUNDLE | none: with Require approver + Do not allow creator as approver the local user can never release (RD:1414, 2019-2020) | – | see the live matrix |
+| Release from an Assembly lists its whole BOM incl. standard content (no revision) and linked parts (no new revision) | TRW "Releasing assemblies" | OPS:158-165 skips `External`, `Standard`, `MirroredPart` instances | – | see the live matrix |
 | Release from a Drawing lists the parts/assemblies it shows | TRW "Releasing drawings" | OPS:171-184 | – | = |
 | Workflow selection dialog (Select release workflow, Debug mode) when several workflows | CW (select-workflow-dialog.png, fs-custwkflow-1.png) | – | – | missing (Enterprise; only one workflow locally) |
 
@@ -126,7 +126,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 |---|---|---|---|---|
 | Release drafts panel (left icon), double-click opens draft | TRW "click the Release drafts icon on the left side… double-click on a draft" | WS:2175, RD:2355-2427 | – | = |
 | Draft reopens titled "Review Release" | image reviewreleasedialog ("Review Release") | RD title: "Review Release" | – | = (fixed 11-14) |
-| Save draft ▴ menu: save / delete | TRW; BUNDLE "Save draft release" / "Delete draft release" | RD:2069-2103 "Save draft" / "Delete draft" | e2e release_drafts_revert_and_generate | ≠ (item texts) |
+| Save draft ▴ menu: save / delete | TRW; BUNDLE "Save draft release" / "Delete draft release" | RD:2069-2103 "Save draft" / "Delete draft" | e2e release_drafts_revert_and_generate | see the live matrix |
 | Delete draft confirmation | BUNDLE "Delete release candidate draft?" / "This will permanently delete <b>name</b> and cannot be undone." | RD:2254-2281 | – | = |
 | Draft submitted from Review Release | TRW "click the Submit button to submit your Release" | RD:2108-2125 (same footer) | e2e release_drafts_revert_and_generate (from_draft) | = |
 | Approve → Released at the Submit version; "Approved by …" | TRW, BUNDLE | RD:2145-2149, OPS:270-276, RD:2177 | e2e release_submit_approve_and_reject | = |
@@ -136,22 +136,22 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Notifications, Action items page, blue "submitted" bubble | TRW | – | – | cloud |
 | Require approval from all approvers / creator override of other approvers | RMS, BUNDLE | – | – | cloud |
 | Delegating approval (My account › Preferences) | SETUP | – | – | cloud |
-| Released package review: read-only + Clone | (Release__cloning_a_release_package, not saved; BUNDLE "Recreate Release from the current workspace") | RD:2159-2169 | – | ? (page not in local set) |
+| Released package review: read-only + Clone | (Release__cloning_a_release_package, not saved; BUNDLE "Recreate Release from the current workspace") | RD:2159-2169 | – | see the live matrix |
 
 ## 4. Revision history
 
 | Item | Help says | Ours | Test | Status |
 |---|---|---|---|---|
 | Opened from part / Assembly / Variable Studio / Drawing context menu | OBS "part in a Parts list, Assembly, Variable Studio, or Drawing tab" | part list crates/part-studio-ui/src/part_studio/mod.rs:4783-4785; tab WS:1985-1987 (only once it has revisions) | – | = |
-| Title "Revision history", sub-header part number (bold, ~16 px) | release_revision-history-01.png ("A-101") | RD:2530: number at 12 px, muted | – | ≠ |
+| Title "Revision history", sub-header part number (bold, ~16 px) | release_revision-history-01.png ("A-101") | RD:2530: number at 12 px, muted | – | see the live matrix |
 | Revisions newest first | image (C, B) | RD:2438 | e2e release_parts_and_revision_history | = |
-| Icons: ▲ released (black); obsolete icon; auto-obsoletion icon | OBS; image | RD:2453: ▲ green / △ grey for any obsolete; text "Obsoleted by a later revision" / "Obsolete" | – | ≠ |
-| Row text order: user name, release name (bold), date, Version: name ↗, Document:, Type: | image | RD:2460-2485: release name + date, "User: …", Document, Version, Type | – | ≠ (order, "User:" label) |
-| Buttons stacked: View release, Export, Obsolete revision (red) | image | RD:2489-2526 in a row: Export, View release, Obsolete revision | – | ≠ (order/layout) |
+| Icons: ▲ released (black); obsolete icon; auto-obsoletion icon | OBS; image | RD:2453: ▲ green / △ grey for any obsolete; text "Obsoleted by a later revision" / "Obsolete" | – | see the live matrix |
+| Row text order: user name, release name (bold), date, Version: name ↗, Document:, Type: | image | RD:2460-2485: release name + date, "User: …", Document, Version, Type | – | see the live matrix |
+| Buttons stacked: View release, Export, Obsolete revision (red) | image | RD:2489-2526 in a row: Export, View release, Obsolete revision | – | see the live matrix |
 | View release opens Review Release | OBS | RD:2504-2507 | – | = |
 | Export opens Export dialog for the release | OBS | RD:2491-2502 | – | = |
-| Click version name → opens version "in a new tab" | OBS | RD:2464-2482: opens the version in the same window | – | ≠ |
-| Obsoleted revision: button becomes "View obsoletion" | OBS; image (B) | RD:2510-2526 for obsoletion packages; an auto-obsoleted revision keeps "Obsolete revision" and has no View obsoletion | – | ≠ (auto case) |
+| Click version name → opens version "in a new tab" | OBS | RD:2464-2482: opens the version in the same window | – | see the live matrix |
+| Obsoleted revision: button becomes "View obsoletion" | OBS; image (B) | RD:2510-2526 for obsoletion packages; an auto-obsoleted revision keeps "Obsolete revision" and has no View obsoletion | – | see the live matrix |
 | Revision label reuses skipped labels? no ("not reusing any skipped labels") | OBS | ML:396-403 | ML test revision_scheme_skips_letters | = |
 | Op | – | `release_revision_history` (crates/ops/src/ops/release.rs:103) | e2e release_parts_and_revision_history | = |
 
@@ -163,8 +163,8 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | "Mark revision as re-releasable" checkbox; label reused next release | OBS | RD:2009-2015, ML:399 | ML test releases_obsolete_and_validate | = |
 | Admin can make an already obsoleted revision re-releasable | OBS "an administrator can override the option" | – (only Revision tools › Reset part number type, crates/release-ui/src/revision_tools.rs) | ML test reset_part_number_type_obsoletes_that_type_only | missing |
 | Add to Obsolete candidate (+) → "Add Items to Obsoletion" | OBS; BUNDLE title "Add Items to Obsoletion" | RD:1611-1616, RD:587, RD:360-390 | – | = |
-| Submit when an approver is given, else Obsolete | OBS "Click Submit if an approver's email is supplied, otherwise click Obsolete" | no Approvers/Observers in obsolete mode (RD:2017); only Obsolete (RD:2151-2158) | – | ≠ (approver path missing) |
-| Name / notes fields and which are required | OBS "Supply the required information" | label = display name "Obsoletion names"/"Obsoletion notes" (RD:1964, RS:79); notes required (RD:1967, 1489) | – | ? (obsolete-dialog-01.png not saved; "Obsoletion names" plural label looks wrong) |
+| Submit when an approver is given, else Obsolete | OBS "Click Submit if an approver's email is supplied, otherwise click Obsolete" | no Approvers/Observers in obsolete mode (RD:2017); only Obsolete (RD:2151-2158) | – | see the live matrix |
+| Name / notes fields and which are required | OBS "Supply the required information" | label = display name "Obsoletion names"/"Obsoletion notes" (RD:1964, RS:79); notes required (RD:1967, 1489) | – | see the live matrix |
 | Obsoleting marks the released version (solid ▲ with dot) | RM | OPS:364-368, HP:1110-1162 | – | = |
 | Obsoleted revisions never offered when inserting into Assembly / Drawing | OBS | drawing insert filters them (crates/drawing-ui/src/drawing_chooser.rs:117-127); assembly Insert has no release filter | drawing_chooser released_items_newest_first_without_obsolete | = (drawing) / ? (assembly) |
 | Agent API op to obsolete a revision | AGENTS.md: every app action is an op | ops `release_obsolete` | e2e release_parts_and_revision_history | = (fixed 11-14) |
@@ -192,7 +192,7 @@ RT revision table, CW customized release workflow; BUNDLE the client's strings. 
 | Watermark for Pending / Rejected / Discarded states | watermarks-dialog.png (texts per state) | RD:90-94 uses only in_progress / released / obsolete | – | ≠ |
 | Release conditions: 8 checkboxes in order | RMS | RS:56-65, RP:449-456 | – | = |
 | Create Release candidate dialog: 6 checkboxes, "Do not allow creator as approver" disabled until Require approver | relmgmt-workflows-18-01.png | RP:468-489 | – | = |
-| Do not allow creator as approver: creator's name not in the list | RMS "the creator's name doesn't appear in the list" | RD:1414, 1444-1445: shown greyed with a tooltip | – | ≠ |
+| Do not allow creator as approver: creator's name not in the list | RMS "the creator's name doesn't appear in the list" | RD:1414, 1444-1445: shown greyed with a tooltip | – | see the live matrix |
 | Restrict approvers to specific users or teams | RMS (Professional) | – | – | cloud |
 | Display names for Release name / notes, Obsoletion names / notes | RMS | RP:460-467, RS:166-173 | RS test old_settings_files_keep_their_values_and_get_the_defaults | = |
 | Obsoletion: Automatically obsolete previous released revisions (default off) | relmgmt-workflows-19.png; RMS | RP:492-498, ML:371-375 | ML test releases_obsolete_and_validate | = |
