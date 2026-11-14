@@ -722,9 +722,9 @@ impl Sketch {
     }
 
     /// Mirrors entities about line `axis` as Onshape's sketch Mirror (live/feel/mirror.json): each copy tied to its
-    /// source by a mirror (symmetric) constraint of its own (a line, an arc, a circle) and a segment's ends by one
-    /// each (Onshape's `.begCons` / `.endCons`; a circle's or an arc's centre only through its curve's); a point by
-    /// one; an ellipse by its points and EQUAL. Points on the axis are reused; an entity whose mirror image is already
+    /// source by a mirror (symmetric) constraint of its own (a line, an arc, a circle, a spline) and a segment's ends
+    /// by one each (Onshape's `.begCons` / `.endCons`; a circle's or an arc's centre, a spline's inner points only
+    /// through its curve's); a point by one; an ellipse by its points and EQUAL. Points on the axis are reused; an entity whose mirror image is already
     /// there makes nothing.
     pub fn mirror(&mut self, ids: &[EntityId], axis: EntityId) -> Result<EditResult> {
         let (a, b) = self.line_pts(axis).ok_or_else(|| SketchError::OperationFailed("mirror axis must be a line".into()))?;
@@ -739,15 +739,33 @@ impl Sketch {
         let vf = move |v: DVec2| d * (2.0 * v.dot(d)) - v;
         let on_axis = move |p: DVec2| (p - a).perp_dot(d).abs() <= 4.0 * tol;
         let (pmap, emap) = self.copy_entities(&ids, &f, &vf, true, &on_axis, &mut res)?;
-        let curve_pair = |sk: &Sketch, e: EntityId| matches!(sk.kind(e), Some(EntityKind::Line | EntityKind::Arc | EntityKind::Circle));
+        let curve_pair = |sk: &Sketch, e: EntityId| {
+            matches!(sk.kind(e), Some(EntityKind::Line | EntityKind::Arc | EntityKind::Circle | EntityKind::BSpline | EntityKind::FitSpline | EntityKind::Conic))
+        };
         for (src, dst) in &emap {
             if curve_pair(self, *src) {
                 self.add_c(&mut res, ConstraintKind::Symmetric { a: *src, b: *dst, axis });
             }
         }
-        let centres: Vec<EntityId> = emap.iter().filter(|(src, _)| matches!(self.kind(*src), Some(EntityKind::Arc | EntityKind::Circle))).filter_map(|(src, _)| self.entity(*src)?.center()).collect();
+        // Points held through their curve's pair: a circle's or an arc's centre, a spline's inner and handle points.
+        let mut held: Vec<EntityId> = Vec::new();
+        for (src, _) in &emap {
+            let Some(e) = self.entity(*src) else { continue };
+            match &e.geometry {
+                Geometry::Arc { center, .. } | Geometry::Circle { center, .. } => held.push(*center),
+                Geometry::BSpline { control: pts, .. } | Geometry::FitSpline { points: pts, .. } => {
+                    held.extend(pts.iter().skip(1).take(pts.len().saturating_sub(2)));
+                    if let Geometry::FitSpline { handles: Some((h0, h1)), .. } = &e.geometry {
+                        held.extend([*h0, *h1]);
+                    }
+                }
+                Geometry::Conic { control, .. } => held.push(*control),
+                _ => {}
+            }
+        }
+        held.retain(|p| !ids.contains(p));
         for (p, q) in &pmap {
-            if p != q && !centres.contains(p) {
+            if p != q && !held.contains(p) {
                 self.add_c(&mut res, ConstraintKind::Symmetric { a: *p, b: *q, axis });
             }
         }

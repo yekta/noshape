@@ -1765,6 +1765,22 @@ impl<'a, L: Lookup> Builder<'a, L> {
                         self.lin(Lin::new().rad(1.0, &ra).rad(-1.0, &rb));
                         Ok(())
                     }
+                    (x, y) if x == y && matches!(x, EntityKind::BSpline | EntityKind::FitSpline | EntityKind::Conic) => {
+                        let (pa, pb) = (self.spline_points(*a)?, self.spline_points(*b)?);
+                        let handles = |g: &Geometry| match g {
+                            Geometry::FitSpline { handles: Some((h0, h1)), .. } => vec![*h0, *h1],
+                            _ => Vec::new(),
+                        };
+                        let (ha, hb) = (handles(self.geom(*a)?), handles(self.geom(*b)?));
+                        if pa.len() != pb.len() || ha.len() != hb.len() {
+                            return Err(format!("symmetric splines {a} and {b} have different numbers of points"));
+                        }
+                        for (p, q) in pa.iter().chain(&ha).zip(pb.iter().chain(&hb)) {
+                            let (p, q) = (self.pt(*p)?, self.pt(*q)?);
+                            self.sym_points(p, q, ax);
+                        }
+                        Ok(())
+                    }
                     _ => Err(format!("symmetric not supported between {ka:?} and {kb:?}")),
                 }
             }

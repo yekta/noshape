@@ -282,6 +282,34 @@ fn mirror_constrains_each_copy_as_live() {
     assert!(again.created.is_empty() && again.constraints_added.is_empty(), "{again:?}");
 }
 
+/// Live's mirrored spline (live/feel/mirror.json, 17-18): one mirror constraint for the curve and one for each end;
+/// its inner fit points and handles held through the curve's. Moving a source fit point moves the copy's.
+#[test]
+fn mirror_spline_as_one_curve_and_its_ends() {
+    let mut sk = Sketch::new();
+    let axis = sk.add_line(v(-5.0, -10.0), v(-5.0, 10.0));
+    sk.add_constraint(ConstraintKind::Fix { entity: axis }).unwrap();
+    let spline = sk.add_fit_spline_with_handles(&[v(0.0, 0.0), v(2.0, 3.0), v(4.0, 1.0), v(6.0, 4.0)]).unwrap();
+    let before = sk.constraints().count();
+    let res = sk.mirror(&[spline], axis).unwrap();
+    let copy = res.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::FitSpline)).unwrap();
+    let sym = |x: EntityId| sk.constraints().filter(|k| matches!(k.kind, ConstraintKind::Symmetric { a, b, .. } if a == x || b == x)).count();
+    let Some(Geometry::FitSpline { points, handles: Some((h0, h1)) }) = sk.entity(copy).map(|e| e.geometry.clone()) else { panic!() };
+    assert_eq!((sym(copy), sym(points[0]), sym(points[3])), (1, 1, 1), "the curve and its ends");
+    assert_eq!((sym(points[1]), sym(points[2]), sym(h0), sym(h1)), (0, 0, 0, 0), "inner points through the curve");
+    assert_eq!(sk.constraints().count() - before, 3);
+    let Some(Geometry::FitSpline { points: src, .. }) = sk.entity(spline).map(|e| e.geometry.clone()) else { panic!() };
+    sk.set_point(src[1], v(1.0, 5.0)).unwrap();
+    sk.add_constraint(ConstraintKind::Fix { entity: src[1] }).unwrap();
+    let rep = sk.solve();
+    assert!(rep.is_solved(), "{rep:?}");
+    assert!((sk.point(points[1]).unwrap() - v(-11.0, 5.0)).length() < 1e-9, "{:?}", sk.point(points[1]));
+    for (p, q) in src.iter().zip(&points) {
+        let (p, q) = (sk.point(*p).unwrap(), sk.point(*q).unwrap());
+        assert!((v(-10.0 - p.x, p.y) - q).length() < 1e-9, "{p} {q}");
+    }
+}
+
 #[test]
 fn patterns_transform_and_external() {
     let mut sk = Sketch::new();
