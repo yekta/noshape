@@ -4393,6 +4393,12 @@ impl<'a> Translator<'a> {
 
     /// An assembly mate connector argument's Z and origin in its part's coordinates (metres), as ours places it now.
     fn connector_frame_local(&mut self, tab: &str, c: &Value) -> Option<(glam::DVec3, glam::DVec3)> {
+        self.connector_frame_of(tab, c, false)
+    }
+
+    /// [`Self::connector_frame_local`]; `exact`: only the entity's own implicit connector, not one of its edges' (a
+    /// face's "center" offers its circles' centres, asm-infento-subs' profile ends their corner arcs').
+    fn connector_frame_of(&mut self, tab: &str, c: &Value, exact: bool) -> Option<(glam::DVec3, glam::DVec3)> {
         let instance = c["instance"].as_str()?;
         let list = self.call("assembly_list", json!({ "tab": tab })).ok()?;
         let k = per_unit(&list["units"]);
@@ -4404,7 +4410,8 @@ impl<'a> Translator<'a> {
         let cands = self.call("assembly_connectors", json!({ "tab": tab, "instance": instance, "entity": c["entity"] })).ok()?;
         let kc = per_unit(&cands["units"]);
         let want = format!("implicit:{}:", c["inference"].as_str()?);
-        let x = cands["connectors"].as_array()?.iter().find(|x| x["reference"].as_str().is_some_and(|r| r.starts_with(&want)))?;
+        let own = format!("{want}{}", c["entity"].as_str().unwrap_or_default());
+        let x = cands["connectors"].as_array()?.iter().find(|x| x["reference"].as_str().is_some_and(|r| if exact { r == own } else { r.starts_with(&want) }))?;
         Some((q.inverse() * v3(&x["z"], 1.0)?, q.inverse() * (v3(&x["position"], kc)? - t)))
     }
 
@@ -7294,7 +7301,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     let on_edge = matches!(inf.as_str(), "MID_POINT" | "CENTER") && c["entity"].as_str().is_some_and(|e| e.starts_with("edge:")) && c["instance"].as_str().is_some_and(|i| !i.contains(" > "));
                     // Every end off live's frame (its point or its Z), to tell which connectors read another entity.
                     if let (Some(z), Some(o)) = (live_z.map(glam::DVec3::from), live_o.map(glam::DVec3::from))
-                        && let Some((ours_z, ours_o)) = placer.connector_frame_local(&l.tab, &c)
+                        && let Some((ours_z, ours_o)) = placer.connector_frame_of(&l.tab, &c, true)
                         && (ours_o.distance(o) > 1e-6 || ours_z.dot(z).abs() < 0.999)
                     {
                         let kind = c["entity"].as_str().or(c["reference"].as_str()).and_then(|e| e.split(':').next()).unwrap_or("?");
