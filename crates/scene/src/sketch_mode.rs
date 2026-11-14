@@ -8978,6 +8978,58 @@ mod tests {
         assert!(wrong.is_empty(), "(R, deg, ours, live): {wrong:?}");
     }
 
+    /// Live (feel/sketch.json "drag" A-first, mm): a free line's end follows the pointer, its body moves it whole; a
+    /// horizontal line's end takes the start along (level kept, its x kept), its body moves it whole; the free end of a
+    /// line from the origin follows.
+    #[test]
+    fn drags_move_lines_as_live() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let ends = |d: &SketchData, l: EntityId| {
+            let (a, b) = d.sketch.endpoints(l).unwrap();
+            (d.sketch.point(a).unwrap(), d.sketch.point(b).unwrap())
+        };
+        let close = |got: (DVec2, DVec2), want: (DVec2, DVec2)| (got.0 - want.0).length() < 1e-6 && (got.1 - want.1).length() < 1e-6;
+        let mut wrong = Vec::new();
+        // Free: the end, then the body.
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(mm(-79.8559, 20.2393), mm(-29.7394, 40.0656));
+        drag(&mut ed, &mut d, mm(-29.7394, 40.0656), mm(-12.9422, 27.6742));
+        if !close(ends(&d, l), (mm(-79.8559, 20.2393), mm(-12.9422, 27.6742))) {
+            wrong.push(("free-end", ends(&d, l)));
+        }
+        let (s, e) = ends(&d, l);
+        let delta = mm(-63.334, 7.8479) - mm(-79.8559, 20.2393);
+        drag(&mut ed, &mut d, (s + e) * 0.5, (s + e) * 0.5 + delta);
+        if !close(ends(&d, l), (s + delta, e + delta)) {
+            wrong.push(("free-body", ends(&d, l)));
+        }
+        // Horizontal: the end up, then the body.
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(mm(-79.8559, 20.2393), mm(-29.7394, 20.2393));
+        d.sketch.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
+        drag(&mut ed, &mut d, mm(-29.7394, 20.2393), mm(-26.7104, 36.7613));
+        if !close(ends(&d, l), (mm(-79.8559, 36.7613), mm(-26.7104, 36.7613))) {
+            wrong.push(("horizontal-end-up", ends(&d, l)));
+        }
+        let (s, e) = ends(&d, l);
+        let delta = mm(-68.8413, 50.5295) - mm(-79.8559, 36.7613);
+        drag(&mut ed, &mut d, (s + e) * 0.5, (s + e) * 0.5 + delta);
+        if !close(ends(&d, l), (s + delta, e + delta)) {
+            wrong.push(("horizontal-body", ends(&d, l)));
+        }
+        // From the origin (drawn with the Line tool from it): the end follows.
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        click(&mut ed, &mut d, mm(40.2033, 25.1959));
+        ed.set_tool(Tool::Select);
+        let l = d.sketch.entities().find(|x| x.kind() == EntityKind::Line && !x.reference_only).map(|x| x.id).unwrap();
+        drag(&mut ed, &mut d, mm(40.2033, 25.1959), mm(51.2179, 8.674));
+        if !close(ends(&d, l), (v(0.0, 0.0), mm(51.2179, 8.674))) {
+            wrong.push(("fromOrigin-end", ends(&d, l)));
+        }
+        assert!(wrong.is_empty(), "{wrong:?}");
+    }
+
     /// Live (feel/sketch.json "boxA": A selected, then a right-to-left box over B): a box adds to the selection.
     #[test]
     fn a_box_adds_to_the_selection() {
