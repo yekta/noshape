@@ -208,6 +208,32 @@ fn a_face_cut_by_disks_on_its_plane_as_occt() {
     }
 }
 
+/// A plate and its top face cut by 30 slots (a louver's sheet: planar faces of lines, checked without BRepCheck's
+/// wire pairs) are taken by noshape's Boolean, valid and as OCCT's.
+#[test]
+fn slots_through_a_plate_and_its_face_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let plate = k::make_box_corners(DVec3::ZERO, DVec3::new(0.12, 0.08, 0.002)).unwrap();
+    let face = plate.faces().into_iter().find(|f| (f.centroid().unwrap().z - 0.002).abs() < 1e-9).expect("its top");
+    let slot = k::make_box_corners(DVec3::new(0.005, 0.005, -0.001), DVec3::new(0.015, 0.009, 0.003)).unwrap();
+    let slots: Vec<k::Shape> = (0..30).map(|i| k::transform(&slot, &k::Transform::Translate(DVec3::new(0.02 * (i % 5) as f64, 0.012 * (i / 5) as f64, 0.0)), true).unwrap().shape).collect();
+    for (name, object) in [("plate", &plate), ("face", &face)] {
+        let run = |rust: bool| {
+            k::set_rust_boolean(Some(rust));
+            let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(object), &slots, &k::BooleanOptions::default()).expect("the cut");
+            let path = k::last_boolean_path();
+            k::set_rust_boolean(None);
+            (r.shape, path)
+        };
+        let ((ours, path), (occt, _)) = (run(true), run(false));
+        assert_eq!(path, "rust", "{name}: {}", k::last_rust_decline());
+        assert!(ours.is_valid() && occt.is_valid(), "{name}: valid");
+        assert_eq!(ours.count(k::ShapeType::Edge), occt.count(k::ShapeType::Edge), "{name}: edges");
+        assert_eq!(ours.count(k::ShapeType::Face), occt.count(k::ShapeType::Face), "{name}: faces");
+        assert!((ours.area().unwrap() - occt.area().unwrap()).abs() <= 1e-12, "{name}: area");
+    }
+}
+
 /// A result's history records, each output by where it lies (a face by its centroid and area, an edge by its ends
 /// and length, a vertex by its point: none by a curve's parameters), grouped by what they say.
 fn placed_records(r: &k::OpResult) -> std::collections::BTreeMap<String, Vec<Vec<f64>>> {

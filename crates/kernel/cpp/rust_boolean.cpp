@@ -4422,6 +4422,235 @@ rust::Vec<uint32_t> brep_occt_moved(rust::Slice<const uint32_t> ids, uint32_t a_
   }
 }
 
+// Whether planar face `f`, all its edges lines, is valid as BRepCheck's wire and face checks have it: each wire closed
+// end to end, no two of its segments crossing or overlapping (but neighbours at their shared vertex), one outer wire
+// the face's way round and the others inside it the other way, none inside another. False where it can't tell (an
+// edge not a line, a wire not explored whole).
+static bool planar_lines_valid(const TopoDS_Face& f)
+{
+  TopLoc_Location                 loc;
+  const occ::handle<Geom_Plane>   pl = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(f, loc));
+  if (pl.IsNull())
+    return false;
+  const gp_Pln p   = pl->Pln().Transformed(loc.Transformation());
+  const auto   at2 = [&](const TopoDS_Vertex& v) {
+    double u = 0, w = 0;
+    ElSLib::Parameters(p, BRep_Tool::Pnt(v), u, w);
+    return gp_XY(u, w);
+  };
+  struct Seg
+  {
+    gp_XY  a, b;
+    size_t wire;
+    TopoDS_Vertex va, vb;
+  };
+  std::vector<Seg>                 segs;
+  std::vector<std::vector<gp_XY>> polys;
+  double                           eps = Precision::Confusion();
+  for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
+  {
+    if (wi.Value().ShapeType() != TopAbs_WIRE)
+      return false;
+    const TopoDS_Wire& w = TopoDS::Wire(wi.Value());
+    int                n = 0;
+    for (TopoDS_Iterator ei(w); ei.More(); ei.Next())
+      ++n;
+    std::vector<gp_XY> poly;
+    TopoDS_Vertex      first, last;
+    int                seen = 0;
+    for (BRepTools_WireExplorer we(w, f); we.More(); we.Next(), ++seen)
+    {
+      const TopoDS_Edge& e = we.Current();
+      double             c0 = 0, c1 = 0;
+      const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, c0, c1);
+      if (c.IsNull() || occ::down_cast<Geom_Line>(basis_of(c)).IsNull())
+        return false;
+      TopoDS_Vertex v0, v1;
+      TopExp::Vertices(e, v0, v1, true);
+      if (v0.IsNull() || v1.IsNull() || !(c0 < c1))
+        return false;
+      // (The line's ends on its vertices and in the plane, as BRepCheck_Edge and BRepCheck_Vertex have them.)
+      const double te = BRep_Tool::Tolerance(e);
+      for (const auto& [v, t] : {std::pair(TopExp::FirstVertex(e), c0), std::pair(TopExp::LastVertex(e), c1)})
+        if (c->Value(t).Distance(BRep_Tool::Pnt(v)) > BRep_Tool::Tolerance(v) || p.Distance(c->Value(t)) > te)
+          return false;
+      if (!last.IsNull() && !last.IsSame(v0))
+        return false;
+      if (first.IsNull())
+        first = v0;
+      last = v1;
+      eps  = std::max(eps, std::max(BRep_Tool::Tolerance(v0), BRep_Tool::Tolerance(e)));
+      segs.push_back({at2(v0), at2(v1), polys.size(), v0, v1});
+      poly.push_back(at2(v0));
+    }
+    if (seen != n || first.IsNull() || !last.IsSame(first))
+      return false;
+    polys.push_back(std::move(poly));
+  }
+  if (polys.empty())
+    return false;
+  // (Segments in x order: each against the ones whose x ranges meet.)
+  std::vector<size_t> order(segs.size());
+  for (size_t i = 0; i < order.size(); ++i)
+    order[i] = i;
+  const auto lo_x = [&](size_t i) { return std::min(segs[i].a.X(), segs[i].b.X()); };
+  std::sort(order.begin(), order.end(), [&](size_t i, size_t j) { return lo_x(i) < lo_x(j); });
+  const auto cross = [](const gp_XY& o, const gp_XY& a, const gp_XY& b) { return (a - o) ^ (b - o); };
+  for (size_t x = 0; x < order.size(); ++x)
+  {
+    const Seg&   s  = segs[order[x]];
+    const double hx = std::max(s.a.X(), s.b.X()) + eps;
+    for (size_t y = x + 1; y < order.size() && lo_x(order[y]) <= hx; ++y)
+    {
+      const Seg& t = segs[order[y]];
+      if (std::min(s.a.Y(), s.b.Y()) > std::max(t.a.Y(), t.b.Y()) + eps || std::min(t.a.Y(), t.b.Y()) > std::max(s.a.Y(), s.b.Y()) + eps)
+        continue;
+      // (Neighbours at a shared vertex: only folding back on each other is wrong.)
+      const bool shared = s.va.IsSame(t.va) || s.va.IsSame(t.vb) || s.vb.IsSame(t.va) || s.vb.IsSame(t.vb);
+      const gp_XY ds = s.b - s.a, dt = t.b - t.a;
+      const double ls = ds.Modulus(), lt = dt.Modulus();
+      if (ls <= eps || lt <= eps)
+        return false;
+      if (shared)
+      {
+        // (Along one line and turned back onto each other: an end to end pair pointing apart, a pair from or to the
+        // same vertex pointing alike.)
+        const bool end_to_end = s.vb.IsSame(t.va) || s.va.IsSame(t.vb);
+        if (std::abs((ds ^ dt) / (ls * lt)) <= 1e-9 && (end_to_end ? (ds * dt) < 0 : (ds * dt) > 0))
+          return false;
+        continue;
+      }
+      // (Apart by more than the tolerance: each other's ends on one side of the other's line, or their spans apart.)
+      const double d1 = cross(s.a, s.b, t.a) / ls, d2 = cross(s.a, s.b, t.b) / ls;
+      const double d3 = cross(t.a, t.b, s.a) / lt, d4 = cross(t.a, t.b, s.b) / lt;
+      if ((d1 > eps && d2 > eps) || (d1 < -eps && d2 < -eps) || (d3 > eps && d4 > eps) || (d3 < -eps && d4 < -eps))
+        continue;
+      // (Along one line: apart if their projections don't meet.)
+      if (std::abs(d1) <= eps && std::abs(d2) <= eps)
+      {
+        const gp_XY  u  = ds / ls;
+        const double t0 = (t.a - s.a) * u, t1 = (t.b - s.a) * u;
+        if (std::max(t0, t1) < -eps || std::min(t0, t1) > ls + eps)
+          continue;
+      }
+      return false;
+    }
+  }
+  // Orientation: the face's normal way round, one outer wire, the rest inside it and turned.
+  const bool rev   = f.Orientation() == TopAbs_REVERSED;
+  const auto area  = [](const std::vector<gp_XY>& q) {
+    double a = 0;
+    for (size_t i = 0; i < q.size(); ++i)
+      a += q[i] ^ q[(i + 1) % q.size()];
+    return 0.5 * a;
+  };
+  const auto inside = [](const std::vector<gp_XY>& q, const gp_XY& pt) {
+    bool in = false;
+    for (size_t i = 0, j = q.size() - 1; i < q.size(); j = i++)
+      if ((q[i].Y() > pt.Y()) != (q[j].Y() > pt.Y()) && pt.X() < (q[j].X() - q[i].X()) * (pt.Y() - q[i].Y()) / (q[j].Y() - q[i].Y()) + q[i].X())
+        in = !in;
+    return in;
+  };
+  int outer = -1;
+  for (size_t i = 0; i < polys.size(); ++i)
+  {
+    const double a = rev ? -area(polys[i]) : area(polys[i]);
+    if (a > 0)
+    {
+      if (outer >= 0)
+        return false;
+      outer = static_cast<int>(i);
+    }
+  }
+  if (outer < 0)
+    return false;
+  for (size_t i = 0; i < polys.size(); ++i)
+  {
+    if (static_cast<int>(i) == outer)
+      continue;
+    if (!inside(polys[static_cast<size_t>(outer)], polys[i][0]))
+      return false;
+    for (size_t j = 0; j < polys.size(); ++j)
+      if (j != i && static_cast<int>(j) != outer && inside(polys[j], polys[i][0]))
+        return false;
+  }
+  return true;
+}
+
+// The result's check as BRepCheck_Analyzer's, cheaper where it has planar faces of lines with many edges (a louver's
+// sheet with its slots: 12 of a 14 ms fuse in the wire pair checks): the topology as BRepCheck's, those faces by
+// planar_lines_valid, the others by BRepCheck face by face.
+static bool cheaply_valid(const TopoDS_Shape& out);
+
+static bool result_valid(const TopoDS_Shape& out, bool parallel)
+{
+  // (Ours only says valid; where it can't (a shell's edge it counts once, a face BRepCheck flags alone), the whole
+  // BRepCheck's.)
+  return cheaply_valid(out) || BRepCheck_Analyzer(out, true, parallel).IsValid();
+}
+
+static bool cheaply_valid(const TopoDS_Shape& out)
+{
+  size_t many = 0;
+  std::vector<TopoDS_Face> faces;
+  std::vector<char>        simple;
+  for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(x.Current());
+    bool               lines = !occ::down_cast<Geom_Plane>(BRep_Tool::Surface(f)).IsNull();
+    size_t             n     = 0;
+    // (Lines only, each a wire's own (no edge inside it, INTERNAL or EXTERNAL: BRepCheck's for that face).)
+    for (TopExp_Explorer e(f, TopAbs_EDGE); lines && e.More(); e.Next(), ++n)
+    {
+      double                        c0 = 0, c1 = 0;
+      const occ::handle<Geom_Curve> c  = BRep_Tool::Curve(TopoDS::Edge(e.Current()), c0, c1);
+      const TopAbs_Orientation      o  = e.Current().Orientation();
+      lines = !c.IsNull() && !occ::down_cast<Geom_Line>(basis_of(c)).IsNull() && (o == TopAbs_FORWARD || o == TopAbs_REVERSED);
+    }
+    faces.push_back(f);
+    simple.push_back(lines ? 1 : 0);
+    if (lines)
+      many += n;
+  }
+  if (many < 64)
+    return false;
+  // (The shells as BRepCheck_Shell has them: in a solid's every edge used by two faces the opposite ways round (a
+  // seam a face's own twice), in a sheet by one or two.)
+  for (TopExp_Explorer sx(out, TopAbs_SHELL); sx.More(); sx.Next())
+  {
+    bool in_solid = false;
+    for (TopExp_Explorer so(out, TopAbs_SOLID); so.More() && !in_solid; so.Next())
+      for (TopExp_Explorer sh(so.Current(), TopAbs_SHELL); sh.More() && !in_solid; sh.Next())
+        in_solid = sh.Current().IsSame(sx.Current());
+    NCollection_IndexedDataMap<TopoDS_Shape, std::array<int, 2>, TopTools_ShapeMapHasher> uses;
+    for (TopExp_Explorer fx(sx.Current(), TopAbs_FACE); fx.More(); fx.Next())
+    {
+      for (TopExp_Explorer ex(fx.Current(), TopAbs_EDGE); ex.More(); ex.Next())
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(ex.Current());
+        if (BRep_Tool::Degenerated(e) || e.Orientation() == TopAbs_INTERNAL || e.Orientation() == TopAbs_EXTERNAL)
+          continue;
+        if (BRep_Tool::IsClosed(e, TopoDS::Face(fx.Current())))
+          continue;
+        const bool fwd = e.Orientation() == TopAbs_FORWARD;
+        if (!uses.Contains(e))
+          uses.Add(e, {0, 0});
+        uses.ChangeFromKey(e)[fwd ? 0 : 1] += 1;
+      }
+    }
+    for (int k = 1; k <= uses.Extent(); ++k)
+    {
+      const std::array<int, 2>& u = uses(k);
+      if (in_solid ? (u[0] != 1 || u[1] != 1) : (u[0] > 1 || u[1] > 1))
+        return false;
+    }
+  }
+  for (size_t i = 0; i < faces.size(); ++i)
+    if (simple[i] ? !planar_lines_valid(faces[i]) : !BRepCheck_Analyzer(faces[i], true, false).IsValid())
+      return false;
+  return true;
+}
+
 void brep_occt_ahead(rust::Slice<const uint32_t> pairs)
 {
   try
@@ -4925,7 +5154,10 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   // (Invalid: first its new edges' and vertices' tolerances raised to what they cover (a sheet's coincident edge's
   // curve on a fillet patch 40 um off it; an input edge's piece 1.1 um off its curves), as OCCT's builder ends,
   // its arguments left as they are (CorrectTolerances, CorrectShapeTolerances); then checked again.)
-  if (full_check && !BRepCheck_Analyzer(out, true, t_built.f.size() > 32).IsValid())
+  std::optional<KernelTimer> check_timer(std::in_place, "boolean.rust.check");
+  const bool valid = !full_check || result_valid(out, t_built.f.size() > 32);
+  check_timer.reset();
+  if (!valid)
   {
     NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> theirs;
     for (const OcShape* x : srcs)
