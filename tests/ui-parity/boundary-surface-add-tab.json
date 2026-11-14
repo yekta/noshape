@@ -1,0 +1,38 @@
+{
+ "name": "boundary-surface-add-tab",
+ "about": "surfaces: Boundary surface, the Add tab, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "surfaces",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Offset surface",
+    "menu": "Boundary surface"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Add"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

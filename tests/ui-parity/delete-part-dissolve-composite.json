@@ -1,0 +1,38 @@
+{
+ "name": "delete-part-dissolve-composite",
+ "about": "overlap: Delete part, Delete composite parts → Dissolve composite parts, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Delete part"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Delete composite parts",
+    "pick": "Dissolve composite parts"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
