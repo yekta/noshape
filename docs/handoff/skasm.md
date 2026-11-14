@@ -14,7 +14,7 @@
   past an Outer step (sheetmetal_frames::corner_break_and_relief_and_tab had failed since the bend-end rule); Fillet 3's
   corner breaks on a U's collinear wall corners; Hole 3 (a pre-V2 Hole storing isV2 false lost its ISO 5 standard and
   took inch units: 1/4"). Every feature's geometry now matches but Fillet 4 (Arm Cover: two R5 fillets meeting across
-  a 10 mm top, live merges their halves, 11 vs our 12 faces; handed to blend 11-14 12:20).
+  a 10 mm top, live merges their halves, 11 vs our 12 faces; handed to blend 11-14 12:20; blend landed 3a6fc428: 11/24/16 as live). Only the collision INFO is left.
 - Knife Sketch 7 (live 3041: JTd the R750 blade arc, JIl a line): the 0.3 mm Distance to the arc took our centre mode;
   now inferred as for local circles (blade 9301.21 -> 9306.43 mm³, live 9306.25). The knife's first difference stays
   at feature 24 (3 lines / 3 "other" edges vs live, from Curve pattern 1's or the Loft's side, not the sketch).
