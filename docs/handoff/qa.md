@@ -5,6 +5,11 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 
 
+## 11-14 00:35: compat alerts reach the lead
+The compat loop's ALERT-<sha> files went unread for an hour on 11-13 (qa stopped polling). bin/compat-loop.sh now also
+appends one line per worsened feature, with its document, to /tmp/lead/qa-alerts (fixes are not alerted). qa's local loops
+are systemd units (qa-compat-loop, qa-suites, qa-land-footer; the 02:00 qa-w7-cli-window).
+
 ## 11-13 10:25: the assembly suite runs one process per assembly (asm)
 The 04:29 run's (redone 06:16) single parity_assemblies process was killed by SIGTERM in asm-infento-subs (1580 s on main
 now, 1108 s at 04:33; sender not found: not rb.sh, no guard, no OOM). bin/suites-rest.sh now runs the built test binary once
