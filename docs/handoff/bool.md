@@ -237,8 +237,9 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   model 1" goes 42 -> 41 faces (its six 1-tool cuts come out equivalent, 1-3e-8 off in volume, and the sheet metal
   model is that sensitive); a closed section (features_c::thin_sweep_as_live, 0.27 mm3) needed the closed-curve rule.
   rings-loft and cf-surface-pattern alone on vibe6 (load 12) were no faster: rings 4.9-7.6 s against main's 3.5-6.9
-  in all three rounds (rejected pairs lose their place in OCCT's parallel batch and are asked one by one). Lead's
-  call whether to drop it for good.
+  in all three rounds (rejected pairs lose their place in OCCT's parallel batch and are asked one by one).
+  **Dropped for good (lead 11-14 ~20:0x):** its 4.3x on isolated sections didn't reach the documents, and within-
+  tolerance differences broke a sheet metal model; don't revive it. The branch stays only as a record.
   - The impeller's last vertices (live 2985, /root/onshape-research/live/bool/q2985/out.json): JJM / JJU at x 0
     (0, +-23.550655, -56.3968) and IO, JOE, JOk on the z 0 intersection curves are the five our feature 15 lacks.
 - **11-14 11:10 UTC: landed 8bb1a09d (fan-blade bolt cut, impeller mirror fuse, arcs in the result check). Fresh
