@@ -2581,3 +2581,23 @@ fn bolts_with_whole_turn_thread_roots_cut_as_occt() {
     let v = r.volume().unwrap();
     assert!((v - 8.782836552303072e-5).abs() <= 1e-9 * v, "volume {v}, OCCT's 8.782836552303072e-5");
 }
+
+/// c2-impeller-loft's mirrored halves fused (recorded b4a6c1dc): their r 32.5 mm circle on the mirror plane is two arcs
+/// in one and a whole circle in the other. The circle's piece past the free-form face ends on the face edge it leaves
+/// across by that edge's own nearest point, not its curve's (an arc of the same circle is 0 from it anywhere): ours,
+/// as OCCT's (1.5 s), 33 faces and 94,807.060968 mm³.
+#[test]
+fn mirrored_halves_sharing_a_circle_fuse_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "b4a6c1dc9b48ebea").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})")).shape;
+    assert!(r.is_valid());
+    assert_eq!(r.count(k::ShapeType::Face), 33);
+    let v = r.volume().unwrap() * 1e9;
+    assert!((v - 94_807.060968).abs() <= 1e-4, "volume {v} mm³, OCCT's 94,807.060968");
+}

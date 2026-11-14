@@ -2059,10 +2059,12 @@ impl Ctx<'_> {
             }
             // (On the face's edge it crosses there: a vertex of that edge, its tolerance reaching the edge's point.)
             let p = point(b);
+            // (The distance to the edge's own point: an arc of the same circle (c2-impeller-loft's mirrored halves at
+            // x 0) is 0 from its circle anywhere, its nearest point its far end.)
             let near = self.faces[f].edges.iter().map(|&(x, _)| {
                 let sx = self.edge_seg(x);
-                let (u, d) = self.seg_param(&sx, p);
-                (d, self.seg_at(&sx, u.clamp(0.0, 1.0)))
+                let q = self.seg_at(&sx, self.seg_param(&sx, p).0.clamp(0.0, 1.0));
+                ((q - p).length(), q)
             }).fold((f64::INFINITY, p), |m, x| if x.0 < m.0 { x } else { m });
             let at = if near.0 <= 1e3 * gap { End::Vertex(self.pool.add_tol(near.1, (1.5 * near.0).max(self.tol))?) } else { End::Point(p) };
             if end == 0 {
