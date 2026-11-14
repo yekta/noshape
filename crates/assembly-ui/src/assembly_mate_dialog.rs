@@ -31,6 +31,8 @@ pub enum MateDialogEvent {
     EditConnector(usize),
     /// "Select parameters to configure" mode: a parameter was clicked.
     ConfigureParam(&'static str),
+    /// A checkbox was clicked: it keeps the keyboard focus (live asm-slider-limits).
+    CheckboxFocused(&'static str),
     Cancel,
 }
 
@@ -386,7 +388,7 @@ impl MateDialog {
 
     /// The dialog's fields as the ui-parity runner reads live's (top to
     /// bottom; a query box's items are its chips' text).
-    pub fn ui_fields(&self) -> Vec<serde_json::Value> {
+    pub fn ui_fields(&self, cx: &App) -> Vec<serde_json::Value> {
         use serde_json::json;
         let t = self.mate_type;
         let (ox, oy, oz, orot) = offset_axes(t);
@@ -414,6 +416,20 @@ impl MateDialog {
         }
         if !limit_keys(t).is_empty() {
             fields.push(check("Limits", self.use_limits));
+        }
+        // Its limit boxes, unlabelled, an empty one reading its placeholder (live asm-slider-limits).
+        if self.use_limits {
+            let number = |st: &Entity<InputState>, unset: &str| {
+                let t = st.read(cx).value().to_string();
+                json!({ "label": "", "kind": "number", "text": if t.trim().is_empty() { unset.to_string() } else { t }, "focused": false, "state": "ok" })
+            };
+            for key in limit_keys(t) {
+                let (lo, hi) = &self.limits[key];
+                if *key != "cone" {
+                    fields.push(number(lo, NO_LIMIT[0]));
+                }
+                fields.push(number(hi, NO_LIMIT[1]));
+            }
         }
         if t.has_simulation_connection() {
             fields.push(check("Simulation connection", self.simulation_connection));
@@ -1022,6 +1038,7 @@ impl Render for MateDialog {
                     .when(t == MateType::Tangent, |d| {
                         d.child(os::checkbox("mate-tangent-prop", "Tangent propagation", self.tangent_propagation).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.tangent_propagation = !this.tangent_propagation;
+                            cx.emit(MateDialogEvent::CheckboxFocused("Tangent propagation"));
                             cx.emit(MateDialogEvent::Changed);
                             cx.notify();
                         })))
@@ -1029,6 +1046,7 @@ impl Render for MateDialog {
                     .when(has_offset, |d| {
                         let offset = os::checkbox("mate-offset", "Offset", self.use_offset).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.use_offset = !this.use_offset;
+                            cx.emit(MateDialogEvent::CheckboxFocused("Offset"));
                             cx.emit(MateDialogEvent::Changed);
                             cx.notify();
                         }));
@@ -1037,6 +1055,7 @@ impl Render for MateDialog {
                     .when(!lkeys.is_empty(), |d| {
                         d.child(os::checkbox("mate-limits", "Limits", self.use_limits).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.use_limits = !this.use_limits;
+                            cx.emit(MateDialogEvent::CheckboxFocused("Limits"));
                             cx.emit(MateDialogEvent::Changed);
                             cx.notify();
                         })))
@@ -1047,6 +1066,7 @@ impl Render for MateDialog {
                     .when(t.has_simulation_connection(), |d| {
                         d.child(os::checkbox("mate-simulation", "Simulation connection", self.simulation_connection).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.simulation_connection = !this.simulation_connection;
+                            cx.emit(MateDialogEvent::CheckboxFocused("Simulation connection"));
                             cx.emit(MateDialogEvent::Changed);
                             cx.notify();
                         })))

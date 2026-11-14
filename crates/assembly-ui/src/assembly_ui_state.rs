@@ -305,7 +305,7 @@ impl AssemblyView {
                 let complete = d.a.is_some() && d.b.is_some() && !d.same_instance();
                 json!({
                     "title": d.name, "titleState": if complete { "ok" } else { "error" }, "kind": "feature", "tabs": [],
-                    "fields": d.ui_fields(),
+                    "fields": d.ui_fields(cx),
                     "error": null, "ok": if complete { "enabled" } else { "disabled" }
                 })
             })

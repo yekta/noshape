@@ -1981,6 +1981,7 @@ impl AssemblyView {
             MateDialogEvent::Animate => this.toggle_mate_preview(window, cx),
             MateDialogEvent::EditConnector(field) => this.edit_dialog_connector(*field, window, cx),
             MateDialogEvent::ConfigureParam(param) => this.configure_mate_param(param, cx),
+            MateDialogEvent::CheckboxFocused(label) => this.ui.checkbox_focus = Some(label),
             MateDialogEvent::Solve => {
                 if let Some(s) = &mut this.mate {
                     s.solve_all = true;
@@ -2074,6 +2075,7 @@ impl AssemblyView {
         let Some(m) = s.dialog.read(cx).to_mate(cx) else { return };
         let editing = s.editing;
         self.mate = None;
+        self.ui.checkbox_focus = None;
         if self.anim.as_ref().is_some_and(|a| a.preview) {
             self.anim = None;
         }
@@ -2102,6 +2104,7 @@ impl AssemblyView {
             self.anim = None;
         }
         if self.mate.take().is_some() {
+            self.ui.checkbox_focus = None;
             window.focus(&self.focus, cx);
             self.infer = None;
             self.schedule_eval(window, cx);
