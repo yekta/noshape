@@ -119,6 +119,75 @@ pub struct Partial {
     pub opposite: bool,
 }
 
+/// Distance along `chain` (of length `total`) of a partial fillet's bound.
+fn bound_along(chain: &[ChainEdge], total: f64, bd: Bound) -> FResult<f64> {
+    Ok(match bd {
+        Bound::Fraction(f) => f.clamp(0.0, 1.0) * total,
+        Bound::Offset(d) => d.clamp(0.0, total),
+        Bound::OffsetFromEnd(d) => (total - d).clamp(0.0, total),
+        Bound::Point(q) => {
+            let (mut best, mut acc, mut where_) = (f64::INFINITY, 0.0, 0.0);
+            for c in chain {
+                for i in 0..=64 {
+                    let t = i as f64 / 64.0;
+                    let info = c.shape.edge_info()?;
+                    let prm = info.first_param + (info.last_param - info.first_param) * if c.forward { t } else { 1.0 - t };
+                    let dist = (c.shape.point_at(prm)? - q).length();
+                    if dist < best {
+                        best = dist;
+                        where_ = acc + t * c.length;
+                    }
+                }
+                acc += c.length;
+            }
+            where_
+        }
+        Bound::Plane(o, n) => {
+            // (The first sign change of the distance to the plane, else the nearest approach.)
+            let (mut best, mut acc, mut where_, mut prev): (f64, f64, f64, Option<(f64, f64)>) = (f64::INFINITY, 0.0, 0.0, None);
+            let mut crossing = None;
+            'chain: for c in chain {
+                let info = c.shape.edge_info()?;
+                for i in 0..=64 {
+                    let t = i as f64 / 64.0;
+                    let prm = info.first_param + (info.last_param - info.first_param) * if c.forward { t } else { 1.0 - t };
+                    let d = (c.shape.point_at(prm)? - o).dot(n);
+                    let at = acc + t * c.length;
+                    if let Some((pd, pat)) = prev
+                        && pd != 0.0
+                        && (pd < 0.0) != (d < 0.0)
+                    {
+                        crossing = Some(pat + (at - pat) * pd / (pd - d));
+                        break 'chain;
+                    }
+                    if d.abs() < best {
+                        best = d.abs();
+                        where_ = at;
+                    }
+                    prev = Some((d, at));
+                }
+                acc += c.length;
+            }
+            crossing.unwrap_or(where_)
+        }
+    })
+}
+
+/// A partial fillet's range along `edges`' chain (from its end nearest the origin corner): from, to and its length.
+pub(super) fn partial_range(shape: &Shape, edges: &[usize], p: &Partial) -> FResult<(f64, f64, f64)> {
+    let chain = chain(shape, edges)?;
+    let total: f64 = chain.iter().map(|c| c.length).sum();
+    let a = bound_along(&chain, total, p.first)?;
+    Ok(match p.second {
+        Some(sb) => {
+            let b = bound_along(&chain, total, sb)?;
+            (a.min(b), a.max(b), total)
+        }
+        None if p.opposite => (a, total, total),
+        None => (0.0, a, total),
+    })
+}
+
 fn fail(why: impl std::fmt::Display) -> FeatureError {
     log::debug!("section blend: {why}");
     if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
@@ -619,58 +688,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     let chain = chain_ordered(shape, edges, ball)?;
     let total: f64 = chain.iter().map(|c| c.length).sum();
     // Distance along the chain of a bound.
-    let along = |bd: Bound| -> FResult<f64> {
-        Ok(match bd {
-            Bound::Fraction(f) => f.clamp(0.0, 1.0) * total,
-            Bound::Offset(d) => d.clamp(0.0, total),
-            Bound::OffsetFromEnd(d) => (total - d).clamp(0.0, total),
-            Bound::Point(q) => {
-                let (mut best, mut acc, mut where_) = (f64::INFINITY, 0.0, 0.0);
-                for c in &chain {
-                    for i in 0..=64 {
-                        let t = i as f64 / 64.0;
-                        let info = c.shape.edge_info()?;
-                        let prm = info.first_param + (info.last_param - info.first_param) * if c.forward { t } else { 1.0 - t };
-                        let dist = (c.shape.point_at(prm)? - q).length();
-                        if dist < best {
-                            best = dist;
-                            where_ = acc + t * c.length;
-                        }
-                    }
-                    acc += c.length;
-                }
-                where_
-            }
-            Bound::Plane(o, n) => {
-                // (The first sign change of the distance to the plane, else the nearest approach.)
-                let (mut best, mut acc, mut where_, mut prev): (f64, f64, f64, Option<(f64, f64)>) = (f64::INFINITY, 0.0, 0.0, None);
-                let mut crossing = None;
-                'chain: for c in &chain {
-                    let info = c.shape.edge_info()?;
-                    for i in 0..=64 {
-                        let t = i as f64 / 64.0;
-                        let prm = info.first_param + (info.last_param - info.first_param) * if c.forward { t } else { 1.0 - t };
-                        let d = (c.shape.point_at(prm)? - o).dot(n);
-                        let at = acc + t * c.length;
-                        if let Some((pd, pat)) = prev
-                            && pd != 0.0
-                            && (pd < 0.0) != (d < 0.0)
-                        {
-                            crossing = Some(pat + (at - pat) * pd / (pd - d));
-                            break 'chain;
-                        }
-                        if d.abs() < best {
-                            best = d.abs();
-                            where_ = at;
-                        }
-                        prev = Some((d, at));
-                    }
-                    acc += c.length;
-                }
-                crossing.unwrap_or(where_)
-            }
-        })
-    };
+    let along = |bd: Bound| bound_along(&chain, total, bd);
     let (lo, hi) = match spec.partial {
         None => (0.0, total),
         Some(p) => {
@@ -3522,6 +3540,28 @@ pub fn variable_round_overflows(shape: &Shape, e: usize, (points, slopes): &Radi
 /// every edge's region between the edge and its round cut away (added at a concave edge) at once, so a round ends where
 /// it meets the faces beyond or another round.
 pub fn variable_round(ev: &mut EvalCtx, bi: usize, laws: &[(usize, RadiusLaw)]) -> FResult<()> {
+    variable_round_in(ev, bi, laws, None)
+}
+
+/// The cubic Bézier `b` (values over t in [0, 1]) over [t0, t1] alone (de Casteljau).
+fn bezier_part(b: [f64; 4], t0: f64, t1: f64) -> [f64; 4] {
+    let split = |b: [f64; 4], t: f64| -> ([f64; 4], [f64; 4]) {
+        let l = |a: f64, c: f64| a + (c - a) * t;
+        let (p01, p12, p23) = (l(b[0], b[1]), l(b[1], b[2]), l(b[2], b[3]));
+        let (p012, p123) = (l(p01, p12), l(p12, p23));
+        let p = l(p012, p123);
+        ([b[0], p01, p012, p], [p, p123, p23, b[3]])
+    };
+    let (_, right) = split(b, t0);
+    if t1 >= 1.0 - 1e-15 || t0 >= 1.0 - 1e-15 {
+        return right;
+    }
+    split(right, (t1 - t0) / (1.0 - t0)).0
+}
+
+/// [`variable_round`] of one edge's span alone where `range` is given (a partial variable fillet, live 3028: the whole
+/// edge's law within the span, flat ends): from and to, as distances along each edge from its start.
+pub fn variable_round_in(ev: &mut EvalCtx, bi: usize, laws: &[(usize, RadiusLaw)], range: Option<(f64, f64)>) -> FResult<()> {
     use super::sheetmetal_util::{body_named, bool_named};
     let body = ev.ctx.bodies[bi].clone();
     let shape = &body.shape;
@@ -3555,7 +3595,8 @@ pub fn variable_round(ev: &mut EvalCtx, bi: usize, laws: &[(usize, RadiusLaw)]) 
             let probe = p + out * (r * 0.5) + (fr.u[0] + fr.u[1]) * (r * 0.05);
             Ok(if shape.classify_point(probe, scale * 1e-9)? == k::PointClass::Outside { 1.5 * r } else { 0.0 })
         };
-        let (e0, e1) = (ext(a, -d, r_start)?, ext(b, d, r_end)?);
+        let (lo, hi) = range.unwrap_or((0.0, len));
+        let (e0, e1) = (if lo <= 1e-12 * len { ext(a, -d, r_start)? } else { 0.0 }, if hi >= len * (1.0 - 1e-12) { ext(b, d, r_end)? } else { 0.0 });
         // The law's spans as cubic Béziers in s (the slopes per fraction: per length / len), the ends' run-ons constant.
         let mut spans: Vec<(f64, f64, [f64; 4])> = Vec::new();
         if e0 > 0.0 {
@@ -3565,7 +3606,13 @@ pub fn variable_round(ev: &mut EvalCtx, bi: usize, laws: &[(usize, RadiusLaw)]) 
             let (s0, s1) = (w[0].0 * len, w[1].0 * len);
             let h = s1 - s0;
             let (m0, m1) = (slopes[k] / len, slopes[k + 1] / len);
-            spans.push((s0, s1, [w[0].1, w[0].1 + m0 * h / 3.0, w[1].1 - m1 * h / 3.0, w[1].1]));
+            let b = [w[0].1, w[0].1 + m0 * h / 3.0, w[1].1 - m1 * h / 3.0, w[1].1];
+            // (Only what lies in the range: the span cut at its ends.)
+            let (c0, c1) = (s0.max(lo), s1.min(hi));
+            if c1 - c0 <= 1e-12 * len {
+                continue;
+            }
+            spans.push((c0, c1, if c0 > s0 || c1 < s1 { bezier_part(b, (c0 - s0) / h, (c1 - s0) / h) } else { b }));
         }
         if e1 > 0.0 {
             spans.push((len, len + e1, [r_end; 4]));

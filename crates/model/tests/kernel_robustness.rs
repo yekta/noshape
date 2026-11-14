@@ -2931,6 +2931,89 @@ fn an_oversized_blend_fails_as_live_never_an_empty_body() {
     assert!(st == FeatureStatus::Error && (v - 12000.0).abs() < 1e-6, "top long chamfer 100: {st:?} {v} mm³");
 }
 
+/// Fillet options on the 40 × 30 × 10 start block as live 3028: Edges to keep and Smooth fillet corners change nothing
+/// there; a partial round bounded by a plane ends on a flat cap; Variable with Partial keeps the whole edge's radius law.
+#[test]
+fn fillet_options_on_the_start_block_as_live_3028() {
+    let mut base = T::new();
+    base.block(40.0, 30.0, 10.0);
+    let top_y0 = base.edges_where(|i| !vertical(i) && (i.start.z - 0.01).abs() < 1e-9 && (i.start.y - i.end.y).abs() < 1e-9 && i.start.y.abs() < 1e-9);
+    let top_y30 = base.edges_where(|i| !vertical(i) && (i.start.z - 0.01).abs() < 1e-9 && (i.start.y - i.end.y).abs() < 1e-9 && (i.start.y - 0.03).abs() < 1e-9);
+    let side = base.edges_where(|i| vertical(i) && i.start.x.abs() < 1e-9 && i.start.y.abs() < 1e-9);
+    let corner = base.edges_where(|i| [i.start, i.end].iter().any(|p| p.distance(glam::DVec3::new(0.0, 0.0, 0.01)) < 1e-9));
+    assert_eq!((top_y0.len(), top_y30.len(), side.len(), corner.len()), (1, 1, 1, 3));
+    let vertex = |t: &mut T, x: f64| {
+        let r = t.regen();
+        let b = &r.context.bodies[0];
+        let vi = b.shape.vertices().iter().position(|v| v.vertex_point().is_ok_and(|q| q.distance(glam::DVec3::new(x * 1e-3, 0.0, 0.01)) < 1e-9)).expect("vertex");
+        Reference::Vertex((*b.vertices[vi]).clone())
+    };
+    // Live 3028's volumes and face counts.
+    let want: std::collections::BTreeMap<&str, (f64, usize)> = [
+        ("y0 R12", (10768.357, 6)),
+        ("y0 R12 keep y30", (10768.357, 6)),
+        ("vertical R12", (11690.973, 7)),
+        ("vertical R12 keep y0", (11690.973, 7)),
+        ("partial entity trim false", (11951.715, 8)),
+        ("partial entity trim true", (11951.715, 8)),
+        ("corner smooth false", (11850.007, 10)),
+        ("corner smooth true", (11850.007, 10)),
+        ("variable", (11939.876, 7)),
+        ("variable partial", (11972.432, 9)),
+        ("R2 partial", (11982.832, 9)),
+    ]
+    .into_iter()
+    .collect();
+    let check = |what: &str, t: &mut T, f: FeatureId| {
+        let (st, msg, v) = status(t, f);
+        let faces = t.regen().context.bodies[0].shape.count(noshape_kernel::ShapeType::Face);
+        let (w, n) = want[what];
+        // (A variable round's live volume is its mass properties on a procedural face, up to ~0.1 off: ours are the
+        // exact law's, 1.75 -> 3.25 mm linear over the span 11972.370.)
+        let tol = if what.starts_with("variable") { 0.1 } else { 1e-3 };
+        assert!(st == FeatureStatus::Ok && (v - w).abs() < tol && faces == n, "{what}: {st:?} {msg:?} {v:.4} mm³, {faces} faces (live {w}, {n})");
+    };
+    for (what, edges, keep) in [("y0 R12", &top_y0, None), ("y0 R12 keep y30", &top_y0, Some(&top_y30)), ("vertical R12", &side, None), ("vertical R12 keep y0", &side, Some(&top_y0))] {
+        let mut t = base.fork();
+        let mut p = vec![("entities", q(edges.clone())), ("radius", e("12 mm")), ("tangentPropagation", ParamValue::Bool(true))];
+        if let Some(k) = keep {
+            p.push(("keepEdges", q(k.clone())));
+        }
+        let f = t.add("fillet", &p);
+        check(what, &mut t, f);
+    }
+    for trim in [false, true] {
+        let mut t = base.fork();
+        let plane = Reference::FeaturePlane(t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("cplaneType", en("OFFSET")), ("offset", e("15 mm"))]));
+        let f = t.add("fillet", &[("entities", q(top_y0.clone())), ("radius", e("3 mm")), ("isPartial", ParamValue::Bool(true)), ("startPartialType", en("ENTITY")), ("startPartialEntity", q(vec![plane])), ("useTrimmedFirstBound", ParamValue::Bool(trim))]);
+        check(&format!("partial entity trim {trim}"), &mut t, f);
+    }
+    for smooth in [false, true] {
+        let mut t = base.fork();
+        let f = t.add("fillet", &[("entities", q(corner.clone())), ("radius", e("3 mm")), ("smoothCorners", ParamValue::Bool(smooth))]);
+        check(&format!("corner smooth {smooth}"), &mut t, f);
+    }
+    for (what, partial) in [("variable", false), ("variable partial", true)] {
+        let mut t = base.fork();
+        let (v0, v1) = (vertex(&mut t, 0.0), vertex(&mut t, 40.0));
+        let row = |v: Reference, r: &str| {
+            let mut p = noshape_model::params::ParamValues::default();
+            p.set("vertex", q(vec![v]));
+            p.set("vertexRadius", e(r));
+            p
+        };
+        let mut p = vec![("entities", q(top_y0.clone())), ("radius", e("2 mm")), ("isVariable", ParamValue::Bool(true)), ("vertexSettings", ParamValue::Array(vec![row(v0, "1 mm"), row(v1, "4 mm")]))];
+        if partial {
+            p.extend([("isPartial", ParamValue::Bool(true)), ("startPartialType", en("PERCENTAGE")), ("partialFirstEdgeTotalParameter", e("0.25")), ("secondBound", ParamValue::Bool(true)), ("endPartialType", en("PERCENTAGE")), ("partialSecondEdgeTotalParameter", e("0.75"))]);
+        }
+        let f = t.add("fillet", &p);
+        check(what, &mut t, f);
+    }
+    let mut t = base.fork();
+    let f = t.add("fillet", &[("entities", q(top_y0.clone())), ("radius", e("2 mm")), ("isPartial", ParamValue::Bool(true)), ("startPartialType", en("PERCENTAGE")), ("partialFirstEdgeTotalParameter", e("0.25")), ("secondBound", ParamValue::Bool(true)), ("endPartialType", en("PERCENTAGE")), ("partialSecondEdgeTotalParameter", e("0.75"))]);
+    check("R2 partial", &mut t, f);
+}
+
 /// Chamfers (Equal distance) on the same 40 × 20 × 10 block as live (behaviours
 /// "spec: kernel FILLET-OVERSIZE-OK chamfer cases and fillet thresholds"):
 /// two or three vertical edges fail past the 20-wide end face ("End boundary

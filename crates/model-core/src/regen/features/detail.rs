@@ -330,6 +330,37 @@ fn round_overrun(shape: &Shape, edges: &[usize], amount: &dyn Fn(usize, f64) -> 
     }
 }
 
+/// A fillet's partial bounds (std fillet.fs: the end offset is measured from the chain's end), if Partial is on.
+fn partial_of(ev: &EvalCtx) -> FResult<Option<super::blend_section::Partial>> {
+    use super::blend_section::{Bound, Partial};
+    if !ev.bool("isPartial") {
+        return Ok(None);
+    }
+    let bound = |ev: &EvalCtx, ty: &str, frac: &str, off: &str, ent: &str, second: bool| -> FResult<Bound> {
+        Ok(match ev.enum_(ty) {
+            "OFFSET" if second => Bound::OffsetFromEnd(ev.length(off)?),
+            "OFFSET" => Bound::Offset(ev.length(off)?),
+            "ENTITY" => {
+                let r = ev.query(ent).first().ok_or_else(|| crate::regen::eval::FeatureError::new("Select an entity for the partial fillet end type."))?;
+                // A vertex or mate connector's point; a plane (datum or planar face) where the chain crosses it; another
+                // face's centroid.
+                if let Some(p) = ev.resolve_vertex_point(r) {
+                    Bound::Point(p)
+                } else if let Some(pl) = ev.resolve_plane(r) {
+                    Bound::Plane(pl.origin, pl.normal)
+                } else {
+                    let p = ev.resolve_faces(std::slice::from_ref(r)).first().and_then(|&(b, f)| ev.ctx.bodies[b].shape.sub_shape(ShapeType::Face, f).ok()?.centroid().ok());
+                    Bound::Point(p.ok_or_else(|| crate::regen::eval::FeatureError::new("Select an entity for the partial fillet end type."))?)
+                }
+            }
+            _ => Bound::Fraction(ev.real(frac)?),
+        })
+    };
+    let first = bound(ev, "startPartialType", "partialFirstEdgeTotalParameter", "startPartialOffset", "startPartialEntity", false)?;
+    let second = if ev.bool("secondBound") { Some(bound(ev, "endPartialType", "partialSecondEdgeTotalParameter", "endPartialOffset", "endPartialEntity", true)?) } else { None };
+    Ok(Some(Partial { first, second, opposite: ev.bool("partialOppositeParameter") }))
+}
+
 pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("filletType", "FULL_ROUND") {
         return full_round(ev);
@@ -355,36 +386,9 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     }
     // Sections OCCT can't build (conic, curvature, asymmetric, partial) go to booleans.
     let special = {
-        use super::blend_section::{BlendSpec, Bound, Partial, Section};
+        use super::blend_section::{BlendSpec, Section};
         let asym = !width && ev.bool("isAsymmetric");
-        let partial = if !width && ev.bool("isPartial") {
-            // std fillet.fs: the end offset is measured from the chain's end.
-            let bound = |ev: &EvalCtx, ty: &str, frac: &str, off: &str, ent: &str, second: bool| -> FResult<Bound> {
-                Ok(match ev.enum_(ty) {
-                    "OFFSET" if second => Bound::OffsetFromEnd(ev.length(off)?),
-                    "OFFSET" => Bound::Offset(ev.length(off)?),
-                    "ENTITY" => {
-                        let r = ev.query(ent).first().ok_or_else(|| crate::regen::eval::FeatureError::new("Select an entity for the partial fillet end type."))?;
-                        // A vertex or mate connector's point; a plane (datum or planar face) where the chain crosses it; another
-                        // face's centroid.
-                        if let Some(p) = ev.resolve_vertex_point(r) {
-                            Bound::Point(p)
-                        } else if let Some(pl) = ev.resolve_plane(r) {
-                            Bound::Plane(pl.origin, pl.normal)
-                        } else {
-                            let p = ev.resolve_faces(std::slice::from_ref(r)).first().and_then(|&(b, f)| ev.ctx.bodies[b].shape.sub_shape(ShapeType::Face, f).ok()?.centroid().ok());
-                            Bound::Point(p.ok_or_else(|| crate::regen::eval::FeatureError::new("Select an entity for the partial fillet end type."))?)
-                        }
-                    }
-                    _ => Bound::Fraction(ev.real(frac)?),
-                })
-            };
-            let first = bound(ev, "startPartialType", "partialFirstEdgeTotalParameter", "startPartialOffset", "startPartialEntity", false)?;
-            let second = if ev.bool("secondBound") { Some(bound(ev, "endPartialType", "partialSecondEdgeTotalParameter", "endPartialOffset", "endPartialEntity", true)?) } else { None };
-            Some(Partial { first, second, opposite: ev.bool("partialOppositeParameter") })
-        } else {
-            None
-        };
+        let partial = if !width { partial_of(ev)? } else { None };
         if !circular || asym || partial.is_some() {
             let (mut r1, mut r2) = (radius, if asym { ev.length("otherRadius")? } else { radius });
             if asym && ev.bool("flipAsymmetric") {
@@ -879,6 +883,20 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<bool> {
                 }
             }
             laws.push((e, law_hermite((radius_at(info.start), radius_at(info.end)), &mut points, smooth)));
+        }
+        // Partial: one straight edge's span of its whole law (live 3028: 1 -> 4 mm with 0.25 -> 0.75 runs 1.75 -> 3.25
+        // there, flat ends), the exact round.
+        if let Some(p) = partial_of(ev)?
+            && let [e] = edges.as_slice()
+        {
+            let (lo, hi, total) = super::blend_section::partial_range(&body.shape, &edges, &p)?;
+            let info = body.shape.sub_shape(ShapeType::Edge, *e)?.edge_info()?;
+            let key = |p: glam::DVec3| (p.x, p.y, p.z);
+            // (The range from the chain's end nearest the origin corner; the law from the edge's start.)
+            let from_start = key(info.start).partial_cmp(&key(info.end)) != Some(std::cmp::Ordering::Greater);
+            let range = if from_start { (lo, hi) } else { (total - hi, total - lo) };
+            super::blend_section::variable_round_in(ev, bi, &laws, Some(range))?;
+            continue;
         }
         // A round wider than a face beside it: OCCT's fails there (after ~70 ms), the exact one first.
         if laws.iter().any(|(e, law)| super::blend_section::variable_round_overflows(&body.shape, *e, law)) {
