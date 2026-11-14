@@ -30,15 +30,16 @@ pub struct AnalysisOptions {
     pub extend: bool,
     /// Curve/surface: control polygons of B-spline edges.
     pub control_points: bool,
-    /// Deviation: Surface tab (else Curve).
+    /// Deviation: Surface tab (else Curve), and its Absolute values.
     pub surface: bool,
+    pub absolute: bool,
     /// Connection: G1–G3 tolerances.
     pub tolerances: ContinuityTolerances,
 }
 
 impl Default for AnalysisOptions {
     fn default() -> Self {
-        Self { u_curves: 8, v_curves: 8, extend: false, control_points: false, surface: false, tolerances: Default::default() }
+        Self { u_curves: 8, v_curves: 8, extend: false, control_points: false, surface: false, absolute: false, tolerances: Default::default() }
     }
 }
 
@@ -128,9 +129,12 @@ pub fn analyze(ctx: &Context, display: &StudioDisplay, kind: AnalysisKind, sel: 
             }
         }
         AnalysisKind::Deviation if o.surface => {
-            let pts: Vec<DVec3> = sel.iter().flat_map(|r| face_triangles(display, r)).flatten().collect();
-            let tris: Vec<[DVec3; 3]> = sel2.iter().flat_map(|r| face_triangles(display, r)).collect();
-            res.deviation = noshape_model::analysis::surface_deviation(&pts, &tris);
+            // As the app (live qdev): the second's (To measure) points against the first (Source), signed by the
+            // Source's side unless absolute; each extreme as (distance, on first, on second).
+            let measured: Vec<[DVec3; 3]> = sel2.iter().flat_map(|r| face_triangles(display, r)).collect();
+            let tris: Vec<[DVec3; 3]> = sel.iter().flat_map(|r| face_triangles(display, r)).collect();
+            let swap = |(d, p, q): noshape_model::analysis::Extremum| (d, q, p);
+            res.deviation = noshape_model::analysis::surface_deviation_signed(&measured, &tris, o.absolute).map(|(lo, hi)| (swap(lo), swap(hi)));
         }
         AnalysisKind::Deviation => {
             let a = densify(&sel.iter().flat_map(|r| curve_points(display, r)).collect::<Vec<_>>(), 400);

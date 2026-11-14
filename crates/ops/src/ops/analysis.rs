@@ -60,7 +60,7 @@ pub fn ops() -> Vec<Op> {
             "deviation",
             "Deviation between two curve chains or two surfaces (Deviation analysis)",
             "Minimum and maximum distance from the first selection to the second, with the points on each.",
-            vec![req("first", strings(), "Edges / sketch curves (or faces with `surface`)."), req("second", strings(), "The chain / faces to measure to."), opt("surface", json!({ "type": "boolean" }), "Surface deviation (faces) instead of curves.")],
+            vec![req("first", strings(), "Edges / sketch curves (or faces with `surface`)."), req("second", strings(), "The chain / faces to measure to."), opt("surface", json!({ "type": "boolean" }), "Surface deviation (faces) instead of curves: the second's faces measured against the first's, signed by the first's side."), opt("absolute", json!({ "type": "boolean" }), "Surface: Absolute values (no sign).")],
             deviation,
         ),
         op(
@@ -154,7 +154,7 @@ fn curvature(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn deviation(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (first, second) = (refs_arg(a, "first")?, refs_arg(a, "second")?);
-    let o = AnalysisOptions { surface: a.bool_or("surface", false)?, ..Default::default() };
+    let o = AnalysisOptions { surface: a.bool_or("surface", false)?, absolute: a.bool_or("absolute", false)?, ..Default::default() };
     let (r, k, units) = run(ctx, a, AnalysisKind::Deviation, first, second, o)?;
     let ((dmin, a1, b1), (dmax, a2, b2)) = r.deviation.ok_or_else(|| OpError::invalid("no deviation: the selections don't overlap (curves) or have no tessellation (faces)"))?;
     Ok(json!({ "units": units, "min": { "distance": dmin * k, "on_first": pt(a1, k), "on_second": pt(b1, k) }, "max": { "distance": dmax * k, "on_first": pt(a2, k), "on_second": pt(b2, k) } }).into())

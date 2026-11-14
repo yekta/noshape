@@ -2913,6 +2913,22 @@ fn surface_deviation_measures_to_measure_against_the_source(cx: &mut TestAppCont
         })
     });
     assert_eq!((low, high), (Some([0x44, 0x01, 0x54, 255]), Some([0xfd, 0xe7, 0x25, 255])), "Viridis' ends at 5 and 11.18 mm");
+    // Swapped, Part 1's top lies under Part 2's: signed, it reads negative (Max -5 mm); Absolute values drops the sign.
+    let swapped = |cx: &mut TestAppContext, absolute: bool| {
+        cx.update(|cx| view.update(cx, |v, cx| {
+            if let Some(t) = &mut v.ui.analysis_tool {
+                t.selection = vec![measured.clone()];
+                t.selection2 = vec![source.clone()];
+                t.options.absolute = absolute;
+            }
+            v.recompute_analysis_tool(cx);
+        }));
+        draw(cx, window);
+        let panel = cx.update(|cx| view.read(cx).analysis_panel_state(cx)).expect("the Deviation panel");
+        let value = |label: &str| panel["fields"].as_array().unwrap().iter().find(|f| f["label"] == label).and_then(|f| f["value"].as_str().map(str::to_string));
+        (value("Max"), value("Min").is_some_and(|m| m.starts_with('-')))
+    };
+    assert_eq!((swapped(cx, false), swapped(cx, true).1), ((Some("-5 mm".to_string()), true), false), "signed, then absolute");
 }
 
 /// Live 1990 (3.18): a double-click on a shown sketch's line in the graphics doesn't open the sketch; the first click

@@ -704,20 +704,23 @@ impl PartStudioView {
                 ToolKind::Deviation if o.surface => {
                     // Live (qdev/b: Part 2's top against Part 1's, Max 11.18 / Min 5 mm): To measure's points against
                     // the Source.
-                    let pts: Vec<DVec3> = sel2.iter().flat_map(|r| self.face_triangles(r)).flatten().collect();
                     let tris: Vec<[DVec3; 3]> = sel.iter().flat_map(|r| self.face_triangles(r)).collect();
-                    res.deviation = noshape_model::analysis::surface_deviation(&pts, &tris);
-                    // The colour map on To measure's faces (live qdev/b).
+                    // Signed by the Source's side, unless Absolute values.
+                    let value = |d: f64| if o.absolute { d.abs() } else { d };
+                    // The colour map on To measure's faces (live qdev/b), and its extremes.
                     let mut map: DeviationMap = Vec::new();
+                    let measured: Vec<[DVec3; 3]> = sel2.iter().flat_map(|r| self.face_triangles(r)).collect();
+                    let extremes = noshape_model::analysis::surface_deviation_signed(&measured, &tris, o.absolute);
                     for (body, verts) in sel2.iter().filter_map(|r| self.face_vertices(r)) {
                         let at: Vec<DVec3> = verts.iter().map(|(_, p)| *p).collect();
-                        let d = noshape_model::analysis::point_deviations(&at, &tris);
-                        let vals = verts.iter().map(|(i, _)| *i).zip(d);
+                        let signed = noshape_model::analysis::signed_deviations(&at, &tris);
+                        let vals = verts.iter().map(|(i, _)| *i).zip(signed.iter().map(|(d, _)| value(*d)));
                         match map.iter_mut().find(|(b, _)| *b == body) {
                             Some((_, v)) => v.extend(vals),
                             None => map.push((body, vals.collect())),
                         }
                     }
+                    res.deviation = extremes;
                     res.deviation_map = (!tris.is_empty() && !map.is_empty()).then(|| Arc::new(map));
                 }
                 ToolKind::Deviation => {

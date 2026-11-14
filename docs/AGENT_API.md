@@ -6665,7 +6665,8 @@ Examples:
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `first` | array of string | required | Edges / sketch curves (or faces with `surface`). |
 | `second` | array of string | required | The chain / faces to measure to. |
-| `surface` | boolean |  | Surface deviation (faces) instead of curves. |
+| `surface` | boolean |  | Surface deviation (faces) instead of curves: the second's faces measured against the first's, signed by the first's side. |
+| `absolute` | boolean |  | Surface: Absolute values (no sign). |
 
 #### analysis_connection
 

@@ -435,9 +435,35 @@ pub fn surface_deviation(a_points: &[DVec3], b_tris: &[[DVec3; 3]]) -> Option<(E
     Some((min?, max?))
 }
 
-/// Each point's distance to the nearest of `tris` (Deviation analysis' colour map).
-pub fn point_deviations(points: &[DVec3], tris: &[[DVec3; 3]]) -> Vec<f64> {
-    points.iter().map(|p| tris.iter().map(|t| closest_on_triangle(*p, t[0], t[1], t[2]).distance(*p)).fold(f64::INFINITY, f64::min)).collect()
+/// Deviation analysis' Surface tab: the minimum and maximum signed distance from `measure` (To measure) to `source`,
+/// each as (distance, point on `measure`, point on `source`); `absolute` drops the sign. Tried at `measure`'s vertices
+/// and at each `source` vertex's nearest point on `measure`, where the extremes of faces like these lie (a Source
+/// corner over the middle of a wider To measure face).
+pub fn surface_deviation_signed(measure: &[[DVec3; 3]], source: &[[DVec3; 3]], absolute: bool) -> Option<(Extremum, Extremum)> {
+    let nearest_on = |p: DVec3, tris: &[[DVec3; 3]]| tris.iter().map(|t| closest_on_triangle(p, t[0], t[1], t[2])).min_by(|a, b| a.distance_squared(p).total_cmp(&b.distance_squared(p)));
+    let mut points: Vec<DVec3> = measure.iter().flatten().copied().collect();
+    points.extend(source.iter().flatten().filter_map(|v| nearest_on(*v, measure)));
+    let signed = signed_deviations(&points, source);
+    points.iter().zip(&signed).map(|(p, (d, q))| (if absolute { d.abs() } else { *d }, *p, *q)).fold(None, |acc: Option<(Extremum, Extremum)>, e| {
+        Some(match acc {
+            None => (e, e),
+            Some((lo, hi)) => (if e.0 < lo.0 { e } else { lo }, if e.0 > hi.0 { e } else { hi }),
+        })
+    })
+}
+
+/// Each point's signed distance to the nearest of `tris` and that nearest point: positive on the side the nearest
+/// triangle faces (its winding's normal), negative behind it (Deviation analysis; "Absolute values" drops the sign).
+pub fn signed_deviations(points: &[DVec3], tris: &[[DVec3; 3]]) -> Vec<(f64, DVec3)> {
+    points
+        .iter()
+        .filter_map(|p| {
+            let (q, t) = tris.iter().map(|t| (closest_on_triangle(*p, t[0], t[1], t[2]), t)).min_by(|a, b| a.0.distance_squared(*p).total_cmp(&b.0.distance_squared(*p)))?;
+            let n = (t[1] - t[0]).cross(t[2] - t[0]);
+            let d = p.distance(q);
+            Some((if (*p - q).dot(n) < 0.0 { -d } else { d }, q))
+        })
+        .collect()
 }
 
 /// Principal curvatures (k1 ≥ k2, signed: positive where the surface bends

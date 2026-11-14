@@ -1837,6 +1837,17 @@ fn analysis_tools() {
     let vertical = lines["edges"].as_array().unwrap().iter().find(|e| num(&e["direction"][2]).abs() > 0.99).unwrap()["id"].as_str().unwrap().to_string();
     let d = call(&mut ctx, "analysis_dihedral", json!({ "entities": [vertical] }));
     assert!((num(&d["min_deg"]) - 90.0).abs() < 0.5 && (num(&d["max_deg"]) - 90.0).abs() < 0.5, "{d}");
+    // Deviation, surfaces (as the app, live qdev): the second's points against the first, signed by its side. The
+    // cylinder's top 20 mm over the block's; swapped, the block's top lies under it (negative); absolute drops the sign.
+    let tops = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1] }));
+    let top_at = |z: f64| tops["faces"].as_array().unwrap().iter().find(|f| (num(&f["centroid"][2]) - z).abs() < 1e-6).unwrap()["id"].as_str().unwrap().to_string();
+    let (block_top, cyl_top) = (top_at(10.0), top_at(30.0));
+    let d = call(&mut ctx, "analysis_deviation", json!({ "first": [block_top.clone()], "second": [cyl_top.clone()], "surface": true }));
+    assert!((num(&d["min"]["distance"]) - 20.0).abs() < 1e-6 && (num(&d["max"]["distance"]) - 20.0).abs() < 1e-6, "{d}");
+    let d = call(&mut ctx, "analysis_deviation", json!({ "first": [cyl_top.clone()], "second": [block_top.clone()], "surface": true }));
+    assert!(num(&d["max"]["distance"]) < -19.9, "{d}");
+    let d = call(&mut ctx, "analysis_deviation", json!({ "first": [cyl_top], "second": [block_top], "surface": true, "absolute": true }));
+    assert!(num(&d["min"]["distance"]) > 19.9, "{d}");
 }
 
 /// A STEP assembly with a subassembly (live request 1742 (A), live's own

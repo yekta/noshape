@@ -169,7 +169,7 @@ Extrude's / Revolve's Thin). Left: three sketch readouts off by under a pixel (l
 (behaviours "psui (Deviation analysis panel, in full)"): a face preselected opens Surface (Source), else Curve with both
 chains empty, the tab not remembered; Max / Min read-only in both tabs; To measure's points against the Source (11.18
 / 5 mm on overlap, ours had them swapped); the Viridis colour map on To measure's faces with live's bar (`Bar::Deviation`).
-Open: Absolute values changes nothing (unsigned distances; live's capture also all positive).
+Deviation's distances are signed since (the Source's side; Absolute values drops the sign; the agent API's analysis_deviation the same, it had first and second swapped too).
 **11-14 07:18:** landed bb587644 (the dialogs-matrix flake); 64b71d9e (Deviation, consumed picks, coverage 1/3/4/5) in
 the queue. Next commit: live's batches 6/7/9 (12 / 24 at first): sheet metal seeds (corner relief 3 mm, hem 8 mm; the
 account's remembered values: live's checker seeds them from batch 17 on), std's tear-drop minimum (2 × (R + sheet),
