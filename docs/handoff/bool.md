@@ -9,13 +9,15 @@ scratch /root/bool-scratch.
   914 -> 889 faces; gate CHECK, knurls only; alternated on vibe7 no slower: corner-break 4160/3752 vs 4150/4251 ms,
   surface-pattern 11752/11400 vs 10666, rings 8965/8797 vs 8229). Its old test a_merge_after_usd_left_invalid_is_dropped
   became walls_usd_leaves_apart_are_merged_valid (33 faces, valid, the volume kept).
-- **Gating 06:0x (branch bool-seamwall, worktree bool-hat, 51df0c9f9):** of_face: a straight edge along a whole
+- **Queued 06:5x (branch bool-seamwall, gate CHECK, 0 differences; clippy: is_multiple_of):** of_face: a straight edge along a whole
   cylinder's seam that isn't the seam (a slot wall at the seam angle) placed on the seam's other side when both its
   ends are odd there and its vertices' other places are odd too. The private dock (exact recordings, vibe5
   ~/agents/bool-keep/tabrec/recx*): tab B 10/10 (ba238f13 too), C 8/10, D1 21/22, D2 23/24, 0 differing (9 more ours).
   T1 bool_patterns::a_slot_wall_on_the_seam_cut_as_occt (fails "non-manifold" without it). Land if clean.
-- Dock OCCT left: A 5670e6af (dome face 75, free-form, slot edges as dangling inner edges: maybe the same seam
-  placement on a revolved / NURBS face: `projected` / free-form seam handling), E1-30's 5 "a face's vertex off its
+- Dock OCCT left: A 5670e6af (with the seam-wall fix its funnel face closes; now "a non-manifold result" at
+  (-6.62, 14.51, 10.0) mm: a section of a tool cylinder (args 1, 2) with the target's free-form face 224 / 225 ends
+  1.3 um off a vertex of the 1.3 um edge there and stays dangling inside the face (edge 619 / 635, origins none):
+  a near-vertex snap at a section's end), E1-30's 5 "a face's vertex off its
   plane" (upstream) + 2de4f3a5 (non-manifold, likely upstream vertices), E2 e4db7fcb (upstream tolerances).
 - gamma union left: 5 faces of 5 um steps, area +121 / volume -2.4 mm3 (probe_slits needs a real face overlap test).
 
