@@ -1736,7 +1736,7 @@ fn formats_gaps_and_revision_tables_across_sheets() {
     }
     let g = &built.geometry;
     assert!((0..g.texts.len()).any(|i| g.text_color(i) == Some([220, 40, 40])));
-    assert!(texts(&built).iter().any(|t| t == "REVISION HISTORY") && texts(&built).iter().any(|t| t == "First"));
+    assert!(texts(&built).iter().any(|t| t == "REVISIONS") && texts(&built).iter().any(|t| t == "First"));
     // Linked: the full table on sheet 2; See sheet 1: the pointer table.
     let built2 = render_sheet_with(&drawing, 1, &sources, &cache, false, &info).unwrap();
     assert!(texts(&built2).iter().any(|t| t == "First"));

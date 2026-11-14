@@ -166,7 +166,8 @@ pub fn revision_rows(log: &crate::release::ReleaseLog, tab: crate::document::Tab
 pub const PENDING_BLUE: [u8; 3] = [0xd2, 0xe8, 0xfc];
 
 /// Revision table column headers (defaults).
-pub const REVISION_HEADERS: [&str; 4] = ["REV", "DESCRIPTION", "DATE", "APPROVED"];
+/// A revision table's title row (live drw-revision-table, Professional).
+pub const REVISION_TITLE: &str = "REVISIONS";
 
 /// Company settings › Release management › Revision table template (live
 /// bundle `osx-properties-table-template-*`, type REVISION_TABLE): the
@@ -190,8 +191,7 @@ impl Default for RevisionTemplate {
 }
 
 impl RevisionTemplate {
-    /// Unchanged from Onshape's default (its table keeps the REV /
-    /// DESCRIPTION / DATE / APPROVED headers).
+    /// Unchanged from Onshape's default.
     pub fn is_default(&self) -> bool {
         self.columns == DEFAULT_REVISION_COLUMNS && !self.all_caps
     }
@@ -269,28 +269,21 @@ fn revision_data_with(kind: &TableKind, revisions: &[RevisionRow], template: Opt
         shown.reverse();
     }
     let desc_of = |r: &RevisionRow| descriptions.iter().find(|(rev, _)| *rev == r.revision).map(|(_, d)| d.clone()).unwrap_or_else(|| r.description.clone());
-    let (header, rows): (Vec<String>, Vec<Vec<String>>) = match template {
-        // A company template: its columns, in capitals with "All uppercase in Drawings".
-        Some(t) => {
-            let caps = |s: String| if t.all_caps { s.to_uppercase() } else { s };
-            let header = t.columns.iter().enumerate().map(|(i, c)| headers.get(i).cloned().flatten().unwrap_or_else(|| caps(c.clone()))).collect();
-            let rows = shown.iter().map(|r| t.columns.iter().map(|c| caps(RevisionTemplate::cell(c, r, &desc_of(r)))).collect()).collect();
-            (header, rows)
-        }
-        None => {
-            let header = REVISION_HEADERS.iter().enumerate().map(|(i, d)| headers.get(i).cloned().flatten().unwrap_or_else(|| d.to_string())).collect();
-            let rows = shown
-                .iter()
-                .map(|r| {
-                    let rev = if r.pending { pending_label(&r.revision) } else { r.revision.clone() };
-                    vec![rev, desc_of(r), r.date.clone(), r.approved.clone()]
-                })
-                .collect();
-            (header, rows)
-        }
-    };
+    // Nothing released nor pending yet: the drawing's first revision, unreleased ("A*", its date and approver "-"; live
+    // drw-revision-table, Professional).
+    let working = RevisionRow { revision: "A".into(), date: "-".into(), approved: "-".into(), pending: true, ..Default::default() };
+    if shown.is_empty() {
+        shown.push(&working);
+    }
+    // Onshape's default template (help relmgmt-workflows-14) or the company's; its columns, in capitals with "All
+    // uppercase in Drawings".
+    let default = RevisionTemplate::default();
+    let t = template.unwrap_or(&default);
+    let caps = |s: String| if t.all_caps { s.to_uppercase() } else { s };
+    let header: Vec<String> = t.columns.iter().enumerate().map(|(i, c)| headers.get(i).cloned().flatten().unwrap_or_else(|| caps(c.clone()))).collect();
+    let rows: Vec<Vec<String>> = shown.iter().map(|r| t.columns.iter().map(|c| caps(RevisionTemplate::cell(c, r, &desc_of(r)))).collect()).collect();
     let pending = shown.iter().enumerate().filter(|(_, r)| r.pending).map(|(i, _)| i).collect();
-    TableData { title: Some(title.clone().unwrap_or_else(|| "REVISION HISTORY".into())), header: Some(header), rows, pending, padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), ..Default::default() }
+    TableData { title: Some(title.clone().unwrap_or_else(|| REVISION_TITLE.into())), header: Some(header), rows, pending, padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), ..Default::default() }
 }
 
 /// Label of a revision callout: the revision, with the unreleased suffix while pending; None
@@ -312,7 +305,7 @@ pub fn revision_callout_label(drawing: &Drawing, revisions: &[RevisionRow], rev:
 
 /// The pointer table "See sheet 1" shows on the other sheets.
 pub fn see_sheet_data(drawing: &Drawing, home: usize) -> TableData {
-    TableData { title: Some("REVISION HISTORY".into()), header: None, rows: vec![vec![format!("SEE SHEET {}", home + 1)]], pending: Vec::new(), padding: padding(drawing), header_bottom: false, overridden: Vec::new(), ..Default::default() }
+    TableData { title: Some(REVISION_TITLE.into()), header: None, rows: vec![vec![format!("SEE SHEET {}", home + 1)]], pending: Vec::new(), padding: padding(drawing), header_bottom: false, overridden: Vec::new(), ..Default::default() }
 }
 
 fn padding(drawing: &Drawing) -> [f64; 2] {
@@ -1356,9 +1349,13 @@ mod tests {
         assert!(revision_rows(&log, crate::document::TabId(8)).is_empty());
         let mut t = Table::new(1, TableKind::revision(), [400.0, 280.0]);
         let d = table_data(&Drawing::default(), &t, None, None, None, &rows, &|s| s.to_string());
-        assert_eq!(d.title.as_deref(), Some("REVISION HISTORY"));
-        assert_eq!(d.header.as_ref().unwrap()[0], "REV");
+        // Onshape's default template (live drw-revision-table, Professional).
+        assert_eq!(d.title.as_deref(), Some("REVISIONS"));
+        assert_eq!(d.header.as_ref().unwrap(), &["Revision", "Revision description", "Date approved", "Approver"]);
         assert_eq!(d.rows.iter().map(|r| r[0].as_str()).collect::<Vec<_>>(), vec!["A", "B", "C*"]);
+        // Nothing released yet: the first revision, unreleased.
+        let d0 = table_data(&Drawing::default(), &t, None, None, None, &[], &|s| s.to_string());
+        assert_eq!((d0.rows, d0.pending), (vec![vec!["A*".to_string(), String::new(), "-".into(), "-".into()]], vec![0]));
         assert_eq!((d.rows[1][1].as_str(), d.pending.as_slice()), ("Hole moved", &[2][..]));
         // Two visible rows, newest at the top.
         if let TableKind::Revision { visible_rows, newest_top, .. } = &mut t.kind {

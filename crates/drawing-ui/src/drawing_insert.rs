@@ -21,6 +21,9 @@ use noshape_model::drawing::*;
 pub struct InsertViewState {
     /// View scale (None: the sheet scale).
     pub scale: Option<f64>,
+    /// The View scale list was used in this insert: live's recorder reads its options with the panel from then on
+    /// (drw-insert-view-top-1to1).
+    pub scale_listed: bool,
     /// View simplification of new views and its value field (Absolute /
     /// Ratio to studio / Ratio to part).
     pub simplification: Simplification,
@@ -57,7 +60,7 @@ pub struct InsertViewState {
 
 impl Default for InsertViewState {
     fn default() -> Self {
-        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, panel: false, sketch: None, flat: false, replace: None, replace_part: None, named: None, asm_position: AsmPosition::Default, display_state: None, pinned: None }
+        Self { scale: None, scale_listed: false, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, panel: false, sketch: None, flat: false, replace: None, replace_part: None, named: None, asm_position: AsmPosition::Default, display_state: None, pinned: None }
     }
 }
 
@@ -82,7 +85,9 @@ impl DrawingEditor {
         if !matches!(self.tool, Tool::InsertView { .. }) || self.insert.simp_value.is_some() || simplification_text(s, mm).is_empty() {
             return;
         }
-        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(simplification_text(s, mm)));
+        // Live (drw-insert-view-scale-absolute, -ratio-to-part): "Threshold", the number, its unit beside it.
+        let number = simplification_text(s, mm).split_once(' ').map(|(n, _)| n.to_string()).unwrap_or_default();
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(number));
         let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change)
                 && let Some(n) = parse_simplification(this.insert.simplification, &st.read(cx).value(), this.drawing.units_mm)
@@ -108,9 +113,12 @@ impl DrawingEditor {
     pub fn open_insert_chooser_expanded(&mut self, cx: &mut Context<Self>) {
         self.chooser.expand_single = true;
         self.open_insert_chooser(cx);
+        self.chooser.by_create = true;
     }
 
     pub fn open_insert_chooser(&mut self, cx: &mut Context<Self>) {
+        self.chooser.by_create = false;
+        self.insert.scale_listed = false;
         self.insert.chooser = Some(self.insert.chooser.unwrap_or(0));
         self.ensure_sources(false, cx);
         cx.notify();
@@ -324,6 +332,7 @@ impl DrawingEditor {
                         // Before the sheet has a scale, its own value means
                         // "follow the sheet"; after, "(Sheet)" does.
                         t.insert.scale = (t.current_sheet().scale_shown || s != t.current_sheet().scale).then_some(s);
+                        t.insert.scale_listed = true;
                         t.insert_auto_scale = false;
                         t.insert_scale_was_auto = false;
                         t.update_preview(cx);
@@ -332,7 +341,9 @@ impl DrawingEditor {
                 )
             }))
             .collect();
+        let scale_labels: Vec<String> = scale_items.iter().map(|i| i.0.clone()).collect();
         let simp = self.insert.simplification;
+        let mm = self.drawing.units_mm;
         let simp_items: Vec<(String, bool, Act)> = simplification_choices(simp)
             .into_iter()
             .map(|c| {
@@ -391,9 +402,15 @@ impl DrawingEditor {
             text.push("View scale".into());
             text.push("View simplification".into());
             text.extend(simp_items.iter().map(|i| i.0.clone()));
+            if let Some((_, unit)) = simplification_text(simp, mm).split_once(' ').filter(|_| self.insert.simp_value.is_some()) {
+                text.extend(["Threshold".to_string(), unit.to_string()]);
+            }
             text.push("Show sketch appearances".into());
             if !is_asm && part.is_some() {
                 text.push("Show annotations from model".into());
+            }
+            if self.insert.scale_listed {
+                text.extend(scale_labels.iter().cloned());
             }
             text.retain(|t| !t.is_empty());
             text.truncate(30);
@@ -433,7 +450,10 @@ impl DrawingEditor {
                 .children(asm_rows)
                 .child(row("View scale", select("div-scale", match cur_scale { None if scale_shown => format!("{} (Sheet)", format_scale(sheet_scale)), c => format_scale(c.unwrap_or(sheet_scale)) }, scale_items, usize::MAX)))
                 .child(row("View simplification", select("div-simp", simp.name().to_string(), simp_items, usize::MAX)))
-                .children(self.insert.simp_value.as_ref().filter(|_| !simplification_text(simp, true).is_empty()).map(|(st, _)| row("", Input::new(st).small().into_any_element())))
+                .children(self.insert.simp_value.as_ref().filter(|_| !simplification_text(simp, true).is_empty()).map(|(st, _)| {
+                    let unit = simplification_text(simp, mm).split_once(' ').map(|(_, u)| u.to_string()).unwrap_or_default();
+                    row("Threshold", h_flex().id("div-simp-threshold").gap(px(4.)).tooltip(crate::ui::tooltip("Simplification threshold: Features below this value will be simplified")).child(div().flex_1().child(Input::new(st).small())).child(div().text_size(px(13.33)).child(unit)).into_any_element())
+                }))
                 .child(
                     div().px(px(6.)).py(px(3.)).child(crate::drawing_chrome::DrCheckbox::new("div-sketch-app").label("Show sketch appearances").checked(self.insert.sketch_appearances).on_click(cx.listener(|this, on: &bool, _, cx| {
                         this.insert.sketch_appearances = *on;

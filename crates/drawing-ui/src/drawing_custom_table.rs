@@ -403,9 +403,11 @@ impl DrawingEditor {
         let row = |label: &'static str, body: AnyElement| h_flex().min_h(px(28.)).px(px(8.)).child(div().w(px(90.)).flex_none().text_size(px(12.)).child(label)).child(div().flex_1().min_w_0().child(body)).into_any_element();
         // A select: label ▾ with a natural-width list (live custom-tables-02).
         type Set = std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Context<DrawingEditor>)>;
+        // (Marked as the runner picks a select by what it shows: `{"dropdown": "Top to bottom"}`.)
         let select = |id: &'static str, label: String, items: Vec<(String, bool, Set)>| {
             let ed = ed.clone();
-            Button::new(id).label(label).ghost().xsmall().w_full().dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            let mark = format!("dropdown:{label}");
+            Button::new(id).label(label).map(move |b| crate::ui_script::mark(b, move || mark.clone())).ghost().xsmall().w_full().dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| f(t, cx))));

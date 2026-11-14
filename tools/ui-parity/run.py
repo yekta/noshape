@@ -471,6 +471,20 @@ def cloud_menu(a, b):
         lb["highlighted"] = la.get("highlighted")
 
 
+# Live's drawing reader counted orange pixels inside a view's box a pixel short before 11-14 (live2): an edge on the box
+# (block-drawing's Front top edge, picked first in a Dimension tool) read as no selection. Ours' Dimension picks aren't
+# compared against those takes until they are re-recorded.
+DIM_PICK_READ_SINCE = "2026-11-14T00:00:00Z"
+
+
+def old_dimension_pick(a, b, recorded):
+    if recorded >= DIM_PICK_READ_SINCE:
+        return
+    la, lb = ((a or {}).get("drawing") or {}), ((b or {}).get("drawing") or {})
+    if "imension" in str(lb.get("tool") or "") and la.get("selection") == [] and isinstance(lb.get("selection"), list):
+        lb["selection"] = [x for x in lb["selection"] if not (isinstance(x, dict) and x.get("kind") == "EDGE")]
+
+
 def sheets_ref_hover_after_menu(a, b, resting):
     """The Sheets panel's reference row reads "<part> In progress[ V1]" while hovered (drw-ref-pin-reference). Right
     after a menu item's click the pointer rests where the item was, over whichever row: Chrome hovers it or not by its
@@ -1070,6 +1084,7 @@ def compare(live, ours, whole_document=True):
             b["dialog"], b["focus"] = a["dialog"], a.get("focus")
         drawn_sizes(a, b)
         sheets_ref_hover_after_menu(a, b, name in resting)
+        old_dimension_pick(a, b, str(live.get("recorded") or ""))
         placed_alike(a, b)
         cloud_menu(a, b)
         menu_badges(a, b)

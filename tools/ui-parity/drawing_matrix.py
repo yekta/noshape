@@ -261,6 +261,7 @@ def main():
     ap.add_argument("--run", required=True, help="a suite run's uip directory (ours' drw-*.json)")
     ap.add_argument("--dom", default="/root/onshape-research/live/dom")
     ap.add_argument("--details", action="store_true", help="list every item, not only the ones that aren't matching")
+    ap.add_argument("--ours-menus", help="our menus per entity (the MENUDUMP json of drawing-ui's drawing_context_menus_are_lives test)")
     args = ap.parse_args()
     src = sources()
 
@@ -308,10 +309,22 @@ def main():
     for k, seen in sorted(tool_seen.items()):
         if k not in listed and not k.endswith(" dimension") and k not in ("dimension", "note", "spline point", "center point circle"):
             rows.append(("Toolbar", k.capitalize(), status(seen, True), "recorded; not in the toolbar dump (Pro plan)"))
+    ours_menus = json.load(open(args.ours_menus)) if args.ours_menus else {}
     for entity, items in menus(args.dom).items():
+        # Our menu of that entity (an entity name's words after the first, e.g. "dimension (with an inspection item)").
+        mine = ours_menus.get(entity.split(" ")[0])
+        mine_keys = {key(r.removesuffix(" ▸")) for r in mine or []}
         for it in items:
             k = key(it)
-            rows.append((f"Menu: {entity}", it, status(menu_seen.get(k), in_sources(src, it) or in_sources(src, it.rstrip("…."))), ""))
+            if mine is not None:
+                st = "=" if k in mine_keys else ("≠" if in_sources(src, it) else "missing")
+                rows.append((f"Menu: {entity}", it, st, "our menu"))
+            else:
+                rows.append((f"Menu: {entity}", it, status(menu_seen.get(k), in_sources(src, it) or in_sources(src, it.rstrip("…."))), ""))
+        # A row of ours live's menu doesn't have.
+        for r in mine or []:
+            if r != "——" and key(r.removesuffix(" ▸")) not in {key(x) for x in items}:
+                rows.append((f"Menu: {entity}", f"{r} (ours only)", "≠", "our menu"))
     for surface, globs_, titles in SURFACES:
         texts = []
         for g in globs_:

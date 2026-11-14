@@ -9,7 +9,6 @@ use crate::drawing_view::*;
 use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -28,8 +27,6 @@ pub struct RevisionDlg {
     pub newest_top: bool,
     pub hide_callouts: bool,
     pub corner: TableCorner,
-    rows_input: Entity<InputState>,
-    _sub: Subscription,
 }
 
 /// The drawing's revisions (oldest first) from the document's release log
@@ -41,44 +38,34 @@ pub fn revisions(doc: &crate::doc_model::DocModel, tab: noshape_model::document:
 const CORNERS: [(TableCorner, &str); 4] = [(TableCorner::TopLeft, "Top left"), (TableCorner::TopRight, "Top right"), (TableCorner::BottomLeft, "Bottom left"), (TableCorner::BottomRight, "Bottom right")];
 
 impl DrawingEditor {
-    fn new_revision_dlg(&mut self, table: Option<u64>, window: &mut Window, cx: &mut Context<Self>) -> RevisionDlg {
+    fn new_revision_dlg(&mut self, table: Option<u64>) -> RevisionDlg {
         let t = table.and_then(|id| self.drawing.sheets[self.sheet].table(id).cloned());
         let original = t.as_ref().map(|t| (t.kind.clone(), t.corner));
         let (see_sheet1, visible_rows, newest_top, hide_callouts) = match t.as_ref().map(|t| &t.kind) {
             Some(TableKind::Revision { see_sheet1, visible_rows, newest_top, hide_callouts, .. }) => (*see_sheet1, *visible_rows, *newest_top, *hide_callouts),
-            _ => (false, 5, false, false),
+            // Live (drw-revision-table, Professional): Multi-sheet "See sheet 1", 5 visible rows.
+            _ => (true, 5, false, false),
         };
         let corner = t.map(|t| t.corner).unwrap_or(TableCorner::TopRight);
-        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(visible_rows.to_string()));
-        let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
-            if matches!(ev, InputEvent::Change)
-                && let Ok(n) = st.read(cx).value().trim().parse::<u32>()
-                && (1..=100).contains(&n)
-                && let Some(d) = &mut this.revision_dlg
-            {
-                d.visible_rows = n;
-                this.apply_revision_dlg(cx);
-            }
-        });
-        RevisionDlg { table, original, see_sheet1, visible_rows, newest_top, hide_callouts, corner, rows_input: st, _sub: sub }
+        RevisionDlg { table, original, see_sheet1, visible_rows, newest_top, hide_callouts, corner }
     }
 
     /// Create / drop the insert dialog with the Revision table tool (called
     /// from render).
-    pub fn sync_revision_dlg(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn sync_revision_dlg(&mut self) {
         let active = matches!(self.tool, Tool::Table { kind: TableTool::Revision, .. });
         let inserting = self.revision_dlg.as_ref().is_some_and(|d| d.table.is_none());
         if active && self.revision_dlg.is_none() {
-            self.revision_dlg = Some(self.new_revision_dlg(None, window, cx));
+            self.revision_dlg = Some(self.new_revision_dlg(None));
         } else if !active && inserting {
             self.revision_dlg = None;
         }
     }
 
     /// Right-click › Revision table properties…
-    pub fn open_revision_props(&mut self, id: u64, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_revision_props(&mut self, id: u64, cx: &mut Context<Self>) {
         self.tool = Tool::Select;
-        self.revision_dlg = Some(self.new_revision_dlg(Some(id), window, cx));
+        self.revision_dlg = Some(self.new_revision_dlg(Some(id)));
         cx.notify();
     }
 
@@ -113,7 +100,8 @@ impl DrawingEditor {
         self.edit_sheet("Revision table", cx, |s| s.tables.push(t));
         self.revision_dlg = None;
         self.tool = Tool::Select;
-        self.selection = vec![Sel::Table(id)];
+        // Placed, not selected (live drw-revision-table, as a BOM table).
+        self.selection.clear();
         cx.notify();
     }
 
@@ -183,7 +171,7 @@ impl DrawingEditor {
     /// to back | Clear selection, Zoom to fit, Delete (Add comment is cloud). With a cell selected: its Size ▸,
     /// Resize…, Copy.
     pub fn revision_table_entries(&self, id: u64, cell: Option<(usize, usize)>) -> Vec<MenuEntry> {
-        let mut out = vec![MenuEntry::item("Revision table properties...", move |t, w, cx| t.open_revision_props(id, w, cx))];
+        let mut out = vec![MenuEntry::item("Revision table properties...", move |t, _, cx| t.open_revision_props(id, cx))];
         let sheet = &self.drawing.sheets[self.sheet];
         let Some(t) = sheet.table(id) else { return out };
         // The revision of the row under the cursor (row 0 is the header).
@@ -293,7 +281,7 @@ impl DrawingEditor {
         });
     }
 
-    fn close_revision_dlg(&mut self, accept: bool, cx: &mut Context<Self>) {
+    pub(crate) fn close_revision_dlg(&mut self, accept: bool, cx: &mut Context<Self>) {
         let Some(d) = self.revision_dlg.take() else { return };
         match (d.table, d.original) {
             (Some(id), Some((kind, corner))) if !accept => self.edit_table(id, "Revision table properties", cx, |t| {
@@ -328,7 +316,40 @@ impl DrawingEditor {
                 m
             })
         };
-        let multi = select("rev-multi", [("Linked", !d.see_sheet1), ("See sheet 1", d.see_sheet1)], |d, i| d.see_sheet1 = i == 1);
+        let multi = select("rev-multi", [("See sheet 1", d.see_sheet1), ("Linked", !d.see_sheet1)], |d, i| d.see_sheet1 = i == 0);
+        // Visible rows: a list of 1 to 100 (live: a select).
+        let rows_now = d.visible_rows;
+        let rows = {
+            let ed = ed.clone();
+            Button::new("rev-rows").label(rows_now.to_string()).ghost().small().w(px(130.)).dropdown_caret(true).os_dropdown_menu("rev-rows-dd", true, move |mut m, _, _| {
+                for n in 1..=100u32 {
+                    let e = ed.clone();
+                    m = m.item(crate::os_menu::OsMenuItem::new(n.to_string()).checked(n == rows_now).on_click(move |_, _, cx| {
+                        e.update(cx, |t, cx| {
+                            if let Some(d) = &mut t.revision_dlg {
+                                d.visible_rows = n;
+                            }
+                            t.apply_revision_dlg(cx);
+                        })
+                    }));
+                }
+                m
+            })
+        };
+        // What live's recorder reads (drw-revision-table): the labels and each list's options, at most 30.
+        let (see1, newest, hide_on) = (d.see_sheet1, d.newest_top, d.hide_callouts);
+        crate::ui_script::note_dialog(|| {
+            let mut text: Vec<String> = ["Revision table", "Multi-sheet", "See sheet 1", "Linked", "Visible rows"].map(String::from).to_vec();
+            text.extend((1..=100).map(|n: u32| n.to_string()));
+            text.truncate(30);
+            let fields = serde_json::json!([
+                { "label": "Multi-sheet", "kind": "select", "value": if see1 { "See sheet 1" } else { "Linked" } },
+                { "label": "Visible rows", "kind": "select", "value": rows_now.to_string() },
+                { "label": "Order", "kind": "select", "value": if newest { "Bottom to top" } else { "Top to bottom" } },
+                { "label": "Hide revision callouts no longer shown in the table", "kind": "checkbox", "value": hide_on },
+            ]);
+            serde_json::json!({ "kind": "drawing-panel", "title": "Revision table", "text": text, "fields": fields })
+        });
         let order = select("rev-order", [("Top to bottom", !d.newest_top), ("Bottom to top", d.newest_top)], |d, i| d.newest_top = i == 1);
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(30.)).px(px(6.)).child(div().w(px(90.)).text_size(px(12.)).child(label)).child(body).into_any_element();
         let corner = d.corner;
@@ -393,7 +414,7 @@ impl DrawingEditor {
                     v_flex()
                         .p(px(3.))
                         .child(row("Multi-sheet", multi.into_any_element()))
-                        .child(row("Visible rows", div().w(px(130.)).child(Input::new(&d.rows_input).small()).into_any_element()))
+                        .child(row("Visible rows", rows.into_any_element()))
                         .child(row("Order", order.into_any_element()))
                         .child(
                             div().px(px(6.)).py(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("rev-hide").label("Hide revision callouts no longer shown in the table").checked(hide).on_click(cx.listener(|this, v: &bool, _, cx| {

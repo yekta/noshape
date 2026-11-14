@@ -1893,7 +1893,7 @@ impl DrawingEditor {
         self.sync_detail_dlg(window, cx);
         self.sync_crop_dlg();
         self.sync_chooser(window, cx);
-        self.sync_revision_dlg(window, cx);
+        self.sync_revision_dlg();
         self.sync_weld_dlg(window, cx);
         self.sync_edge_condition_dlg(window, cx);
         self.sync_callout_dlg(window, cx);

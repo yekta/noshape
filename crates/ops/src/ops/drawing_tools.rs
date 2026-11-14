@@ -759,7 +759,7 @@ pub fn ops() -> Vec<Op> {
                     opt("corner", json!({ "type": "string", "enum": ["top_left", "top_right", "bottom_left", "bottom_right"], "default": "top_right" }), "The table's fixed corner."),
                     opt("visible_rows", json!({ "type": "integer", "minimum": 1, "default": 5 }), "Rows shown."),
                     opt("newest_top", json!({ "type": "boolean", "default": false }), "Newest revision at the top."),
-                    opt("see_sheet1", json!({ "type": "boolean", "default": false }), "Show \"See sheet 1\" on other sheets."),
+                    opt("see_sheet1", json!({ "type": "boolean", "default": true }), "Show \"See sheet 1\" on other sheets (else Linked; live's new table: See sheet 1)."),
                     opt("hide_callouts", json!({ "type": "boolean", "default": false }), "Hide revision callouts."),
                 ],
             ),

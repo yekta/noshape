@@ -65,8 +65,8 @@ pub fn paste_always() -> MenuEntry {
     MenuEntry::item("Paste", |t, _, cx| t.paste_views(cx))
 }
 
-/// Live request 1736: every annotation, leader and view menu lists Paste,
-/// clipboard or not (identical before and after a Copy).
+/// Paste in an annotation, leader or view menu (the menu drops it while nothing of a drawing is on the clipboard:
+/// `context_menu_entries`).
 pub fn paste_entry(_cx: &App) -> Option<MenuEntry> {
     Some(paste_always())
 }

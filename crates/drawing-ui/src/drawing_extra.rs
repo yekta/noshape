@@ -1265,6 +1265,9 @@ impl DrawingEditor {
                     self.tool = Tool::Table { kind: TableTool::Hole, view: Some(v), origin: Some(p) };
                 }
             }
+            // Without location data the table waits for ✓ (live drw-hole-table-no-location: a click in the view first
+            // leaves the panel open).
+            Tool::Table { kind: TableTool::Hole, view: Some(_), .. } if !self.hole_ready_to_place() => {}
             Tool::Table { kind, view: Some(v), origin } => {
                 let id = self.current_sheet().next_table_id();
                 let (mut table, name) = noshape_scene::drawing_tools::view_table(id, kind, v, origin, c);

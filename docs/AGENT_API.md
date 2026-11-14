@@ -5116,7 +5116,7 @@ Examples:
 | `corner` | one of `top_left`, `top_right`, `bottom_left`, `bottom_right` |  | The table's fixed corner. |
 | `visible_rows` | integer |  | Rows shown. |
 | `newest_top` | boolean |  | Newest revision at the top. |
-| `see_sheet1` | boolean |  | Show "See sheet 1" on other sheets. |
+| `see_sheet1` | boolean |  | Show "See sheet 1" on other sheets (else Linked; live's new table: See sheet 1). |
 | `hide_callouts` | boolean |  | Hide revision callouts. |
 
 #### drawing_revision_callout

@@ -14,6 +14,9 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Value {
     registry::run(ctx, op, &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value
 }
 
+/// Agent API calls on a test drawing (its tab's name) before the editor opens.
+type Setup = fn(&mut Ctx, &str);
+
 thread_local! {
     /// The next test drawing gets the source's suggested views.
     static SUGGESTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -23,6 +26,8 @@ thread_local! {
     static HOLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The next test drawing is ui-parity's start of this name (tests/ui-parity/starts.json) instead.
     static START: std::cell::Cell<Option<&'static str>> = const { std::cell::Cell::new(None) };
+    /// The next test drawing is given more through the agent API (its tab's name) before the editor opens.
+    static SETUP: std::cell::Cell<Option<Setup>> = const { std::cell::Cell::new(None) };
 }
 
 /// A drawing of a block (Drawing 1) in a test window.
@@ -52,6 +57,9 @@ fn drawing(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Draw
             call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "endBound": "BLIND", "symmetric": true, "depth": "40 mm", "operationType": "REMOVE" } }));
         }
         let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": SUGGESTED.get() }));
+        if let Some(f) = SETUP.take() {
+            f(&mut ctx, d["drawing"].as_str().unwrap_or_default());
+        }
         if DIMENSIONED.get() {
             let tab = d["drawing"].clone();
             let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
@@ -679,4 +687,146 @@ fn a_section_view_waits_where_it_was_placed_for_its_depth_entity(cx: &mut TestAp
     assert_eq!(views(cx), before + 1, "the depth entity makes the view");
     let placed = cx.update(|cx| editor.read(cx).drawing.sheets[0].views.last().map(|v| v.position)).unwrap();
     assert!((placed[1] - 30.0).abs() < 1e-6, "the view at the placement's height: {placed:?}");
+}
+
+
+/// Every right-click menu of ours, one entity of each kind, as live's dumps have them (live2 11-14,
+/// dom/context-menus-drawing*.txt, nothing copied: no Paste; Add comment is cloud-only). `MENUDUMP <json>` prints them
+/// all ({entity: [rows]}, separators "——", a submenu's label with " ▸") for docs/parity/drawing-matrix.md.
+#[gpui::test]
+fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    SUGGESTED.set(true);
+    HOLED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let num = |v: &Value| v.as_f64().unwrap_or(0.0);
+        let views = g["views"].as_array().cloned().unwrap_or_default();
+        let front = views.iter().find(|v| v["orientation"] == "front").cloned().unwrap_or_else(|| views[0].clone());
+        let len = |e: &Value| (num(&e["b"][0]) - num(&e["a"][0])).hypot(num(&e["b"][1]) - num(&e["a"][1]));
+        let edges = front["edges"].as_array().cloned().unwrap_or_default();
+        let long = edges.iter().filter(|e| e["type"] == "line").max_by(|a, b| len(a).total_cmp(&len(b))).cloned().unwrap_or_default();
+        let (a, b) = ([num(&long["a"][0]), num(&long["a"][1])], [num(&long["b"][0]), num(&long["b"][1])]);
+        let mid = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
+        let mut run = |tool: &str, args: Value| {
+            if let Err(e) = registry::run(ctx, registry::by_tool_name(tool).unwrap(), &args) {
+                eprintln!("MENUDUMP-SKIP {tool}: {}", e.message);
+            }
+        };
+        run("drawing_dimension", json!({ "drawing": dw, "picks": [mid], "place": [mid[0], mid[1] + 15.0] }));
+        run("drawing_inspection", json!({ "drawing": dw, "action": "automatic", "scope": "sheet" }));
+        run("drawing_note", json!({ "drawing": dw, "text": "NOTE", "position": [30, 40] }));
+        run("drawing_callout", json!({ "drawing": dw, "anchor": mid, "position": [mid[0] + 25.0, mid[1] + 25.0], "text": "1" }));
+        run("drawing_datum", json!({ "drawing": dw, "anchor": a, "position": [a[0], a[1] - 15.0], "label": "A" }));
+        run("drawing_gdt", json!({ "drawing": dw, "position": [60, 60], "rows": [{ "symbol": "position", "tolerance": "⌀0.1", "datums": ["A"] }] }));
+        run("drawing_surface_finish", json!({ "drawing": dw, "position": [60, 80], "value": "Ra 1.6" }));
+        run("drawing_weld", json!({ "drawing": dw, "target": b, "position": [b[0] + 20.0, b[1] + 25.0], "spec": { "arrow": { "symbol": "fillet", "size": "5" } } }));
+        run("drawing_edge_condition", json!({ "drawing": dw, "target": mid, "position": [mid[0] - 20.0, mid[1] + 20.0], "rows": [{ "sign": "+", "value": 0.3 }] }));
+        run("drawing_ordinate", json!({ "drawing": dw, "origin": a, "side": [a[0], a[1] - 10.0], "points": [b] }));
+        run("drawing_sketch", json!({ "drawing": dw, "tool": "line", "picks": [[20, 200], [60, 200]] }));
+        run("drawing_sketch", json!({ "drawing": dw, "tool": "point", "picks": [[80, 200]] }));
+        run("drawing_table", json!({ "drawing": dw, "position": [20, 280], "rows": 3, "columns": 2, "header_row": true }));
+        run("drawing_revision_table", json!({ "drawing": dw, "position": [300, 290] }));
+        run("drawing_hatch_region", json!({ "drawing": dw, "points": [[100, 240], [140, 240], [140, 270]] }));
+    }));
+    let (window, editor) = drawing(cx, "menu-dump");
+    real_sheet(cx, window, &editor);
+    let entities: Vec<(String, u32, [f64; 2])> = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        let sheet = e.current_sheet();
+        let kind = |id: u64| sheet.annotations.iter().find(|a| a.id == id).map(|a| format!("{:?}", a.kind).split([' ', '(', '{']).next().unwrap_or("").to_string()).unwrap_or_default();
+        let mut out: Vec<(String, u32, [f64; 2])> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for (pick, t) in b.picks.iter().enumerate() {
+            let name = match t {
+                PickTarget::Annotation(id) => match kind(*id).as_str() {
+                    "Note" => "note".to_string(),
+                    "Balloon" => "callout".into(),
+                    "Datum" => "datum".into(),
+                    "DatumTarget" => "datum-target".into(),
+                    "Gdt" => "gdt".into(),
+                    "SurfaceFinish" => "surface-finish".into(),
+                    "Weld" => "weld".into(),
+                    "EdgeCondition" => "edge-condition".into(),
+                    "Centermark" => "centermark".into(),
+                    k if k.contains("Centerline") => "centerline".into(),
+                    k if k.starts_with("Ordinate") => "ordinate".into(),
+                    k if k.ends_with("Dimension") => "dimension".into(),
+                    k => k.to_lowercase(),
+                },
+                PickTarget::Inspection(_) => "inspection-item".into(),
+                PickTarget::View(_) | PickTarget::Edge { .. } => "view".into(),
+                PickTarget::TitleField(_) => "title-block".into(),
+                PickTarget::Table(id) => match sheet.table(*id).map(|t| format!("{:?}", t.kind).split([' ', '(', '{']).next().unwrap_or("").to_string()).as_deref() {
+                    Some("Revision") => "revision-table".into(),
+                    Some(k) => format!("{}-table", k.to_lowercase()),
+                    None => "table".into(),
+                },
+                PickTarget::SketchEntity(_) => "sketch".into(),
+                PickTarget::Hatch(_) => "hatch".into(),
+                _ => continue,
+            };
+            if !seen.insert(name.clone()) {
+                continue;
+            }
+            // A text's middle (a callout's, away from its leader), else a line's.
+            let at = b.geometry.texts.iter().find(|x| x.pick as usize == pick).map(|x| {
+                let w = noshape_model::drawing::font::text_width(&x.text, x.height);
+                [x.pos[0] + w / 2.0, x.pos[1] + x.height / 2.0]
+            }).or_else(|| {
+                b.geometry.lines.iter().find(|l| l.pick as usize == pick && l.points.len() >= 2).map(|l| [(l.points[0][0] + l.points[1][0]) / 2.0, (l.points[0][1] + l.points[1][1]) / 2.0])
+            });
+            if let Some(at) = at {
+                out.push((name, pick as u32, at));
+            }
+        }
+        out
+    });
+    let flat = |entries: &[MenuEntry]| -> Vec<String> {
+        entries
+            .iter()
+            .map(|m| match m {
+                MenuEntry::Item { label, .. } => label.to_string(),
+                MenuEntry::Separator => "——".into(),
+                MenuEntry::Submenu(label, _) => format!("{label} ▸"),
+            })
+            .collect()
+    };
+    let mut dump = serde_json::Map::new();
+    let empty = cx.update(|cx| editor.update(cx, |e, cx| {
+        e.cursor = [5.0, 5.0];
+        e.hover = None;
+        e.selection.clear();
+        e.context_menu_entries(None, cx)
+    }));
+    dump.insert("empty-sheet".into(), json!(flat(&empty)));
+    for (name, pick, at) in entities {
+        let rows = cx.update(|cx| editor.update(cx, |e, cx| {
+            e.cursor = at;
+            e.hover = Some(pick);
+            e.selection.clear();
+            e.context_menu_entries(Some(pick), cx)
+        }));
+        dump.insert(name, json!(flat(&rows)));
+    }
+    println!("MENUDUMP {}", Value::Object(dump.clone()));
+    let tail = ["——", "Clear selection", "Zoom to fit", "Delete"];
+    let with_tail = |rows: &[&str]| -> Vec<String> { rows.iter().chain(tail.iter()).map(|r| r.to_string()).collect() };
+    let live: Vec<(&str, Vec<String>)> = vec![
+        ("empty-sheet", ["Paste as table", "Sheet properties...", "Drawing properties...", "——", "Zoom to fit", "Zoom to window", "Zoom to sheet"].map(String::from).to_vec()),
+        ("title-block", with_tail(&["Edit note...", "Explode note", "Copy", "Paste as table", "Add leader", "Move to ▸", "Bring to front", "Send to back"])),
+        ("note", with_tail(&["Edit note...", "Explode note", "Copy", "Paste as table", "Add leader", "Move to ▸", "Bring to front", "Send to back"])),
+        ("dimension", with_tail(&["Edit...", "Paste as table", "Unbreak dimension"])),
+        ("inspection-item", ["Edit...", "Reorder inspection items...", "Remove inspection item", "Remove all inspection items", "——", "Clear selection", "Zoom to fit"].map(String::from).to_vec()),
+        ("callout", with_tail(&["Edit...", "Copy", "Paste as table", "Add leader", "Remove leaders", "Move to ▸"])),
+        ("datum", with_tail(&["Edit...", "Copy", "Paste as table"])),
+        ("gdt", with_tail(&["Edit...", "Copy", "Paste as table", "Add leader", "Move to ▸"])),
+        ("edge-condition", with_tail(&["Edit...", "Copy", "Paste as table", "Add leader", "Remove leaders", "Move to ▸"])),
+        ("ordinate", with_tail(&["Add to ordinate dimension group", "Edit...", "Paste as table", "Unbreak dimension"])),
+        ("revision-table", with_tail(&["Revision table properties...", "Paste as table", "Move to ▸", "Bring to front", "Send to back"])),
+    ];
+    for (entity, rows) in live {
+        assert_eq!(dump.get(entity), Some(&json!(rows)), "{entity}'s menu");
+    }
 }

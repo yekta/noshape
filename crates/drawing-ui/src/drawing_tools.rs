@@ -128,6 +128,11 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
+        // Revision table properties…: Esc closes it, as a cancel (live drw-revision-table-properties).
+        if self.revision_dlg.as_ref().is_some_and(|d| d.table.is_some()) {
+            self.close_revision_dlg(false, cx);
+            return;
+        }
         if self.zoom_window.take().is_some() || self.rotate_to_edge.take().is_some() || self.align_views.take().is_some() || self.sheet_props.take().is_some() || self.shortcut_toolbar.take().is_some() || self.measure.take().is_some() || self.align_centermark.take().is_some() || self.align_auto_centermark.take().is_some() || self.painter.take().is_some() || self.cancel_inspection(cx) || self.cancel_hatch(cx) {
             self.status = None;
             cx.notify();
@@ -1468,7 +1473,7 @@ impl DrawingEditor {
         match &self.tool {
             Tool::Table { kind: TableTool::Custom, .. } => self.custom_dlg_placing(),
             Tool::Table { kind: TableTool::General | TableTool::Revision, .. } => true,
-            Tool::Table { kind: TableTool::Hole, view: Some(_), .. } => self.hole_origins_done(),
+            Tool::Table { kind: TableTool::Hole, view: Some(_), .. } => self.hole_ready_to_place(),
             Tool::Table { view: Some(_), .. } => true,
             _ => false,
         }
@@ -2042,6 +2047,30 @@ impl DrawingEditor {
             self.cancel(cx);
             return;
         }
+        self.menu_at = self.local(position);
+        let entries = self.context_menu_entries(pick, cx);
+        let ed = cx.entity();
+        // Onshape's right-click menu (os_menu: 12 px text, a drawing's 23.5 px rows).
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
+        if !menu.read(cx).is_empty() {
+            self.frame_menu = Some(menu.downgrade());
+            crate::drawing_view::open_drawing_menu(position, menu, window, cx);
+        }
+        cx.notify();
+    }
+
+    /// The right-click menu's entries for what `pick` (at the cursor) is, the selection set to it as live does.
+    pub(crate) fn context_menu_entries(&mut self, pick: Option<u32>, cx: &mut Context<Self>) -> Vec<MenuEntry> {
+        let mut entries = self.context_menu_rows(pick, cx);
+        // Paste is listed while drawing content is on the clipboard (live's menus from a fresh session have none,
+        // dom/context-menus-drawing-2.txt; with a view copied every one starts so, behaviours 1736).
+        if crate::drawing_props::view_clipboard(cx).is_none() {
+            entries.retain(|e| !matches!(e, MenuEntry::Item { label, .. } if label.as_ref() == "Paste"));
+        }
+        entries
+    }
+
+    fn context_menu_rows(&mut self, pick: Option<u32>, cx: &mut Context<Self>) -> Vec<MenuEntry> {
         let sel = self.sel_at(pick, self.cursor);
         // A section line's menu leaves the selection as it was (live drw-section-flip-direction: nothing orange).
         let on_cut_line = pick.and_then(|p| self.built.as_ref()?.picks.get(p as usize)).is_some_and(|t| matches!(t, PickTarget::SectionLine(_)));
@@ -2052,7 +2081,6 @@ impl DrawingEditor {
             self.selection = vec![s];
             self.redraw(cx);
         }
-        self.menu_at = self.local(position);
         // Exactly on a note or callout leader: its own menu (live drw2 10-21
         // g (3), (4), (6)).
         // On a detail view's circle in its parent: the circle's menu (live
@@ -2076,7 +2104,7 @@ impl DrawingEditor {
                 Some((v.id, index))
             });
         }
-        let entries = match (self.leader_hit(self.cursor), circle, cut_line, field) {
+        match (self.leader_hit(self.cursor), circle, cut_line, field) {
             _ if bubble.is_some() => bubble.map(|a| self.inspection_entries(&a)).unwrap_or_default(),
             (Some(hit), ..) => self.leader_entries(hit, cx),
             (None, Some(v), ..) => self.detail_circle_entries(v, cx),
@@ -2144,15 +2172,7 @@ impl DrawingEditor {
                 ]
             }
             (None, None, None, None) => self.context_entries(sel, cx),
-        };
-        let ed = cx.entity();
-        // Onshape's right-click menu (os_menu: 12 px text, a drawing's 23.5 px rows).
-        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
-        if !menu.read(cx).is_empty() {
-            self.frame_menu = Some(menu.downgrade());
-            crate::drawing_view::open_drawing_menu(position, menu, window, cx);
         }
-        cx.notify();
     }
 
     /// The auxiliary view reference indicator's own menu (live u-906).
@@ -2509,15 +2529,6 @@ impl DrawingEditor {
                     if let AnnotationKind::Note { .. } = a.kind {
                         let pos = a.position;
                         out.push(MenuEntry::item("Edit note...", move |t, w, cx| t.open_note_panel(Some(id), pos, w, cx)));
-                    }
-                    if let AnnotationKind::LinearDimension { orientation, .. } = a.kind {
-                        for (label, o) in [("Horizontal", DimOrientation::Horizontal), ("Vertical", DimOrientation::Vertical), ("Aligned", DimOrientation::Aligned)] {
-                            out.push(MenuEntry::check(label, orientation == o, move |t, _, cx| {
-                                t.edit_sheet("Dimension orientation", cx, |s| {
-                                    noshape_scene::drawing_tools::annotation_edit::set_dimension_orientation(s, id, o);
-                                })
-                            }));
-                        }
                     }
                     out.extend(self.annotation_more_entries(a));
                     if let AnnotationKind::RadialDimension { diameter, .. } = a.kind {

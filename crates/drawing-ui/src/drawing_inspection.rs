@@ -329,7 +329,10 @@ impl DrawingEditor {
         let chars_label = chars_items.iter().find(|i| i.1 == own_chars).map(|i| i.0.clone()).unwrap_or_default();
         let ed2 = ed.clone();
         let items2 = shape_items.clone();
-        let shapes = Button::new("insp-shape").label(shape_label).ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-shape-dd", true, move |mut m, _, _| {
+        let shapes = {
+            let mark = format!("dropdown:{}", shape_label);
+            Button::new("insp-shape").label(shape_label).map(move |b| crate::ui_script::mark(b, move || mark.clone()))
+        }.ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-shape-dd", true, move |mut m, _, _| {
             for (label, v) in &items2 {
                 let (e, v) = (ed2.clone(), *v);
                 m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(v == own_shape).on_click(move |_, _, cx| {
@@ -345,7 +348,10 @@ impl DrawingEditor {
         });
         let ed2 = ed.clone();
         let items2 = chars_items.clone();
-        let widths = Button::new("insp-chars").label(chars_label).ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-chars-dd", true, move |mut m, _, _| {
+        let widths = {
+            let mark = format!("dropdown:{}", chars_label);
+            Button::new("insp-chars").label(chars_label).map(move |b| crate::ui_script::mark(b, move || mark.clone()))
+        }.ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-chars-dd", true, move |mut m, _, _| {
             for (label, v) in &items2 {
                 let (e, v) = (ed2.clone(), *v);
                 m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(v == own_chars).on_click(move |_, _, cx| {

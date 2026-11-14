@@ -64,6 +64,9 @@ pub struct ChooserState {
     pub open: Vec<TabId>,
     /// Opened from + › Create Drawing…: the only Part Studio with parts starts expanded (live doc-plus-create-drawing-ok).
     pub expand_single: bool,
+    /// Opened by + › Create Drawing… (not the Insert view panel's Insert): live's recorder reads it as a dialog of its
+    /// own there (doc-plus-create-drawing-ok), else the Insert view panel beside it (drw-insert-view-*, 11-14).
+    pub by_create: bool,
     pub search: Option<Entity<InputState>>,
     /// Create version… left the keyboard on the drawing (the state reads the drawing, not the chooser's field, until
     /// the chooser is used again).
@@ -1171,13 +1174,18 @@ impl DrawingEditor {
         // Beside the Insert view panel (the empty one until a source is chosen).
         // (Select a composite part: beside the Cut list table panel.)
         let left = if matches!(self.tool, Tool::InsertView { .. }) || composite { None } else { Some(self.render_empty_insert_panel(cx)) };
-        // Live's recorder since 2026-11-14 reads the open picker as a feature dialog (doc-plus-create-drawing-ok): its
-        // tabs, the search box and the rows; `panel` keeps what the panel beside it read (older takes read that).
+        // Live's recorder since 2026-11-14 reads the picker + › Create Drawing… opened as a feature dialog
+        // (doc-plus-create-drawing-ok): its tabs, the search box and the rows; `panel` keeps what the panel beside it
+        // read (older takes read that, and the picker from the Insert view panel's Insert still reads so).
         let panel_read = crate::ui_script::open_dialog();
+        let by_create = self.chooser.by_create;
         let other = self.chooser.other;
         let placeholder = if composite { "Search composite parts" } else { "Search parts or sketches" };
         let search_text = self.chooser.search.as_ref().map(|s| s.read(cx).value().to_string()).unwrap_or_default();
         crate::ui_script::note_dialog(|| {
+            if !by_create && let Some(p) = panel_read.clone() {
+                return p;
+            }
             let mut fields = vec![serde_json::json!({ "label": placeholder, "kind": "string", "text": search_text })];
             fields.extend(read_rows);
             serde_json::json!({

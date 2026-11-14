@@ -129,6 +129,12 @@ impl DrawingEditor {
         first && self.hole_dlg.as_ref().is_none_or(|d| !d.adding_view && (!d.show_location || d.more.iter().all(|m| m.1.is_some())))
     }
 
+    /// The table being inserted can be placed: after its origin(s) with Show location data; without it, after ✓ (live
+    /// drw-hole-table-no-location: a click in the view before ✓ leaves the panel open).
+    pub fn hole_ready_to_place(&self) -> bool {
+        self.hole_origins_done() && (self.hole_needs_origin() || self.hole_dlg.as_ref().is_some_and(|d| d.placing))
+    }
+
     /// The table being inserted measures from an origin: with Show location data off it has no X / Y LOC columns and
     /// ✓ takes it without one (live drw-hole-table-collapse-tags: the view, then ✓).
     pub fn hole_needs_origin(&self) -> bool {
@@ -184,7 +190,7 @@ impl DrawingEditor {
     /// click on the sheet, or Esc after ✓).
     pub fn place_hole_table(&mut self, cx: &mut Context<Self>) {
         let Tool::Table { kind: TableTool::Hole, view: Some(v), origin } = self.tool.clone() else { return };
-        if !self.hole_origins_done() {
+        if !self.hole_ready_to_place() {
             return;
         }
         let id = self.current_sheet().next_table_id();
@@ -201,7 +207,7 @@ impl DrawingEditor {
     /// the view's tags and the origin arrows follow it before the click).
     pub fn hole_table_preview(&self) -> Option<noshape_model::drawing::Table> {
         let Tool::Table { kind: TableTool::Hole, view: Some(v), origin } = &self.tool else { return None };
-        if self.hole_dlg.as_ref().is_some_and(|d| d.picking || d.x_picking || d.y_picking) || !self.hole_origins_done() {
+        if self.hole_dlg.as_ref().is_some_and(|d| d.picking || d.x_picking || d.y_picking) || !self.hole_ready_to_place() {
             return None;
         }
         let id = self.current_sheet().next_table_id();

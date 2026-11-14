@@ -276,8 +276,8 @@ impl DrawingEditor {
                 _ => None,
             };
             // (Nor a custom table: live2 drw-custom-table-insert lists none after placing one; nor a cut list,
-            // drw-cut-list-table-properties.)
-            for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. } | TableKind::Custom { .. } | TableKind::CutList { .. }) && Some(t.id) != editing) {
+            // drw-cut-list-table-properties; nor a revision table, drw-revision-table.)
+            for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. } | TableKind::Custom { .. } | TableKind::CutList { .. } | TableKind::Revision { .. }) && Some(t.id) != editing) {
                 let mut texts: Vec<_> = b.geometry.texts.iter().filter(|x| matches!(b.picks.get(x.pick as usize), Some(PickTarget::Table(id)) if *id == t.id)).collect();
                 // Bottom to top: live's recorder reads the rows in their data order (the header, item 1, item 2…; live2
                 // drw-bom-multi-level-bottom-to-top), bottom up here.
@@ -329,13 +329,12 @@ impl DrawingEditor {
         // A dimension's picked edges and a closed broken-out profile are drawn picked (live: drw-dimension-*,
         // drw-broken-out-section).
         match &self.tool {
-            // (Live: a picked circle shows at once, a line once it is the second pick: drw-dimension-edge, -angular,
-            // -point-to-line.)
+            // (Live keeps every pick orange, a line's first too: live2 11-14, drw-dimension-edge re-recorded; the older
+            // takes' [] after a first line pick was their reader missing an edge on the view's box.)
             Tool::Dimension { picks, .. } => {
-                let lines = picks.iter().filter(|p| matches!(p, Pick::Line { .. })).count();
                 for p in picks {
                     match p {
-                        Pick::Line { a: PickedPoint { view, .. }, .. } if lines >= 2 || picks.len() >= 2 => selection.push(("EDGE".into(), self.ui_view_name(*view))),
+                        Pick::Line { a: PickedPoint { view, .. }, .. } => selection.push(("EDGE".into(), self.ui_view_name(*view))),
                         Pick::Circle { view, .. } | Pick::Arc { view, .. } | Pick::CircleAt { view, .. } => selection.push(("EDGE".into(), self.ui_view_name(*view))),
                         _ => {}
                     }

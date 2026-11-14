@@ -526,7 +526,7 @@ pub struct RevisionTableOpts {
 
 impl Default for RevisionTableOpts {
     fn default() -> Self {
-        Self { see_sheet1: false, visible_rows: 5, newest_top: false, hide_callouts: false, corner: TableCorner::TopRight }
+        Self { see_sheet1: true, visible_rows: 5, newest_top: false, hide_callouts: false, corner: TableCorner::TopRight }
     }
 }
 

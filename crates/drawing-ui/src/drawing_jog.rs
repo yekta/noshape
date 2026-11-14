@@ -27,7 +27,8 @@ impl DrawingEditor {
     /// Onshape's menu of a linear dimension (None for other annotations).
     pub fn dimension_entries(&self, id: u64) -> Option<Vec<MenuEntry>> {
         let a = self.resolved_annotation(id)?;
-        if !matches!(a.kind, AnnotationKind::LinearDimension { .. }) || a.inspection.is_some() {
+        // (With an inspection item too: live dom/context-menus-drawing-2.txt, the bubble's rows are its own menu.)
+        if !matches!(a.kind, AnnotationKind::LinearDimension { .. }) {
             return None;
         }
         let mut out = Vec::new();
