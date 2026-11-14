@@ -5,6 +5,16 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-14 08:45 UTC: live fetched every assembly studio's sketch solve (08:37); runs restarted on it
+- All 14 assemblies' studio JSONs now carry "sketches" (live 08:37, synced to vibe5/6/7 every 10 min). Earlier
+  infento / tvc numbers were on the old data: vibe6 unit dx-chain9 (log ~/tmp/dx/chain9.out, sk-<binary>-<asm>.log)
+  waits for the sync, then runs one at a time: ops-b0612 (base d58368558) vs ops-1dc3 (dx-1dc) on infento; base vs
+  ops-tvcB / ops-tvcA on tvc-mount; base vs tvcB on scissor-lift; tvcA on infento; base on bjr-config. Unit
+  dx-studios9 reruns the 1dc32b and bjr 5d8bc1 studios alone on the new data (sk-st-1dc32b.log, sk-st-5d8bc1.log):
+  1dc32b's Extrude 7 should now match (core: the Treads Use lines re-projected to ±34 mm).
+- Land rules as below: dx-1dc if infento holds against ops-b0612; dx-tvc-b if tvc-mount / scissor-lift hold; dx-tvc-a
+  only if infento holds.
+
 ## 11-14 08:30 UTC: session end (Bbedward at 99 %): what's landed, gating, queued, next
 Landed today: STEP closed shell -> solid (570317ea), the translator's id-only mirror plane (f7eaf6a9), sheet metal
 probes by parameters (a27f8202), hose x_t as OFFSET_SURF + split tolerant rings (23eca675, live imports the hoses),
