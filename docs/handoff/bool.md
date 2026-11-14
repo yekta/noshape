@@ -230,6 +230,17 @@ The suite's per-feature kernel profiles count its own measuring (props_surface v
 Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **11-14 19:5x UTC, the marcher revived and measured (branch bool2-march2, pushed: 0434839f4), not landed:**
+  plane x B-spline only, OCCT's section where the march finds none or a curve is closed or doesn't end on a face's
+  boundary. On rings-loft's cut 3c0b53fe's 187 pairs outside the Boolean: 4.3x OCCT's time, OCCT's curves on ours
+  within 1.2e-6. In the Boolean: gate FAIL. The replay is clean (0 differing), but c2-sm-corner-break's "Sheet metal
+  model 1" goes 42 -> 41 faces (its six 1-tool cuts come out equivalent, 1-3e-8 off in volume, and the sheet metal
+  model is that sensitive); a closed section (features_c::thin_sweep_as_live, 0.27 mm3) needed the closed-curve rule.
+  rings-loft and cf-surface-pattern alone on vibe6 (load 12) were no faster: rings 4.9-7.6 s against main's 3.5-6.9
+  in all three rounds (rejected pairs lose their place in OCCT's parallel batch and are asked one by one). Lead's
+  call whether to drop it for good.
+  - The impeller's last vertices (live 2985, /root/onshape-research/live/bool/q2985/out.json): JJM / JJU at x 0
+    (0, +-23.550655, -56.3968) and IO, JOE, JOk on the z 0 intersection curves are the five our feature 15 lacks.
 - **11-14 11:10 UTC: landed 8bb1a09d (fan-blade bolt cut, impeller mirror fuse, arcs in the result check). Fresh
   per-document recordings (vibe6 ~/agents/bool2-keep/bydoc2/rec, today's main): 875/945 ours, 22 OCCT.** Left:
   - c2-gamma-imported / c2-wire-clip-imported f68f4393 (Boolean 1, 87 tools, 7.4-7.7 s) and 678f4bf2 (Boolean 2, 1.9
