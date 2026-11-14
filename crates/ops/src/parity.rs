@@ -1201,6 +1201,10 @@ impl<'a> Translator<'a> {
         refs.extend(parse_refs(src["refs"].as_str().unwrap_or("")));
         // (Another studio built in the same session: our queries read go.)
         self.query_cache.clear();
+        // (Its sketches' bodies, when fetched with it: an assembly's studio.)
+        for (key, r) in refs_from_sketches(&doc["sketchBodies"], doc["features"].as_array().map(Vec::as_slice).unwrap_or_default()) {
+            refs.entry(key).or_insert(r);
+        }
         let mut t = Translator::open_in(&mut *self.ctx, &name, &doc, refs)?;
         for (e, tab) in parent_studios {
             t.studios.entry(e).or_insert(tab);
@@ -6967,6 +6971,19 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         if studio["partVolumes"].is_null() {
             let bands: Vec<Value> = parts.as_array().into_iter().flatten().filter_map(|p| volume_band(p).map(|(lo, hi)| json!([lo, hi]))).collect();
             studio["partVolumes"] = json!(bands);
+        }
+        // A Derived from another studio the assembly fetched (asm-tvc-mount's Derived 2 takes 41b795's parts, fetched
+        // as an instance's studio, not as the Derived's source): that one as its source.
+        for f in studio["features"].as_array().cloned().into_iter().flatten().filter(|f| f["featureType"] == "importDerived") {
+            for p in f["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"] == "buildFunction" || p["parameterId"] == "partStudio") {
+                let Some(source) = p["namespace"].as_str().and_then(|n| n.split("::").find_map(|x| x.strip_prefix('e'))) else { continue };
+                if source == element || !studio["derivedSources"][source].is_null() {
+                    continue;
+                }
+                if let Some((_, other, _)) = studios.iter().find(|(e, ..)| e == source) {
+                    studio["derivedSources"][source] = json!({ "doc": other, "live": other["live"], "refs": "" });
+                }
+            }
         }
         let studio = &studio;
         // Live's per-feature geometry (the studio's `live` lines, `<element>.live.jsonl`) for its id-only queries.
