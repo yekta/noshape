@@ -360,6 +360,12 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     feature 12, upstream). Times: Boolean Flansch+Gehäuse 2964/2461 -> 1479/1605 ms (live 154), Boolean 3 347/204 ->
     168/156 (live 94), Fillet Stevenrohr einnschub 640/612 -> 65/70; Move face 1 ~6 s and Delete face 2 ~3-4 s either
     way (core's defeaturing); the document 26-32 s either way under that load (live 2.8).
+  - **Live's feature 15 (REQUESTS 2985, live/bool/q2985/out.json; read 00:55 UTC):** 19/56/39, ours 19/51/34. Of live's 39
+    vertices ours lacks: JJM / JJU (0, ±23.55, -56.40), between the input's three circle arcs at x 0, which our unify
+    joins into one edge (live keeps a body's own vertices; testing a unify that keeps the arguments' vertices, branch
+    bool2-fill); and live's turn-off edges are short verticals stopping part-way (x 29.409: 0.69 mm; 61.988: 2.31;
+    63.503: 0.35), ours run to the flange's bottom at x 30.08 / 63.86 / 64.34: a different crossing of the walls,
+    upstream (the flange 0.07 mm³ and the Shell 7 mm³ off live).
   - **To core:** the next difference downstream is yours: feature 24 Extrude 4's Part 3 5/9/6, live 5/10/7, 0.009 mm³
     off (up to the inner wall); feature 25 Boolean 1 is then 32/81/50 (live 30/83/54) with OCCT's result identical to
     ours on its inputs (a1af84e6, 3998eb43), then Chamfer Stevenrohr Halterung fails. Recording of the whole document
