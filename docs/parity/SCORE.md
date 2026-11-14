@@ -233,6 +233,27 @@ else running (load 0.5–3.1 for the opens, 2.3–3.4 for the models: the CLI's 
 Mac / vibe7 per document: median 0.43. The ten furthest behind live on the Mac, vibe7's time: impeller 14783 ms, knife 1425,
 faceblend 454, valve 685, helical sweep 148, snap hook 820, tpd fillet 168, michael 267, lighten 317, bottle split 129.
 
+### Interaction latency (qa, 2026-11-14 02:40; live2's live/feel/latency.json; provisional)
+
+v0.4.49's Linux app on the same host as live2's Onshape runs (16-vCPU Xeon VM, Xvfb 1920x1080, software rendering: llvmpipe
+for ours, SwiftShader for Chrome), live2's harness (xdotool input, ffmpeg x11grab 60 fps, lat.py), median of 5 after a warm-up;
+block 40x30x10, Extrude 1 10 -> 15 mm. **The harness's own delay is large and moves:** a window move the X server draws itself
+shows up 0.3-1.2 s later, growing through a recording (frame stamps by frame count drift; with `-use_wallclock_as_timestamps`
+the delay is Xvfb's and ffmpeg's queue under load 10-14). Ours below has each trial's own calibration move subtracted; live's
+are raw and carry that delay too, so the columns are **not comparable yet** (asked live2 to re-run with the calibration).
+
+| item | ours, ms (calibrated) | Onshape, ms (raw) |
+|---|---|---|
+| tool click -> dialog: Extrude / Fillet | 139 / 108 | 1097 / 1107 (DOM-visible ~320) |
+| sketch enter / exit | 138 / 149 | 992 / 898 |
+| ✓ -> model / undo -> model | 371 / 272 | 736 first, 1281 settled / 888 |
+| right-click -> menu | 194 | 210 |
+| hover -> face highlight | 514 | 544 |
+| view cube Top / Front, settled | 960 / 1094 | 2759 / 2998 |
+
+Not timed yet: tab switches, document open, configuration switch. The Mac can't be timed this way (no screen capture over
+ssh); it needs in-app timing (input -> first presented frame).
+
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
 Of the recorded Booleans (each distinct call once), the share noshape's own Boolean takes instead of OCCT, by count and
