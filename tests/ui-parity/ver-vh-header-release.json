@@ -1,21 +1,26 @@
 {
- "name": "ver-vh-header-release",
- "about": "Release… (Versions and history header icon (Create release candidate))",
- "area": "studios",
- "source": "universe versions vh-header-release (studios 11-08, coverage batch)",
- "start": "doc-branches",
- "steps": [
-  {
-   "on": {
-    "button": "Versions and history"
-   },
-   "do": "click"
-  },
-  {
-   "on": {
-    "button": "Create release candidate"
-   },
-   "do": "click"
-  }
- ]
+  "name": "ver-vh-header-release",
+  "about": "Release… (Versions and history header icon (Create release candidate))",
+  "area": "studios",
+  "source": "universe versions vh-header-release (studios 11-08, coverage batch)",
+  "start": "doc-branches",
+  "steps": [
+    {
+      "on": {
+        "button": "Versions and history"
+      },
+      "do": "click"
+    },
+    {
+      "on": {
+        "button": "Create release candidate"
+      },
+      "do": "click"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2500
+    }
+  ]
 }

@@ -1,18 +1,18 @@
 {
  "scenario": "ver-vh-header-release",
- "recorded": "2026-11-14T02:56:30.143Z",
+ "recorded": "2026-11-14T05:33:25.579Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.3"
+  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.5"
  },
  "live": {
-  "document": "5cd1d2368f70acc6e963ae73",
-  "workspace": "b4660c84cedf9ce45039ff8b",
-  "element": "7f5dcebae03c2097e6aac745",
+  "document": "0bded27bca11dd61b2c84edb",
+  "workspace": "57ca2926dfd6e44f0c318393",
+  "element": "efd6d16c6d5b946e8e23a124",
   "start": "doc-branches",
-  "startElement": "7f5dcebae03c2097e6aac745",
+  "startElement": "efd6d16c6d5b946e8e23a124",
   "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
@@ -284,7 +284,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 28122
+   "t": 30708
   },
   {
    "step": 2,
@@ -427,7 +427,195 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 30732
+   "t": 33394
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 2500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Release candidate",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "*",
+       "kind": "input",
+       "value": "A"
+      },
+      {
+       "label": "*",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "*",
+       "kind": "input",
+       "value": "A"
+      },
+      {
+       "label": "*",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Release name *",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Release notes *",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Approvers",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Observers",
+       "kind": "input",
+       "value": ""
+      }
+     ],
+     "buttons": [
+      "Undo",
+      "Redo",
+      "Save draft",
+      "Apply",
+      "Submit",
+      "Release",
+      "Close"
+     ],
+     "text": "Create Release candidate 2 items need attention Part 1 Part Part 2 Part Revision State Part number In progress In progress Release name * Required field must not be empty. Release notes * Required field must not be empty. Approvers Observers Save draft A field required by one or more actions is empty Apply Submit Release Close"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 37942
   }
  ]
 }
