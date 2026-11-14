@@ -1,5 +1,20 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-14 20:07 UTC): sketch differences in the model suite (lead: after the jog)
+- Jog at its reduced angle: fixed (the unfold goes through two rolled bends that meet; flat 100 mm, no overlap);
+  REQUESTS 11-14 19:30 asks live for that jog's flat to confirm. The collision check compares bend zones again.
+- Translator: negative stored distances (live's flip done) and live's current configuration variables fixed.
+- Next, solver robustness: c2-impeller-loft's "Sketch Bohrung Flansch". Adding the (already satisfied) COINCIDENT of
+  the two patterns' seed centres rotates pattern 1 about its pivot by ~1.5° and swings the construction line's end
+  2.6 mm (trace: SKTRACE in check_moved, not committed). Live's stored geometry leaves the line's start 0.83 µm off its
+  VERTICAL to the origin; with VERTICAL, NORMAL to KmZB, the seed on the line and the pivot CONCENTRIC with JZZ the
+  system is redundant and near-singular, and our step for a sub-µm residual goes 2.6 mm along an almost free
+  direction. Want: a minimal-move correction (the residual is within live's tolerance), then the same check on
+  c2-rings-loft Sketch 1 (2.86 mm), cf-sheet-metal-hem's derived Sketch 3 (MIDPOINT, 94.8 mm) and the impeller's
+  Stefevenrohr Führung (5 µm).
+- Knife: its first difference (feature 24) is Curve pattern 1's 3 B-spline edges in live vs 3 lines in ours, not a
+  sketch; for core.
+
 ## Resume here (2026-11-14 12:22 UTC): config-assembly's sheet metal studio 08590a (asm's item; lead: first difference, fix or hand on)
 - Run it alone in the model suite: copy `<asm>/studios/08590a….{json,live.jsonl,sketches.json,mass.json}` to
   `~/tmp/skasm/cfgm/cfg-08590a/{features.json,live.jsonl,sketches.json,mass.json}` on vibe7, then
