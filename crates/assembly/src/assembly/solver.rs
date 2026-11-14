@@ -1672,6 +1672,14 @@ fn group_conflict(problem: &Problem, start: &[Frame], local: &[Frame], scale: f6
         return Vec::new();
     }
     let mut out: Vec<(usize, bool)> = failing.iter().map(|&i| (i, fails(start, i))).collect();
+    // Only a mate on a loop through one that can't hold fights it: one hanging off the loop holds by moving its
+    // side (live 1764 (5): the chain's loop in error, nothing else).
+    if out.iter().any(|&(_, unheld)| unheld) {
+        let blocks = term_blocks(problem);
+        let term_of = |i: usize| problem.terms.iter().position(|t| matches!(t, Term::Mate(m) if *m == i));
+        let culprits: Vec<usize> = out.iter().filter(|&&(_, unheld)| unheld).filter_map(|&(i, _)| term_of(i)).flat_map(|t| blocks[t].iter().copied()).collect();
+        out.retain(|&(i, unheld)| unheld || term_of(i).is_none_or(|t| blocks[t].iter().any(|b| culprits.contains(b))));
+    }
     // A loop through a Slider spares the Fastened links that held (live
     // probes 1798 a1 / f80: the Slider(s) and the closing mate red, the
     // Fastened between the moving parts OK); a loop of Fastened / Revolute
@@ -1683,6 +1691,97 @@ fn group_conflict(problem: &Problem, start: &[Frame], local: &[Frame], scale: f6
     out.extend(copies.iter().filter_map(|&b| problem.driven.placer[b]).map(|i| (i, false)));
     out.sort_unstable();
     out.dedup_by_key(|(i, _)| *i);
+    out
+}
+
+/// The biconnected blocks each of `p`'s terms lies in, over the graph of its free bodies (a copy stands for its free
+/// drivers, fixed parts are one node) with a term of more than two bodies a star from a node of its own.
+fn term_blocks(p: &Problem) -> Vec<Vec<usize>> {
+    let mut node: HashMap<usize, usize> = HashMap::new();
+    let mut edges: Vec<(usize, usize, usize)> = Vec::new();
+    let mut nodes = 1;
+    for (k, t) in p.terms.iter().enumerate() {
+        let mut free = Vec::new();
+        let mut ground = false;
+        for b in term_bodies(p, *t) {
+            let before = free.len();
+            p.driven.push_free_roots(p.bodies, b, &mut free);
+            ground |= free.len() == before;
+        }
+        let mut ends: Vec<usize> = free.into_iter().map(|b| *node.entry(b).or_insert_with(|| { nodes += 1; nodes - 1 })).collect();
+        if ground {
+            ends.push(0);
+        }
+        ends.sort_unstable();
+        ends.dedup();
+        match ends.len() {
+            0 | 1 => {}
+            2 => edges.push((ends[0], ends[1], k)),
+            _ => {
+                let hub = nodes;
+                nodes += 1;
+                edges.extend(ends.iter().map(|&e| (hub, e, k)));
+            }
+        }
+    }
+    let mut adj: Vec<Vec<(usize, usize)>> = vec![Vec::new(); nodes];
+    for (e, &(a, b, _)) in edges.iter().enumerate() {
+        adj[a].push((b, e));
+        adj[b].push((a, e));
+    }
+    // Tarjan's blocks, iteratively: each edge's block from the edge stack popped at an articulation.
+    let mut disc = vec![usize::MAX; nodes];
+    let mut low = vec![0; nodes];
+    let mut block_of = vec![usize::MAX; edges.len()];
+    let (mut time, mut blocks) = (0, 0);
+    let mut stack: Vec<usize> = Vec::new();
+    for root in 0..nodes {
+        if disc[root] != usize::MAX {
+            continue;
+        }
+        disc[root] = time;
+        low[root] = time;
+        time += 1;
+        let mut walk: Vec<(usize, usize, usize)> = vec![(root, usize::MAX, 0)];
+        while let Some(top) = walk.last_mut() {
+            let (v, via) = (top.0, top.1);
+            if let Some(&(w, e)) = adj[v].get(top.2) {
+                top.2 += 1;
+                if e == via {
+                    continue;
+                }
+                if disc[w] == usize::MAX {
+                    stack.push(e);
+                    disc[w] = time;
+                    low[w] = time;
+                    time += 1;
+                    walk.push((w, e, 0));
+                } else if disc[w] < disc[v] {
+                    stack.push(e);
+                    low[v] = low[v].min(disc[w]);
+                }
+                continue;
+            }
+            walk.pop();
+            let Some(&(u, _, _)) = walk.last() else { continue };
+            low[u] = low[u].min(low[v]);
+            if low[v] >= disc[u] {
+                while let Some(e) = stack.pop() {
+                    block_of[e] = blocks;
+                    if e == via {
+                        break;
+                    }
+                }
+                blocks += 1;
+            }
+        }
+    }
+    let mut out = vec![Vec::new(); p.terms.len()];
+    for (e, &(_, _, k)) in edges.iter().enumerate() {
+        if !out[k].contains(&block_of[e]) {
+            out[k].push(block_of[e]);
+        }
+    }
     out
 }
 
@@ -2226,6 +2325,21 @@ mod tests {
         // B keeps its orientation (bottom face down).
         assert!((p.z() - DVec3::Z).length() < 1e-6);
         assert_eq!(r.dof, 0);
+    }
+
+    /// A conflict's mates are those on its loop: ground-B-C-ground is one block, the mate hanging D off C another, and
+    /// D-E twice (a loop of its own) a third; the two fixed parts are one node.
+    #[test]
+    fn term_blocks_split_loops_from_what_hangs_off_them() {
+        let bodies: Vec<SolverBody> = [true, false, false, false, false, true].iter().map(|&f| body(DVec3::ZERO, f)).collect();
+        let m = |a: usize, b: usize| mate(MateType::Fastened, a, Frame::default(), b, Frame::default());
+        let mates = vec![m(0, 1), m(1, 2), m(2, 5), m(2, 3), m(3, 4), m(3, 4)];
+        let driven = Driven::new(&bodies, &mates);
+        let p = Problem { bodies: &bodies, mates: &mates, relations: &[], drags: &[], driven: &driven, terms: (0..mates.len()).map(Term::Mate).collect(), scale: 1.0 };
+        let b = term_blocks(&p);
+        assert!(b.iter().all(|x| x.len() == 1), "{b:?}");
+        assert!(b[0] == b[1] && b[1] == b[2], "{b:?}");
+        assert!(b[3] != b[0] && b[4] == b[5] && b[4] != b[3] && b[4] != b[0], "{b:?}");
     }
 
     /// Live 1763: along a mate chain the instance whose geometry changed
