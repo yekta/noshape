@@ -1324,15 +1324,17 @@ fn draft_fallback_face_deletion_probe() {
 }
 
 /// Shell's common with hyperbola edges (14218a58), our result (tests/data/unify): walls on one cylinder USD leaves
-/// apart, merged after it, and USD's joining of their boundary's edges then left the shape invalid. That merge is
-/// dropped then: valid, OCCT's counts (42 faces, 100 edges).
+/// apart, merged after it. Their merge once left the shape invalid and was dropped (OCCT's 42 faces); with the group's
+/// curves projected in its surface's own frame each wall is one face, valid, the volume kept: 33 faces, 80 edges.
 #[test]
-fn a_merge_after_usd_left_invalid_is_dropped() {
+fn walls_usd_leaves_apart_are_merged_valid() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/hyperbola-edges-walls.brep");
     let ours = k::read_brep(&path).expect("our result");
     let u = k::unify_same_domain(&ours).expect("unified").shape;
     assert!(u.is_valid(), "unified invalid");
-    assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (42, 100));
+    assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (33, 80));
+    let (v, vo) = (u.volume().unwrap(), ours.volume().unwrap());
+    assert!((v - vo).abs() <= 1e-9 * vo.abs(), "volume {v} against {vo}");
 }
 
 /// qa's cli-shell-gpf part fused with its mirror (11ed9bd7), our result (tests/data/unify): each Ø12 hole's wall in
@@ -2483,3 +2485,25 @@ fn a_flange_drawn_from_a_shells_wall_fused_as_live() {
     assert_eq!(slivers, 2, "live's two 6.8 mm² slivers");
 }
 
+
+/// Two imported parts stacked (c2-gamma-imported's Boolean 2, two of its 24 bodies clipped to 8 mm round a bolt hole):
+/// the hole's wall in each a whole band of one cylinder, the two cylinders framed a quarter turn apart and placed by
+/// their parts' locations. OCCT's fuse keeps a band each and its unify can't merge them; ours merges the two bands
+/// into one face (live one face a hole): 3 cylinder faces, not 4.
+#[test]
+fn stacked_holes_framed_apart_unify_into_one_wall() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let pair = k::Shape::from_brep_bytes(&std::fs::read(dir.join("stacked-holes-framed-apart.brep")).unwrap()).unwrap();
+    let parts = pair.children();
+    k::set_rust_boolean(Some(false));
+    let fused = k::boolean(k::BooleanOp::Fuse, &parts[..1], &parts[1..], &k::BooleanOptions::default());
+    k::set_rust_boolean(None);
+    let fused = fused.unwrap().shape;
+    let u = k::unify_same_domain(&fused).unwrap().shape;
+    assert!(u.is_valid());
+    let cylinders = |s: &k::Shape| s.faces().iter().filter(|f| matches!(f.face_surface(), Ok(k::Surface::Cylinder { .. }))).count();
+    assert_eq!((cylinders(&fused), cylinders(&u)), (4, 3));
+    let (v, vf) = (u.volume().unwrap(), fused.volume().unwrap());
+    assert!((v - vf).abs() <= 1e-9 * vf.abs(), "volume {v} against the fuse's {vf}");
+}

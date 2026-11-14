@@ -3143,9 +3143,13 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
   // An edge's curve on a group's first surface `ga` (its range within a bounded curve's: a B-spline edge can reach a
   // rounding past its curve's end, and a trimmed curve there throws).
   occ::handle<Geom_Surface> ga;
-  auto                      project = [&ga](const occ::handle<Geom_Curve>& c3, double f, double l) -> occ::handle<Geom2d_Curve> {
+  TopLoc_Location           la;
+  // (In `ga`'s own frame: a placed face's surface is its untransformed one, imported parts' (c2-gamma-imported).)
+  auto project = [&ga, &la](occ::handle<Geom_Curve> c3, double f, double l) -> occ::handle<Geom2d_Curve> {
     if (c3.IsNull())
       return nullptr;
+    if (!la.IsIdentity())
+      c3 = occ::down_cast<Geom_Curve>(c3->Transformed(la.Transformation().Inverted()));
     if (!c3->IsPeriodic())
     {
       f = std::max(f, c3->FirstParameter());
@@ -3276,16 +3280,19 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
       }
       if (!closed || chains.empty() || chains.size() > 2)
         continue;
-      TopLoc_Location la;
-      ga         = BRep_Tool::Surface(a, la);
+      ga = BRep_Tool::Surface(a, la);
       double tol = 1e-7;
       for (const TopoDS_Edge& e : bnd)
         tol = std::max(tol, BRep_Tool::Tolerance(e));
+      // A boundary circle made again with its vertex elsewhere (below), and the one it replaces, everywhere at once.
+      TopoDS_Edge swap_from, swap_to;
       // The merged face in place of the group's, kept where valid with the same volume.
       auto replace_by = [&](const TopoDS_Face& F) {
         if (!BRepCheck_Analyzer(F).IsValid())
           return false;
         occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+        if (!swap_from.IsNull())
+          rs->Replace(swap_from, swap_to);
         rs->Replace(a.Oriented(TopAbs_FORWARD), F);
         for (size_t k = 1; k < g.size(); ++k)
           rs->Remove(fm(g[k]));
@@ -3431,6 +3438,75 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
                 vt   = TopoDS::Vertex(y.Current());
               }
             }
+      // (A whole circle against the other chain with its vertices at other angles: stacked bands of one cylinder from
+      // two inputs, their frames a quarter turn apart (c2-gamma-imported's bolt holes, live one face each): the circle made
+      // again from the other chain's first vertex (by its point), its curves on its other faces projected, used in its
+      // place.)
+      const auto whole = [&](int c) {
+        if (chains[(size_t)c].size() != 1)
+          return false;
+        const TopoDS_Edge&            e = bnd[(size_t)chains[(size_t)c][0]];
+        double                        f = 0, l = 0;
+        const occ::handle<Geom_Curve> cv = BRep_Tool::Curve(e, f, l);
+        return BRep_Tool::IsClosed(e) && !occ::down_cast<Geom_Circle>(cv).IsNull() && std::abs(l - f - 2 * M_PI) < 1e-9;
+      };
+      const int moving = vb.IsNull() ? (whole(1) ? 1 : whole(0) ? 0 : -1) : -1;
+      if (moving >= 0)
+      {
+        const int                                   fixed = 1 - moving;
+        const TopoDS_Edge                           e1    = bnd[(size_t)chains[(size_t)moving][0]];
+        TopoDS_Vertex                               p0;
+        std::tuple<long long, long long, long long> first;
+        for (int k : chains[(size_t)fixed])
+          for (TopExp_Explorer x(bnd[(size_t)k], TopAbs_VERTEX); x.More(); x.Next())
+          {
+            const auto kk = key(BRep_Tool::Pnt(TopoDS::Vertex(x.Current())));
+            if (p0.IsNull() || kk < first)
+            {
+              first = kk;
+              p0    = TopoDS::Vertex(x.Current());
+            }
+          }
+        double                         f1 = 0, l1 = 0;
+        const occ::handle<Geom_Circle> circ = occ::down_cast<Geom_Circle>(BRep_Tool::Curve(e1, f1, l1));
+        const double                   t0   = f1 + std::remainder(ElCLib::Parameter(circ->Circ(), BRep_Tool::Pnt(p0)) - f1, 2 * M_PI);
+        BRepBuilderAPI_MakeEdge        mk(circ, t0, t0 + 2 * M_PI);
+        const ShapeList*               users = ef.Seek(e1);
+        bool                           ok    = !p0.IsNull() && mk.IsDone() && users != nullptr;
+        TopoDS_Edge                    moved = ok ? mk.Edge() : TopoDS_Edge();
+        if (ok)
+        {
+          BRep_Builder bb;
+          bb.UpdateEdge(moved, BRep_Tool::Tolerance(e1));
+          for (const TopoDS_Shape& u : *users)
+          {
+            if (std::find_if(g.begin(), g.end(), [&](int j) { return fm(j).IsSame(u); }) != g.end())
+              continue;
+            const TopoDS_Face               uf = TopoDS::Face(u);
+            TopLoc_Location                 lu;
+            const occ::handle<Geom_Surface> su  = BRep_Tool::Surface(uf, lu);
+            const occ::handle<Geom_Curve>   c3  = occ::down_cast<Geom_Curve>(circ->Transformed(lu.Transformation().Inverted()));
+            const occ::handle<Geom2d_Curve> pc2 = c3.IsNull() ? nullptr : GeomProjLib::Curve2d(c3, t0, t0 + 2 * M_PI, su);
+            if (pc2.IsNull())
+            {
+              ok = false;
+              break;
+            }
+            bb.UpdateEdge(moved, pc2, uf, BRep_Tool::Tolerance(e1));
+          }
+        }
+        if (ok)
+        {
+          BRepLib::SameParameter(moved, BRep_Tool::Tolerance(e1));
+          TopoDS_Vertex p1, q1;
+          TopExp::Vertices(moved, p1, q1);
+          swap_from                              = e1;
+          swap_to                                = moved;
+          bnd[(size_t)chains[(size_t)moving][0]] = moved;
+          vb                                     = fixed == 0 ? p0 : p1;
+          vt                                     = fixed == 0 ? p1 : p0;
+        }
+      }
       if (vb.IsNull())
         continue;
       gp_Pnt2d         qb = uv(BRep_Tool::Pnt(vb)), qt = uv(BRep_Tool::Pnt(vt));
