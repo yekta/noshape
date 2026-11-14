@@ -2828,13 +2828,23 @@ impl Ctx<'_> {
                 let w = r.point(o) - o;
                 (r.dir(a) - a).length() <= 1e-9 && if k == 0.0 { w.cross(a).length() <= self.tol } else { w.length() <= self.tol }
             }
-            Surf::Nurbs { .. } => false,
+            // (A whole turn of a torus turned about its own axis: a circular pattern of tread tools round a tyre,
+            // asm-infento-subs. A part of one (a Shell slab's round) can't take the moved curves.)
+            Surf::Nurbs { .. } => match self.faces[f].ns.as_deref() {
+                Some(crate::freeform::FreeSurface::Torus { o, z, .. }) => self.faces[f].uvbox[1] - self.faces[f].uvbox[0] >= TAU && (r.dir(*z) - *z).length() <= 1e-9 && (r.point(*o) - *o).length() <= self.tol,
+                _ => false,
+            },
         }
     }
 
     /// Whether OCCT's moved section curves on the other argument's face `f`, and the curves they were moved from,
     /// stay clear of its boundary (the face trims and splits OCCT's curves there): (moved, from).
     fn clear_inside(&self, f: usize, curves: &[SectionCurve], r: &Rigid) -> R<(bool, bool)> {
+        // (A free-form face's parameter plane isn't one the curves map onto here (a whole torus a motion keeps, the
+        // rings' Circular pattern 1): not clear, the pair's own sections then.)
+        if matches!(self.faces[f].s, Surf::Nurbs { .. }) {
+            return Ok((false, false));
+        }
         let bound = self.bound(f)?;
         // (Only the boundary the motion doesn't keep counts: a whole circle about a rotation's axis is the same
         // there, and OCCT's curves meet it alike.)
