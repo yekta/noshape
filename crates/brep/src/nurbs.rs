@@ -758,9 +758,43 @@ impl NurbsSurface {
     }
 
     pub fn at(&self, u: f64, v: f64) -> DVec3 {
+        let (su, sv) = (span(&self.uknots, self.udegree, self.nu, u), span(&self.vknots, self.vdegree, self.nv, v));
+        self.point_of(su, &basis(&self.uknots, su, u, self.udegree), sv, &basis(&self.vknots, sv, v, self.vdegree))
+    }
+
+    /// [`Self::at`] at each (u, v) of `us` × `vs`, row by row in u: each v's basis found once, each u's poles summed
+    /// once along u (a degree 14 surface's patch boxes: its u basis and sums were most of each point).
+    pub fn grid(&self, us: &[f64], vs: &[f64]) -> Vec<DVec3> {
         let (p, q) = (self.udegree, self.vdegree);
-        let (su, sv) = (span(&self.uknots, p, self.nu, u), span(&self.vknots, q, self.nv, v));
-        let (bu, bv) = (basis(&self.uknots, su, u, p), basis(&self.vknots, sv, v, q));
+        let bvs: Vec<(usize, [f64; M])> = vs.iter().map(|&v| {
+            let sv = span(&self.vknots, q, self.nv, v);
+            (sv, basis(&self.vknots, sv, v, q))
+        }).collect();
+        let Some(j0) = bvs.iter().map(|x| x.0 - q).min() else { return Vec::new() };
+        let j1 = bvs.iter().map(|x| x.0).max().unwrap_or(j0);
+        let mut row = vec![DVec4::ZERO; j1 + 1 - j0];
+        let mut out = Vec::with_capacity(us.len() * vs.len());
+        for &u in us {
+            let su = span(&self.uknots, p, self.nu, u);
+            let bu = basis(&self.uknots, su, u, p);
+            for (j, r) in row.iter_mut().enumerate() {
+                *r = (0..=p).fold(DVec4::ZERO, |acc, a| {
+                    let idx = (su - p + a) * self.nv + j0 + j;
+                    let w = if self.weights.is_empty() { 1.0 } else { self.weights[idx] };
+                    acc + (self.poles[idx] * w).extend(w) * bu[a]
+                });
+            }
+            out.extend(bvs.iter().map(|(sv, bv)| {
+                let h = (0..=q).fold(DVec4::ZERO, |acc, b| acc + row[sv - q + b - j0] * bv[b]);
+                h.truncate() / h.w
+            }));
+        }
+        out
+    }
+
+    /// Its point from the spans' basis functions.
+    fn point_of(&self, su: usize, bu: &[f64; M], sv: usize, bv: &[f64; M]) -> DVec3 {
+        let (p, q) = (self.udegree, self.vdegree);
         let (mut aw, mut w) = (DVec3::ZERO, 0.0);
         for (a, &na) in bu.iter().enumerate().take(p + 1) {
             let i = su - p + a;
@@ -1018,6 +1052,32 @@ mod tests {
         let foot = s.at(uv.x, uv.y);
         let [_, su, sv, ..] = s.derivs(uv.x, uv.y);
         assert!((q - foot).dot(su).abs() < 1e-12 && (q - foot).dot(sv).abs() < 1e-12 && (d - (q - foot).length()).abs() < 1e-15);
+    }
+
+    #[test]
+    fn a_grid_of_points_as_each_point_alone() {
+        // A rational quarter cylinder and a bicubic of two spans each way, on grids crossing their knots.
+        let c = quarter();
+        let (mut poles, mut weights) = (Vec::new(), Vec::new());
+        for i in 0..3 {
+            for z in [0.0, 3.0] {
+                poles.push(c.poles[i] + DVec3::Z * z);
+                weights.push(c.weights[i]);
+            }
+        }
+        let cyl = NurbsSurface { udegree: 2, vdegree: 1, uknots: c.knots.clone(), vknots: vec![0.0, 0.0, 1.0, 1.0], nu: 3, nv: 2, poles, weights };
+        let knots = vec![0.0, 0.0, 0.0, 0.0, 1.5, 3.0, 3.0, 3.0, 3.0];
+        let poles = (0..25).map(|k| DVec3::new((k / 5) as f64, (k % 5) as f64 * 0.7, ((k * 7) % 5) as f64 * 0.3)).collect();
+        let bicubic = NurbsSurface { udegree: 3, vdegree: 3, uknots: knots.clone(), vknots: knots, nu: 5, nv: 5, poles, weights: Vec::new() };
+        for (s, us, vs) in [(&cyl, vec![0.0, 0.3, 0.5, 1.0], vec![0.0, 0.25, 1.0]), (&bicubic, vec![0.0, 1.0, 1.5, 2.9], vec![0.2, 1.5, 1.6, 3.0]), (&bicubic, vec![0.5, 2.0], vec![1.6, 2.0, 3.0])] {
+            let g = s.grid(&us, &vs);
+            assert_eq!(g.len(), us.len() * vs.len());
+            for (k, p) in g.iter().enumerate() {
+                let q = s.at(us[k / vs.len()], vs[k % vs.len()]);
+                assert!((*p - q).length() <= 1e-14 * (1.0 + q.length()), "{k}: {p} vs {q}");
+            }
+        }
+        assert!(cyl.grid(&[0.5], &[]).is_empty());
     }
 
     #[test]

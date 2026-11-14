@@ -160,8 +160,11 @@ impl FreeSurface {
     }
 
     /// Its points at each (u, v) of `us` × `vs`, row by row in u (as [`Self::at`]: an extrusion's curve evaluated
-    /// once a u, a revolution's once a v).
+    /// once a u, a revolution's once a v, a NURBS's bases once a u and a v).
     pub fn grid(&self, us: &[f64], vs: &[f64]) -> Vec<DVec3> {
+        if let FreeSurface::Nurbs(s) = self {
+            return s.grid(us, vs);
+        }
         let mut out = Vec::with_capacity(us.len() * vs.len());
         match self {
             FreeSurface::Extrusion { c, d } => {

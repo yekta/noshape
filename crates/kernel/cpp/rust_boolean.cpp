@@ -26,6 +26,8 @@
 #include <BRepBndLib.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
+#include <BndLib_Add3dCurve.hxx>
+#include <GeomAdaptor_Curve.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepTopAdaptor_FClass2d.hxx>
 #include <GeomAPI.hxx>
@@ -4140,6 +4142,24 @@ static std::vector<IntTools_Curve> off_shared_edges(const TopoDS_Face& fa, const
     occ::handle<Geom_Curve> c;
     double                  t0, t1;
   };
+  struct Near
+  {
+    TopoDS_Edge             e;
+    occ::handle<Geom_Curve> c;
+    double                  t0 = 0, t1 = 0;
+    Bnd_Box                 box;
+  };
+  // (fb's edges with their boxes: an edge of fa's with a point outside one, grown by the tolerances, isn't on it.)
+  std::vector<Near> bs;
+  for (TopExp_Explorer xb(fb, TopAbs_EDGE); xb.More(); xb.Next())
+  {
+    Near b;
+    b.e = TopoDS::Edge(xb.Current());
+    if (BRep_Tool::Degenerated(b.e) || (b.c = BRep_Tool::Curve(b.e, b.t0, b.t1)).IsNull())
+      continue;
+    BndLib_Add3dCurve::Add(GeomAdaptor_Curve(b.c, b.t0, b.t1), 0.0, b.box);
+    bs.push_back(std::move(b));
+  }
   std::vector<Shared> shared;
   for (TopExp_Explorer xa(fa, TopAbs_EDGE); xa.More(); xa.Next())
   {
@@ -4148,15 +4168,19 @@ static std::vector<IntTools_Curve> off_shared_edges(const TopoDS_Face& fa, const
     const occ::handle<Geom_Curve> ca = BRep_Tool::Degenerated(ea) ? occ::handle<Geom_Curve>() : BRep_Tool::Curve(ea, a0, a1);
     if (ca.IsNull())
       continue;
-    for (TopExp_Explorer xb(fb, TopAbs_EDGE); xb.More(); xb.Next())
+    const gp_Pnt mid = ca->Value(0.5 * (a0 + a1));
+    for (const Near& b : bs)
     {
-      const TopoDS_Edge& eb = TopoDS::Edge(xb.Current());
-      double             b0 = 0, b1 = 0;
-      const occ::handle<Geom_Curve> cb = BRep_Tool::Degenerated(eb) || eb.IsSame(ea) ? occ::handle<Geom_Curve>() : BRep_Tool::Curve(eb, b0, b1);
-      if (cb.IsNull())
+      if (b.e.IsSame(ea))
         continue;
-      const double reach = BRep_Tool::Tolerance(ea) + BRep_Tool::Tolerance(eb) + Precision::Confusion();
-      bool         on    = true;
+      const occ::handle<Geom_Curve>& cb = b.c;
+      const double b0 = b.t0, b1 = b.t1;
+      const double reach = BRep_Tool::Tolerance(ea) + BRep_Tool::Tolerance(b.e) + Precision::Confusion();
+      Bnd_Box      grown = b.box;
+      grown.Enlarge(reach + 1e-3 * std::sqrt(b.box.SquareExtent()));
+      if (grown.IsOut(mid))
+        continue;
+      bool on = true;
       for (int k = 1; k < 8 && on; ++k)
       {
         GeomAPI_ProjectPointOnCurve pr(ca->Value(a0 + (a1 - a0) * k / 8), cb, b0, b1);
@@ -4580,16 +4604,16 @@ static bool planar_lines_valid(const TopoDS_Face& f)
 // The result's check as BRepCheck_Analyzer's, cheaper where it has planar faces of lines with many edges (a louver's
 // sheet with its slots: 12 of a 14 ms fuse in the wire pair checks): the topology as BRepCheck's, those faces by
 // planar_lines_valid, the others by BRepCheck face by face.
-static bool cheaply_valid(const TopoDS_Shape& out);
+static bool cheaply_valid(const TopoDS_Shape& out, bool parallel);
 
 static bool result_valid(const TopoDS_Shape& out, bool parallel)
 {
   // (Ours only says valid; where it can't (a shell's edge it counts once, a face BRepCheck flags alone), the whole
   // BRepCheck's.)
-  return cheaply_valid(out) || BRepCheck_Analyzer(out, true, parallel).IsValid();
+  return cheaply_valid(out, parallel) || BRepCheck_Analyzer(out, true, parallel).IsValid();
 }
 
-static bool cheaply_valid(const TopoDS_Shape& out)
+static bool cheaply_valid(const TopoDS_Shape& out, bool parallel)
 {
   size_t many = 0;
   std::vector<TopoDS_Face> faces;
@@ -4645,10 +4669,14 @@ static bool cheaply_valid(const TopoDS_Shape& out)
         return false;
     }
   }
-  for (size_t i = 0; i < faces.size(); ++i)
-    if (simple[i] ? !planar_lines_valid(faces[i]) : !BRepCheck_Analyzer(faces[i], true, false).IsValid())
-      return false;
-  return true;
+  // (Each face on its own: on all threads, as BRepCheck_Analyzer's own.)
+  std::atomic<bool> ok{true};
+  OSD_Parallel::For(0, static_cast<int>(faces.size()), [&](int i) {
+    const size_t k = static_cast<size_t>(i);
+    if (ok.load(std::memory_order_relaxed) && !(simple[k] ? planar_lines_valid(faces[k]) : BRepCheck_Analyzer(faces[k], true, false).IsValid()))
+      ok.store(false, std::memory_order_relaxed);
+  }, !parallel);
+  return ok.load();
 }
 
 void brep_occt_ahead(rust::Slice<const uint32_t> pairs)
