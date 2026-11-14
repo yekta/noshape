@@ -66,15 +66,6 @@
      "cls": "is-instance"
     },
     {
-     "name": "Simulation features (0)",
-     "state": "ok",
-     "selected": false,
-     "editing": false,
-     "related": false,
-     "hidden": false,
-     "cls": "is-folder"
-    },
-    {
      "name": "Mate features (0)",
      "state": "ok",
      "selected": false,
@@ -344,15 +335,6 @@
        "related": false,
        "hidden": false,
        "cls": "is-instance"
-      },
-      {
-       "name": "Simulation features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
       },
       {
        "name": "Mate features (1)",
@@ -647,15 +629,6 @@
        "related": false,
        "hidden": false,
        "cls": "is-instance"
-      },
-      {
-       "name": "Simulation features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
       },
       {
        "name": "Mate features (1)",
@@ -959,15 +932,6 @@
        "cls": "is-instance"
       },
       {
-       "name": "Simulation features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
-      },
-      {
        "name": "Mate features (1)",
        "state": "ok",
        "selected": false,
@@ -1255,15 +1219,6 @@
        "related": false,
        "hidden": false,
        "cls": "is-instance"
-      },
-      {
-       "name": "Simulation features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
       },
       {
        "name": "Mate features (1)",
@@ -1598,15 +1553,6 @@
        "cls": "is-instance"
       },
       {
-       "name": "Simulation features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
-      },
-      {
        "name": "Mate features (1)",
        "state": "ok",
        "selected": false,
@@ -1933,15 +1879,6 @@
        "cls": "is-instance"
       },
       {
-       "name": "Simulation features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
-      },
-      {
        "name": "Mate features (1)",
        "state": "ok",
        "selected": false,
@@ -2116,15 +2053,6 @@
        "cls": "is-instance"
       },
       {
-       "name": "Simulation features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
-      },
-      {
        "name": "Mate features (0)",
        "state": "ok",
        "selected": false,
@@ -2280,15 +2208,6 @@
        "related": false,
        "hidden": false,
        "cls": "is-instance"
-      },
-      {
-       "name": "Simulation features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
       },
       {
        "name": "Mate features (0)",
