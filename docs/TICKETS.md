@@ -487,6 +487,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-13 17:00 release (qa list 17:52, candidate release/v0.4.49 = b441978c6; the latest release is v0.4.48)
+- **qa, v0.4.50 checked (published 07:30, cut 1a665d952): no blocker.** Released CLI against v0.4.49's (vibe5): rust-zero-solid-f197,
+  hat15, hat15b, hat8, the dock the same. Released app (vibe6): the user's cases as ui-parity scenarios, 13/13 = live (88/88 states:
+  plane-graphics-rclick-menu, the nine extrude-depth-variable-*, sketch-dimension-variable, fillet-radius-variable,
+  shell-thickness-variable-click-once); qa-edge-snap (a line's end released 0.3 mm inside the block's top edge: COINCIDENT to it).
+  Spot-check rows 1-8 (3D and sketch snaps) via the 156 sketch-* scenarios: 151/156; the five that differ were recorded today
+  (no baseline; psui): sketch-key-concentric-two-circles, -fix-line, -midpoint, -symmetric (no Measure readout after the
+  selection, live shows Diameter / Length / Point) and sketch-tangent-arc-from-arc (2 constraints, live 3: MIDPOINT / TANGENT).
+  Compat loop and fuzz on v0.4.50.
 - **qa, v0.4.49 checked (published 22:40, cut 67ab7298b): no blocker.** Released CLI against v0.4.48's (vibe5):
   rust-zero-solid-f197 the same (Fillet 1 Ok, blend e1fc68798); every feature's status the same in hat8, hat15, hat15b and the
   dock (the three hats' STEP reference 51188.66 -> 51188.65 mm³). Released app (vibe7, hat15 mode-700 copy): the
