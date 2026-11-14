@@ -2014,8 +2014,9 @@ impl Render for ReleaseDialog {
                 v_flex()
                     .w(px(380.))
                     .gap(px(4.))
-                    .child(label(name_label, true, name_empty))
-                    .child(
+                    // Live (review-release, review-pending-as-approver): a review has no Release name field.
+                    .when(self.mode != Mode::Review, |d| d.child(label(name_label.clone(), true, name_empty)))
+                    .when(self.mode != Mode::Review, |d| d.child(
                         h_flex()
                             .gap(px(4.))
                             .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(30.)).flex().items_center().border_1().rounded(px(3.)).border_color(if name_empty { red } else { gpui_kit::rgb(0xcccccc) }).map(|d| crate::ui_script::mark(d, || "field:Release name".into())).child(Input::new(&self.name).appearance(false).small().disabled(read_only))))
@@ -2035,9 +2036,28 @@ impl Render for ReleaseDialog {
                                         }),
                                 )
                             }),
-                    )
-                    .child(div().pt(px(6.)).child(label(notes_label, notes_required, notes_required && notes_empty && self.mode == Mode::Release)))
+                    ))
+                    .child(div().when(self.mode != Mode::Review, |d| d.pt(px(6.))).child(label(notes_label, notes_required && self.mode != Mode::Review, notes_required && notes_empty && self.mode == Mode::Release)))
                     .child(div().map(|d| crate::ui_script::mark(d, || "field:Release notes".into())).child(Textarea::new(&self.notes).disabled(read_only)))
+                    // A review's Comment (required while Pending) and its "(comment history)".
+                    .when(self.mode == Mode::Review, |d| {
+                        let required = self.candidate == Some(noshape_model::release::CandidateState::Pending);
+                        let empty = self.comment_input.read(cx).value().trim().is_empty();
+                        d.child(
+                            h_flex()
+                                .pt(px(6.))
+                                .gap(px(4.))
+                                .text_size(px(14.))
+                                .child(div().font_weight(FontWeight::SEMIBOLD).text_color(if required { red } else { pal.text }).child("Comment"))
+                                .when(required, |d| d.child(div().text_color(red).child("*")))
+                                .when(required && empty, |d| d.child(div().text_size(px(12.)).text_color(red).child("Required field must not be empty.")))
+                                .child(div().id("rel-comment-history").text_size(px(13.)).text_color(pal.accent).cursor_pointer().child("(comment history)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.comments_view = true;
+                                    cx.notify();
+                                }))),
+                        )
+                        .child(div().map(|d| crate::ui_script::mark(d, || "field:Comment".into())).child(Textarea::new(&self.comment_input)))
+                    })
                     .when(self.mode == Mode::Obsolete, |d| {
                         let on = self.re_releasable;
                         d.child(div().pt(px(6.)).child(os::checkbox("rel-rerelease", "Mark revision as re-releasable", on).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -2161,21 +2181,60 @@ impl Render for ReleaseDialog {
             // A Pending candidate's approver (the local user): Approve or Reject (Onshape's standard workflow); its
             // creator can discard it.
             Mode::Review if self.candidate == Some(noshape_model::release::CandidateState::Pending) => {
+                // Live (review-pending-as-approver): Apply, Release (approve), Reject ▴ (Reject | Discard), Close; Release
+                // and Reject need a comment; the creator's Reject confirms overriding the other approvers.
                 let me = noshape_store::local_user_name();
                 let approver = self.approvers.contains(&me);
+                let commented = !self.comment_input.read(cx).value().trim().is_empty();
                 let view = cx.entity();
+                let open = self.draft_menu;
                 footer = footer
-                    .child(os::secondary_button("rel-discard", "Discard", cx).on_click(move |_, window, cx| confirm_discard(view.clone(), window, cx)))
-                    .child(button("rel-reject", "Reject", 0xbd3039, approver).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                        if this.decide(false, cx) {
-                            close(window, cx);
+                    .child(button("rel-apply", "Apply", 0x1651b0, false))
+                    .child(release_button("rel-approve", "Release", approver && commented).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        if this.comment_input.read(cx).value().trim().is_empty() || !this.approvers.contains(&noshape_store::local_user_name()) {
+                            return;
                         }
-                    })))
-                    .child(button("rel-approve", "Approve", 0x2b9d3a, approver).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        this.add_comment(window, cx);
                         if this.decide(true, cx) {
                             close(window, cx);
                         }
-                    })));
+                    })))
+                    .child(
+                        h_flex()
+                            .relative()
+                            .child(release_button_colored("rel-reject", "Reject", 0xbd3039, 0xe9a7ab, commented).rounded_r(px(0.)).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                if !this.comment_input.read(cx).value().trim().is_empty() {
+                                    confirm_reject_override(cx.entity(), window, cx);
+                                }
+                            })))
+                            .child(release_button_colored("rel-reject-menu", "▴", 0xbd3039, 0xbd3039, true).px(px(6.)).rounded_l(px(0.)).border_l_1().border_color(gpui_kit::rgb(0x9a262d)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.draft_menu = !this.draft_menu;
+                                cx.notify();
+                            })))
+                            .when(open, |d| {
+                                let item = |id: &'static str, label: &'static str| div().id(id).px(px(12.)).py(px(6.)).text_size(px(13.)).text_color(pal.accent).cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0xf2f2f2))).child(label).map(|d| crate::ui_script::mark(d, move || format!("menu:{label}")));
+                                let reject_view = cx.entity();
+                                d.child(
+                                    v_flex()
+                                        .absolute()
+                                        .bottom(px(34.))
+                                        .right_0()
+                                        .w(px(110.))
+                                        .bg(gpui_kit::rgb(0xffffff))
+                                        .border_1()
+                                        .border_color(gpui_kit::rgb(0xcccccc))
+                                        .rounded(px(4.))
+                                        .child(item("rel-menu-reject", "Reject").on_click(move |_, window, cx| {
+                                            reject_view.update(cx, |t, _| t.draft_menu = false);
+                                            confirm_reject_override(reject_view.clone(), window, cx);
+                                        }))
+                                        .child(item("rel-menu-discard", "Discard").on_click(move |_, window, cx| {
+                                            view.update(cx, |t, _| t.draft_menu = false);
+                                            confirm_discard(view.clone(), window, cx);
+                                        })),
+                                )
+                            }),
+                    );
             }
             Mode::Obsolete => {
                 let ok = !name_empty && !self.notes.read(cx).value().trim().is_empty();
@@ -2190,7 +2249,7 @@ impl Render for ReleaseDialog {
             // Release__cloning_a_release_package: Clone starts a new candidate
             // from the current workspace (not while viewing a version).
             Mode::Review if self.doc.read(cx).session.viewing.is_none() => {
-                footer = footer.child(button("rel-apply", "Apply", 0x1651b0, false)).child(os::secondary_button("rel-clone", "Clone", cx).tooltip("Recreate Release from the current workspace").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                footer = footer.child(button("rel-apply", "Apply", 0x1651b0, false)).child(os::primary_button("rel-clone", "Clone").tooltip("Recreate Release from the current workspace").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     let doc = this.doc.clone();
                     let items = refreshed_items(doc.read(cx), &this.items(cx));
                     let (name, notes) = (this.name.read(cx).value().to_string(), this.notes.read(cx).value().to_string());
@@ -2249,10 +2308,6 @@ impl Render for ReleaseDialog {
                     .child(div().flex_1())
                     .children(attention_label)
                     .children(attention_filter)
-                    .child(os::secondary_button("rel-comments-open", "Comments", cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.comments_view = !this.comments_view;
-                        cx.notify();
-                    })))
                     .child(overflow),
             )
             .when(!self.comments_view, |d| d.child(v_flex().border_t_1().border_b_1().border_color(gpui_kit::rgb(GRID)).child(header).children(filter_row).child(list)).child(form))
@@ -2292,6 +2347,26 @@ fn confirm_override_policy(view: Entity<ReleaseDialog>, window: &mut Window, cx:
             .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Release"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
                 if view.update(cx, |t, cx| t.commit(cx)) {
+                    window.close_all_dialogs(cx);
+                }
+                true
+            })
+    });
+}
+
+/// Live (reject-override-confirm.png): the creator's Reject.
+fn confirm_reject_override(view: Entity<ReleaseDialog>, window: &mut Window, cx: &mut App) {
+    window.open_dialog(cx, move |dialog, _, cx| {
+        let view = view.clone();
+        os::modal(dialog, "Reject and override other approvers", 600.)
+            .child(os::modal_body().child(div().text_size(px(14.)).text_color(p().text).child("As creator of this release you can override all other approvers and reject this Release candidate immediately.")))
+            .footer(os::modal_footer().child(os::modal_ok(os::danger_button("ok", "Reject", cx))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .on_ok(move |_, window, cx| {
+                let done = view.update(cx, |t, cx| {
+                    t.add_comment(window, cx);
+                    t.decide(false, cx)
+                });
+                if done {
                     window.close_all_dialogs(cx);
                 }
                 true

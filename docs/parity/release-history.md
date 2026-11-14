@@ -8,7 +8,7 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
   constraint, live's start has one "Add feature" per feature), ver-linked-selective-update (live's take missed the
   checkbox; re-recorded 11-14).
 - **Release management**: live's account is on Professional since 2026-11-14 (before, Release… opened only the upsell).
-  The live matrix below is live2's capture (25 rows: = 18, ≠ 3, missing 0, ? 4); the help matrix keeps the rows live
+  The live matrix below is live2's capture (25 rows: = 21, ≠ 0, ? 4); the help matrix keeps the rows live
   hasn't shown yet.
   Rows: 138; = 97, ≠ 20, missing 9, ? 6, cloud 6 (left out: other users, notifications).
 
@@ -20,7 +20,7 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
 | Workflows off | no Release… (part, tab, instance), no Revision history…, no Releases on Versions rows, no Create release candidate icon; nothing greyed, no upsell | `managed_workflows()` gates them; release_create / release_obsolete refuse | ui-parity part-menu-release-workflows-off, ver-vrow-releases-workflows-off (queued) | = |
 | Part Properties, workflows off | Part number, Revision, State dropdown (In progress … Discarded) by hand, Not revision managed; no release icon | the same | – | = |
 | Defaults when turned on | Alphabetical, suffix *, Access 1st on, Require a note on, "Drawing has a pending update" on, other documents off, Do not allow creator greyed until Require an approver | the same defaults; Do not allow creator greyed until Require an approver (`release_prefs`) | ops settings test | = |
-| Dialog title | "Create Release candidate" + refresh; a reopened draft "Review Release"; submitted / released "Review Release: <name>" + link icon | the same titles; the link icon missing | release-ui the_release_dialogs_titles_are_lives | ≠ (link icon) |
+| Dialog title | "Create Release candidate" + refresh; a reopened draft "Review Release"; submitted / released "Review Release: <name>" + link icon | the same titles; the link icon (Copy release candidate URL) is a cloud link | release-ui the_release_dialogs_titles_are_lives | = (link: cloud) |
 | Header | "N item(s) needs attention" + red ⓘ, ⋯ (View audit log, View workflow) | the same | – | = |
 | Item row | thumbnail, icon + name, kind, yellow flag, red × "Remove from release" (top-level only) | the same ("Remove from release") | – | = |
 | Item name click | nothing (dialog stays, no tab) | nothing | – | = |
@@ -32,15 +32,15 @@ Coverage of crates/release-ui and crates/history-ui against Onshape.
 | Submit | toast "… View the status of Releases in Action items." | the same toast | – | = |
 | Version graph | released ▲; Pending and Rejected open △ | the same | model-core pending_and_rejected_candidates_mark_their_version | = |
 | Versions row Releases ▸ | only on a version with candidates; state badges Pending #769fcc, Rejected #bd3039 | only with candidates; badge colours not compared | ui-parity ver-vrow-releases (re-recorded) | ? |
-| Review (approver) | Comment * required, Apply, Release, Reject ▴ (Reject / Discard), Close; Reject as creator confirms "Reject and override other approvers" | Discard, Reject, Approve | – | ≠ |
-| Released review | read-only, Apply greyed, Clone ("Recreate Release from the current workspace"), Close | the same | – | = |
+| Review (approver) | Comment * required, Apply, Release, Reject ▴ (Reject / Discard), Close; Reject as creator confirms "Reject and override other approvers" | the same: Comment * with (comment history), Apply, Release, Reject ▴ (Reject / Discard), the creator's override confirm | – | = |
+| Released review | no Release name field, notes read-only, Comment (comment history); Apply greyed, Clone (blue, "Recreate Release from the current workspace"), Close | the same | – | = |
 | Drafts | Release drafts panel (thumbnail, name, "by <user> <time>", "Double click to open a draft") | the same | – | = |
 | Revision history | heading part number; ▲ black / obsolete / auto-obsolete icon, letter, user, release name (bold), time, Version ↗ (Open in new tab), Document, Type; View release, Export, Obsolete revision (red) or View obsoletion | the same layout (our own icons) | – | = |
 | Auto-obsolete | A's icon auto-obsolete, View obsoletion; B keeps Obsolete revision | the same | – | = |
 | Obsolete candidate | Add to Obsoletion…, read-only row, Obsoletion name *, notes *, Approvers, Observers, re-releasable; Apply, Submit, Obsolete (red), Close | the same footer (Apply greyed) | ops release_parts_and_revision_history | = |
 | Admin without required approvers | Release stays on; confirm "Release and override company policy" | the same | – | = |
 | Barred creator | not offered as approver; no asterisk | the same | – | = |
-| Assembly release | the assembly, its parts once (mirror adds none), linked parts In progress without fields ("Document is not owned by your company"), no standard content | standard content and linked parts listed | – | ≠ |
+| Assembly release | the assembly, its parts once (mirror adds none), linked parts In progress without fields ("Document is not owned by your company"), no standard content | the assembly and its parts once; no standard content or mirror items; linked parts left out (company ownership: none offline) | – | = (ownership: cloud) |
 | Drawing pending update | red band "Drawing has a pending update" blocks; after Update it releases, title block DRW-1 / A, tab menu Revision history… | ? | – | ? |
 | Locking | released version: Name, Category, Part number, Revision, State, Material locked; workspace part keeps Part number editable | ? | – | ? |
 
