@@ -3394,7 +3394,7 @@ impl FeatureDialog {
                     // "Create selection" button (20 px icon, 3 px padding).
                     .when(takes_cs, |d| {
                         let p_cs = path.to_string();
-                        d.child(
+                        d.child(crate::ui_script::mark(
                             div()
                                 .id(SharedString::from(format!("cs-{path}")))
                                 .size(px(26.))
@@ -3415,7 +3415,8 @@ impl FeatureDialog {
                                     cx.emit(DialogEvent::CreateSelection(p_cs.clone()));
                                     cx.notify();
                                 })),
-                        )
+                            || "button:Create selection".to_string(),
+                        ))
                     })
                     .children(flips)
                     .into_any_element()

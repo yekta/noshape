@@ -721,9 +721,11 @@ impl Sketch {
         Ok((pmap, emap))
     }
 
-    /// Mirrors entities about line `axis`, adding symmetric constraints
-    /// between corresponding points (and equal constraints for circles and
-    /// ellipses). Points on the axis are reused.
+    /// Mirrors entities about line `axis` as Onshape's sketch Mirror (live/feel/mirror.json): each copy tied to its
+    /// source by a mirror (symmetric) constraint of its own (a line, an arc, a circle) and a segment's ends by one
+    /// each (Onshape's `.begCons` / `.endCons`; a circle's or an arc's centre only through its curve's); a point by
+    /// one; an ellipse by its points and EQUAL. Points on the axis are reused; an entity whose mirror image is already
+    /// there makes nothing.
     pub fn mirror(&mut self, ids: &[EntityId], axis: EntityId) -> Result<EditResult> {
         let (a, b) = self.line_pts(axis).ok_or_else(|| SketchError::OperationFailed("mirror axis must be a line".into()))?;
         let tol = self.tool_tol();
@@ -731,23 +733,58 @@ impl Sketch {
         if d == DVec2::ZERO {
             return Err(SketchError::OperationFailed("degenerate mirror axis".into()));
         }
-        let ids: Vec<EntityId> = ids.iter().copied().filter(|i| *i != axis).collect();
-        let mut res = EditResult::default();
         let f = move |p: DVec2| reflect(p, a, b);
+        let ids: Vec<EntityId> = ids.iter().copied().filter(|i| *i != axis && !self.has_image(*i, &f, tol)).collect();
+        let mut res = EditResult::default();
         let vf = move |v: DVec2| d * (2.0 * v.dot(d)) - v;
         let on_axis = move |p: DVec2| (p - a).perp_dot(d).abs() <= 4.0 * tol;
         let (pmap, emap) = self.copy_entities(&ids, &f, &vf, true, &on_axis, &mut res)?;
+        let curve_pair = |sk: &Sketch, e: EntityId| matches!(sk.kind(e), Some(EntityKind::Line | EntityKind::Arc | EntityKind::Circle));
+        for (src, dst) in &emap {
+            if curve_pair(self, *src) {
+                self.add_c(&mut res, ConstraintKind::Symmetric { a: *src, b: *dst, axis });
+            }
+        }
+        let centres: Vec<EntityId> = emap.iter().filter(|(src, _)| matches!(self.kind(*src), Some(EntityKind::Arc | EntityKind::Circle))).filter_map(|(src, _)| self.entity(*src)?.center()).collect();
         for (p, q) in &pmap {
-            if p != q {
+            if p != q && !centres.contains(p) {
                 self.add_c(&mut res, ConstraintKind::Symmetric { a: *p, b: *q, axis });
             }
         }
         for (src, dst) in emap {
-            if matches!(self.kind(src), Some(EntityKind::Circle | EntityKind::Ellipse | EntityKind::EllipticalArc)) {
+            if matches!(self.kind(src), Some(EntityKind::Ellipse | EntityKind::EllipticalArc)) {
                 self.add_c(&mut res, ConstraintKind::Equal { a: src, b: dst });
             }
         }
         Ok(res)
+    }
+
+    /// Whether entity `id`'s image under `f` is already in the sketch (a point, a line, an arc or a circle of the same
+    /// kind there, within `tol`).
+    fn has_image(&self, id: EntityId, f: &dyn Fn(DVec2) -> DVec2, tol: f64) -> bool {
+        let Some(kind) = self.kind(id) else { return false };
+        let near = |p: DVec2, q: DVec2| (p - q).length() <= tol;
+        let ends = |e: EntityId| self.endpoints(e).and_then(|(s, t)| Some((self.point(s)?, self.point(t)?)));
+        let circle = |e: EntityId| Some((self.center_pos(e)?, self.radius_of(e)?));
+        let same = |other: EntityId| -> bool {
+            if other == id || self.kind(other) != Some(kind) {
+                return false;
+            }
+            match kind {
+                EntityKind::Point => self.point(id).zip(self.point(other)).is_some_and(|(p, q)| near(f(p), q)),
+                EntityKind::Line | EntityKind::Arc => {
+                    let ((s, t), (u, v)) = match (ends(id), ends(other)) {
+                        (Some(x), Some(y)) => (x, y),
+                        _ => return false,
+                    };
+                    let ends_match = (near(f(s), u) && near(f(t), v)) || (near(f(s), v) && near(f(t), u));
+                    ends_match && (kind == EntityKind::Line || circle(id).zip(circle(other)).is_some_and(|((c, r), (k, q))| near(f(c), k) && (r - q).abs() <= tol))
+                }
+                EntityKind::Circle => circle(id).zip(circle(other)).is_some_and(|((c, r), (k, q))| near(f(c), k) && (r - q).abs() <= tol),
+                _ => false,
+            }
+        };
+        matches!(kind, EntityKind::Point | EntityKind::Line | EntityKind::Arc | EntityKind::Circle) && self.entities().any(|e| same(e.id))
     }
 
     /// Linear pattern: `count - 1` copies, each offset by `step`.

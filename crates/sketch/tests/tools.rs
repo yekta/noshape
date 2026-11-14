@@ -244,6 +244,44 @@ fn mirror_with_symmetric_constraints() {
     }
 }
 
+/// Live's sketch Mirror (live/feel/mirror.json): one mirror constraint per copy (a line's, an arc's, a circle's,
+/// a point's), a segment's ends one each, a circle's or an arc's centre none of its own; the source's own
+/// constraints not copied; mirroring onto an image already there makes nothing. The sketch solves.
+#[test]
+fn mirror_constrains_each_copy_as_live() {
+    let mut sk = Sketch::new();
+    let axis = sk.add_line(v(-5.0, -10.0), v(-5.0, 10.0));
+    let l = sk.add_line(v(0.0, 0.0), v(4.0, 0.0));
+    sk.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
+    let a = sk.add_arc(v(2.0, -3.0), v(3.0, -3.0), v(2.0, -2.0));
+    let p = sk.add_point(v(1.0, 5.0));
+    let c = sk.add_circle(v(3.0, 6.0), 0.5);
+    let before = sk.constraints().count();
+    let res = sk.mirror(&[l, a, p, c], axis).unwrap();
+    let sym = |x: EntityId| sk.constraints().filter(|k| matches!(k.kind, ConstraintKind::Symmetric { a, b, .. } if a == x || b == x)).count();
+    let copy = |k: EntityKind| res.created.iter().copied().find(|e| sk.kind(*e) == Some(k)).unwrap();
+    let (line, arc, circle) = (copy(EntityKind::Line), copy(EntityKind::Arc), copy(EntityKind::Circle));
+    assert_eq!((sym(line), sym(arc), sym(circle)), (1, 1, 1), "the curve pairs");
+    let (s, e) = sk.endpoints(line).unwrap();
+    assert_eq!((sym(s), sym(e)), (1, 1), "a line's ends");
+    let arc_centre = sk.entity(arc).unwrap().center().unwrap();
+    let circle_centre = sk.entity(circle).unwrap().center().unwrap();
+    assert_eq!((sym(arc_centre), sym(circle_centre)), (0, 0), "centres through their curves");
+    let copied = |k: &ConstraintKind| match k {
+        ConstraintKind::Equal { .. } => true,
+        ConstraintKind::Horizontal { a, .. } => *a == line,
+        _ => false,
+    };
+    assert!(!sk.constraints().any(|k| copied(&k.kind)), "no EQUAL, the source's HORIZONTAL not copied");
+    // line 1 + 2 ends, arc 1 + 2 ends, point 1, circle 1.
+    assert_eq!(sk.constraints().count() - before, 8);
+    let rep = sk.solve();
+    assert!(rep.is_solved(), "{rep:?}");
+    // Again: every image is there already.
+    let again = sk.mirror(&[l, a, p, c], axis).unwrap();
+    assert!(again.created.is_empty() && again.constraints_added.is_empty(), "{again:?}");
+}
+
 #[test]
 fn patterns_transform_and_external() {
     let mut sk = Sketch::new();
