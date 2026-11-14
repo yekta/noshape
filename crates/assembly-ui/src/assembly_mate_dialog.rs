@@ -288,6 +288,8 @@ impl MateDialog {
         subs.push(cx.subscribe_in(&type_select, window, |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, _, cx| {
             let crate::os_select::OsSelectEvent::Picked(id) = ev;
             if let Some(mt) = MATE_TYPE_ORDER.iter().copied().find(|mt| mt.name() == id.as_ref()) {
+                // Live asm-mate-type-switch: the type box keeps the keyboard (its unlabelled input).
+                cx.emit(MateDialogEvent::CheckboxFocused(""));
                 this.set_type(mt, cx);
             }
         }));
@@ -404,7 +406,7 @@ impl MateDialog {
         }
         for (label, slots) in boxes {
             let items: Vec<String> = slots.iter().filter_map(|f| self.slot(*f).as_ref()).map(|c| (self.labeler)(c)).collect();
-            let active = self.active.is_some_and(|a| slots.contains(&a));
+            let active = self.box_active(slots);
             fields.push(json!({ "label": label, "kind": "query", "items": items, "active": active, "state": "ok" }));
         }
         let check = |label: &str, on: bool| json!({ "label": label, "kind": "boolean", "checked": on, "state": "ok" });
@@ -712,14 +714,18 @@ impl MateDialog {
         }
     }
 
+    /// A selection box over these slots looks active: one of them takes the next pick, or, all picked, the first box
+    /// keeps its active look (live assembly/2220; after a type switch too: asm-mate-type-switch).
+    fn box_active(&self, slots: &[usize]) -> bool {
+        self.active.is_some_and(|a| slots.contains(&a)) || (self.active.is_none() && slots.contains(&0) && self.editing_field.is_none())
+    }
+
     /// One Onshape selection box over some connector slots: the filled
     /// slots are its rows; it is the active box while one of them takes the
     /// next pick.
     fn query_box(&self, id: &'static str, label: &'static str, fields: &[usize], cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        // Live (assembly/2220): once both connectors are picked the
-        // connectors box keeps its active look (blue, framed).
-        let active = self.active.is_some_and(|a| fields.contains(&a)) || (self.active.is_none() && fields.contains(&0) && self.editing_field.is_none());
+        let active = self.box_active(fields);
         let mut rows = Vec::new();
         for &field in fields {
             let Some(c) = self.slot(field) else { continue };
@@ -1081,7 +1087,16 @@ impl Render for MateDialog {
                             .h(px(match t { MateType::Width => 22., MateType::Tangent => 26., _ => 30. }))
                             .px(px(3.))
                             .gap(px(4.))
-                            .when(t != MateType::Width, |d| d.child(small_tool("mate-flip", flip_icon, "Flip primary axis (a)", false).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.flip(cx)))))
+                            .when(t != MateType::Width, |d| {
+                                d.child(crate::ui_script::mark(
+                                    small_tool("mate-flip", flip_icon, "Flip primary axis (a)", false).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                        // Live asm-revolute-flip-primary: the clicked icon keeps the focus.
+                                        cx.emit(MateDialogEvent::CheckboxFocused(""));
+                                        this.flip(cx)
+                                    })),
+                                    || "button:Opposite direction".into(),
+                                ))
+                            })
                             .when(full_row, |d| d.child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.reorient = (this.reorient + 1) % 4;
                                 cx.emit(MateDialogEvent::Changed);

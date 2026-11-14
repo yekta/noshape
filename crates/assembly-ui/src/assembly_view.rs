@@ -4499,7 +4499,7 @@ impl AssemblyView {
                 rows.push(self.instance_row(result.node(&[inst.id]), Some(inst), vec![inst.id], usize::from(tree), cx));
             }
             if tree && hits.len() < p.generated.len() {
-                rows.push(h_flex().h(px(crate::ui::ROW_H)).flex_none().pl(px(28. + 22.)).text_size(px(crate::ui::ROW_TEXT)).text_color(crate::theme::p().text).child("…").into_any_element());
+                rows.push(h_flex().h(px(crate::ui::ROW_H)).flex_none().pl(px(28. + 22.)).text_size(px(crate::ui::ROW_TEXT)).text_color(crate::theme::p().text).child("...").into_any_element());
             }
             return true;
         }
@@ -4910,7 +4910,7 @@ impl AssemblyView {
         }
         if tree && (hidden || mate_hidden) {
             // The "…" (live: text at x 28 of the list), past the rows shown.
-            rows.push(h_flex().h(px(crate::ui::ROW_H)).flex_none().pl(px(28.)).text_size(px(crate::ui::ROW_TEXT)).text_color(pal.text).child("…").into_any_element());
+            rows.push(h_flex().h(px(crate::ui::ROW_H)).flex_none().pl(px(28.)).text_size(px(crate::ui::ROW_TEXT)).text_color(pal.text).child("...").into_any_element());
         }
         rows
     }

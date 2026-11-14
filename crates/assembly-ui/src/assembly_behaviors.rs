@@ -349,6 +349,8 @@ pub struct AsmUi {
     /// Insert dialog: search box, source (0 current document, 1 other
     /// documents) and element tab (0 Part Studios, 1 Assemblies).
     pub insert_search: Option<Entity<InputState>>,
+    /// The Insert dialog's search box has the keyboard.
+    pub insert_search_focused: bool,
     pub insert_search_sub: Option<Subscription>,
     /// The search box's text, kept here so the cached catalog tree doesn't
     /// read the box (which would re-render it on every caret blink).
@@ -3157,9 +3159,13 @@ impl AssemblyView {
             // No `cx.notify()`: the field's own notification re-renders the
             // panel around it; of the cached slices only the catalog tree
             // shows the query.
-            if matches!(ev, InputEvent::Change) {
-                this.ui.insert_query = st.read(cx).value().to_string();
-                this.insert_search_changed(cx);
+            match ev {
+                InputEvent::Change => {
+                    this.ui.insert_query = st.read(cx).value().to_string();
+                    this.insert_search_changed(cx);
+                }
+                InputEvent::Focus | InputEvent::Blur => this.ui.insert_search_focused = matches!(ev, InputEvent::Focus),
+                _ => {}
             }
         }));
         self.ui.insert_search = Some(st);
@@ -3328,7 +3334,7 @@ impl AssemblyView {
                     .rounded(px(3.))
                     // Live (dom/assembly-lists): the box has the funnel's tooltip.
                     .tooltip(crate::ui::tooltip("Filter assembly contents"))
-                    .child(crate::ui::input_with_placeholder(&st, "Filter by name", cx).appearance(false).text_size(px(13.33)).pl(px(5.)))
+                    .child(crate::ui_script::mark(div().flex_1().child(crate::ui::input_with_placeholder(&st, "Filter by name", cx).appearance(false).text_size(px(13.33)).pl(px(5.))), || "field:Filter by name".into()))
                     .when(self.ui.filter_focused && self.ui.filter.is_empty(), |d| d.child(div().absolute().top(px(31.)).left_0().child(deferred(anchored().child(filter_help())).with_priority(2)))),
             )
             .child(div().flex_1())

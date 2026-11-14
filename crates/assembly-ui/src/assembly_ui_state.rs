@@ -194,7 +194,8 @@ impl AssemblyView {
             items.push((MateId(u64::MAX - 1), row(&asm.next_feature_name("Group"), if ok { "ok" } else { "error" }, true, true, false, !self.show_mates)));
         }
         let folder_related = self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || picked || self.ui.np_driver.is_some() || editing.is_some();
-        rows.push(row(&format!("Mate features ({})", items.len()), "ok", false, false, folder_related, false));
+        let items_len = items.len();
+        rows.push(row(&format!("Mate features ({items_len})"), "ok", false, false, folder_related, false));
         if !self.expanded.contains(&vec![MATE_FEATURES_COLLAPSED]) {
             for (id, r) in items {
                 // An expanded mate's implicit connectors under it, hidden as it is.
@@ -203,6 +204,41 @@ impl AssemblyView {
                 rows.push(r);
                 rows.extend((0..children).map(|_| row("Mate connector", "ok", false, false, false, hidden)));
             }
+        }
+        // Filtered by name, as the list draws it (tree mode, live asm-instance-filter): the assembly's row, the
+        // instances and mate features that pass, "Mate features (n)" only over some, then "..." for those hidden.
+        if !self.ui.filter.is_empty() && !self.ui.filter_flat {
+            use noshape_model::assembly::ops::RowKind;
+            let instance_ok = |i: &Instance| self.instance_passes(i, self.result.node(&[i.id]), cx);
+            let feature_ok = |name: &str| {
+                let kind_of = || -> Option<(RowKind, bool, bool)> {
+                    if let Some(m) = asm.mates.iter().find(|m| m.name == name) {
+                        return Some((RowKind::Mate, m.suppressed, m.hidden));
+                    }
+                    if let Some(c) = asm.connectors.iter().find(|c| c.name == name) {
+                        return Some((RowKind::Connector, c.suppressed, c.hidden));
+                    }
+                    if let Some(r) = asm.relations.iter().find(|r| r.name == name) {
+                        return Some((RowKind::Relation, r.suppressed, false));
+                    }
+                    asm.groups.iter().find(|g| g.name == name).map(|g| (RowKind::Group, g.suppressed, false))
+                };
+                kind_of().is_some_and(|(k, suppressed, hidden)| self.feature_passes(k, name, false, suppressed, hidden, false))
+            };
+            let tops: Vec<&Instance> = asm.instances.iter().filter(|i| asm.generated_by(i.id).is_none()).collect();
+            let shown_instances: Vec<&Instance> = tops.iter().copied().filter(|i| instance_ok(i)).collect();
+            let mate_names: Vec<String> = rows.iter().skip_while(|r| !r["name"].as_str().is_some_and(|n| n.starts_with("Mate features ("))).skip(1).filter_map(|r| r["name"].as_str().map(str::to_string)).filter(|n| feature_ok(n)).collect();
+            let all_mates = asm.connectors.len() + asm.mates.len() + asm.relations.len() + asm.groups.len();
+            let mut filtered = vec![rows[0].clone()];
+            filtered.extend(rows.iter().filter(|r| shown_instances.iter().any(|i| r["name"] == i.name.as_str())).cloned());
+            if !mate_names.is_empty() {
+                filtered.push(row(&format!("Mate features ({})", items_len), "ok", false, false, folder_related, false));
+                filtered.extend(rows.iter().filter(|r| r["name"].as_str().is_some_and(|n| mate_names.iter().any(|m| m == n))).cloned());
+            }
+            if shown_instances.len() < tops.len() || mate_names.len() < all_mates {
+                filtered.push(row("...", "ok", false, false, false, false));
+            }
+            rows = filtered;
         }
         // A transform as live's occurrences give it: 16 numbers, row-major,
         // the translation in mm (rounded to 1e-6).
@@ -351,7 +387,25 @@ impl AssemblyView {
             None => rename,
         };
         let focus = focus.or_else(|| self.ui.panel_focus.then(|| json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })));
-        let focus = focus.or_else(|| self.ui.checkbox_focus.zip(dialog.as_ref()).map(|(label, d)| json!({ "kind": "field", "label": label, "dialog": d["title"] })));
+        // The Insert dialog's search box: an unlabelled field (live asm-insert-search).
+        let focus = focus.or_else(|| {
+            self.ui.insert_search.as_ref().filter(|_| self.insert_open && self.ui.insert_search_focused).map(|st| {
+                let mut f = crate::ui_script::field_focus("", st.read(cx));
+                f["label"] = Value::Null;
+                f
+            })
+        });
+        // The instance list's Filter by name box (live asm-instance-filter: "filter", its text).
+        let focus = focus.or_else(|| {
+            self.ui.filter_input.as_ref().filter(|_| self.ui.filter_focused).map(|st| {
+                let mut f = crate::ui_script::field_focus("Filter by name", st.read(cx));
+                f["kind"] = json!("filter");
+                f["label"] = Value::Null;
+                f
+            })
+        });
+        // (The flip icon has no label: live's recorder reads an osc-svg-icon, label null.)
+        let focus = focus.or_else(|| self.ui.checkbox_focus.zip(dialog.as_ref()).map(|(label, d)| json!({ "kind": "field", "label": if label.is_empty() { Value::Null } else { json!(label) }, "dialog": d["title"] })));
         // A right-clicked number field, then the page once its Configure is picked (live asm-pattern-field-configure).
         let focus = focus.or_else(|| self.ui.keyboard_away.then(|| json!({ "kind": "none" })));
         let focus = focus.or_else(|| {
@@ -749,7 +803,14 @@ impl AssemblyView {
             if self.ui.insert_source == 0 {
                 text.push(self.doc.read(cx).name());
                 text.extend(["Part Studios", "Assemblies"].map(String::from));
-                text.push(if self.ui.insert_tab == 0 { "(Search Part Studios)".into() } else { "(Search Assemblies)".into() });
+                // The search box: its text once typed in (live asm-insert-search), else its hint.
+                text.push(if !self.ui.insert_query.is_empty() {
+                    self.ui.insert_query.clone()
+                } else if self.ui.insert_tab == 0 {
+                    "(Search Part Studios)".into()
+                } else {
+                    "(Search assemblies)".into()
+                });
             }
             // "Inserted: N" (live's recorder since 2026-11-14.1, asm-insert-*-pending; run.py takes it into the dialog).
             let mut d = panel("Insert parts and assemblies", text);

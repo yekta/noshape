@@ -4415,7 +4415,7 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// The Insert dialog's "Search Part Studios" / "Search Assemblies" box;
+    /// The Insert dialog's "Search Part Studios" / "Search assemblies" box;
     /// the placeholder is italic (live 320, 612).
     pub(super) fn insert_search_box(&self, cx: &mut App) -> Option<AnyElement> {
         let st = self.ui.insert_search.as_ref()?;
@@ -4425,7 +4425,7 @@ impl AssemblyView {
         } else if self.ui.insert_tab == 0 {
             "Search Part Studios"
         } else {
-            "Search Assemblies"
+            "Search assemblies"
         };
         Some(
             div()
@@ -4435,7 +4435,7 @@ impl AssemblyView {
                 .child(
                     div()
                         .relative()
-                        .child(crate::ui::input_with_placeholder(st, ph, cx).h(px(30.)).cleanable(true).text_size(px(12.)).pl(px(5.))),
+                        .child(crate::ui_script::mark(div().child(crate::ui::input_with_placeholder(st, ph, cx).h(px(30.)).cleanable(true).text_size(px(12.)).pl(px(5.))), move || format!("field:{ph}"))),
                 )
                 .into_any_element(),
         )
