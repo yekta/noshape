@@ -1,6 +1,6 @@
 # Blends (agent "blend")
 
-## 11-14 15:55 UTC: landed partrays, frameside, halfround, projonce; before/after on the Mac
+## 11-14 15:35 UTC: landed partrays, frameside, halfround, projonce; before/after on the Mac
 
 Landed today: secwires 66cc9880, partrays c04fdfb5, frameside 351cb81d, halfround 3a6fc428 (skasm told), projonce
 5b263529. Nothing queued, nothing gating.
