@@ -19,6 +19,8 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepCheck_Shell.hxx>
+#include <BRepCheck_Solid.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <BRepTools_WireExplorer.hxx>
@@ -4638,36 +4640,66 @@ static bool cheaply_valid(const TopoDS_Shape& out, bool parallel)
   }
   if (many < 64)
     return false;
-  // (The shells as BRepCheck_Shell has them: in a solid's every edge used by two faces the opposite ways round (a
-  // seam a face's own twice), in a sheet by one or two.)
+  // (The shells as the analyzer has them: where each edge is used by two faces the opposite ways round (a seam a
+  // face's own twice; in a sheet by one or two) and the faces are joined, so; else BRepCheck_Shell's and
+  // BRepCheck_Solid's own (a seam another face meets too).)
+  const auto clean = [](const NCollection_List<BRepCheck_Status>& l) {
+    for (const BRepCheck_Status st : l)
+      if (st != BRepCheck_NoError)
+        return false;
+    return true;
+  };
   for (TopExp_Explorer sx(out, TopAbs_SHELL); sx.More(); sx.Next())
   {
-    bool in_solid = false;
-    for (TopExp_Explorer so(out, TopAbs_SOLID); so.More() && !in_solid; so.Next())
-      for (TopExp_Explorer sh(so.Current(), TopAbs_SHELL); sh.More() && !in_solid; sh.Next())
-        in_solid = sh.Current().IsSame(sx.Current());
-    NCollection_IndexedDataMap<TopoDS_Shape, std::array<int, 2>, TopTools_ShapeMapHasher> uses;
-    for (TopExp_Explorer fx(sx.Current(), TopAbs_FACE); fx.More(); fx.Next())
+    TopoDS_Shape solid;
+    for (TopExp_Explorer so(out, TopAbs_SOLID); so.More() && solid.IsNull(); so.Next())
+      for (TopExp_Explorer sh(so.Current(), TopAbs_SHELL); sh.More() && solid.IsNull(); sh.Next())
+        if (sh.Current().IsSame(sx.Current()))
+          solid = so.Current();
+    NCollection_IndexedDataMap<TopoDS_Shape, std::array<int, 3>, TopTools_ShapeMapHasher> uses;
+    std::vector<int> group;
+    const auto       root = [&](int x) {
+      while (group[x] != x)
+        x = group[x] = group[group[x]];
+      return x;
+    };
+    bool simple_uses = true;
+    int  nf          = 0;
+    for (TopExp_Explorer fx(sx.Current(), TopAbs_FACE); fx.More(); fx.Next(), ++nf)
     {
+      group.push_back(nf);
       for (TopExp_Explorer ex(fx.Current(), TopAbs_EDGE); ex.More(); ex.Next())
       {
         const TopoDS_Edge& e = TopoDS::Edge(ex.Current());
+        if (!uses.Contains(e))
+          uses.Add(e, {0, 0, nf});
+        std::array<int, 3>& u = uses.ChangeFromKey(e);
+        group[root(nf)] = root(u[2]);
         if (BRep_Tool::Degenerated(e) || e.Orientation() == TopAbs_INTERNAL || e.Orientation() == TopAbs_EXTERNAL)
           continue;
         if (BRep_Tool::IsClosed(e, TopoDS::Face(fx.Current())))
-          continue;
-        const bool fwd = e.Orientation() == TopAbs_FORWARD;
-        if (!uses.Contains(e))
-          uses.Add(e, {0, 0});
-        uses.ChangeFromKey(e)[fwd ? 0 : 1] += 1;
+          simple_uses = simple_uses && u[0] == 0 && u[1] == 0 && u[2] == nf;
+        else
+          u[e.Orientation() == TopAbs_FORWARD ? 0 : 1] += 1;
       }
     }
-    for (int k = 1; k <= uses.Extent(); ++k)
+    for (int k = 1; k <= uses.Extent() && simple_uses; ++k)
     {
-      const std::array<int, 2>& u = uses(k);
-      if (in_solid ? (u[0] != 1 || u[1] != 1) : (u[0] > 1 || u[1] > 1))
-        return false;
+      const std::array<int, 3>& u = uses(k);
+      simple_uses = solid.IsNull() ? u[0] <= 1 && u[1] <= 1 : u[0] == u[1] && u[0] <= 1;
     }
+    for (int k = 1; k < nf && simple_uses; ++k)
+      simple_uses = root(k) == root(0);
+    if (simple_uses)
+      continue;
+    const occ::handle<BRepCheck_Shell> r = new BRepCheck_Shell(TopoDS::Shell(sx.Current()));
+    if (!clean(r->Status()))
+      return false;
+    if (solid.IsNull())
+      continue;
+    r->InContext(solid);
+    if (!clean(r->StatusOnShape(solid)) || !clean(occ::handle<BRepCheck_Solid>(new BRepCheck_Solid(TopoDS::Solid(solid)))->Status()))
+      return false;
   }
   // (Each face on its own: on all threads, as BRepCheck_Analyzer's own.)
   std::atomic<bool> ok{true};
