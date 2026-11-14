@@ -1,5 +1,21 @@
 # Blends (agent "blend")
 
+## 11-14 20:31 UTC: floorplane landed; mitretools and fsorder gating; knife Fillet 8 builds (core)
+
+Landed: floorplane 4a9bee22. Gating (systemd units here, flags /root/blend-scratch/*.done):
+- blend6 `blend-mitretools` ec0b0f78a (rebased; now refuses rounds that roll past a face not taken by a neighbour's
+  round: kernel_robustness::oversize_fillets_like_onshape's "4 top edges R12" fails as live again; touch points
+  classified as 3D points, a periodic face's parameters came a period off). Unit blend-mitre-gates6 on vibe6: g++-13,
+  tests, pair vs blend10 (652c65913), then asm (asm-mitre-new.log -> mitre-asm.done).
+- blend4 `blend-fsorder` be588685f: a custom feature's faces (Generated(<op face>)) rank in Onshape's entity order as
+  their operation's (side before end cap): hand-drill f79298's gear Chamfer 1 as live after skasm's 302bbe425 query
+  fix, 9 -> 20/30. T1 custom_features::two_offset_chamfer_on_a_custom_features_faces_measures_as_live (fails without).
+  Unit blend-fsorder-gates5 on vibe5: model tests, pair vs blend10, asm.
+- Knife Fillet 8 builds on main since core's 0147815a: 16/34/20 vs live 15/37/25 (input HANDLE 14/31/18 vs live
+  14/31/19), 824 ms on the Mac: OCCT's round splits, the rolling balls decline (a near-tangent stretch of the ring: a
+  side arc too flat, then a zero-length side), OCCT's finished, unify 260 ms. Live makes one face over the closed ring;
+  asked live for its created faces (REQUESTS, 20:31).
+
 ## 11-14 16:53 UTC: asm-hand-drill-pinslot's failing blends (live's targets core/qhd); floorplane, mitretools gating
 
 live's targets: /root/onshape-research/live/core/qhd/targets.md (+ out.json: created faces' ids, types, areas, boxes).
