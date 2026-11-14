@@ -8,7 +8,22 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
-## Now (asm, 2026-11-14 08:06 UTC)
+## Now (asm, 2026-11-14 13:01 UTC)
+- Landed since 08:06: Transform along a construction sketch line / from the origin (infento's studio 74d3d6: the Bearing
+  block 40x80 hexa 20 mm off), a same-document Derived source from the corpus' studios (robot-relations 137 -> 139/139
+  occurrences, 7/9 -> 8/11 mates), edge-midpoint connectors aligned to a face second id. Queued: the suite compares
+  a studio feature's status with live's line (skasm), assembly_mate `simulation_faces` (studios' Faces to connect).
+- infento-subs fell 143/194 -> 74/196 mates with no code change: the same test binary gave 143 at 08:35 and 74 later
+  on vibe5. Not skasm's solver, bool's unify, my Transform fix or the query cache (each reverted: still 74): live's
+  08:30 corpus update (the assembly studios' sketch solves, dx's request), read by the translator. The new failures sit
+  on studio f0eedd's frame extrusions (Part 1 <1>, 16, 11, 22, 13), their ends still at live's frames. With dx
+  (13:00 message). A gate on the new corpus (vibe5 g-14) is the new baseline.
+- MID_POINT connectors: live's second id names an edge, not a face (Planar 10's SQC1J), so the face alignment does
+  nothing yet; live's Z for such a midpoint is across the edge. Open.
+- Composite parts: ~15 of infento's unresolvable connectors are on composite instances (Composite part 4 <n>, the
+  7" wheels); not looked into yet.
+
+## Earlier (asm, 2026-11-14 08:06 UTC)
 - Queued a42d6a59 (carries dbd8da0f): suppressed mates; Cylindrical rule reverted (premise wrong: live 3004); part
   mapping by live's centroid, by live's first maker (<element>.first.json, live 3043), several made by one feature by
   volume; the mate dialog / Insert / filter / relation / pattern state as live's recorder reads it (asm-* coverage
