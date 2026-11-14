@@ -142,6 +142,39 @@ fn a_loft_between_guides_fades_them_across_as_live() {
     }
 }
 
+/// Live 2620 / 3027 (c2-hunting-knife's Loft 3): a guide of several pieces is one C1 curve. Each piece has its share of
+/// the guide's length, and at a joint both pieces run at the geometric mean of their own speeds there (each piece's
+/// parameter eased by a cubic); the guide's ends keep theirs. A guide of a cubic spline and a line, a straight guide.
+#[test]
+fn a_loft_guide_of_pieces_runs_at_the_geometric_mean_of_their_speeds() {
+    let v = |x: f64, y: f64, z: f64| DVec3::new(x, y, z);
+    let line = |a: DVec3, b: DVec3| make_line(a, b).unwrap();
+    let (a0, a1, b0, b1) = (v(0., 0., 0.), v(10., 0., 0.), v(0., 20., 3.), v(10., 20., 3.));
+    let joint = v(0., 10., 3.);
+    let spline = make_bspline(&[a0, v(-2., 3., 0.), v(-3., 8., 2.), joint], None, &[0.0, 1.0], &[4, 4], 3, false).unwrap();
+    let (ls, total) = (spline.length().unwrap(), spline.length().unwrap() + 10.0);
+    let share = ls / total;
+    // The pieces' own speeds at the joint, over their shares of the face's [0, 1]: the spline's end tangent over its
+    // share (its poles' last leg times 3), the line's length over its share.
+    let spline_speed = 3.0 * joint.distance(v(-3., 8., 2.)) / share;
+    let line_speed = total;
+    let mean = (spline_speed * line_speed).sqrt();
+    let g0 = make_wire(&[spline, line(joint, b0)]).unwrap();
+    let g1 = make_wire(&[line(a1, b1)]).unwrap();
+    let r = loft_guided_open(&make_wire(&[line(a0, a1)]).unwrap(), &make_wire(&[line(b0, b1)]).unwrap(), &[g0, g1], true, false).unwrap();
+    let face = r.faces()[0].clone();
+    let [u0, u1, v0, v1] = face.uv_bounds().unwrap();
+    // The side on the spline (u at one end), run along in v.
+    let on = |u: f64, w: f64| face.point_at_uv(u, w).unwrap();
+    let side = if on(u0, v0).distance(a0) < 1e-6 || on(u0, v1).distance(a0) < 1e-6 { u0 } else { u1 };
+    let from_a0 = on(side, v0).distance(a0) < 1e-6;
+    let at = |t: f64| if from_a0 { v0 + (v1 - v0) * t } else { v1 - (v1 - v0) * t };
+    let h = 1e-6;
+    let speed = |t0: f64, t1: f64| on(side, at(t0)).distance(on(side, at(t1))) / (t1 - t0).abs();
+    let (left, right) = (speed(share - h, share), speed(share, share + h));
+    assert!((left - mean).abs() < 1e-3 * mean && (right - mean).abs() < 1e-3 * mean, "at the joint: {left} and {right}, the mean of {spline_speed} and {line_speed} is {mean}");
+}
+
 /// Live 2276 (loft Start condition Normal to profile, magnitude 1, End None): a Ø20 circle on Top lofted to a Ø20
 /// circle (D) 10 up and 5 aside, (I) 20 up and 5 aside (live's volumes), (G) on the plane x = 15 centred (15, 0, 15):
 /// a solid facing out (it came out inside out, -5300 mm³) with its start step per pole column (0.9 (c·n) + 0.1 |c| over 3

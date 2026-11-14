@@ -907,47 +907,105 @@ TopoDS_Face simplest_face(const std::vector<std::vector<gp_Pnt>>& g, double tol)
   return as_analytic(grid_face(g), tol);
 }
 
-// A run of lines on one straight line, between curves running at other speeds (a spline in its own parameter), takes
-// their speeds at its ends, eased between as a cubic over its share of the length: the chain C1 where the curves'
-// shapes fix their own parameters (live 2291: c2-hunting-knife's guide, a spline, two lines and an arc; the lines'
-// speed 1.13 at the spline, 1 at the arc, 0.96 between). Lines where the speed would turn back stay as they are.
-void ease_lines(std::vector<occ::handle<Geom_BSplineCurve>>& pieces, std::vector<bool>& lines)
+// `c` on [0, len] run through at speed `a` times its own at its start, `b` at its end, eased between by a cubic map of
+// its parameter, as C1 cubic Hermite spans (halved until within `tol`; a straight piece is one span, exact).
+occ::handle<Geom_BSplineCurve> eased(const occ::handle<Geom_BSplineCurve>& c, double a, double b, double tol)
 {
-  for (size_t i = 0; i < pieces.size();)
+  const double t0 = c->FirstParameter(), t1 = c->LastParameter(), len = t1 - t0;
+  // The map w in [0, 1] to the curve's parameter: Hermite, slopes a and b, its derivative.
+  auto phi  = [&](double w) { return t0 + len * ((-2 * w + 3) * w * w + (w * w - 2 * w + 1) * w * a + (w * w - w) * w * b); };
+  auto dphi = [&](double w) { return len * ((-6 * w + 6) * w + (3 * w * w - 4 * w + 1) * a + (3 * w * w - 2 * w) * b); };
+  for (int n = 1; n <= 64; n *= 2)
+  {
+    NCollection_Array1<double> knots(1, n + 1);
+    std::vector<gp_Pnt>        at(n + 1);
+    std::vector<gp_Vec>        d(n + 1);
+    for (int k = 0; k <= n; ++k)
+    {
+      const double w = (double)k / n;
+      gp_Pnt       p;
+      gp_Vec       v;
+      c->D1(phi(w), p, v);
+      at[k] = p;
+      d[k]  = v * (dphi(w) / n);
+      knots(k + 1) = t0 + len * w;
+    }
+    // Each span's Bézier poles from its ends' points and derivatives (C0 form: interior knots 3 times).
+    NCollection_Array1<gp_Pnt> all(1, 3 * n + 1);
+    for (int k = 0; k < n; ++k)
+    {
+      all(3 * k + 1) = at[k];
+      all(3 * k + 2) = at[k].Translated(d[k] / 3);
+      all(3 * k + 3) = at[k + 1].Translated(-d[k + 1] / 3);
+    }
+    all(3 * n + 1) = at[n];
+    NCollection_Array1<int> m2(1, n + 1);
+    for (int k = 1; k <= n + 1; ++k)
+      m2(k) = k == 1 || k == n + 1 ? 4 : 3;
+    occ::handle<Geom_BSplineCurve> out = new Geom_BSplineCurve(all, knots, m2, 3);
+    double worst = 0;
+    for (int k = 0; k < n && worst <= tol; ++k)
+      for (const double f : {0.25, 0.5, 0.75})
+      {
+        const double w = (k + f) / n;
+        worst          = std::max(worst, out->Value(t0 + len * w).Distance(c->Value(phi(w))));
+      }
+    if (worst <= tol || n == 64)
+    {
+      // C1 at the joints: knots of multiplicity 2 where the spans' derivatives agree.
+      for (int k = 2; k <= n; ++k)
+        out->RemoveKnot(k, 2, tol);
+      return out;
+    }
+  }
+  return c;
+}
+
+// A chain's pieces (each over its share of the chain's length) C1 at their joints as live's loft guides are: runs of
+// lines on one straight line one piece; at each joint both pieces run at the geometric mean of their speeds there, the
+// chain's ends at their own, each piece's parameter eased between by a cubic map (live 2620 / 3027: c2-hunting-knife's
+// Loft 3 guide, a cubic, a line and an arc: 134.68 at the cubic's end where it runs at 152.13 and the line at 119.24;
+// live 2291: the line's 1.13 there). A piece whose map would turn back stays as it is.
+void ease_chain(std::vector<occ::handle<Geom_BSplineCurve>>& pieces, std::vector<bool>& lines, double tol)
+{
+  // Runs of lines on one straight line: one straight piece over their length.
+  for (size_t i = 0; i < pieces.size(); ++i)
   {
     if (!lines[i])
-    {
-      ++i;
       continue;
-    }
-    // The run: lines on one straight line.
     const gp_Dir dir(gp_Vec(pieces[i]->StartPoint(), pieces[i]->EndPoint()));
     size_t       j = i + 1;
     while (j < pieces.size() && lines[j] && gp_Dir(gp_Vec(pieces[j]->StartPoint(), pieces[j]->EndPoint())).Angle(dir) < 1e-9)
       ++j;
-    const gp_Pnt q0 = pieces[i]->StartPoint(), q1 = pieces[j - 1]->EndPoint();
-    const double len = q0.Distance(q1);
-    const double a   = i > 0 ? pieces[i - 1]->DN(pieces[i - 1]->LastParameter(), 1).Magnitude() : 1.0;
-    const double b   = j < pieces.size() ? pieces[j]->DN(pieces[j]->FirstParameter(), 1).Magnitude() : 1.0;
-    if (len > 0 && (std::abs(a - 1) > 1e-9 || std::abs(b - 1) > 1e-9) && a > 0 && b > 0 && a * a + b * b <= 9)
-    {
-      const gp_Vec               d(q0, q1);
-      NCollection_Array1<gp_Pnt> poles(1, 4);
-      poles(1) = q0;
-      poles(2) = q0.Translated(d * (a / 3));
-      poles(3) = q1.Translated(d * (-b / 3));
-      poles(4) = q1;
-      NCollection_Array1<double> knots(1, 2);
-      NCollection_Array1<int>    mults(1, 2);
-      knots(1) = 0;
-      knots(2) = len;
-      mults(1) = mults(2) = 4;
-      pieces[i] = new Geom_BSplineCurve(poles, knots, mults, 3);
-      pieces.erase(pieces.begin() + (long)i + 1, pieces.begin() + (long)j);
-      lines.erase(lines.begin() + (long)i + 1, lines.begin() + (long)j);
-      j = i + 1;
-    }
-    i = j;
+    if (j == i + 1)
+      continue;
+    const gp_Pnt               q0 = pieces[i]->StartPoint(), q1 = pieces[j - 1]->EndPoint();
+    NCollection_Array1<gp_Pnt> poles(1, 2);
+    NCollection_Array1<double> knots(1, 2);
+    NCollection_Array1<int>    mults(1, 2);
+    poles(1) = q0;
+    poles(2) = q1;
+    knots(1) = 0;
+    knots(2) = q0.Distance(q1);
+    mults(1) = mults(2) = 2;
+    pieces[i] = new Geom_BSplineCurve(poles, knots, mults, 1);
+    pieces.erase(pieces.begin() + (long)i + 1, pieces.begin() + (long)j);
+    lines.erase(lines.begin() + (long)i + 1, lines.begin() + (long)j);
+  }
+  const size_t        n = pieces.size();
+  std::vector<double> s0(n), s1(n);
+  for (size_t i = 0; i < n; ++i)
+  {
+    s0[i] = pieces[i]->DN(pieces[i]->FirstParameter(), 1).Magnitude();
+    s1[i] = pieces[i]->DN(pieces[i]->LastParameter(), 1).Magnitude();
+  }
+  for (size_t i = 0; i < n; ++i)
+  {
+    const double a = i > 0 && s1[i - 1] > 0 && s0[i] > 0 ? std::sqrt(s1[i - 1] * s0[i]) / s0[i] : 1.0;
+    const double b = i + 1 < n && s1[i] > 0 && s0[i + 1] > 0 ? std::sqrt(s1[i] * s0[i + 1]) / s1[i] : 1.0;
+    if ((std::abs(a - 1) <= 1e-9 && std::abs(b - 1) <= 1e-9) || a * a + b * b > 9)
+      continue;
+    pieces[i] = eased(pieces[i], a, b, tol);
   }
 }
 
@@ -997,7 +1055,7 @@ occ::handle<Geom_BSplineCurve> chain_bspline(const TopoDS_Shape& chain, const gp
     lines.push_back(c->IsKind(STANDARD_TYPE(Geom_Line)));
   }
   if (by_arc)
-    ease_lines(pieces, lines);
+    ease_chain(pieces, lines, tol);
   // Each piece keeps its share of the chain's length (OCCT's ratio would rescale the next piece to the speed at the
   // joint: c2-hunting-knife's guide, live 2291 has its line and arc at their length shares after the spline).
   GeomConvert_CompCurveToBSplineCurve join;
