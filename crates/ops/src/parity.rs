@@ -7263,17 +7263,27 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     None => res.untranslated.push(format!("mate connector {}: LOOP_CENTER: its loop on {face} not found (the face's centroid taken)", key.1)),
                 }
             }
-            if inference == "MID_POINT"
-                && let Ok(edge) = &found
-                && edge.starts_with("edge:")
-                && let Some(second) = q["second"].as_str().filter(|s| !s.is_empty())
-            {
-                let ids = t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [second] }));
-                trace(&format!("{name}: mate connector {}: MID_POINT's second {second} -> {ids:?}", key.1));
-                if let Some(face) = ids.ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("face:"))) {
-                    aligns.insert(key.clone(), face);
+            // An edge's midpoint picked on a face (live's query: the face, its second id the edge; asm-infento-subs'
+            // Planar 10, SQCyD / SQC1J): the edge's midpoint, Z along the face's normal.
+            let found = match (inference.as_str(), q["second"].as_str().filter(|s| !s.is_empty())) {
+                ("MID_POINT", Some(second)) => {
+                    let face = t.resolve(q).ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("face:")));
+                    // The edge of the face's part whose midpoint is at live's point; else the second id's (named at
+                    // the feature live read it after, not always ours at the end: Fastened 18's read another edge).
+                    let part = face.as_deref().and_then(|f| t.part_of_entity(f));
+                    let at_live = connector_origins.get(key).zip(part).and_then(|(o, part)| t.connector_candidates("MID_POINT", *o).ok()?.into_iter().find(|(_, p)| *p == part).map(|(id, _)| id));
+                    let edge = at_live.or_else(|| t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [second] })).ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("edge:"))));
+                    trace(&format!("{name}: mate connector {}: MID_POINT on face {face:?}, its second {second} edge {edge:?}", key.1));
+                    match (edge, face) {
+                        (Some(edge), Some(face)) => {
+                            aligns.insert(key.clone(), face);
+                            Ok(edge)
+                        }
+                        _ => found,
+                    }
                 }
-            }
+                _ => found,
+            };
             match found {
                 Ok(e) => {
                     entities.insert(key.clone(), e);
