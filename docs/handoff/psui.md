@@ -182,6 +182,14 @@ assemblies)" lower case (asm). Open: Fill's edge rows (live reads a Continuity s
 live2), an Enter on an unchanged retyped value is an undo step in live (one take: external-thread-new-edit-reedit),
 gusset-new-edit-reedit picks Part 2's copy of the corner edge (frame part order, core's), the see-through outline
 (studios' `Instance::outline_through`, then the Part Studio's selected bodies; hover needs the hover-mask path).
+**11-14 07:34:** batches 10 / 14: 6 / 14 at first. Done since: Fill's and Fillet's picked arrays as expandable entry
+rows (open at first, a title click folds; live2 fill-rows.png), Mate connector's Realign hands the keyboard to Primary
+axis entity, a click on the selected tab changes nothing (✓ stays off: wrap-surface-split-tabs), Enter on a retyped
+unchanged value is a dialog undo step. Open, not mine or waiting: Jog's Thickness bound with an Inside anchor shows
+70.529 deg in live (the server's angle; ours keeps 90: core's sheet metal), Edit curve's Approximate gives 4 control
+points in live, 202 in ours (the model's approximation), frame-corner-coped-limit's "Sketch 1" chip (the start's
+"Sketch 1 edges" is a whole-sketch pick live remembers, ours keeps edges), Where used… (Pro part menu: a local
+search of the documents using a part; capture asked of live2, then build it with its op).
 Flaky on vibe6 under load (green too, not from these changes): a first graphics pick into a dialog sometimes records
 the active selection field still focused (shell-*, boolean-new-edit-reedit, move-face-translate, mirror-face-type,
 linear-pattern-centered-skip, loft-*) or the title red one step early (move-face-new-edit-reedit); alone they pass. The

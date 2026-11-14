@@ -248,6 +248,9 @@ pub struct FeatureDialog {
     completion: Option<crate::var_complete::VarCompletion>,
     /// The dialog takes the keyboard at its next render (see `set_value`).
     focus_dialog_pending: bool,
+    /// Enter applied typed text: a dialog undo step even when the value is unchanged (live external-thread-new-edit-
+    /// reedit, move-face-tool: "5" over "5 mm" turns Undo on).
+    pub applied_typed: bool,
     /// The empty selection field the last edit brought up and activated: (it, the field active before, the control
     /// edited, whether the keyboard was outside). The editing logic filling it in undoes that (`set_value_logic`).
     auto_activated: Option<(String, Option<String>, String, bool)>,
@@ -448,6 +451,7 @@ impl FeatureDialog {
             quiet_text: None,
             edit_focus: None,
             focus_dialog_pending: false,
+            applied_typed: false,
             auto_activated: None,
             focus_select_pending: None,
             focus_active_pending: false,
@@ -609,7 +613,11 @@ impl FeatureDialog {
         // A FOCUS_ON_VISIBLE query takes it whatever brought it up (live loft-guides-checkbox: Path's query; Guides'
         // array leaves it on the checkbox).
         let eager = self.active_query.as_deref().and_then(|q| self.spec_for_path(q)).is_some_and(|s| s.hints.has(Hints::FOCUS_ON_VISIBLE) && matches!(s.kind, ParamKind::Query { .. }));
+        // Per control (live 1983: nothing visible decides it): Mate connector's Realign hands the keyboard to Primary
+        // axis entity (live mate-connector-realign-move).
+        let follows = matches!((self.feature.type_id.as_str(), path), ("mateConnector", "realign"));
         let takes = eager
+            || follows
             || match kind {
                 Some((true, true)) => true,
                 Some((true, false)) => !before_gone || picks_geometry,
@@ -1582,6 +1590,7 @@ impl FeatureDialog {
                 // text stays selected); the next Enter commits the feature.
                 // Shift+Enter with typed text only applies it too (live ui-parity shortcut-plane-shift-enter).
                 if this.apply_on_enter(&path_s, state, window, cx) {
+                    this.applied_typed = true;
                     this.flush_typed(cx);
                 } else if *shift {
                     cx.emit(DialogEvent::Accept { repeat: true });
@@ -2929,6 +2938,12 @@ impl FeatureDialog {
                                     window.focus(&this.focus, cx);
                                     this.keyboard_left = true;
                                 }
+                                // The tab already selected changes nothing: the dialog stays clean, ✓ off (live
+                                // wrap-surface-split-tabs).
+                                if matches!(this.get_value(&path_s), Some(ParamValue::Enum(cur)) if *cur == id_s) {
+                                    cx.notify();
+                                    return;
+                                }
                                 this.set_value(&path_s, ParamValue::Enum(id_s.clone()), cx)
                             }))
                     }));
@@ -3448,7 +3463,6 @@ impl FeatureDialog {
                         .bg(if active { pal.query_active } else if error { gpui_kit::rgb(0xf9ebec) } else { pal.panel })
                         .cursor_pointer()
                         .child(div().px(px(6.)).when(items == 0, |d| d.pt(px(6.)).pb(px(5.)).text_size(px(12.)).line_height(px(13.33))).when(items > 0, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.))).text_color(pal.text_muted).child(crate::ui::spec_text(s.label)));
-                    let mut details: Vec<AnyElement> = Vec::new();
                     // Arrays may be reordered (live: unless PREVENT_ARRAY_REORDER)
                     // once they have 2+ items: the reorder button and mode.
                     let can_reorder = items >= 2 && !s.hints.has(Hints::PREVENT_ARRAY_REORDER);
@@ -3462,6 +3476,9 @@ impl FeatureDialog {
                     // field under its row (its query field then the active one);
                     // a 1 px rgba(0,0,0,0.2) divider between entries.
                     let collapse = s.hints.has(Hints::COLLAPSE_ARRAY_ITEMS);
+                    // Without COLLAPSE_ARRAY_ITEMS each entry is an expandable row with its fields inside, open at first;
+                    // a click on its title or chevron folds it (live2 11-14, Fill's Edges: feel/fill-rows.png).
+                    let rows = !collapse && !focus_only;
                     for k in 0..items {
                         let r = q.and_then(|q| values.array(arr_id).get(k).and_then(|it| it.query(q.id).first().cloned()));
                         let label = match (s.item_template, values.array(arr_id).get(k)) {
@@ -3469,8 +3486,9 @@ impl FeatureDialog {
                             _ => r.as_ref().map(|r| (self.labeler)(r)).unwrap_or_default(),
                         };
                         let item_key = format!("{arr_id}.{k}");
-                        let open = collapse && self.open_items.contains(&item_key);
-                        let expander = collapse.then(|| {
+                        let open = if rows { !self.closed_items.contains(&item_key) } else { collapse && self.open_items.contains(&item_key) };
+                        let toggle_key = item_key.clone();
+                        let expander = (collapse || rows).then(|| {
                             let q_id = q.map(|q| q.id);
                             div()
                                 .id(SharedString::from(format!("dqe-{path}-{k}")))
@@ -3483,7 +3501,11 @@ impl FeatureDialog {
                                 .child(crate::ui::glyph(if open { "expander-down" } else { "expander-right" }, 14., gpui_kit::rgb(0x555555)))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
-                                    if !this.open_items.remove(&item_key) {
+                                    if rows {
+                                        if !this.closed_items.remove(&item_key) {
+                                            this.closed_items.insert(item_key.clone());
+                                        }
+                                    } else if !this.open_items.remove(&item_key) {
                                         this.open_items.insert(item_key.clone());
                                         if let Some(q) = q_id {
                                             this.active_query = Some(item_path(arr_id, k, q));
@@ -3507,7 +3529,22 @@ impl FeatureDialog {
                             .text_size(px(13.33))
                             .text_color(if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
                             .children(expander)
-                            .child(div().flex_1().truncate().child(label.clone()))
+                            .child(
+                                div()
+                                    .id(SharedString::from(format!("dqt-{path}-{k}")))
+                                    .flex_1()
+                                    .truncate()
+                                    .child(label.clone())
+                                    .when(rows, |d| {
+                                        d.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                            cx.stop_propagation();
+                                            if !this.closed_items.remove(&toggle_key) {
+                                                this.closed_items.insert(toggle_key.clone());
+                                            }
+                                            cx.notify();
+                                        }))
+                                    }),
+                            )
                             .when(reorder_on, |d| d.child(self.reorder_grip(arr_id, k, &label, true)))
                             .when(!reorder_on, |d| {
                                 d.child(
@@ -3540,24 +3577,11 @@ impl FeatureDialog {
                         if focus_only {
                             continue;
                         }
-                        if collapse {
-                            if open {
-                                let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
-                                // Clicks inside stay with the entry's own fields.
-                                field = field.child(v_flex().id(SharedString::from(format!("dqo-{path}-{k}"))).pl(px(20.)).pr(px(4.)).pb(px(4.)).children(inner).on_click(|_, _, cx| cx.stop_propagation()));
-                            }
-                            continue;
+                        if open {
+                            let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
+                            // Clicks inside stay with the entry's own fields.
+                            field = field.child(v_flex().id(SharedString::from(format!("dqo-{path}-{k}"))).pl(px(20.)).pr(px(4.)).pb(px(4.)).children(inner).on_click(|_, _, cx| cx.stop_propagation()));
                         }
-                        let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
-                        details.push(
-                            v_flex()
-                                .relative()
-                                .pl(px(24.))
-                                .child(div().absolute().left(px(15.)).top_0().bottom_0().w(px(1.)).bg(pal.border))
-                                .child(div().h(px(24.)).flex().items_center().text_size(px(13.33)).text_color(pal.text_muted).truncate().child(label))
-                                .children(inner)
-                                .into_any_element(),
-                        );
                     }
                     let path_s = path.to_string();
                     // Live (os-param-array-clear-button): "CLEAR", 10.5 px
@@ -3614,7 +3638,7 @@ impl FeatureDialog {
                                 cx.notify();
                             }))
                     });
-                    return Some(v_flex().w_full().child(h_flex().w_full().items_start().gap(px(2.)).px(px(1.)).pt(px(5.)).child(field).children(cs)).children(details).into_any_element());
+                    return Some(v_flex().w_full().child(h_flex().w_full().items_start().gap(px(2.)).px(px(1.)).pt(px(5.)).child(field).children(cs)).into_any_element());
                 }
                 // Live (dialogs/fillet-12): a bordered box captioned with the
                 // array's name, its items, and a full-width "Add <item>" button.
@@ -4178,6 +4202,10 @@ fn param_icon(feature: &str, param: &str) -> Option<&'static str> {
         ("hole", "tappedDepthV3") => Some("hole-tapped-depth"),
         // Live (part-studio/102, dom/dialog-copy-here.txt): Translate by
         // XYZ rows start with an axis icon instead of a label.
+        // Live (mate-connector-realign-move): Move's translations sit beside the axis arrows, unlabelled.
+        ("mateConnector", "translationX") => Some("xyz-along-x"),
+        ("mateConnector", "translationY") => Some("xyz-along-y"),
+        ("mateConnector", "translationZ") => Some("xyz-along-z"),
         ("transform", "dx") => Some("xyz-along-x"),
         ("transform", "dy") => Some("xyz-along-y"),
         ("transform", "dz") => Some("xyz-along-z"),

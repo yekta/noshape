@@ -256,6 +256,21 @@ impl FeatureDialog {
                         fields.extend(inner);
                         continue;
                     }
+                    // Expandable entry rows (a driven array without COLLAPSE_ARRAY_ITEMS): live's recorder reads each open
+                    // entry's fields, the first under the array's label (live fill-new-edit-reedit: "Edges" Position,
+                    // then "Continuity" Position).
+                    let rows = s.hints.has(Hints::DRIVEN_QUERY) && !s.hints.has(Hints::COLLAPSE_ARRAY_ITEMS) && !s.hints.has(Hints::ALLOW_ARRAY_FOCUS);
+                    let n = values.array(s.id).len();
+                    if rows && n > 0 {
+                        // The array itself reads as an enum with its first entry's value (live: one edge gives "Edges"
+                        // Position, then "Continuity" Position; two edges add another "Continuity").
+                        let entries: Vec<Value> = (0..n).filter(|k| !self.closed_items.contains(&format!("{}.{k}", s.id))).flat_map(|k| self.item_fields(s.id, k, specs)).collect();
+                        if let Some(first) = entries.iter().find(|f| f["kind"] == "enum") {
+                            fields.push(json!({ "label": label, "kind": "enum", "text": first["text"].clone(), "state": "ok" }));
+                        }
+                        fields.extend(entries);
+                        continue;
+                    }
                     let q = specs.iter().find(|p| matches!(p.kind, ParamKind::Query { .. }));
                     let picked = s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS);
                     let mut text = vec![crate::i18n::spec(s.label).to_string()];

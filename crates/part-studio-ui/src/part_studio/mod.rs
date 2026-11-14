@@ -289,6 +289,18 @@ impl DraftHistory {
         }
     }
 
+    /// A step of its own for `current` though nothing changed (Enter applying a retyped value).
+    pub fn step_unchanged(&mut self, current: &Feature) {
+        if *current != self.last {
+            return;
+        }
+        self.undo.push(current.clone());
+        if self.undo.len() > Self::LIMIT {
+            self.undo.remove(0);
+        }
+        self.redo.clear();
+    }
+
     /// Record `current` if it differs from the last checkpoint.
     pub fn checkpoint(&mut self, current: &Feature) -> bool {
         if *current == self.last {
@@ -2707,7 +2719,16 @@ impl PartStudioView {
                 }
                 // What the editing logic changes at once belongs to the same step.
                 this.auto_operation(window, cx);
+                let retyped = this.edit.as_ref().is_some_and(|e| e.dialog.update(cx, |d, _| std::mem::take(&mut d.applied_typed)));
+                let stepped = this.edit.as_ref().map(|e| e.history.undo.len());
                 this.draft_checkpoint(cx);
+                if retyped
+                    && let Some(e) = &mut this.edit
+                    && stepped == Some(e.history.undo.len())
+                {
+                    let f = e.dialog.read(cx).feature.clone();
+                    e.history.step_unchanged(&f);
+                }
                 this.schedule_regen(window, cx);
                 this.refresh_scene(false, cx);
             }
