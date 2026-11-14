@@ -4392,14 +4392,15 @@ TopoDS_Shape without_slivers(const TopoDS_Shape& s, double width, HHist& h)
 // Runs `build` (see BlendBuild) with the fallbacks of checked blends; returns
 // the result and its history relative to `input`.
 std::pair<TopoDS_Shape, HHist> checked_blend(const TopoDS_Shape& input, const BlendBuild& build,
-                                             bool checked, double size, const char* what)
+                                             bool checked, double size, const char* what, bool failed_already = false)
 {
   TopoDS_Shape r;
   HHist        h;
   bool         ok = false;
   try
   {
-    ok = build(1.0, r, h);
+    // (Already built as it is and failed, at this very scale: OCCT would fail the same, the retries next.)
+    ok = !failed_already && build(1.0, r, h);
   }
   catch (const Standard_Failure&)
   {
@@ -6088,6 +6089,7 @@ static void finish_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHist
 OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const char* what,
                    const MakeBuild& make)
 {
+  bool as_is_failed = false;
   if (checked)
   {
     const Scaled as_is(input, 1.0);
@@ -6102,6 +6104,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
     catch (const Standard_Failure&)
     {
     }
+    as_is_failed = !ok;
     bool valid = false;
     {
       const KernelTimer timer("blend.as_is_check");
@@ -6139,7 +6142,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
   }
   const KernelTimer timer("blend.scaled");
   const Scaled sc(input, checked ? working_scale() : 1.0);
-  auto [r, h] = checked_blend(sc.shape, make(sc), checked, size * sc.factor, what);
+  auto [r, h] = checked_blend(sc.shape, make(sc), checked, size * sc.factor, what, checked && sc.factor == 1.0 && as_is_failed);
   if (checked)
   {
     finish_blend_faces(sc.shape, r, h);
