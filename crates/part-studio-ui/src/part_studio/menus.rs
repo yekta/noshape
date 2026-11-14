@@ -575,6 +575,9 @@ impl PartStudioView {
                             }
                             this.open_export_dialog(vec![b8.clone()], w, cx)
                         })));
+                        // Live (Professional, live2's export-* takes): "Where used for Part 1…" after Export….
+                        let b9 = b.clone();
+                        m = m.item(item(&format!("Where used for {body_name}…"), Box::new(move |this, _, cx| this.open_where_used(b9.clone(), cx))));
                     }
                     m = m.separator();
                     if has_selection {

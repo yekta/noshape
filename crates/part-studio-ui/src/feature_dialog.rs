@@ -4189,7 +4189,8 @@ fn param_icon(feature: &str, param: &str) -> Option<&'static str> {
     match (feature, param) {
         ("hole", "holeDiameterV3") => Some("hole-diameter"),
         ("hole", "holeDepthV3" | "holeDepthComputedV3") => Some("hole-depth"),
-        ("hole", "tipAngleStyle" | "tipAngleV3") => Some("hole-drill-angle"),
+        // (A Custom tip angle's value sits under the select with its own "Tip angle" label: live hole-tip-angle-custom.)
+        ("hole", "tipAngleStyle") => Some("hole-drill-angle"),
         // Counterbore, countersink and tap rows too (qa5 ADV4: text labels
         // truncated the values); our own drawings of Onshape's ideas.
         ("hole", "cBoreDiameterV3") => Some("hole-cbore-diameter"),

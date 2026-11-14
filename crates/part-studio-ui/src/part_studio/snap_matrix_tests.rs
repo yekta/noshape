@@ -163,8 +163,9 @@ fn rows() -> Vec<Row> {
         // its level the corner stays where it is), its midpoints and curves kept.
         Row { on_target: true, ..row("tool/rectangle-corner/no-level", Tool::CornerRect, &[], Some(C(-150., -20.)), (C(0., -17.), (0., 0.)), (0., None), &[]) },
         Row { on_target: true, ..row("tool/rectangle-corner/midpoint", Tool::CornerRect, VERTICAL_LINE, Some(C(-150., -100.)), (C(0., 0.), (1., 0.)), (3., None), &["MIDPOINT"]) },
-        // A 3 point arc's third point: coincident points only (and its own chord's midpoint): not onto a line.
-        Row { clicks: &[C(-60., -100.)], not: &["COINCIDENT", "MIDPOINT"], ..row("tool/arc-third/no-curve", Tool::Arc3, VERTICAL_LINE, Some(C(-60., 60.)), (C(0., 30.), (1., 0.)), (3., None), &[]) },
+        // A 3 point arc's third point: coincident points only (and its own chord's midpoint): not onto a line. (Away
+        // from the semicircle over the chord, whose own snap gives MIDPOINT: live2 arcmid.)
+        Row { clicks: &[C(-60., -100.)], not: &["COINCIDENT", "MIDPOINT"], ..row("tool/arc-third/no-curve", Tool::Arc3, VERTICAL_LINE, Some(C(-60., 60.)), (C(0., 50.), (1., 0.)), (3., None), &[]) },
         Row { clicks: &[C(-60., -100.)], ..row("tool/arc-third/point", Tool::Arc3, POINT_P, Some(C(-150., 60.)), (C(-60., 70.), (1., 0.)), (3., None), &["COINCIDENT"]) },
         // Drags (live2 "feel (sketch)" (2), the catalogue's "dragExistingPoint"): a free line end dragged onto a point
         // (7–9 px), a midpoint (6, not 8), a circle's rim (≤ 6); no horizontal / vertical while dragging.

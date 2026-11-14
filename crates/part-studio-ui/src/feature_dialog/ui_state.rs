@@ -214,7 +214,10 @@ impl FeatureDialog {
                 }
                 ParamKind::Text { .. } => {
                     let (focused, text) = self.input_of(s.id, window, cx).map(|(f, t, _)| (f, t)).unwrap_or_else(|| (false, values.text(s.id).to_string()));
-                    fields.push(json!({ "label": label, "kind": "text", "text": text, "focused": focused, "state": "ok" }));
+                    // A Variable's Any value is Onshape's expression field, the number fields' own (live
+                    // variable-type-number-any: "number").
+                    let kind = if self.ty.id == "assignVariable" && s.id == "anyValue" { "number" } else { "text" };
+                    fields.push(json!({ "label": label, "kind": kind, "text": text, "focused": focused, "state": "ok" }));
                 }
                 ParamKind::Query { .. } => {
                     let refs = values.query(s.id).to_vec();

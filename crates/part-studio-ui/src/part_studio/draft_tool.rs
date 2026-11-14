@@ -274,12 +274,12 @@ impl PartStudioView {
                 )
                 .child(h_flex().h(px(26.)).gap_2().text_size(px(12.)).child(div().text_color(pal.text_muted).child("Minimum draft angle")).child(div().flex_1().child(d.angle_input.clone())))
                 .child(field(1, "Entities to check", d.parts.clone(), cx))
-                .child(Checkbox::new("dr-undercut").label("Show undercut regions").checked(d.undercut).on_click(cx.listener(|this, v: &bool, _, cx| {
+                .child(super::analysis_tools::marked_check("Show undercut regions", Checkbox::new("dr-undercut").label("Show undercut regions").checked(d.undercut).on_click(cx.listener(|this, v: &bool, _, cx| {
                     if let Some(d) = &mut this.ui.draft {
                         d.undercut = *v;
                     }
                     this.sync_draft(cx);
-                })))
+                }))))
                 .into_any_element(),
         )
     }

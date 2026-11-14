@@ -792,7 +792,7 @@ def compare(live, ours, whole_document=True):
         a, b = export_fields_by_label(a), export_fields_by_label(b)
         bl = (b or {}).get("list")
         if isinstance(bl, dict) and isinstance(bl.get("rows"), list) and str(live.get("recorded", "")) < PRO_SINCE:
-            b = dict(b, list=dict(bl, rows=[r for r in bl["rows"] if r not in PRO_ROWS]))
+            b = dict(b, list=dict(bl, rows=[r for r in bl["rows"] if r not in PRO_ROWS and not str(r).startswith("Where used for ")]))
         bd = (b or {}).get("dialog")
         if isinstance(bd, dict) and str(live.get("recorded", "")) < panel_read_since(bd.get("title")) and (a or {}).get("dialog") is None:
             b = dict(b, dialog=None)

@@ -2931,6 +2931,22 @@ fn surface_deviation_measures_to_measure_against_the_source(cx: &mut TestAppCont
     assert_eq!((swapped(cx, false), swapped(cx, true).1), ((Some("-5 mm".to_string()), true), false), "signed, then absolute");
 }
 
+/// Live2 (11-14, feel/hidden-part-selection.png): a part selected whole has its outline drawn through the parts in
+/// front (the renderer's `outline_through` on its meshes); nothing selected, none.
+#[gpui::test]
+fn a_selected_part_outlines_through_parts_in_front(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "outline-through");
+    let through = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).viewport.read(cx).scene().instances.iter().any(|i| i.outline_through));
+    let before = through(cx);
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let body = v.display.bodies[0].id.clone();
+        v.selection = vec![Reference::Body(body)];
+        v.refresh_scene(false, cx);
+    }));
+    draw(cx, window);
+    assert_eq!((before, through(cx)), (false, true), "outline through: nothing selected, the part selected");
+}
+
 /// Live 1990 (3.18): a double-click on a shown sketch's line in the graphics doesn't open the sketch; the first click
 /// selects the line, the second deselects it.
 #[gpui::test]

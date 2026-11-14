@@ -110,6 +110,7 @@ pub fn render<V: 'static>(props: Props, key: &'static str, view: &Entity<V>, on:
             // #d7d7d7 on the other, over the label's box (both labels on one baseline).
             .child(div().absolute().left_0().right_0().bottom_0().h(px(if on_tab { 2. } else { 1. })).bg(if on_tab { pal.accent } else { gpui_kit::rgb(0xd7d7d7) }))
             .on_click(act(Action::Include(include)))
+            .map(|d| crate::ui_script::mark(d, move || format!("tab:{label}")))
     };
     let chip = |id: SharedString, label: String, bold: bool, remove: Action| {
         h_flex()

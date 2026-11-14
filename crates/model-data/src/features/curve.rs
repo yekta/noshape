@@ -413,7 +413,8 @@ pub fn routing_curve() -> FeatureType {
                 // A polyline's: the dialog's items see the feature's values (live 1722: not on a spline's points).
                 ParamSpec::bool("overrideBendRadius", "Override bend radius", false).visible(|v| !v.is("curveType", "INTERPOLATED_SPLINE")),
                 ParamSpec::num("pointBendRadius", "Bend radius", NONNEGATIVE_ZERO_DEFAULT).visible(|v| !v.is("curveType", "INTERPOLATED_SPLINE") && v.bool("overrideBendRadius")),
-                ParamSpec::bool("hasDerivative", "Derivative", false),
+                // std (routingCurve.fs): the spline branch's, not a polyline's (live routing-curve-polyline-segments).
+                ParamSpec::bool("hasDerivative", "Derivative", false).visible(|v| v.is("curveType", "INTERPOLATED_SPLINE")),
                 ParamSpec::enum_(
                     "derivativeAlignment",
                     "Derivative alignment",

@@ -1550,6 +1550,24 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     for id in silhouette {
         scene.add_flag(id, state::OUTLINE);
     }
+    // A part selected whole: a light-orange silhouette round it, drawn through the parts in front too, never over
+    // its own image (live2 11-14, feel/hidden-part-selection.png; the renderer's `outline_through`), as an assembly's
+    // selected instance. Its edges keep their selection colour (the boundary pass above).
+    let whole = state::SELECTED | state::BODY;
+    let part_faces: Vec<u32> = (1..scene.states.len() as u32).filter(|&id| scene.states[id as usize] & whole == whole && built.picks.get(id).is_some_and(|t| t.kind == PickKind::Face)).collect();
+    for &id in &part_faces {
+        scene.add_flag(id, state::OUTLINE);
+    }
+    let bases: std::collections::HashSet<u32> = part_faces
+        .iter()
+        .copied()
+        .filter_map(|id| built.picks.face_at(id).map(|(_, fi, _)| id - fi as u32 - 1))
+        .collect();
+    if !bases.is_empty() {
+        for inst in scene.instances[..built.static_instances].iter_mut().filter(|i| matches!(i.drawable, Drawable::Mesh(_)) && i.pickable && !i.pick_only && bases.contains(&i.pick_base)) {
+            inst.outline_through = true;
+        }
+    }
     // Selected faces drawn again at SELECTION_OVER_PLANES over the planes in
     // front of them (live selection/04: under one plane (229,170,56), two
     // (228,176,73); the plane alone over the face gives (224,174,73)). Only
