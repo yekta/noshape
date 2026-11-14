@@ -327,7 +327,7 @@ impl PartStudioView {
             Some((q, _, _)) if active => *q,
             _ => at - pl.normal * pl.normal.dot(at - on_plane),
         };
-        Some(super::manipulators::Arrow { base, dir: pl.normal, length: section_handle(lo, hi), param: SECTION_PARAM, flip: None, secondary: false })
+        Some(super::manipulators::Arrow { base, dir: pl.normal, length: section_handle(lo, hi), param: SECTION_PARAM, flip: None, secondary: false, scale: 1.0 })
     }
 
     /// A drag of the section arrow: its handle end is now at `length`

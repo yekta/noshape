@@ -2263,6 +2263,37 @@ fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
     assert_eq!(drawn, Some(vec![(true, 0.47), (false, 1.0)]), "the removed face's fill, then its outline");
 }
 
+/// Fillet's drag arrow as std edgeBlendCommon.fs addFilletControlManipulator: on a block's top edge (a 90° convex edge)
+/// its tip where the round crosses the faces' bisector (offset radius × (1/cos 45° − 1)), into the material; Width
+/// drives the width (offset × |n₀ − n₁| = √2 per width), a conic section its own radius; none for a variable radius.
+#[gpui::test]
+fn fillet_arrow_as_std(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "fillet-arrow");
+    let edge = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = &v.context.as_ref().expect("the part").bodies[0];
+        let top = b.shape.bounding_box(false).map(|bb| bb.max.z).unwrap_or(0.0);
+        let i = b.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| (i.start.z - top).abs() < 1e-7 && (i.end.z - top).abs() < 1e-7)).expect("a top edge");
+        Reference::Edge((*b.edges[i]).clone())
+    });
+    let arrow = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).param_arrow(cx).map(|a| (a.param, a.scale, a.dir, a.length)));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    let d = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    let set = |cx: &mut TestAppContext, k: &str, v: noshape_model::ParamValue| cx.update(|cx| d.update(cx, |d, cx| d.set_value(k, v, cx)));
+    set(cx, "entities", noshape_model::ParamValue::Query(vec![edge]));
+    let ratio = std::f64::consts::SQRT_2 - 1.0;
+    let a = arrow(cx).expect("the radius arrow");
+    assert!(a.0 == "radius" && (a.1 - ratio).abs() < 1e-9 && a.2.z < -0.5, "{a:?}");
+    set(cx, "crossSection", noshape_model::ParamValue::Enum("CONIC".into()));
+    assert!(arrow(cx).is_some_and(|a| a.0 == "nonCircularRadius" && (a.1 - ratio).abs() < 1e-9), "conic: {:?}", arrow(cx));
+    set(cx, "crossSection", noshape_model::ParamValue::Enum("CIRCULAR".into()));
+    set(cx, "blendControlType", noshape_model::ParamValue::Enum("WIDTH".into()));
+    assert!(arrow(cx).is_some_and(|a| a.0 == "width" && (a.1 - ratio / std::f64::consts::SQRT_2).abs() < 1e-9), "width: {:?}", arrow(cx));
+    set(cx, "blendControlType", noshape_model::ParamValue::Enum("RADIUS".into()));
+    set(cx, "isVariable", noshape_model::ParamValue::Bool(true));
+    assert!(arrow(cx).is_none(), "a variable radius: no arrow");
+}
+
 /// Projected curve's direction flip (audit-part-studio M11; projectCurves.fs addDropCurveManipulator): Curve to face
 /// with a Direction, the Top plane: a flip arrow at its origin along +Z, along −Z with Opposite direction; none for
 /// Normal to target.

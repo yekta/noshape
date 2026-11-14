@@ -24,6 +24,8 @@ pub(super) struct Arrow {
     pub flip: Option<&'static str>,
     /// std's SECONDARY style (a second end's depth): a double chevron.
     pub secondary: bool,
+    /// The arrow's length per unit of the parameter (a fillet's offset to its round: 1 / cos(φ/2) - 1).
+    pub scale: f64,
 }
 
 /// The arrow glyph (pixels at the arrow, drawn in 3D like live's): shaft
@@ -198,7 +200,7 @@ impl PartStudioView {
         // flipManipulator: at the profile, across the turn (the arc's start direction).
         let flip = |flip: &'static str, opposite: bool, secondary: bool| {
             let dir = arc.axis.cross(arc.radial).normalize_or_zero();
-            Handle::Arrow(Arrow { base: arc.point(0.0), dir: if opposite { -dir } else { dir }, length: 0.0, param: "", flip: Some(flip), secondary })
+            Handle::Arrow(Arrow { base: arc.point(0.0), dir: if opposite { -dir } else { dir }, length: 0.0, param: "", flip: Some(flip), secondary, scale: 1.0 })
         };
         let first = if p.is("endBound", "BLIND") { Handle::Arc(arc) } else { flip("oppositeDirection", false, false) };
         let second = if p.bool("symmetric") || !p.bool("hasStartBound") {
@@ -309,7 +311,7 @@ impl PartStudioView {
         }
         .try_normalize()?;
         let dir = if opposite { -dir } else { dir };
-        Manip::of([Handle::Arrow(Arrow { base: c, dir, length: value("distance", Dim::LENGTH)?, param: "distance", flip: Some("oppositeDirection"), secondary: false })])
+        Manip::of([Handle::Arrow(Arrow { base: c, dir, length: value("distance", Dim::LENGTH)?, param: "distance", flip: Some("oppositeDirection"), secondary: false, scale: 1.0 })])
     }
 
     /// World axis (point, unit direction) of a sketch line or straight/circular edge.
@@ -368,7 +370,7 @@ impl PartStudioView {
             dir = -dir;
         }
         let symmetric = d.feature.params.bool("symmetric");
-        Some(Arrow { base, dir, length: if symmetric { depth * 0.5 } else { depth }, param: if blind { "depth" } else { "" }, flip: Some("oppositeDirection"), secondary: false })
+        Some(Arrow { base, dir, length: if symmetric { depth * 0.5 } else { depth }, param: if blind { "depth" } else { "" }, flip: Some("oppositeDirection"), secondary: false, scale: 1.0 })
     }
 
     /// Extrude's second end (std addExtrudeManipulator, live psb 10-24 ex2):
@@ -385,11 +387,11 @@ impl PartStudioView {
         let dir = if p.bool("secondDirectionOppositeDirection") != p.bool("oppositeDirection") { -first.dir } else { first.dir };
         // Other end types: std's SECONDARY flip arrow at the profile.
         if !p.is("secondDirectionBound", "BLIND") {
-            return Some(Arrow { base: first.base, dir, length: 0.0, param: "", flip: Some("secondDirectionOppositeDirection"), secondary: true });
+            return Some(Arrow { base: first.base, dir, length: 0.0, param: "", flip: Some("secondDirectionOppositeDirection"), secondary: true, scale: 1.0 });
         }
         let units = self.doc.read(cx).session.doc.settings.units;
         let depth = p.expr("secondDirectionDepth").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value)))?;
-        Some(Arrow { base: first.base, dir, length: depth, param: "secondDirectionDepth", flip: Some("secondDirectionOppositeDirection"), secondary: true })
+        Some(Arrow { base: first.base, dir, length: depth, param: "secondDirectionDepth", flip: Some("secondDirectionOppositeDirection"), secondary: true, scale: 1.0 })
     }
 
     /// A blended Extrude preview's end cap (live 10-27, psui-prv-05a/b): the
@@ -455,7 +457,7 @@ impl PartStudioView {
                 // A plane, or a circular / elliptical edge (offset from its plane).
                 let f = p.query("entities").iter().find_map(|r| noshape_model::regen::features::cplane::circular_edge_frame(ctx, r).or_else(|| self.frame_of_ref(r)))?;
                 let dir = if p.bool("oppositeDirection") { -f.normal } else { f.normal };
-                Some(Arrow { base: f.origin, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false })
+                Some(Arrow { base: f.origin, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false, scale: 1.0 })
             }
             // moveFace.fs: Offset drives offsetDistance along the first
             // face's normal, Translate drives translationDistance along the
@@ -464,11 +466,11 @@ impl PartStudioView {
                 let (base, n) = p.query("moveFaces").iter().find_map(|r| self.face_anchor(ctx, r))?;
                 let sign = if p.bool("oppositeDirection") { -1.0 } else { 1.0 };
                 if p.is("moveFaceType", "OFFSET") {
-                    return Some(Arrow { base, dir: n * sign, length: value("offsetDistance")?, param: "offsetDistance", flip: Some("oppositeDirection"), secondary: false });
+                    return Some(Arrow { base, dir: n * sign, length: value("offsetDistance")?, param: "offsetDistance", flip: Some("oppositeDirection"), secondary: false, scale: 1.0 });
                 }
                 let r = p.query("direction").first()?;
                 let dir = self.axis_of(r).map(|(_, d)| d).or_else(|| self.frame_of_ref(r).map(|f| f.normal))?;
-                Some(Arrow { base, dir: dir * sign, length: value("translationDistance")?, param: "translationDistance", flip: Some("oppositeDirection"), secondary: false })
+                Some(Arrow { base, dir: dir * sign, length: value("translationDistance")?, param: "translationDistance", flip: Some("oppositeDirection"), secondary: false, scale: 1.0 })
             }
             // offsetSurface.fs: on the last face (a sketch region: its
             // plane), along its normal, the offset signed by the flip.
@@ -482,20 +484,20 @@ impl PartStudioView {
                     r => self.face_anchor(ctx, r),
                 })?;
                 let dir = if p.bool("oppositeDirection") { -n } else { n };
-                Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false })
+                Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false, scale: 1.0 })
             }
             // replaceFace.fs: on the face to replace with, along its normal
             // (Flip alignment turns it twice there: not at all).
             "replaceFace" => {
                 let (base, n) = p.query("templateFace").iter().find_map(|r| self.face_anchor(ctx, r).or_else(|| self.frame_of_ref(r).map(|f| (f.origin, f.normal))))?;
                 let dir = if p.bool("oppositeDirection") { -n } else { n };
-                Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false })
+                Some(Arrow { base, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection"), secondary: false, scale: 1.0 })
             }
             // extend.fs (Move boundary, Blind): on the last edge, out of its face.
             "extendSurface" if p.is("endCondition", "BLIND") => {
                 let (base, out) = p.query("entities").iter().rev().find_map(|r| noshape_model::select::edge_extend(ctx, r))?;
                 let dir = if p.bool("oppositeDirection") { -out } else { out };
-                Some(Arrow { base, dir, length: value("extendDistance")?, param: "extendDistance", flip: Some("oppositeDirection"), secondary: false })
+                Some(Arrow { base, dir, length: value("extendDistance")?, param: "extendDistance", flip: Some("oppositeDirection"), secondary: false, scale: 1.0 })
             }
             // projectCurves.fs addDropCurveManipulator (Curve to face,
             // Direction): a flip arrow at the direction's plane (or axis)
@@ -503,7 +505,7 @@ impl PartStudioView {
             "projectCurves" if !p.is("curveProjectionType", "TWO_SKETCHES") && p.is("projectionType", "DIRECTION") => {
                 let r = p.query("directionQuery").first()?;
                 let (base, n) = self.frame_of_ref(r).map(|f| (f.origin, f.normal)).or_else(|| self.axis_of(r))?;
-                Some(Arrow { base, dir: if p.bool("oppositeDirection") { -n } else { n }, length: 0.0, param: "", flip: Some("oppositeDirection"), secondary: false })
+                Some(Arrow { base, dir: if p.bool("oppositeDirection") { -n } else { n }, length: 0.0, param: "", flip: Some("oppositeDirection"), secondary: false, scale: 1.0 })
             }
             // frameTrim.fs addKeepSideManipulator (Face): a flip arrow on the
             // tool where it is nearest the parts to trim, along its normal
@@ -527,7 +529,7 @@ impl PartStudioView {
                     let face = tool.faces().into_iter().find(|f| noshape_kernel::make_vertex(d.point_a).ok().and_then(|v| noshape_kernel::distance(f, &v).ok()).is_some_and(|x| x.distance < 1e-7))?;
                     (d.point_a, face.normal_at_point(d.point_a).ok()?)
                 };
-                Some(Arrow { base, dir: if flipped { -n } else { n }, length: 0.0, param: "", flip: Some("flipTrim"), secondary: false })
+                Some(Arrow { base, dir: if flipped { -n } else { n }, length: 0.0, param: "", flip: Some("flipTrim"), secondary: false, scale: 1.0 })
             }
             // bodyDraft.fs createManipulators: a flip arrow along the pull
             // direction, at the first drafted entity's point nearest the
@@ -559,13 +561,13 @@ impl PartStudioView {
                         r => self.frame_of_ref(r)?.origin,
                     }
                 };
-                Some(Arrow { base, dir: if p.bool("flipPullDirection") { -dir } else { dir }, length: 0.0, param: "", flip: Some("flipPullDirection"), secondary: false })
+                Some(Arrow { base, dir: if p.bool("flipPullDirection") { -dir } else { dir }, length: 0.0, param: "", flip: Some("flipPullDirection"), secondary: false, scale: 1.0 })
             }
             // moveCurveBoundary.fs (Extend, Blind, with a help point): from
             // the first curve's end that grows, along its tangent.
             "trimCurve" => {
                 let (base, dir) = noshape_model::interaction::move_curve_boundary_anchor(ctx, p, &units)?;
-                Some(Arrow { base, dir, length: value("extensionDistance")?, param: "extensionDistance", flip: None, secondary: false })
+                Some(Arrow { base, dir, length: value("extensionDistance")?, param: "extensionDistance", flip: None, secondary: false, scale: 1.0 })
             }
             // splitpart.fs addKeepSideManipulator (Part, not Keep both
             // sides): a flip arrow on the tool where it is nearest the parts
@@ -577,12 +579,20 @@ impl PartStudioView {
                 let (lo, hi) = self.parts_box("targets", cx)?;
                 let c = (lo + hi) * 0.5;
                 let base = c - n * n.dot(c - o);
-                Some(Arrow { base, dir: if p.bool("keepFront") { n } else { -n }, length: 0.0, param: "", flip: Some("keepFront"), secondary: false })
+                Some(Arrow { base, dir: if p.bool("keepFront") { n } else { -n }, length: 0.0, param: "", flip: Some("keepFront"), secondary: false, scale: 1.0 })
             }
-            "fillet" => {
-                // Live (behaviours "Fillet", qa5 P1-3): on the last picked edge.
-                let (base, dir) = p.query("entities").iter().rev().find_map(|r| noshape_model::select::edge_inward(ctx, r))?;
-                Some(Arrow { base, dir, length: value("radius")?, param: "radius", flip: None, secondary: false })
+            // std edgeBlendCommon.fs addFilletControlManipulator: on the last picked edge (live behaviours "Fillet",
+            // qa5 P1-3), its tip where the round crosses the faces' bisector, driving the radius (a conic or curvature
+            // section's own) or the width; none for a variable radius.
+            "fillet" if !(p.is("blendControlType", "RADIUS") && p.bool("isVariable")) => {
+                let (base, dir, ratio, chord) = p.query("entities").iter().rev().find_map(|r| noshape_model::select::fillet_handle(ctx, r))?;
+                let circular = !p.is("crossSection", "CONIC") && !p.is("crossSection", "CURVATURE");
+                let (param, scale) = match () {
+                    _ if p.is("blendControlType", "WIDTH") => ("width", ratio / chord.max(1e-12)),
+                    _ if circular => ("radius", ratio),
+                    _ => ("nonCircularRadius", ratio),
+                };
+                Some(Arrow { base, dir, length: value(param)? * scale, param, flip: None, secondary: false, scale })
             }
             _ => None,
         }
@@ -757,6 +767,8 @@ impl PartStudioView {
                 let vp = self.viewport.read(cx);
                 let view = noshape_render::camera_geometry::View { camera: vp.camera, size: vp.size() };
                 let m_per_px = view.world_per_px(a.base + a.dir * len).unwrap_or(0.00025);
+                // (The parameter the length stands for: a fillet's radius is its offset over 1 / cos(φ/2) - 1.)
+                let (len, m_per_px) = (len / a.scale, m_per_px / a.scale);
                 let len = if window.modifiers().shift {
                     len.abs()
                 } else {
@@ -1114,10 +1126,10 @@ impl PartStudioView {
 fn std_handle(m: &noshape_model::display::FeatureManipulator, i: usize) -> Option<Handle> {
     use noshape_model::display::FeatureManipulator as M;
     Some(match m {
-        M::Linear { base, direction, offset, secondary, .. } => Handle::StdArrow(Arrow { base: *base, dir: *direction, length: *offset, param: "", flip: None, secondary: *secondary }, i),
+        M::Linear { base, direction, offset, secondary, .. } => Handle::StdArrow(Arrow { base: *base, dir: *direction, length: *offset, param: "", flip: None, secondary: *secondary, scale: 1.0 }, i),
         M::Flip { base, direction, flipped, other_direction, secondary } => {
             let dir = if *flipped { other_direction.unwrap_or(-*direction) } else { *direction };
-            Handle::StdArrow(Arrow { base: *base, dir, length: 0.0, param: "", flip: None, secondary: *secondary }, i)
+            Handle::StdArrow(Arrow { base: *base, dir, length: 0.0, param: "", flip: None, secondary: *secondary, scale: 1.0 }, i)
         }
         M::Angular { axis_origin, axis_direction, rotation_origin, angle, min, max, secondary, .. } => {
             let rel = *rotation_origin - *axis_origin;

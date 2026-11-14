@@ -4673,7 +4673,7 @@ P2
 - [ ] P2 FILLET-KEEPEDGES (blend) Edges to keep (keepEdges) never read.
 - [ ] P2 FILLET-SMOOTHCORNERS (blend, live) Smooth fillet corners + exceptions never read; find a case where it changes
   the geometry.
-- [ ] P2 FILLET-MANIP-PARAM (blend) the drag arrow always drives `radius` (Conic / Curvature / Width edit a hidden value)
+- [x] (blend 11-14: as std 3112 edgeBlendCommon.fs: radius, a conic or curvature section's own radius, or the width; none for a variable radius; the tip at offset × (1/cos(φ/2) − 1), into the material at a convex edge; GPUI test fillet_arrow_as_std) P2 FILLET-MANIP-PARAM (blend) the drag arrow always drives `radius` (Conic / Curvature / Width edit a hidden value)
   and shows with Variable on; std's offset r(1/cos(φ/2) - 1).
 - [ ] P2 FILLET-PARTIAL-DIR (blend, live) which end is position 0 off the axes (ours: lowest x, y, z); a second bound
   flipped on a closed chain.

@@ -490,6 +490,28 @@ pub fn with_pattern_instances(ctx: &Context, found: &[Reference]) -> Vec<Referen
 
 /// Midpoint of an edge and the direction into the material (minus the
 /// average of its two faces' normals), for fillet/chamfer drag handles.
+/// A fillet's drag handle on an edge (std edgeBlendCommon.fs addFilletControlManipulator): the edge's midpoint, the
+/// direction a positive offset runs (its faces' outward normals' sum, into the material at a convex edge), the offset
+/// per unit of radius where the round crosses that line (1 / cos(φ/2) - 1, φ between the normals) and |n₀ - n₁| (a
+/// width's chord per radius).
+pub fn fillet_handle(ctx: &Context, edge: &Reference) -> Option<(DVec3, DVec3, f64, f64)> {
+    let (b, kind, e) = body_of(ctx, edge)?;
+    if kind != ShapeType::Edge {
+        return None;
+    }
+    let m = edge_mid(b, e)?;
+    let &[fa, fb] = b.shape.edge_faces().ok()?.get(e)?.as_slice() else { return None };
+    let normal = |f: u32| b.shape.sub_shape(ShapeType::Face, f as usize).ok()?.normal_at_point(m).ok().map(|v| v.normalize_or_zero());
+    let (n0, n1) = (normal(fa)?, normal(fb)?);
+    let sum = (n0 + n1).normalize_or_zero();
+    if sum.length() < 0.5 {
+        return None;
+    }
+    let convex = edge_convexity(b, e, fa as usize, fb as usize) > 0;
+    let ratio = 1.0 / (0.5 * n0.dot(n1).clamp(-1.0, 1.0).acos()).cos() - 1.0;
+    Some((m, if convex { -sum } else { sum }, ratio, (n0 - n1).length()))
+}
+
 pub fn edge_inward(ctx: &Context, edge: &Reference) -> Option<(DVec3, DVec3)> {
     let (b, kind, e) = body_of(ctx, edge)?;
     if kind != ShapeType::Edge {
