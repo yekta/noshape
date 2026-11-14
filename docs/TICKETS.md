@@ -1594,6 +1594,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and current Vulkan drivers have the float format), but the fallback must draw.
 
 ## Core modelling (core)
+- [ ] P3 PS-INEXACT-INTERSECTION-EDGES (core / bool; dx 2026-11-14 21:01 UTC, lead's decision) **intersection edges up to
+  3e-5 m off their faces; make them exact.** Our models' edges where two faces meet are OCCT's approximated
+  intersection curves, off their faces by more than Parasolid's 1e-8 m. A Parasolid / STEP file writes them tolerant
+  (SP-curves) and every read fits them again, so reading our own file back moves the volume by 1-2e-6 (the exchange
+  suite now allows edge tolerance x area, docs/PARITY-SUITES.md §3). The four cases (exchange suite, vibe6
+  ~/tmp/dx/exch-ops-main2.log): cf-sheet-metal-model-plus's Part 3 (STEP 10148.3723, x_t 10148.3648 mm³ for the
+  model's 10148.3828; its x_t drifts every round, .3648 -> .3723 -> .3755: its extruded face and the side planes at
+  x -10 mm, 7 tolerant edges up to 3.3e-5 m, between B-surfaces and planes / cylinders), cf-wave-spring's Part 1 (x_t
+  916.6074 for 916.6061), cf-hose-routing's hoses (x_t 7088.0115 for 7088.0265; the four hose walls). The x_t writer's
+  `refit` (exact points through Newton on both faces) can't reach 1e-8 on them: the points are noisy at ~1e-8 at those
+  shallow plane / B-surface intersections (tried 11-14, dropped). Done when these parts' edges are within 1e-8 m of
+  their faces and the round trips are fixed points.
 - [ ] P3 SPLIT-EXACT-EXTRUSION-SECTION (core 2026-11-09 02:41) A Split (opSplitFace) by a plane perpendicular to an
   extruded spline face cuts it along the spline itself in Parasolid (live 2291: c2-hunting-knife's Split 2 edge at
   y = -0.25, a cubic of 4 poles, the sketch spline's own parameter); OCCT's section approximates it (degree 5, 6

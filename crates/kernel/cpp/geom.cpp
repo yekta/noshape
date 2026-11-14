@@ -1513,6 +1513,16 @@ PropsF props_volume(const OcShape& s)
   return to_props(s.volume_props([&] { return volume_props(s.shape); }));
 }
 
+// The largest tolerance of the shape's edges (metres): how far an edge's curve may lie off its faces.
+double max_edge_tolerance(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  double tol = 0.0;
+  for (TopExp_Explorer e(s.shape, TopAbs_EDGE); e.More(); e.Next())
+    tol = std::max(tol, BRep_Tool::Tolerance(TopoDS::Edge(e.Current())));
+  return tol;
+}
+
 PropsF props_volume_precise(const OcShape& s)
 {
   require_non_null(s.shape, "shape");

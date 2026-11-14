@@ -6142,6 +6142,31 @@ pub struct PartState {
     /// Ours: the area of the part's faces on other surfaces (blends' procedural surfaces, B-splines), m², whose area
     /// live measures up to 0.22 % low (docs/PARITY-SUITES.md, "Area of procedural blend faces").
     pub freeform_area: Option<f64>,
+    /// Ours: the largest edge tolerance (m) and the edges' total length (m) (`query_parts`).
+    pub edge_tolerance: Option<f64>,
+    pub edge_length: Option<f64>,
+}
+
+/// Our parts as an exchange round trip may give them back (docs/PARITY-SUITES.md §3, "Reading our own files back"):
+/// a volume within the largest edge tolerance `tol` times the area, an area within it times the edges' length.
+/// Edges as far off their faces as that are written tolerant and refitted on reading (OCCT's approximated
+/// intersections, up to 3e-5 m: 1-2e-6 of the volume), which no user sees.
+pub fn within_edge_tolerance(parts: &[PartState], tol: f64) -> Vec<PartState> {
+    parts
+        .iter()
+        .map(|p| {
+            let mut p = p.clone();
+            if let (Some(v), Some(a)) = (p.volume, p.area) {
+                let e = tol * a;
+                p.volume_band = Some(p.volume_band.map_or([v - e, v + e], |[lo, hi]| [lo.min(v - e), hi.max(v + e)]));
+            }
+            if let (Some(a), Some(l)) = (p.area, p.edge_length) {
+                let e = tol * l;
+                p.area_band = Some(p.area_band.map_or([a - e, a + e], |[lo, hi]| [lo.min(a - e), hi.max(a + e)]));
+            }
+            p
+        })
+        .collect()
 }
 
 /// How low live measures the area of procedural (OTHER) blend faces: c2-extension-spring's Curvature rounds read
@@ -6343,6 +6368,8 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             face_types: types(p, "faces", "surface"),
             edge_types: types(p, "edges", "curve"),
             freeform_area: None,
+            edge_tolerance: None,
+            edge_length: None,
         })
         .collect()
 }
@@ -6418,6 +6445,8 @@ pub fn parts_from_query(r: &Value) -> Vec<PartState> {
             face_types: None,
             edge_types: None,
             freeform_area: None,
+            edge_tolerance: p["edge_tolerance"].as_f64().map(|t| t * k),
+            edge_length: p["edge_length"].as_f64().map(|l| l * k),
         })
         .collect()
 }
@@ -6450,6 +6479,8 @@ pub fn parts_from_live_import(v: &Value, mesh: bool) -> Vec<PartState> {
             face_types: None,
             edge_types: None,
             freeform_area: None,
+            edge_tolerance: None,
+            edge_length: None,
         })
         .collect()
 }

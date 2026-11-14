@@ -92,7 +92,15 @@ Per document under `/root/parity/exchange/<doc>/` (a corpus document's name, nev
 NOSHAPE_PARITY_MODELS, NOSHAPE_PARITY_ONLY as the model suite): ours imports each live file and its parts are compared
 with live-self.json's (counts exact, volume and area within live's band or 1e-6; an STL's mesh by its parts, volume
 and area only); then ours is exported, and live-ours.json, once given, is compared with live-self.json the same way.
-Its last line is the score: `exchange score: ours imports live's files m/n; live imports ours m/n`.
+Its last line is the score: `exchange score: ours imports live's files m/n; live imports ours m/n; ours reads ours
+back m/n`.
+
+Reading our own files back (lead 11-14): the parts read back are compared with the model's, counts exact. A volume
+within the largest edge tolerance (of the model's parts or the file's) times the part's area, and an area within it
+times the edges' total length (`query_parts`' `edge_tolerance`, `edge_length`), is no difference. Our models carry
+intersection edges up to 3e-5 m off their faces (OCCT's approximations): a file writes them as tolerant edges that
+the reader fits again, which moves the volume by 1-2e-6, invisible to a user. Making those edges exact is a modelling
+ticket (TICKETS PS-INEXACT-INTERSECTION-EDGES), not the suite's.
 
 ## 4. Assembly suite: Onshape assemblies rebuilt in noshape (asm, lead 11-06)
 

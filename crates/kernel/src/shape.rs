@@ -361,6 +361,11 @@ impl Shape {
         ffi::has_triangulation(self.raw())
     }
 
+    /// The largest tolerance of its edges (metres): how far an edge's curve may lie off its faces.
+    pub fn max_edge_tolerance(&self) -> f64 {
+        ffi::max_edge_tolerance(self.raw()).unwrap_or(0.0)
+    }
+
     /// BRepCheck_Analyzer validity (mesh faces: a triangulation with triangles).
     pub fn is_valid(&self) -> bool {
         ffi::is_valid(self.raw()).unwrap_or(false)

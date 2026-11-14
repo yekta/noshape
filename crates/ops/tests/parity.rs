@@ -2,7 +2,7 @@
 //! rebuilt feature by feature and compared with live after each feature.
 
 use noshape_ops::Ctx;
-use noshape_ops::parity::{PartState, Translator, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, model_topology, refs_from_bodies, refs_from_sketches, standard_spec_by_part_name};
+use noshape_ops::parity::{PartState, Translator, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, model_topology, refs_from_bodies, refs_from_sketches, standard_spec_by_part_name, within_edge_tolerance};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -616,14 +616,16 @@ fn exchange_round_trip() {
                 let d = differences(&live, &mesh_counts(b.clone()));
                 println!("{name}: ours.stl as live will read it: {}", if d.is_empty() { "matches".into() } else { d.join("; ") });
             }
+            // (Within the edges' tolerance, either side's: `within_edge_tolerance`.)
+            let tol = |v: &[PartState]| v.iter().filter_map(|p| p.edge_tolerance).fold(0.0f64, f64::max);
             let diff = match back {
-                Ok(b) if format == "IGES" || format == "STEP" => differences(&mesh_counts(native.clone()), &mesh_counts(b)),
+                Ok(b) if format == "IGES" || format == "STEP" => differences(&mesh_counts(within_edge_tolerance(&native, tol(&native).max(tol(&b)))), &mesh_counts(b)),
                 Ok(b) if format == "STL" => {
                     let read_by_live = (!theirs[format].is_null()).then(|| parts_from_live_import(&theirs[format], true));
                     let (a, n) = (total(&b), read_by_live.as_deref().map_or_else(|| total(&native), total));
                     if (a - n).abs() <= 1e-2 * n.abs() { Vec::new() } else { vec![format!("mesh volume {:.3} mm³, expected {:.3}", a * 1e9, n * 1e9)] }
                 }
-                Ok(b) => differences(&native, &b),
+                Ok(b) => differences(&within_edge_tolerance(&native, tol(&native).max(tol(&b))), &b),
                 Err(e) => vec![e],
             };
             selfs_ok += usize::from(diff.is_empty());
@@ -752,6 +754,19 @@ fn an_import_splitting_fewer_edges_than_lives_own_is_lives_shortcoming() {
     assert!(splits_no_more(&held, &own, &[part(12, 13, 2)]), "between the model and live's own file");
     assert!(!splits_no_more(&held, &own, &[part(12, 17, 2)]), "more edges than live's own");
     assert!(!splits_no_more(&held, &own, &[part(11, 13, 2)]), "fewer faces than the model");
+}
+
+/// Reading our own file back (docs/PARITY-SUITES.md §3): a volume off by up to the largest edge tolerance times the
+/// area, an area by it times the edges' length, is no difference; more is.
+#[test]
+fn read_back_within_edge_tolerance() {
+    let native = vec![PartState { name: "Part 3".into(), faces: 70, edges: 160, vertices: 94, volume: Some(10148.3828e-9), area: Some(11638.911e-6), edge_tolerance: Some(3e-8), edge_length: Some(2.0), ..Default::default() }];
+    let back = |dv: f64, da: f64| vec![PartState { volume: Some(10148.3828e-9 + dv), area: Some(11638.911e-6 + da), ..native[0].clone() }];
+    let held = within_edge_tolerance(&native, 3e-8);
+    // Sheet metal's x_t read back: 0.018 mm³ and 0.015 mm² off (band 0.35 mm³, 0.06 mm²).
+    assert!(differences(&held, &back(-0.018e-9, -0.015e-6)).is_empty());
+    assert!(!differences(&native, &back(-0.018e-9, -0.015e-6)).is_empty(), "without the band: 1.8e-6 off");
+    assert!(!differences(&held, &back(-1.0e-9, 0.0)).is_empty(), "a cubic millimetre off is a difference");
 }
 
 #[test]

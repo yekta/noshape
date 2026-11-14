@@ -197,6 +197,12 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             if let Some(bb) = bbox {
                 v["bounding_box"] = json!({ "min": pt(bb.min, k), "max": pt(bb.max, k) });
             }
+            // How far its edges may lie off their faces, and their total length: what an exchange round trip may
+            // move its volume and area by (docs/PARITY-SUITES.md §3).
+            v["edge_tolerance"] = json!(b.shape.max_edge_tolerance() * k);
+            if let Ok(l) = noshape_kernel::linear_properties(&b.shape) {
+                v["edge_length"] = json!(r6(l.mass * k));
+            }
             if let Some(p) = ps.part_properties.get(&b.id) {
                 if let Some(m) = &p.material {
                     v["material"] = json!(m);
