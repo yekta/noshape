@@ -214,6 +214,23 @@ The suite's per-feature kernel profiles count its own measuring (props_surface v
 Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **11-14 11:10 UTC: landed 8bb1a09d (fan-blade bolt cut, impeller mirror fuse, arcs in the result check). Fresh
+  per-document recordings (vibe6 ~/agents/bool2-keep/bydoc2/rec, today's main): 875/945 ours, 22 OCCT.** Left:
+  - c2-gamma-imported / c2-wire-clip-imported f68f4393 (Boolean 1, 87 tools, 7.4-7.7 s) and 678f4bf2 (Boolean 2, 1.9
+    s), parked (patch with debug prints: /root/bool2-scratch/gamma-wip.patch). Peeled so far: (1) "cylinders nearly
+    coincident": coaxial 2.10 / 2.11 mm holes 10 um apart, the Boolean's tolerance 4.9 um from one vertex elsewhere,
+    the faces' own 1e-7: the grey band by the two faces' own tolerances (their edges' and vertices') lets them be
+    apart; (2) "two edges leave a vertex in one direction": a 1 mm hole's seam is a straight B-spline (imported),
+    the ruling test compared its middle's angle without the turn (a rounding put it 2 pi on): compare modulo a turn;
+    (3) 678f4bf2 then "a piece's point on another solid's face": cylinder pieces 1e-9-3e-7 off coaxial cylinders of
+    other bodies (near-coincident, under the 4e-7 tolerance) and one cylinder piece tangent to a plane at its point;
+    a retry at the piece's other points (state the same all over a piece) isn't enough. f68f4393 after (1)-(2):
+    "an arc across a cylinder's seam": a neighbour body's hole edge (r 1 mm, tilted 5 um over 2 mm, off centre) ends
+    10 um past the cylinder's seam. Needs: coincidence of cylinder pieces by the faces' own tolerances, and arcs
+    within the tolerance band of a seam split there.
+  - c2-impeller-loft 1d7fc3da (6.7 s) / 8d00ba15 (1.8 s): "a face's vertex off its plane", the upstream 1.14 mm vertex
+    (core).
+  - cf-setback-fillet 9d08366e (0.7 s, "a section touching a face's boundary"); small ones under 0.2 s.
 - **Sheet metal's result check and glued fuses (lead 11-14 ~03:00: the flat-face check, then skasm's walls-and-bends
   fuse), 11-14 05:2x UTC, gating a9a785004 on vibe6 (vibe5 out of memory: earlyoom killed two gate builds):**
   - 53cc4779d: our result's planar faces bounded by lines are checked by `planar_lines_valid` (wires closed, no two
