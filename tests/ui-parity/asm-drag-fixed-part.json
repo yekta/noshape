@@ -1,0 +1,27 @@
+{
+ "name": "asm-drag-fixed-part",
+ "about": "two-blocks: drag the fixed Part 1 by its top face: it doesn't move",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (mate dialog options and assembly interactions with no recorded scenario)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "face": [
+     20,
+     20,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   },
+   "to": {
+    "empty": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

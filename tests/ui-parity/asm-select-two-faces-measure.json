@@ -1,0 +1,31 @@
+{
+ "name": "asm-select-two-faces-measure",
+ "about": "two-blocks: click Part 1's top, then Part 2's top: two faces selected, the measure readout",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (mate dialog options and assembly interactions with no recorded scenario)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     20,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  }
+ ]
+}

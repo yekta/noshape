@@ -1,0 +1,27 @@
+{
+ "name": "asm-drag-free-part",
+ "about": "two-blocks: drag the free Part 2 by its top face to empty space (Part 1 is fixed)",
+ "area": "asm",
+ "source": "live coverage audit 2026-11-14 (mate dialog options and assembly interactions with no recorded scenario)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   },
+   "to": {
+    "empty": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
