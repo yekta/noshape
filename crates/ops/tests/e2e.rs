@@ -7238,6 +7238,9 @@ fn release_submit_approve_and_reject() {
     assert_eq!(list["candidates"][0]["state"], "Pending", "{list}");
     assert_eq!(list["candidates"][0]["approvers"][0], me.as_str(), "{list}");
     assert!(try_call(&mut ctx, "release_revision_history", json!({ "part_number": "PRT-0100" })).is_err(), "not released while pending");
+    // Another candidate of a part number pending in R1 is refused (live2 11_studios_abc).
+    let e = try_call(&mut ctx, "release_create", json!({ "notes": "e2e", "tab": "Part Studio 1", "name": "R1b", "part_numbers": { "Part 1": "PRT-0100" } })).unwrap_err();
+    assert!(e.message.contains("Part number(s): PRT-0100 included in another pending Release candidate."), "{e:?}");
     let a = call(&mut ctx, "release_approve", json!({ "name": "R1" }));
     assert_eq!(a["state"], "Released", "{a}");
     assert_eq!(a["approved_by"], me.as_str(), "Approved by …: {a}");

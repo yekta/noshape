@@ -21,13 +21,14 @@ const ROLLED_BACK: usize = 1;
 const ASSEMBLY_ERRORS: usize = 2;
 const PENDING_REFERENCES: usize = 3;
 const DRAWING_UPDATE: usize = 4;
-const PENDING_CANDIDATE: usize = 5;
 const OBSOLETE_REFERENCES: usize = 7;
 
 /// The conditions that hold for each item.
 pub fn condition_issues(session: &Session, items: &[ReleaseItem]) -> Vec<Vec<Issue>> {
     let on = crate::release_settings::release_settings().conditions;
-    let pending = if on[PENDING_CANDIDATE] { crate::release::release_log(session).pending_part_numbers("") } else { Vec::new() };
+    // A part number in another pending candidate is refused whatever the condition says (live2 11_studios_abc: a
+    // company with the default conditions refused it).
+    let pending = crate::release::release_log(session).pending_part_numbers("");
     let mut studio_errors: HashMap<(TabId, noshape_model::configuration::ConfigValues), bool> = HashMap::new();
     items
         .iter()

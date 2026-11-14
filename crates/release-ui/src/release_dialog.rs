@@ -2068,7 +2068,41 @@ impl Render for ReleaseDialog {
                     .child(main)
                     .children(row_issues.iter().filter(|x| **x != Issue::MissingPartNumber).map(|x| {
                         let colours = if matches!(x, Issue::RevisionTooLow { .. } | Issue::Notice(_)) { BAND_WARNING } else { BAND_DANGER };
-                        note(x.message().into(), colours)
+                        // Live2 11_studios_abc: "Part number(s): PRT-001 included in another pending Release candidate.
+                        // View release": the link opens that candidate's review.
+                        let pending = matches!(x, Issue::Prevented(t) if t.starts_with("Part number(s): ")).then(|| {
+                            release_log(self.doc.read(cx)).candidates.iter().rev().find(|c| c.state == Some(noshape_model::release::CandidateState::Pending) && c.items.iter().any(|i| i.part_number == row.item.part_number)).cloned()
+                        }).flatten();
+                        match pending {
+                            Some(pkg) => {
+                                let doc = self.doc.clone();
+                                let (bg, fg) = colours;
+                                h_flex()
+                                    .flex_wrap()
+                                    .ml(px(col_item()))
+                                    .mr(px(8.))
+                                    .mb(px(4.))
+                                    .px(px(10.))
+                                    .py(px(6.))
+                                    .rounded(px(3.))
+                                    .bg(gpui_kit::rgb(bg))
+                                    .text_size(px(12.))
+                                    .text_color(gpui_kit::rgb(fg))
+                                    .child(x.message())
+                                    .child(
+                                        div()
+                                            .id(SharedString::from(format!("rel-view-pending-{i}")))
+                                            .map(|d| crate::ui_script::mark(d, || "link:View release".into()))
+                                            .ml(px(4.))
+                                            .text_color(gpui_kit::rgb(0x2a6496))
+                                            .cursor_pointer()
+                                            .child("View release")
+                                            .on_click(move |_, window, cx| open_review(doc.clone(), &pkg, window, cx)),
+                                    )
+                                    .into_any_element()
+                            }
+                            None => note(x.message().into(), colours),
+                        }
                     }))
                     // The server's INFO messages (alert-info), as Onshape's help screenshots show them.
                     .children(since.filter(|_| !reverted).map(|s| {
