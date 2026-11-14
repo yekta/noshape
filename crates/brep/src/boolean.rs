@@ -2650,7 +2650,7 @@ impl Ctx<'_> {
         let reach = GREY * self.tol;
         // (On a plane, within its face's box in the plane grown by a tenth of its size (a cylinder's whole): the runs' ends kept clear of
         // the face's corners, where three faces' sections micrometres apart decide its vertices.)
-        let bx = if matches!(self.faces[fi].s, Surf::Plane { .. }) { self.face_box(fi) } else { None };
+        let bx = if matches!(self.faces[fi].s, Surf::Plane { .. }) && std::env::var_os("X_NOCLIP").is_none() { self.face_box(fi) } else { None };
         let within = |_: DVec2, p: DVec3| bx.is_none_or(|(l, h)| {
             let q = self.faces[fi].to2(p);
             let m = reach.max(0.1 * (h - l).length());

@@ -248,6 +248,12 @@ pub(crate) fn sections(s: &FreeSurface, uv: [f64; 4], f: &Implicit, tol: f64, ne
             chains.push(walk(k, &mut done));
         }
     }
+    if std::env::var_os("X_CHAIN").is_some() {
+        for c in &chains {
+            let (a, b) = (c[0], c[c.len() - 1]);
+            eprintln!("XCHAIN {} pts uv {a:?} -> {b:?} p {:?} -> {:?} box {uv:?} grid {nu}x{nv}", c.len(), s.at(a.x, a.y) * 1e3, s.at(b.x, b.y) * 1e3);
+        }
+    }
     // (Only their runs over the other face (`within`), each with the point before and after it.)
     let mut runs: Vec<Vec<DVec2>> = Vec::new();
     for mut c in chains {
@@ -378,18 +384,53 @@ fn fill(s: &FreeSurface, f: &Implicit, uv: [f64; 4], chain: Vec<DVec2>, tol: f64
     let mut i = 0;
     while i + 1 < pts.len() {
         let mut j = i + 1;
-        while j + 1 < pts.len() && fits(i, j + 1) {
+        while j + 1 < pts.len() && std::env::var_os("X_NOTHIN").is_none() && fits(i, j + 1) {
             j += 1;
         }
         keep.push(j);
         i = j;
     }
+    let dense = (pts.clone(), along.clone());
     let pts: Vec<(DVec2, DVec2, DVec3, DVec3)> = keep.iter().map(|&k| pts[k]).collect();
     let lens: Vec<f64> = keep.windows(2).map(|w| along[w[1]] - along[w[0]]).collect();
     if std::env::var_os("X_MARCH").is_some() {
         eprintln!("XMARCH pieces {} error {error:e}", pts.len() - 1);
     }
-    // Bézier pieces with triple knots, the parameter the length along the chords.
+    // (One smooth spline (C2) through the kept points, else through all of them, in space and on the free-form face
+    // with the same parameters: OCCT's 2D intersections in the result's check take cubic pieces one span at a time.)
+    let check = |m: &Marched, n: usize| {
+        let mut stray = 0.0f64;
+        for k in 0..=n {
+            let x = m.t1 * k as f64 / n as f64;
+            let (p, q) = (m.curve.at(x), m.uv.at(x));
+            stray = stray.max(f.at(p).abs()).max((s.at(q.x, q.y) - p).length());
+        }
+        stray
+    };
+    for (pp, al) in [(pts.clone(), keep.iter().map(|&k| along[k]).collect::<Vec<f64>>()), dense] {
+        if std::env::var_os("X_NOSPLINE").is_some() {
+            break;
+        }
+        let n = pp.len() - 1;
+        let ts: Vec<f64> = al.iter().map(|x| x - al[0]).collect();
+        let (Some((knots, poles3)), Some((_, poles2))) = (
+            spline(&ts, &pp.iter().map(|p| p.2).collect::<Vec<_>>(), pp[0].3, pp[n].3),
+            spline(&ts, &pp.iter().map(|p| p.0.extend(0.0)).collect::<Vec<_>>(), rate(pp[0].0, pp[0].1).extend(0.0), rate(pp[n].0, pp[n].1).extend(0.0)),
+        ) else {
+            continue;
+        };
+        let m = Marched {
+            uv: NurbsCurve { degree: 3, knots: knots.clone(), poles: poles2, weights: Vec::new(), spans: Default::default() },
+            curve: NurbsCurve { degree: 3, knots, poles: poles3, weights: Vec::new(), spans: Default::default() },
+            t1: ts[n],
+            error,
+        };
+        let stray = check(&m, 16 * n.max(1));
+        if stray <= 0.1 * tol {
+            return Some(Marched { error: error.max(stray), ..m });
+        }
+    }
+    // Else Bézier pieces with triple knots, the parameter the length along the chords.
     let mut knots = vec![0.0; 4];
     let mut poles2 = vec![pts[0].0.extend(0.0)];
     let mut poles3 = vec![pts[0].2];
@@ -435,6 +476,73 @@ fn fill(s: &FreeSurface, f: &Implicit, uv: [f64; 4], chain: Vec<DVec2>, tol: f64
     (stray <= tol).then_some(Marched { error: m.error.max(stray), ..m })
 }
 
+/// The cubic B-spline through `pts` at parameters `ts` (increasing, from 0) with derivatives `d0`, `dn` at its ends
+/// (C2 inside: one knot a point): its knots and poles. None for fewer than two points or a parameter not increasing.
+fn spline(ts: &[f64], pts: &[DVec3], d0: DVec3, dn: DVec3) -> Option<(Vec<f64>, Vec<DVec3>)> {
+    let n = pts.len().checked_sub(1)?;
+    if n == 0 || ts.windows(2).any(|w| w[1] <= w[0]) {
+        return None;
+    }
+    let mut knots = vec![ts[0]; 4];
+    knots.extend(&ts[1..n]);
+    knots.extend([ts[n]; 4]);
+    let mut poles = vec![DVec3::ZERO; n + 3];
+    poles[0] = pts[0];
+    poles[1] = pts[0] + d0 * ((ts[1] - ts[0]) / 3.0);
+    poles[n + 2] = pts[n];
+    poles[n + 1] = pts[n] - dn * ((ts[n] - ts[n - 1]) / 3.0);
+    if n == 1 {
+        return Some((knots, poles));
+    }
+    // (At an inner knot t_i the basis of poles i, i+1, i+2; the unknown poles 2..=n by Thomas's algorithm.)
+    let basis = |k: usize, u: f64| -> [f64; 4] {
+        let mut nb = [0.0; 4];
+        nb[0] = 1.0;
+        let (mut left, mut right) = ([0.0; 4], [0.0; 4]);
+        for j in 1..=3 {
+            left[j] = u - knots[k + 1 - j];
+            right[j] = knots[k + j] - u;
+            let mut saved = 0.0;
+            for r in 0..j {
+                let tmp = nb[r] / (right[r + 1] + left[j - r]);
+                nb[r] = saved + right[r + 1] * tmp;
+                saved = left[j - r] * tmp;
+            }
+            nb[j] = saved;
+        }
+        nb
+    };
+    let m = n - 1;
+    let (mut a, mut b, mut c, mut r) = (vec![0.0; m], vec![0.0; m], vec![0.0; m], vec![DVec3::ZERO; m]);
+    for i in 1..n {
+        // (Knot t_i is knots[i + 3]; its span starts there: poles i..=i+3, the last one's basis 0.)
+        let nb = basis(i + 3, ts[i]);
+        let row = i - 1;
+        a[row] = nb[0];
+        b[row] = nb[1];
+        c[row] = nb[2];
+        r[row] = pts[i];
+    }
+    r[0] -= poles[1] * a[0];
+    r[m - 1] -= poles[n + 1] * c[m - 1];
+    for i in 1..m {
+        let w = a[i] / b[i - 1];
+        b[i] -= w * c[i - 1];
+        let rp = r[i - 1];
+        r[i] -= rp * w;
+    }
+    if b.iter().any(|x| x.abs() <= 1e-300) {
+        return None;
+    }
+    let mut x = vec![DVec3::ZERO; m];
+    x[m - 1] = r[m - 1] / b[m - 1];
+    for i in (0..m - 1).rev() {
+        x[i] = (r[i] - x[i + 1] * c[i]) / b[i];
+    }
+    poles[2..(m + 2)].copy_from_slice(&x);
+    Some((knots, poles))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -458,6 +566,24 @@ mod tests {
             let q = m.uv.at(t);
             assert!((p.x - 0.6).abs() < 1e-7 && (p.y - 0.8).abs() < 1e-7, "{p}");
             assert!((s.at(q.x, q.y) - p).length() < 1e-7);
+        }
+    }
+
+    /// The spline through points of a circle's arc, its ends' tangents given: on the circle within 1e-4 of its
+    /// radius over 32 points, through each point exactly.
+    #[test]
+    fn a_spline_through_an_arc() {
+        let n = 8;
+        let ts: Vec<f64> = (0..=n).map(|k| k as f64 / n as f64 * std::f64::consts::FRAC_PI_2).collect();
+        let pts: Vec<DVec3> = ts.iter().map(|&t| DVec3::new(t.cos(), t.sin(), 0.0)).collect();
+        let (knots, poles) = spline(&ts, &pts, DVec3::Y, -DVec3::X).expect("a spline");
+        let c = NurbsCurve { degree: 3, knots, poles, weights: Vec::new(), spans: Default::default() };
+        for (t, p) in ts.iter().zip(&pts) {
+            assert!((c.at(*t) - *p).length() < 1e-12);
+        }
+        for k in 0..=32 {
+            let t = std::f64::consts::FRAC_PI_2 * k as f64 / 32.0;
+            assert!((c.at(t).length() - 1.0).abs() < 1e-4);
         }
     }
 }
