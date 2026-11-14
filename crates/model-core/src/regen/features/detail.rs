@@ -564,8 +564,9 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
                     if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
                         eprintln!("rolling balls declined: {}", e.message);
                     }
-                    // OCCT's then, finished.
-                    k::fillet_checked(&body.shape, &shapes, &radii).map_err(fillet_failed)?
+                    // OCCT's then, finished: built again only where it came back as built (a fallback's or a finished
+                    // result is already the blend's: pipeflange-steven's Fillet 2 was built twice, 133 -> 510 ms).
+                    if k::blend_raw_returned() { k::fillet_checked(&body.shape, &shapes, &radii).map_err(fillet_failed)? } else { res }
                 }
             }
         } else {

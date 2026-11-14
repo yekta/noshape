@@ -6121,7 +6121,10 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
         split = faces > 1;
       }
       if (split)
+      {
+        note_blend_raw_returned();
         return as_is.finish(r, h);
+      }
     }
     if (valid)
     {

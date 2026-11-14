@@ -120,6 +120,8 @@ double working_scale() { return g_working_scale.load(std::memory_order_relaxed);
 namespace {
 thread_local bool t_blend_retries = true;
 thread_local bool t_blend_split_raw = false;
+// (Whether a blend since set_blend_split_raw returned its split round as built.)
+thread_local bool t_blend_raw_returned = false;
 }
 
 bool blend_retries() { return t_blend_retries; }
@@ -128,7 +130,14 @@ void set_blend_retries(bool on) { t_blend_retries = on; }
 
 bool blend_split_raw() { return t_blend_split_raw; }
 
-void set_blend_split_raw(bool on) { t_blend_split_raw = on; }
+void set_blend_split_raw(bool on)
+{
+  t_blend_split_raw = on;
+  if (on)
+    t_blend_raw_returned = false;
+}
+bool blend_raw_returned() { return t_blend_raw_returned; }
+void note_blend_raw_returned() { t_blend_raw_returned = true; }
 
 void set_working_scale(double k)
 {

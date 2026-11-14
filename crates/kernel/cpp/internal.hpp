@@ -317,6 +317,8 @@ bool blend_retries();
 // set_blend_split_raw's switch for this thread: a blend whose round of an edge came out in several faces returned as
 // OCCT built it, not finished (its caller builds it otherwise).
 bool blend_split_raw();
+// That such a blend was returned so (since set_blend_split_raw).
+void note_blend_raw_returned();
 
 // Corner faces of a fillet over smaller corner fillets rebuilt as Parasolid's
 // rolling-ball vertex blends (vertex_blend.cpp); `s` unchanged (and the

@@ -580,6 +580,12 @@ pub fn with_blend_split_raw<R>(f: impl FnOnce() -> R) -> R {
     r
 }
 
+/// Whether the last [`with_blend_split_raw`] blend on this thread returned its split round as built (not finished):
+/// a fallback's or a finished result is the blend's own.
+pub fn blend_raw_returned() -> bool {
+    ffi::blend_raw_returned()
+}
+
 /// The working scale [`set_working_scale`] set.
 pub fn working_scale() -> f64 {
     ffi::working_scale()
