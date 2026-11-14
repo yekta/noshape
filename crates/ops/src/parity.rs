@@ -958,9 +958,20 @@ impl<'a> Translator<'a> {
         let mut tolerances = 0;
         // A Hole before V2: its standard is today's table for its units and
         // style (std hole.fs picks it so).
-        let legacy_table = (ty == "hole" && !given.contains(&"isV2")).then(|| {
+        // (A V2 Hole by its `isV2`'s value: a pre-V2 one may carry it false, asm-config-assembly studio 08590a's Hole 3,
+        // ISO 5 Drilled.)
+        let is_v2 = f["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "isV2" && p["value"] == json!(true));
+        // Its units: given, else its standard's (ANSI inch, ISO metric).
+        let legacy_inch = {
+            let param = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id);
+            match param("unitsSystem").and_then(|p| p["value"].as_str()) {
+                Some(u) => u == "INCH",
+                None => param("standardTappedOrClearance").is_some_and(|p| p["value"]["standard"] == "ANSI"),
+            }
+        };
+        let legacy_table = (ty == "hole" && !is_v2).then(|| {
             let value = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id).and_then(|p| p["value"].as_str());
-            match (value("unitsSystem") == Some("INCH"), value("style").is_none_or(|s| s == "SIMPLE")) {
+            match (legacy_inch, value("style").is_none_or(|s| s == "SIMPLE")) {
                 (true, true) => "ansiHoleTableEx",
                 (true, false) => "ansiHoleTable",
                 (false, true) => "isoHoleTableEx",
@@ -1005,7 +1016,7 @@ impl<'a> Translator<'a> {
                     continue;
                 }
                 // The pre-V2 Hole's standards (std hole.fs: `!isV2` branch).
-                if ["standardTappedOrClearance", "standardBlindInLast"].contains(&id) && given.contains(&"isV2") {
+                if ["standardTappedOrClearance", "standardBlindInLast"].contains(&id) && is_v2 {
                     continue;
                 }
                 let stem = id.trim_end_matches("V2");
@@ -1030,6 +1041,10 @@ impl<'a> Translator<'a> {
             }
         }
         problems.append(&mut self.partial);
+        // A pre-V2 Hole without units: its standard's, for its table to count.
+        if legacy_table.is_some() && !given.contains(&"unitsSystem") && known.iter().any(|n| n == "unitsSystem") {
+            params.insert("unitsSystem".into(), json!(if legacy_inch { "INCH" } else { "METRIC" }));
+        }
         if tolerances > 0 {
             problems.push(format!("{tolerances} tolerance / precision fields not translated (no effect on the geometry)"));
         }
