@@ -19,7 +19,8 @@ drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
   whatever meets the joint (`alone` dropped for arcs in region_profile_with); e2e `arcs_of_one_circle_extrude_to_one_
   side_face` (4 faces before, 3). Model gate queued on vibe6 (unit dx-garcs, models-arcs.log, binary ops-arcs) after
   dx-chain9: land if none worse against models-d6.log / models-1dc3.log.
-- dx-chain9 (base vs dx-1dc / tvc variants on the new data) still running; read sk-*.log, land per the rules below.
+- dx-chain9 (base vs dx-1dc / tvc variants on the new data) restarted 09:23 with 90 min a run (infento took over 45 min
+  on the sketch solves: the first base run timed out); read sk-*.log, land per the rules below.
 
 ## 11-14 08:45 UTC: live fetched every assembly studio's sketch solve (08:37); runs restarted on it
 - All 14 assemblies' studio JSONs now carry "sketches" (live 08:37, synced to vibe5/6/7 every 10 min). Earlier
