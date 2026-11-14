@@ -532,6 +532,38 @@ fn corner_break_fillets_a_free_corner() {
     assert!((flat.area() * 1e6 - expected / 2.0).abs() < 1e-4, "flat area {}", flat.area() * 1e6);
 }
 
+/// A Fillet R 5 of both corners of a sheet metal part's 10 mm wide end (std: corner breaks) meet: the end is one
+/// half-round, both corners off (live config-assembly 08590a's Fillet 2 on the arm: 32 faces before and after, 32.19 mm³
+/// less at 3 mm).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn corner_breaks_meeting_across_an_end_make_one_half_round() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 10.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("3 mm"));
+        p.set("radius", expr("1 mm"));
+    });
+    let r = s.ok();
+    let count = |r: &RegenResult| {
+        let s = &r.context.bodies[part(r)].shape;
+        (s.faces().len(), s.edges().len(), s.vertices().len())
+    };
+    let (faces, edges, vertices) = count(&r);
+    let corners = vec![edge_at(&r, DVec3::new(60.0, 0.0, 1.5)), edge_at(&r, DVec3::new(60.0, 10.0, 1.5))];
+    s.add("fillet", |p| {
+        p.set("entities", ParamValue::Query(corners));
+        p.set("radius", expr("5 mm"));
+    });
+    let r = s.ok();
+    let expected = (600.0 - 2.0 * (25.0 - std::f64::consts::PI * 25.0 / 4.0)) * 3.0;
+    assert!((volume_mm3(&r) - expected).abs() < 1e-6, "{} mm³ vs {expected}", volume_mm3(&r));
+    // The end face, its two corner edges and its lines gone for one round face, its tangent lines and two whole arcs.
+    assert_eq!(count(&r), (faces, edges, vertices), "faces / edges / vertices");
+}
+
 /// Corner break of a slot's corners (live c2-sm-corner-break: a louver panel's slots, a flange on one side of each):
 /// each corner rounded in the flat, the slot pulled back from its flange's bend as before.
 #[test]
@@ -2174,4 +2206,49 @@ fn bend_relief_takes_only_a_bend_end_with_a_relief() {
             assert!(matches!(last.status, FeatureStatus::Error) && last.message.as_deref() == Some("Selection is not a bend relief."), "whole-edge flange's end: {:?} {:?}", last.status, last.message);
         }
     }
+}
+
+/// A flange on a plate's edge whose free side runs on past the bend's end (here an R 20 arc tangent to the edge) tears
+/// the plate at the flange's square end: the plate keeps its corner, the bend ends square (live config-assembly
+/// 08590a's Flange 1: planar bend ends at the flange's side). 3 mm, R 1,
+/// 25 mm Outer: the plate less the 26 × 4 mm strip, the quarter annulus R 1–4 and the 21 mm flange along 26 mm.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_flange_beside_a_side_running_on_tears_the_plate() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(0.0, 0.0), (26.0, 0.0), (26.0, 20.0), (-20.0, 20.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    for i in 0..3 {
+        sk.add_line_between(p[i], p[i + 1]).unwrap();
+    }
+    let c = sk.add_point(glam::DVec2::new(0.0, mm(20.0)));
+    sk.add_arc_between(c, p[3], p[0]).unwrap();
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let key = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch").regions[0].key.clone();
+    s.add("sheetMetalStart", move |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("thickness", expr("3 mm"));
+        p.set("radius", expr("1 mm"));
+    });
+    let r = s.ok();
+    let edge = edge_at(&r, DVec3::new(13.0, 0.0, 0.0));
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(vec![edge]));
+        p.set("flangeAlignment", en("OUTER"));
+        p.set("distance", expr("25 mm"));
+    });
+    let r = s.ok();
+    let got = volume_mm3(&r);
+    let b = &r.context.bodies[part(&r)];
+    for f in b.shape.faces() {
+        assert!(matches!(f.face_surface(), Ok(noshape_kernel::Surface::Plane(_) | noshape_kernel::Surface::Cylinder { .. })), "a face neither planar nor cylindrical: {:?} (volume {got:.6} mm³)", f.face_surface());
+    }
+    let region = 46.0 * 20.0 - (400.0 - std::f64::consts::PI * 100.0);
+    let want = (region - 26.0 * 4.0) * 3.0 + std::f64::consts::PI / 4.0 * 15.0 * 26.0 + 21.0 * 26.0 * 3.0;
+    assert!((got - want).abs() < 1e-3, "volume {got:.6} mm³, want {want:.6}");
 }

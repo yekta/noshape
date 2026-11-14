@@ -130,33 +130,75 @@ fn corner_breaks(st: &CtxState, q: &QueryCx, b: usize) -> BTreeMap<usize, Corner
 }
 
 /// The part's corner breaks: at each broken definition vertex, the edge through the thickness filleted or chamfered;
-/// the faces that makes come from the vertex.
+/// the faces that makes come from the nearest broken vertex. Fillets of one radius go together (two R 5 on a 10 mm end
+/// meet: one alone leaves nothing of the end for the other; config-assembly 08590a's Fillet 2, one half-round as live).
 fn apply_corner_breaks(part: &mut Shape, pieces: &mut Vec<Piece>, def: &Definition, topo: &Topo) {
     let t = def.front + def.back;
     let key = |f: &Shape| f.bounding_box(false).map(|b| (b.center(), b.diagonal())).ok();
+    let mut groups: Vec<(&CornerBreak, Vec<usize>)> = Vec::new();
     for (&v, brk) in &def.breaks {
-        let Some(&p) = topo.vertices.get(v) else { continue };
-        let through = |e: &Shape| {
-            e.edge_info().is_ok_and(|i| {
-                let d = (i.end - i.start).normalize_or_zero();
-                let r = p - i.start;
-                matches!(i.curve, k::Curve::Line { .. }) && (i.length - t).abs() < 1e-6 && (r - d * r.dot(d)).length() < 1e-6
+        match groups.iter_mut().find(|(b, _)| matches!((b, brk), (CornerBreak::Fillet(x), CornerBreak::Fillet(y)) if x == y)) {
+            Some((_, vs)) => vs.push(v),
+            None => groups.push((brk, vec![v])),
+        }
+    }
+    let through = |part: &Shape, p: DVec3| -> Option<Shape> {
+        let edges: Vec<Shape> = part
+            .edges()
+            .into_iter()
+            .filter(|e| {
+                e.edge_info().is_ok_and(|i| {
+                    let d = (i.end - i.start).normalize_or_zero();
+                    let r = p - i.start;
+                    matches!(i.curve, k::Curve::Line { .. }) && (i.length - t).abs() < 1e-6 && (r - d * r.dot(d)).length() < 1e-6
+                })
             })
-        };
-        let edges: Vec<Shape> = part.edges().into_iter().filter(through).collect();
-        let [edge] = edges.as_slice() else { continue };
+            .collect();
+        let [edge] = <[Shape; 1]>::try_from(edges).ok()?;
+        Some(edge)
+    };
+    let mut apply = |part: &mut Shape, brk: &CornerBreak, vs: &[usize]| -> bool {
+        let found: Vec<(usize, Shape)> = vs.iter().filter_map(|&v| Some((v, through(part, *topo.vertices.get(v)?)?))).collect();
+        if found.is_empty() {
+            return false;
+        }
+        let edges: Vec<Shape> = found.iter().map(|(_, e)| e.clone()).collect();
         let before: Vec<_> = part.faces().iter().map(key).collect();
         let made = match brk {
-            CornerBreak::Fillet(r) => k::fillet(part, std::slice::from_ref(edge), *r),
-            CornerBreak::Chamfer(d) => k::chamfer(part, std::slice::from_ref(edge), k::ChamferSpec::Equal(*d), &[]),
+            CornerBreak::Fillet(r) => k::fillet(part, &edges, *r),
+            CornerBreak::Chamfer(d) => k::chamfer(part, &edges, k::ChamferSpec::Equal(*d), &[]),
         };
-        let Ok(made) = made else { continue };
-        *part = made.shape;
-        for f in part.faces() {
-            let kf = key(&f);
-            if !before.iter().any(|b| matches!((b, kf), (Some(b), Some(kf)) if b.0.distance(kf.0) < 1e-9 && (b.1 - kf.1).abs() < 1e-9)) {
-                pieces.push(Piece { face: f, from: Def::Vertex(v) });
+        let Ok(made) = made else { return false };
+        let mut shape = made.shape;
+        let is_new = |f: &Shape| {
+            let kf = key(f);
+            !before.iter().any(|b| matches!((b, kf), (Some(b), Some(kf)) if b.0.distance(kf.0) < 1e-9 && (b.1 - kf.1).abs() < 1e-9))
+        };
+        // Fillets that met: their faces on one cylinder, one face, its arcs whole.
+        if found.len() > 1 {
+            for f in shape.faces().into_iter().filter(|f| is_new(f) && matches!(f.face_surface(), Ok(k::Surface::Cylinder { .. }))) {
+                if let Ok(merged) = k::merge_faces_on(&shape, &f) {
+                    shape = merged;
+                }
             }
+            if let Ok(joined) = k::unify_edges(&shape) {
+                shape = joined.shape;
+            }
+        }
+        *part = shape;
+        for f in part.faces().into_iter().filter(|f| is_new(f)) {
+            let c = key(&f).map_or(DVec3::ZERO, |k| k.0);
+            let v = found.iter().map(|(v, _)| *v).min_by(|a, b| topo.vertices[*a].distance(c).total_cmp(&topo.vertices[*b].distance(c))).unwrap_or(found[0].0);
+            pieces.push(Piece { face: f, from: Def::Vertex(v) });
+        }
+        true
+    };
+    for (brk, vs) in groups {
+        if vs.len() > 1 && apply(part, brk, &vs) {
+            continue;
+        }
+        for v in vs {
+            apply(part, brk, &[v]);
         }
     }
 }
@@ -592,7 +634,7 @@ fn bend_geometry(topo: &Topo, e: usize, fa: usize, fb: usize, radius: f64, front
 /// face less a strip along each pulled side. A strip runs on past an end
 /// whose neighbour is a free side across it (the face's outline stops it),
 /// not past a joint or a free side running on in line (as [`pulled_sides`]).
-fn pulled_face(face: &Shape, l: &Loop, n: DVec3, offset: &[f64], free: impl Fn(usize) -> bool) -> FResult<Shape> {
+fn pulled_face(face: &Shape, topo: &Topo, l: &Loop, n: DVec3, offset: &[f64], free: impl Fn(usize) -> bool) -> FResult<Shape> {
     let wire = outer_wire(face).ok_or_else(|| fe("A sheet metal wall has no boundary"))?;
     let base = on_definition(face, &wire, DVec3::ZERO)?;
     let big = face.bounding_box(false).map_err(|e| fe(e.to_string()))?.diagonal() * 2.0;
@@ -607,12 +649,17 @@ fn pulled_face(face: &Shape, l: &Loop, n: DVec3, offset: &[f64], free: impl Fn(u
         let d = (b - a) / len;
         let u = inward(l, n, k);
         let in_line = |j: usize| (l.pts[(j + 1) % m] - l.pts[j]).normalize_or_zero().cross(d).length() <= 1e-6;
-        // A free side across shorter than the pull, to a free side running on in line, doesn't stop the strip: it
-        // ends at the bend's end (c2-sm-louver's Flange 3: a 0.275 mm step to the tab, the tab kept whole).
-        let runs_on = |j: usize, beyond: usize| {
-            free(j) && (l.curved[j] || (!in_line(j) && !(l.pts[(j + 1) % m].distance(l.pts[j]) < off && free(beyond) && !l.curved[beyond] && in_line(beyond))))
+        // A free side across shorter than the pull, to a free side running on in line, or any free side across to an
+        // arc leaving along the line, doesn't stop the strip: it ends at the bend's end (c2-sm-louver's Flange 3: a
+        // 0.275 mm step to the tab, the tab kept whole; config-assembly 08590a's Flange 1, Outer: the plate's R 20
+        // side past the 3 mm step keeps its corner, as live).
+        let runs_on = |j: usize, beyond: usize, at: DVec3| {
+            let tangent = l.curved[beyond] && arc_along(topo, l.side[beyond], at, d);
+            let short = l.pts[(j + 1) % m].distance(l.pts[j]) < off && !l.curved[beyond] && in_line(beyond);
+            free(j) && (l.curved[j] || (!in_line(j) && !(free(beyond) && (short || tangent))))
         };
-        let (s0, s1) = (if runs_on((k + m - 1) % m, (k + m - 2) % m) { -big } else { 0.0 }, if runs_on((k + 1) % m, (k + 2) % m) { len + big } else { len });
+        let (before, after) = ((k + m - 1) % m, (k + 1) % m);
+        let (s0, s1) = (if runs_on(before, (k + m - 2) % m, l.pts[before]) { -big } else { 0.0 }, if runs_on(after, (k + 2) % m, l.pts[(k + 2) % m]) { len + big } else { len });
         let quad = [a + d * s0 - u * big, a + d * s1 - u * big, a + d * s1 + u * off, a + d * s0 + u * off];
         let w = k::make_polyline(&quad, true).map_err(|e| fe(e.to_string()))?;
         strips.push(k::make_face_from_wire(&w, true).map_err(|e| fe(e.to_string()))?);
@@ -621,6 +668,14 @@ fn pulled_face(face: &Shape, l: &Loop, n: DVec3, offset: &[f64], free: impl Fn(u
         return Ok(base);
     }
     Ok(k::boolean(k::BooleanOp::Cut, &[base], &strips, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal wall failed: {e}")))?.shape)
+}
+
+/// Definition edge `e` is an arc leaving `at` along `dir` (either way).
+fn arc_along(topo: &Topo, e: usize, at: DVec3, dir: DVec3) -> bool {
+    match topo.edges[e].edge_curve() {
+        Ok(k::Curve::Circle { center, axis, .. }) => axis.cross(at - center).normalize_or_zero().cross(dir).length() <= 1e-6,
+        _ => false,
+    }
 }
 
 /// A face bounded by `wire` on definition face `face`'s plane moved by
@@ -1418,7 +1473,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                 return Err(fe("Curved sheet metal joints are not supported yet"));
             }
             let free = |j: usize| !def.bends.contains_key(&l.side[j]) && !def.rips.contains(&l.side[j]);
-            let pf = pulled_face(face, &l, n, &offset, free)?;
+            let pf = pulled_face(face, &topo, &l, n, &offset, free)?;
             for k in 0..m {
                 if offset[k] > TOL
                     && !l.curved[k]
@@ -1459,7 +1514,8 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         let (j, next) = if at_start { ((k + m - 1) % m, (k + m - 2) % m) } else { ((k + 1) % m, (k + 2) % m) };
         let connector = (l.pts[(j + 1) % m] - l.pts[j]).length();
         let along = (l.pts[(next + 1) % m] - l.pts[next]).normalize_or_zero();
-        connector <= reach + TOL && along.cross(dir).length() <= 1e-9 && !def.bends.contains_key(&l.side[next]) && !def.rips.contains(&l.side[next])
+        let runs_on = if l.curved[next] { arc_along(&topo, l.side[next], if at_start { l.pts[j] } else { l.pts[next] }, dir) } else { along.cross(dir).length() <= 1e-9 };
+        connector <= reach + TOL && runs_on && !def.bends.contains_key(&l.side[next]) && !def.rips.contains(&l.side[next])
     };
     let (clips, extends, mut cuts, wraps) = corner_reliefs(def, &topo, &outlines, &bends, &setbacks)?;
     for (e, fa, fb, b) in bends {
