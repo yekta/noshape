@@ -8,7 +8,7 @@ objects 1
 tools 1
 target_faces 186
 valid 1
-volume 9.67867992612139634e-6
+volume 9.67868052570031895e-6
 faces 242
 edges 710
 vertices 454

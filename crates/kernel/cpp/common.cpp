@@ -1486,8 +1486,28 @@ Moments inner(const BRepAdaptor_Surface& s, double a, double b, double v, double
 // The surface's parameter values where it's less than C2 along u (`along_u`)
 // or v (B-spline knots, a sweep's section knots), repeated a period either
 // side on a periodic surface.
+// The knots of the B-spline curve an extrusion (along u) or revolution (along v) sweeps: none where it isn't one.
+std::vector<double> swept_knots(const BRepAdaptor_Surface& s, bool along_u)
+{
+  std::vector<double> out;
+  const GeomAbs_SurfaceType k = s.GetType();
+  if (!((k == GeomAbs_SurfaceOfExtrusion && along_u) || (k == GeomAbs_SurfaceOfRevolution && !along_u)))
+    return out;
+  const occ::handle<Adaptor3d_Curve> c = s.BasisCurve();
+  if (c.IsNull() || c->GetType() != GeomAbs_BSplineCurve)
+    return out;
+  const occ::handle<Geom_BSplineCurve> b = c->BSpline();
+  for (int i = 1; i <= b->NbKnots(); ++i)
+    out.push_back(b->Knot(i));
+  return out;
+}
+
 std::vector<double> surface_breaks(const BRepAdaptor_Surface& s, bool along_u)
 {
+  // (A swept B-spline's every knot: an interpolated cubic is C2 at all of them, no C2 breaks, and the integral ran
+  // across 88 spans in 16 steps: the prism of a Shell wall's offset curve 8e-5 short in volume, the impeller's inlet.)
+  if (std::vector<double> kn = swept_knots(s, along_u); kn.size() > 2)
+    return kn;
   std::vector<double> out;
   const int           n = along_u ? s.NbUIntervals(GeomAbs_C2) : s.NbVIntervals(GeomAbs_C2);
   if (n <= 1)
@@ -1621,8 +1641,8 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
       return p / 16;
     return std::max(hi - lo, 1e-300) / (2 * std::max(1, spans));
   };
-  const int    nus = s.GetType() == GeomAbs_BSplineSurface ? s.NbUIntervals(GeomAbs_C2) : 4;
-  const int    nvs = s.GetType() == GeomAbs_BSplineSurface ? s.NbVIntervals(GeomAbs_C2) : 4;
+  const int    nus = s.GetType() == GeomAbs_BSplineSurface ? s.NbUIntervals(GeomAbs_C2) : std::max(4, (int)swept_knots(s, true).size() - 1);
+  const int    nvs = s.GetType() == GeomAbs_BSplineSurface ? s.NbVIntervals(GeomAbs_C2) : std::max(4, (int)swept_knots(s, false).size() - 1);
   const double ustep = step(uper, period, nus, s.FirstUParameter(), s.LastUParameter());
   const double vstep = step(vper, vper ? s.VPeriod() : 0, nvs, s.FirstVParameter(), s.LastVParameter());
   const double coarse = t_props_coarse ? 2.0 : 1.0;
