@@ -4,7 +4,28 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-13 21:12 UTC; restart from here)
+## bool, now (11-14 00:05 UTC; restart from here)
+- **Landed 23:31 as 6632308e (skasm's lead 22:2x):** in a fuse of arguments that must only touch (glue ShiftChecked:
+  sheet metal build_part's walls and bends), free-form face pairs (and their edge-on-face handling kept) that share an edge
+  get no OCCT section (`Ctx::edge_only`; the classification's overlap check still declines a real crossing).
+  c2-sm-corner-break's 4 glued fuses 53-65 -> 33-49 ms, the document's Boolean time 1331/1202 -> 1096/1067 ms (kernel
+  profile, vibe5); model-plus's 3 (35-40 ms) hardly change: their time is converting inputs, building the OCCT result and
+  BRepCheck, not sections. Tried, not kept: the same for analytic round pairs (no gain seen, noisy). Agreed with skasm:
+  build_part's fuse is ours to speed up; skasm won't sew there.
+- **Gating 23:57 (branch bool-inout, worktree bool-hat, de6bc7a83):** `solid_inside_out` (after every feature, each new
+  solid) classifies a point at infinity first (OCCT's OrientClosedSolid test), the volume only when unclear:
+  cf-surface-pattern's 107 calls 401 -> 31 ms, the same results; boolean_groups / features_c pass. Land if clean.
+- **Open rows from core's x86 ranking (vibe7, 11-13 23:xx):** cf-surface-pattern Surface Pattern 3 2.10 s vs 537 ms
+  (op_boolean 1592: brep 1321, sections ahead 385; unify.usd 407 with usd.check 302; op_unify 214; inside-out 220, fixed
+  above); c2-valve-config Circular pattern 1 245 vs 67 (one_by_one, brep ~200, sections 70); c2-helical-sweep Sweep 1 134
+  vs 28 (one cut of a rod by a thread, ours 84 ms: OCCT sections 48 % (plane∩ / cylinder∩B-spline: bool2's marcher),
+  ray_state on the thread's B-splines 26 %; case vibe5 ~/agents/bool-keep/suite/rec-hs/2e082aa1e0d06cd3); cf-fix-pcb
+  Fix PCB 2 388-407 vs 276 (split.ours 126 over 2: boolean.rust.build 95 over 4, building OCCT faces from ours; logs
+  vibe7 ~/agents/core-keep/cf-fix-pcb.prof).
+- Next: land de6bc7a83; then the build step (our result -> OCCT shapes, ~1.2 ms a Boolean in sheet metal, 24 ms a call in
+  fix-pcb) and usd.check after our Booleans; rings-loft's Shell 1 (CheckerSI 23 %); the fan blade's free-form face offset.
+
+## bool, earlier (11-13 21:12 UTC)
 - **Landed 21:20 as ecd9df2f:** Boolean's Subtract with Offset was
   ignored by the native evaluator (basic.rs). Now the tools' copies get their faces (all, or Faces to offset) offset as
   boolean.fs's opOffsetFace, by OCCT's offset_faces for planes / cylinders / cones / spheres / tori within a 2 s
