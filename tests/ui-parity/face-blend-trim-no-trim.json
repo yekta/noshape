@@ -65,5 +65,12 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "faceBlend": {
+   "length:Millimeter": {
+    "radius": "2 mm"
+   }
+  }
+ }
 }
