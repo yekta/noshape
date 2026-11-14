@@ -111,6 +111,8 @@ impl RenderOnce for DrCheckbox {
         let pal = crate::theme::p();
         let checked = self.checked;
         let handler = self.on_click.filter(|_| !self.disabled);
+        // The ui-parity runner's target ("checkbox:<label>").
+        let mark = self.label.clone().filter(|_| !self.user);
         let label = self.label.map(|l| if self.user { crate::ui::user_text(l).into_any_element() } else { l.into_any_element() });
         let custom_box = || {
             div()
@@ -130,6 +132,10 @@ impl RenderOnce for DrCheckbox {
         };
         div()
             .id(self.id)
+            .map(|d| match mark {
+                Some(m) => crate::ui_script::mark(d, move || format!("checkbox:{m}")),
+                None => d,
+            })
             .flex()
             .items_center()
             .gap(px(if self.native { 6. } else { 9. }))

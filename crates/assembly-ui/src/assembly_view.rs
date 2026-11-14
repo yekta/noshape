@@ -161,6 +161,13 @@ type ListRowFn = Rc<dyn Fn(&mut AssemblyView, &mut Context<AssemblyView>) -> Any
 /// and its Mate features folder (collapsed).
 const NESTED_PATTERN_BIT: u64 = 1 << 62;
 const NESTED_MATES_COLLAPSED: InstanceId = InstanceId(u64::MAX - 1);
+actions!(assembly_view, [RelationValueTab]);
+
+/// Tab in the relation dialog's value field (bindings outrank key listeners, and the field's own Tab would win).
+pub fn bind_keys(cx: &mut App) {
+    cx.bind_keys([KeyBinding::new("tab", RelationValueTab, Some("RelationValue")), KeyBinding::new("tab", RelationValueTab, Some("RelationValue > Input"))]);
+}
+
 /// The relation dialog's types, in the live select's order.
 const RELATION_KINDS: [RelationType; 4] = [RelationType::Gear, RelationType::RackAndPinion, RelationType::Screw, RelationType::Linear];
 
@@ -5755,17 +5762,13 @@ impl AssemblyView {
         let value = crate::os_ui::param_row(
             value_label,
             crate::ui_script::mark(
-                div().w_full().capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
-                    if e.keystroke.key != "tab" || e.keystroke.modifiers.shift {
-                        return;
-                    }
+                div().w_full().key_context("RelationValue").on_action(cx.listener(|this, _: &RelationValueTab, window, cx| {
                     if let Some(r) = &mut this.relation {
                         r.apply_ratio(cx);
                         r.ratio_focused = false;
                     }
                     this.ui.checkbox_focus = Some("Reverse direction");
                     window.focus(&this.focus, cx);
-                    cx.stop_propagation();
                     cx.notify();
                 })).child(crate::os_ui::input_h(Input::new(&r.ratio).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)),
                 move || format!("field:{value_label}"),

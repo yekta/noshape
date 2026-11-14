@@ -344,8 +344,11 @@ impl AssemblyView {
             .map(|s| {
                 let d = s.dialog.read(cx);
                 let complete = d.a.is_some() && d.b.is_some() && !d.same_instance();
+                // Simulation connection checked with no Faces to connect: the title red, ✓ still on (live
+                // asm-slider-simulation-connection).
+                let faces_missing = d.simulation_connection && d.simulation_faces.is_empty() && d.mate_type().has_simulation_connection();
                 json!({
-                    "title": d.name, "titleState": if complete { "ok" } else { "error" }, "kind": "feature", "tabs": [],
+                    "title": d.name, "titleState": if complete && !faces_missing { "ok" } else { "error" }, "kind": "feature", "tabs": [],
                     "fields": d.ui_fields(cx),
                     "error": null, "ok": if complete { "enabled" } else { "disabled" }
                 })

@@ -513,6 +513,7 @@ fn main() {
         shortcuts::init(cx, actions::default_key_bindings());
         feature_studio::bind_keys(cx);
         variable_studio::bind_keys(cx);
+        assembly_view::bind_keys(cx);
         // Mouse controls (also hands "Use pen input as mouse" to the platform).
         navigation::MouseControls::current();
         // Preferences › Decimal format (comma decimals in expressions and values).

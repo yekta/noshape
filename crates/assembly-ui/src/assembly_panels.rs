@@ -1612,7 +1612,7 @@ impl AssemblyView {
             // Live: the field ends where the button starts, both top-aligned.
             h_flex()
                 .items_start()
-                .child(div().flex_1().min_w_0().child(os::query_box(id, label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                .child(crate::ui_script::mark(div().flex_1().min_w_0(), move || format!("field:{label}")).child(os::query_box(id, label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(p) = &mut this.pattern {
                         p.active = Some(field);
                     }

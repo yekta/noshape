@@ -138,6 +138,7 @@ impl DrawingEditor {
         };
         let style = d.style;
         let ed = cx.entity();
+        let shown = STYLES.iter().find(|s| s.1 == style).map(|s| s.0).unwrap_or("Zig zag");
         let styles = Button::new("brk-style").label(STYLES.iter().find(|s| s.1 == style).map(|s| s.0).unwrap_or("Zig zag")).ghost().small().w(px(130.)).dropdown_caret(true).os_dropdown_menu("brk-style-dd", true, move |mut m, _, _| {
             for (n, st) in STYLES {
                 let e = ed.clone();
@@ -151,7 +152,7 @@ impl DrawingEditor {
                 }));
             }
             m
-        });
+        }).map(|d| crate::ui_script::mark(d, move || format!("dropdown:{shown}")));
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(30.)).px(px(6.)).child(div().w(px(90.)).text_size(px(12.)).child(label)).child(body).into_any_element();
         Some(
             v_flex()

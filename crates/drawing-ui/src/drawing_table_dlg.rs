@@ -499,6 +499,7 @@ impl DrawingEditor {
             // "Onshape Default BOM" is wider than the button: that list
             // takes its own width.
             let as_select = id != "table-dlg-template";
+            let shown = label.clone();
             Button::new(id).label(label).ghost().xsmall().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), as_select, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
@@ -514,7 +515,7 @@ impl DrawingEditor {
                     }));
                 }
                 m
-            })
+            }).map(|d| crate::ui_script::mark(d, move || format!("dropdown:{shown}")))
         };
         let mut source_items: Vec<(String, bool, Set)> = sources.iter().map(|(v, n)| {
             let v = *v;

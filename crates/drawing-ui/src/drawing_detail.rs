@@ -363,6 +363,7 @@ impl DrawingEditor {
             m
         });
         let ed3 = ed.clone();
+        let shown = STYLES[style as usize];
         let style_btn = Button::new("det-style").label(STYLES[style as usize]).ghost().small().w(px(117.)).h(px(25.)).rounded(px(0.)).dropdown_caret(true).os_dropdown_menu("det-style-dd", true, move |mut m, _, _| {
             for (i, s) in STYLES.iter().enumerate() {
                 let e = ed3.clone();
@@ -377,7 +378,7 @@ impl DrawingEditor {
                 }));
             }
             m
-        });
+        }).map(|d| crate::ui_script::mark(d, move || format!("dropdown:{shown}")));
         let mut tools = h_flex().pl(px(4.)).pt(px(3.)).pb(px(3.)).gap(px(2.));
         for (i, (tip, icon)) in SHAPES.iter().enumerate() {
             // Live dom drawing-detail-dialog: 30 px buttons, radius 2; the active

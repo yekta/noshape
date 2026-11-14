@@ -250,6 +250,7 @@ impl DrawingEditor {
         };
         let select = |id: &'static str, label: String, w: f32, items: Vec<StyleChoice>| {
             let ed = ed.clone();
+            let shown = label.clone();
             Button::new(id).label(label).ghost().xsmall().w(px(w)).dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
@@ -263,7 +264,7 @@ impl DrawingEditor {
                     }));
                 }
                 m
-            })
+            }).map(|d| crate::ui_script::mark(d, move || format!("dropdown:{shown}")))
         };
         let borders: Vec<StyleChoice> = CalloutBorder::ALL.iter().map(|&b| (b.name().to_string(), style.border == b, std::rc::Rc::new(move |s: &mut CalloutStyle| s.border = b) as std::rc::Rc<dyn Fn(&mut CalloutStyle)>)).collect();
         let sizes: Vec<StyleChoice> = SIZES.iter().map(|&(n, l)| (l.to_string(), style.chars == n, std::rc::Rc::new(move |s: &mut CalloutStyle| s.chars = n) as std::rc::Rc<dyn Fn(&mut CalloutStyle)>)).collect();
