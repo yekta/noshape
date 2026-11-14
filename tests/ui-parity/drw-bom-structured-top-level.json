@@ -1,0 +1,50 @@
+{
+  "name": "drw-bom-structured-top-level",
+  "about": "BOM table with BOM type Flattened › Structured - Top level, then placed",
+  "area": "drawing",
+  "source": "live2 11-14: drawing field-level coverage (panel options no scenario touched; lead: the asm/drawing half of the coverage audit)",
+  "start": "pin-block-asm-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "BOM table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Flattened"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Structured - Top level"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          260,
+          200
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
