@@ -110,6 +110,31 @@ fn surface_area(r: &RegenResult, idx: usize) -> f64 {
     r.context.bodies[idx].shape.faces().iter().map(|f| f.area().unwrap()).sum()
 }
 
+/// A Mate connector at a cylinder's mid axis point: Z the cylinder's axis, X world X across it (world Y for an axis
+/// along X), not the cylinder's own x (live "skasm (11-14) through-all hole cylinder frame": on a circle extruded
+/// from Front x (1,0,0), whose cylinder's x is (0,0,−1); from Right x (0,1,0)).
+#[test]
+fn mate_connector_on_a_cylinder_takes_world_x() {
+    for (plane, x) in [(DatumPlane::Front, DVec3::X), (DatumPlane::Right, DVec3::Y)] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        sk.add_circle(DVec2::new(0.01, 0.02), 0.005);
+        let id = s.sketch(Reference::Plane(plane), sk);
+        s.extrude_largest(id, "20 mm");
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let side = b.shape.faces().iter().position(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).expect("the cylinder");
+        let face = Reference::Face((*b.faces[side]).clone());
+        s.add("mateConnector", |p| {
+            p.set("originQuery", ParamValue::Query(vec![face]));
+            p.set("entityInferenceType", ParamValue::Enum("MID_AXIS_POINT".into()));
+        });
+        let r = s.ok();
+        let c = &r.context.connectors[0];
+        assert!(vnear(c.x, x) && c.z.cross(x).length() > 1.0 - 1e-9 && c.z.dot(x).abs() < 1e-9, "{plane:?}: x {:?} z {:?}", c.x, c.z);
+    }
+}
+
 #[test]
 fn mate_connector_on_face_with_offset_drives_plane_and_sketch() {
     let mut s = block();

@@ -85,7 +85,7 @@ fn face_csys(ev: &EvalCtx, face: &Shape, inference: &str, secondary: &[Reference
         }
     });
     match face.face_surface()? {
-        k::Surface::Cylinder { origin, axis, x_dir, .. } | k::Surface::Cone { origin, axis, x_dir, .. }
+        k::Surface::Cylinder { origin, axis, .. } | k::Surface::Cone { origin, axis, .. }
             if matches!(inference, "TOP_AXIS_POINT" | "MID_AXIS_POINT" | "BOTTOM_AXIS_POINT" | "CENTROID" | "CENTER" | "") =>
         {
             let (lo, hi) = extent_along(face, origin, axis)?;
@@ -94,7 +94,13 @@ fn face_csys(ev: &EvalCtx, face: &Shape, inference: &str, secondary: &[Reference
                 "BOTTOM_AXIS_POINT" => lo,
                 _ => (lo + hi) * 0.5,
             };
-            Ok(Csys::new(origin + axis * t, axis, Some(x_dir)))
+            // Z the surface's axis, X world X across it (world Y when the axis is along X), not the surface's x (live
+            // "skasm (11-14) through-all hole cylinder frame": config-assembly 08590a's Mate connector 1, x (1,0,0) on a
+            // hole whose cylinder has x (0,0,−1)).
+            let a = axis.normalize();
+            let across = |w: DVec3| w - a * a.dot(w);
+            let x = if across(DVec3::X).length() > 1e-9 { across(DVec3::X) } else { across(DVec3::Y) };
+            Ok(Csys::new(origin + axis * t, axis, Some(x.normalize())))
         }
         k::Surface::Cone { axis, x_dir, apex, .. } if inference == "VIRTUAL_SHARP" => Ok(Csys::new(apex, axis, Some(x_dir))),
         surf => {
