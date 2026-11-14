@@ -4870,7 +4870,7 @@ impl<'a> Translator<'a> {
     /// A distance to a circle or arc measures to its centre, its near side
     /// or its far side: the one whose length is the value Onshape solved
     /// (its `halfSpace` sides aren't read).
-    fn circle_mode(&self, oid: &str, c: &Value, value: Option<&str>) -> Option<&'static str> {
+    fn circle_mode(&self, oid: &str, c: &Value, value: Option<&str>, external: Option<([f64; 2], f64)>) -> Option<&'static str> {
         let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).and_then(|p| p["value"].as_str()).map(str::to_string);
         let want = noshape_units::evaluate_as(value?, noshape_units::Dim::LENGTH, &noshape_units::UnitPrefs::default(), &noshape_units::EmptyScope).ok()?.value;
         enum G {
@@ -4893,7 +4893,12 @@ impl<'a> Translator<'a> {
                 _ => None,
             }
         };
-        let (a, b) = (geom(par("localFirst")?)?, geom(par("localSecond")?)?);
+        // (An external circle or arc in place of a local entity: its centre and radius in the sketch's plane.)
+        let side = |name: &str| match par(name) {
+            Some(e) => geom(e),
+            None => external.map(|(c, r)| G::Point(c, r)),
+        };
+        let (a, b) = (side("localFirst")?, side("localSecond")?);
         let to_line = |p: [f64; 2], s: [f64; 2], e: [f64; 2]| {
             let (dx, dy) = (e[0] - s[0], e[1] - s[1]);
             ((p[0] - s[0]) * dy - (p[1] - s[1]) * dx).abs() / dx.hypot(dy).max(1e-12)
@@ -4907,6 +4912,21 @@ impl<'a> Translator<'a> {
             return None;
         }
         [("center", centres), ("minimum", centres - radii), ("maximum", centres + radii)].into_iter().min_by(|x, y| (x.1 - want).abs().total_cmp(&(y.1 - want).abs())).map(|m| m.0)
+    }
+
+    /// A circular model edge's centre (in sketch `oid`'s plane, m) and radius (m), when its axis is along the
+    /// sketch's normal.
+    fn circle_in_sketch(&mut self, oid: &str, edge: &str) -> Option<([f64; 2], f64)> {
+        let [o, x, y] = *self.frames.get(oid)?;
+        let edges = self.call("query_entities", json!({ "kind": "edges", "curve": "circle", "limit": 100000 })).ok()?;
+        let e = edges["edges"].as_array()?.iter().find(|e| e["id"] == edge)?.clone();
+        let (c, r, a) = (f3(&e["center"])?, e["radius"].as_f64()? * 1e-3, f3(&e["axis"])?);
+        let n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+        if (a[0] * n[0] + a[1] * n[1] + a[2] * n[2]).abs() < 1.0 - 1e-9 {
+            return None;
+        }
+        let d: Vec<f64> = (0..3).map(|i| c[i] * 1e-3 - o[i]).collect();
+        Some(([(0..3).map(|i| d[i] * x[i]).sum(), (0..3).map(|i| d[i] * y[i]).sum()], r))
     }
 
     /// `edges` and the line edges on the same lines (the pieces a cut
@@ -5006,11 +5026,17 @@ impl<'a> Translator<'a> {
             let mut entities = Vec::new();
             let mut missing = false;
             let mut handle: Option<[String; 2]> = None;
+            let mut external_circle = None;
             for n in ["localFirst", "externalFirst", "localSecond", "externalSecond", "localEntity1", "localEntity2"] {
                 if n.starts_with("external") {
                     let Some(ext) = par(n) else { continue };
                     match self.external_ref(k, &ext) {
-                        Some(e) => entities.push(e),
+                        Some(e) => {
+                            if kind == "distance" {
+                                external_circle = self.circle_in_sketch(oid, &e);
+                            }
+                            entities.push(e)
+                        }
                         None => missing = true,
                     }
                     continue;
@@ -5046,7 +5072,7 @@ impl<'a> Translator<'a> {
             }
             let mut args = json!({ "sketch": id, "entities": entities, "kind": kind });
             if kind == "distance"
-                && let Some(mode) = self.circle_mode(oid, c, value.as_deref())
+                && let Some(mode) = self.circle_mode(oid, c, value.as_deref(), external_circle)
             {
                 args["mode"] = json!(mode);
             }
