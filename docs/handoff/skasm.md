@@ -4,14 +4,14 @@
 - Jog at its reduced angle: fixed (the unfold goes through two rolled bends that meet; flat 100 mm, no overlap);
   REQUESTS 11-14 19:30 asks live for that jog's flat to confirm. The collision check compares bend zones again.
 - Translator: negative stored distances (live's flip done) and live's current configuration variables fixed.
-- Next, solver robustness: c2-impeller-loft's "Sketch Bohrung Flansch". Adding the (already satisfied) COINCIDENT of
-  the two patterns' seed centres rotates pattern 1 about its pivot by ~1.5° and swings the construction line's end
-  2.6 mm (trace: SKTRACE in check_moved, not committed). Live's stored geometry leaves the line's start 0.83 µm off its
-  VERTICAL to the origin; with VERTICAL, NORMAL to KmZB, the seed on the line and the pivot CONCENTRIC with JZZ the
-  system is redundant and near-singular, and our step for a sub-µm residual goes 2.6 mm along an almost free
-  direction. Want: a minimal-move correction (the residual is within live's tolerance), then the same check on
-  c2-rings-loft Sketch 1 (2.86 mm), cf-sheet-metal-hem's derived Sketch 3 (MIDPOINT, 94.8 mm) and the impeller's
-  Stefevenrohr Führung (5 µm).
+- c2-impeller-loft's "Sketch Bohrung Flansch" (probe: /root/skasm-scratch/probes/zz_skdump.rs on a sketch dumped
+  just before the moving edit, /root/skasm-scratch/skdump-trace.diff makes the dump): the line start is Coincident
+  with external spline KmZB and Vertical to the Origin; live's point is 0.83 µm off x = 0 at the spline's end. Our
+  point-on-spline keeps its parameter in the spline's range (equations.rs FitPoint `x[2].clamp(a, b)`), so those two
+  conflict before any iteration; the conflict pass drops the Coincident and the line swings 2.6 mm. Waiting for
+  REQUESTS 11-14 20:19 (does live extend a spline for a coincident point, or tolerate the 1 µm). Then the same check
+  on c2-rings-loft Sketch 1 (2.86 mm), cf-sheet-metal-hem's derived Sketch 3 (MIDPOINT, 94.8 mm) and the impeller's
+  Stefevenrohr Führung (5 µm: its dump Fb4c32fe8b4b9 solves, moving 5.5 µm).
 - Knife: its first difference (feature 24) is Curve pattern 1's 3 B-spline edges in live vs 3 lines in ours, not a
   sketch; for core.
 
