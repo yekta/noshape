@@ -15,8 +15,15 @@
   placements (43 dumped real sketches fingerprinted), live fuzz 766 / 830 as before, sketch tests 9.5 -> 3.4 s.
 - vibe7, same build, main vs mine: all sketches' regeneration 1107 -> 604 ms; dock 332 -> 115, hat8 197 -> 79, hat15
   174 -> 81, hex-bookcase 47 -> 21, louver 51 -> 38. Drags unchanged (they never ran the constructive pass).
-- Next levers: what's left in regeneration is mostly plane resolution / imprint / regions of a few sketches
-  (cf-fix-pcb's 23 ms, impeller's 19 ms, hex-bookcase's 18 ms text sketch): profile them with per-stage timers.
+- Drag (f214d8c6, landed): components already within tolerance set up no factorisation, `still_reps` uses sets: a
+  2,950-entity synthetic sketch's step 12.5 -> 9.7 ms (interleaved min of 8; vibe7 has no HW counters for perf stat).
+- Imprint (5c20d5ba5): a sketch on a face tested every imprinted region against its own with `Region::contains`
+  (re-tessellating each call) behind exact spline boxes (tessellations too): now `Region::tester` (polygons once,
+  same tolerance) behind `Region::hull_bbox`. imprint cf-fix-pcb Sketch 4 10.3 -> 3.1 ms, impeller flange 17.8 -> 9.5,
+  "0.2" 10.0 -> 5.7. All sketches' regeneration 604 -> 553 ms (loaded vibe7).
+- Left (first-time costs, all memoized after): a NURBS curve's box is a tessellation (2-5 ms for a sketch's splines;
+  a coarser one could shrink a box and miss a crossing, so not changed) and crossings with a face's B-spline edges.
+  Per-stage timers: /root/skasm-scratch/probe-instr.diff (model-core sketch.rs laps, NOSHAPE_SKPROF=1; reapply by hand).
 
 ## Resume here (2026-11-14 01:02 UTC): the 7 model-suite documents not matching (Mac 80/87, 870/947)
 - c2-hunting-knife, c2-impeller-loft: core's (the user's split). c2-fan-blade-sweep Boolean 2: bool (sent by core).
