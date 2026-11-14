@@ -511,7 +511,14 @@ impl AssemblyView {
     /// asm-menu-connector-at-origin selects nothing).
     fn mc_picks(&self) -> Vec<&MateConnectorRef> {
         let Some(m) = self.mc.as_ref().filter(|m| !m.picks_undo.is_empty()) else { return Vec::new() };
-        m.on.iter().chain(m.extra.iter().flatten()).filter(|c| c.instance != InstanceId::ORIGIN && !matches!(c.reference, Reference::Origin)).collect()
+        // The active field's pick only (live asm-mate-connector-realign: Realign makes the empty Primary axis entity
+        // active, nothing selected).
+        let picks: Vec<&MateConnectorRef> = match (m.active, m.slot) {
+            (true, 0) => m.on.iter().collect(),
+            (true, k) => m.extra.get(k - 1).into_iter().flatten().collect(),
+            (false, _) => m.on.iter().chain(m.extra.iter().flatten()).collect(),
+        };
+        picks.into_iter().filter(|c| c.instance != InstanceId::ORIGIN && !matches!(c.reference, Reference::Origin)).collect()
     }
 
     /// The blue how-to box a right-hand panel shows, as live's recorder reads it into the message (its bold title,
