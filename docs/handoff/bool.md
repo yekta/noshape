@@ -4,7 +4,26 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-14 00:05 UTC; restart from here)
+## bool, now (11-14 02:30 UTC; restart from here)
+- Landed: 6632308e (glued fuses' edge-only pairs), 55fe2ff5 (inside-out check: the volume's sign integrated to 5 %;
+  the first try, a point at infinity classified, took an inside-out mirrored cutter for right: bool_patterns
+  an_inside_out_tool_declined_first; cf-surface-pattern's 107 checks 402 -> 96 ms).
+- **Gating 02:2x (branch bool-bands, worktree bool-hat, 903024d48), skasm's c2-gamma-imported / c2-wire-clip-imported
+  Boolean 2 (UNION of 24 imported bodies, OCCT's: ours declines "two edges leave a vertex in one direction"; Boolean 1's
+  88 bodies "cylinders nearly coincident", 7.4 s):** merge_cylinder_groups projected the group's curves onto the
+  first face's surface without its location (imported parts are placed), and gave up where a whole boundary circle's
+  vertex sat at another angle than the other chain's (stacked bands framed a quarter turn apart): now projected in the
+  surface's frame, and such a circle made again from the other chain's first vertex (its curves on its other faces
+  projected, swapped in the same reshape). 914 -> 889/2403/1344 (live 884/2405/1344). T1
+  bool_patterns::stacked_holes_framed_apart_unify_into_one_wall (tests/data/booleans/stacked-holes-framed-apart.brep:
+  two of the bodies clipped to 8 mm round a hole). Left there: 5 faces of 5 um steps (two bodies' bottoms 5 um apart
+  at z 18.386 mm: live may merge them), area +121 mm2 and volume -2.4 mm3 (not found yet); then ours taking both unions.
+- Tried, not kept: valve-config's 7 cones clipped to the part's box first and cut at once (the clip works; the cut by
+  the clipped cones declines "a non-manifold result"); the dock's tab C / D "a face lost" is a funnel cone face whose
+  regions all come out degenerate (inside points ~ (0, 0) in its 2D frame): to look at.
+- Probes (xprobe.rs, scratch): probe_clip_tools, probe_unmerged_faces, probe_inner_faces, probe_pair_at.
+
+## bool, earlier (11-14 00:05 UTC)
 - **Landed 23:31 as 6632308e (skasm's lead 22:2x):** in a fuse of arguments that must only touch (glue ShiftChecked:
   sheet metal build_part's walls and bends), free-form face pairs (and their edge-on-face handling kept) that share an edge
   get no OCCT section (`Ctx::edge_only`; the classification's overlap check still declines a real crossing).
