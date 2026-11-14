@@ -425,9 +425,25 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
             let (reach_h, reach_v) = (ra_h, ra_v);
             let (to_h, to_v) = (off_y(d), off_x(d));
             let near_axis = |horizontal: bool| if horizontal { to_h <= reach_h && to_h < to_v } else { to_v <= reach_v && to_v <= to_h };
+            // A horizontal / vertical line ending on another curve takes both (live feel/sketch.json, interaction-feel.md
+            // "Two at once"): where the line through the start meets a curve within a point's reach of the pointer.
+            let axis_hits = |horizontal: bool| -> Vec<(EntityId, DVec2)> {
+                let span = (sk.bbox().size().max_element() + d.length()).max(1e-3) * 4.0;
+                let along = if horizontal { DVec2::X } else { DVec2::Y } * span;
+                let axis = Curve2::Line { a: a - along, b: a + along };
+                sk.entities()
+                    .filter(|e| e.kind() != EntityKind::Point && !excluded(sk, ctx, e.id))
+                    .filter_map(|e| Some((e.id, sk.curve(e.id)?)))
+                    .flat_map(|(id, c)| crate::intersect::intersect(&axis, &c, 1e-12).into_iter().map(move |x| (id, x.point)))
+                    .filter(|(_, p)| seen(*p - cursor) <= r_point && (*p - a).length() > 1e-12)
+                    .collect()
+            };
             if near_axis(true) {
                 let (kind, on, c) = line_kind(true);
                 push(&mut out, kind, DVec2::new(cursor.x, a.y), on, Some(a), vec![c], 2);
+                for (e, p) in axis_hits(true) {
+                    push(&mut out, InferenceKind::OnCurve, p, Some(e), Some(a), vec![c, AutoConstraint::OnCurve(e)], 1);
+                }
                 // A horizontal line ending in vertical alignment with a woken
                 // point takes both (live: Horizontal + Vertical with it).
                 if let Some((_, vp, vpos)) = best_v {
@@ -437,6 +453,9 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
             if near_axis(false) {
                 let (kind, on, c) = line_kind(false);
                 push(&mut out, kind, DVec2::new(a.x, cursor.y), on, Some(a), vec![c], 2);
+                for (e, p) in axis_hits(false) {
+                    push(&mut out, InferenceKind::OnCurve, p, Some(e), Some(a), vec![c, AutoConstraint::OnCurve(e)], 1);
+                }
                 if let Some((_, hp, hpos)) = best_h {
                     push(&mut out, InferenceKind::AlignHorizontal, DVec2::new(a.x, hpos.y), Some(hp), Some(hpos), vec![c, AutoConstraint::HorizontalWith(hp)], 1);
                 }
@@ -631,6 +650,24 @@ mod tests {
         assert!((r[0].position - v(2.0, 6.0)).length() < 1e-12);
         let r = infer(&sk, v(2.03, 6.03), &InferenceContext { woken: vec![], ..ctx });
         assert_eq!(r[0].constraints, vec![AutoConstraint::HorizontalLine]);
+    }
+
+    /// Live (feel/sketch.json, interaction-feel.md "Two at once"): a line's end both horizontal and on a line gets
+    /// both; a point snap beats horizontal; a point beats the line it ends.
+    #[test]
+    fn two_inferences_at_once_as_live() {
+        let mut sk = Sketch::new();
+        let wall = sk.add_line(v(3.0, -1.0), v(3.0, 3.0));
+        let line = SketchTool::Line;
+        let ctx = InferenceContext { tool: line, anchor: Some(v(0.0, 0.0)), snap_radius: 0.1, ..Default::default() };
+        let r = infer(&sk, v(3.02, 0.03), &ctx);
+        assert!(r[0].constraints.contains(&AutoConstraint::HorizontalLine) && r[0].constraints.contains(&AutoConstraint::OnCurve(wall)), "{:?}", r[0]);
+        let p = sk.add_point(v(6.0, 0.06));
+        let r = infer(&sk, v(6.02, 0.02), &ctx);
+        assert_eq!((r[0].kind, r[0].constraints.first().cloned()), (InferenceKind::Endpoint, Some(AutoConstraint::CoincidentPoint(p))), "{:?}", r[0]);
+        let (_, top) = sk.endpoints(wall).unwrap();
+        let r = infer(&sk, v(3.03, 2.98), &InferenceContext { anchor: Some(v(0.0, 6.0)), ..ctx });
+        assert_eq!(r[0].constraints.first().cloned(), Some(AutoConstraint::CoincidentPoint(top)), "{:?}", r[0]);
     }
 
     #[test]
