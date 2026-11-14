@@ -2749,6 +2749,57 @@ fn a_region_by_id_added_to_a_part() {
     assert_eq!((r.matching, r.compared), (4, 4), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A sketch arc live names by its edge (arc length midpoint and length, live's sketch bodies) is that arc of ours, as a
+/// line is (asm-hand-drill-pinslot's Gear Selector Pin: its sweep path's sketch fillet arcs, "not all connected").
+#[test]
+fn a_sketch_arc_is_found_by_lives_midpoint_and_length() {
+    let arc = json!({ "btType": "BTMSketchCurveSegment-155", "entityId": "arc", "isConstruction": false, "startParam": 0.0, "endParam": std::f64::consts::FRAC_PI_2,
+        "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.01, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } });
+    let features = json!({ "features": [{ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+        "entities": [arc, segment("line", (0.01, 0.0), (0.02, 0.0))], "constraints": [] }] });
+    let h = 0.01 * std::f64::consts::FRAC_1_SQRT_2;
+    let refs = parse_refs(&json!({ "index": 1, "id": "JA", "kind": "EDGE", "bodyType": "SKETCH", "point": [h, h, 0.0], "length": 0.005 * std::f64::consts::PI }).to_string());
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("sketch-arc-ref.noshape"), &features, refs).unwrap();
+    assert!(t.step(0).ours.is_some());
+    let found = t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JA"], "queryString": "" })).unwrap();
+    let sketch = t.call("feature_list", json!({})).unwrap()["features"][0]["id"].clone();
+    let entities = t.call("sketch_get", json!({ "sketch": sketch })).unwrap()["entities"].clone();
+    let kind = entities.as_array().unwrap().iter().find(|e| e["id"] == found[0]).map(|e| e["type"].clone());
+    assert_eq!(kind, Some(json!("arc")), "{found:?}");
+}
+
+/// A face none of ours near live's point matches in area (live's is its tessellation's, here 1 % off), whose point
+/// (its box's centre, on its axis) is nearer many other faces: ours of about its area with the centroid in live's box,
+/// the bore, not the nearest (asm-hand-drill-pinslot studio e53bba's groove wall, Extrude 11's end).
+#[test]
+fn a_bore_live_names_off_its_area_is_found_in_its_box() {
+    let mut ctx = Ctx::new();
+    let refs = parse_refs(&json!({ "index": 0, "id": "JW", "kind": "FACE", "point": [0.0, 0.0, 0.005], "area": 1.01 * 2.0 * std::f64::consts::PI * 0.01 * 0.01, "box": [[-0.01, -0.01, 0.0], [0.01, 0.01, 0.01]] }).to_string());
+    let mut t = Translator::open(&mut ctx, &scratch("bore-ref.noshape"), &json!({ "features": [] }), refs).unwrap();
+    // Nine pins round the axis, nearer its point than the bore of the ring round them.
+    let pins = t.call("sketch_create", json!({ "plane": "plane:top" })).unwrap()["sketch"].clone();
+    for i in 0..9 {
+        let a = std::f64::consts::TAU * i as f64 / 9.0;
+        let (x, y) = (2.0 * a.cos(), 2.0 * a.sin());
+        t.call("sketch_draw", json!({ "sketch": pins, "tool": "circle", "points": [[x, y], [x + 0.5, y]] })).unwrap();
+    }
+    let ring = t.call("sketch_create", json!({ "plane": "plane:top" })).unwrap()["sketch"].clone();
+    for r in [10, 12] {
+        t.call("sketch_draw", json!({ "sketch": ring, "tool": "circle", "points": [[0, 0], [r, 0]] })).unwrap();
+    }
+    for (sketch, keep) in [(&pins, None), (&ring, Some(std::f64::consts::PI * 44.0))] {
+        let regions = t.call("sketch_get", json!({ "sketch": sketch })).unwrap()["regions"].clone();
+        let ids: Vec<Value> = regions.as_array().unwrap().iter().filter(|r| keep.is_none_or(|a| (r["area"].as_f64().unwrap() - a).abs() < 1e-3)).map(|r| r["id"].clone()).collect();
+        t.call("feature_add", json!({ "type": "extrude", "params": { "entities": ids, "depth": "10 mm" } })).unwrap();
+    }
+    let found = t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JW"], "queryString": "" })).unwrap();
+    let faces = t.call("query_entities", json!({ "kind": "faces", "surface": "cylinder" })).unwrap()["faces"].clone();
+    let face = faces.as_array().unwrap().iter().find(|f| f["id"] == found[0]).cloned().unwrap_or_default();
+    assert_eq!(face["radius"].as_f64().map(|r| (r * 1e6).round() / 1e6), Some(10.0), "{found:?}");
+}
+
 /// In a sketch's line in live.jsonl the parts before it are still faces
 /// (an extrude up to one of them: clamp-hms, cf-hose-routing); only the
 /// sketch's own body's faces are its regions.

@@ -3815,8 +3815,8 @@ impl<'a> Translator<'a> {
                 let part = self.part_of(k, &r);
                 self.nearest("faces", &r, part.as_deref()).ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p)))
             }
-            // A sketch's line: that line of ours (a part's edge of its length may lie beside it).
-            "EDGE" if r.sketch && let Some(line) = self.sketch_line_at(p, r.measure) => Ok(line),
+            // A sketch's line or arc: that one of ours (a part's edge of its length may lie beside it).
+            "EDGE" if r.sketch && let Some(curve) = self.sketch_curve_at(p, r.measure) => Ok(curve),
             "EDGE" => {
                 let part = self.part_of(k, &r);
                 self.nearest("edges", &r, part.as_deref()).ok_or_else(|| format!("{id}: no edge of ours at {:?} mm", mm(p)))
@@ -3875,9 +3875,9 @@ impl<'a> Translator<'a> {
         None
     }
 
-    /// A line of one of our sketches with its midpoint at `mid` (model, m)
-    /// and live's length, within 1e-6 m.
-    fn sketch_line_at(&mut self, mid: [f64; 3], length: Option<f64>) -> Option<String> {
+    /// A line or arc of one of our sketches with its (arc length) midpoint at `mid` (model, m) and live's length,
+    /// within 1e-6 m (asm-hand-drill-pinslot's Gear Selector Pin: its sweep path's sketch fillet arcs).
+    fn sketch_curve_at(&mut self, mid: [f64; 3], length: Option<f64>) -> Option<String> {
         let sketches: Vec<String> = self.feature_ids.values().cloned().collect();
         for s in sketches {
             let Some(g) = self.sketch_geometry(&s) else { continue };
@@ -3893,6 +3893,24 @@ impl<'a> Translator<'a> {
                 let (Some(a), Some(b)) = (at(&e["start_point"]), at(&e["end_point"])) else { continue };
                 let on = (0..3).all(|i| ((a[i] + b[i]) / 2.0 - mid[i]).abs() < 1e-6);
                 let long = length.is_none_or(|l| ((0..3).map(|i| (b[i] - a[i]).powi(2)).sum::<f64>().sqrt() - l).abs() < 1e-6);
+                if on && long {
+                    return e["id"].as_str().map(str::to_string);
+                }
+            }
+            // An arc runs counterclockwise from its start to its end.
+            let uv = |v: &Value| Some([v[0].as_f64()?, v[1].as_f64()?]);
+            for e in entities.iter().filter(|e| e["type"] == "arc") {
+                let (Some(c), Some(a), Some(b)) = (uv(&e["center"]), uv(&e["start"]), uv(&e["end"])) else { continue };
+                let r = (a[0] - c[0]).hypot(a[1] - c[1]);
+                let t0 = (a[1] - c[1]).atan2(a[0] - c[0]);
+                let mut t1 = (b[1] - c[1]).atan2(b[0] - c[0]);
+                while t1 <= t0 {
+                    t1 += std::f64::consts::TAU;
+                }
+                let t = (t0 + t1) / 2.0;
+                let (u, v) = (c[0] + r * t.cos(), c[1] + r * t.sin());
+                let on = (0..3).all(|i| ((o[i] + u * x[i] + v * y[i]) * k - mid[i]).abs() < 1e-6);
+                let long = length.is_none_or(|l| (r * (t1 - t0) * k - l).abs() < 1e-6);
                 if on && long {
                     return e["id"].as_str().map(str::to_string);
                 }
@@ -4027,6 +4045,21 @@ impl<'a> Translator<'a> {
             let theirs: Vec<&Value> = close.iter().copied().filter(on_part).collect();
             if let Some(e) = if theirs.is_empty() { close } else { theirs }.into_iter().min_by(|x, y| rel(x).total_cmp(&rel(y))) {
                 return id(e);
+            }
+            // None near its point: a whole cylinder's point is its box's centre, on its axis, nearer the faces inside it
+            // (asm-hand-drill-pinslot studio e53bba's groove wall, Extrude 11's end): ours with its centroid in live's box.
+            if kind == "faces"
+                && let Some(b) = r.bbox
+            {
+                let pad = 1e-6 + 1e-3 * (0..3).map(|i| b[1][i] - b[0][i]).fold(0.0, f64::max);
+                let inside = |e: &&Value| f3(&e["centroid"]).is_some_and(|c| (0..3).all(|i| c[i] * k >= b[0][i] - pad && c[i] * k <= b[1][i] + pad));
+                let mut every = a.clone();
+                every.as_object_mut().map(|o| o.remove("near"));
+                every["limit"] = json!(100000);
+                let all = self.call("query_entities", every).ok()?;
+                if let Some(e) = all[kind].as_array().into_iter().flatten().filter(|e| rel(e) <= 5e-2).filter(inside).min_by(|x, y| rel(x).total_cmp(&rel(y))) {
+                    return id(e);
+                }
             }
         }
         // A planar face none of ours matches in area: ours on its plane before the nearest (an Extrude up to it takes
