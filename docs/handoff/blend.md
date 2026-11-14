@@ -1,5 +1,30 @@
 # Blends (agent "blend")
 
+## 11-14 03:50 UTC: landed overnight, gates in flight, hosts
+
+Landed: f197 P0 (e1fc6879), torus rounds (fab048ae, knife Fillet 5 as live), the fillet's drag arrow as std's
+(b2d2b2c4b), a variable fillet of a tangent run in one build (33873848d: knife Fillet 7 symmetric, live's 25 faces;
+volume 1474.19 vs live 1478.82, we take 11.85 mm³ where live takes 7.21: waiting for live's mid-edge radius, 3022 part 2).
+
+In flight (local branches; every pair so far 870 = 870 with no differences):
+- blend-f2twice (blend8): pipeflange Fillet 2 was built twice since 6d4ac9879 (133 -> 510 ms, dx's P0); pair on vibe5.
+- blend-coaxdirect (blend5): coaxial rounds built directly (snap-hook Fillet 5 ~66 -> ~20 ms); asm on vibe7.
+- blend-raysfirst (blend6): the direct build classifies against tools by rays first (knife Fillet 3 94-102 -> 88-90 ms);
+  asm on vibe7 after coax (the vibe6 run was OOM-killed at load 50).
+- blend-p2live (blend7): variable + partial fillets as live 3028 (pair clean, g++-13 OK); asm after rays.
+- blend-partrays (blend2, on raysfirst): the part's classification by rays first too (rings Chamfer 1: 42 points).
+- blend-holdcache (blend10): hold lines sampled once per edge, crossings by regula falsi (faceblend Face blend 1
+  423 / 402 -> 272 / 301 ms on a loaded vibe7: 121725 edge points before).
+- blend-secwires (blend4, on holdcache): a round's loft sections as wires (212 section faces).
+
+Dropped: building fillet_as_cut's tools from their sections and blend_direct before the OCCT cut: slower on the
+groove test (19.8 -> 30 ms), and c2-tpd-fillet-variable's Fillet 1 doesn't use it anyway: it is the variable round's
+tool cut by bool's Rust Boolean (boolean.rust.sections_ahead ~80% of the feature): bool's.
+
+Hosts (lead 11-14): model pairs on vibe5/vibe7 (host-pair.sh, new-side.sh reuses a same-host base log), never the Mac
+(short builds only, one slot). vibe6 is shared with psui/studios and ran out of memory with 3 of my jobs. perf isn't
+allowed on the vibe hosts (perf_event_paranoid 4): find hot calls with NOSHAPE_KERNEL_PROFILE (gcc names the bridge calls).
+
 ## 11-13 16:40 UTC: knife Fillet 2 / 3 faster (blend-speed)
 - A fillet of straight edges with overflow on tries OCCT once without its scaled retries before its sections
   (`k::without_blend_retries`): c2-hunting-knife's Fillet 2 ~300 -> ~150 ms, results identical.
