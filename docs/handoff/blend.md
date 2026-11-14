@@ -1,5 +1,25 @@
 # Blends (agent "blend")
 
+## 11-14 15:55 UTC: landed partrays, frameside, halfround, projonce; before/after on the Mac
+
+Landed today: secwires 66cc9880, partrays c04fdfb5, frameside 351cb81d, halfround 3a6fc428 (skasm told), projonce
+5b263529. Nothing queued, nothing gating.
+
+Mac dev, the blend documents, main 5d31020b1 (with secwires) -> c38ce7bd2 (ms, live): impeller 7402 -> 5328 (2773; the
+flange round 2507 -> ~450), rings 1306 -> 1284 (1557), snap-hook 271 -> 263 (274), michael 94 -> 92 (96), faceblend 41
+(58), tpd 78 -> 79 (44), knife 1180 -> 1254 (408), pipeflange 81 -> 84 (212), setback 528 -> 549 (1089), motor-mount
+49 -> 48 (53), bracket03 29 -> 30 (67), stef 26 (74). Matches unchanged. The knife's +60 is core's a3e9fb3db /
+a6a966cd3 (Loft 3's guide one cubic): its later Booleans' sections_ahead double (Extrude 2 11 -> 20, Fillet 2 68 ->
+101, Chamfer 1 161 -> 175; two alternations, altd-knifeab-*.log); bool and core told.
+
+Open, mine:
+- Impeller flange round (~450 vs 67): blend_direct's result has an open shell (free edges along the flange's bottom
+  outline at z = -4 and the touch line 0.8 mm in: the bottom face's strip under the round isn't closed by it; a tool
+  side "lies on part face 4 within 3.79e-04 mm"), so it declines after ~250 ms and OCCT's round stays.
+- Knife Fillet 3 (80 vs 11): OCCT's attempt 24 ms only to see its round split, then the balls; Fillet 2 (101 vs 10)
+  now mostly the Boolean.
+- tpd's variable round and michael's mitre balls through blend_direct: parked (near-tangent corner sections).
+
 ## 11-14 13:25 UTC: three branches gating; the Mac ranking; projectors made once
 
 Mac dev, per feature against live (main 5d31020b1): c2-impeller-loft's Fillet Flansch zum Stroemungskanal 2507 vs 67
