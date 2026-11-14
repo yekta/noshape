@@ -1,0 +1,67 @@
+{
+ "name": "revolve-intersect-tab",
+ "about": "block: Revolve the y = 0 face about the x = 0 edge, the Intersect tab, Escape",
+ "area": "psui",
+ "source": "live coverage audit 2026-11-14 (dialog options with no recorded scenario)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Revolve"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Revolve axis"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     0,
+     0,
+     3
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Intersect"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
