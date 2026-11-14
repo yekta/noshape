@@ -2688,6 +2688,12 @@ impl<'a> Translator<'a> {
                 if packed_entity_type(&tree).as_deref() == Some("BODY") {
                     return Ok(None);
                 }
+                // A thickened or extruded face named by its cap or side (a sheet metal wall's `CAP_FACE` of
+                // `….wallThicken.*.3D`, through a flange's or fillet's `….copyWalls` SUBSTITUTION: asm-config-assembly
+                // studio 08590a's Hole 2 on the arm's outer face) is the solid's, not the region it came from.
+                if matches!(packed_query_type(&tree).as_deref(), Some("CAP_FACE" | "SWEPT_FACE" | "SUBSTITUTION")) {
+                    return Ok(None);
+                }
                 let mut strings = Vec::new();
                 packed_strings(&tree, &mut strings);
                 own_edges = packed_face_edges(&tree);
@@ -3238,7 +3244,10 @@ impl<'a> Translator<'a> {
                 packed_strings(v, &mut op);
             }
             // (A sketch's imprint keeps it too, split: cf-transform-pattern's connector on a cap edge a sketch imprints.)
-            if !op.iter().any(|o| o.ends_with(".opBoolean") || o.ends_with(".imprint")) {
+            // (So do sheet metal's copies of its walls' edges: a model's `….extract.opExtractSurface`, a flange's
+            // `….copyWalls` SUBSTITUTION; asm-config-assembly studio 08590a's Hole 1 centred on the plate's edge over
+            // Sketch 1's arc.)
+            if !op.iter().any(|o| o.ends_with(".opBoolean") || o.ends_with(".imprint") || o.ends_with(".extract.opExtractSurface") || o.ends_with(".copyWalls")) {
                 return None;
             }
         }
@@ -3273,7 +3282,15 @@ impl<'a> Translator<'a> {
             let r = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 1 }));
             return Some(r.and_then(|f| f["faces"][0]["part"].as_str().map(str::to_string).ok_or_else(|| format!("SWEPT_BODY of {op}: no part of ours"))));
         }
-        let (op, revolve) = strings.iter().find_map(|s| s.strip_suffix(".opExtrude").map(|o| (o.to_string(), false)).or_else(|| s.strip_suffix(".opRevolve").map(|o| (o.to_string(), true))))?;
+        // The cap's own feature's (a disambiguation names other features' extrudes first: asm-config-assembly studio
+        // 08590a's Hole 2 on Sheet metal model 2's wall, told apart by Sheet metal model 1's edges).
+        let mut own = Vec::new();
+        if let Some(v) = get("operationId") {
+            packed_strings(v, &mut own);
+        }
+        let own = own.first().and_then(|o| o.split('.').next()).map(|f| format!("{f}."));
+        let swept = |s: &String| s.strip_suffix(".opExtrude").map(|o| (o.to_string(), false)).or_else(|| s.strip_suffix(".opRevolve").map(|o| (o.to_string(), true)));
+        let (op, revolve) = own.as_ref().and_then(|f| strings.iter().filter(|s| s.starts_with(f.as_str())).find_map(swept)).or_else(|| strings.iter().find_map(swept))?;
         let sk = strings.iter().find_map(|s| s.strip_suffix(".wireOp"))?.to_string();
         let mut curves: Vec<Vec<[f64; 2]>> = Vec::new();
         for c in strings.iter().filter_map(|e| self.curve_of(&sk, e)) {
@@ -3583,7 +3600,8 @@ impl<'a> Translator<'a> {
     }
 
     fn extrude_entity(&mut self, name: &str, is_start: bool, crossing: Option<usize>, op: &str, sk: &str, curves: &[Vec<[f64; 2]>]) -> Result<String, String> {
-        let ours = self.feature_ids.get(op).cloned().ok_or_else(|| format!("{name}: extrude {op} was not built"))?;
+        // A feature's own operation inside it (`F….*.extrude`, a sheet metal model's sheet): that feature's.
+        let ours = self.feature_ids.get(op).or_else(|| op.split_once(".*.").and_then(|(f, _)| self.feature_ids.get(f))).cloned().ok_or_else(|| format!("{name}: extrude {op} was not built"))?;
         // A curve of a custom feature's own sketch (Spur gear's `blankSketch`), whose curves we can't name: a cap's
         // edge by its centre, when the cap's circles share one (asm-hand-drill-pinslot's second Spur gear centred on
         // Extrude 1's hub over the first one's hole).
@@ -5366,6 +5384,17 @@ fn packed_entity_type(p: &noshape_model::custom::host::packed::Packed) -> Option
             Packed::Str(s) => Some(s.clone()),
             _ => None,
         },
+        Packed::Str(s) => Some(s.clone()),
+        _ => None,
+    }
+}
+
+/// A packed query's own `queryType` (its top level's).
+fn packed_query_type(p: &noshape_model::custom::host::packed::Packed) -> Option<String> {
+    use noshape_model::custom::host::packed::Packed;
+    let Packed::Tagged(_, inner) = p else { return None };
+    let Packed::Map(m) = inner.as_ref() else { return None };
+    match &m.iter().find(|(k, _)| matches!(k, Packed::Str(s) if s == "queryType"))?.1 {
         Packed::Str(s) => Some(s.clone()),
         _ => None,
     }
