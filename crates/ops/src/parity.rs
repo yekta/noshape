@@ -6947,7 +6947,17 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 } else if pass {
                     continue;
                 } else {
-                    let by_creator = t.part_by_creator(t.len(), pid, &our_ids).and_then(|id| solids.iter().find(|s| s.2 == id).map(|s| s.0.clone()));
+                    // The feature whose live line first lists the part made it (a composite part, renamed and off in
+                    // volume: asm-infento-subs' "Toothed belt pulley 46T"): the one part of ours that our copy made.
+                    let first_line = studio["live"].as_array().into_iter().flatten().find(|l| l["parts"].as_array().is_some_and(|ps| ps.iter().any(|p| p["partId"] == pid)));
+                    let by_line = first_line.and_then(|l| l["featureId"].as_str()).and_then(|f| t.feature_ids.get(f)).and_then(|ours| {
+                        let head = format!("body:{ours}.");
+                        match solids.iter().filter(|s| s.2.starts_with(&head)).collect::<Vec<_>>().as_slice() {
+                            [one] => Some(one.0.clone()),
+                            _ => None,
+                        }
+                    });
+                    let by_creator = by_line.or_else(|| t.part_by_creator(t.len(), pid, &our_ids).and_then(|id| solids.iter().find(|s| s.2 == id).map(|s| s.0.clone())));
                     match by_creator {
                         Some(n) if fitting.contains(&n) => ours_parts.iter().map(|(n, _)| n).find(|n| !taken.contains(n) && !fitting.contains(n)).cloned().unwrap_or(n),
                         Some(n) => n,
@@ -7260,9 +7270,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 })();
                 // An axis point's Z runs along its cylinder's axis, an edge point's along its curve or circle axis, in
                 // the kernel's own sense (Parasolid's and OCCT's differ: rack-pinion's full round fillet, robotic-arm's
-                // base edge midpoint): flipped where live's frame has it the other way. A circle's centre then often
-                // sits on the hole's other rim: moved along its axis to live's (scissor-lift's Revolute 13: 6 mm). (A
-                // face's point has its outward normal: no such choice; a part inside a subassembly not yet.)
+                // base edge midpoint): flipped where live's frame has it the other way. A circle's centre often sits
+                // on the hole's other rim: moved along its axis to live's. (A face's point has its outward normal: no
+                // such choice; a part inside a subassembly not yet.)
                 ends.push(end.map(|(mut c, inf, live_z, live_o)| {
                     let on_edge = matches!(inf.as_str(), "MID_POINT" | "CENTER") && c["entity"].as_str().is_some_and(|e| e.starts_with("edge:")) && c["instance"].as_str().is_some_and(|i| !i.contains(" > "));
                     if inf.ends_with("AXIS_POINT") {
@@ -7271,9 +7281,14 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     if (inf.ends_with("AXIS_POINT") || on_edge)
                         && let Some(z) = live_z.map(glam::DVec3::from)
                         && let Some((ours_z, ours_o)) = placer.connector_frame_local(&l.tab, &c)
-                        && ours_z.dot(z) < -0.999
+                        && ours_z.dot(z).abs() > 0.999
                     {
-                        c["flip"] = json!(true);
+                        let flip = ours_z.dot(z) < 0.0;
+                        if flip {
+                            c["flip"] = json!(true);
+                        }
+                        // Only along the axis off live's point (the hole's other rim: scissor-lift's Revolute 13, 6 mm,
+                        // flipped; isaac-ball's Revolute 18, 18 mm, not): moved there.
                         if let Some(o) = live_o.map(glam::DVec3::from) {
                             let d = o - ours_o;
                             let along = d.dot(z);
@@ -7281,7 +7296,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                                 c["move"] = json!({ "z": format!("{} mm", along * 1e3) });
                             }
                         }
-                        trace(&format!("{name}: {inf} on {} flipped to live's Z{}", c["instance"], c.get("move").map(|m| format!(", moved {m}")).unwrap_or_default()));
+                        if flip || c.get("move").is_some() {
+                            trace(&format!("{name}: {inf} on {}{}{}", c["instance"], if flip { " flipped to live's Z" } else { "" }, c.get("move").map(|m| format!(", moved {m}")).unwrap_or_default()));
+                        }
                     }
                     c
                 }));
