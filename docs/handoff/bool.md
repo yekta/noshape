@@ -364,52 +364,7 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     off (up to the inner wall); feature 25 Boolean 1 is then 32/81/50 (live 30/83/54) with OCCT's result identical to
     ours on its inputs (a1af84e6, 3998eb43), then Chamfer Stevenrohr Halterung fails. Recording of the whole document
     with this branch: vibe5 ~/agents/bool2-keep/rec-imp2; per-feature diff ~/agents/bool2-keep/imp-diff.log.
-- **Our own sections (lead 15:40 UTC; split with bool on REQUESTS 15:45 / 15:49: plane∩B-spline, lofted∩B-spline,
-  sphere∩B-spline mine; bool keeps sections_ahead's plumbing). WIP branch bool2-march (pushed, e9d8c7a83; debug prints
-  in, not to land).** brep `boolean/march.rs`: an elementary surface's signed distance over the free-form face's
-  parameter grid (its spans x4, >= 32 a way, points evaluated lazily for cells whose hull is near the other face and
-  reaches its surface), crossings on the grid lines chained through the cells (a cell crossed 4 times, or one whose
-  corners / middle come within 2 tol without a crossing and no crossed neighbour: None = OCCT's), cubic pieces filled
-  in to a tenth of the tolerance, then thinned (32 -> ~3 pieces) and checked over every piece. `brep_own_section`
-  (rust_boolean.cpp) keeps each as an IntTools_Curve with OCCT's (its plane curve the poles in the plane's
-  parameters), so the build is unchanged; `SectionSource::own`, `Ctx::own_sections` in occt_sections, the pairs left
-  out of the ahead list and marched ahead on all threads, cached over boolean_with's rounds (`Round`, `Marches`).
-  - c2-rings-loft's 51-slot cut bd8a6b96 (all cores, vibe6): 808 ms without, 840 unclipped (results as OCCT's,
-    "equivalent"), 680 with the runs clipped to the plane face's box in its plane, but then one vertex more than OCCT
-    (at a three-face corner OCCT's section ends 14 um short, on the ring face's boundary; ours stops one grid point
-    past the box). Ending runs exactly on both faces' boundaries declined two cuts (non-manifold). Patches:
-    /root/bool2-scratch/march-{box-clip,exact-trim,with-sphere}.patch.
-  - Spheres (bool's 85 balls, sp-1113 7ecd5a8b): marched curves cut at the sphere's seam (free::seam_crossings) and
-    projected onto it, but the cut declines non-manifold (156 open edges): ours aren't trimmed to the faces as
-    OCCT's (longer, some where OCCT has none). Off on the branch (march-with-sphere.patch has it).
-  - 23:48 UTC (branch bool2-march, pushed): clip margin a tenth of the plane face's box: bd8a6b96 747-759 ms against
-    886-888 (OCCT's sections), but still one vertex more: two vertices 14 um apart at a three-face corner that OCCT's
-    sections (tolerance ~1e-5) merge and ours (1e-7) keep. Asked the lead: accept as equivalent / pad our tolerance /
-    keep it off.
-  - Cylinders (bool's c2-helical-sweep case, vibe5 ~/agents/bool-keep/suite/rec-hs/2e082aa1): marched, cut at the
-    cylinder's seam (free::seam_cuts) and registered by part (OwnSection.range), the curve on the cylinder OCCT's
-    projection: "equivalent" to OCCT's, but 411 ms against 83: 45 % in BRepCheck's wire self-intersection, OCCT's 2D
-    intersection taking our C0-jointed cubic pieces span by span. Next: our curves smooth (C2: one interpolating
-    spline through the pieces' points, in space and on both faces) in brep_own_section, then time again.
-  - 00:40 UTC: live (JwQ): after Circular pattern 1 only OCCT's vertex, so the clipped curves must end as OCCT's. One C2
-    spline per section: the helical sweep 411 -> 131 ms (OCCT's sections 83). But on c2-rings-loft, with every
-    pair marched (the first runs' "equivalent" had most pairs on OCCT via the touch probe): thinning gives declines
-    (bd8a6b96, 0f2fe0e2); without it 78cd8309 has 2 vertices fewer (OCCT's at y 0, where two of the wedge tool's planes
-    meet on the ring) and bd8a6b96 one more. Ours and OCCT's differ where a section reaches a face's corner. Switches on
-    the branch: X_NOMARCH, X_NOCLIP, X_NOSPLINE, X_NOTHIN; probes xprobe::probe_extra_vertices, X_NEAR, X_CHAIN.
-- **c2-hunting-knife (10:52 UTC, gating 1ff449d86): to blend, I changed your blend_section.rs.** The chamfer's
-  section Booleans with lofted tools ran under `with_occt_boolean` (11b4acf22: "noshape's own Boolean takes planes,
-  cylinders and cones only"). Ours takes them since the knife fix (82cfec7d), so the skip is gone (and with it
-  with_occt_boolean, unused). Chamfer 1's two 2-tool cuts: 500-660 ms OCCT -> 180-250 ms ours each; the document
-  1785-1888 -> 1491-1616 ms (live 408), the same 20/52 features (first difference Fillet 3, feature 20). Found with
-  a per-Boolean path print in the document run: "not tried (an earlier path took it)" is what a forced-OCCT Boolean
-  reports.
-  Per document, ours vs live (regeneration ms, recorded on a loaded vibe5): impeller 19117 / 2773 (6.8 s of
-  Booleans on OCCT, upstream), surface-pattern 13683 / 4178 (12.5 s ours, its 85- and 196-tool cuts, bool's),
-  sm-louver 10280 / 4987 (1.2 s ours), rings-loft 6703 / 1557 (the 51-slot cut 0.86 s ours, OCCT 4.5 s),
-  fill-pattern 8458 / 4711 (2.3 s ours, OCCT 11 s), hunting-knife 3741 / 408 (above), snap-hook 1940 / 274.
-- **Completion and speed (08:42 UTC; all 98 documents recorded again with branch 64d5d5501's binaries, vibe5
-  ~/agents/bool2-keep/bydoc, kept out of ~/tmp's pruning):** 936 distinct Booleans, 25 on OCCT (97.3 % ours or our
+- **Our own sections: SHELVED (lead 11-14 00:45 UTC: slower than OCCT's sections (helical sweep 131 vs 83 ms), corner cases open-ended). Branch bool2-march kept. What it would need: sections ending where OCCT's walks end at faces' corners (vertices where two faces of one argument meet on the other: c2-rings-loft 78cd8309 (OCCT's 2 at y 0), bd8a6b96 (live JwQ: OCCT's one)), a curve form OCCT's 2D intersections take whole (C2), and the touch probe not sending most pairs back to OCCT. (Was: lead 15:40 UTC;:** 936 distinct Booleans, 25 on OCCT (97.3 % ours or our
   shortcuts); the replay declines 22. Left: c2-impeller-loft 4 (7519a27a 2.5 s, 9522310b 2.1 s, b4a6c1dc 1.5 s,
   84f92d10 0.6 s; upstream tolerances, blend / core), c2-fan-blade-sweep 2 (fb562f41, 05cd5358: helical strips on
   whole cylinders, bool's seam area; /root/bool2-scratch/fan-wrap-gap.patch), "a shared shape OCCT may keep or remake"
