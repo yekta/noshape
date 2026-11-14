@@ -1216,10 +1216,10 @@ fn auto_icon(c: &AutoConstraint) -> &'static str {
 }
 
 /// Where the first of `n` snap glyphs (20 px boxes, 2 px apart) sits from the pointer, in px right and down: a single
-/// one at (19, 21); a combined snap's row 4 px left and 4 px lower (live2 combo-perpEdge 3x crops: +15 / +25, a
-/// single coincident +19 / +21 beside it).
+/// one at (20, 20); a combined snap's row 5 px left and 5 px lower (live2 sketch-snaps.json "combined": pairs at
+/// +15 / +25, a single glyph at +20 / +20).
 pub fn glyph_offset(n: usize) -> (f32, f32) {
-    if n > 1 { (15.0, 25.0) } else { (19.0, 21.0) }
+    if n > 1 { (15.0, 25.0) } else { (20.0, 20.0) }
 }
 
 /// The glyphs shown by the pointer for inference `inf`: one per constraint it creates, in its order (a combined snap
@@ -1909,8 +1909,9 @@ impl SketchEditor {
             return;
         }
         let distance = |q: DVec2| self.cursor.map(|c| (c - q).length()).unwrap_or(0.0);
+        // (A parallel doesn't meet a model edge: live2 combo parEdge, Lb woken, the end only on the edge.)
         if let ExternalSnap::Edge { position, tangent, midpoint: false, .. } = &snap
-            && let Some(combined) = self.inference.as_ref().and_then(|i| self.direction_onto(i, *position, *tangent))
+            && let Some(combined) = self.inference.as_ref().filter(|i| i.kind != InferenceKind::Parallel).and_then(|i| self.direction_onto(i, *position, *tangent))
         {
             self.inference = Some(combined);
             self.external_snap = Some(snap);
@@ -8368,7 +8369,7 @@ mod tests {
         assert_eq!(inference_icons(&aligned, false), vec!["horizontal", "vertical"]);
         assert_eq!(inference_icons(&inf(InferenceKind::OnCurve, vec![]), true), vec!["coincident"], "a model edge alone");
         assert_eq!(inference_icons(&inf(InferenceKind::Midpoint, vec![]), false), vec!["midpoint"]);
-        assert_eq!((glyph_offset(1), glyph_offset(2)), ((19.0, 21.0), (15.0, 25.0)), "live2's crops");
+        assert_eq!((glyph_offset(1), glyph_offset(2)), ((20.0, 20.0), (15.0, 25.0)), "live2's crops");
     }
 
     /// qa5 SK3: a dimension to a model edge adds no visible sketch
