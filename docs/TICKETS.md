@@ -2224,7 +2224,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   @evFaceTangentPlanes 0.24 and @opCreateBSplineSurface 0.08: the script ~0.9 s. Loops (vibe4) 1.18 -> 1.00 s;
   dev (vibe5) loops 1.11 -> 0.83 s, the feature 2.23 -> 1.97 s; a cached length op 50-65 -> 30-45 ns. Identical on
   all 78 documents. mimalloc preloaded on the new loops: 1.00 -> 1.04 s (points +5 %), steps equal.
-- [ ] P2 ALLOC-MIMALLOC (dx 11-06 01:21, lead 11-06: mimalloc, not jemalloc (MSVC); adopt only if nothing regresses):
+- [x] (dx 2026-11-14 00:43 UTC: closed as not adopted, by its 11-06 09:10 measurement: no gain beyond noise, more memory) P2 ALLOC-MIMALLOC (dx 11-06 01:21, lead 11-06: mimalloc, not jemalloc (MSVC); adopt only if nothing regresses):
   measure app-wide with and without (the corpus' regeneration, the interpreter benchmarks, cold start, peak memory on
   the big documents). First pass with the system libmimalloc 3.2 preloaded (also OCCT's heap): corpus regen 30.1 ->
   33.2 s (cf-spur-gear +59 %, cf-fix-pcb +61 %), peak RSS 2.6 -> 1.5 GB. 01:43: the crate (mimalloc 0.1, Rust's heap
