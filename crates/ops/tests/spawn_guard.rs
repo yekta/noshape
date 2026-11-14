@@ -7,6 +7,7 @@
 const ALLOWED: &[(&str, &str)] = &[
     ("app/src/cli_mode.rs", "macOS only: `open` for a link outside the .app"),
     ("launcher/src/main.rs", "noshape.com, a console program: it starts noshape.exe, a GUI program, in its terminal"),
+    ("app/src/ui_script.rs", "the ui-parity driver's NOSHAPE_UI_SHOTS screenshots (X11's import): a runner aid, off unless set"),
 ];
 
 fn sources(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
