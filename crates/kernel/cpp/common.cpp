@@ -2513,6 +2513,11 @@ std::string bridge_name(const char* mangled)
   // MSVC's type names are already readable (no <cxxabi.h> there).
   std::string n = mangled;
 #endif
+  // (Clang names the lambda "cxxbridge1$op_fillet::$_0" or "...::'lambda'()": the function's name is before it, or
+  // every bridge call reads "_0" in a profile made on a Mac.)
+  for (const char* lambda : {"::$_", "::'lambda"})
+    if (const size_t at = n.find(lambda); at != std::string::npos)
+      n.resize(at);
   const size_t paren = n.find('(');
   size_t       end   = paren == std::string::npos ? n.size() : paren;
   size_t       start = n.rfind('$', end);
