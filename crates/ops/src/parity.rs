@@ -6893,6 +6893,27 @@ pub fn standard_spec_by_part_name(name: &str) -> Option<noshape_model::assembly:
 }
 
 /// A part's volume band (m³, lo and hi) in an assembly corpus' parts list: `volume` [lo, hi] from `.mass.json`, else
+/// NOSHAPE_PATTERN_TRACE: for a pattern or mirror feature `k`, live's change of each part's volume from line `k - 1` to
+/// line `k` (`PATTERN <feature>: live …` on stderr), beside the regeneration's own `PATTERN` lines (model-core's pattern
+/// tracing: each instance's tool and what it alone adds).
+pub fn trace_live_pattern(feature: &str, feature_type: &str, live: &[Value], k: usize) {
+    if std::env::var_os("NOSHAPE_PATTERN_TRACE").is_none() || !["linearPattern", "circularPattern", "curvePattern", "mirror"].contains(&feature_type) {
+        return;
+    }
+    let line = |i: usize| live.iter().find(|l| l["index"].as_u64() == Some(i as u64));
+    let volumes = |l: Option<&Value>| -> Vec<(String, f64)> { l.and_then(|l| l["parts"].as_array()).into_iter().flatten().filter_map(|p| Some((p["name"].as_str()?.to_string(), p["volume"].as_f64()?))).collect() };
+    let (before, after) = (volumes(k.checked_sub(1).and_then(line)), volumes(line(k)));
+    if after.is_empty() {
+        eprintln!("PATTERN {feature}: live has no line {k}");
+    }
+    for (name, v) in &after {
+        match before.iter().find(|(n, _)| n == name) {
+            Some((_, b)) => eprintln!("PATTERN {feature}: live part {name:?}: {:.6} -> {:.6} mm³ ({:+.6})", b * 1e9, v * 1e9, (v - b) * 1e9),
+            None => eprintln!("PATTERN {feature}: live part {name:?}: new, {:.6} mm³", v * 1e9),
+        }
+    }
+}
+
 /// `volume_band` of live's per-feature lines (where `volume` is the number).
 fn volume_band(p: &Value) -> Option<(f64, f64)> {
     let b = p["volume"].as_array().filter(|v| v.len() == 2).or_else(|| p["volume_band"].as_array())?;
@@ -7135,6 +7156,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         for k in 0..t.len() {
             trace(&format!("{name}: feature {k}"));
             let step = t.step(k);
+            trace_live_pattern(&step.name, &step.feature_type, studio["live"].as_array().map(Vec::as_slice).unwrap_or_default(), k);
             res.untranslated.extend(step.problems.iter().map(|p| format!("{name} › {} ({}): {p}", step.name, step.feature_type)));
             // (One live has suppressed is added, then suppressed: its status is the add's.)
             // (Not where live's own line has that status: asm-config-assembly's Fillet 2 / 3 "For active sheet metal parts

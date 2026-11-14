@@ -184,6 +184,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     let mut reached: Vec<String> = Vec::new();
     for k in 0..t.len() {
         let step = t.step(k);
+        noshape_ops::parity::trace_live_pattern(&step.name, &step.feature_type, live, k);
         reached.push(step.name.clone());
         for p in &step.problems {
             res.untranslated.push(format!("{} ({}): {p}", step.name, step.feature_type));

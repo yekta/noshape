@@ -493,6 +493,22 @@ fn verb(ev: &EvalCtx) -> &'static str {
 }
 
 fn run_pattern(ev: &mut EvalCtx, instances: Vec<Instance>) -> FResult<()> {
+    let before = tracing().then(|| solid_volumes(ev));
+    trace(ev, format!("{} instances, {} pattern", instances.len(), ev.enum_("patternType")));
+    let r = run_pattern_paths(ev, instances);
+    if let Some(before) = before {
+        for (id, name, after) in solid_volumes(ev) {
+            let was = before.iter().find(|(b, ..)| *b == id).map(|(.., v)| *v);
+            trace(ev, format!("part {name:?}: {} -> {:.6} mm³ ({})", was.map_or("new".into(), |v| format!("{:.6}", v * 1e9)), after * 1e9, was.map_or(String::new(), |v| format!("{:+.6}", (after - v) * 1e9))));
+        }
+        if let Err(e) = &r {
+            trace(ev, format!("failed: {}", e.message));
+        }
+    }
+    r
+}
+
+fn run_pattern_paths(ev: &mut EvalCtx, instances: Vec<Instance>) -> FResult<()> {
     match ev.enum_("patternType") {
         "FEATURE" => feature_pattern(ev, &instances),
         "FACE" => {
@@ -549,6 +565,9 @@ fn copy_bodies(ev: &EvalCtx, bodies: &[usize], instances: &[Instance]) -> FResul
             let b = &ev.ctx.bodies[bi];
             let res = k::transform(&b.shape, &inst.t, false).map_err(kerr("Failed to create pattern, check input."))?;
             let names = copy_names(ev, &b.faces, &res, inst.code);
+            if tracing() {
+                trace(ev, format!("instance {ii}: copy of {:?}, {:.6} mm³, {} faces", b.id, res.shape.volume().unwrap_or(f64::NAN) * 1e9, res.shape.faces().len()));
+            }
             out.push((ii, bj, b.kind, NamedShape::new(res.shape, names)));
         }
     }
@@ -742,6 +761,7 @@ pub fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instan
     // The copies stitched in where they land inside faces the pattern keeps (Parasolid's face pattern copies the faces:
     // motor-mount-jack's slots through a tube 5 ms in live; tools and a cut took 158 ms).
     if stitch_copies(ev, bi, &body, faces, instances) {
+        trace(ev, format!("{} faces of {body_id:?} copied and stitched in (no Boolean)", faces.len()));
         if crate::regen::display::perf_enabled() {
             log::info!(target: "perf", "pattern_faces × {}: stitched {:.1} ms", instances.len(), t0.elapsed().as_secs_f64() * 1e3);
         }
@@ -760,6 +780,10 @@ pub fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instan
         tools.push(NamedShape::new(res.shape, names));
     }
     let t_copies = t0.elapsed();
+    if tracing() {
+        trace(ev, format!("face tool of {} faces of {body_id:?}: {:.6} mm³, {} faces, {}", faces.len(), tool.shape.volume().unwrap_or(f64::NAN) * 1e9, tool.shape.faces().len(), if tool.add { "added" } else { "removed" }));
+        trace_tools(ev, &body.shape, &tools.iter().map(|t| t.shape.clone()).collect::<Vec<_>>(), tool.add);
+    }
     let r = apply_tools(ev, body_id, tools, tool.add, strict);
     if crate::regen::display::perf_enabled() {
         log::info!(target: "perf", "pattern_faces × {}: tool {:.1} ms, copies + names {:.1} ms, apply {:.1} ms", instances.len(), t_tool.as_secs_f64() * 1e3, (t_copies - t_tool).as_secs_f64() * 1e3, (t0.elapsed() - t_copies).as_secs_f64() * 1e3);
@@ -962,8 +986,10 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     // With Reapply, patternUtils.fs re-runs the features and reports their
     // failure as is (no fallback to the geometry).
     if ev.bool("fullFeaturePattern") {
+        trace(ev, "re-applying the features (Reapply features)");
         return reapply_features(ev, &feats, instances);
     }
+    trace(ev, "geometry of the features (face / part patterns)");
     match geometric_feature_pattern(ev, &feats, instances) {
         Ok(()) => Ok(()),
         // Onshape's own failure (live G45): no re-apply.
@@ -972,6 +998,7 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
         // Faces our face pattern can't make a tool of (Parasolid's can):
         // the same instances by re-applying the features.
         Err(e) => {
+            trace(ev, format!("geometry failed ({}): re-applying the features", e.message));
             ev.ctx = before;
             ev.warnings.truncate(warnings_before);
             match reapply_features(ev, &feats, instances) {
@@ -1746,6 +1773,7 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
             None => m,
         };
         let mut done: Vec<FeatureId> = Vec::new();
+        let total_before = tracing().then(|| solid_volumes(ev).iter().map(|(.., v)| v).sum::<f64>());
         for seed in &seeds {
             let tmp = FeatureId(mix(&[ev.feature.0, seed.id.0, inst.code as u64]) | (1 << 62));
             let expanded = crate::regen::eval::expand_query_variables(&seed.params, &ev.ctx);
@@ -1786,6 +1814,10 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
                 }
                 Err(e) => failures.push(e.message),
             }
+        }
+        if let Some(b) = total_before {
+            let a: f64 = solid_volumes(ev).iter().map(|(.., v)| v).sum();
+            trace(ev, format!("instance {}: re-applied, parts {:+.6} mm³", inst.code, (a - b) * 1e9));
         }
     }
     // patternUtils.fs: instances that fail are skipped silently; only when
@@ -1969,6 +2001,11 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[Option
             let sc = EvalCtx::new(ev.feature, &seeds[si].name, &seeds[si].params, ev.units, ev.ctx.clone(), ev.outer_vars);
             super::extrude::scope(&sc)
         };
+        if tracing() {
+            trace(ev, format!("{}: {} instance tools made as New, then one {op}", seeds[si].name, t.len()));
+            let solids: Vec<Shape> = ev.ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| b.shape.clone()).collect();
+            trace_tools(ev, &Shape::compound(&solids), &t.iter().map(|x| x.shape.clone()).collect::<Vec<_>>(), op == "ADD");
+        }
         // Instances that miss the part leave the pattern OK, without the
         // Add / Remove infos (live "kern (10-23 22:00) patterns": O3, M2).
         let n = ev.infos.len();
@@ -2205,4 +2242,35 @@ pub fn copy_part(ev: &mut EvalCtx) -> FResult<()> {
         push_body_colored(ev, BodyId { feature: ev.feature, index: bj as u32 }, kind, ns.shape, ns.names.faces, color);
     }
     Ok(())
+}
+
+// ------------------------------------------------------------------ tracing
+
+/// NOSHAPE_PATTERN_TRACE=1: each pattern's path, each instance's tool and the volume it alone adds to (or takes from)
+/// its parts, and the parts' volumes before and after, as `PATTERN <feature>:` lines on stderr (the parity harness
+/// adds live's change: docs/handoff/core.md).
+fn tracing() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("NOSHAPE_PATTERN_TRACE").is_some())
+}
+
+fn trace(ev: &EvalCtx, line: impl std::fmt::Display) {
+    if tracing() {
+        eprintln!("PATTERN {}: {line}", ev.name);
+    }
+}
+
+fn solid_volumes(ev: &EvalCtx) -> Vec<(BodyId, String, f64)> {
+    ev.ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| (b.id.clone(), b.name.clone(), b.shape.volume().unwrap_or(f64::NAN))).collect()
+}
+
+/// Each instance tool's volume and faces, and what it alone does to `target`.
+fn trace_tools(ev: &EvalCtx, target: &Shape, tools: &[Shape], add: bool) {
+    let before = target.volume().unwrap_or(f64::NAN);
+    let op = if add { k::BooleanOp::Fuse } else { k::BooleanOp::Cut };
+    for (i, t) in tools.iter().enumerate() {
+        let after = k::boolean(op, std::slice::from_ref(target), std::slice::from_ref(t), &k::BooleanOptions::default()).ok().and_then(|r| r.shape.volume().ok()).unwrap_or(f64::NAN);
+        let c = t.centroid().unwrap_or(DVec3::NAN) * 1e3;
+        trace(ev, format!("instance {i}: tool {:.6} mm³, {} faces, at ({:.3}, {:.3}, {:.3}) mm; alone it {} {:.6} mm³", t.volume().unwrap_or(f64::NAN) * 1e9, t.faces().len(), c.x, c.y, c.z, if add { "adds" } else { "removes" }, (after - before).abs() * 1e9));
+    }
 }

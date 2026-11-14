@@ -31,7 +31,15 @@ area 1e-6 relative or live's band; centre and box 1e-6 m). Per document: the fir
 Score: documents that match to the end, and features that match, out of all. Each difference that isn't the
 translator's becomes a ticket for its area.
 
-**Area of procedural blend faces (core, lead 11-07).** Live measures the area of its procedural (OTHER) blend faces
+**Pattern tracing (core, lead 11-14).** `NOSHAPE_PATTERN_TRACE=1` on any regeneration (parity_models,
+parity_assemblies, the app, the CLI) prints `PATTERN <feature>:` lines on stderr for every pattern and mirror: the
+path it took (face copies stitched in, one face tool, copied bodies, features re-applied as New tools or one by one,
+and why the geometric path fell back), each instance's tool (volume, faces, centroid) and the volume it alone adds to
+or takes from its part, and each part's volume before and after. Under the two suite runners the same lines carry
+live's change of each part from the line before (`PATTERN <feature>: live part …`). Example: asm-hand-drill-pinslot
+studio e53bba's Circular pattern 1, five tools of 22.41 mm³, +112.071 against live's +112.053.
+
+**Area of procedural blend faces (core, lead 11-07).****Area of procedural blend faces (core, lead 11-07).** Live measures the area of its procedural (OTHER) blend faces
 about 0.22 % low, so a part's area band is widened above by 0.22 % of the area of our faces on other surfaces
 (`LIVE_FREEFORM_AREA_SHORT`, `PartState::freeform_area`). Evidence: c2-extension-spring's Curvature rounds
 (magnitude 0.5) read 0.8113 mm² (R 0.5 × 1 mm) and 2.4341 mm² (R 1.5 × 1 mm) in live, ours 0.8131 / 2.4393. Live's own
