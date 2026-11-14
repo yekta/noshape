@@ -12,6 +12,11 @@
     sweep's Sketch 5: a Use joined to another edge's exact end missed it by 3 nm (two fixed points Coincident); the
     ends now come from the exact geometry. Probe for a translated sketch's conflict: /root/skasm-scratch/probes/
     zz_sksolve.rs on a sketch dumped with SKDUMP_ALL (patch: the dump block after `self.dimensions` in parity.rs).
+  - Sampled projections now take their samples on the edge (closest point), not the tessellation's chords:
+    c2-impeller-loft's Stefevenrohr Führung moves 1.9 µm instead of 5.5 (the rest is the 13-sample fit of what is a
+    B-spline in our model). Its Sketch Bohrung Ansaugflansch: JrB is a straight 80 mm edge at x = −44 in live, a
+    different edge in ours (upstream geometry); now dimensionable, its 5 mm distance moves the sketch 44 mm and the
+    sketch's edits are taken back (before, that one distance was skipped). Core's geometry first.
   - c2-impeller-loft's Sketch Bohrung Flansch (2.6 mm): not the solver. Its external KmZB / KmZD resolve to other edges
     (ours a 67.6 mm spline at x = 0 and a full R29.5 circle; live a 52.7 mm edge at x = −44 and a 33.2 mm arc): the
     impeller's geometry differs from feature 12 on (core's). Live (behaviours "skasm (11-14) point on a spline past
