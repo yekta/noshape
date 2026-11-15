@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## qa, 2026-11-15
-- [ ] P0 QUIT-ABORT-DOCK (core; asm / studios for the tab side) The user's dock document (private: vibe5 ~/lead-private/dock.noshape,
+- [x] verified 80e16e42d (qa 11-15 12:50: dae03465 on green 80e16e42d, vibe6: qa-asm-a 10/10 and qa-tabs 10/10 clean; before 6/6 and 6/8 crashed on 0.4.52) P0 QUIT-ABORT-DOCK (core; asm / studios for the tab side) The user's dock document (private: vibe5 ~/lead-private/dock.noshape,
   only as a mode-700 copy in ~/tmp/<agent>) aborts the app as it quits: glibc "corrupted size vs. prev_size while consolidating" /
   "noshape: the kernel aborted; not recoverable" (exit 134, core dumped), after the UI-script runner's "UI-SCRIPT done". v0.4.52's
   Linux release app on vibe6 (llvmpipe, :661): 4 of 9 runs of a script that switches tabs A - Yumusak Kutu -> B - Cakil Tasi ->
