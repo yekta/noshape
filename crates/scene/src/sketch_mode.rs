@@ -639,6 +639,8 @@ pub struct SketchEditor {
     pub text_flip_vertical: bool,
     /// The text rectangle is provisional until the Text dialog is confirmed.
     pub pending_text: Option<(DVec2, f64)>,
+    /// The two clicks that placed it: a corner on a snapped point gets that point's Coincident at ✓.
+    text_clicks: Vec<Click>,
     /// Existing text reopened in the Text dialog (double-click, live Onshape).
     pub editing_text: Option<u32>,
     /// The Text dialog's "Convert to expression" state.
@@ -1305,6 +1307,7 @@ impl SketchEditor {
             text_flip_horizontal: false,
             text_flip_vertical: false,
             pending_text: None,
+            text_clicks: Vec::new(),
             editing_text: None,
             text_expression: false,
             pattern_count: 3,
@@ -1397,6 +1400,7 @@ impl SketchEditor {
         self.text_expression = false;
         self.xf_center_pinned = false;
         self.pending_text = None;
+        self.text_clicks.clear();
         self.slot_session = None;
         self.offset_pending = None;
         self.offset_repeat = false;
@@ -3578,6 +3582,7 @@ impl SketchEditor {
                 let first = self.clicks.remove(0);
                 let (origin, height) = self.text_box_from(first.pos, click.pos);
                 self.pending_text = Some((origin, height));
+                self.text_clicks = vec![first, click];
                 self.message = None;
                 EditOutcome::redraw()
             }
@@ -3730,6 +3735,18 @@ impl SketchEditor {
                     t.expression = self.text_expression;
                 }
                 self.pending_text = None;
+                // Live (sketch-text-font-typed-ok: COINCIDENT, HORIZONTAL): a corner placed on a point is Coincident with it.
+                let corners: Vec<EntityId> = data.texts.iter().find(|t| t.id == id).map(|t| t.box_points.iter().map(|p| EntityId(*p)).collect()).unwrap_or_default();
+                for c in std::mem::take(&mut self.text_clicks) {
+                    let Some(pt) = corners.iter().copied().find(|p| data.sketch.point(*p).is_some_and(|q| q.distance(c.pos) < 1e-9)) else { continue };
+                    for a in c.inference.iter().flat_map(|i| &i.constraints) {
+                        if let AutoConstraint::CoincidentPoint(q) = *a
+                            && q != pt
+                        {
+                            let _ = data.sketch.add_constraint(ConstraintKind::Coincident { a: pt, b: q });
+                        }
+                    }
+                }
                 self.set_tool(Tool::Select);
                 // Live (sketch-text-font-typed-ok): nothing is selected after ✓.
                 self.selection.clear();

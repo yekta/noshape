@@ -461,10 +461,14 @@ impl PartStudioView {
             (shown != T::Select).then(|| crate::ui::onshape_title(shown.label()).split(" (").next().unwrap_or_default().to_string())
         };
         let owned: std::collections::HashSet<_> = sk.entities().filter(|e| e.kind() != EntityKind::Point).flat_map(|e| e.point_refs()).collect();
+        // A text is one entity in live's model, its box's own constraints but its Horizontal not listed
+        // (sketch-text-font-typed-ok: "other"; COINCIDENT, HORIZONTAL).
+        let text_box: std::collections::HashSet<noshape_sketch::EntityId> =
+            data.texts.iter().flat_map(|t| t.box_lines.iter().chain(&t.box_points)).map(|i| noshape_sketch::EntityId(*i)).collect();
         let mut entities: Vec<String> = sk
             .entities()
             // (A spline's tangent handles are part of it in live's model: not listed.)
-            .filter(|e| !e.external && !e.reference_only && e.handle_of.is_none() && !(e.kind() == EntityKind::Point && owned.contains(&e.id)))
+            .filter(|e| !e.external && !e.reference_only && e.handle_of.is_none() && !(e.kind() == EntityKind::Point && owned.contains(&e.id)) && !text_box.contains(&e.id))
             .map(|e| {
                 let kind = match e.kind() {
                     EntityKind::Line => "line",
@@ -479,10 +483,11 @@ impl PartStudioView {
                 if e.construction { format!("construction {kind}") } else { kind.to_string() }
             })
             .collect();
+        entities.extend(data.texts.iter().map(|_| "other".to_string()));
         entities.sort();
         // A point the tools share between curves is a Coincident in live.
         let mut users: std::collections::HashMap<_, usize> = std::collections::HashMap::new();
-        for e in sk.entities().filter(|e| e.kind() != EntityKind::Point && !e.external && e.handle_of.is_none()) {
+        for e in sk.entities().filter(|e| e.kind() != EntityKind::Point && !e.external && e.handle_of.is_none() && !text_box.contains(&e.id)) {
             let mut pts = e.point_refs().to_vec();
             pts.sort();
             pts.dedup();
@@ -518,7 +523,8 @@ impl PartStudioView {
             driven.push(kind);
         }
         let mut pattern_seeds = Vec::new();
-        for c in sk.constraints().filter(|c| c.driving) {
+        let in_text_box = |c: &noshape_sketch::Constraint| !matches!(c.kind, K::Horizontal { .. }) && c.kind.entities().iter().all(|e| text_box.contains(e));
+        for c in sk.constraints().filter(|c| c.driving && !in_text_box(c)) {
             let mm = |v: f64| (v * 1e3 * 1e6).round() / 1e6;
             let typed = |unit: &str| data.dimension_exprs.get(&c.id.0).map(|e| onshape_dimension_expression(&e.text, unit));
             let length = typed(units.length.symbol());
