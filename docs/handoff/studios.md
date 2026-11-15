@@ -9,25 +9,20 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-15 22:46 UTC.
+Updated 2026-11-15 23:20 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-- 53ff8e254: an auxiliary view's own label 3.1 mm under it, as a section's.
-- b13ba80df, live2's 11-15 retakes (drawing-ui tests pass on the Mac):
-  - the Note panel and the dimension palette report in the 11-15 reader's form (`{kind: "cell-format" | "palette",
-    fields, old}`; the runner takes `old` for older takes); the palette's untyped value follows a precision picked
-  - Paste from a menu lands at the pointer where Paste was clicked
-  - Move to ▸ lists every layer, the annotation's own greyed; Send to back is greyed only with nothing else on the
-    sheet
-  - the empty sheet's menu with an annotation selected ends with Delete (drw-datum-copy-paste s6)
-  - a datum target's picked anchor reads EDGE of its view; "Insert custom table of <source> ..."; run.py maps live's
-    "start … Copy n" row names
-- Checked on vibe6 (20 takes: the 15 new-reader drawing takes + 5 old-form ones) before the palette precision, Move
-  to and Delete fixes: 11 match, the rest are listed below. The full drawing run waits for a free slot.
+- A datum target's anchor edge is marked `new` in ours' state; the runner drops it for takes from recorders before
+  2026-11-15.1, which didn't read it (drw-datum-target, -show-dims, -show-all-dims match again; -hide-dim still does).
+
+Landed 22:55: 417c6341 as 35f38a29 (the 11-15 retakes batch + the auxiliary label). Full drawing run on vibe5
+(22:50, part on the binary before it): 276 of 287; rerun of the 10 that differed on the new one: 8 match. Left:
+drw-datum-copy-paste (live2's answer), drw-note-move-to-title-block s8 (the reader's lit edge under the pointer),
+plus the known drw-centermark / -align, drw-insert-view-top-1to1, drw-view-align-horizontally.
 
 ## Waiting on others
 - live2 (22:40 asked): drw-datum-copy-paste s6's Add leader on a datum (what it does; which rows a note, a dimension, a

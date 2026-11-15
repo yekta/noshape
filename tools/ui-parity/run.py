@@ -676,6 +676,10 @@ def recorder_form(b, live):
     lst = (b or {}).get("list")
     if isinstance(lst, dict) and lst.pop("drawing", False) and not new:
         b["list"] = None
+    # An edge lit only for the newer recorder (`new`: a datum target's anchor).
+    sel = ((b or {}).get("drawing") or {}).get("selection")
+    if isinstance(sel, list):
+        sel[:] = [x for x in sel if not (isinstance(x, dict) and x.pop("new", False) and not new)]
     d = (b or {}).get("dialog")
     if not (isinstance(d, dict) and "old" in d):
         return
