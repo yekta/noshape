@@ -1528,7 +1528,13 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
         Ok(!corners.is_empty() && corners.iter().all(|p| out(*p)) && out(corners.iter().sum::<DVec3>() / corners.len() as f64))
     };
     // Each edge's tool on its own (in parallel: c2-hunting-knife's six lofts took 200 ms one after another).
-    let build = |c: &ChainEdge, e: &BallEdge| -> FResult<Shape> {
+    // A ball's tool: made (a line's extrusion, an arc's revolution), or its sections to loft once every edge's are known
+    // good (a bad one declines the round before any loft).
+    enum Ball {
+        Tool(Shape),
+        Loft(Vec<Shape>, bool, Vec<DVec3>, usize, f64),
+    }
+    let build = |c: &ChainEdge, e: &BallEdge| -> FResult<Ball> {
         let ends = [junction(c.start)?, junction(c.end)?];
         let outs = [-tangent_dir(c, true)?, tangent_dir(c, false)?];
         let rolls_on = |end: usize| ends[end].is_none() && !tangent_continues(shape, if end == 0 { c.start } else { c.end }, outs[end], c.index);
@@ -1566,7 +1572,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
                 Some(j) => ball_section_as(j, ball(c.start + d * s0)?.1, &e.sup, r)?,
                 None => section(c.start + d * s0)?,
             };
-            return Ok(k::extrude(&k::make_face_from_wire(&first, true)?, d * (s1 - s0))?.shape);
+            return Ok(Ball::Tool(k::extrude(&k::make_face_from_wire(&first, true)?, d * (s1 - s0))?.shape));
         }
         let info = c.shape.edge_info()?;
         // An arc between a plane square to its axis and a cylinder about it: the balls' centres run round that axis, the
@@ -1635,7 +1641,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
                 eprintln!("ball torus: {:.4} rad from {:.4}: valid {} volume {:?}", phi1 - phi0, phi0, tool.is_valid(), tool.volume());
             }
-            return Ok(tool);
+            return Ok(Ball::Tool(tool));
         }
         let at = |f: f64| -> FResult<(DVec3, DVec3)> {
             let t = info.first_param + (info.last_param - info.first_param) * if c.forward { f } else { 1.0 - f };
@@ -1651,13 +1657,19 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
         let closed = near(c.start, c.end);
         // (A section per 0.1 rad of turn: the knife's R3.5 tip within 1e-6 mm of its balls.)
         let n = ((turn / 0.1).ceil() as usize).clamp(8, 240);
-        let (mut secs, mut starts, mut centres) = (Vec::new(), Vec::new(), Vec::new());
+        let (mut secs, mut starts, mut centres): (Vec<Shape>, Vec<DVec3>, Vec<DVec3>) = (Vec::new(), Vec::new(), Vec::new());
         let mut guess = at(0.0)?.0 + e.inward * r;
         for k in 0..if closed { n } else { n + 1 } {
             let f = if closed { (k as f64 / n as f64 + 0.25).fract() } else { k as f64 / n as f64 };
             let (p, t) = at(f)?;
             let (centre, touch) = rolling_ball(p, t, &e.sup, r, guess)?;
             guess = centre;
+            // (A jump, found as it happens: the rest of the balls not rolled for nothing.)
+            if let [.., a, b] = centres.as_slice()
+                && (centre - *b).length() > 4.0 * (*b - *a).length() + scale * 1e-9
+            {
+                return Err(fail("the rolling balls jump along the edge"));
+            }
             centres.push(centre);
             let shared = if closed { None } else if k == 0 { ends[0].as_ref() } else if k == n { ends[1].as_ref() } else { None };
             let (face, start) = match shared {
@@ -1698,15 +1710,41 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
                 starts.extend(more_starts);
             }
         }
-        let tool = k::loft_tool(&secs, closed, &starts)?;
-        if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
-            eprintln!("ball loft: {} sections ({n} on the edge, turning {turn:.3}): valid {} volume {:?}", secs.len(), tool.shape.is_valid(), tool.shape.volume());
+        // Balls that jump from one station to the next, or a section far off the others' size (a junction's ball
+        // taken on another branch): a loft through them comes out inside out or vast (c2-hunting-knife's Fillet 8 on
+        // its lean handle: two such lofts, 440 ms, then declined anyway). Declined before lofting.
+        let median = |mut v: Vec<f64>| -> f64 {
+            v.sort_by(|a, b| a.total_cmp(b));
+            v.get(v.len() / 2).copied().unwrap_or(0.0)
+        };
+        let steps: Vec<f64> = centres.windows(2).map(|w| (w[1] - w[0]).length()).collect();
+        let step = median(steps.clone());
+        if steps.iter().any(|&d| d > 4.0 * step + scale * 1e-9) {
+            return Err(fail("the rolling balls jump along the edge"));
         }
-        Ok(tool.shape)
+        let areas: Vec<f64> = secs.iter().map(|f| f.area().unwrap_or(0.0)).collect();
+        let size = median(areas.clone());
+        if areas.iter().any(|&a| a > 8.0 * size || a < size / 8.0) {
+            return Err(fail("a rolling ball's section far off the others' size"));
+        }
+        Ok(Ball::Loft(secs, closed, starts, n, turn))
     };
     use rayon::prelude::*;
     let legacy = k::kernel_legacy();
-    let tools = chain.par_iter().zip(edges.par_iter()).map(|(c, e)| k::with_kernel_legacy(legacy.clone(), || build(c, e))).collect::<FResult<Vec<_>>>()?;
+    let built = chain.par_iter().zip(edges.par_iter()).map(|(c, e)| k::with_kernel_legacy(legacy.clone(), || build(c, e))).collect::<FResult<Vec<_>>>()?;
+    let tools = built
+        .into_par_iter()
+        .map(|b| match b {
+            Ball::Tool(t) => Ok(t),
+            Ball::Loft(secs, closed, starts, n, turn) => k::with_kernel_legacy(legacy.clone(), || {
+                let tool = k::loft_tool(&secs, closed, &starts)?;
+                if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+                    eprintln!("ball loft: {} sections ({n} on the edge, turning {turn:.3}): valid {} volume {:?}", secs.len(), tool.shape.is_valid(), tool.shape.volume());
+                }
+                Ok(tool.shape)
+            }),
+        })
+        .collect::<FResult<Vec<_>>>()?;
     let conics = edges.iter().flat_map(|e| plane_cylinder_contacts(&e.sup, r)).collect();
     Ok((tools, conics))
 }
