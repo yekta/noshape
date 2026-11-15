@@ -114,7 +114,7 @@ if [ $mainonly = 1 ]; then
   bins=$(grep -E 'Executable tests/all.rs' "$scratch/gate-build-base.log" | sed -n 's|.*(\(.*\)).*|\1|p')
   bk=$(echo "$bins" | sed -n 1p); bo=-; [ $ops = 1 ] && bo=$(echo "$bins" | sed -n 2p)
   ssh -o BatchMode=yes "$host" "mkdir -p ~/agents/bool-gate/bin ~/agents/bool-gate/runs" && scp -q "$here/gate-host.py" "$host:agents/bool-gate/bin/gate-host.py"
-  (cd "$wt_base" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && python3 agents/bool-gate/bin/gate-host.py run --out agents/bool-gate/runs/main-${base:0:9} --jobs $jobs --threads $threads --role base:$bkey_r:$bkey_s:$bkey_o:$bk:$bo") >> "$log" 2>&1
+  (cd "$wt_base" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && \$([ -x bin/slot ] && echo bin/slot) python3 agents/bool-gate/bin/gate-host.py run --out agents/bool-gate/runs/main-${base:0:9} --jobs $jobs --threads $threads --role base:$bkey_r:$bkey_s:$bkey_o:$bk:$bo") >> "$log" 2>&1
   say "main ${base:0:9}: replay $(cached "$bkey_r" replay && echo cached || echo 'not cached (a shard without results)'), suite $(cached "$bkey_s" suite && echo cached || echo 'not cached'), $(( ($(date +%s) - t0) / 60 )) min"
   exit 0
 fi
@@ -130,7 +130,7 @@ if [ $nightly = 1 ]; then
   ssh -o BatchMode=yes "$host" "mkdir -p ~/agents/bool-gate/bin ~/agents/bool-gate/runs ~/agents/bool-gate/nightly" && scp -q "$here/gate-host.py" "$host:agents/bool-gate/bin/gate-host.py"
   night=$(date -u +%m%d); corp=${NOSHAPE_NIGHTLY_CORPORA:-kall}  # (another corpus: to try the run)
   out="agents/bool-gate/runs/kall-$night"
-  (cd "$wt_base" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && python3 agents/bool-gate/bin/gate-host.py run --out $out --jobs 1 --threads 8 --corpora $corp --role main:kall-$night-${base:0:9}:-:$bkey_o:$bk:- && cp $out/kall-$night-${base:0:9}-replay.tsv agents/bool-gate/nightly/kall-$night.tsv && prev=\$(ls agents/bool-gate/nightly/kall-*.tsv | grep -v kall-$night.tsv | tail -1) && if [ -n \"\$prev\" ]; then python3 agents/bool-gate/bin/gate-host.py cmpfiles \$prev agents/bool-gate/nightly/kall-$night.tsv; else echo \"VERDICT PASS: the first night, nothing to compare: \$(cut -f4 agents/bool-gate/nightly/kall-$night.tsv | sort | uniq -c | tr -s ' ' | paste -sd, -)\"; fi") >> "$log" 2>&1
+  (cd "$wt_base" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && \$([ -x bin/slot ] && echo bin/slot) python3 agents/bool-gate/bin/gate-host.py run --out $out --jobs 1 --threads 8 --corpora $corp --role main:kall-$night-${base:0:9}:-:$bkey_o:$bk:- && cp $out/kall-$night-${base:0:9}-replay.tsv agents/bool-gate/nightly/kall-$night.tsv && prev=\$(ls agents/bool-gate/nightly/kall-*.tsv | grep -v kall-$night.tsv | tail -1) && if [ -n \"\$prev\" ]; then python3 agents/bool-gate/bin/gate-host.py cmpfiles \$prev agents/bool-gate/nightly/kall-$night.tsv; else echo \"VERDICT PASS: the first night, nothing to compare: \$(cut -f4 agents/bool-gate/nightly/kall-$night.tsv | sort | uniq -c | tr -s ' ' | paste -sd, -)\"; fi") >> "$log" 2>&1
   v=$(grep '^VERDICT' "$log" | tail -1); [ -n "$v" ] || v="VERDICT FAIL: the nightly kall run gave no verdict ($log)"
   line="$(date -u +%m-%d) kall on main ${base:0:9}: $v"
   echo "$line" | tee -a "$scratch/kall-nightly.log"; mkdir -p /tmp/lead; echo "$line" > /tmp/lead/kall-status
@@ -187,7 +187,7 @@ args=(--out "$out" --jobs "$jobs" --threads "$threads" --cmp base new
   --role "base:$bkey_r:$bkey_s:$bkey_o:$bk:$bo" --role "new:$nkey_r:$nkey_s:$nkey_o:$nk:$no")
 # (A branch that leaves the kernel's crates alone times the same as main.)
 [ $spd = 1 ] && [ "$base_rk" != "$new_rk" ] && args+=(--speed "$bk" "$nk")
-(cd "$wt_new" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && python3 agents/bool-gate/bin/gate-host.py run $(printf '%q ' "${args[@]}")") 2>&1 | tee -a "$log" | grep -E '^(gate-host|VERDICT|replay|model suite|speed)' >&2
+(cd "$wt_new" && NOSHAPE_RB_HOST=$host tools/tiers/rb.sh bash -c "cd ~ && \$([ -x bin/slot ] && echo bin/slot) python3 agents/bool-gate/bin/gate-host.py run $(printf '%q ' "${args[@]}")") 2>&1 | tee -a "$log" | grep -E '^(gate-host|VERDICT|replay|model suite|speed)' >&2
 wait $ptests; rt=$?
 grep -E '^test result|FAILED$' "$scratch/gate-tests.log" >> "$log"
 failed=$(grep -E '^test .* FAILED$' "$scratch/gate-tests.log" | sed 's/^test //; s/ \.\.\. FAILED$//' | head -3 | paste -sd, -)
