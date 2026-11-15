@@ -5,6 +5,26 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 11:32 UTC: exchange "live imports ours" findings; disk cache parked
+- Queued 206bb6dc (re-queued: the 11:03 failure was the land host SIGTERMing part-studio-ui's tests; 201 pass on the
+  Mac in 28 s): evEdgeConvexity, std per-module slots, the suite's held rule (below), handoff.
+- Cold custom features (quiet vibe7, median of 7, live 43 / 43): cf-3d-spline 20.4 ms, cf-mortise-and-tenon 41.6 (was
+  97.8). The parsed-std disk cache (branch dx-fscache: bincode, build key from build.rs, per-module files) adds <= 2 ms:
+  parked (lead 11-15: no measurable gain for 15 MB and more code).
+- Exchange on live's 11-15 files: 39/48 (vibe7 ~/tmp/dx/exch-1115d.log; the hosts' live-ours*.json were 11-09 until I
+  rsynced them at 11:20: sync after each live re-import).
+  - Live misreads its own STEP / IGES of the chamfered gears (32 teeth: own STEP 4771.70, IGES 4772.67, model 4761.97):
+    the suite's "held to the model as close as live's own" rule was bypassed by the total-volume branch; now
+    live's import of ours is always held so, x1.25, and to the model where live fails its own (wave spring STEP).
+  - Dropped on live's evidence: B-spline flanks (live 10:44: gears unchanged), B-spline sheet metal surfaces (live
+    11:15: still 61 faces). Our STEP / IGES writers give an extrusion a 1 mm vector; harmless for live.
+  - Left: spur gear 20-tooth area (blend, gating); 65-tooth STEP area -0.17 mm² (live's own IGES reads the same: left,
+    lead); hose x_t ring split (deliberate, tolerant rings); sheet metal STEP / IGES 61 vs 58 and STL (inexact edges:
+    skasm, lead 11-15); STL density (mine): live.stl is REST's default, not 5° arcs (Ø10 bore 23 points, ours 67;
+    asked live 11:31 for the rule; radijator ours 17 % fewer triangles, gear 52 % more).
+- skasm's dropped constraints: live's sketch refs merged into c2-hunting-knife / c2-fan-blade-sweep refs.jsonl (lines
+  evaluated after their own sketch dropped: Ic / Id).
+
 ## 11-15 10:07 UTC: Part mirror + Edge point landed; 1dc32b 4 failing; custom-feature speed (std cold load)
 - Landed: Edge point on a sketch curve, evCollision same-side faces interfere (Part mirror boss-block Add, core/psui),
   studio refs from `<element>.refs.jsonl` (ca3083c7); inspection bubble fill one outlined path (fa4acfdb).
