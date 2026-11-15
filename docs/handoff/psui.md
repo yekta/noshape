@@ -251,6 +251,14 @@ Mirror strategy table as 65 (34/35 px rows, icon sizes, `mirror-symmetric` icon,
 target `button:Mirror strategy…`). Open: live swallows the first click after a sketch box select (live2: 3 runs) — a
 lost click, not copied; decision to the lead (sketch-mirror-preselected-batch stays at 19/24). The shot scenarios
 (shot-*.json, starts.json) are in /root/psui-scratch/mshots/scen; mshots.sh runs them with NOSHAPE_UI_SHOTS.
+**11-15 11:45 (qa's hat15 P0, lead):** the 7.9 s / 4.4 s were lat-steps.py's 600 ms quiet rule meeting the text
+caret's 500 ms blink (qa now uses 450 ms and NOSHAPE_PERF's regen lines). The real bug: Tab with a number field's unit
+list open ("6 mm") took the entry only, so no preview ran and ✓ then just applied the value, dialog left open; now Tab
+also applies the field (`completion_keys`; dialogs matrix row, 20 / 20). Cold hat15 (fresh NOSHAPE_CACHE_DIR, vibe6):
+open 12.7 s for 140 features, Tab's preview 252 ms, ✓ 139 ms, undo 24 ms. Also: a sketch edit's synchronous regen
+dropped the run entering the sketch started but kept its `pending`, so the working overlay stayed up until the sketch
+closed (fixed in `regen_sync`); ui-parity `live_defects` (README) for live shortcomings we don't copy. Full psui-area
+run (1021 with live takes) going on vibe6: ~/tmp/psui/full1115.
 **11-14 18:16 (viewport speed, Linux numbers):** vibe7 (load ~16), release, llvmpipe, 60 samples, mode-700 copies
 deleted after. Pointer / click to the frame with its highlight or selection, p50: dock hover 370 ms, pick 620; hat15
 hover 381-856, pick 1074: llvmpipe drawing the models. To its submission p50 0.4-1.9 ms; the maxima (69-985 ms, one
