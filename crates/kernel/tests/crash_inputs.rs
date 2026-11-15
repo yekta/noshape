@@ -71,6 +71,7 @@ fn replay_as(name: &str, describe: bool) -> String {
             let parts = s.children();
             extrude_up_to(&parts[0], v3(&after(&p, "dir", 3)), &parts[1], after(&p, "start_offset", 1)[0])
         }
+        "defeature" => delete_faces(&s, &subs),
         other => panic!("unknown op {other}"),
     };
     match r {
@@ -99,7 +100,7 @@ fn crashing_kernel_inputs_return() {
     assert!((b.volume().unwrap() - 1.0).abs() < 1e-12);
 }
 
-/// Replays one NOSHAPE_DUMP_OPS capture and times it:
+/// Replays one NOSHAPE_DUMP_OPS capture (fillet, draft, shell, prism_until, defeature) and times it:
 /// `NOSHAPE_REPLAY=<dir>/<name> cargo test -p noshape-kernel --test all crash_inputs::replay_one -- --ignored --nocapture`.
 #[test]
 #[ignore = "T2: a tool; needs NOSHAPE_REPLAY"]

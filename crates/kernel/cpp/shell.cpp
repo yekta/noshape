@@ -10782,13 +10782,32 @@ OpOut op_draft_wedges(const OcShape& solid_in, const OcShapeList& faces_in, P3 p
       else if (c.GetType() == GeomAbs_Line)
         ++lines;
     }
-    if (arcs.size() != 2 || lines != 2)
-      fail_op("draft fallback: unsupported cylinder face");
-    const double      R = s.Cylinder().Radius();
-    BRepAdaptor_Curve c(arcs[0]);
-    const gp_Circ     ci = c.Circle();
-    const gp_Pnt      E  = c.Value(c.FirstParameter());
-    const gp_Vec      rho = gp_Vec(ci.Location(), E).Normalized();
+    const double R = s.Cylinder().Radius();
+    // The band's circle, start and sweep: its first arc's, or (its rim notched, as by a hole's counterbore through it:
+    // asm-infento-subs' 1dc32b Draft 1) the cylinder's over the face's angle range; the wedge over a notch lies in its
+    // void.
+    gp_Circ ci;
+    gp_Pnt  E;
+    double  sweep = 0;
+    if (arcs.size() == 2 && lines == 2)
+    {
+      BRepAdaptor_Curve c(arcs[0]);
+      ci    = c.Circle();
+      E     = c.Value(c.FirstParameter());
+      sweep = c.LastParameter() - c.FirstParameter();
+    }
+    else
+    {
+      double u0, u1, v0, v1;
+      BRepTools::UVBounds(f, u0, u1, v0, v1);
+      if (!(u1 - u0 < 2 * M_PI - 1e-9) || !(u1 > u0))
+        fail_op("draft fallback: unsupported cylinder face");
+      const gp_Cylinder cy = s.Cylinder();
+      ci    = gp_Circ(cy.Position().Ax2(), R);
+      E     = ElSLib::Value(u0, 0.0, cy);
+      sweep = u1 - u0;
+    }
+    const gp_Vec rho = gp_Vec(ci.Location(), E).Normalized();
     gp_Pnt            q;
     gp_Dir            n;
     if (!inner_point(f, q, n))
@@ -10826,7 +10845,7 @@ OpOut op_draft_wedges(const OcShape& solid_in, const OcShapeList& faces_in, P3 p
       TopoDS_Face sec = polygon_face(poly);
       if (sec.IsNull())
         continue;
-      BRepPrimAPI_MakeRevol mk(sec, ci.Axis(), c.LastParameter() - c.FirstParameter());
+      BRepPrimAPI_MakeRevol mk(sec, ci.Axis(), sweep);
       if (!mk.IsDone())
         fail_op("draft fallback: revolve failed");
       TopoDS_Shape w = mk.Shape();

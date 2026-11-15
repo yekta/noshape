@@ -187,6 +187,40 @@ fn draft_wedges_like_onshape() {
     }
 }
 
+/// A fillet band whose rim a hole notches (asm-infento-subs' 1dc32b Draft 1: a counterbore through a pulley window's
+/// wall) is drafted as the plain band, the notch's void staying where it is: the R3-filleted 40 × 20 × 10 block with a
+/// Ø2 cut down to z 8 across one corner fillet's top rim, its sides drafted 5° about the base, is the plain block drafted
+/// less the notch's part inside that.
+#[test]
+fn draft_wedges_take_a_notched_fillet_band() {
+    setup();
+    let b = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    let v = edges_where(&b, |i| (i.start.z - i.end.z).abs() > 1e-9);
+    let plain = fillet_checked(&b, &v, &[3.0 * MM]).unwrap().shape;
+    let at = DVec3::new(37.0 + 2.0 * std::f64::consts::FRAC_1_SQRT_2, 17.0 + 2.0 * std::f64::consts::FRAC_1_SQRT_2, 8.0) * MM;
+    let notch = make_cylinder(&Plane::from_normal(at, DVec3::Z), 1.0 * MM, 3.0 * MM, std::f64::consts::TAU).unwrap();
+    let notched = boolean(BooleanOp::Cut, std::slice::from_ref(&plain), std::slice::from_ref(&notch), &BooleanOptions::default()).unwrap().shape;
+    let sides = |s: &Shape| -> Vec<Shape> {
+        s.faces()
+            .into_iter()
+            .filter(|f| match f.face_surface().unwrap() {
+                Surface::Plane(p) => p.normal.z.abs() < 1e-9 && f.area().unwrap() > 1e-6,
+                Surface::Cylinder { radius, .. } => (radius - 3.0 * MM).abs() < 1e-9,
+                _ => false,
+            })
+            .collect()
+    };
+    assert_eq!(sides(&notched).len(), 8);
+    let neutral = Plane::from_normal(DVec3::ZERO, DVec3::Z);
+    let a = 5f64.to_radians();
+    let drafted = draft_wedges(&plain, &sides(&plain), DVec3::Z, &neutral, a).unwrap().shape;
+    let r = draft_wedges(&notched, &sides(&notched), DVec3::Z, &neutral, a).expect("the notched band drafted").shape;
+    assert!(r.is_valid());
+    let inside = vol_mm3(&common(&notch, &drafted).unwrap().shape);
+    let want = vol_mm3(&drafted) - inside;
+    assert!(inside > 0.1 && (vol_mm3(&r) - want).abs() < 1e-6 * want, "{} vs {want} (notch inside {inside})", vol_mm3(&r));
+}
+
 /// A prism whose sides are all drafted about its base, its profile curved (an ellipse in two arcs, which OCCT offsets
 /// as B-spline pieces, as a gear's involutes): its far cap is the base offset inward, each side ruled from its base
 /// edge to that edge's offset. For a convex smooth profile the volume is Steiner's: V = A·h − L·tanα·h²/2 +
