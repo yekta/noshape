@@ -7973,6 +7973,13 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     {
                         res.untranslated.push(format!("{element}: part {pid} not renamed \"{live}\": {e}"));
                     }
+                    // A standard content part has its component's material (our catalogue's default, as live's BOM).
+                    let standard = levels.iter().flat_map(|l| l.instances.iter()).any(|i| i["elementId"] == element.as_str() && i["partId"] == pid && i["isStandardContent"] == true);
+                    if let Some(spec) = p["name"].as_str().filter(|_| standard).and_then(standard_spec_by_part_name)
+                        && let Err(e) = t.call("part_set_material", json!({ "tab": t.tab, "parts": [id], "material": spec.material() }))
+                    {
+                        res.untranslated.push(format!("{element}: part {pid}'s material {}: {e}", spec.material()));
+                    }
                 }
                 part_names.insert((element.clone(), pid.to_string()), ours);
             }
