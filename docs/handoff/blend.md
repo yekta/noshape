@@ -1,5 +1,26 @@
 # Blends (agent "blend")
 
+## 11-15 17:27 UTC: a stack of five knife speedups gating (blend6); Chamfer 3 waits on live 3169
+
+Stack in blend10 (branch blend-chordnear), gating as one in blend6 at d04f5c0ae (unit blend-chord-gates, vibe6: pair vs
+blend4 = balljump, then asm; flags chord-gates.done, chord-asm.done). Mac release, knife (parity copy, 33/52 unchanged):
+regen 1540 -> 1465 ms.
+- chamferair 31473b9cd (Chamfer 1 167 -> 150) and balljump 278641b42 (core's lean handle Fillet 8 541 -> 231): pairs
+  clean (chair 882 = 882, jump 882 = 882). Both their asms died (earlyoom 16:22; then a link error from blend4's
+  half-built release target, now deleted): blend6's asm covers them.
+- chordnear: a chamfer's chord feet by Newton from the nearest station's foot (kernel `project_point_near`: OCCT's
+  local extremum, kept only inside the face with the offset along the normal, else the full projection). Chamfer 1 141
+  -> 121 ms. The normal check matters: without it the T1 knife-chamfer strip came 0.0476 mm (live 0.0499).
+- ballnear: Support::Face (the revolved ring) feet the same way: Fillet 8 231 -> 206.
+- unifycand: unify's candidate search not repeated on an unchanged shape; a B-spline whose poles lie off one plane
+  isn't sampled by GeomLib_IsPlanarSurface (planar surfaces have coplanar poles): Fillet 8 206 -> 175.
+- Left in these features: Boolean sections_ahead (Chamfer 1 53 ms, Fillet 2 20: bool's queue), Fillet 8's OCCT
+  scaled retry 45 + USD 40, Fillet 2's split 26 + distances 14, Fillet 3's discarded OCCT try 27.
+- Chamfer 3 (infento 1dc32b, dx/core): geometry in blend-ch3-wip (a2074e738), 87,057.04 mm3 as live when the 23 mm
+  goes down both sides; our side rule puts it on the bottom cap at the mirrored arc. Asked live (REQUESTS 3169).
+- 20-tooth x_t (lead): spurside moved live's read of our x_t 9680.85 -> 9679.41 mm3, 4883.33 -> 4879.61 mm2 (live's
+  own x_t round trip 9678.32 / 4879.49).
+
 ## 11-15 14:45 UTC: the stack, runlaw and the face blend fields landed; chamferair gating; knife speed notes
 
 Landed: spurside f7125520d (dx told), seams 2b3a92e25, unifyskip 6211481af, planarmemo aa14a4d0c, sliverskip
