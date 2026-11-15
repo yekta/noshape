@@ -295,15 +295,28 @@ fn section_regions_nest_and_find_styles() {
     assert!(views::section_regions(&segs[..3]).is_none());
 }
 
-/// Live 2231: a section's Auto hatch spacing is its region's on-sheet bounding-box diagonal ÷ 9 (DXF ANSI31 scales).
+/// Live 2231 / "dx (00:52)": a section's Auto hatch spacing is the on-sheet box diagonal of its hatched regions, ÷ 9
+/// for one region, ÷ 13 for several (DXF ANSI31 scales); spline boundaries count by their control points.
 #[test]
 fn auto_hatch_spacing_follows_the_regions_size_on_paper() {
-    let rect = |w: f64, h: f64| vec![[[0.0, 0.0], [w, 0.0]], [[w, 0.0], [w, h]], [[w, h], [0.0, h]], [[0.0, h], [0.0, 0.0]]];
+    let rect_at = |x: f64, w: f64, h: f64| vec![[[x, 0.0], [x + w, 0.0]], [[x + w, 0.0], [x + w, h]], [[x + w, h], [x, h]], [[x, h], [x, 0.0]]];
+    let rect = |w: f64, h: f64| rect_at(0.0, w, h);
+    let in_ = |scale: f64| scale * 0.125 * 25.4;
     // (region on paper mm, live's ANSI31 scale; its base spacing is 0.125 in)
     for ((w, h), scale) in [((40.0, 10.0), 1.442907), ((49.88, 12.5), 1.799505), ((39.56, 50.0), 2.231351)] {
-        let s = super::build::auto_hatch_spacing(&rect(w, h));
-        assert!((s - scale * 0.125 * 25.4).abs() < 1e-3, "{w} x {h}: {s}");
+        let s = super::build::auto_hatch_spacing(&rect(w, h), &[]);
+        assert!((s - in_(scale)).abs() < 1e-3, "{w} x {h}: {s}");
     }
+    // H1 / H2: two regions in a 40 x 20 box, centred or not: 1.08350 either way.
+    for (a, b) in [(15.0, 15.0), (23.0, 7.0)] {
+        let two: Vec<_> = rect_at(0.0, a, 20.0).into_iter().chain(rect_at(40.0 - b, b, 20.0)).collect();
+        let s = super::build::auto_hatch_spacing(&two, &[]);
+        assert!((s - in_(1.08350)).abs() < 1e-3, "{a} + {b}: {s}");
+    }
+    // Live's drw-broken-out-section: two regions whose spline control points span 22.04 x 13.64 mm: 0.62795.
+    let two: Vec<_> = rect_at(0.0, 5.0, 10.0).into_iter().chain(rect_at(15.0, 5.0, 10.0)).collect();
+    let s = super::build::auto_hatch_spacing(&two, &[[-1.0, -1.82], [21.04, 11.82]]);
+    assert!((s - in_(0.62795)).abs() < 1e-3, "{s}");
 }
 
 /// Live asb 10-23 views (4): Edit hatch section restyles one region of the
@@ -595,8 +608,9 @@ fn section_view_indicator_and_hatch_properties() {
     // lines 0.375 in apart) hatches the cut its own way.
     drawing.props.view_tab.hatch_pattern = (0, 1);
     let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
-    let steel = (0..b.geometry.lines.len()).filter(|&k| b.geometry.lines[k].pick == view_pick && b.geometry.lines[k].style == sheet::LineStyle::Thin).count();
-    assert!(steel > 0 && steel != hatch.len(), "{steel} vs {}", hatch.len());
+    let steel: Vec<Vec<[f64; 2]>> = (0..b.geometry.lines.len()).filter(|&k| b.geometry.lines[k].pick == view_pick && b.geometry.lines[k].style == sheet::LineStyle::Thin).map(|k| b.geometry.lines[k].points.clone()).collect();
+    let ansi31: Vec<Vec<[f64; 2]>> = hatch.iter().map(|&k| g.lines[k].points.clone()).collect();
+    assert!(!steel.is_empty() && steel != ansi31, "{} lines either way, the same", steel.len());
 }
 
 /// Drawing properties › Formats and Construction geometry pens: the
@@ -2515,6 +2529,18 @@ fn auto_centermarks_delete_one_by_one_and_edges_hide() {
     let left = marks(&drawing);
     assert_eq!(left.len(), all.len() - 1);
     assert!(!left.contains(&all[0]));
+    // A Single centermark on a circle with an automatic one is that mark: no lines of its own, and the automatic
+    // mark's lines pick as it (live "dx (01:08)": one set of 6 lines in the DXF, Delete in its menu).
+    let lines_n = render_sheet(&drawing, 0, &sources, &cache, false).unwrap().geometry.lines.len();
+    let c = all[1].map(|k| k as f64 * 1e-9);
+    let id = drawing.sheets[0].next_annotation_id();
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::Centermark { view: top, center: c, size: 0.005, angle: 0.0, arms: [0.0; 4] }, ..Default::default() });
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert_eq!(b.geometry.lines.len(), lines_n);
+    let ap = pick_of(&b, PickTarget::Annotation(id));
+    assert!(b.geometry.lines.iter().filter(|l| l.pick == ap).count() >= 2);
+    assert!(!b.picks.iter().any(|p| *p == PickTarget::AutoCentermark { view: top, center: all[1] }) || !b.geometry.lines.iter().any(|l| b.picks.get(l.pick as usize) == Some(&PickTarget::AutoCentermark { view: top, center: all[1] })));
+    drawing.sheets[0].annotations.retain(|a| a.id != id);
     // Show/hide edges: a hidden model edge is left out of the view, and
     // drawn grey (pickable) while the dialog is open.
     let g = compute_view(&drawing, &drawing.sheets[0], top, &sources, &cache, false);
@@ -3493,6 +3519,12 @@ fn view_labels_move_alone_and_aux_indicator_formats() {
     assert!(ind(&built).contains(&LineStyle::Phantom), "Line style: the viewing line");
     // Its arrows' shafts are filled bands, not lines (live drw-auxiliary-view.dxf: one LINE, four SOLIDs).
     assert_eq!(ind(&built), [LineStyle::Phantom]);
+    // Its length by the parent view's width on the sheet (live "dx (01:00)": W/2 + 3.63 mm; 40 mm wide → 0.9305 in).
+    let line = built.geometry.lines.iter().find(|l| built.picks.get(l.pick as usize) == Some(&PickTarget::AuxIndicator(id)) && l.style == LineStyle::Phantom).unwrap();
+    let pp = built.placement(ViewId(1)).unwrap();
+    let (a, b) = (line.points[0], *line.points.last().unwrap());
+    assert!(((a[0] - b[0]).hypot(a[1] - b[1]) - ((pp.max[0] - pp.min[0]) / 2.0 + 3.63)).abs() < 1e-9);
+    assert_eq!(build::aux_line_size(40.0), (23.63, 20.96));
     // The label moves on its own.
     drawing.sheets[0].view_mut(id).unwrap().label_at = Some([10.0, 5.0]);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();

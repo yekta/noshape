@@ -1711,6 +1711,7 @@ impl SheetGeometry {
                     let t = env.text(a, a1 - a0, true, "");
                     self.dim_label([v[0] + (radius + 3.0) * mid.cos(), v[1] + (radius + 3.0) * mid.sin()], 0.0, 0.5, true, &t, dh, pick);
                 }
+                AnnotationKind::Centermark { view, center, .. } if env.covered_centermark(*view, *center) => {}
                 AnnotationKind::Centermark { view, center, size, angle, arms } => {
                     let c = env.to_sheet(*view, *center);
                     let k = env.scale(*view);
@@ -3561,6 +3562,11 @@ pub trait AnnotationEnv {
     /// instance off it is drawn red, live 1699).
     fn on_model(&self, _view: ViewId, _p: [f64; 2]) -> bool {
         true
+    }
+    /// Whether view `view` draws an automatic centermark on the circle centred at `center` (view metres): a Single
+    /// centermark there is drawn as that mark, not again (live "dx (01:08)": one set of lines in the DXF).
+    fn covered_centermark(&self, _view: ViewId, _center: [f64; 2]) -> bool {
+        false
     }
     /// Drawing-wide dimension / annotation style.
     fn sheet_style(&self) -> SheetStyle {

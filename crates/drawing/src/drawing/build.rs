@@ -67,6 +67,11 @@ pub fn centermark_key(c: [f64; 2]) -> [i64; 2] {
     c.map(|x| (x * 1e9).round() as i64)
 }
 
+/// Two centermark keys within 100 nm (a picked circle's centre and the view's, found apart).
+fn same_centre(a: [i64; 2], b: [i64; 2]) -> bool {
+    (a[0] - b[0]).abs() <= 100 && (a[1] - b[1]).abs() <= 100
+}
+
 impl PickTarget {
     /// The view this target belongs to (for selecting/dragging views).
     pub fn view(&self) -> Option<ViewId> {
@@ -417,16 +422,17 @@ pub fn aux_arrow_letter(ind: &AuxIndicator, a: &super::AuxRef) -> [f64; 2] {
     [ind.mid[0] + sight[0] * 3.35 + side[0] * 4.4 + moved[0], ind.mid[1] + sight[1] * 3.35 + side[1] * 4.4 + moved[1]]
 }
 
-/// Live (sheet inches → mm): line 0.879 in from the edge, 0.105 in past
-/// each end of it; arrow shaft and head 0.18 in each, head 0.06 in wide;
-/// letters 0.12 in.
-pub const AUX_OFFSET: f64 = 22.33;
-pub const AUX_PAST_EDGE: f64 = 2.667;
+/// Live (sheet inches → mm): arrow shaft and head 0.18 in each, head 0.06 in wide; letters 0.12 in.
 pub const AUX_SHAFT: f64 = 4.572;
 pub const AUX_HEAD: f64 = 4.572;
 pub const AUX_LETTER: f64 = 3.048;
-/// The line's half length when the edge can't be measured.
-pub const AUX_EXT: f64 = 10.0;
+
+/// The viewing line's length and its distance from the edge (sheet mm) by the parent view's width `w` on the sheet
+/// (live "dx (01:00)": 40 mm → 23.63 / 20.96, 30 mm → 18.62 / 18.46; not by the edge's length or where the aux view
+/// sits).
+pub fn aux_line_size(w: f64) -> (f64, f64) {
+    (w / 2.0 + 3.63, w / 4.0 + 10.96)
+}
 
 /// The reference indicator of auxiliary view `id`, `ppl` being its parent's
 /// placement and `parent` its geometry (for the edge's extent).
@@ -458,11 +464,11 @@ pub fn aux_indicator(sheet: &Sheet, id: ViewId, ppl: &ViewPlacement, parent: Opt
             }
         }
     }
-    let (centre, half) = match span {
-        Some((lo, hi)) => ((lo + hi) / 2.0 * k, (hi - lo) / 2.0 * k + AUX_PAST_EDGE),
-        None => (0.0, AUX_EXT),
-    };
-    let offset = a.offset.unwrap_or(AUX_OFFSET);
+    // Centred on the edge; its length and distance by the parent view's width.
+    let centre = span.map_or(0.0, |(lo, hi)| (lo + hi) / 2.0 * k);
+    let (length, distance) = aux_line_size(ppl.max[0] - ppl.min[0]);
+    let half = length / 2.0;
+    let offset = a.offset.unwrap_or(distance);
     let ext = a.ext.unwrap_or([half; 2]);
     let base = [c[0] + ns[0] * offset + es[0] * centre, c[1] + ns[1] * offset + es[1] * centre];
     let at = |t: f64| [base[0] + es[0] * t, base[1] + es[1] * t];
@@ -718,14 +724,25 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
     (out, dangling, lost)
 }
 
-/// A section's automatic hatch spacing (mm): its cut's bounding-box diagonal on the sheet ÷ 9 (live 2231).
-pub fn auto_hatch_spacing(segments: &[[[f64; 2]; 2]]) -> f64 {
+/// A section's automatic hatch spacing (mm), one for the view (live 2231, "dx (00:52)"): the diagonal of the sheet box
+/// around its hatched regions, ÷ 9 for one region, ÷ 13 for several; a spline boundary's box is its control points'
+/// (`poles`).
+pub fn auto_hatch_spacing(segments: &[[[f64; 2]; 2]], poles: &[[f64; 2]]) -> f64 {
     let (mut lo, mut hi) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
-    for p in segments.iter().flatten() {
+    for p in segments.iter().flatten().chain(poles) {
         lo = [lo[0].min(p[0]), lo[1].min(p[1])];
         hi = [hi[0].max(p[0]), hi[1].max(p[1])];
     }
-    ((hi[0] - lo[0]).hypot(hi[1] - lo[1]) / 9.0).max(0.3)
+    let k = if hatch_region_count(segments) > 1 { 13.0 } else { 9.0 };
+    ((hi[0] - lo[0]).hypot(hi[1] - lo[1]) / k).max(0.3)
+}
+
+/// The regions a cut's boundary `segments` encloses: its loops (split where two touch, an aligned section's legs at
+/// their fold) that no other loop holds, or an even number do (holes don't count).
+fn hatch_region_count(segments: &[[[f64; 2]; 2]]) -> usize {
+    let Some(loops) = super::cad_layers::chain_loops(segments, 1e-6) else { return 0 };
+    let loops: Vec<Vec<[f64; 2]>> = loops.iter().flat_map(|l| super::cad_layers::split_at_touches(l, 1e-6)).collect();
+    (0..loops.len()).filter(|&i| (0..loops.len()).filter(|&j| j != i && views::point_in_polygon(loops[i][0], &loops[j])).count() % 2 == 0).count()
 }
 
 /// 45-degree hatch lines (sheet coordinates) inside the region bounded by
@@ -1012,11 +1029,6 @@ fn format_layer_pens(g: &mut SheetGeometry, lines: std::ops::Range<usize>, layer
 /// edges along the profile (the cut's walls seen edge-on) go into them, not written on their own.
 fn broken_out_jog_lines(g: &mut SheetGeometry, pl: &ViewPlacement, v: &super::DrawingView, hatches_from: usize) {
     let Some(r) = g.view_edges.iter().rev().find(|(id, _)| *id == v.id).map(|(_, r)| r.clone()) else { return };
-    let to_segment = |p: [f64; 2], s: [[f64; 2]; 2]| {
-        let (d, e) = ([s[1][0] - s[0][0], s[1][1] - s[0][1]], [p[0] - s[0][0], p[1] - s[0][1]]);
-        let t = ((e[0] * d[0] + e[1] * d[1]) / (d[0] * d[0] + d[1] * d[1]).max(1e-30)).clamp(0.0, 1.0);
-        (e[0] - t * d[0]).hypot(e[1] - t * d[1])
-    };
     let mid = |a: [f64; 2], b: [f64; 2]| [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
     let hatch: Vec<[[f64; 2]; 2]> = g.hatches[hatches_from..].iter().flat_map(|h| h.loops.iter()).flat_map(|lp| (0..lp.len()).map(move |k| [lp[k], lp[(k + 1) % lp.len()]])).collect();
     let mut walls: Vec<usize> = Vec::new();
@@ -1029,49 +1041,7 @@ fn broken_out_jog_lines(g: &mut SheetGeometry, pl: &ViewPlacement, v: &super::Dr
         let on_profile = |p: [f64; 2]| segs.iter().any(|s| to_segment(p, *s) < 1e-3);
         let along = |l: &Polyline2| l.points.len() >= 2 && l.points.iter().all(|p| on_profile(*p)) && l.points.windows(2).all(|w| on_profile(mid(w[0], w[1])));
         walls.extend(r.clone().filter(|&i| g.lines[i].style == LineStyle::Visible && along(&g.lines[i])));
-        // Per span (16 segments between two of the profile's points), the runs of its chords over the hatch's
-        // boundary, each the span's own cubic cut to the run (live: 4 poles a piece); a run's ends where the hatch's
-        // boundary leaves the chord.
-        let per = n / b.profile.len();
-        let hatch_vertices: Vec<[f64; 2]> = hatch.iter().map(|h| h[0]).collect();
-        let bounding = |s: &[[f64; 2]; 2]| hatch.iter().any(|h| to_segment(mid(s[0], s[1]), *h) < 1e-2);
-        // Where along chord `s` (0..1) a hatch vertex lies inside it, nearest `from`'s end.
-        let leave = |s: &[[f64; 2]; 2], from_start: bool| {
-            let len2 = (s[1][0] - s[0][0]).powi(2) + (s[1][1] - s[0][1]).powi(2);
-            let fs: Vec<f64> = hatch_vertices
-                .iter()
-                .filter(|v| to_segment(**v, *s) < 1e-2)
-                .map(|v| (((v[0] - s[0][0]) * (s[1][0] - s[0][0]) + (v[1] - s[0][1]) * (s[1][1] - s[0][1])) / len2.max(1e-30)).clamp(0.0, 1.0))
-                .filter(|f| *f > 1e-6 && *f < 1.0 - 1e-6)
-                .collect();
-            if from_start { fs.iter().cloned().fold(None, |a: Option<f64>, f| Some(a.map_or(f, |a| a.min(f)))) } else { fs.iter().cloned().fold(None, |a: Option<f64>, f| Some(a.map_or(f, |a| a.max(f)))) }
-        };
-        let m = b.profile.len();
-        for span in 0..m {
-            let q = |i: usize| b.profile[(span + i + m - 1) % m];
-            let (p0, p1, p2, p3) = (q(0), q(1), q(2), q(3));
-            let bez: [[f64; 2]; 4] = [p1, [p1[0] + (p2[0] - p0[0]) / 6.0, p1[1] + (p2[1] - p0[1]) / 6.0], [p2[0] - (p3[0] - p1[0]) / 6.0, p2[1] - (p3[1] - p1[1]) / 6.0], p2].map(|p| pl.to_sheet(p));
-            let step = 1.0 / per as f64;
-            let chords = &segs[span * per..(span + 1) * per];
-            let mut start: Option<f64> = None;
-            for (k, s) in chords.iter().enumerate() {
-                let bounds = bounding(s);
-                match (bounds, start) {
-                    // It starts where the hatch's boundary meets this chord (else at its start).
-                    (true, None) => start = Some((k as f64 + leave(s, true).filter(|_| k == 0 || !bounding(&chords[k - 1])).unwrap_or(0.0)) * step),
-                    // It ended on the chord before, where the boundary left it.
-                    (false, Some(a)) => {
-                        let prev = &chords[k - 1];
-                        pieces.push(bezier_sub(&bez, a, (k as f64 - 1.0 + leave(prev, false).unwrap_or(1.0)) * step));
-                        start = None;
-                    }
-                    _ => {}
-                }
-            }
-            if let Some(a) = start {
-                pieces.push(bezier_sub(&bez, a, 1.0));
-            }
-        }
+        pieces.extend(broken_out_pieces(pl, b, &hatch));
     }
     if pieces.is_empty() {
         return;
@@ -1090,6 +1060,64 @@ fn broken_out_jog_lines(g: &mut SheetGeometry, pl: &ViewPlacement, v: &super::Dr
             g.add_cad_open_spline(&m, p);
         }
     }
+}
+
+/// The distance from `p` to segment `s`.
+fn to_segment(p: [f64; 2], s: [[f64; 2]; 2]) -> f64 {
+    let (d, e) = ([s[1][0] - s[0][0], s[1][1] - s[0][1]], [p[0] - s[0][0], p[1] - s[0][1]]);
+    let t = ((e[0] * d[0] + e[1] * d[1]) / (d[0] * d[0] + d[1] * d[1]).max(1e-30)).clamp(0.0, 1.0);
+    (e[0] - t * d[0]).hypot(e[1] - t * d[1])
+}
+
+/// A spline broken-out profile's pieces over the section's boundary `hatch` (sheet segments), each a cubic's poles on
+/// the sheet (live: 4 poles a piece): per span (16 segments between two of the profile's points), the runs of its
+/// chords over the boundary, each run's ends where the boundary leaves the chord.
+fn broken_out_pieces(pl: &ViewPlacement, b: &super::BrokenOut, hatch: &[[[f64; 2]; 2]]) -> Vec<Vec<[f64; 2]>> {
+    let mid = |a: [f64; 2], b: [f64; 2]| [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
+    let outline = views::broken_out_outline(b);
+    let n = outline.len();
+    let sheet: Vec<[f64; 2]> = outline.iter().map(|p| pl.to_sheet(*p)).collect();
+    let segs: Vec<[[f64; 2]; 2]> = (0..n).map(|k| [sheet[k], sheet[(k + 1) % n]]).collect();
+    let per = n / b.profile.len();
+    let hatch_vertices: Vec<[f64; 2]> = hatch.iter().map(|h| h[0]).collect();
+    let bounding = |s: &[[f64; 2]; 2]| hatch.iter().any(|h| to_segment(mid(s[0], s[1]), *h) < 1e-2);
+    // Where along chord `s` (0..1) a hatch vertex lies inside it, nearest `from`'s end.
+    let leave = |s: &[[f64; 2]; 2], from_start: bool| {
+        let len2 = (s[1][0] - s[0][0]).powi(2) + (s[1][1] - s[0][1]).powi(2);
+        let fs: Vec<f64> = hatch_vertices
+            .iter()
+            .filter(|v| to_segment(**v, *s) < 1e-2)
+            .map(|v| (((v[0] - s[0][0]) * (s[1][0] - s[0][0]) + (v[1] - s[0][1]) * (s[1][1] - s[0][1])) / len2.max(1e-30)).clamp(0.0, 1.0))
+            .filter(|f| *f > 1e-6 && *f < 1.0 - 1e-6)
+            .collect();
+        if from_start { fs.iter().cloned().fold(None, |a: Option<f64>, f| Some(a.map_or(f, |a| a.min(f)))) } else { fs.iter().cloned().fold(None, |a: Option<f64>, f| Some(a.map_or(f, |a| a.max(f)))) }
+    };
+    let mut pieces = Vec::new();
+    let m = b.profile.len();
+    for span in 0..m {
+        let q = |i: usize| b.profile[(span + i + m - 1) % m];
+        let (p0, p1, p2, p3) = (q(0), q(1), q(2), q(3));
+        let bez: [[f64; 2]; 4] = [p1, [p1[0] + (p2[0] - p0[0]) / 6.0, p1[1] + (p2[1] - p0[1]) / 6.0], [p2[0] - (p3[0] - p1[0]) / 6.0, p2[1] - (p3[1] - p1[1]) / 6.0], p2].map(|p| pl.to_sheet(p));
+        let step = 1.0 / per as f64;
+        let chords = &segs[span * per..(span + 1) * per];
+        let mut start: Option<f64> = None;
+        for (k, s) in chords.iter().enumerate() {
+            match (bounding(s), start) {
+                // It starts where the hatch's boundary meets this chord (else at its start).
+                (true, None) => start = Some((k as f64 + leave(s, true).filter(|_| k == 0 || !bounding(&chords[k - 1])).unwrap_or(0.0)) * step),
+                // It ended on the chord before, where the boundary left it.
+                (false, Some(a)) => {
+                    pieces.push(bezier_sub(&bez, a, (k as f64 - 1.0 + leave(&chords[k - 1], false).unwrap_or(1.0)) * step));
+                    start = None;
+                }
+                _ => {}
+            }
+        }
+        if let Some(a) = start {
+            pieces.push(bezier_sub(&bez, a, 1.0));
+        }
+    }
+    pieces
 }
 
 /// A cubic Bézier's poles over `t0..t1` of it (de Casteljau).
@@ -1467,9 +1495,14 @@ struct Env<'a> {
     /// Callouts showing a BOM item number their part has none of: drawn
     /// red (live request 1647).
     unresolved: &'a std::cell::RefCell<Vec<u64>>,
+    /// The automatic centermarks drawn (view, circle key).
+    auto_marks: &'a [(ViewId, [i64; 2], std::ops::Range<usize>)],
 }
 
 impl AnnotationEnv for Env<'_> {
+    fn covered_centermark(&self, view: ViewId, center: [f64; 2]) -> bool {
+        self.auto_marks.iter().any(|(v, k, _)| *v == view && same_centre(*k, centermark_key(center)))
+    }
     fn to_sheet(&self, view: ViewId, p: [f64; 2]) -> [f64; 2] {
         self.placements.iter().find(|pl| pl.id == view).map(|pl| pl.to_sheet(p)).unwrap_or(p)
     }
@@ -1761,12 +1794,15 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     let hatch_clear = if sheet.views.iter().any(|v| views.get(&v.id).is_some_and(|g| !g.section_segments.is_empty())) && sheet.annotations.iter().any(|a| a.kind.is_dimension()) {
         let (resolved, _, _) = resolve_annotations(drawing, sheet, views, sources);
         let (used, unresolved) = (std::cell::RefCell::new(Vec::new()), std::cell::RefCell::new(Vec::new()));
-        let env = Env { drawing, sheet, placements: &placements, views, sources, fields: &fields, revisions: &info.revisions, used: &used, unresolved: &unresolved };
+        let env = Env { drawing, sheet, placements: &placements, views, sources, fields: &fields, revisions: &info.revisions, used: &used, unresolved: &unresolved, auto_marks: &[] };
         HatchClear::of(&resolved, &env, w, h)
     } else {
         HatchClear::default()
     };
 
+    // The automatic centermarks drawn (view, circle key, their lines): a Single centermark on one of their circles is
+    // that mark (live "dx (01:08)").
+    let mut auto_marks: Vec<(ViewId, [i64; 2], std::ops::Range<usize>)> = Vec::new();
     for v in &sheet.views {
         if v.id.is_ghost() && !v.id.is_child_ghost() {
             continue;
@@ -1943,7 +1979,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 let ub = pl.unbroken();
                 let segs: Vec<[[f64; 2]; 2]> = geo.section_segments.iter().map(|s| [ub.to_sheet(s[0]), ub.to_sheet(s[1])]).collect();
                 let hatch_l0 = g.lines.len();
-                let spacing = auto_hatch_spacing(&segs);
+                // A spline broken-out profile's pieces over the cut count by their control points.
+                let poles: Vec<[f64; 2]> = v.broken_out.iter().filter(|b| b.spline && b.profile.len() >= 3).flat_map(|b| broken_out_pieces(&pl, b, &segs)).flatten().collect();
+                let spacing = auto_hatch_spacing(&segs, &poles);
                 let whole = geo.clip_poly.is_none() && geo.clip.is_none() && geo.crop.is_none() && pl.breaks().is_empty();
                 // Edit hatch section...: restyled regions (the rest keep the
                 // drawing's hatch; a cut that doesn't close keeps it all).
@@ -2117,6 +2155,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     let k = if auto { (0.7 * r / (a + gap)).min(1.0) } else { 1.0 };
                     let (a, gap) = (a * k, gap * k);
                     let at = |u: [f64; 2], t: f64| [c[0] + u[0] * t, c[1] + u[1] * t];
+                    let first = g.lines.len();
                     // Turned with Align centermark.
                     let turn = v.centermark_angles.iter().find(|(k, _)| *k == key).map(|(_, a)| *a).unwrap_or(0.0);
                     let (ux, uy) = if turn != 0.0 { (rotate2(ux, turn), rotate2(uy, turn)) } else { (ux, uy) };
@@ -2128,6 +2167,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             g.lines.push(Polyline2 { points: vec![at(u, a + gap), at(u, r + a + gap)], style: LineStyle::Centerline, closed: false, pick: view_pick });
                         }
                     }
+                    auto_marks.push((v.id, key, first..g.lines.len()));
                 }
                 g.cad_since(mark, CadLayer::Centermarks);
                 if let Some(c) = vt.centermark_color {
@@ -2702,7 +2742,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // Note fields are matched only against annotation texts.
     let used_notes = std::cell::RefCell::new(Vec::<String>::new());
     let unresolved = std::cell::RefCell::new(Vec::<u64>::new());
-    let env = Env { drawing, sheet, placements: &placements, views, sources, fields: &fields, revisions: &info.revisions, used: &used_notes, unresolved: &unresolved };
+    let env = Env { drawing, sheet, placements: &placements, views, sources, fields: &fields, revisions: &info.revisions, used: &used_notes, unresolved: &unresolved, auto_marks: &auto_marks };
     let pens_before = g.pens.len();
     g.add_annotations(&resolved, &env);
     annotation_pens(&mut g, ml, pens_before, &drawing.props);
@@ -2716,6 +2756,17 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     let red_fills: Vec<std::ops::Range<usize>> = g.annotation_fills.iter().filter(|(id, _)| dangling.contains(id)).map(|(_, r)| r.clone()).collect();
     for fills in red_fills {
         g.colors.push(super::sheet::ColorSpan { lines: 0..0, texts: 0..0, fills, rgb: LOST_RED });
+    }
+    // A Single centermark on an automatic one's circle picks as that mark's lines (live: Delete in its menu).
+    for a in &resolved.annotations {
+        if let AnnotationKind::Centermark { view, center, .. } = &a.kind
+            && let Some((_, _, r)) = auto_marks.iter().find(|(v, k, _)| v == view && same_centre(*k, centermark_key(*center)))
+        {
+            let pick = picks.id(PickTarget::Annotation(a.id));
+            for l in &mut g.lines[r.clone()] {
+                l.pick = pick;
+            }
+        }
     }
     let mut remap: HashMap<u32, u32> = HashMap::new();
     for a in &resolved.annotations {
