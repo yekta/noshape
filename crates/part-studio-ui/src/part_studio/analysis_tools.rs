@@ -34,9 +34,10 @@ pub enum ToolKind {
 
 impl ToolKind {
     /// Tools whose preselection stays selected while they are open and clears when they close (live's recordings
-    /// analysis-connection / -dihedral / -interference / -deviation); the others take it into their field at once.
+    /// analysis-connection / -dihedral / -interference / -deviation / -flatten / -zebra / -reflection,
+    /// edge-menu-curve-analysis); Draft analysis takes it into its field at once (analysis-draft).
     pub fn keeps_selection(self) -> bool {
-        matches!(self, ToolKind::Connection | ToolKind::Dihedral | ToolKind::Interference | ToolKind::Deviation)
+        !matches!(self, ToolKind::Draft | ToolKind::Thickness)
     }
 
     /// Tools that change how the parts are drawn: ✓ keeps them on, ✗ (or
@@ -388,7 +389,7 @@ impl PartStudioView {
         if kind == ToolKind::Draft {
             self.open_draft(window, cx);
         }
-        if (had_pre && !kind.keeps_selection()) || matches!(kind, ToolKind::Draft | ToolKind::Flatten) {
+        if (had_pre && !kind.keeps_selection()) || kind == ToolKind::Draft {
             self.selection.clear();
         } else if had_pre {
             // Selected as the tool took it (live analysis-interference: a face picked, its part).

@@ -31,6 +31,11 @@ impl PartStudioView {
             f["kind"] = "other".into();
             f["label"] = Value::Null;
             f
+        } else if let Some(st) = self.ui.material_panel.as_ref().map(|m| m.search.read(cx)).filter(|st| st.focus_handle(cx).is_focused(window)) {
+            // The Material panel's search (live material-search-acetal-ok: a field, no label).
+            let mut f = crate::feature_dialog::field_focus("", st);
+            f["label"] = Value::Null;
+            f
         } else if let Some(st) = self.unlabelled_input_focused(window, cx) {
             // A row being renamed, the folder name popup: inputs without a label (live).
             let mut f = crate::feature_dialog::field_focus("", st);
@@ -129,7 +134,9 @@ impl PartStudioView {
             let linked = self.sketch_data(cx).map(|d| d.external_refs.clone()).unwrap_or_default();
             ed.selection.iter().chain(&picks).map(|e| linked.get(&e.0).cloned().unwrap_or(Reference::SketchEntity { sketch: f, entity: e.0 })).chain(ed.selected_regions.iter().map(|k| Reference::SketchRegion { sketch: f, key: k.clone() })).chain(ed.model_selection.iter().cloned()).collect::<Vec<_>>()
         });
-        let picked = in_sketch.or_else(|| dialog.map(|d| d.active_refs()));
+        // An open Create selection panel: its picks are the selection (live mirror-face-create-selection).
+        let cs_seeds = self.ui.create_selection.as_ref().map(|c| c.seeds.clone());
+        let picked = in_sketch.or(cs_seeds).or_else(|| dialog.map(|d| d.active_refs()));
         let items: Vec<Value> = picked
             .as_ref()
             .unwrap_or(&self.selection)

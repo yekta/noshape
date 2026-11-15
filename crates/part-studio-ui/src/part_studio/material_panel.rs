@@ -48,7 +48,7 @@ pub struct MaterialPanel {
     pub(super) active: usize,
     /// The library list is open.
     lib_open: bool,
-    search: Entity<InputState>,
+    pub search: Entity<InputState>,
     /// Custom tab: one input per field.
     custom_fields: Vec<Entity<InputState>>,
     _subs: Vec<Subscription>,
@@ -141,11 +141,13 @@ impl PartStudioView {
         none.into_iter().chain(self.material_entries(m.library, cx).into_iter().filter(|e| query.is_empty() || e.name.to_lowercase().contains(&query) || e.category.to_lowercase().contains(&query)).map(Some)).collect()
     }
 
-    /// Pick a row of the picker and close it.
-    fn pick_material_row(&mut self, e: Option<Entry>, cx: &mut Context<Self>) {
+    /// Pick a row of the picker and close it; the search keeps the keyboard (live material-library-pick-abs-cancel:
+    /// a field, its text empty).
+    fn pick_material_row(&mut self, e: Option<Entry>, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(m) = &mut self.ui.material_panel {
             m.picked = e;
             m.list_open = false;
+            m.search.update(cx, |s, cx| s.focus(window, cx));
         }
         cx.notify();
     }
@@ -236,7 +238,8 @@ impl PartStudioView {
                 }
             }
         }
-        let assigned = (!m.custom && m.picked.is_none() && !m.list_open).then_some("No material assigned");
+        // (On the Custom tab too: live material-custom-tab-cancel.)
+        let assigned = (m.picked.is_none() && !m.list_open).then_some("No material assigned");
         let mut state = json!({ "kind": "material", "title": "Material", "tabs": tabs, "fields": fields, "assigned": assigned });
         if m.list_open && !m.custom {
             let choices: Vec<serde_json::Value> = self
@@ -387,7 +390,7 @@ impl PartStudioView {
                             "up" => m.active = m.active.saturating_sub(1),
                             "enter" => {
                                 if let Some(e) = rows.get(m.active).cloned() {
-                                    this.pick_material_row(e, cx);
+                                    this.pick_material_row(e, window, cx);
                                 }
                             }
                             // The list only; the keyboard back to the studio, so the next Esc cancels the dialog (live).
@@ -481,7 +484,7 @@ impl PartStudioView {
                             .child(div().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).child(StyledText::new(name).with_highlights(bold)))
                             // Live: <small> 11.67 px #555 at opacity .65.
                             .child(div().text_size(px(11.67)).text_color(gpui_kit::rgb(0x555555)).opacity(0.65).child(format!("Density: {dens}")))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_material_row(e.clone(), cx)))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.pick_material_row(e.clone(), window, cx)))
                             .into_any_element()
                     })
                     .collect();
