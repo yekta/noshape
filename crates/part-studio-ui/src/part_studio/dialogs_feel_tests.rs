@@ -217,6 +217,23 @@ fn rows() -> Vec<Row> {
             let want = ["tol:radius", "cb:isAsymmetric", "cb:isPartial", "cb:isVariable", "cb:allowEdgeOverflow", "cb:smoothCorners"];
             expect(order, want.map(String::from).to_vec(), "focus after each Tab")
         } },
+        Row { id: "fields / Tab with the unit list open, then ✓", live: "typing '5 mm' opens the list (mm / max / min); Tab takes the entry and applies the field, the keyboard stays; ✓ then commits (behaviours: 'Tab, then ✓ commits')", gap: false, check: |cx| {
+            let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-tab-list")?;
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("radius", w, cx))).unwrap();
+            draw(cx, window);
+            keys(cx, window, &["6", "space", "m", "m"]);
+            let listed = cx.update(|cx| dialog.read(cx).ui_list().is_some());
+            keys(cx, window, &["tab"]);
+            draw(cx, window);
+            let after = cx.update_window(window, |_, w, cx| (dialog.read(cx).ui_list().is_some(), dialog.read(cx).focused_control(w, cx))).unwrap();
+            let ok = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("dialog-ok").ok_or("no ✓")?.center();
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(ok, Modifiers::default());
+            draw(cx, window);
+            wait_until(cx, window, |cx| view.read(cx).edit.is_none());
+            let closed = cx.update(|cx| view.read(cx).edit.is_none());
+            expect((listed, after, closed), (true, (false, Some("in:radius".to_string())), true), "the list while typing; (the list, the keyboard) after Tab; the dialog closed by one ✓")
+        } },
         Row { id: "preview / not while typing; Tab sends it", live: "no preview request while typing (none for 3 s a key); Enter, Tab or leaving the field sends it", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "dlg-typing");
             wait_until(cx, window, |cx| !view.read(cx).ui_busy());

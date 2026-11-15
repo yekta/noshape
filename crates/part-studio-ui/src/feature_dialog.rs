@@ -1894,11 +1894,24 @@ impl FeatureDialog {
                 cx.notify();
             }
         }))
-        // Tab accepts too (live 152: "Tab/Enter").
+        // Tab accepts too (live 152: "Tab/Enter"), applies the field and keeps the keyboard there, the list closed:
+        // ✓ after it commits (live behaviours "5 mm": "Tab, then ✓ commits").
         .capture_action(cx.listener(move |this, _: &crate::actions::DialogTab, window, cx| {
             if open(this, &p5) {
                 cx.stop_propagation();
                 this.accept_completion(None, window, cx);
+                if this.create_var.is_some() {
+                    return;
+                }
+                let Some(state) = this.inputs.get(&p5).cloned() else { return };
+                if this.baselines.get(&p5).is_some_and(|b| *b != state.read(cx).value().as_ref()) {
+                    this.commit_number(&p5, &state, window, cx);
+                    this.baselines.insert(p5.clone(), state.read(cx).value().to_string());
+                    this.just_applied = Some(p5.clone());
+                    this.flush_typed(cx);
+                }
+                this.quiet_text = Some(state.read(cx).value().to_string());
+                cx.notify();
             }
         }))
     }
