@@ -1036,6 +1036,27 @@ fn a_guided_loft_of_a_stadium_to_a_circle_has_one_side_face_on_its_profiles() {
     assert!((bb.max.y / mm - 11.0).abs() < 0.5, "the pin ends on the side, near y 11 mm: {} mm", bb.max.y / mm);
 }
 
+/// A guided solid loft is one closed shell at either scale (in mm its sewing tolerance is 0.1 µm, and an unsewn seam
+/// once came back as an open "solid", BRepCheck NotClosed): the stadium to the circle in mm and in metres, valid, the
+/// same volume.
+#[test]
+fn a_guided_solid_loft_is_closed_at_either_scale() {
+    let volume = |mm: f64| {
+        let p = |x: f64, y: f64| DVec3::new(x, y, 0.0) * mm;
+        let e = [
+            make_line(p(-10.0, -10.0), p(10.0, -10.0)).unwrap(),
+            make_arc(p(10.0, 0.0), DVec3::Z, DVec3::X, 10.0 * mm, -PI / 2.0, PI / 2.0).unwrap(),
+            make_line(p(10.0, 10.0), p(-10.0, 10.0)).unwrap(),
+            make_arc(p(-10.0, 0.0), DVec3::Z, DVec3::X, 10.0 * mm, PI / 2.0, 3.0 * PI / 2.0).unwrap(),
+        ];
+        let s = loft_to_two_arcs(&make_face_from_wire(&make_wire(&e).unwrap(), true).unwrap(), mm);
+        assert!(s.is_valid() && s.count(ShapeType::Shell) == 1, "{mm}");
+        s.volume().unwrap() / mm.powi(3)
+    };
+    let (a, b) = (volume(1.0), volume(1e-3));
+    assert!((a - b).abs() < 1e-6 * a, "{a} / {b} mm³");
+}
+
 /// A slot cut into a guided loft's end keeps the vertices where the guides met its profiles (live's handle, Extrude 8:
 /// 8/32/28; a unify merged the split lines back).
 #[test]

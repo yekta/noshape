@@ -22,6 +22,7 @@
 #include <BSplCLib.hxx>
 #include <GeomAdaptor_Curve.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepCheck_Shell.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
@@ -975,6 +976,24 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
   }
   sew.Perform();
   TopoDS_Shape r = sew.SewedShape();
+  // One closed shell, or the solid would be open (a piece's end off a profile by more than the tolerance: BRepCheck
+  // NotClosed, kept as a solid before): sewn again ten times looser, else refused.
+  auto closed = [](const TopoDS_Shape& s) {
+    int          n = 0;
+    TopoDS_Shell sh;
+    for (TopExp_Explorer x(s, TopAbs_SHELL); x.More(); x.Next(), ++n)
+      sh = TopoDS::Shell(x.Current());
+    return n == 1 && BRepCheck_Shell(sh).Closed() == BRepCheck_NoError;
+  };
+  if (make_solid && !closed(r))
+  {
+    BRepBuilderAPI_Sewing again(1e-5 * (1 + size));
+    again.Add(r);
+    again.Perform();
+    r = again.SewedShape();
+    if (!closed(r))
+      fail_op("Could not create loft with given information. Check profile order, guide/profile intersections or end conditions.");
+  }
   for (const TopoDS_Shape& c : caps)
     keep_profile_curves(r, c, 1e-6 * (1 + size));
   // For good: no unify merges the edges either side of a guide end.
