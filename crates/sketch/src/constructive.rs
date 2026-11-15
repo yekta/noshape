@@ -517,6 +517,19 @@ impl Sketch {
                 holds.insert(*c, !unheld.contains(c));
             }
         }
+        for &u in comp {
+            if placed.contains(&u) {
+                continue;
+            }
+            if let Some(ring) = self.grow_slot(u, cons, &holds) {
+                placed.extend(ring.iter().copied());
+                kept.extend(ring.iter().copied());
+                let unheld = self.unheld_constraints(1e-9);
+                for (c, _) in cons {
+                    holds.insert(*c, !unheld.contains(c));
+                }
+            }
+        }
         while placed.len() < comp.len() {
             // Next: a unit with a constraint to placed units (or of its own)
             // that doesn't hold, the one with most of them; with none, a
@@ -2124,6 +2137,82 @@ impl Sketch {
             }
         }
         seen
+    }
+
+    /// A free slot (two lines, two tangent arcs, end to end) whose only change is its arcs' new size: the side with
+    /// fewer Tangents stays (the first drawn on a tie), the arcs grow away from it, their centres moving straight
+    /// out (live probes 20, fuzz s228: the bottom line stays; without a top Tangent the top). A side with a
+    /// Horizontal or Vertical of its own leaves it to the pass (s320 / s422: those slots keep their top). Returns
+    /// the slot's curves when placed.
+    fn grow_slot(&mut self, u: EntityId, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], holds: &HashMap<crate::ids::ConstraintId, bool>) -> Option<BTreeSet<EntityId>> {
+        let ring = self.ring_of(u, cons);
+        let kinds: Vec<EntityKind> = ring.iter().filter_map(|x| self.kind(*x)).collect();
+        if ring.len() != 4 || kinds.iter().filter(|k| **k == EntityKind::Line).count() != 2 || kinds.iter().filter(|k| **k == EntityKind::Arc).count() != 2 || !self.closed(&ring) {
+            return None;
+        }
+        let lines: Vec<EntityId> = ring.iter().copied().filter(|x| self.kind(*x) == Some(EntityKind::Line)).collect();
+        let arcs: Vec<EntityId> = ring.iter().copied().filter(|x| self.kind(*x) == Some(EntityKind::Arc)).collect();
+        let kind = |c: crate::ids::ConstraintId| self.constraint(c).map(|k| k.kind.clone());
+        let tangents = |l: EntityId| cons.iter().filter(|(c, us)| us.contains(&l) && matches!(kind(*c), Some(ConstraintKind::Tangent { .. }))).count();
+
+        if lines.iter().any(|l| cons.iter().any(|(c, us)| us.as_slice() == [*l] && matches!(kind(*c), Some(ConstraintKind::Horizontal { .. } | ConstraintKind::Vertical { .. })))) {
+            return None;
+        }
+        // The new radius: the one size that doesn't hold, the arcs Equal (or both sized).
+        let mut radius = None;
+        for (c, us) in cons.iter().filter(|(c, _)| !holds[c]) {
+            let inside = us.iter().all(|x| ring.contains(x));
+            match kind(*c) {
+                Some(ConstraintKind::Radius { curve, value }) if ring.contains(&curve) => radius = Some(value),
+                Some(ConstraintKind::Diameter { curve, value }) if ring.contains(&curve) => radius = Some(value / 2.0),
+                Some(ConstraintKind::Equal { a, b }) if arcs.contains(&a) && arcs.contains(&b) => {}
+                // Relations to other geometry (a Parallel to a turned rectangle) come to the slot afterwards.
+                Some(k) if !inside && !k.is_dimension() && us.iter().any(|x| ring.contains(x)) => {}
+                _ if us.iter().all(|x| !ring.contains(x)) => {}
+                _ => return None,
+            }
+        }
+        let r = radius.filter(|r| *r > 0.0)?;
+        let tangent = |a: EntityId, l: EntityId| cons.iter().any(|(c, us)| us.contains(&a) && us.contains(&l) && matches!(kind(*c), Some(ConstraintKind::Tangent { .. })));
+        if arcs.iter().any(|a| lines.iter().all(|l| !tangent(*a, *l))) {
+            return None;
+        }
+        // Both arcs one size: Equal, or each tangent to both sides (live probes 20 k18).
+        let equal = cons.iter().any(|(c, us)| arcs.iter().all(|a| us.contains(a)) && matches!(kind(*c), Some(ConstraintKind::Equal { .. })));
+        if !equal && !arcs.iter().all(|a| lines.iter().all(|l| tangent(*a, *l))) {
+            return None;
+        }
+        let keep = *lines.iter().min_by_key(|l| (tangents(**l), l.0))?;
+        let (ka, kb) = self.line_pts(keep)?;
+        let d = (kb - ka).normalize_or_zero();
+        if d == DVec2::ZERO {
+            return None;
+        }
+        let class = |p: EntityId| -> Vec<EntityId> { std::iter::once(p).chain(self.coincident_class(p)).collect() };
+        let (k0, k1) = self.endpoints(keep)?;
+        let on_keep: Vec<EntityId> = class(k0).into_iter().chain(class(k1)).collect();
+        let mut moves: Vec<(EntityId, DVec2)> = Vec::new();
+        for &a in &arcs {
+            let (s0, s1) = self.endpoints(a)?;
+            let c = self.entity(a)?.center()?;
+            let (near, far) = if on_keep.contains(&s0) { (s0, s1) } else if on_keep.contains(&s1) { (s1, s0) } else { return None };
+            let pk = self.point(near)?;
+            let cc = self.point(c)?;
+            let n = {
+                let w = cc - pk;
+                let v = w - d * w.dot(d);
+                if v.length() < 1e-12 { return None }
+                v.normalize()
+            };
+            moves.push((c, pk + n * r));
+            for q in class(far) {
+                moves.push((q, pk + n * (2.0 * r)));
+            }
+        }
+        for (p, at) in moves {
+            let _ = self.set_point(p, at);
+        }
+        Some(ring)
     }
 
     /// Whether every curve end of `lp` is shared with another of its curves.

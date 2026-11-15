@@ -155,12 +155,6 @@ impl Case {
         let (pa, pb) = self.sk.endpoints(e).unwrap();
         self.points.push((format!("{id}.start"), pa));
         self.points.push((format!("{id}.end"), pb));
-        // Live's names for its start, control and end (REST /sketches).
-        if let Some(Geometry::Conic { start, control, end, .. }) = self.sk.entity(e).map(|x| x.geometry.clone()) {
-            for (n, p) in [start, control, end].into_iter().enumerate() {
-                self.points.push((format!("{id}.{n}.internal"), p));
-            }
-        }
         self.curves.push((id.clone(), e, Kind::Free));
         self.os_entities.push(json!({"btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": 1.0,
             "geometry": {"btType": "BTCurveGeometryConic-2284", "rho": rho, "points": [a.x * MM, a.y * MM, ctrl.x * MM, ctrl.y * MM, b.x * MM, b.y * MM]}}));
@@ -1741,10 +1735,20 @@ fn ours(c: &mut Case) -> Value {
 
 /// The named points' positions (mm, 6 decimals).
 fn ours_points(c: &Case) -> BTreeMap<String, [f64; 2]> {
-    c.points.iter().map(|(n, id)| {
-        let p = c.sk.point(*id).unwrap() / MM;
-        (n.clone(), [(p.x * 1e6).round() / 1e6, (p.y * 1e6).round() / 1e6])
-    }).collect()
+    let at = |id: EntityId| {
+        let p = c.sk.point(id).unwrap() / MM;
+        [(p.x * 1e6).round() / 1e6, (p.y * 1e6).round() / 1e6]
+    };
+    let mut out: BTreeMap<String, [f64; 2]> = c.points.iter().map(|(n, id)| (n.clone(), at(*id))).collect();
+    // A conic's start, control and end by live's names (REST /sketches), not among the generator's points.
+    for (n, e, _) in &c.curves {
+        if let Some(Geometry::Conic { start, control, end, .. }) = c.sk.entity(*e).map(|x| x.geometry.clone()) {
+            for (k, p) in [start, control, end].into_iter().enumerate() {
+                out.insert(format!("{n}.{k}.internal"), at(p));
+            }
+        }
+    }
+    out
 }
 
 fn batch(n: usize, first_seed: u64, rich: bool) -> Value {
@@ -3580,4 +3584,23 @@ fn a_neighbour_that_still_fits_stays_put() {
         let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
         assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
     }
+}
+
+/// A free slot whose arcs grow keeps the side with fewer Tangents (the first drawn on a tie) and grows away from it
+/// (live probes 20: without a top Tangent the top stays; without its Radius nothing moves; fuzz s228). T1: the
+/// fixtures' answers, no live.
+#[test]
+fn a_growing_slot_keeps_its_less_tied_side() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-probe-20.live.json")).unwrap()).unwrap();
+    let names = ["r228-k5", "r228-k6", "r228-k7", "r228-k8", "r228-k18", "r228-k20"];
+    let b = probe_batch(probes20().into_iter().filter(|(n, _)| names.contains(&n.split(' ').next().unwrap())).collect());
+    assert_eq!(b["cases"].as_array().unwrap().len(), names.len());
+    for case in b["cases"].as_array().unwrap() {
+        let d = differences(case, &live["cases"][case["case"].as_str().unwrap()]);
+        assert!(d.is_empty(), "{}: {}", case["case"], d.join("; "));
+    }
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-3.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 228, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s228"]);
+    assert!(d.is_empty(), "s228: {}", d.join("; "));
 }
