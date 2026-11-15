@@ -2576,7 +2576,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     // Drawing properties › Views › Auxiliary views: viewing
                     // lines, arrowheads, viewing line label.
                     let vtab = &drawing.props.view_tab;
-                    let head = vtab.aux_arrow.size.unwrap_or(g.style.ann_arrow);
+                    // Drawing properties › Views › Auxiliary views › Arrowhead: 0.18 in by default (live asbu, drw-auxiliary-view).
+                    let head = vtab.aux_arrow.size.unwrap_or(AUX_HEAD);
                     let letter_h = vtab.aux_label.height.unwrap_or(AUX_LETTER);
                     let t0 = g.texts.len();
                     // Arrow style (live u-933): one arrow from the line's middle
@@ -2592,8 +2593,11 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         g.lines.push(Polyline2 { points: ind.elbows.to_vec(), style: LineStyle::Phantom, closed: false, pick });
                         pen_lines(&mut g, line..line + 1, &vtab.aux_line);
                         for ((elbow, tip), letter) in ind.elbows.into_iter().zip(ind.tips).zip(ind.letters) {
+                            // The shaft a filled band a twelfth of an arrow wide (live drw-auxiliary-view.dxf: a SOLID).
                             let neck = [elbow[0] + sight[0] * AUX_SHAFT, elbow[1] + sight[1] * AUX_SHAFT];
-                            g.lines.push(Polyline2 { points: vec![elbow, neck], style: LineStyle::Thin, closed: false, pick });
+                            let w = [-sight[1] * head / 24.0, sight[0] * head / 24.0];
+                            g.outlined_fills.push(g.fills.len());
+                            g.fills.push(Fill2 { points: vec![[elbow[0] - w[0], elbow[1] - w[1]], [neck[0] - w[0], neck[1] - w[1]], [neck[0] + w[0], neck[1] + w[1]], [elbow[0] + w[0], elbow[1] + w[1]]] });
                             g.arrow_as(tip, sight, head, vtab.aux_arrow.kind);
                             g.texts.push(Text2 { pos: letter, height: letter_h, text: a.letter.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                         }

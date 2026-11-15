@@ -3475,6 +3475,8 @@ fn view_labels_move_alone_and_aux_indicator_formats() {
     assert_eq!(before.iter().map(|t| t.0.as_str()).collect::<Vec<_>>(), ["Auxiliary B - B"], "live default prefix and A-A style");
     let ind = |b: &build::BuiltSheet| b.geometry.lines.iter().filter(|l| b.picks.get(l.pick as usize) == Some(&PickTarget::AuxIndicator(id))).map(|l| l.style).collect::<Vec<_>>();
     assert!(ind(&built).contains(&LineStyle::Phantom), "Line style: the viewing line");
+    // Its arrows' shafts are filled bands, not lines (live drw-auxiliary-view.dxf: one LINE, four SOLIDs).
+    assert_eq!(ind(&built), [LineStyle::Phantom]);
     // The label moves on its own.
     drawing.sheets[0].view_mut(id).unwrap().label_at = Some([10.0, 5.0]);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
