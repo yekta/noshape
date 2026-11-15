@@ -4255,37 +4255,43 @@ private:
     return true;
   }
 
-  // The faces meshed (on copies, at a twentieth of the wall) for drop_far_edges. (A rule on the edge's faces' meshes
-  // before it, a face-to-face proximity, cost more than it saved once the edges' own points are tested.)
+  // drop_far_edges over the faces. (A rule on the edge's faces' meshes before it, a face-to-face proximity, cost more
+  // than it saved once the edges' own points are tested.)
   void drop_far_pairs()
   {
     if (!(apart_ > 0))
       return;
     NCollection_DataMap<const void*, int> face_at;
-    BRep_Builder                          bb;
-    TopoDS_Compound                       copies;
-    bb.MakeCompound(copies);
-    int nfaces = 0;
+    std::vector<TopoDS_Face>              faces;
     for (int n = 0; n < myDS->NbSourceShapes(); ++n)
-    {
-      if (myDS->ShapeInfo(n).ShapeType() != TopAbs_FACE)
-        continue;
-      face_at.Bind(myDS->Shape(n).TShape().get(), nfaces++);
-      bb.Add(copies, BRepBuilderAPI_Copy(myDS->Shape(n), false, false).Shape());
-    }
-    if (nfaces == 0)
-      return;
-    // (The wall's thickness is ten times `apart_`.)
+      if (myDS->ShapeInfo(n).ShapeType() == TopAbs_FACE)
+      {
+        face_at.Bind(myDS->Shape(n).TShape().get(), static_cast<int>(faces.size()));
+        faces.push_back(TopoDS::Face(myDS->Shape(n)));
+      }
+    if (!faces.empty())
+      drop_far_edges(face_at, faces);
+  }
+
+  // `faces`' copies meshed at a twentieth of the wall (the wall's thickness is ten times `apart_`); none where one
+  // fails.
+  std::vector<TopoDS_Face> meshed_copies(const std::vector<TopoDS_Face>& faces) const
+  {
+    BRep_Builder    bb;
+    TopoDS_Compound copies;
+    bb.MakeCompound(copies);
+    for (const TopoDS_Face& f : faces)
+      bb.Add(copies, BRepBuilderAPI_Copy(f, false, false).Shape());
     BRepMesh_IncrementalMesh(copies, 0.5 * apart_, false, 0.5, !serial_);
     std::vector<TopoDS_Face> meshed;
     for (TopoDS_Iterator it(copies); it.More(); it.Next())
     {
       TopLoc_Location l;
       if (BRep_Tool::Triangulation(TopoDS::Face(it.Value()), l).IsNull())
-        return;
+        return {};
       meshed.push_back(TopoDS::Face(it.Value()));
     }
-    drop_far_edges(face_at, meshed);
+    return meshed;
   }
 
   // The pairs marked in `drop` (by list and place) taken out.
@@ -4304,7 +4310,7 @@ private:
   // Edge / face pairs left that don't touch, and vertex / face pairs: points along the edge a tenth of the wall apart
   // (the vertex's) against the face's mesh, apart when none comes within 3 tenths of it (c2-rings-loft's Shell 1: 703
   // of 867 such edges, OCCT's exact distance 7 ms each, and 726 vertices).
-  void drop_far_edges(const NCollection_DataMap<const void*, int>& face_at, const std::vector<TopoDS_Face>& meshed)
+  void drop_far_edges(const NCollection_DataMap<const void*, int>& face_at, const std::vector<TopoDS_Face>& faces)
   {
     struct Left
     {
@@ -4314,7 +4320,7 @@ private:
     std::vector<Left>                     left;
     std::vector<TopoDS_Shape>             shapes;
     NCollection_DataMap<const void*, int> shape_at;
-    std::vector<int>                      face_set(meshed.size(), -1);
+    std::vector<int>                      face_set(faces.size(), -1);
     std::vector<int>                      set_face;
     for (int k = 0; k < myLists.Length(); ++k)
       for (int i = 0; i < myLists(k).Length(); ++i)
@@ -4392,7 +4398,14 @@ private:
       }
     }, serial_);
     std::vector<occ::handle<BRepExtrema_TriangleSet>> sets(set_face.size());
-    OSD_Parallel::For(0, static_cast<int>(set_face.size()), [&](int j) { sets[(size_t)j] = triangle_set(meshed[(size_t)set_face[(size_t)j]]); }, serial_);
+    // (Only the faces left in pairs meshed.)
+    std::vector<TopoDS_Face> used;
+    for (const int f : set_face)
+      used.push_back(faces[(size_t)f]);
+    const std::vector<TopoDS_Face> meshed = meshed_copies(used);
+    if (meshed.empty())
+      return;
+    OSD_Parallel::For(0, static_cast<int>(set_face.size()), [&](int j) { sets[(size_t)j] = triangle_set(meshed[(size_t)j]); }, serial_);
     // (A point stands for its chord within half a step, the chord for the edge within its deflection; the mesh lies
     // within its own, half a tenth, of the face: taken twice.)
     const double r2 = std::pow(apart_ + 0.5 * step + defl + 2 * 0.5 * apart_, 2);
@@ -8848,8 +8861,15 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
             own_offset.insert({E.TShape().get(), xf.Current().TShape().get()});
         }
     quad::NewPairsCheckerSI checker(in, 0.1 * thickness, own_offset);
+    // (The wall's shells, not its solid: no solid takes part up to edges against faces, and boxing one classified
+    // a point in it, a fifth of the check's setup.)
     NCollection_List<TopoDS_Shape> args;
-    args.Append(wall);
+    BRep_Builder                   bb;
+    TopoDS_Compound                shells;
+    bb.MakeCompound(shells);
+    for (TopExp_Explorer xs(wall, TopAbs_SHELL); xs.More(); xs.Next())
+      bb.Add(shells, xs.Current());
+    args.Append(shells);
     checker.SetArguments(args);
     checker.SetNonDestructive(true);
     checker.SetRunParallel(true);
