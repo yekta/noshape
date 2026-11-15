@@ -4,6 +4,14 @@
  "area": "psui",
  "source": "psui coverage audit batch 2, 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
  "start": "frame-l",
+ "remembered": {
+  "gusset": {
+   "length:Millimeter": {
+    "length": "20 mm",
+    "thickness": "10 mm"
+   }
+  }
+ },
  "steps": [
   {
    "do": "click",
