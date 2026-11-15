@@ -930,7 +930,8 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
     for (size_t k2 = 0; k2 + 1 < at.size(); ++k2)
     {
       // Rows for the wider of A's and B's shares, twice as many until the piece's ends lie on both profiles between
-      // them (an arc of B paired to a short line or spline of A: c2-hunting-knife's handle didn't sew there).
+      // them within half the sewing tolerance (an arc of B paired to a short line or spline of A: c2-hunting-knife's
+      // handle didn't sew there; to `tol` it took 988 rows of poles, live 66, and every later cut on it slowed).
       occ::handle<Geom_BSplineSurface> piece;
       for (int m = std::max(3, (int)std::ceil(NU * std::max(at[k2 + 1] - at[k2], b_share(at[k2 + 1]) - b_share(at[k2])))); ; m *= 2)
       {
@@ -948,7 +949,7 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
           const double u = 0.5 * (us[i] + us[i + 1]);
           off            = std::max({off, piece->Value(u, 0).Distance(bot(u)), piece->Value(u, 1).Distance(top(u))});
         }
-        if (off <= tol || m >= 256)
+        if (off <= 0.5e-6 * (1 + size) || m >= 256)
           break;
       }
       pieces.push_back(piece);
