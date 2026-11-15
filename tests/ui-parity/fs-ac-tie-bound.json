@@ -1,0 +1,33 @@
+{
+ "name": "fs-ac-tie-bound",
+ "about": "inside uip Feature's body (end of the println line, Enter) type Bound: std's autocomplete order where several entries score the same (Ace's tie order between std modules)",
+ "area": "studios",
+ "source": "studios 11-15 (lead: Ace tie order)",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "code": "println"
+   }
+  },
+  {
+   "do": "key",
+   "key": "End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "type",
+   "text": "Bound"
+  }
+ ]
+}
