@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-15 22:00 UTC.
+Updated 11-15 21:46 UTC.
 
 ## In flight
 - Queued to land: deb41792 (snap hook stack: uv_of cache; torus_sections by v for drafted planes; revolved circle
