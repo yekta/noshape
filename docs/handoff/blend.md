@@ -1,5 +1,26 @@
 # Blends (agent "blend")
 
+## 11-15 08:31 UTC: leanf8 and paramline landing; spurside and seams gating; Booleans with known sections (bool)
+
+- paramline's asm (no leanf8) also has isaac-ball 96/103: main's, so leanf8 and paramline were queued (08:08 / 08:10).
+  Tell core when leanf8 lands.
+- blend10 `blend-runlaw` 73e5339f9: asm on vibe6 running (runlaw-asm.done). Land it from another worktree (blend10 has
+  moved on).
+- `blend-spurside` 4325e427b (frozen in blend4): live 3120: opChamfer's distance on two rims sharing a face takes the
+  side of the FIRST rim in Onshape's entity order (face_order of its faces: the start cap's rim), each lone edge its left
+  face. cf-spur-gear 20-tooth back at 4879.59 mm² (live 4879.41, band ±1.5). T1
+  custom_features::op_chamfer_on_both_rims_takes_the_first_rims_side_as_live. Pair + asm on vibe6 after runlaw's
+  (unit blend-spurside-gates2). Tell dx (sgrel.py) when it lands.
+- `blend-seams` e51b58ecb (frozen in blend6): rim_chain_seams accepts a moved torus / cone face by its parameter area
+  (within 1e-6), the new faces checked once in the solid: michael's Fillet 2 seams 14.5 -> 5.3 ms (Mac). Kernel tests
+  pass; g++-13 on vibe5 (seams-g13.log); pair vs blend8 + asm on vibe6 after spurside's (blend-seams-gates).
+- qa's speed list (release CLIs on the Mac, v0.4.48 -> v0.4.52, live): faceblend 226 -> 53 (58), tpd 85 -> 86 (44),
+  michael 115 -> 104 (96), motor-mount 58 -> 60 (53); bracket03, pipeflange, stef faster than live. vibe7 reads ~2x
+  the Mac. What's left of tpd Fillet 1 and michael Fillet 2 is mostly the Rust Boolean's sections_ahead (42 / 34 ms:
+  tangent tool/face pairs). bool will add an entry point taking known sections (tool face, part face, 3D curve +
+  pcurves); then fill it from fillet_by_tools' contact lines. They suggest NOSHAPE_RECORD_BOOLEANS for the two cases.
+- cf-setback-fillet feature 3 (area +1.14 mm²) is its fill surface (G1 fill of the corner), not a blend.
+
 ## 11-15 07:16 UTC: fsorder landed; leanf8, paramline, runlaw gating; knife 46/52 with runlaw
 
 Landed: fsorder 4b3905a5. Builds and crate tests on the Mac from blend10 only (lead); pairs / asms on vibe5/6/7.
