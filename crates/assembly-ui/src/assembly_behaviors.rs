@@ -1379,10 +1379,23 @@ impl AssemblyView {
         // From another document: "Open linked document" (bundle `switchToImageOwner`), opening the referenced version;
         // live (asm-menu-open-linked-document) lists it after the version row.
         let mut open_linked = None;
+        // Its part's "Where used…" after Export… (live2 context-create-version-update, Professional): in the linked
+        // document, as the Part Studio's own.
+        let mut where_used = None;
         if !multi
             && let Some(key) = inst.source.external_key().map(|k| k.to_string())
             && let Some(r) = crate::derived::ExternalRef::parse(&key)
         {
+            if let InstanceSource::External { body: Some(body), .. } = &inst.source {
+                let (gpu, key, r, body) = (self.gpu.clone(), key.clone(), r.clone(), body.clone());
+                where_used = Some(item("Where used…", move |_, _, cx| {
+                    use noshape_model::assembly::eval::ExternalStudios as _;
+                    let Some((_, tab)) = AppExternal.studio(&key) else { return };
+                    let Ok(handle) = crate::assembly_hooks::open_version_window(r.path.clone(), r.microversion, gpu.clone(), cx) else { return };
+                    let body = body.clone();
+                    let _ = handle.update(cx, |_, window, cx| window.defer(cx, move |window, cx| crate::actions::request_where_used(tab, body, window, cx)));
+                }));
+            }
             let gpu = self.gpu.clone();
             open_linked = Some(item("Open linked document", move |_, _, cx| {
                 use noshape_model::assembly::eval::ExternalStudios as _;
@@ -1470,6 +1483,7 @@ impl AssemblyView {
         // Live (asm-instance-suppress-unsuppress): no Export… or Zoom to selection on a suppressed instance.
         if !suppressed {
             m.push(export);
+            m.extend(where_used);
         }
         // Live qa5 CA2: Release… after Export… (the instances' parts; a subassembly's own release items, live
         // asm-menu-dissolve-subassembly).

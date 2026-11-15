@@ -2490,6 +2490,11 @@ impl Render for Workspace {
                             cx.notify();
                         });
                     }
+                    if let Some(body) = crate::actions::take_requested_where_used()
+                        && let Some(TabView::PartStudio(v)) = this.views.get(&t)
+                    {
+                        v.update(cx, |v, cx| v.show_where_used(body, cx));
+                    }
                 }
             }))
             .on_action(cx.listener(|this, _: &CreateDrawing, window, cx| {

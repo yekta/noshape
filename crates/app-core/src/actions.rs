@@ -405,6 +405,21 @@ pub fn take_requested_selection() -> Option<Vec<noshape_model::reference::Refere
     REQUESTED_SELECTION.lock().take()
 }
 
+/// The part whose Where used the requested Part Studio tab opens.
+static REQUESTED_WHERE_USED: parking_lot::Mutex<Option<noshape_model::reference::BodyId>> = parking_lot::Mutex::new(None);
+
+/// [`request_activate_tab`] with `body`'s Where used open there (an assembly instance of another document's part, live2
+/// context-create-version-update).
+pub fn request_where_used(tab: noshape_model::document::TabId, body: noshape_model::reference::BodyId, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App) {
+    *REQUESTED_WHERE_USED.lock() = Some(body);
+    request_activate_tab(tab, window, cx);
+}
+
+/// The part [`request_where_used`] asked for, once.
+pub fn take_requested_where_used() -> Option<noshape_model::reference::BodyId> {
+    REQUESTED_WHERE_USED.lock().take()
+}
+
 #[cfg(test)]
 mod recent_tab_tests {
     use super::RECENT_TAB_CONTEXT;

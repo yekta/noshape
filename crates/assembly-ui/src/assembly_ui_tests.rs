@@ -966,7 +966,8 @@ fn another_documents_part_pins_its_reference(cx: &mut TestAppContext) {
     assert!(at("Update linked document…") < at("Open linked document") && at("Open linked document") < at("Pin reference"), "{menu:?}");
     assert!(menu.iter().any(|l| l == "Create Drawing of Part 1…"), "{menu:?}");
     assert!(at("Edit in context") < at("Add mate connector to instance origin…"), "{menu:?}");
-    at("Export…");
+    // (Live2 context-create-version-update, Professional: Where used… right after Export….)
+    assert_eq!(menu.get(at("Export…") + 1).map(String::as_str), Some("Where used…"), "{menu:?}");
     assert!(!menu.iter().any(|l| l == "Release…"), "no Release… with a new company's managed workflows off: {menu:?}");
     cx.update(|cx| {
         view.update(cx, |v, cx| {

@@ -473,6 +473,8 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Switch to BOM", Op("drawing_switch_to_reference")),
     ("drawing:Switch to reference", Op("drawing_switch_to_reference")),
     ("assembly:Pin reference", Op("assembly_pin_reference")),
+    // (Another document's part: its Where used in that document.)
+    ("assembly:Where used…", Op("part_where_used")),
     ("assembly:Unpin reference", Op("assembly_pin_reference")),
     ("drawing:Pin reference", Op("drawing_pin_reference")),
     ("drawing:Unpin reference", Op("drawing_pin_reference")),
