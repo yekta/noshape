@@ -698,6 +698,25 @@ fn frame_on(s: &mut Studio, sid: FeatureId, ids: &[u32], profile: &str, corner: 
     })
 }
 
+/// Frame members are numbered as std sweeps them (live ui-parity frame-l, end-cap-*): from the first selected edge to
+/// the path's end, then back from it; the first selected line is Part 1 even when the path runs into it.
+#[test]
+fn frame_members_are_numbered_from_the_first_selected_edge() {
+    for first_selected_is_x in [true, false] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        // (0, -60) → (0, 0) → (100, 0): the path runs into the line along X.
+        let ids = polyline(&mut sk, &[(0.0, -60.0), (0.0, 0.0), (100.0, 0.0)], false);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let order = if first_selected_is_x { [ids[1], ids[0]] } else { [ids[0], ids[1]] };
+        frame_on(&mut s, sid, &order, "SHS 40x40x3", "MITER");
+        let r = s.ok();
+        let part1 = r.context.bodies.iter().find(|b| b.name == "Part 1").expect("Part 1");
+        let bb = part1.shape.bounding_box(true).unwrap();
+        assert_eq!(bb.max.x > 0.05, first_selected_is_x, "Part 1 {bb:?}");
+    }
+}
+
 /// Frame › Sketch profile › Libraries (live D134): ISO › Rectangular tube › 30mm x 30mm x 2mm, Rounded, along a 200 mm
 /// line: the tube's section (outer corners r 4, inner r 2) times the length; ANSI's round bar by its inch size.
 #[test]

@@ -176,6 +176,21 @@ struct PathSeg {
 struct FramePath {
     segs: Vec<PathSeg>,
     closed: bool,
+    /// The first selected edge's segment (std frame.fs's stable edge): std sweeps from it to the path's end, then
+    /// back from it to the start, and its parts are numbered in that order.
+    stable: usize,
+}
+
+impl FramePath {
+    /// Segment `i`'s place in std's sweep order ([`Self::stable`]).
+    fn sweep_rank(&self, i: usize) -> usize {
+        let n = self.segs.len();
+        match (self.closed, i >= self.stable) {
+            (true, _) => (i + n - self.stable) % n,
+            (false, true) => i - self.stable,
+            (false, false) => n - 1 - i,
+        }
+    }
 }
 
 fn source_name(src: &Source, feature: FeatureId) -> Name {
@@ -214,6 +229,7 @@ fn chain_paths(mut edges: Vec<(Shape, Name)>) -> FResult<Vec<FramePath>> {
     while !edges.is_empty() {
         let (e0, n0) = edges.remove(0);
         let mut segs = vec![oriented_seg(&e0, n0, false)?];
+        let mut stable = 0;
         loop {
             let end = segs.last().map(|s| s.end).unwrap_or_default();
             let start = segs[0].start;
@@ -232,6 +248,7 @@ fn chain_paths(mut edges: Vec<(Shape, Name)>) -> FResult<Vec<FramePath>> {
                     let (e, n) = edges.remove(i);
                     let rev = (a - start).length() < tol;
                     segs.insert(0, oriented_seg(&e, n, rev)?);
+                    stable += 1;
                     progressed = true;
                     break;
                 }
@@ -242,7 +259,7 @@ fn chain_paths(mut edges: Vec<(Shape, Name)>) -> FResult<Vec<FramePath>> {
             }
         }
         let closed = segs.len() > 1 && (segs[0].start - segs[segs.len() - 1].end).length() < tol;
-        paths.push(FramePath { segs, closed });
+        paths.push(FramePath { segs, closed, stable });
     }
     Ok(paths)
 }
@@ -679,6 +696,8 @@ pub fn frame(ev: &mut EvalCtx) -> FResult<()> {
             let first = groups.remove(0);
             groups.last_mut().unwrap().extend(first);
         }
+        // Numbered as std sweeps them (live frame-l: the first selected line is Part 1, the one before it Part 2).
+        groups.sort_by_key(|g| g.iter().map(|i| path.sweep_rank(*i)).min());
         for g in groups {
             let named = if g.len() == 1 {
                 built[g[0]].clone()
