@@ -396,23 +396,27 @@ impl ReleaseLog {
         out
     }
 
-    /// The latest released revision of a part number.
     /// An item's part number for its release history: its own, else the one it was last released with (a release
     /// keeps its part numbers in its version, the workspace's part keeps none: live2 11_studios_abc).
     pub fn released_part_number(&self, item: &ReleaseItem) -> String {
         if !item.part_number.trim().is_empty() {
             return item.part_number.clone();
         }
+        self.part_number_released(item.tab, item.part.as_ref()).unwrap_or_default()
+    }
+
+    /// The part number tab `tab`'s item (`part`: a part of it) was last released with.
+    pub fn part_number_released(&self, tab: TabId, part: Option<&BodyId>) -> Option<String> {
         self.packages
             .iter()
             .rev()
             .filter(|p| p.kind == PackageKind::Release)
             .flat_map(|p| p.items.iter())
-            .find(|i| i.tab == item.tab && i.part == item.part && i.document.is_none() && !i.part_number.is_empty())
+            .find(|i| i.tab == tab && i.part.as_ref() == part && i.document.is_none() && !i.part_number.is_empty())
             .map(|i| i.part_number.clone())
-            .unwrap_or_default()
     }
 
+    /// The latest released revision of a part number.
     pub fn latest_revision(&self, part_number: &str) -> Option<String> {
         self.revisions(part_number).last().map(|e| e.revision.clone())
     }
@@ -779,6 +783,19 @@ mod tests {
         assert!(!log.candidate_at_version("v-D"), "discarded");
         log.take_pending("P");
         assert!(!log.candidate_at_version("v-P"), "approved: a release now");
+    }
+
+    /// A part released keeps its part number in the release (the workspace's part has none, live2 11_studios_abc): the
+    /// log finds it by tab and part, and an item without its own takes it for its history.
+    #[test]
+    fn a_released_parts_number_is_found_by_its_tab_and_part() {
+        let part = BodyId { feature: crate::reference::FeatureId(1), index: 0 };
+        let released = ReleaseItem { part: Some(part.clone()), ..item("PRT-1", "A") };
+        let mut log = ReleaseLog::default();
+        log.record(package(PackageKind::Release, "R1", vec![released.clone()]));
+        assert_eq!(log.part_number_released(TabId(1), Some(&part)).as_deref(), Some("PRT-1"));
+        assert_eq!(log.part_number_released(TabId(1), Some(&BodyId { feature: crate::reference::FeatureId(1), index: 1 })), None);
+        assert_eq!(log.released_part_number(&ReleaseItem { part_number: String::new(), ..released }), "PRT-1");
     }
 
     #[test]

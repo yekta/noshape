@@ -4603,8 +4603,11 @@ impl PartStudioView {
         let solid_part = b.kind == noshape_model::display::BodyKind::Solid && b.composite.is_none();
         let curve = b.kind == noshape_model::display::BodyKind::Wire;
         // Release…: the part's number and whether it has released revisions.
-        let part_number = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty());
-        let has_revisions = part_number.as_ref().is_some_and(|pn| !crate::part_studio_hooks::release_log(self.doc.read(cx)).revisions(pn).is_empty());
+        // Its own part number, else the one it was released with (the workspace's part keeps none after a release:
+        // its menu still has Revision history…, live2 feel/release/part-menu-after-release.png).
+        let log = crate::part_studio_hooks::release_log(self.doc.read(cx));
+        let part_number = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty()).or_else(|| log.part_number_released(self.tab, Some(&b.id)));
+        let has_revisions = part_number.as_ref().is_some_and(|pn| !log.revisions(pn).is_empty());
         let part_icon = match b.kind {
             _ if b.composite.is_some() => "composite-part",
             // Onshape's svg-icon-part-mesh (live G27).

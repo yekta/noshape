@@ -21,9 +21,6 @@ use noshape_model::drawing::*;
 pub struct InsertViewState {
     /// View scale (None: the sheet scale).
     pub scale: Option<f64>,
-    /// The View scale list was used in this insert: live's recorder reads its options with the panel from then on
-    /// (drw-insert-view-top-1to1).
-    pub scale_listed: bool,
     /// View simplification of new views and its value field (Absolute /
     /// Ratio to studio / Ratio to part).
     pub simplification: Simplification,
@@ -60,7 +57,7 @@ pub struct InsertViewState {
 
 impl Default for InsertViewState {
     fn default() -> Self {
-        Self { scale: None, scale_listed: false, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, panel: false, sketch: None, flat: false, replace: None, replace_part: None, named: None, asm_position: AsmPosition::Default, display_state: None, pinned: None }
+        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, panel: false, sketch: None, flat: false, replace: None, replace_part: None, named: None, asm_position: AsmPosition::Default, display_state: None, pinned: None }
     }
 }
 
@@ -118,7 +115,6 @@ impl DrawingEditor {
 
     pub fn open_insert_chooser(&mut self, cx: &mut Context<Self>) {
         self.chooser.by_create = false;
-        self.insert.scale_listed = false;
         self.insert.chooser = Some(self.insert.chooser.unwrap_or(0));
         self.ensure_sources(false, cx);
         cx.notify();
@@ -332,7 +328,6 @@ impl DrawingEditor {
                         // Before the sheet has a scale, its own value means
                         // "follow the sheet"; after, "(Sheet)" does.
                         t.insert.scale = (t.current_sheet().scale_shown || s != t.current_sheet().scale).then_some(s);
-                        t.insert.scale_listed = true;
                         t.insert_auto_scale = false;
                         t.insert_scale_was_auto = false;
                         t.update_preview(cx);
@@ -341,7 +336,6 @@ impl DrawingEditor {
                 )
             }))
             .collect();
-        let scale_labels: Vec<String> = scale_items.iter().map(|i| i.0.clone()).collect();
         let simp = self.insert.simplification;
         let mm = self.drawing.units_mm;
         let simp_items: Vec<(String, bool, Act)> = simplification_choices(simp)
@@ -408,9 +402,6 @@ impl DrawingEditor {
             text.push("Show sketch appearances".into());
             if !is_asm && part.is_some() {
                 text.push("Show annotations from model".into());
-            }
-            if self.insert.scale_listed {
-                text.extend(scale_labels.iter().cloned());
             }
             text.retain(|t| !t.is_empty());
             text.truncate(30);

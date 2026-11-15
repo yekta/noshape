@@ -2,9 +2,14 @@
  "name": "rel-rc-dialog",
  "about": "Part 1 › Release…: the Create Release candidate dialog (Part 1 at revision A, In progress, no part number: 1 item needs attention, Release name required), Close",
  "area": "studios",
- "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1)",
- "recordable": false,
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on.",
+ "recordable": true,
  "start": "doc-versions",
+ "config_files": {
+  "release_settings.json": {
+   "managed_workflows": true
+  }
+ },
  "steps": [
   {
    "do": "rclick",

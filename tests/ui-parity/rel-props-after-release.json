@@ -2,9 +2,14 @@
  "name": "rel-props-after-release",
  "about": "After releasing Part 1 as PN-0001: Part 1 › Properties…: the Part number the release gave it, the Revision and State fields",
  "area": "studios",
- "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1)",
- "recordable": false,
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on.",
+ "recordable": true,
  "start": "doc-versions",
+ "config_files": {
+  "release_settings.json": {
+   "managed_workflows": true
+  }
+ },
  "steps": [
   {
    "do": "rclick",
