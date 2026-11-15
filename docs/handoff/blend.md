@@ -1,5 +1,25 @@
 # Blends (agent "blend")
 
+## 11-15 11:32 UTC: leanf8 + paramline landed; a combo of five speed / parity changes gating
+
+Landed: paramline f3866ebc5, leanf8 5c044b9b3 (core told). Gating as one stack in blend4 (base blend8 = 39ef18819):
+spurside (opChamfer's side, cf-spur-gear 20-tooth), seams (rim_chain_seams' area check by parameter area), unifyskip
+(a fillet result's whole-part unify only when two adjacent blend faces could share a surface: knife Fillet 8 500 -> 233
+ms), planarmemo (rust_boolean.cpp as_plane memoised per surface, bool OK'd: knife's acceptance checks 121 ms; Fillet 8
+-> 158), sliverskip (OCCT's round checked for slivers only when fillet_by_tools could rebuild it: Fillet 8 -> ~120).
+The first pair (first three) was clean, regen no slower (knife 6230 -> 5612 ms on vibe6). Its asm was SIGTERMed after
+rack-pinion; unit blend-combo-asm2 runs the rest + infento-subs (asm-combo-rest.log), infento on the base
+(asm-base8-inf.log), then a pair of the whole stack (combo2) and g++-13 (combo2-g13.log); flag combo2.done. infento-subs
+moved 159/156 -> 144/176 (of 182 mates): probably main's (dx's refs.json landing); the base run tells. Branches:
+blend-spurside, blend-seams, blend-unifyskip, blend-planarmemo, blend-sliverskip (blend10 repo). Land them as one rebase
+of blend4 (several commits). Then tell dx (sgrel.py).
+runlaw: rebased in blend3 (4ad47c737); its infento run on main's base after combo2 (runlaw-inf.done), then land.
+Speed (qa, Mac release CLI): what's left in tpd / michael / knife Chamfer 1 is mostly the Rust Boolean's tangent
+sections; bool adds a known-sections entry point (tool face, part face, curve + pcurves) after its Shell work; then
+feed it from fillet_by_tools' contact lines and the section lofts' rails. Recorded cuts: vibe5
+~/agents/blend-keep/known-sections. Impeller fillets (Stevenrohr zum Halter 941 ms failing, Flansch zum
+Stroemungskanal 413) run on a part that differs from live upstream (core's): not tuned.
+
 ## 11-15 08:31 UTC: leanf8 and paramline landing; spurside and seams gating; Booleans with known sections (bool)
 
 - paramline's asm (no leanf8) also has isaac-ball 96/103: main's, so leanf8 and paramline were queued (08:08 / 08:10).
