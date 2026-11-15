@@ -1,19 +1,23 @@
 {
  "scenario": "fs-ed-error-squiggle",
- "recorded": "2026-11-11T21:28:10.648Z",
+ "recorded": "2026-11-15T17:24:51.058Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-11.3"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.3"
  },
  "live": {
-  "document": "a45c14a16c2b718dfc20d61a",
-  "workspace": "f9bf85e578504ecc31ded317",
-  "element": "5296c49fa4a339eee10f4f26",
+  "document": "8dc99f38a37b36c3a1b55693",
+  "workspace": "e3704b97649e3b6b53b72ed7",
+  "element": "a645ebc4f31ba976447e3e34",
   "start": "fs-studio",
-  "startElement": "5296c49fa4a339eee10f4f26",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "a645ebc4f31ba976447e3e34",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -41,6 +45,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    68.58,
+    -118.784,
+    79.189
+   ],
+   "width_mm": 426.206,
+   "height_mm": 247.877,
+   "mmPerPixel": 0.254755,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -82,7 +113,7 @@
    "ok": true,
    "at": [
     583,
-    976
+    1063
    ],
    "state": {
     "focus": {
@@ -113,6 +144,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -151,7 +209,7 @@
      "notices": 0
     }
    },
-   "t": 38619
+   "t": 45359
   },
   {
    "step": 2,
@@ -195,6 +253,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -233,7 +318,7 @@
      "notices": 0
     }
    },
-   "t": 51671
+   "t": 57898
   },
   {
    "step": 3,
@@ -279,6 +364,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -317,7 +429,7 @@
      "notices": 0
     }
    },
-   "t": 64238
+   "t": 70104
   },
   {
    "step": 4,
@@ -363,6 +475,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -401,7 +540,7 @@
      "notices": 0
     }
    },
-   "t": 76939
+   "t": 82365
   },
   {
    "step": 5,
@@ -439,6 +578,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -477,7 +643,7 @@
      "notices": 1
     }
    },
-   "t": 92139
+   "t": 96941
   },
   {
    "step": 6,
@@ -521,6 +687,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -559,7 +752,7 @@
      "notices": 1
     }
    },
-   "t": 105037
+   "t": 109453
   },
   {
    "step": 7,
@@ -603,6 +796,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -641,7 +861,7 @@
      "notices": 2
     }
    },
-   "t": 119261
+   "t": 123423
   }
  ]
 }

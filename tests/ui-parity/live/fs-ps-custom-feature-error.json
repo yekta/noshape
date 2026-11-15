@@ -1,18 +1,22 @@
 {
  "scenario": "fs-ps-custom-feature-error",
- "recorded": "2026-11-08T19:43:06.325Z",
+ "recorded": "2026-11-15T17:27:25.995Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.3"
  },
  "live": {
-  "document": "cccea8635ffc2eaced715d88",
-  "workspace": "904860760a84685ec9a766f0",
-  "element": "df247d6c4328a16694adcdf5",
+  "document": "5495c5d493893faca250b245",
+  "workspace": "ab8aaf3dbe5ec57f15a483af",
+  "element": "7f8147e8d8b1d33180f2c522",
   "start": "fs-custom",
-  "startElement": "df247d6c4328a16694adcdf5",
+  "startElement": "7f8147e8d8b1d33180f2c522",
   "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
@@ -62,6 +66,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -103,7 +134,7 @@
    "ok": true,
    "at": [
     179,
-    976
+    1063
    ],
    "state": {
     "focus": {
@@ -152,6 +183,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -181,7 +239,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 51535
+   "t": 35863
   },
   {
    "step": 2,
@@ -250,6 +308,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -279,7 +364,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 68781
+   "t": 38038
   },
   {
    "step": 3,
@@ -393,6 +478,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -422,7 +534,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 91124
+   "t": 44063
   },
   {
    "step": 4,
@@ -495,6 +607,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -524,7 +663,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 111966
+   "t": 46889
   },
   {
    "step": 5,
@@ -537,7 +676,7 @@
    "ok": true,
    "at": [
     583,
-    976
+    1063
    ],
    "state": {
     "focus": {
@@ -568,6 +707,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 471.147,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -606,7 +772,7 @@
      "notices": 0
     }
    },
-   "t": 131154
+   "t": 66817
   },
   {
    "step": 6,
@@ -650,6 +816,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 471.147,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -688,7 +881,7 @@
      "notices": 0
     }
    },
-   "t": 149161
+   "t": 79392
   },
   {
    "step": 7,
@@ -734,6 +927,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 471.147,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -772,7 +992,7 @@
      "notices": 0
     }
    },
-   "t": 166080
+   "t": 91648
   },
   {
    "step": 8,
@@ -818,6 +1038,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 471.147,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -856,7 +1103,7 @@
      "notices": 0
     }
    },
-   "t": 182150
+   "t": 103862
   },
   {
    "step": 9,
@@ -894,6 +1141,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 471.147,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -929,10 +1203,10 @@
      "line": "uip(",
      "lines": 31,
      "committed": false,
-     "notices": 0
+     "notices": 1
     }
    },
-   "t": 189245
+   "t": 116624
   },
   {
    "step": 10,
@@ -976,6 +1250,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 471.147,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -1014,7 +1315,7 @@
      "notices": 1
     }
    },
-   "t": 195585
+   "t": 129197
   },
   {
    "step": 11,
@@ -1027,7 +1328,7 @@
    "ok": true,
    "at": [
     179,
-    976
+    1063
    ],
    "state": {
     "focus": {
@@ -1035,28 +1336,93 @@
     },
     "dialog": null,
     "dialogs": [],
-    "panels": null,
+    "panels": [
+     {
+      "id": "element-details-pane",
+      "title": null,
+      "text": "FeatureScript notices Feature Studio 1 extraneous input 'uip' expecting {<EOF>, 'annotation', 'export', 'enum', 'type', 'function', 'predicate', 'operator', 'typeconvert', 'const', TOP_SEMI} 31:1 Feature Studio 1 Monitor Part Studio 1 Error imported from \"c587912617110984da00c8d4\": extraneous input ",
+      "inputs": [
+       {
+        "placeholder": "Filter notices",
+        "value": ""
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
      "items": []
     },
     "features": {
-     "rows": [],
-     "rollbackAfter": null
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
+      },
+      {
+       "name": "uip Feature 1",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
+      }
+     ],
+     "rollbackAfter": "uip Feature 1"
     },
-    "parts": [
-     "Part 1"
-    ],
-    "partsHeading": "Parts (1)",
+    "parts": [],
+    "partsHeading": "Parts (0)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 911.089,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.544584,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -1086,7 +1452,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 214715
+   "t": 135468
   },
   {
    "step": 12,
@@ -1099,7 +1465,7 @@
    "ok": true,
    "at": [
     70,
-    275
+    304
    ],
    "state": {
     "focus": {
@@ -1111,7 +1477,7 @@
      {
       "id": "element-details-pane",
       "title": null,
-      "text": "FeatureScript notices Feature Studio 1 extraneous input 'uip' expecting {<EOF>, 'annotation', 'export', 'enum', 'type', 'function', 'predicate', 'operator', 'typeconvert', 'const', TOP_SEMI} 31:1 Feature Studio 1 Monitor Part Studio 1 Error imported from \"67b4335c83ee9f7bb6b0918d\": extraneous input ",
+      "text": "FeatureScript notices Feature Studio 1 extraneous input 'uip' expecting {<EOF>, 'annotation', 'export', 'enum', 'type', 'function', 'predicate', 'operator', 'typeconvert', 'const', TOP_SEMI} 31:1 Feature Studio 1 Monitor Part Studio 1 Error imported from \"c587912617110984da00c8d4\": extraneous input ",
       "inputs": [
        {
         "placeholder": "Filter notices",
@@ -1167,6 +1533,33 @@
     "tooltip": "uip Feature 1",
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 911.089,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.544584,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -1196,7 +1589,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 251759
+   "t": 168027
   }
  ]
 }

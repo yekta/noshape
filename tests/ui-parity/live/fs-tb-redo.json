@@ -1,19 +1,23 @@
 {
  "scenario": "fs-tb-redo",
- "recorded": "2026-11-08T07:22:28.392Z",
+ "recorded": "2026-11-15T17:30:21.521Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.3"
  },
  "live": {
-  "document": "9617774f202e6eac6a60a415",
-  "workspace": "470422f25df2293debc3baeb",
-  "element": "1f2d721e47b347c01d72992c",
+  "document": "76d21e42b3594ea2b9dcd5f6",
+  "workspace": "645bcb5894f8149dcba18341",
+  "element": "8368832c9043716d8df83d76",
   "start": "fs-studio",
-  "startElement": "1f2d721e47b347c01d72992c",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "8368832c9043716d8df83d76",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -41,6 +45,33 @@
   "tooltip": null,
   "sketch": null,
   "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    68.58,
+    -118.784,
+    79.189
+   ],
+   "width_mm": 426.206,
+   "height_mm": 247.877,
+   "mmPerPixel": 0.254755,
+   "orthographic": true
+  },
+  "measure": null,
   "document": {
    "workspace": "Main",
    "history": null,
@@ -82,7 +113,7 @@
    "ok": true,
    "at": [
     583,
-    976
+    1063
    ],
    "state": {
     "focus": {
@@ -113,6 +144,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -151,7 +209,7 @@
      "notices": 0
     }
    },
-   "t": 36162
+   "t": 45027
   },
   {
    "step": 2,
@@ -195,6 +253,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -233,7 +318,7 @@
      "notices": 0
     }
    },
-   "t": 41264
+   "t": 57610
   },
   {
    "step": 3,
@@ -279,6 +364,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -317,7 +429,7 @@
      "notices": 0
     }
    },
-   "t": 43732
+   "t": 69848
   },
   {
    "step": 4,
@@ -363,6 +475,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -401,7 +540,7 @@
      "notices": 0
     }
    },
-   "t": 45761
+   "t": 82131
   },
   {
    "step": 5,
@@ -439,6 +578,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -477,7 +643,7 @@
      "notices": 0
     }
    },
-   "t": 48650
+   "t": 95014
   },
   {
    "step": 6,
@@ -514,6 +680,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -544,15 +737,15 @@
     "featurestudio": {
      "caret": [
       4,
-      4
+      0
      ],
-     "line": "// u",
+     "line": "",
      "lines": 5,
      "committed": false,
      "notices": 0
     }
    },
-   "t": 53830
+   "t": 107578
   },
   {
    "step": 7,
@@ -589,6 +782,33 @@
     "tooltip": null,
     "sketch": null,
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      900,
+      -1558.846,
+      1039.23
+     ],
+     "width_mm": 478.686,
+     "height_mm": 247.877,
+     "mmPerPixel": 0.254755,
+     "orthographic": true
+    },
+    "measure": null,
     "document": {
      "workspace": "Main",
      "history": null,
@@ -627,7 +847,7 @@
      "notices": 0
     }
    },
-   "t": 57264
+   "t": 120175
   }
  ]
 }
