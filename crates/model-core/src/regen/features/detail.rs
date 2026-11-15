@@ -728,6 +728,16 @@ fn variable_law(ends: (f64, f64), points: &mut Vec<(f64, f64)>, smooth: bool) ->
     law
 }
 
+/// The radius a law of cubic Hermite spans ([`law_hermite`]'s) gives at fraction `u`.
+pub(super) fn hermite_at((knots, slope): &super::blend_section::RadiusLaw, u: f64) -> f64 {
+    let i = knots.windows(2).position(|w| u <= w[1].0).unwrap_or(knots.len() - 2);
+    let (a, b) = (knots[i], knots[i + 1]);
+    let h = b.0 - a.0;
+    let f = ((u - a.0) / h).clamp(0.0, 1.0);
+    let (h00, h10, h01, h11) = (2.0 * f * f * f - 3.0 * f * f + 1.0, f * f * f - 2.0 * f * f + f, -2.0 * f * f * f + 3.0 * f * f, f * f * f - f * f);
+    h00 * a.1 + h10 * h * slope[i] + h01 * b.1 + h11 * h * slope[i + 1]
+}
+
 /// The variable law as cubic Hermite spans: its points (fraction, radius), from 0 to 1, and the slope at each.
 pub(super) fn law_hermite(ends: (f64, f64), points: &mut Vec<(f64, f64)>, smooth: bool) -> super::blend_section::RadiusLaw {
     points.retain(|p| p.0 > 1e-9 && p.0 < 1.0 - 1e-9);
@@ -932,11 +942,23 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<bool> {
                 singles.extend(run.iter().map(|r| r.0));
             }
         }
-        // Each edge's law from its curve's first point to its last, every edge of a run set in one build.
+        // One law along each run (its ends', vertices' and points' radii by length along it, the slopes as one edge's:
+        // live 04:16, c2-hunting-knife's Fillet 7, 3 mm to 0.25 mm along a side and 0.25 across the tip: 1.093 mm at the
+        // side's middle, not the straight 1.625 of the side alone), each edge's part from its curve's first point to its
+        // last, every edge of a run set in one build.
         let mut run_laws: Vec<Vec<EdgeLaw>> = Vec::new();
         for run in &multi {
-            let mut laws_of_run = Vec::new();
-            for &(e, ..) in run {
+            let total: f64 = run.iter().map(|r| r.3).sum();
+            if total <= 0.0 {
+                continue;
+            }
+            let mut points: Vec<(f64, f64)> = Vec::new();
+            let mut at = 0.0;
+            let mut spans: Vec<(f64, f64)> = Vec::new();
+            for (i, &(e, start, _, len, forward)) in run.iter().enumerate() {
+                if i > 0 {
+                    points.push((at / total, radius_at(start)));
+                }
                 let edge = body.shape.sub_shape(ShapeType::Edge, e)?;
                 let info = edge.edge_info()?;
                 let (p0, p1) = (edge.point_at(info.first_param)?, edge.point_at(info.last_param)?);
@@ -944,15 +966,40 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<bool> {
                 let key = |p: glam::DVec3| (p.x, p.y, p.z);
                 // (Onshape's position 0 is the end nearest the origin corner, lowest x, y, z.)
                 let low_first = key(p0).partial_cmp(&key(p1)) != Some(std::cmp::Ordering::Greater);
-                let mut points: Vec<(f64, f64)> = on_edge.iter().filter(|(n, _, _)| *n == name).map(|(_, t, r)| (if low_first { *t } else { 1.0 - *t }, *r)).collect();
+                // Each point's fraction along its curve, then along the run.
+                let mut on: Vec<(f64, f64)> = on_edge.iter().filter(|(n, _, _)| *n == name).map(|(_, t, r)| (if low_first { *t } else { 1.0 - *t }, *r)).collect();
                 for (p, r) in &at_vertex {
                     if (*p - p0).length() > 1e-9 && (*p - p1).length() > 1e-9
                         && let Some(t) = param_on_edge(&edge, &info, *p)
                     {
-                        points.push((t, *r));
+                        on.push((t, *r));
                     }
                 }
-                laws_of_run.push((name, variable_law((radius_at(p0), radius_at(p1)), &mut points, smooth)));
+                points.extend(on.into_iter().filter(|p| p.0 > 1e-9 && p.0 < 1.0 - 1e-9).map(|(t, r)| ((at + len * if forward { t } else { 1.0 - t }) / total, r)));
+                spans.push((at / total, (at + len) / total));
+                at += len;
+            }
+            let law = law_hermite((radius_at(run[0].1), radius_at(run[run.len() - 1].2)), &mut points, smooth);
+            let knots = &law.0;
+            let eval = |u: f64| hermite_at(&law, u);
+            let mut laws_of_run = Vec::new();
+            for (&(e, _, _, _, forward), &(u0, u1)) in run.iter().zip(&spans) {
+                // Samples 16 a span of the law within the edge, from its curve's first point.
+                let mut us: Vec<f64> = vec![u0];
+                let mut cuts: Vec<f64> = knots.iter().map(|k| k.0).filter(|&k| k > u0 + 1e-12 && k < u1 - 1e-12).collect();
+                cuts.push(u1);
+                let mut from = u0;
+                for c in cuts {
+                    for j in 1..=16 {
+                        us.push(from + (c - from) * j as f64 / 16.0);
+                    }
+                    from = c;
+                }
+                let mut law: Vec<(f64, f64)> = us.iter().map(|&u| ((u - u0) / (u1 - u0), eval(u))).collect();
+                if !forward {
+                    law = law.into_iter().rev().map(|(t, r)| (1.0 - t, r)).collect();
+                }
+                laws_of_run.push((body.edges[e].clone(), law));
             }
             run_laws.push(laws_of_run);
         }
@@ -1690,6 +1737,21 @@ fn coaxial_round_tool(faces: &[Shape], cyl: k::Plane, rc: f64, sides: [DVec3; 2]
 
 #[cfg(test)]
 mod tests {
+    /// Live 04:16 (c2-hunting-knife's Fillet 7): a variable fillet over a tangent run, 3 mm, 0.25 mm, 0.25 mm, 3 mm at
+    /// its vertices, smooth off: one law along the run (slope 0 where the flat tip span meets a side, 1.5 x the chord at
+    /// the ends), so a side's radius at its fractions as live's (within its measure's ~0.03 mm), not the straight
+    /// line of the side alone (1.625 at the middle).
+    #[test]
+    fn a_variable_runs_law_is_one_along_the_run_as_live() {
+        let (side, tip) = (9.4528, 3.7);
+        let total = 2.0 * side + tip;
+        let law = super::law_hermite((3.0, 3.0), &mut vec![(side / total, 0.25), ((side + tip) / total, 0.25)], false);
+        for (f, live) in [(0.1, 2.567), (0.25, 1.973), (0.5, 1.093), (0.75, 0.473), (0.9, 0.285)] {
+            let r = super::hermite_at(&law, f * side / total);
+            assert!((r - live).abs() < 0.03, "side at {f}: {r} mm, live {live}");
+        }
+    }
+
     /// Onshape G6, F4: x=0 → R1, 0.5 → R6, x=40 → R4, smooth off, sampled at x mm.
     #[test]
     fn variable_law_like_onshape() {
