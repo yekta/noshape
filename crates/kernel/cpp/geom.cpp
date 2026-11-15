@@ -453,15 +453,19 @@ BSplineSurfF face_bspline(const OcShape& fs)
 P3 face_normal_at_uv(const OcShape& fs, double u, double v)
 {
   const TopoDS_Face& f = as_face(fs.shape, "shape");
-  BRepGProp_Face     gf(f); // accounts for face orientation
-  gp_Pnt             p;
-  gp_Vec             n;
-  gf.Normal(u, v, p, n);
+  // The surface without the face's parameter box (BRepGProp_Face's adaptor works it out from the edges' pcurves each
+  // call: ~40 us a call on a plane whose pcurves aren't stored, 2,146 calls in a sheet metal corner break).
+  BRepAdaptor_Surface s(f, false);
+  gp_Pnt              p;
+  gp_Vec              du, dv;
+  s.D1(u, v, p, du, dv);
+  gp_Vec n = du.Crossed(dv);
+  if (f.Orientation() == TopAbs_REVERSED)
+    n.Reverse();
   if (n.Magnitude() < 1e-15)
   {
     // Singular point: fall back to local properties.
-    BRepAdaptor_Surface s(f);
-    BRepLProp_SLProps   props(s, u, v, 1, 1e-9);
+    BRepLProp_SLProps props(s, u, v, 1, 1e-9);
     if (!props.IsNormalDefined())
       fail_op("normal is undefined at this point");
     gp_Dir d = props.Normal();
@@ -476,7 +480,7 @@ P3 face_normal_at_uv(const OcShape& fs, double u, double v)
 P3 face_point_at_uv(const OcShape& fs, double u, double v)
 {
   const TopoDS_Face&  f = as_face(fs.shape, "shape");
-  BRepAdaptor_Surface s(f);
+  BRepAdaptor_Surface s(f, false);
   return from_pnt(s.Value(u, v));
 }
 
@@ -1452,7 +1456,7 @@ PlaneQ find_plane(const OcShape& s, double tolerance)
   q.found = false;
   if (s.shape.ShapeType() == TopAbs_FACE)
   {
-    BRepAdaptor_Surface a(TopoDS::Face(s.shape), true);
+    BRepAdaptor_Surface a(TopoDS::Face(s.shape), false);
     if (a.GetType() == GeomAbs_Plane)
     {
       // A left-handed frame (a mirror's image) has its surface normal X × Y
