@@ -846,6 +846,13 @@ fn a_create_selection_pick_lights_up_its_feature(cx: &mut TestAppContext) {
     draw(cx, window);
     let focused = cx.update_window(window, |_, w, cx| view.read(cx).ui.create_selection.as_ref().is_some_and(|c| c.focus.is_focused(w))).unwrap();
     assert!(focused, "the Selection field has the keyboard");
+    // Another field of the dialog activated: the panel closes, the field takes the next pick.
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.user_focus_query("mirrorPlane");
+        cx.emit(crate::feature_dialog::DialogEvent::QueryFocused);
+    }));
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).ui.create_selection.is_none()), "the panel closed");
 }
 
 /// Live (ui-parity extrude-remove-tab): Extrude opened on a part's face takes Add by itself, and that isn't an undo

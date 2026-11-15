@@ -2747,7 +2747,14 @@ impl PartStudioView {
                     this.cancel_edit(window, cx);
                 }
             }
-            DialogEvent::QueryFocused => this.refresh_scene(false, cx),
+            DialogEvent::QueryFocused => {
+                // Live (mirror-face-create-selection): clicking another field closes Create selection.
+                let active = emitter.read(cx).active_query.clone();
+                if this.ui.create_selection.as_ref().is_some_and(|c| matches!(&c.target, create_selection::CsTarget::Field(f) if active.as_ref() != Some(f))) {
+                    this.close_create_selection(cx);
+                }
+                this.refresh_scene(false, cx)
+            }
             // Live (psb 10-19 h): Tab past the dialog's last control goes to
             // the navbar; Shift+Tab before its first one to <body> (here the
             // Part Studio itself, so shortcuts keep working).
