@@ -3557,3 +3557,15 @@ fn one_case() {
     let o = ours(&mut c);
     eprintln!("{}", o["points"]);
 }
+
+/// Live fuzz s222 / s1057: an outline tied to the resized one only by Parallel / Perpendicular (or otherwise still
+/// holding where it was) stays exactly there; ours moved it by up to 25 µm. T1: the fixtures' answers, no live.
+#[test]
+fn a_neighbour_that_still_fits_stays_put() {
+    for (fixture_name, seed) in [("sketch-3.live.json", 222), ("sketch-22.live.json", 1057)] {
+        let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture(fixture_name)).unwrap()).unwrap();
+        let ours = batch(1, seed, true);
+        let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
+        assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
+    }
+}

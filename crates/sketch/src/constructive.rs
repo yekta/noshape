@@ -995,9 +995,28 @@ impl Sketch {
                     }
                 }
             }
-            let Some(sub) = done else {
+            let Some(mut sub) = done else {
                 return false;
             };
+            // A neighbour the solve moved that still fits where it was stays there (live fuzz s222: a second
+            // outline tied to the slot only by Parallel / Perpendicular doesn't move).
+            for &g in group.iter().filter(|g| **g != u) {
+                let Some(e) = self.entity(g) else { continue };
+                let refs: Vec<EntityId> = e.point_refs().into_iter().chain(std::iter::once(g)).collect();
+                let solved: Vec<(EntityId, Geometry)> = refs.iter().filter_map(|p| Some((*p, sub.entity(*p)?.geometry.clone()))).collect();
+                for p in &refs {
+                    if let (Some(x), Some(s)) = (self.entity(*p).map(|x| x.geometry.clone()), sub.entity_mut_silent(*p)) {
+                        s.geometry = x;
+                    }
+                }
+                if !sub.unheld_constraints(1e-9).is_empty() {
+                    for (p, x) in solved {
+                        if let Some(s) = sub.entity_mut_silent(p) {
+                            s.geometry = x;
+                        }
+                    }
+                }
+            }
             // The group's points (and a circle's radius) back.
             for &g in &group {
                 let Some(e) = self.entity(g) else { return false };
