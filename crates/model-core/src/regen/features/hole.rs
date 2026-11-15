@@ -175,19 +175,22 @@ fn hole_dims(ev: &EvalCtx) -> FResult<HoleDims> {
     let len = |id: &str| ev.eval_num_in(vals, id, crate::params::NumKind::Length);
     let diameter = len("holeDiameterV3")?;
     let tap_drill = if vals.bool("showTappedDepth") { Some(len("tapDrillDiameterV3")?) } else { None };
-    let cbore = if style == "C_BORE" { Some((len("cBoreDiameterV3")?, len("cBoreDepthV3")?)) } else { None };
+    let mut cbore = if style == "C_BORE" { Some((len("cBoreDiameterV3")?, len("cBoreDepthV3")?)) } else { None };
     let csink = if style == "C_SINK" { Some((len("cSinkDiameterV3")?, ev.eval_num_in(vals, "cSinkAngleV3", crate::params::NumKind::Angle)?)) } else { None };
     // (Out of the parameter's bounds, as std's precondition says it.)
     if diameter <= 0.0 {
         return crate::regen::eval::err_at(&["holeDiameterV3"], "Error regenerating: a parameter is out of range.");
     }
+    // std hole.fs: a counterbore as wide or as deep as the hole is an error from V1900_EQUAL_HOLE_CBORE_FIX; before, it
+    // builds (asm-infento-subs' 1dc32b Hole 2, V1472, as deep; f0eedd Hole 3, V1605, as wide: a plain hole).
+    let equal_ok = super::solid_a::feature_version(ev.params.text("asVersion")).is_some_and(|v| v < 1900);
     // hole.fs checks these before the locations.
-    if cbore.is_some_and(|(cd, _)| cd <= diameter) {
+    if cbore.is_some_and(|(cd, _)| if equal_ok { cd < diameter - 1e-8 } else { cd <= diameter }) {
         return crate::regen::eval::err_at(&["holeDiameterV3", "cBoreDiameterV3"], "The counterbore diameter must be larger than the hole diameter.");
     }
-    // std hole.fs: as deep as the hole is too deep from V1900_EQUAL_HOLE_CBORE_FIX (asm-infento-subs' 1dc32b Hole 2, V1472,
-    // builds in live).
-    let equal_ok = super::solid_a::feature_version(ev.params.text("asVersion")).is_some_and(|v| v < 1900);
+    if cbore.is_some_and(|(cd, _)| cd <= diameter) {
+        cbore = None;
+    }
     if let Some((_, cdepth)) = cbore
         && ev.is("endStyleV2", "BLIND")
         && if equal_ok { cdepth > len("holeDepthV3")? + 1e-8 } else { cdepth >= len("holeDepthV3")? - 1e-8 }

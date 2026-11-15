@@ -999,6 +999,32 @@ fn a_counterbore_as_deep_as_its_hole_builds_in_a_hole_made_before_v1900() {
     }
 }
 
+/// std hole.fs: a counterbore as wide as its hole is an error from V1900_EQUAL_HOLE_CBORE_FIX; a hole made before
+/// (asm-infento-subs' f0eedd Hole 3, asVersion V1605, 8 mm and 8 mm) builds as a plain hole, as in live.
+#[test]
+fn a_counterbore_as_wide_as_its_hole_is_a_plain_hole_in_a_hole_made_before_v1900() {
+    for (version, builds) in [("", false), ("V1605_RULED_SURFACE_BUMP", true)] {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.1, 0.05, "25 mm");
+        let pl = t.top_plane("25 mm");
+        let mut sk = noshape_sketch::Sketch::new();
+        let p1 = sk.add_point(DVec2::new(0.03, 0.02));
+        let s = t.sketch(Reference::FeaturePlane(pl), sk);
+        let locs = q(vec![Reference::SketchEntity { sketch: s, entity: p1.0 }]);
+        let h = t.add("hole", &[("locations", locs), ("unitsSystem", en("METRIC")), ("styleV2", en("C_BORE")), ("endStyleV2", en("BLIND")), ("holeDiameterV3", e("8 mm")), ("holeDepthV3", e("12 mm")), ("cBoreDiameterV3", e("8 mm")), ("cBoreDepthV3", e("8 mm")), ("asVersion", ParamValue::Text(version.into()))]);
+        let res = t.regen();
+        let st = res.display.features.iter().find(|x| x.id == h).unwrap();
+        assert_eq!(st.status == FeatureStatus::Ok, builds, "{version:?}: {:?} {:?}", st.status, st.message);
+        if builds {
+            // The block less an 8 mm by 12 mm hole and its 118° drill point.
+            let v = total_volume(&res.context);
+            let (r, pi) = (0.004, std::f64::consts::PI);
+            let want = 0.1 * 0.05 * 0.025 - pi * r * r * 0.012 - pi * r * r * (r / 59f64.to_radians().tan()) / 3.0;
+            assert!((v - want).abs() < 1e-9, "{v} vs {want}");
+        }
+    }
+}
+
 #[test]
 fn cancelled_regeneration_is_discarded_and_superseded_one_is_reused() {
     use noshape_model::regen::RegenCancel;
