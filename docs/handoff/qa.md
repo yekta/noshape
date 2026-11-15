@@ -10,6 +10,9 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
   NOSHAPE_PERF=1; lat-open.py; ../lat-steps.py's quiet rule 450 ms (a field caret blinks every ~500 ms: psui)). Absolute numbers
   only from qa-w7-nightly's 02:00 vibe7 window (lead), which now runs hat15 / dock / block after the CLI timings ->
   nightly/lat-<mmdd>.txt. vibe6 runs are for candidates only.
+- Regression guard (lead 11-15): the dock's tab switch + quit (lat/hat/qa-asm-a.json) x5 runs in qa-w7-nightly (nightly/quit-<mmdd>.txt)
+  and in each release's bin/rel-published.sh <v> <candidate> (SHA256SUMS, userdocs vs the candidate, then the compat baseline);
+  any crash appends to /tmp/lead/qa-alerts. Verified fixed on 80e16e42d (dae03465).
 - QUIT-ABORT-DOCK (TICKETS qa 11-15): an exit race (core: threads in the kernel under exit()'s static destructors), in every
   release since at least 0.4.48; shortest repro lat/hat/qa-asm-a.json (6/6 on 0.4.52), loop quitv.sh. core's _Exit fix: re-run
   qa-asm-a + qa-tabs 10x each on its green.
