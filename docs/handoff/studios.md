@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-15 23:20 UTC.
+Updated 2026-11-15 23:11 UTC.
 
 ## In flight
 
@@ -55,12 +55,12 @@ plus the known drw-centermark / -align, drw-insert-view-top-1to1, drw-view-align
   the code before taking an item from it.
 
 ## Next, in order
-1. Land the batch above when the sample run is clean; rerun all drawing takes on vibe5 or vibe6 when a slot frees.
-2. drw-datum-copy-paste: Add leader and the menu's placement, from live2's answer.
-3. View orientation on a projected view's menu, from live2's answer.
-4. Refresh docs/parity/drawing-matrix.md (last 11-15 14:30: 949 of 1868 live items compared and matching).
-5. interaction-feel.md's remaining "?" rows in Drawings / Documents / Assembly (ask live2 for the missing captures).
-6. A full run of the 655 non-drawing takes of my areas to catch regressions since 15:05.
+1. drw-datum-copy-paste: Add leader on the empty sheet's menu and the menu's placement, from live2's answer.
+2. View orientation on a projected view's menu, from live2's answer.
+3. Ask live2 for takes of the drawing panels with most items uncompared (docs/parity/drawing-matrix.md, refreshed
+   23:11: 964 of 1874 compared and matching, none missing): Drawing properties, Hole table, Title block, Note, Hatch
+   region, Hole/thread callout.
+4. interaction-feel.md's remaining "?" rows in Drawings / Documents / Assembly (ask live2 for the missing captures).
 
 ## How to run
 
