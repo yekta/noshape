@@ -321,8 +321,33 @@ pub fn by_body(items: Vec<(usize, usize)>) -> BTreeMap<usize, Vec<usize>> {
 /// Parameter intervals `[t0, t1]` along `p + t * dir` (0 <= t <= len) where
 /// the ray is inside `solid`.
 pub fn ray_intervals(solid: &Shape, p: DVec3, dir: DVec3, len: f64) -> Vec<(f64, f64)> {
+    // A ray past the part's box meets nothing (a Hole's rays against every part of 1dc32b: 681 line Commons, 17 s).
+    if let Ok(b) = solid.bounding_box(false)
+        && !ray_meets_box(p, dir, len, b.min - DVec3::splat(1e-6), b.max + DVec3::splat(1e-6))
+    {
+        return Vec::new();
+    }
     if let Some(iv) = ray_crossings(solid, p, dir, len) {
         return iv;
+    }
+    // A composite part's solids one by one.
+    if solid.shape_type() == k::ShapeType::Compound {
+        let solids = solid.solids();
+        if !solids.is_empty() && solids.iter().map(|s| s.faces().len()).sum::<usize>() == solid.faces().len() {
+            let each: Option<Vec<Vec<(f64, f64)>>> = solids.iter().map(|s| ray_crossings(s, p, dir, len)).collect();
+            if let Some(each) = each {
+                let mut all: Vec<(f64, f64)> = each.into_iter().flatten().collect();
+                all.sort_by(|a, b| a.0.total_cmp(&b.0));
+                let mut merged: Vec<(f64, f64)> = Vec::new();
+                for iv in all {
+                    match merged.last_mut() {
+                        Some(last) if iv.0 <= last.1 + 1e-9 => last.1 = last.1.max(iv.1),
+                        _ => merged.push(iv),
+                    }
+                }
+                return merged;
+            }
+        }
     }
     let Ok(line) = k::make_line(p, p + dir * len) else { return Vec::new() };
     let Ok(res) = k::boolean(k::BooleanOp::Common, &[line], std::slice::from_ref(solid), &k::BooleanOptions::default()) else { return Vec::new() };
@@ -347,6 +372,26 @@ pub fn ray_intervals(solid: &Shape, p: DVec3, dir: DVec3, len: f64) -> Vec<(f64,
         }
     }
     merged
+}
+
+/// Whether the segment from `p` along unit `dir` for `len` meets the box (slabs).
+fn ray_meets_box(p: DVec3, dir: DVec3, len: f64, lo: DVec3, hi: DVec3) -> bool {
+    let (mut t0, mut t1) = (0.0f64, len);
+    for i in 0..3 {
+        if dir[i].abs() < 1e-15 {
+            if p[i] < lo[i] || p[i] > hi[i] {
+                return false;
+            }
+            continue;
+        }
+        let (a, b) = ((lo[i] - p[i]) / dir[i], (hi[i] - p[i]) / dir[i]);
+        t0 = t0.max(a.min(b));
+        t1 = t1.min(a.max(b));
+        if t0 > t1 {
+            return false;
+        }
+    }
+    true
 }
 
 /// [`ray_intervals`] from where the ray crosses the faces of one solid, in
