@@ -2792,7 +2792,9 @@ impl Renderer {
         let mesh_pick_plane = lazy(LayoutKind::Main, P { label: "mesh-pick-plane", vs: "vs_mesh", fs: "fs_mesh_pick_plane", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }, PLAIN);
         let mesh_sample = lazy(LayoutKind::Main, P { label: "mesh-sample", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }, PLAIN);
         let mesh_pick_priority = lazy(LayoutKind::Main, P { label: "mesh-pick-p", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: priority, samples: 1 }, PLAIN);
-        let line_pick = lazy(LayoutKind::Main, P { label: "line-pick", vs: "vs_line", fs: "fs_line_pick", buffers: LINE_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: 1 }, PLAIN);
+        // Coincident edges (a mitred frame corner: two members' ends) pick the one drawn first, the earlier part (live
+        // gusset-new-edit-reedit, gusset-rectangle-aligned: Part 1's).
+        let line_pick = lazy(LayoutKind::Main, P { label: "line-pick", vs: "vs_line", fs: "fs_line_pick", buffers: LINE_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, wgpu::CompareFunction::Greater)), bias: EDGE_DEPTH_BIAS, samples: 1 }, PLAIN);
         let line_pick_behind = lazy(LayoutKind::Main, P { label: "line-pick-b", vs: "vs_line", fs: "fs_line_pick", buffers: LINE_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((false, ge)), bias: EDGE_DEPTH_BIAS, samples: 1 }, PLAIN);
         let point_pick = lazy(LayoutKind::Main, P { label: "point-pick", vs: "vs_point", fs: "fs_point_pick", buffers: POINT_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: 1 }, PLAIN);
         let image_opaque = lazy(LayoutKind::Image, P { label: "image", vs: "vs_image", fs: "fs_image_opaque", buffers: IMAGE_BUFFERS, format: COLOR_FORMAT, blend: premul, depth: Some((true, ge)), bias: none, samples: msaa }, PLAIN);
