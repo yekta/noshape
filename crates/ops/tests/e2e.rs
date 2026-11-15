@@ -966,38 +966,46 @@ fn a_workspace_branches_from_a_version() {
     assert_eq!(e.param.as_deref(), Some("version"), "{}", e.to_json());
 }
 
-/// A Hole's size given through the API is used as given, the schema default's 5 mm too (lead 11-15: not replaced by
-/// the Standard's 1/4), with Onshape's "Parameters have been overridden. Check input." where it differs from the
-/// Standard's (live's REST-built holes say it too). Given with a Standard's size or tableSynced=true, the Standard's
-/// values are the hole's: a size that differs from them is refused in those words, one that agrees is taken.
+/// A Hole's size given through the API is used as given, the schema default's 5 mm too, with or without a Standard's
+/// size or tableSynced: where it differs from the Standard's the hole is overridden as live's are, with Onshape's
+/// "Parameters have been overridden. Check input." (lead 11-15; the model suite's live holes). A Standard's size with
+/// tableSynced=true and no size of its own takes the Standard's.
 #[test]
 fn a_hole_size_given_is_used_as_given() {
     let mut ctx = Ctx::new();
     let sk = new_sketch(&mut ctx, "hole-size-given.noshape", "plane:top");
-    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [100, 40]] }));
     let r = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].clone();
     call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r], "depth": "10 mm" } }));
     let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "at": [[30, 20, 10]] }))["faces"][0]["id"].clone();
     let s2 = call(&mut ctx, "sketch_create", json!({ "plane": top }))["sketch"].clone();
-    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": [[15, 20, 10], [45, 20, 10]] }));
+    let xs = [10.0, 30.0, 50.0, 70.0, 90.0];
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": xs.iter().map(|x| json!([x, 20, 10])).collect::<Vec<_>>() }));
     let pts: Vec<Value> = p["created"].as_array().unwrap().iter().map(|x| x["id"].clone()).collect();
     let radius_at = |ctx: &mut Ctx, x: f64| -> f64 {
         let c = call(ctx, "query_entities", json!({ "kind": "edges", "curve": "circle", "near": [x, 20, 10] }));
         num(&c["edges"][0]["radius"])
     };
-    let h1 = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": [pts[0]], "holeDiameterV3": "5 mm", "endStyleV2": "THROUGH" } }));
-    assert_eq!(h1["feature_status"]["message"], "Parameters have been overridden. Check input.", "{h1}");
-    assert!((radius_at(&mut ctx, 15.0) - 2.5).abs() < 1e-3, "5 mm kept: {}", radius_at(&mut ctx, 15.0));
-    for with in [json!({ "ansiHoleTableEx": ["Drilled", "1/4 (0.25)"] }), json!({ "tableSynced": true })] {
-        let mut params = json!({ "locations": [pts[1]], "holeDiameterV3": "5 mm", "endStyleV2": "THROUGH" });
+    let overridden = "Parameters have been overridden. Check input.";
+    let given = [
+        json!({}),
+        json!({ "ansiHoleTableEx": ["Drilled", "1/4 (0.25)"] }),
+        json!({ "tableSynced": true }),
+        json!({ "ansiHoleTableEx": ["Drilled", "1/4 (0.25)"], "tableSynced": false }),
+    ];
+    // (tableSynced=false as live's own overridden holes pass it, with a size of their own: 5.5 mm.)
+    for (i, with) in given.iter().enumerate() {
+        let d = if i == 3 { 5.5 } else { 5.0 };
+        let mut params = json!({ "locations": [pts[i]], "holeDiameterV3": format!("{d} mm"), "endStyleV2": "THROUGH" });
         params.as_object_mut().unwrap().extend(with.as_object().unwrap().clone());
-        let e = try_call(&mut ctx, "feature_add", json!({ "type": "hole", "params": params })).expect_err("5 mm against the 1/4 size");
-        assert_eq!(e.param.as_deref(), Some("params.holeDiameterV3"), "{with}: {}", e.to_json());
-        assert!(e.message.contains("1/4 (0.25)") && e.message.ends_with("Parameters have been overridden. Check input."), "{with}: {}", e.message);
+        let h = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": params }));
+        assert_eq!(h["feature_status"]["message"], overridden, "{with}: {h}");
+        assert!((radius_at(&mut ctx, xs[i]) - d / 2.0).abs() < 1e-3, "{with}: {d} mm kept: {}", radius_at(&mut ctx, xs[i]));
     }
-    let h2 = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": [pts[1]], "ansiHoleTableEx": ["Drilled", "1/4 (0.25)"], "holeDiameterV3": "0.25 in", "endStyleV2": "THROUGH" } }));
-    assert_eq!(h2["feature_status"]["status"], "Ok", "the size's own diameter: {h2}");
-    assert!((radius_at(&mut ctx, 45.0) - 3.175).abs() < 1e-3, "1/4 in: {}", radius_at(&mut ctx, 45.0));
+    let h = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": [pts[4]], "ansiHoleTableEx": ["Drilled", "1/4 (0.25)"], "tableSynced": true, "endStyleV2": "THROUGH" } }));
+    assert_eq!(h["feature_status"]["status"], "Ok", "the size's own values: {h}");
+    assert!(h["feature_status"]["message"].is_null(), "{h}");
+    assert!((radius_at(&mut ctx, xs[4]) - 3.175).abs() < 1e-3, "1/4 in: {}", radius_at(&mut ctx, xs[4]));
 }
 
 /// Revision history's Export (live rel-rh-export): a Part Studio's parts as they are in a version, the workspace
@@ -1436,11 +1444,7 @@ fn hole_standard_sets_the_table_sizes() {
     call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M8"] } }));
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Hole 1" }));
     assert_eq!(g["params"]["holeDiameterV3"], "6.8 mm", "{g}");
-    // A size with a diameter of its own: refused (lead 11-15); the diameter alone is the caller's.
-    let e = try_call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M6"], "holeDiameterV3": "5.2 mm" } })).unwrap_err();
-    assert_eq!(e.param.as_deref(), Some("params.holeDiameterV3"), "{e:?}");
-    call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M6"] } }));
-    call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "holeDiameterV3": "5.2 mm" } }));
+    call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M6"], "holeDiameterV3": "5.2 mm" } }));
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Hole 1" }));
     assert_eq!(g["params"]["holeDiameterV3"], "5.2 mm", "{g}");
     // The legacy `style` (hidden, ignored) points to `styleV2` (qa API-HOLE-STYLE);

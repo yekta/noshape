@@ -246,15 +246,13 @@ pub fn ops() -> Vec<Op> {
 fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> bool) -> Result<(), OpError> {
     use noshape_model::features::hole_tables as ht;
     use noshape_model::params::ParamValue;
-    // A size the caller gives is theirs, a schema default's value too (5 mm): not replaced by the Standard's (it then
-    // reads as one whose values were set, with Onshape's "Parameters have been overridden. Check input." where it
-    // differs from the Standard's), unless the caller also gives the Standard's size or tableSynced=true: then the
-    // Standard's values are the hole's, and a size given that differs from them is refused (lead 11-15).
+    // A size the caller gives is theirs, a schema default's value too (5 mm): never replaced by the Standard's, with
+    // or without a Standard's size or tableSynced given. Where it differs from the Standard's the Hole reads as live's
+    // overridden holes: Onshape's "Parameters have been overridden. Check input." (lead 11-15, the model suite's live
+    // holes). A Standard's size alone (tableSynced=true or not) takes the Standard's values.
     const DIMS: [&str; 6] = ["holeDiameterV3", "tapDrillDiameterV3", "cBoreDiameterV3", "cBoreDepthV3", "cSinkDiameterV3", "cSinkAngleV3"];
     const SIZES: [&str; 4] = ["ansiHoleTableEx", "ansiHoleTable", "isoHoleTableEx", "isoHoleTable"];
-    let given: Vec<&str> = DIMS.iter().copied().filter(|k| set(k)).collect();
-    let table_wins = SIZES.iter().any(|k| set(k)) || (set(ht::TABLE_SYNCED_PARAM) && feature.params.bool(ht::TABLE_SYNCED_PARAM));
-    if !given.is_empty() && !table_wins {
+    if !set(ht::TABLE_SYNCED_PARAM) && DIMS.iter().any(|k| set(k)) {
         feature.params.set(ht::TABLE_SYNCED_PARAM, ParamValue::Bool(true));
     }
     // A Standard given without Units: the tab that shows it.
@@ -267,7 +265,7 @@ fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> boo
     }
     // Its default size when none is chosen (an ISO M6 tapped hole drills
     // 5 mm, not the new hole's 1/4 in).
-    if SIZES.iter().chain(&["unitsSystem", "styleV2"]).any(|k| set(k)) || table_wins {
+    if SIZES.iter().chain(&["unitsSystem", "styleV2"]).any(|k| set(k)) {
         let mut v = feature.params.clone();
         let (pid, table) = ht::hole_table_param(&v);
         // Every level chosen, as the dialog's dropdowns leave it (a path
@@ -278,26 +276,12 @@ fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> boo
             v.set(pid, ParamValue::Lookup(path.clone()));
             feature.params.set(pid, ParamValue::Lookup(path));
         }
-        let applied = if set(pid) || table_wins { ht::apply_table_to_params(&mut v) } else { ht::sync_hole_standard(&mut v) };
-        if !applied {
-            return Ok(());
-        }
-        let value = |p: Option<&ParamValue>| match p {
-            Some(ParamValue::Expr(e)) => noshape_units::evaluate(&e.text, &noshape_units::EmptyScope).ok().map(|q| q.value),
-            _ => None,
-        };
-        for k in given.iter().filter(|_| table_wins) {
-            let (mine, table) = (value(feature.params.get(k)), value(v.get(k)));
-            if let (Some(a), Some(b)) = (mine, table)
-                && (a - b).abs() > 1e-9 + b.abs() * 1e-9
-            {
-                let size = v.lookup(pid).join(" ");
-                return Err(OpError::param(&format!("params.{k}"), &format!("differs from the size {size}'s; give one or the other. Parameters have been overridden. Check input.")));
-            }
-        }
-        for (k, val) in v.0 {
-            if !set(&k) || (table_wins && DIMS.contains(&k.as_str())) {
-                feature.params.set(&k, val);
+        let applied = if set(pid) { ht::apply_table_to_params(&mut v) } else { ht::sync_hole_standard(&mut v) };
+        if applied {
+            for (k, val) in v.0 {
+                if !set(&k) {
+                    feature.params.set(&k, val);
+                }
             }
         }
     }
