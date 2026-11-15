@@ -1046,12 +1046,17 @@ fn broken_out_jog_lines(g: &mut SheetGeometry, pl: &ViewPlacement, v: &super::Dr
     if pieces.is_empty() {
         return;
     }
-    // Each wall line into the piece it lies on, else the nearest.
+    // Each wall line into the piece it lies on. One on no piece (the profile over a hole at the depth: no section
+    // there) isn't drawn: live's PDF has the jog only over material.
+    let curves: Vec<Vec<[f64; 2]>> = pieces.iter().map(|p| bezier_points(p, 16)).collect();
     let mut members: Vec<Vec<usize>> = vec![Vec::new(); pieces.len()];
     for &i in &walls {
         let m = mid(g.lines[i].points[0], g.lines[i].points[g.lines[i].points.len() - 1]);
-        let d = |p: &Vec<[f64; 2]>| p.windows(2).map(|w| to_segment(m, [w[0], w[1]])).fold(f64::INFINITY, f64::min);
-        let k = (0..pieces.len()).min_by(|a, b| d(&pieces[*a]).total_cmp(&d(&pieces[*b]))).unwrap_or(0);
+        let d = |k: &usize| curves[*k].windows(2).map(|w| to_segment(m, [w[0], w[1]])).fold(f64::INFINITY, f64::min);
+        let Some(k) = (0..pieces.len()).min_by(|a, b| d(a).total_cmp(&d(b))).filter(|k| d(k) < 0.05) else {
+            g.lines[i].points.clear();
+            continue;
+        };
         members[k].push(i);
         g.cad.push(super::cad_layers::CadSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, layer: CadLayer::SectionJogLines });
     }
@@ -1078,7 +1083,12 @@ fn broken_out_pieces(pl: &ViewPlacement, b: &super::BrokenOut, hatch: &[[[f64; 2
     let n = outline.len();
     let sheet: Vec<[f64; 2]> = outline.iter().map(|p| pl.to_sheet(*p)).collect();
     let segs: Vec<[[f64; 2]; 2]> = (0..n).map(|k| [sheet[k], sheet[(k + 1) % n]]).collect();
-    let per = n / b.profile.len();
+    let poles = super::cad_objects::closed_spline_poles(&b.profile, super::cad_objects::SplineKnots::Centripetal);
+    let spans = poles.len().saturating_sub(1) / 3;
+    if spans == 0 || n < spans {
+        return Vec::new();
+    }
+    let per = n / spans;
     let hatch_vertices: Vec<[f64; 2]> = hatch.iter().map(|h| h[0]).collect();
     let bounding = |s: &[[f64; 2]; 2]| hatch.iter().any(|h| to_segment(mid(s[0], s[1]), *h) < 1e-2);
     // Where along chord `s` (0..1) a hatch vertex lies inside it, nearest `from`'s end.
@@ -1093,11 +1103,8 @@ fn broken_out_pieces(pl: &ViewPlacement, b: &super::BrokenOut, hatch: &[[[f64; 2
         if from_start { fs.iter().cloned().fold(None, |a: Option<f64>, f| Some(a.map_or(f, |a| a.min(f)))) } else { fs.iter().cloned().fold(None, |a: Option<f64>, f| Some(a.map_or(f, |a| a.max(f)))) }
     };
     let mut pieces = Vec::new();
-    let m = b.profile.len();
-    for span in 0..m {
-        let q = |i: usize| b.profile[(span + i + m - 1) % m];
-        let (p0, p1, p2, p3) = (q(0), q(1), q(2), q(3));
-        let bez: [[f64; 2]; 4] = [p1, [p1[0] + (p2[0] - p0[0]) / 6.0, p1[1] + (p2[1] - p0[1]) / 6.0], [p2[0] - (p3[0] - p1[0]) / 6.0, p2[1] - (p3[1] - p1[1]) / 6.0], p2].map(|p| pl.to_sheet(p));
+    for span in 0..spans {
+        let bez: [[f64; 2]; 4] = [0, 1, 2, 3].map(|j| pl.to_sheet(poles[3 * span + j]));
         let step = 1.0 / per as f64;
         let chords = &segs[span * per..(span + 1) * per];
         let mut start: Option<f64> = None;
@@ -1118,6 +1125,15 @@ fn broken_out_pieces(pl: &ViewPlacement, b: &super::BrokenOut, hatch: &[[[f64; 2
         }
     }
     pieces
+}
+
+/// `k + 1` points along the cubic Bézier of `poles` (fewer than 4: the poles).
+fn bezier_points(poles: &[[f64; 2]], k: usize) -> Vec<[f64; 2]> {
+    let [a, b, c, d] = poles else { return poles.to_vec() };
+    (0..=k).map(|s| s as f64 / k as f64).map(|t| {
+        let w = [(1.0 - t).powi(3), 3.0 * t * (1.0 - t).powi(2), 3.0 * t * t * (1.0 - t), t * t * t];
+        [w[0] * a[0] + w[1] * b[0] + w[2] * c[0] + w[3] * d[0], w[0] * a[1] + w[1] * b[1] + w[2] * c[1] + w[3] * d[1]]
+    }).collect()
 }
 
 /// A cubic Bézier's poles over `t0..t1` of it (de Casteljau).

@@ -1097,6 +1097,43 @@ fn broken_out_section_exposes_interior() {
     assert!(built.geometry.colors.iter().any(|c| c.lines.contains(&li) && c.rgb == [0xdd, 0x52, 0x28]));
 }
 
+/// A broken-out section's jog lines follow its profile only where it bounds the section: over the hole at the depth
+/// there's none (live drw-broken-out-section's PDF: 104 pt of jog for the 162 pt profile), and each jog piece lies on
+/// the profile's curve.
+#[test]
+fn broken_out_jog_lines_only_over_material() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    // Inside the plate's thickness, across the centre hole: the hole is in front of the depth too, so the cut's wall
+    // shows all round, but the section at the depth has no material over the hole.
+    let profile = vec![[-0.02, 0.004], [0.02, 0.004], [0.02, 0.006], [-0.02, 0.006]];
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile, spline: true, depth: 0.03, depth_ref: None, offset: 0.0, exclude: Vec::new(), created_before: 0 });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let g = &built.geometry;
+    let len = |pts: &[[f64; 2]]| pts.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum::<f64>();
+    let bp = pick_of(&built, PickTarget::BrokenOut { view: ViewId(1), index: 0 });
+    let mut outline = g.lines.iter().find(|l| l.pick == bp).expect("the profile").points.clone();
+    outline.push(outline[0]);
+    let jog: f64 = g.cad.iter().filter(|c| c.layer == crate::drawing::cad_layers::CadLayer::SectionJogLines).flat_map(|c| c.lines.clone()).map(|i| len(&g.lines[i].points)).sum();
+    assert!(jog > 0.25 * len(&outline) && jog < 0.7 * len(&outline), "jog {jog} of the profile's {}", len(&outline));
+    // (Within the profile polyline's own chord error.)
+    let on_outline = |p: [f64; 2]| outline.windows(2).any(|w| views::dist_to_segment(p, w[0], w[1]) < 0.05);
+    let mut pieces = 0;
+    for o in &g.cad_objects {
+        if let crate::drawing::cad_objects::CadObject::Spline { poles, closed: false } = o {
+            pieces += 1;
+            let [a, b, c, d] = poles[..] else { panic!("{poles:?}") };
+            for t in (0..=8).map(|k| k as f64 / 8.0) {
+                let w = [(1.0 - t).powi(3), 3.0 * t * (1.0 - t).powi(2), 3.0 * t * t * (1.0 - t), t * t * t];
+                let p = [w[0] * a[0] + w[1] * b[0] + w[2] * c[0] + w[3] * d[0], w[0] * a[1] + w[1] * b[1] + w[2] * c[1] + w[3] * d[1]];
+                assert!(on_outline(p), "jog piece point {p:?} off the profile");
+            }
+        }
+    }
+    assert!(pieces > 0);
+}
+
 #[test]
 fn projected_views_inherit_broken_out_and_section_cuts() {
     let (doc, mut drawing) = demo();
