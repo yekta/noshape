@@ -10429,20 +10429,16 @@ OpOut op_offset_faces(const OcShape& s, const OcShapeList& faces,
   std::vector<TopoDS_Shape> args{s.shape};
   if (!any)
     return make_result(args, s.shape, nullptr);
+  // A prism's sides all moved by one distance: its cap's outline offset and extruded again, before OCCT's offset
+  // (cf-lighten's Lighten: 4 such offsets, ~10 ms each in MakeOffset).
+  const bool same = std::all_of(offsets.begin(), offsets.end(), [&](double o) { return o == offsets[0]; });
+  TopoDS_Shape prism;
+  HHist        ph;
+  if (same && offset_prism_sides(s.shape, faces.items, offsets[0], prism, ph))
+    return make_result(args, prism, ph.get());
   mo.MakeOffsetShape();
   if (!mo.IsDone())
     fail_op("offset face failed (error " + std::to_string((int)mo.Error()) + ")");
-  // Every face kept but edges lost (a short face's ends between tangent faces): a prism's sides built directly.
-  const bool same = std::all_of(offsets.begin(), offsets.end(), [&](double o) { return o == offsets[0]; });
-  ShapeIMap ein, eout, fin, fout;
-  TopExp::MapShapes(s.shape, TopAbs_EDGE, ein);
-  TopExp::MapShapes(mo.Shape(), TopAbs_EDGE, eout);
-  TopExp::MapShapes(s.shape, TopAbs_FACE, fin);
-  TopExp::MapShapes(mo.Shape(), TopAbs_FACE, fout);
-  TopoDS_Shape prism;
-  HHist ph;
-  if (same && fout.Extent() == fin.Extent() && eout.Extent() < ein.Extent() && offset_prism_sides(s.shape, faces.items, offsets[0], prism, ph))
-    return make_result(args, prism, ph.get());
   HHist h = history_of(args, mo);
   return make_result(args, mo.Shape(), h.get());
 }
