@@ -1361,7 +1361,8 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   }
   if (!ok(r))
     return no("invalid result");
-  const double vo = volume_of(solid), vr = volume_of(r);
+  // (A sanity check: the exact integrals were 50 ms each on c2-rings-loft's lofted ring, Shell 2.)
+  const double vo = rough_volume_by_faces(solid), vr = rough_volume_by_faces(r);
   if (!(vr > 0 && vr < vo))
     return no("volume out of range");
   lap = std::make_unique<KernelTimer>("regions.history");
