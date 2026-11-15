@@ -123,6 +123,7 @@
 #include <map>
 #include <GC_MakeCircle.hxx>
 #include <Geom_OffsetSurface.hxx>
+#include <BRepTopAdaptor_FClass2d.hxx>
 #include <GeomAPI_PointsToBSpline.hxx>
 #include <ShapeAnalysis_Surface.hxx>
 #include <Geom_ToroidalSurface.hxx>
@@ -3813,6 +3814,7 @@ protected:
       myLists(k) = std::move(kept);
     }
     drop_far_pairs();
+    drop_clear_offset_pairs();
     // (Each edge / face pair's distance on all threads; a pair kept unless it was found clearly apart.)
     struct EF
     {
@@ -3870,6 +3872,214 @@ protected:
   }
 
 private:
+  // Edge / face pairs where the face is a free-form face's offset and they share a vertex (an offset edge ending on its
+  // neighbour's offset): the edge walked from that vertex, its foot on the offset found in the face's own parameters
+  // (Gauss-Newton, each from the last, the first the vertex's own place on the face), the signed distance watched;
+  // apart when, inside the face's bounds and past two steps from the vertex, it stays beyond half a step (a tenth of
+  // the wall) and never changes sign. Else OCCT's check as before (c2-rings-loft's Shell 1: 164 such pairs, 350 ms of
+  // OCCT's edge / face intersections on one thread, one 73 ms).
+  void drop_clear_offset_pairs()
+  {
+    if (!(apart_ > 0))
+      return;
+    struct Pair
+    {
+      int  list, at;
+      bool clear = false;
+    };
+    std::vector<Pair> ps;
+    for (int k = 0; k < myLists.Length(); ++k)
+      for (int i = 0; i < myLists(k).Length(); ++i)
+      {
+        int n1, n2;
+        myLists(k)(i).Indices(n1, n2);
+        const TopAbs_ShapeEnum t1 = myDS->ShapeInfo(n1).ShapeType(), t2 = myDS->ShapeInfo(n2).ShapeType();
+        if (!((t1 == TopAbs_EDGE && t2 == TopAbs_FACE) || (t1 == TopAbs_FACE && t2 == TopAbs_EDGE)))
+          continue;
+        const TopoDS_Face&              f = TopoDS::Face(t1 == TopAbs_FACE ? myDS->Shape(n1) : myDS->Shape(n2));
+        TopLoc_Location                 l;
+        const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f, l);
+        if (g.IsNull() || !l.IsIdentity() || (occ::down_cast<Geom_OffsetSurface>(g).IsNull() && !free_form(g)))
+          continue;
+        ps.push_back({k, i});
+      }
+    if (ps.empty())
+      return;
+    // (Each face's classifier made once: made for every pair it was most of the check.)
+    NCollection_DataMap<const void*, int>                 face_at;
+    std::vector<TopoDS_Face>                              fs;
+    std::vector<std::unique_ptr<BRepTopAdaptor_FClass2d>> cls;
+    for (const Pair& p : ps)
+    {
+      int n1, n2;
+      myLists(p.list)(p.at).Indices(n1, n2);
+      const TopoDS_Shape& f = myDS->ShapeInfo(n1).ShapeType() == TopAbs_FACE ? myDS->Shape(n1) : myDS->Shape(n2);
+      if (!face_at.IsBound(f.TShape().get()))
+      {
+        face_at.Bind(f.TShape().get(), static_cast<int>(fs.size()));
+        fs.push_back(TopoDS::Face(f.Oriented(TopAbs_FORWARD)));
+      }
+    }
+    cls.resize(fs.size());
+    OSD_Parallel::For(0, static_cast<int>(fs.size()), [&](int j) {
+      try
+      {
+        cls[(size_t)j] = std::make_unique<BRepTopAdaptor_FClass2d>(fs[(size_t)j], BRep_Tool::Tolerance(fs[(size_t)j]));
+      }
+      catch (const Standard_Failure&)
+      {
+      }
+    }, serial_);
+    OSD_Parallel::For(0, static_cast<int>(ps.size()), [&](int j) {
+      if (noshape_should_break() != 0)
+        return;
+      int n1, n2;
+      myLists(ps[(size_t)j].list)(ps[(size_t)j].at).Indices(n1, n2);
+      const TopoDS_Shape& a = myDS->Shape(n1);
+      const TopoDS_Shape& b = myDS->Shape(n2);
+      const TopoDS_Shape& f = a.ShapeType() == TopAbs_EDGE ? b : a;
+      const BRepTopAdaptor_FClass2d* c = cls[(size_t)face_at.Find(f.TShape().get())].get();
+      if (c == nullptr)
+        return;
+      try
+      {
+        ps[(size_t)j].clear = edge_clear_of_offset(TopoDS::Edge(a.ShapeType() == TopAbs_EDGE ? a : b), TopoDS::Face(f), *c, apart_);
+      }
+      catch (const Standard_Failure&)
+      {
+        ps[(size_t)j].clear = false;
+      }
+    }, serial_);
+    std::vector<std::vector<char>> drop((size_t)myLists.Length());
+    for (int k = 0; k < myLists.Length(); ++k)
+      drop[(size_t)k].assign((size_t)myLists(k).Length(), 0);
+    for (const Pair& p : ps)
+      drop[(size_t)p.list][(size_t)p.at] = p.clear;
+    remove(drop);
+  }
+
+  // A surface other than a plane, cylinder, cone, sphere or torus (their pairs are OCCT's quick ones).
+  static bool free_form(const occ::handle<Geom_Surface>& g)
+  {
+    switch (GeomAdaptor_Surface(g).GetType())
+    {
+      case GeomAbs_Plane:
+      case GeomAbs_Cylinder:
+      case GeomAbs_Cone:
+      case GeomAbs_Sphere:
+      case GeomAbs_Torus:
+        return false;
+      default:
+        return true;
+    }
+  }
+
+  static bool edge_clear_of_offset(const TopoDS_Edge& e, const TopoDS_Face& face, const BRepTopAdaptor_FClass2d& cls, double step)
+  {
+    if (BRep_Tool::Degenerated(e))
+      return false;
+    const TopoDS_Face                     f   = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
+    const occ::handle<Geom_Surface>       g   = BRep_Tool::Surface(f);
+    const occ::handle<Geom_OffsetSurface> off = occ::down_cast<Geom_OffsetSurface>(g);
+    const occ::handle<Geom_Surface>       base = off.IsNull() ? g : off->BasisSurface();
+    const double                          d    = off.IsNull() ? 0.0 : off->Offset();
+    TopoDS_Vertex                         v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    auto on_face = [&](const TopoDS_Vertex& v) {
+      for (TopExp_Explorer w(f, TopAbs_VERTEX); w.More(); w.Next())
+        if (w.Current().IsSame(v))
+          return true;
+      return false;
+    };
+    const bool at0 = !v0.IsNull() && on_face(v0), at1 = !v1.IsNull() && on_face(v1);
+    if (!at0 && !at1)
+      return false;
+    const TopoDS_Vertex& from = at0 ? v0 : v1;
+    gp_Pnt2d             uv   = BRep_Tool::Parameters(from, f);
+    // The offset's point and its first derivatives at (u, v): base + d n, n the natural normal.
+    auto at = [&](const gp_Pnt2d& q, gp_XYZ& P, gp_XYZ& Pu, gp_XYZ& Pv, gp_XYZ& n) {
+      gp_Pnt S;
+      gp_Vec Su, Sv, Suu, Svv, Suv;
+      base->D2(q.X(), q.Y(), S, Su, Sv, Suu, Svv, Suv);
+      const gp_Vec N = Su.Crossed(Sv);
+      const double m = N.Magnitude();
+      if (m < 1e-300)
+        return false;
+      n               = N.XYZ() / m;
+      const gp_XYZ Nu = (Suu.Crossed(Sv) + Su.Crossed(Suv)).XYZ(), Nv = (Suv.Crossed(Sv) + Su.Crossed(Svv)).XYZ();
+      P               = S.XYZ() + n * d;
+      Pu              = Su.XYZ() + (Nu - n * n.Dot(Nu)) * (d / m);
+      Pv              = Sv.XYZ() + (Nv - n * n.Dot(Nv)) * (d / m);
+      return true;
+    };
+    double U0, U1, V0, V1;
+    base->Bounds(U0, U1, V0, V1);
+    const bool uper = base->IsUPeriodic(), vper = base->IsVPeriodic();
+    // (Gauss-Newton on |O(u, v) - X|: from the last foot; held at a bound the surface ends at, `past` then.)
+    bool past = false;
+    auto foot = [&](const gp_XYZ& X, gp_Pnt2d& q, double& s) {
+      past = false;
+      for (int it = 0; it < 40; ++it)
+      {
+        gp_XYZ P, Pu, Pv, n;
+        if (!at(q, P, Pu, Pv, n))
+          return false;
+        const gp_XYZ dl = X - P;
+        const double a = Pu.Dot(Pu), bb = Pu.Dot(Pv), c = Pv.Dot(Pv), det = a * c - bb * bb;
+        if (std::abs(det) < 1e-300)
+          return false;
+        const double ru = Pu.Dot(dl), rv = Pv.Dot(dl);
+        const double du = (c * ru - bb * rv) / det, dv = (a * rv - bb * ru) / det;
+        q = gp_Pnt2d(q.X() + du, q.Y() + dv);
+        if ((!uper && (q.X() < U0 || q.X() > U1)) || (!vper && (q.Y() < V0 || q.Y() > V1)))
+        {
+          q    = gp_Pnt2d(uper ? q.X() : std::clamp(q.X(), U0, U1), vper ? q.Y() : std::clamp(q.Y(), V0, V1));
+          past = true;
+          return true;
+        }
+        if (std::abs(du) * std::sqrt(a) + std::abs(dv) * std::sqrt(c) < 1e-4 * step)
+        {
+          if (!at(q, P, Pu, Pv, n))
+            return false;
+          s = (X - P).Dot(n);
+          return true;
+        }
+      }
+      return false;
+    };
+    const BRepAdaptor_Curve c(e);
+    const double            t0 = c.FirstParameter(), t1 = c.LastParameter();
+    const double            len = GCPnts_AbscissaPoint::Length(c);
+    const int               n = std::min(4000, std::max(8, (int)std::ceil(len / step)));
+    const gp_XYZ            v = BRep_Tool::Pnt(from).XYZ();
+    int                     sign = 0;
+    for (int k = 1; k <= n; ++k)
+    {
+      const double t = at0 ? t0 + (t1 - t0) * k / n : t1 - (t1 - t0) * k / n;
+      const gp_XYZ X = c.Value(t).XYZ();
+      double       sd = 0;
+      if (!foot(X, uv, sd))
+        return false;
+      if (past || (X - v).Modulus() <= 2 * step)
+        continue;
+      // (Classified only where it would count: a point clear of the face on the side so far needs no place on it.)
+      const int sg = sd > 0 ? 1 : -1;
+      if (std::abs(sd) > 0.5 * step && (sign == 0 || sg == sign))
+      {
+        sign = sg;
+        continue;
+      }
+      if (cls.Perform(uv) != TopAbs_IN)
+        continue;
+      if (std::abs(sd) <= 0.5 * step)
+        return false;
+      if (sign != 0 && sg != sign)
+        return false;
+      sign = sg;
+    }
+    return true;
+  }
+
   // The faces meshed (on copies, at a twentieth of the wall) for drop_far_edges. (A rule on the edge's faces' meshes
   // before it, a face-to-face proximity, cost more than it saved once the edges' own points are tested.)
   void drop_far_pairs()
