@@ -2574,6 +2574,7 @@ impl PartStudioView {
                         .child(
                             div()
                                 .id("sk-text-edit")
+                                .map(|d| crate::ui_script::mark(d, || "field:Text".into()))
                                 .h(px(93.))
                                 .border_1()
                                 .border_color(gpui_kit::rgb(0x1651b0))
