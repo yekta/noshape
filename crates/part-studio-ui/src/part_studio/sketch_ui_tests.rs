@@ -785,6 +785,22 @@ fn a_tab_that_swaps_a_field_for_its_twin_leaves_the_keyboard_off(cx: &mut TestAp
     assert_eq!(f1["kind"].as_str(), Some("none"), "{f1}");
 }
 
+/// Live edge-menu-curve-analysis: the open Curve/surface analysis panel is recorded as live's recorder reads it (its
+/// field, then each option in order, the U / V counts after their checkboxes, "Comb size" last).
+#[gpui::test]
+fn the_curve_analysis_panel_is_recorded(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "curve-panel-state");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| { v.selection = vec![top.clone()]; v.toggle_analysis_tool(crate::part_studio::analysis_tools::ToolKind::CurveSurface, w, cx); })).unwrap();
+    draw(cx, window);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    let d = &st["dialog"];
+    assert_eq!(d["title"].as_str(), Some("Curve/surface analysis"), "{d}");
+    let text: Vec<&str> = d["text"].as_array().unwrap().iter().filter_map(|t| t.as_str()).collect();
+    assert_eq!((text.first().copied(), text.last().copied()), (Some("Edges and faces to analyze"), Some("Comb size")), "{text:?}");
+    assert!(text.windows(2).any(|w| w == ["U curves", "8"]), "{text:?}");
+}
+
 /// Live 3096: the Create selection panel opened from a field's button sits 4 px right of the dialog, its top 64 px
 /// under the button's (Mirror › Face mirror: button top 141, panel 205).
 #[gpui::test]

@@ -26,7 +26,7 @@ pub struct AnnotationDrag {
 }
 
 pub struct DatumEdit {
-    letter: Entity<InputState>,
+    pub letter: Entity<InputState>,
     /// The face picked so far (shown as a preview).
     pub placed: Option<Annotation>,
 }
@@ -371,8 +371,8 @@ impl PartStudioView {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Datum"))
-                        .child(div().id("datum-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, crate::ui::disabled_accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb_static(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_datum(cx))))
-                        .child(div().id("datum-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_datum_tool(cx)))),
+                        .child(crate::ui_script::mark(div().id("datum-ok"), || "button:ok".into()).size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, crate::ui::disabled_accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb_static(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_datum(cx))))
+                        .child(crate::ui_script::mark(div().id("datum-cancel"), || "button:cancel".into()).size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_datum_tool(cx)))),
                 )
                 .child(div().p(px(3.)).child(gpui_kit::base::input::input_frame(div().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&e.letter).small().appearance(false).text_size(px(13.33))))))
                 .into_any_element(),

@@ -420,6 +420,29 @@ impl PartStudioView {
             }
         };
         let (mut text, mut fields) = (Vec::new(), Vec::new());
+        // Flatten surfaces (live analysis-flatten): its fields and options in the panel's order.
+        if let Some(f) = &self.ui.flatten {
+            let units = self.doc.read(cx).session.doc.settings.units;
+            let q = |v: f64, dim| noshape_units::format_quantity(noshape_units::Quantity::new(v, dim), &units);
+            text.push("Faces to flatten".into());
+            chips(&mut text, &f.faces);
+            text.push("Rip edges".into());
+            chips(&mut text, &f.rips);
+            for (label, on) in [("Show facets", f.show_facets), ("Show edges", f.show_edges), ("Show checkerboard", f.show_checker), ("Show distortion", f.show_distortion), ("Show flattened", f.show_flattened)] {
+                check(&mut text, &mut fields, label, on);
+            }
+            text.push("Origin".into());
+            chips(&mut text, f.origin.as_slice());
+            text.push("Flattened position (mate connector)".into());
+            chips(&mut text, f.position.as_slice());
+            for (label, v) in [("Flattened offset", q(f.offset, noshape_units::Dim::LENGTH)), ("Flattened angle", q(f.angle_deg.to_radians(), noshape_units::Dim::ANGLE))] {
+                text.extend([label.to_string(), v.clone()]);
+                fields.push(json!({ "label": label, "kind": "input", "value": v }));
+            }
+            check(&mut text, &mut fields, "Show export controls", f.show_export);
+            text.push("Flatten".into());
+            return Some(json!({ "kind": "panel", "title": "Flatten surfaces", "text": text, "fields": fields }));
+        }
         if let Some(d) = &self.ui.draft {
             text.push("Mold split direction".into());
             chips(&mut text, d.direction.as_slice());
@@ -511,6 +534,22 @@ impl PartStudioView {
                     check(&mut text, &mut fields, "Absolute values", o.absolute);
                 }
                 text.push("Scale".into());
+            }
+            // Live edge-menu-curve-analysis: the field, then each option in the panel's order, the U / V counts after
+            // their checkboxes, the comb size slider's label last.
+            ToolKind::CurveSurface => {
+                text.push("Edges and faces to analyze".into());
+                chips(&mut text, &t.selection);
+                check(&mut text, &mut fields, "Curvature combs", o.combs);
+                for (label, on, count) in [("U curves", o.show_u, o.u_curves), ("V curves", o.show_v, o.v_curves)] {
+                    check(&mut text, &mut fields, &format!("Show {label}"), on);
+                    text.extend([label.to_string(), count.to_string()]);
+                    fields.push(json!({ "label": label, "kind": "input", "value": count.to_string() }));
+                }
+                for (label, on) in [("Sketch inflection points", o.inflections), ("Minimum radius", o.min_radius), ("Extend across face", o.extend), ("Control point grids", o.control_points), ("Knot points", o.knots), ("Details", o.details)] {
+                    check(&mut text, &mut fields, label, on);
+                }
+                text.push("Comb size".into());
             }
             _ => return None,
         }

@@ -255,7 +255,7 @@ impl PartStudioView {
         // The parts list's heading, as drawn (render_parts_list).
         let parts_heading = format!("Parts ({})", self.display.bodies.iter().filter(|b| super::part_section(b) == "parts").count());
         // The sketch Text dialog over the Sketch dialog reads as itself (live's recorder since 2026-11-14.11).
-        let dialog_state = self.sketch_text_ui_state(cx).or_else(|| dialog.map(|d| d.ui_state(window, cx))).or_else(|| self.section_dialog_state()).or_else(|| self.appearance_dialog_state(cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.insert_go_state(cx)).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(|| self.panel_ui_state(cx)).or_else(crate::ui_script::open_dialog);
+        let dialog_state = self.sketch_text_ui_state(cx).or_else(|| dialog.map(|d| d.ui_state(window, cx))).or_else(|| self.section_dialog_state()).or_else(|| self.appearance_dialog_state(cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.datum_panel_state(cx)).or_else(|| self.insert_go_state(cx)).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(|| self.panel_ui_state(cx)).or_else(crate::ui_script::open_dialog);
         // The dialog the focused field is in (live `focus.dialog`; the Create variable popup stands for its dialog).
         let mut focus = focus;
         // Mass properties' Face tab: its faces field has the keyboard (live ui-parity mass-properties-face-tab).
@@ -630,6 +630,14 @@ impl PartStudioView {
 
     /// The focused rename or folder name input, if any.
     /// The Isolate / Make transparent panel as live's state reads it (a dialog frame with no fields of its own).
+    /// Model definitions' Datum panel as live's recorder reads it: a panel titled Datum, its letter's input
+    /// (annotation-datum-delete).
+    fn datum_panel_state(&self, cx: &App) -> Option<Value> {
+        let e = self.ui.datum_edit.as_ref()?;
+        let letter = e.letter.read(cx).value().to_string();
+        Some(json!({ "kind": "panel", "title": "Datum", "text": [letter.clone()], "fields": [{ "label": null, "kind": "input", "value": letter }] }))
+    }
+
     fn isolate_panel_state(&self) -> Option<Value> {
         let iso = self.ui.isolate.as_ref()?;
         let title = if iso.mode == super::behaviors::IsolateMode::Isolate { "Isolate" } else { "Make transparent" };
