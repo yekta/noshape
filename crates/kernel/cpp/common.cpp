@@ -1450,6 +1450,35 @@ bool is_valid(const OcShape& s)
   return a.IsValid();
 }
 
+bool faces_valid(const OcShape& s, rust::Slice<const uint32_t> faces)
+{
+  if (s.shape.IsNull())
+    return false;
+  ShapeIMap all;
+  TopExp::MapShapes(s.shape, TopAbs_FACE, all);
+  NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> e2f;
+  TopExp::MapShapesAndAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, e2f);
+  ShapeIMap around;
+  for (const uint32_t i : faces)
+  {
+    if ((int)i >= all.Extent())
+      return false;
+    const TopoDS_Shape& f = all((int)i + 1);
+    around.Add(f);
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+      if (const NCollection_List<TopoDS_Shape>* fs = e2f.Seek(x.Current()))
+        for (const TopoDS_Shape& g : *fs)
+          around.Add(g);
+  }
+  BRep_Builder    b;
+  TopoDS_Compound c;
+  b.MakeCompound(c);
+  for (int i = 1; i <= around.Extent(); ++i)
+    b.Add(c, around(i));
+  BRepCheck_Analyzer a(c);
+  return a.IsValid();
+}
+
 // Props' second, coarser run (props_bounds): segments twice as long, OCCT's adaptive integrator 1000 times looser.
 thread_local bool t_props_coarse = false;
 

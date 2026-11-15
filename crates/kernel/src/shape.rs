@@ -378,6 +378,12 @@ impl Shape {
         ffi::is_valid(self.raw()).unwrap_or(false)
     }
 
+    /// [`Shape::is_valid`] of the faces at `faces` (indices) and those sharing an edge with them only: what a local
+    /// modification (a draft, a moved face) can have broken, without checking the rest of the part again.
+    pub fn faces_valid(&self, faces: &[u32]) -> bool {
+        ffi::faces_valid(self.raw(), faces).unwrap_or(false)
+    }
+
     /// Whether faces of the shape intersect each other (BOPAlgo_ArgumentAnalyzer
     /// self-interference check; BRepCheck doesn't see this, e.g. a sweep whose
     /// bend is tighter than its profile). ~10 ms on small parts.

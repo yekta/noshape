@@ -108,12 +108,22 @@ pub fn draft_faces(ev: &mut EvalCtx, groups: BTreeMap<usize, Vec<usize>>, pull: 
 /// invalid solid (drafted fillets that vanish, e.g. R3 at 30° over 10 mm).
 pub(super) fn draft_robust(shape: &Shape, faces: &[Shape], pull: DVec3, neutral: &k::Plane, angle: f64) -> k::Result<k::OpResult> {
     match k::draft(shape, faces, pull, neutral, angle) {
-        Ok(r) if r.shape.is_valid() => Ok(r),
+        Ok(r) if valid_where_drafted(shape, faces, &r) => Ok(r),
         first => k::draft_wedges(shape, faces, pull, neutral, angle).map_err(|e| match first {
             Ok(_) => e,
             Err(f) => f,
         }),
     }
+}
+
+/// Whether a draft's result is valid where the draft changed it: the drafted faces and their neighbours (OCCT's draft
+/// keeps the topology; the whole part checked again took 7.5 ms a draft in cf-circular-pattern's 14 patterned drafts).
+fn valid_where_drafted(shape: &Shape, faces: &[Shape], r: &k::OpResult) -> bool {
+    let drafted: Vec<u32> = faces.iter().filter_map(|f| shape.index_of(f, ShapeType::Face)).flat_map(|i| r.history.modified(0, ShapeType::Face, i as u32)).collect();
+    if drafted.is_empty() {
+        return r.shape.is_valid();
+    }
+    r.shape.faces_valid(&drafted)
 }
 
 /// A fillet face of `shape`: a blend (by name) on a cylinder, torus or sphere

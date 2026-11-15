@@ -48,6 +48,13 @@ fn replay(name: &str) -> String {
 /// [`replay`]; `describe` false: the op only (profiling).
 fn replay_as(name: &str, describe: bool) -> String {
     let (s, subs, p) = load(name);
+    if p[0] == "project_along" {
+        let parts = s.children();
+        return match project_curves(&parts[0], &parts[1], Some(v3(&after(&p, "dir", 3)))) {
+            Ok(r) => format!("ok edges {} length {:.9e}", r.edges().len(), r.edges().iter().map(|e| e.length().unwrap_or(0.0)).sum::<f64>()),
+            Err(e) => format!("error {e}"),
+        };
+    }
     let r = match p[0].as_str() {
         "fillet" => {
             let radii: Vec<f64> = p[p.iter().position(|x| x == "radii").unwrap() + 1..].iter().map(|x| x.parse().unwrap()).collect();
@@ -100,7 +107,7 @@ fn crashing_kernel_inputs_return() {
     assert!((b.volume().unwrap() - 1.0).abs() < 1e-12);
 }
 
-/// Replays one NOSHAPE_DUMP_OPS capture (fillet, draft, shell, prism_until, defeature) and times it:
+/// Replays one NOSHAPE_DUMP_OPS capture (fillet, draft, shell, prism_until, defeature, project_along) and times it:
 /// `NOSHAPE_REPLAY=<dir>/<name> cargo test -p noshape-kernel --test all crash_inputs::replay_one -- --ignored --nocapture`.
 #[test]
 #[ignore = "T2: a tool; needs NOSHAPE_REPLAY"]

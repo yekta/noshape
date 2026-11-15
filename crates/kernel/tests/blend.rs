@@ -236,6 +236,21 @@ fn a_draft_past_its_work_bound_fails_and_the_next_one_builds() {
     assert!(r.is_valid() && vol_mm3(&r) < 8000.0 - 1.0, "{}", vol_mm3(&r));
 }
 
+/// A draft's result checked where it changed (the drafted faces and their neighbours) is valid as the whole part is;
+/// an index past the part's faces is not.
+#[test]
+fn a_drafts_faces_check_valid_as_the_whole_part() {
+    setup();
+    let b = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    let side: Vec<Shape> = b.faces().into_iter().max_by(|f, g| f.centroid().unwrap().x.total_cmp(&g.centroid().unwrap().x)).into_iter().collect();
+    let r = draft(&b, &side, DVec3::Z, &Plane::from_normal(DVec3::ZERO, DVec3::Z), 5f64.to_radians()).unwrap();
+    let i = b.index_of(&side[0], ShapeType::Face).unwrap() as u32;
+    let drafted = r.history.modified(0, ShapeType::Face, i);
+    assert_eq!(drafted.len(), 1);
+    assert!(r.shape.is_valid() && r.shape.faces_valid(&drafted));
+    assert!(!r.shape.faces_valid(&[r.shape.faces().len() as u32]));
+}
+
 /// A prism whose sides are all drafted about its base, its profile curved (an ellipse in two arcs, which OCCT offsets
 /// as B-spline pieces, as a gear's involutes): its far cap is the base offset inward, each side ruled from its base
 /// edge to that edge's offset. For a convex smooth profile the volume is Steiner's: V = A·h − L·tanα·h²/2 +
