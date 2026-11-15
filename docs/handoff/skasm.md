@@ -14,6 +14,12 @@
   corner; two sides placed from it with new / own direction and length, the other two close). T1
   live_fuzz::a_growing_slot_keeps_its_less_tied_side. Mac: write_batch's "generator changed" there is float digits
   (aarch64), not a change.
+- Probes 11 (s218 / s236 / s226 leave-one-outs, 0/30), 06:36: live solves the three linked quads of s236 at once:
+  quad 1 ends identical in the base and 4 leave-one-outs ((-4.23, 0.39) (7.91, 0.39) (7.91, 14.28) (-4.23, 13.36):
+  its free top keeps its direction, its corner on the Distance to quad 2 and its own diagonal); without that Distance
+  (k20) it keeps its top-right corner and the diagonal's direction. Not a sequential placement: per-case rules don't
+  converge (decision for the lead). /root/skasm-scratch/fz/cmpprobe.sh <set> <case> prints initial / ours / live.
+- db0fbba8 (the hats' revert) failed twice on dx's red drawing test; requeue when 233c023c lands (main green).
 
 ## Resume here (2026-11-15 04:25 UTC): sketch constraints the model suite leaves to the solved geometry (lead)
 - 04:25: 269 -> 107 (full suite, vibe7: 80/87, 878/947; only knife changed, main's). Since 03:10: dx's mesh points
