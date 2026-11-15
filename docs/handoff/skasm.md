@@ -1,5 +1,20 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-15 03:10 UTC): sketch constraints the model suite leaves to the solved geometry (lead)
+- Dropped constraints, full suite on vibe6 (/root/skasm-scratch/bin/dropped.py on the suite log): 269 -> 132
+  (PROJECTED 146 -> 46, COINCIDENT to model geometry 68 -> 16); documents and features unchanged (80/87, 870/947).
+- Fixed: a used line's `.start` / `.end` PROJECTED counted as its line's; orphan Uses (no reference in live either)
+  not counted; co-edge queries take their edge; `use_nearest`: a Use with no named geometry (or landing elsewhere)
+  tries the 6 model edges / vertices nearest where it's stored, keeping one that lands exactly; `model_at`: a
+  Coincident to an id-only model reference takes the vertex where live solved the point, else the one line / circle
+  edge through it; Use of the Origin (app: sketch_use "origin", kept on regeneration).
+- Left (owners): hex-bookcase 25 Uses + 11 Coincidents on the derived mesh part (dx: Reference::MeshPoint, then
+  route bare ids through use_nearest / model_at); knife 6 (blade geometry, core); valve-config 6 (our edge ends 10
+  µm short of live's); duct 4 (live's stored projections of other sketches' lines are stale: ours is on the same line,
+  other ends); bracket03 4 (Uses of a circular edge's centre: no such Use in ours yet); bottle-split 1 (a second Use of
+  an already-used circle makes nothing). 24 constraints now read "(its sketch entity not translated)": fillet arcs /
+  sharp corners, spline inner points, text box sides of ours not mapped to live's ids.
+
 ## Resume here (2026-11-14 23:44 UTC): sketch Mirror, sketch side (lead: the user's priority)
 - Split with psui (4d0a82b2): psui owns the tool's flow (model-edge / plane / other-sketch line as mirror line, box
   select, preselected batch, preview) and had landed live's constraint set for lines / arcs / circles / points
