@@ -3112,8 +3112,9 @@ struct Surf
 };
 
 // The foot of P on `S` near uv (the distance's stationary point, a minimum): Newton on the gradient of |S(u, v) - P|²
-// with the surface's second derivatives, from uv; false where it doesn't converge or leaves the surface's bounds.
-bool newton_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& uv)
+// with the surface's second derivatives, from uv; false where it doesn't converge or leaves the surface's bounds
+// (`past` set where it would step outward from a bound it stands on).
+bool newton_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& uv, bool* past = nullptr)
 {
   double U0, U1, V0, V1;
   S->Bounds(U0, U1, V0, V1);
@@ -3145,7 +3146,11 @@ bool newton_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& 
       if (b == x + dx)
         return true;
       if (std::abs(b - x) < 1e-9 * (hi - lo))
+      {
+        if (past)
+          *past = true;
         return false;
+      }
       t = std::min(t, 0.5 * (b - x) / dx);
       return true;
     };
@@ -3760,8 +3765,17 @@ bool march_offsets(const Surf* S[2], const TopoDS_Edge& e, const TopoDS_Face F[2
 // none.
 double eval_grad_near(const Surf& q, const gp_XYZ& p, gp_XYZ& g, double scale, bool global = true)
 {
-  const double e = eval_grad(q, p, g);
-  if (!q.general || std::abs(e) > 1e299)
+  // (From the last foot by Newton's steps only: where they fail, the searches below (eval_grad's own from the last
+  // foot is the local one below again, both falling back to a global one: a fifth of c2-rings-loft's Shell 1).)
+  bool found = true;
+  if (q.general && q.has_hint)
+  {
+    gp_Pnt2d uv = q.hint;
+    if ((found = newton_foot(q.base, p, uv)))
+      q.hint = uv;
+  }
+  const double e = found ? eval_grad(q, p, g) : 1e300;
+  if (!q.general || (found && std::abs(e) > 1e299))
     return e;
   // At foot (u, v): the value and its gradient, where the foot lies square below the point.
   auto at = [&](double u, double v, double& out) {
@@ -3791,14 +3805,17 @@ double eval_grad_near(const Surf& q, const gp_XYZ& p, gp_XYZ& g, double scale, b
   // short of the surface's end, where a projection is held.)
   if (q.has_hint)
   {
-    gp_Pnt2d w = q.hint;
-    if (!newton_foot(q.base, p, w))
+    gp_Pnt2d w    = q.hint;
+    bool     past = false;
+    // (Its foot past the surface's end: OCCT's local search would hold it at the bound, no foot square below; the
+    // global one then.)
+    if (!newton_foot(q.base, p, w, &past) && !past)
       w = q.sas->NextValueOfUV(q.hint, gp_Pnt(p), 1e-9 * scale, 1e-3 * scale);
     double         U0, U1, V0, V1;
     q.base->Bounds(U0, U1, V0, V1);
     const double eu = 1e-6 * (U1 - U0), ev = 1e-6 * (V1 - V0);
     const bool   inside = w.X() > U0 + eu && w.X() < U1 - eu && w.Y() > V0 + ev && w.Y() < V1 - ev;
-    if ((own(w.X(), w.Y()) || inside) && at(w.X(), w.Y(), out0))
+    if (!past && (own(w.X(), w.Y()) || inside) && at(w.X(), w.Y(), out0))
     {
       q.hint = w;
       return out0;
