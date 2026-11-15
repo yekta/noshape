@@ -9,38 +9,43 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-15 23:11 UTC.
+Updated 2026-11-15 23:37 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-- A datum target's anchor edge is marked `new` in ours' state; the runner drops it for takes from recorders before
-  2026-11-15.1, which didn't read it (drw-datum-target, -show-dims, -show-all-dims match again; -hide-dim still does).
+- aaa63901d (committed, not queued: waits for the full drawing run on vibe5, ~/tmp/studios/drw288, task queued behind
+  ~/bin/slot; don't rebuild ~/tmp/studios/noshape there until it ends):
+  - a projected view's View orientation ▸ (Top, Left, Right, Front, Back, Bottom, Isometric; its own greyed, no
+    checks) turns its base so that it shows the pick, the family following (`views::reoriented_base`,
+    `set_base_frame`; op drawing_view_display orientation on a projected view; e2e drawing_view_menu_edits; take
+    drw-view-orientation-projected from live2's vo-probe)
+  - the sheet's right-click menu opens with its top 35 px above the pointer, left edge 1 px right (live2 rmb-probe);
+    panel and list menus keep +2 px below
+  - what a menu row leaves hovered under the pointer, and Align views' view and target, read lit with the `new`
+    marker (only the 11-15 recorder reads them): drw-view-align-horizontally / -vertically match
+- Checked on 18 menu takes (vibe5): no regressions.
 
-Landed 22:55: 417c6341 as 35f38a29 (the 11-15 retakes batch + the auxiliary label). Full drawing run on vibe5
-(22:50, part on the binary before it): 276 of 287; rerun of the 10 that differed on the new one: 8 match. Left:
-drw-datum-copy-paste (live2's answer), drw-note-move-to-title-block s8 (the reader's lit edge under the pointer),
-plus the known drw-centermark / -align, drw-insert-view-top-1to1, drw-view-align-horizontally.
+Landed 23:11: af25fdb0 as 0876332a; c1e1a6e5 (drawing matrix + handoff) queued 23:13.
 
 ## Waiting on others
-- live2 (22:40 asked): drw-datum-copy-paste s6's Add leader on a datum (what it does; which rows a note, a dimension, a
-  view get there) and why s7's Paste row was 5 mm above the pointer (menu flipped or shifted to fit). Ours pastes
-  at y 41.0 against live's 50.8 because our menu opens below the pointer.
-- live2: a projected view's "View orientation" submenu (drw-view-align-horizontally).
-- live: drw-hole-callout-palette retake.
-- live2's 11-15 retakes, as answered:
-  - drw-centermark / -align: live's reader flickers 0 / 1 on the automatic mark: a known mismatch.
-  - drw-insert-view-top-1to1 s7 (VIEW Top), drw-note-move-to-title-block s8, drw-view-align-horizontally s4: what
-    the 11-15 reader lights after a menu closes (the edge under the pointer); ours differs, left as reader artefacts.
+- live2 (asked 23:20): which points near the title block's TITLE field highlight it (x 230, y 36-48 mm). live2's
+  rmb-probe: (230, 40) is the TITLE field; a right-click there adds it to the selection and the menu is the field's
+  plus the selection's (datum: Copy, Paste as table, Add leader | Clear selection, Zoom to fit, Delete; note: + Move
+  to; dimension: no Copy; view: as datum). Ours treats (230, 40) as empty sheet: our TITLE cell is its row only.
+- live2: panel takes for Drawing properties, Hole table, Title block (asked 23:15).
+- drw-note-move-to-title-block s8: decision asked of the lead. Live's note menu is one row and a separator taller
+  (Add comment, cloud), so when it shifts up to fit the window its Move to ▸ Title block row sits ~30 px higher than
+  ours and the pointer ends on Front's edge in live, 31 px under it in ours.
 
 ## Open (no owner action possible yet)
+- live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;
+  the take matches.
 - Full run of my areas (vibe5, 11-15 ~22:00, before the batch in flight): 992 of 1004 takes match. Besides the
   takes above: asm-cylindrical-limits (old).
 - drw-insert-view-top-1to1: live reads VIEW where five other Insert view takes read EDGE (the reader's pixels).
-- drw-hole-callout-palette steps 17-18: our callout's leader is lit inside Top's box after the palette closes; live
-  reads []. Near the reader's 60 px threshold.
 - A table's Bring to front greyed when just placed (REQUESTS 12:38; ours greys it only for a table alone).
 - Projected view preview: ours snaps at 22.5° both ways. Live2's coarse sweep put the side/iso boundary at 25-30°
   (250 px) and 20-25° (400 px), and top at 20-25° from vertical. Left as is until a finer sweep.
