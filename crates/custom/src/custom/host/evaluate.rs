@@ -736,8 +736,13 @@ pub(super) fn convexity(q: &QueryCx, e: &Ent) -> Option<&'static str> {
     let info = edge.edge_info().ok()?;
     let fa = shape.sub_shape(ShapeType::Face, faces[0] as usize).ok()?;
     let fb = shape.sub_shape(ShapeType::Face, faces[1] as usize).ok()?;
+    // A line or circle between two planes, cylinders, cones, spheres or tori meets them alike all along: one sample
+    // (each costs two projections and two classifications; cf-lighten asks ~140 edges a rebuild).
+    let elementary = |f: &k::Shape| matches!(f.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. }));
+    let steady = matches!(edge.edge_curve(), Ok(k::Curve::Line { .. } | k::Curve::Circle { .. })) && elementary(&fa) && elementary(&fb);
+    let samples: &[f64] = if steady { &[0.5] } else { &[0.2, 0.5, 0.8] };
     let mut kinds = Vec::new();
-    for t in [0.2, 0.5, 0.8] {
+    for &t in samples {
         let p = edge.point_at(info.first_param + (info.last_param - info.first_param) * t).ok()?;
         let (na, nb) = (fa.normal_at_point(p).ok()?.normalize_or_zero(), fb.normal_at_point(p).ok()?.normalize_or_zero());
         if na.dot(nb) > 1.0 - 1e-6 {
