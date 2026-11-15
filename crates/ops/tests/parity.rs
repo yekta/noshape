@@ -318,7 +318,8 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         let unmapped = step.problems.iter().any(|p| p.contains("query not mapped") || p.contains("no entity of ours") || p.contains("was not built") || p.contains("not built:") || (p.contains("an empty query") && ours == "ERROR"));
         // A custom feature that errors where live's doesn't, given all its
         // inputs, failed to run (the FeatureScript host or std), apart from geometry.
-        let failed_run = step.custom && step.ours.is_some() && ours == "ERROR" && live_status != "ERROR" && !unmapped;
+        // (Not one live has suppressed: live never ran it, cf-surface-pattern's Surface Pattern 1.)
+        let failed_run = step.custom && step.ours.is_some() && ours == "ERROR" && !["ERROR", "SUPPRESSED"].contains(&live_status.as_str()) && !unmapped;
         if failed_run {
             res.custom.push(format!("{}: failed to run: {}", step.name, step.message.as_deref().unwrap_or("no message")));
         }
@@ -1829,13 +1830,16 @@ export const thrower = defineFeature(function(context is Context, id is Id, defi
         { "btType": "BTMFeature-134", "featureType": "gone", "namespace": "e0bbb::m1", "featureId": "FG", "name": "Gone 1", "parameters": [] },
         { "btType": "BTMFeature-134", "featureType": "thrower", "namespace": "e0aaa::m1", "featureId": "FT2", "name": "Thrower 2", "parameters": [
             { "btType": "BTMParameterQueryList-148", "parameterId": "edge", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JXX"], "queryString": "" }] }
-        ] }
+        ] },
+        { "btType": "BTMFeature-134", "featureType": "thrower", "namespace": "e0aaa::m1", "featureId": "FT3", "name": "Thrower 3", "suppressed": true, "parameters": [] }
     ] });
     std::fs::write(dir.join("features.json"), features.to_string()).unwrap();
     let (features, _, refs) = read_model(&dir).unwrap();
-    let live = vec![json!({ "index": 0, "status": "OK", "parts": [] }), json!({ "index": 1, "status": "OK", "parts": [] }), json!({ "index": 2, "status": "OK", "parts": [] })];
+    let live = vec![json!({ "index": 0, "status": "OK", "parts": [] }), json!({ "index": 1, "status": "OK", "parts": [] }), json!({ "index": 2, "status": "OK", "parts": [] }), json!({ "index": 3, "status": "SUPPRESSED", "parts": [] })];
     let r = run_model("custom-failures", &features, &live, &refs);
-    assert_eq!(r.custom_compared, 3, "{r:?}");
+    assert_eq!(r.custom_compared, 4, "{r:?}");
+    // Suppressed in live: never run there.
+    assert!(!r.custom.iter().any(|c| c.starts_with("Thrower 3")), "{:?}", r.custom);
     // Its edge not placed: the translation's failure, not the host's.
     assert!(!r.custom.iter().any(|c| c.starts_with("Thrower 2")), "{:?}", r.custom);
     assert!(r.custom.iter().any(|c| c.starts_with("0bbb: failed to compile")), "{:?}", r.custom);
