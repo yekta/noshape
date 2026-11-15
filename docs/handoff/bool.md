@@ -358,6 +358,11 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
   - Not done: c2-impeller-loft's Extrude 4 fuse (f10ce62e, 0.5-0.7 s): extrusion x B-spline sections 340 ms each in
     OCCT, a third of it IntTools_TopolTool::SamplePnts (per pair); Extrude Flansch's fuse (e05c4cf9, 0.23 s) declines
     "a shared shape OCCT may keep or remake".
+  - c2-helical-sweep regressed from main's input, not ours: Sweep 1's cut is now 9b68aa2b (OCCT's result 13/47/36,
+    the recorded 2e082aa1 14/34/22; likely core's 608e3b402, helices / circles starting at the sketch's x) and ours
+    declines "two edges leave a vertex in one direction" (arrange.rs; an older binary too): a 2.1 µm section piece
+    along a B-spline face's iso boundary at v 63.5 mm, from the same point as that edge, not split into it. OCCT
+    then takes the cut (~290 ms against ours ~80). Next for bool2. Recording vibe6 ~/agents/bool2-keep/hel-new.
   - Left: chamfer 26's own cut (f37371b8, OCCT 0.9 s) declines "a piece's point on another solid's face": the run-on
     tail lies along the strip's tolerant B-spline face (8.5 µm). Delete face 2 (core's OCCT defeaturing) is 17-26 s on
     the chamfered body (was 4-7 s); told core and the lead (decision needed). Recordings vibe6
