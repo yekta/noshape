@@ -436,7 +436,10 @@ impl PartStudioView {
             let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
             regen.regenerate(&studio, &config, &units, &RegenOptions { upto, editing_sketch, document_variables, derived: Some(derived), ..Default::default() })
         };
+        // It supersedes a background run (entering the sketch's): that one's pending state and overlay go with it.
         self.regen_task = None;
+        self.pending = None;
+        self.pending_timer = None;
         self.context = Some(result.context.clone());
         self.update_conflicts();
         self.apply_display(Arc::new(result.display), window, cx);
