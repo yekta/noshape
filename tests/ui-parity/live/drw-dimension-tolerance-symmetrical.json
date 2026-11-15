@@ -1,16 +1,20 @@
 {
  "scenario": "drw-dimension-tolerance-symmetrical",
- "recorded": "2026-11-14T23:49:33.966Z",
+ "recorded": "2026-11-15T21:03:10.299Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
  },
  "live": {
   "document": "a1e7207bcd206771836609af",
   "workspace": "6d6324b30f07aa9904363635",
-  "element": "8b76849b677369073a7cdf11",
+  "element": "b19737451e43e3b9ceb48b49",
   "start": "block-drawing",
   "startElement": "fec75b9b8f06f7e2fe8fa56f",
   "runner": "live2 .nstate-uip-1.json"
@@ -193,7 +197,7 @@
      "selection": []
     }
    },
-   "t": 225418
+   "t": 227742
   },
   {
    "step": 2,
@@ -302,7 +306,7 @@
      ]
     }
    },
-   "t": 251065
+   "t": 254635
   },
   {
    "step": 3,
@@ -415,7 +419,7 @@
      "selection": []
     }
    },
-   "t": 275449
+   "t": 281157
   },
   {
    "step": 4,
@@ -523,7 +527,7 @@
      "selection": []
     }
    },
-   "t": 300369
+   "t": 308031
   },
   {
    "step": 5,
@@ -544,10 +548,44 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
-     "title": "(in)",
-     "text": [
-      "(in)"
+     "kind": "palette",
+     "title": "Dimension palette",
+     "fields": [
+      {
+       "label": "Text above",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Prefix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Quantity",
+       "kind": "combo",
+       "value": "1.575"
+      },
+      {
+       "label": "Value",
+       "kind": "text",
+       "value": null
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "(in)"
+      },
+      {
+       "label": "Suffix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Text below",
+       "kind": "input",
+       "value": ""
+      }
      ]
     },
     "dialogs": [],
@@ -635,7 +673,7 @@
      "selection": []
     }
    },
-   "t": 336391
+   "t": 347107
   },
   {
    "step": 6,
@@ -651,10 +689,44 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
-     "title": "(in)",
-     "text": [
-      "(in)"
+     "kind": "palette",
+     "title": "Dimension palette",
+     "fields": [
+      {
+       "label": "Text above",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Prefix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Quantity",
+       "kind": "combo",
+       "value": "1.575"
+      },
+      {
+       "label": "Value",
+       "kind": "text",
+       "value": null
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "(in)"
+      },
+      {
+       "label": "Suffix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Text below",
+       "kind": "input",
+       "value": ""
+      }
      ]
     },
     "dialogs": [],
@@ -742,7 +814,7 @@
      "selection": []
     }
    },
-   "t": 362320
+   "t": 373454
   },
   {
    "step": 7,
@@ -763,10 +835,52 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
-     "title": "(in)",
-     "text": [
-      "(in)",
+     "kind": "palette",
+     "title": "Dimension palette",
+     "fields": [
+      {
+       "label": "Text above",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Prefix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Quantity",
+       "kind": "combo",
+       "value": "1.575"
+      },
+      {
+       "label": "Value",
+       "kind": "text",
+       "value": null
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "(in)"
+      },
+      {
+       "label": "Suffix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Text below",
+       "kind": "input",
+       "value": ""
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "DimPal_UnitPrecisionMenu",
+     "rows": [
       "0",
       "0.1",
       "0.12",
@@ -775,11 +889,29 @@
       "0.1234",
       "0.12345",
       "0.123456"
-     ]
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
     },
-    "dialogs": [],
-    "panels": null,
-    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -862,7 +994,7 @@
      "selection": []
     }
    },
-   "t": 386763
+   "t": 398901
   },
   {
    "step": 8,
@@ -883,10 +1015,44 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
-     "title": "(in)",
-     "text": [
-      "(in)"
+     "kind": "palette",
+     "title": "Dimension palette",
+     "fields": [
+      {
+       "label": "Text above",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Prefix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Quantity",
+       "kind": "combo",
+       "value": "1.57"
+      },
+      {
+       "label": "Value",
+       "kind": "text",
+       "value": null
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "(in)"
+      },
+      {
+       "label": "Suffix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Text below",
+       "kind": "input",
+       "value": ""
+      }
      ]
     },
     "dialogs": [],
@@ -974,7 +1140,7 @@
      "selection": []
     }
    },
-   "t": 412071
+   "t": 424634
   },
   {
    "step": 9,
@@ -995,10 +1161,52 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
-     "title": "(in)",
-     "text": [
-      "(in)",
+     "kind": "palette",
+     "title": "Dimension palette",
+     "fields": [
+      {
+       "label": "Text above",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Prefix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Quantity",
+       "kind": "combo",
+       "value": "1.57"
+      },
+      {
+       "label": "Value",
+       "kind": "text",
+       "value": null
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "(in)"
+      },
+      {
+       "label": "Suffix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Text below",
+       "kind": "input",
+       "value": ""
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "DimPal_ToleranceDisplayMenu",
+     "rows": [
       "None",
       "Symmetrical",
       "Deviation",
@@ -1009,11 +1217,33 @@
       "Fit",
       "Fit with tolerance",
       "Fit (Tolerance only)"
-     ]
+     ],
+     "checked": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
     },
-    "dialogs": [],
-    "panels": null,
-    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -1096,7 +1326,7 @@
      "selection": []
     }
    },
-   "t": 437269
+   "t": 450568
   },
   {
    "step": 10,
@@ -1117,10 +1347,44 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
-     "title": "(in)",
-     "text": [
-      "(in)"
+     "kind": "palette",
+     "title": "Dimension palette",
+     "fields": [
+      {
+       "label": "Text above",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Prefix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Quantity",
+       "kind": "combo",
+       "value": "1.57"
+      },
+      {
+       "label": "Value",
+       "kind": "text",
+       "value": null
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "(in)"
+      },
+      {
+       "label": "Suffix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Text below",
+       "kind": "input",
+       "value": ""
+      }
      ]
     },
     "dialogs": [],
@@ -1208,7 +1472,7 @@
      "selection": []
     }
    },
-   "t": 463267
+   "t": 477089
   },
   {
    "step": 11,
@@ -1229,10 +1493,44 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
-     "title": "(in)",
-     "text": [
-      "(in)"
+     "kind": "palette",
+     "title": "Dimension palette",
+     "fields": [
+      {
+       "label": "Text above",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Prefix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Quantity",
+       "kind": "combo",
+       "value": "1.57"
+      },
+      {
+       "label": "Value",
+       "kind": "text",
+       "value": null
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "(in)"
+      },
+      {
+       "label": "Suffix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Text below",
+       "kind": "input",
+       "value": ""
+      }
      ]
     },
     "dialogs": [],
@@ -1320,7 +1618,7 @@
      "selection": []
     }
    },
-   "t": 488385
+   "t": 503679
   },
   {
    "step": 12,
@@ -1343,10 +1641,44 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
-     "title": "(in)",
-     "text": [
-      "(in)"
+     "kind": "palette",
+     "title": "Dimension palette",
+     "fields": [
+      {
+       "label": "Text above",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Prefix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Quantity",
+       "kind": "combo",
+       "value": "1.57"
+      },
+      {
+       "label": "Value",
+       "kind": "text",
+       "value": null
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "(in)"
+      },
+      {
+       "label": "Suffix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Text below",
+       "kind": "input",
+       "value": ""
+      }
      ]
     },
     "dialogs": [],
@@ -1434,7 +1766,7 @@
      "selection": []
     }
    },
-   "t": 513148
+   "t": 529074
   },
   {
    "step": 13,
@@ -1449,10 +1781,44 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
-     "title": "(in)",
-     "text": [
-      "(in)"
+     "kind": "palette",
+     "title": "Dimension palette",
+     "fields": [
+      {
+       "label": "Text above",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Prefix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Quantity",
+       "kind": "combo",
+       "value": "1.57"
+      },
+      {
+       "label": "Value",
+       "kind": "text",
+       "value": null
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "(in)"
+      },
+      {
+       "label": "Suffix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Text below",
+       "kind": "input",
+       "value": ""
+      }
      ]
     },
     "dialogs": [],
@@ -1540,7 +1906,7 @@
      "selection": []
     }
    },
-   "t": 538342
+   "t": 553903
   },
   {
    "step": 14,
@@ -1563,10 +1929,44 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
-     "title": "(in)",
-     "text": [
-      "(in)"
+     "kind": "palette",
+     "title": "Dimension palette",
+     "fields": [
+      {
+       "label": "Text above",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Prefix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Quantity",
+       "kind": "combo",
+       "value": "1.57"
+      },
+      {
+       "label": "Value",
+       "kind": "text",
+       "value": null
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "(in)"
+      },
+      {
+       "label": "Suffix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Text below",
+       "kind": "input",
+       "value": ""
+      }
      ]
     },
     "dialogs": [],
@@ -1654,7 +2054,7 @@
      "selection": []
     }
    },
-   "t": 563110
+   "t": 579418
   },
   {
    "step": 15,
@@ -1678,10 +2078,44 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
-     "title": "(in)",
-     "text": [
-      "(in)"
+     "kind": "palette",
+     "title": "Dimension palette",
+     "fields": [
+      {
+       "label": "Text above",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Prefix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Quantity",
+       "kind": "combo",
+       "value": "1.57"
+      },
+      {
+       "label": "Value",
+       "kind": "text",
+       "value": null
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "(in)"
+      },
+      {
+       "label": "Suffix",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Text below",
+       "kind": "input",
+       "value": ""
+      }
      ]
     },
     "dialogs": [],
@@ -1769,7 +2203,7 @@
      "selection": []
     }
    },
-   "t": 588199
+   "t": 605500
   }
  ]
 }

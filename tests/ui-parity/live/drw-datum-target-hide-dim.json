@@ -1,19 +1,23 @@
 {
  "scenario": "drw-datum-target-hide-dim",
- "recorded": "2026-11-08T06:24:25.832Z",
+ "recorded": "2026-11-15T20:32:45.054Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "341e10571d3117b3d4c59d46",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "9e529568c57698378a658299",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -51,6 +55,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -58,6 +66,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -65,6 +77,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -72,6 +88,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -140,6 +160,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -147,6 +171,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -154,6 +182,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -161,6 +193,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -170,7 +206,7 @@
      "selection": []
     }
    },
-   "t": 244149
+   "t": 230277
   },
   {
    "step": 2,
@@ -201,6 +237,13 @@
       "Style:",
       "Area size:",
       "Targets"
+     ],
+     "fields": [
+      {
+       "label": "Area size:",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -233,6 +276,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -240,6 +287,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -247,6 +298,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -254,6 +309,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -263,7 +322,7 @@
      "selection": []
     }
    },
-   "t": 260587
+   "t": 255235
   },
   {
    "step": 3,
@@ -282,8 +341,8 @@
    },
    "ok": true,
    "at": [
-    828,
-    618
+    813,
+    672
    ],
    "state": {
     "focus": {
@@ -301,6 +360,13 @@
       "Style:",
       "Area size:",
       "Targets"
+     ],
+     "fields": [
+      {
+       "label": "Area size:",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -333,6 +399,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -340,6 +410,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -347,6 +421,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -354,6 +432,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -368,7 +450,7 @@
      ]
     }
    },
-   "t": 277294
+   "t": 281259
   },
   {
    "step": 4,
@@ -387,8 +469,8 @@
    },
    "ok": true,
    "at": [
-    906,
-    540
+    899,
+    586
    ],
    "state": {
     "focus": {
@@ -422,6 +504,18 @@
       "Distance:",
       "X",
       "Y"
+     ],
+     "fields": [
+      {
+       "label": "Area size:",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length"
+      }
      ]
     },
     "dialogs": [],
@@ -454,6 +548,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -461,6 +559,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -468,6 +570,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -475,6 +581,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -484,7 +594,7 @@
      "selection": []
     }
    },
-   "t": 294222
+   "t": 308115
   },
   {
    "step": 5,
@@ -503,8 +613,8 @@
    },
    "ok": true,
    "at": [
-    828,
-    658
+    813,
+    715
    ],
    "state": {
     "focus": {
@@ -540,6 +650,18 @@
       "Distance:",
       "X",
       "Y"
+     ],
+     "fields": [
+      {
+       "label": "Area size:",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length"
+      }
      ]
     },
     "dialogs": [],
@@ -572,6 +694,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -579,6 +705,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -586,6 +716,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -593,6 +727,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -602,7 +740,7 @@
      "selection": []
     }
    },
-   "t": 312750
+   "t": 334946
   },
   {
    "step": 6,
@@ -653,6 +791,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -660,6 +802,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -667,6 +813,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -674,6 +824,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -683,7 +837,7 @@
      "selection": []
     }
    },
-   "t": 329442
+   "t": 360597
   },
   {
    "step": 7,
@@ -702,8 +856,8 @@
    },
    "ok": true,
    "at": [
-    906,
-    540
+    899,
+    586
    ],
    "state": {
     "focus": {
@@ -713,7 +867,47 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Edit...",
+      "Copy",
+      "Paste as table",
+      "Show dimensions",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -741,6 +935,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -748,6 +946,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -755,6 +957,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -762,6 +968,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -776,7 +986,7 @@
      ]
     }
    },
-   "t": 347834
+   "t": 387072
   },
   {
    "step": 8,
@@ -789,8 +999,8 @@
    },
    "ok": true,
    "at": [
-    946,
-    589
+    961,
+    634
    ],
    "state": {
     "focus": {
@@ -800,7 +1010,23 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "This target",
+      "All targets"
+     ],
+     "checked": [
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -828,6 +1054,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -835,6 +1065,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -842,6 +1076,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -849,6 +1087,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -863,7 +1105,7 @@
      ]
     }
    },
-   "t": 364480
+   "t": 412348
   },
   {
    "step": 9,
@@ -876,7 +1118,7 @@
    "ok": true,
    "at": [
     1071,
-    590
+    635
    ],
    "state": {
     "focus": {
@@ -914,6 +1156,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -921,6 +1167,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -928,6 +1178,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -935,6 +1189,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -944,7 +1202,7 @@
      "selection": []
     }
    },
-   "t": 380761
+   "t": 439481
   },
   {
    "step": 10,
@@ -963,8 +1221,8 @@
    },
    "ok": true,
    "at": [
-    851,
-    638
+    838,
+    693
    ],
    "state": {
     "focus": {
@@ -974,7 +1232,47 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Edit...",
+      "Copy",
+      "Paste as table",
+      "Hide dimension",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -1002,6 +1300,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -1009,6 +1311,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1016,6 +1322,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1023,6 +1333,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1037,7 +1351,7 @@
      ]
     }
    },
-   "t": 398789
+   "t": 465434
   },
   {
    "step": 11,
@@ -1049,8 +1363,8 @@
    },
    "ok": true,
    "at": [
-    892,
-    686
+    895,
+    742
    ],
    "state": {
     "focus": {
@@ -1088,6 +1402,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -1095,6 +1413,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1102,6 +1424,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1109,6 +1435,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1118,7 +1448,7 @@
      "selection": []
     }
    },
-   "t": 416209
+   "t": 491911
   }
  ]
 }

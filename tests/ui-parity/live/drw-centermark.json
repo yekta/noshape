@@ -1,19 +1,23 @@
 {
  "scenario": "drw-centermark",
- "recorded": "2026-11-10T09:57:01.512Z",
+ "recorded": "2026-11-15T21:13:31.982Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.2 0a4d2573 + live2 2026-11-09.1"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "5a1eef25f317761c0c1be053",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "bb6db0c10048b5dbd54b92b3",
   "start": "hole-plate-drawing",
-  "startElement": "e14cce55628fbf2ae4425d70",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "ac3109d7c4982f44b949727b",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -51,6 +55,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -58,6 +66,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -65,6 +77,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -72,6 +88,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -141,6 +161,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -148,6 +172,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -155,6 +183,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -162,16 +194,26 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "centermark",
+       "text": null,
+       "position": null
+      }
+     ],
      "selection": []
     }
    },
-   "t": 233974
+   "t": 231120
   },
   {
    "step": 2,
@@ -190,8 +232,8 @@
    },
    "ok": true,
    "at": [
-    763,
-    312
+    742,
+    335
    ],
    "state": {
     "focus": {
@@ -241,6 +283,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -248,6 +294,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -255,6 +305,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -262,21 +316,20 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
-     "annotations": [
-      {
-       "kind": "centermark",
-       "text": null
-      }
-     ],
+     "annotations": [],
      "selection": []
     }
    },
-   "t": 260450
+   "t": 257022
   },
   {
    "step": 3,
@@ -329,6 +382,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -336,6 +393,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -343,6 +404,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -350,6 +415,102 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 282862
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 2000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -358,13 +519,202 @@
      "annotations": [
       {
        "kind": "centermark",
-       "text": null
+       "text": null,
+       "position": null
       }
      ],
      "selection": []
     }
    },
-   "t": 287039
+   "t": 311649
   }
- ]
+ ],
+ "_meta": {
+  "export": [
+   {
+    "format": "DXF",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-centermark.dxf",
+    "bytes": 95277,
+    "error": null,
+    "formatBefore": "PDF",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "DXF"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "Release 14"
+     },
+     {
+      "label": "Sheets",
+      "id": null,
+      "value": "All sheets"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": null,
+      "value": "Export as text"
+     },
+     {
+      "label": "Units",
+      "id": "drawing-units-dropdown",
+      "value": "Use drawing units"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Export splines as polylines",
+      "checked": false
+     },
+     {
+      "label": "Set z-height to zero and normals to positive",
+      "checked": true
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     },
+     {
+      "label": "Exclude off-sheet content",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   },
+   {
+    "format": "DWG",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-centermark.dwg",
+    "bytes": 26080,
+    "error": null,
+    "formatBefore": "DXF",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "DWG"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "2018"
+     },
+     {
+      "label": "Sheets",
+      "id": null,
+      "value": "All sheets"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": null,
+      "value": "Export as text"
+     },
+     {
+      "label": "Units",
+      "id": "drawing-units-dropdown",
+      "value": "Use drawing units"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Export splines as polylines",
+      "checked": false
+     },
+     {
+      "label": "Set z-height to zero and normals to positive",
+      "checked": true
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     },
+     {
+      "label": "Exclude off-sheet content",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   },
+   {
+    "format": "PDF",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-centermark.pdf",
+    "bytes": 77607,
+    "error": null,
+    "formatBefore": "DWG",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "PDF"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "1.5"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": "drawing-export-text-dropdown",
+      "value": "Normal"
+     },
+     {
+      "label": "Color",
+      "id": "drawing-export-color-dropdown",
+      "value": "Color"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   }
+  ]
+ }
 }

@@ -1,16 +1,20 @@
 {
  "scenario": "drw-auxiliary-view-no-indicator",
- "recorded": "2026-11-14T11:11:20.691Z",
+ "recorded": "2026-11-15T20:41:08.653Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
  },
  "live": {
   "document": "a1e7207bcd206771836609af",
   "workspace": "6d6324b30f07aa9904363635",
-  "element": "25d95638acf4777b9cd93bd8",
+  "element": "16400e098304e8c2901c1923",
   "start": "block-drawing",
   "startElement": "fec75b9b8f06f7e2fe8fa56f",
   "runner": "live2 .nstate-uip-1.json"
@@ -41,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1 (1)",
+   "tab": "Part 1 Drawing 1",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -155,7 +159,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -211,7 +215,7 @@
      "selection": []
     }
    },
-   "t": 236602
+   "t": 230809
   },
   {
    "step": 2,
@@ -265,7 +269,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -321,7 +325,7 @@
      "selection": []
     }
    },
-   "t": 263421
+   "t": 258490
   },
   {
    "step": 3,
@@ -380,7 +384,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -436,7 +440,7 @@
      "selection": []
     }
    },
-   "t": 288768
+   "t": 284012
   },
   {
    "step": 4,
@@ -490,7 +494,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -546,7 +550,7 @@
      "selection": []
     }
    },
-   "t": 316635
+   "t": 309904
   },
   {
    "step": 5,
@@ -614,7 +618,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -670,7 +674,7 @@
      "selection": []
     }
    },
-   "t": 343560
+   "t": 336784
   },
   {
    "step": 6,
@@ -718,7 +722,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -794,7 +798,7 @@
      "selection": []
     }
    },
-   "t": 373365
+   "t": 363562
   },
   {
    "step": 7,
@@ -837,7 +841,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -913,7 +917,7 @@
      "selection": []
     }
    },
-   "t": 399224
+   "t": 390657
   }
  ]
 }

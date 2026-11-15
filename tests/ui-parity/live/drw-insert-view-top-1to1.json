@@ -1,19 +1,23 @@
 {
  "scenario": "drw-insert-view-top-1to1",
- "recorded": "2026-11-15T01:19:34.217Z",
+ "recorded": "2026-11-15T20:13:10.913Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "fc21ac2dc565981a6fbdc28f",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "cf112e4c5df5c8ca426e098e",
   "start": "block-drawing-empty",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -158,7 +162,7 @@
      "selection": []
     }
    },
-   "t": 157567
+   "t": 166468
   },
   {
    "step": 2,
@@ -246,7 +250,7 @@
      {
       "id": "_OSDRAWINGVIEW",
       "title": "Select a part or assembly",
-      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-2 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / start block-broken / start block-fillet / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / start plate (ui) / start two-blocks / star",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-1 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / start block-broken / start block-fillet / start config-block-drawing / start config-blocks / start curves / start curves Copy 1 / start frame-l / start hole-plate / start ov",
       "inputs": [
        {
         "placeholder": "Search parts or sketches",
@@ -284,7 +288,7 @@
      "selection": []
     }
    },
-   "t": 180235
+   "t": 190216
   },
   {
    "step": 3,
@@ -367,7 +371,7 @@
      {
       "id": "_OSDRAWINGVIEW",
       "title": "Select a part or assembly",
-      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-2 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / Part 1 / start block-broken / start block-fillet / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / start plate (ui) / start two-bloc",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-1 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / Part 1 / start block-broken / start block-fillet / start config-block-drawing / start config-blocks / start curves / start curves Copy 1 / start frame-l / start hole-plate /",
       "inputs": [
        {
         "placeholder": "Search parts or sketches",
@@ -405,7 +409,7 @@
      "selection": []
     }
    },
-   "t": 202850
+   "t": 215552
   },
   {
    "step": 4,
@@ -519,7 +523,7 @@
      "selection": []
     }
    },
-   "t": 225364
+   "t": 240474
   },
   {
    "step": 5,
@@ -635,7 +639,7 @@
      "selection": []
     }
    },
-   "t": 237219
+   "t": 254273
   },
   {
    "step": 6,
@@ -751,7 +755,7 @@
      "selection": []
     }
    },
-   "t": 250158
+   "t": 267937
   },
   {
    "step": 7,
@@ -823,7 +827,7 @@
      ]
     }
    },
-   "t": 275645
+   "t": 294161
   },
   {
    "step": 8,
@@ -889,7 +893,7 @@
      "selection": []
     }
    },
-   "t": 300792
+   "t": 321607
   }
  ]
 }

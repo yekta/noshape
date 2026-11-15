@@ -1,19 +1,23 @@
 {
  "scenario": "drw-note-move-to-title-block",
- "recorded": "2026-11-07T12:00:44.595Z",
+ "recorded": "2026-11-15T20:19:39.923Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0 + live2 2026-11-07.5"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "c795278aa25a90784ed592d9",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "5470b5b03fce8aef323b2a60",
   "start": "block-drawing",
-  "startElement": "392bca590892e6ffb484a34b",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -51,6 +55,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -58,6 +66,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -65,6 +77,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -72,6 +88,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -131,6 +151,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -138,6 +162,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -145,6 +173,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -152,6 +184,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -161,7 +197,7 @@
      "selection": []
     }
    },
-   "t": 219695
+   "t": 229697
   },
   {
    "step": 2,
@@ -176,8 +212,8 @@
    },
    "ok": true,
    "at": [
-    667,
-    798
+    636,
+    870
    ],
    "state": {
     "focus": {
@@ -185,39 +221,114 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Note",
-     "text": [
-      "Note",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans ( Note )",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
-      "Flag notes",
-      "None",
-      "Circle",
-      "Diamond",
-      "Double circle",
-      "Flag (Drawing)",
-      "Hexagon"
+     "rect": [
+      636,
+      653,
+      394,
+      160
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
+      },
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Flag (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
      ]
     },
     "dialogs": [],
@@ -250,6 +361,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -257,6 +372,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -264,6 +383,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -271,6 +394,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -280,7 +407,7 @@
      "selection": []
     }
    },
-   "t": 233825
+   "t": 256457
   },
   {
    "step": 3,
@@ -295,39 +422,114 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Note",
-     "text": [
-      "Note",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans ( Note )",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
-      "Flag notes",
-      "None",
-      "Circle",
-      "Diamond",
-      "Double circle",
-      "Flag (Drawing)",
-      "Hexagon"
+     "rect": [
+      636,
+      653,
+      394,
+      160
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
+      },
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Flag (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
      ]
     },
     "dialogs": [],
@@ -360,6 +562,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -367,6 +573,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -374,6 +584,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -381,6 +595,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -390,7 +608,7 @@
      "selection": []
     }
    },
-   "t": 248652
+   "t": 282181
   },
   {
    "step": 4,
@@ -405,8 +623,8 @@
    },
    "ok": true,
    "at": [
-    1372,
-    211
+    1410,
+    224
    ],
    "state": {
     "focus": {
@@ -444,6 +662,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -451,6 +673,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -458,6 +684,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -465,6 +695,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -473,13 +707,17 @@
      "annotations": [
       {
        "kind": "note",
-       "text": "TEMP"
+       "text": "TEMP",
+       "position": [
+        65.3,
+        38.6
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 264497
+   "t": 309145
   },
   {
    "step": 5,
@@ -488,6 +726,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     931,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -524,6 +770,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -531,6 +781,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -538,6 +792,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -545,6 +803,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -553,13 +815,17 @@
      "annotations": [
       {
        "kind": "note",
-       "text": "TEMP"
+       "text": "TEMP",
+       "position": [
+        65.3,
+        38.6
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 279292
+   "t": 335189
   },
   {
    "step": 6,
@@ -571,8 +837,8 @@
    },
    "ok": true,
    "at": [
-    665,
-    798
+    635,
+    869
    ],
    "state": {
     "focus": {
@@ -582,7 +848,59 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Edit note...",
+      "Explode note",
+      "Copy",
+      "Paste as table",
+      "Add leader",
+      "Move to",
+      "Bring to front",
+      "Send to back",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -610,6 +928,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -617,6 +939,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -624,6 +950,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -631,6 +961,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -639,13 +973,17 @@
      "annotations": [
       {
        "kind": "note",
-       "text": "TEMP"
+       "text": "TEMP",
+       "position": [
+        65.3,
+        38.6
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 293542
+   "t": 374428
   },
   {
    "step": 7,
@@ -658,8 +996,8 @@
    },
    "ok": true,
    "at": [
-    706,
-    602
+    692,
+    674
    ],
    "state": {
     "focus": {
@@ -669,7 +1007,29 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Border frame",
+      "Border zones",
+      "Title block",
+      "Drawing"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      true
+     ],
+     "highlighted": -1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -697,6 +1057,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -704,6 +1068,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -711,6 +1079,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -718,6 +1090,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -726,13 +1102,17 @@
      "annotations": [
       {
        "kind": "note",
-       "text": "TEMP"
+       "text": "TEMP",
+       "position": [
+        65.3,
+        38.6
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 307666
+   "t": 399514
   },
   {
    "step": 8,
@@ -744,8 +1124,8 @@
    },
    "ok": true,
    "at": [
-    818,
-    649
+    801,
+    721
    ],
    "state": {
     "focus": {
@@ -783,6 +1163,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -790,6 +1174,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -797,6 +1185,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -804,6 +1196,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -812,18 +1208,22 @@
      "annotations": [
       {
        "kind": "note",
-       "text": "TEMP"
+       "text": "TEMP",
+       "position": [
+        65.3,
+        38.6
+       ]
       }
      ],
      "selection": [
       {
-       "kind": "VIEW",
+       "kind": "EDGE",
        "owner": "Front"
       }
      ]
     }
    },
-   "t": 321826
+   "t": 426974
   }
  ]
 }
