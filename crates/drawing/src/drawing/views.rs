@@ -2468,11 +2468,14 @@ fn simplify_edges(g: &mut ViewGeometry, ctx: &Context, part: Option<&BodyId>, s:
 /// Restrict a view's geometry to a crop boundary.
 fn apply_crop(g: &mut ViewGeometry, crop: &Crop) {
     let edges = std::mem::take(&mut g.edges);
-    for e in edges {
+    let boundary = crop_boundary_in_material(&edges, crop);
+    for e in &edges {
         for piece in clip_to_crop(&e.points, crop) {
             g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model: e.model, sketch: e.sketch });
         }
     }
+    // The profile is drawn where it runs through material (live drw-crop-spline, live2 crop-snap-reach: any profile).
+    g.edges.extend(boundary.into_iter().map(|points| ViewEdge { points, visible: true, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None }));
     let poly = crop_polygon(crop);
     let inside = |p: [f64; 2]| match (crop, &poly) {
         (Crop::Circle { center, radius }, _) => (p[0] - center[0]).powi(2) + (p[1] - center[1]).powi(2) <= radius * radius * (1.0 + 1e-9),
@@ -2493,6 +2496,93 @@ fn apply_crop(g: &mut ViewGeometry, crop: &Crop) {
     }
     g.crop = Some(crop.clone());
     g.update_bounds();
+}
+
+/// Whether view point `p` lies in the part's projected material: an even-odd count of the visible model edges a ray
+/// to +x crosses (exact for outlines and through holes; an interior line across a face counts as a boundary).
+pub fn inside_material(edges: &[ViewEdge], p: [f64; 2]) -> bool {
+    let mut n = 0usize;
+    for e in edges.iter().filter(|e| e.visible && e.sketch == SketchEdge::None) {
+        for w in e.points.windows(2) {
+            let (a, b) = (w[0], w[1]);
+            if (a[1] > p[1]) != (b[1] > p[1]) && a[0] + (p[1] - a[1]) * (b[0] - a[0]) / (b[1] - a[1]) > p[0] {
+                n += 1;
+            }
+        }
+    }
+    n % 2 == 1
+}
+
+/// The pieces of crop profile `crop` that lie in the material the view's `edges` bound (the crossings found to a
+/// thousandth of the view's size).
+fn crop_boundary_in_material(edges: &[ViewEdge], crop: &Crop) -> Vec<Vec<[f64; 2]>> {
+    let mut ring = match crop {
+        Crop::Circle { center, radius } => (0..=72).map(|i| {
+            let t = i as f64 / 72.0 * std::f64::consts::TAU;
+            [center[0] + radius * t.cos(), center[1] + radius * t.sin()]
+        }).collect(),
+        _ => crop_polygon(crop).unwrap_or_default(),
+    };
+    if ring.len() < 3 {
+        return Vec::new();
+    }
+    if ring.first() != ring.last() {
+        ring.push(ring[0]);
+    }
+    let (lo, hi) = ring.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
+    let step = ((hi[0] - lo[0]).max(hi[1] - lo[1]) / 400.0).max(1e-9);
+    let lerp = |a: [f64; 2], b: [f64; 2], t: f64| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    // Where along a..b material starts or stops (bisection between an inside and an outside end).
+    let crossing = |a: [f64; 2], b: [f64; 2]| {
+        let a_in = inside_material(edges, a);
+        let (mut t0, mut t1) = (0.0, 1.0);
+        for _ in 0..30 {
+            let m = (t0 + t1) / 2.0;
+            if inside_material(edges, lerp(a, b, m)) == a_in { t0 = m } else { t1 = m }
+        }
+        lerp(a, b, (t0 + t1) / 2.0)
+    };
+    // The ring sampled finely, each sample's side tested once.
+    let mut pts: Vec<[f64; 2]> = vec![ring[0]];
+    for w in ring.windows(2) {
+        let n = ((w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]) / step).ceil().max(1.0) as usize;
+        pts.extend((1..=n).map(|k| lerp(w[0], w[1], k as f64 / n as f64)));
+    }
+    let inside: Vec<bool> = pts.iter().map(|p| inside_material(edges, *p)).collect();
+    let mut out: Vec<Vec<[f64; 2]>> = Vec::new();
+    let mut cur: Vec<[f64; 2]> = Vec::new();
+    for k in 0..pts.len() - 1 {
+        let (a, b) = (pts[k], pts[k + 1]);
+        match (inside[k], inside[k + 1]) {
+            (true, true) => {
+                if cur.is_empty() {
+                    cur.push(a);
+                }
+                cur.push(b);
+            }
+            (true, false) => {
+                if cur.is_empty() {
+                    cur.push(a);
+                }
+                cur.push(crossing(a, b));
+                out.push(std::mem::take(&mut cur));
+            }
+            (false, true) => cur = vec![crossing(a, b), b],
+            (false, false) => {}
+        }
+    }
+    if !cur.is_empty() {
+        // The ring started inside: its first piece continues this one.
+        match out.first_mut() {
+            Some(first) if inside[0] => {
+                cur.extend(first.iter().skip(1).copied());
+                *first = cur;
+            }
+            _ => out.push(cur),
+        }
+    }
+    out.retain(|p| p.len() >= 2);
+    out
 }
 
 /// Compute every view of a sheet, in parallel: detail views after the
@@ -3692,6 +3782,28 @@ fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live drw-crop-spline (dx 11-15): a spline crop through points on a block's bottom and top edges keeps those
+    /// edges between its crossings and draws the profile where it runs through the block: two arcs; a profile wholly
+    /// inside the block is drawn whole.
+    #[test]
+    fn a_crop_profile_is_drawn_where_it_crosses_material() {
+        let edge = |a: [f64; 2], b: [f64; 2]| ViewEdge { points: vec![a, b], visible: true, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None };
+        let block = vec![edge([0.0, 0.0], [40.0, 0.0]), edge([40.0, 0.0], [40.0, 10.0]), edge([40.0, 10.0], [0.0, 10.0]), edge([0.0, 10.0], [0.0, 0.0])];
+        assert!(inside_material(&block, [20.0, 5.0]) && !inside_material(&block, [20.0, 12.0]));
+        let snapped = Crop::Spline(vec![[5.0, 0.0], [25.0, 0.0], [25.0, 10.0], [5.0, 10.0]]);
+        let arcs = crop_boundary_in_material(&block, &snapped);
+        assert_eq!(arcs.len(), 2, "{arcs:?}");
+        for a in &arcs {
+            assert!(a.iter().all(|p| p[1] > -1e-3 && p[1] < 10.0 + 1e-3), "inside the block: {a:?}");
+        }
+        let kept: Vec<_> = block.iter().flat_map(|e| clip_to_crop(&e.points, &snapped)).collect();
+        assert_eq!(kept.len(), 2, "the bottom and top edges between the crossings: {kept:?}");
+        let inner = Crop::Spline(vec![[5.0, 2.0], [25.0, 2.0], [25.0, 8.0], [5.0, 8.0]]);
+        let whole = crop_boundary_in_material(&block, &inner);
+        assert_eq!(whole.len(), 1, "{whole:?}");
+        assert!(whole[0].len() > 40 && whole[0].first() == whole[0].last(), "the whole ring");
+    }
 
     #[test]
     fn standard_frames_follow_onshape_axes() {

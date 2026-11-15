@@ -576,6 +576,38 @@ impl SheetPick<'_> {
         Some(PickedPoint { view: v, p: pl.to_view(c), r: None })
     }
 
+    /// A click of a profile tool (Crop view, Broken-out section, Detail view profiles): a snap point, else onto the
+    /// nearest visible edge within 9 px inside the material or 6 px outside (screen px, any zoom: live2
+    /// crop-snap-reach, inside snapping at 8 px and not 9 at 100 %, at 9 and not 10 at 2×), else the point in the
+    /// view under `c`.
+    pub fn profile_point(&self, c: [f64; 2], view: Option<ViewId>) -> Option<PickedPoint> {
+        if let Some(p) = self.snap_at(c).filter(|p| view.is_none_or(|v| v == p.view)) {
+            return Some(p);
+        }
+        let v = view.or_else(|| self.view_at(c))?;
+        let pl = self.placement(v)?;
+        let q = pl.to_view(c);
+        let Some(g) = self.geoms.get(&v) else { return Some(PickedPoint { view: v, p: q, r: None }) };
+        let px = if views::inside_material(&g.edges, q) { 9.0 } else { 6.0 };
+        let reach = self.tol_mm(px) / (pl.scale * 1000.0);
+        let nearest = g
+            .edges
+            .iter()
+            .filter(|e| e.visible)
+            .flat_map(|e| e.points.windows(2).map(|w| (w[0], w[1])))
+            .map(|(a, b)| {
+                let ab = sub(b, a);
+                let l2 = ab[0] * ab[0] + ab[1] * ab[1];
+                let t = if l2 > 0.0 { (((q[0] - a[0]) * ab[0] + (q[1] - a[1]) * ab[1]) / l2).clamp(0.0, 1.0) } else { 0.0 };
+                let f = [a[0] + ab[0] * t, a[1] + ab[1] * t];
+                (len(sub(f, q)), f)
+            })
+            .min_by(|x, y| x.0.total_cmp(&y.0))
+            .filter(|(d, _)| *d <= reach)
+            .map(|(_, f)| f);
+        Some(PickedPoint { view: v, p: nearest.unwrap_or(q), r: None })
+    }
+
     /// A cutting line's two end segments extended past the view's geometry.
     pub fn extend_line_ends(&self, view: ViewId, points: &[[f64; 2]]) -> Vec<[f64; 2]> {
         let mut pts = points.to_vec();

@@ -137,7 +137,10 @@ impl DrawingEditor {
     fn on_first_point(&self, view: ViewId, points: &[[f64; 2]], c: [f64; 2]) -> bool {
         let (Some(pl), Some(first)) = (self.placement(view), points.first()) else { return false };
         let f = pl.to_sheet(*first);
-        (f[0] - c[0]).hypot(f[1] - c[1]) * self.zoom <= 8.0
+        // The click as the profile tool snaps it (the first point snapped onto an edge the same way: live
+        // drw-crop-spline closes on the click that made it).
+        let snapped = self.pk().profile_point(c, Some(view)).map(|pp| pl.to_sheet(pp.p)).unwrap_or(c);
+        [c, snapped].iter().any(|q| (f[0] - q[0]).hypot(f[1] - q[1]) * self.zoom <= 8.0)
     }
 
     pub fn more_tool_click(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
@@ -152,7 +155,7 @@ impl DrawingEditor {
                 {
                     return self.more_confirm(window, cx);
                 }
-                if let Some(pp) = self.view_point(parent) {
+                if let Some(pp) = self.profile_point(parent) {
                     if let Some(why) = noshape_scene::drawing_tools::broken_out_refused(self.current_sheet(), pp.view) {
                         self.status = Some(why.into());
                         cx.notify();
@@ -232,7 +235,7 @@ impl DrawingEditor {
                 // The first point: the view under it, snapping only to that
                 // view's points (a neighbour's corner nearby took the crop).
                 let target = parent.or_else(|| self.pk().view_containing(c));
-                if let Some(pp) = self.view_point(target) {
+                if let Some(pp) = self.profile_point(target) {
                     if self.crop_refused(pp.view) {
                         return true;
                     }

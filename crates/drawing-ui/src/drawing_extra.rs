@@ -1013,6 +1013,11 @@ impl DrawingEditor {
         self.pk().view_point(self.cursor, view)
     }
 
+    /// A profile tool's click: [`noshape_scene::drawing_tools::SheetPick::profile_point`] at the cursor.
+    pub fn profile_point(&self, view: Option<ViewId>) -> Option<PickedPoint> {
+        self.pk().profile_point(self.cursor, view)
+    }
+
     /// Orthogonal continuation (in the view's frame) from `last` toward `target`.
     fn ortho_view(last: [f64; 2], target: [f64; 2]) -> [f64; 2] {
         noshape_scene::drawing_tools::ortho_view(last, target)

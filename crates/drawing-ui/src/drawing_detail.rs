@@ -137,7 +137,8 @@ impl DrawingEditor {
             return true;
         }
         let Some(pl) = self.placement(view) else { return true };
-        let p = self.snap_at(c).filter(|s| s.view == view).map(|s| s.p).unwrap_or(pl.to_view(c));
+        // (A profile tool's snap: onto a point, else an edge, live2 crop-snap-reach.)
+        let p = self.profile_point(Some(view)).filter(|s| s.view == view).map(|s| s.p).unwrap_or(pl.to_view(c));
         let tol = self.tol_mm(8.0);
         let Some(d) = &mut self.detail_dlg else { return true };
         d.view = Some(view);
