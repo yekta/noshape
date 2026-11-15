@@ -4,17 +4,28 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-15 19:35 UTC.
+Updated 11-15 20:45 UTC.
 
 ## In flight
-- Queued to land: 14c0b668 (41c844b78 + f1b32bd0e, branch bool-land-41c). Gate clean (CHECK: knurls only; 0 new
-  differences; model suite 80 -> 80, 883/935); hats/dock: all 12 tabs SAME (bodies, counts, volumes, statuses).
-  - f1b32bd0e: Shell's offset value on a free-form face searches for a foot once where Newton's steps fail, and not
-    locally where that foot lies past the surface's end. c2-rings-loft Shell 1 ~8 % less CPU, the same result.
-  - 41c844b78: torus_sections (was plane_torus_sections): a plane along the torus axis (off it) and a sphere off the
-    axis too, exact point by point round the axis, interpolated. learning-center-michael's 12-tool cut: 24 more
-    pairs ours. T1 bool_patterns::a_rings_top_cut_along_its_axis_and_by_a_ball_as_occt.
-- Now: cf-snap-hook's Booleans (Next 1).
+- Landed: d647a614a / 78bed3217 (torus_sections round the axis; Shell foot search), 11-15 19:44.
+- Gating to land: branch bool-land-snap (worktree bool-split) = 4 commits on main d647a614a; gate 8d7322fd7 running
+  (/root/bool-hat-scratch/chain-8d7322fd7.out) and hats/dock compared on it (udoc-ab.out); land all if both clean.
+  - 583d31911: GFace::uv_of keeps the parameters it found per exact point (cf-snap-hook's cut asks 1020 times for
+    332 points): ~1.5 % CPU, bit-identical.
+  - 158586955: torus_sections by v where by u fails (a plane drafted off the axis: the sections loops round the tube,
+    u = psi +- acos(c(v)), c linear in cos v / sin v): cf-snap-hook's 14 drafted torus x plane pairs ours, the cut
+    ~5 % less CPU. Gate 158586955 alone: clean (CHECK, knurls only; replay 0 new; suite 78 -> 78, 881/935).
+    T1 a_rings_top_cut_by_a_side_drafted_off_its_axis_as_occt.
+  - f094e1979: a circle arc revolved about an axis in its plane (OCCT keeps it as a revolution) taken as its torus
+    (u the same, v = phi + sv * the arc's parameter), spindle tori (R < r) where the face keeps R + r cos v > 0:
+    c2-housing-draft's Rotieren 1 cut (4361c232e43fc0c1): 16 plane x revolution pairs (~140 ms OCCT CPU) ours;
+    cf-snap-hook's 4. Volume 1.2e-7 relative off the recording (OCCT's curves 4 nm off the revolution, ours 1e-17)
+    and the replay's history hash moves (edges named by their mid-parameter point). Lead ruling ad3308a7d: a flag on
+    only those two is accepted if end to end is identical (suite topology + statuses, hats/dock SAME, corner-break
+    42); name it in the land message; any end-to-end difference parks it. T1
+    a_cut_by_a_revolved_arcs_spindle_torus_as_recorded (OCCT's own cut gives 42 faces; live and the recording 41).
+  - 8d7322fd7: interpolated() stops checking a failing try at its first point off by > 1e-8 (bit-identical: the
+    skipped midpoints are the next try's samples, the same doubles).
 
 ## Parked (branches / diffs, not landing as they are)
 - Plane x B-spline marcher + our own least-squares fit (branch bool-free-sections-wip: 71efdd87e, f6c77c748, ...):
@@ -34,15 +45,17 @@ Updated 11-15 19:35 UTC.
 - Offset-surface approximation cache (/root/bool-scratch/offset-cache.diff): 1-2 % CPU on cf-snap-hook's cuts: dropped.
 - blend's pole-hull disjointness test: withdrawn by blend (the knife's costly empty pairs touch; tangent contacts).
 - blend's known sections entry point: parked (few pairs are tangent contacts).
+- Parallel-axis cone / cylinder disjointness (/root/bool-scratch/parked-cones-apart.diff: circles at each height,
+  angular ranges as cosine bounds, quadratics in z): cf-snap-hook fuse 96de626280206723's 30 cone x cone pairs
+  (OCCT ~30 ms each, none found) share one height where the circles are internally tangent (4e-7): only 1 proven.
+  Tangent contacts stay OCCT's (lead 11-15); likewise housing's 4 cylinder x revolution pairs (20-27 ms each, none).
 
 ## Next, in order
-1. cf-snap-hook's Booleans (dx 11-15: x3.4 live; Snap Hook 1/2 opBoolean 256-286 ms vs live's whole features 81-83).
-   Recorded: vibe5 ~/tmp/bool/snap (9 cases); costliest ddcfc2632aeb7365 and bcab565b15f622ca (body cut by 2 tools,
-   50-90 ms each; probe_case_timed). Profile: OCCT sections ahead ~16 %, GFace::uv_of ~16 % (FreeSurface::derivs in
-   param_of, from c2_of/to2 and on_free_surface/surface_distance), intervals_on ~11 %, offset_as_bspline ~10 %.
-   Lever: an exact (face, point) cache in GFace::uv_of if points repeat (bit-identical); else seed param_of from the
-   previous point's uv (may move last digits: full gate). Measure first: /root/bool-scratch/uvdbg.diff (UVDBG=1).
-   The 414 bounding_box calls dx saw are the suite measuring after the feature: not regen.
+1. cf-snap-hook's Booleans, what's left (recorded vibe5 ~/tmp/bool/snap; probe_case_timed; per-kind section times
+   with /root/bool-scratch/ahead-debug.diff, NOSHAPE_AHEAD_DEBUG): the cuts' remaining OCCT pairs offset x plane (2,
+   ~15-20 ms); our torus x plane pairs ~1 ms each (interpolated(): Interpolate + Value); intervals_on's chords
+   (C2::at, NurbsCurve::at) ~40 % of the cut's CPU; fuse 96de6262's tangent cones (parked). The wall profile
+   (sampler.rs SAMPLE_WALL=1): occt_ahead ~32 % of the cut's main thread, intervals ~25 %.
 2. c2-rings-loft Shell 1 (~510-590 ms, live 235): repair 251 (traces 95, split 78, crossings 26, joins 17),
    self-interference 67 (its EF time in ~23 pairs on free-form faces; quadric pairs are cheap), edges 44, check 35,
    thin 34. Points with no square foot: OCCT's global search found none wherever a Newton search from the own 25 x 25
