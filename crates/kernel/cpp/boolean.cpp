@@ -27,6 +27,13 @@
 #include <malloc.h>
 #endif
 #include "internal.hpp"
+#include <NCollection_HArray1.hxx>
+#include <Geom2dAPI_Interpolate.hxx>
+#include <Precision.hxx>
+#include <GeomAPI_ExtremaCurveCurve.hxx>
+#include <BOPAlgo_BuilderFace.hxx>
+#include <BOPTools_AlgoTools2D.hxx>
+#include <ShapeAnalysis_Curve.hxx>
 
 #include <BOPAlgo_MakerVolume.hxx>
 #include <BRepAlgoAPI_Common.hxx>
@@ -9540,6 +9547,476 @@ OpOut op_split_on(const OcShape& shape, const OcShapeList& edges, double tol)
   return make_result({shape.shape}, sp.Shape(), hist.get());
 }
 
+namespace {
+
+// A tool edge on one of the shape's faces: the edge with its curve there (the tool's own, else a copy with its points'
+// feet fitted) and where it meets the face's boundary (its parameters, the vertices there).
+struct OnFace
+{
+  TopoDS_Edge                                   tool, edge;
+  TopoDS_Face                                   face;
+  std::vector<std::pair<double, TopoDS_Vertex>> cuts;
+};
+
+// The edge's curve on `face` from its own curve on it, else from its points' feet (from the middle out, each from the
+// last: continuous across a seam) interpolated; the distance between the two within `tol` (as `dev`), else null.
+occ::handle<Geom2d_Curve> curve_on(const TopoDS_Edge& e, const TopoDS_Face& face, double tol, double& dev, bool& own)
+{
+  double                          f, l;
+  const occ::handle<Geom_Curve>   c3 = BRep_Tool::Curve(e, f, l);
+  TopLoc_Location                 loc;
+  const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(face, loc);
+  if (c3.IsNull() || !loc.IsIdentity())
+    return nullptr;
+  occ::handle<Geom2d_Curve> c2;
+  {
+    double                          p0, p1;
+    const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, face, p0, p1);
+    own = !c.IsNull() && std::abs(p0 - f) <= 1e-9 * (l - f) && std::abs(p1 - l) <= 1e-9 * (l - f);
+    if (own)
+      c2 = c;
+  }
+  if (c2.IsNull())
+  {
+    // (Each sample's foot on its own, then whole periods added along a closed surface's direction to keep them
+    // continuous: stepping from the middle's foot, on a seam, the next went round the other side.)
+    const occ::handle<ShapeAnalysis_Surface> sas = new ShapeAnalysis_Surface(surf);
+    const int                                n   = 64;
+    NCollection_Array1<gp_Pnt2d>             uv(1, n + 1);
+    NCollection_Array1<double>               ts(1, n + 1);
+    double                                   u0, u1, v0, v1;
+    surf->Bounds(u0, u1, v0, v1);
+    const double pu = surf->IsUPeriodic() ? surf->UPeriod() : surf->IsUClosed() ? u1 - u0 : 0;
+    const double pv = surf->IsVPeriodic() ? surf->VPeriod() : surf->IsVClosed() ? v1 - v0 : 0;
+    for (int k = 0; k <= n; ++k)
+    {
+      ts(k + 1) = f + (l - f) * k / n;
+      gp_Pnt2d q = sas->ValueOfUV(c3->Value(ts(k + 1)), tol);
+      if (k > 0)
+      {
+        const gp_Pnt2d& was = uv(k);
+        if (pu > 0)
+          q.SetX(q.X() + pu * std::round((was.X() - q.X()) / pu));
+        if (pv > 0)
+          q.SetY(q.Y() + pv * std::round((was.Y() - q.Y()) / pv));
+      }
+      uv(k + 1) = q;
+    }
+    Geom2dAPI_Interpolate ip(new NCollection_HArray1<gp_Pnt2d>(uv), new NCollection_HArray1<double>(ts), false, 1e-12);
+    ip.Perform();
+    if (!ip.IsDone())
+      return nullptr;
+    c2 = ip.Curve();
+  }
+  dev = 0;
+  for (int k = 0; k < 96; ++k)
+  {
+    const double   t = f + (l - f) * (k + 0.37) / 96;
+    const gp_Pnt2d q = c2->Value(t);
+    dev              = std::max(dev, surf->Value(q.X(), q.Y()).Distance(c3->Value(t)));
+  }
+  return dev <= 10 * tol ? c2 : nullptr;
+}
+
+// One shape's faces split by edges lying on them (each on one face; c2-hunting-knife's Split 4: four rings round its
+// handle, each closed on its face's seam): each edge cut where it meets its face's boundary, the boundary edges cut
+// there, and each face touched made again from its edges by OCCT's BuilderFace, as OCCT's splitter does after finding
+// the same (its edge / face tests projected points onto the handle's B-spline face: 2.1 s). False where an edge lies on
+// no face, crosses another, ends inside its face, or the result loses area or isn't valid.
+bool split_by_edges_on_faces(const TopoDS_Shape& shape, const std::vector<TopoDS_Shape>& tools, double tol, TopoDS_Shape& out, HHist& hist)
+{
+  // (Why it declined, with NOSHAPE_SPLIT_DEBUG.)
+  auto no = [](int line) {
+    if (std::getenv("NOSHAPE_SPLIT_DEBUG") != nullptr)
+      std::fprintf(stderr, "split by edges declined at boolean.cpp:%d\n", line);
+    return false;
+  };
+  if (shape.ShapeType() != TopAbs_SOLID)
+    return no(__LINE__);
+  ShapeIMap faces;
+  TopExp::MapShapes(shape, TopAbs_FACE, faces);
+  std::vector<Bnd_Box> boxes((size_t)faces.Extent() + 1);
+  for (int j = 1; j <= faces.Extent(); ++j)
+  {
+    BRepBndLib::Add(faces(j), boxes[(size_t)j]);
+    boxes[(size_t)j].Enlarge(tol);
+  }
+  BRep_Builder                   b;
+  std::vector<OnFace>            on;
+  std::vector<Bnd_Box>           tool_boxes;
+  occ::handle<BRepTools_History> h = new BRepTools_History;
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> copies;
+  auto copy_of = [&](const TopoDS_Vertex& v) {
+    if (const TopoDS_Shape* c = copies.Seek(v))
+      return TopoDS::Vertex(*c);
+    TopoDS_Vertex c;
+    b.MakeVertex(c, BRep_Tool::Pnt(v), BRep_Tool::Tolerance(v));
+    copies.Bind(v, c);
+    h->AddModified(v, c);
+    return c;
+  };
+  for (const TopoDS_Shape& t : tools)
+    for (TopExp_Explorer x(t, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge e = TopoDS::Edge(x.Current().Oriented(TopAbs_FORWARD));
+      if (BRep_Tool::Degenerated(e))
+        return no(__LINE__);
+      double                        f, l;
+      const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, f, l);
+      if (c3.IsNull())
+        return no(__LINE__);
+      // Its face: the one it has a curve on (OCCT makes one up on any plane: the one it lies on), else the nearest to
+      // its middle within `tol`.
+      int                       at = 0;
+      double                    dev = 0;
+      bool                      own = false;
+      occ::handle<Geom2d_Curve> c2;
+      for (int j = 1; j <= faces.Extent() && at == 0; ++j)
+      {
+        double p0, p1;
+        if (boxes[(size_t)j].IsOut(c3->Value(f)) || BRep_Tool::CurveOnSurface(e, TopoDS::Face(faces(j)), p0, p1).IsNull())
+          continue;
+        c2 = curve_on(e, TopoDS::Face(faces(j)), tol, dev, own);
+        if (!c2.IsNull())
+          at = j;
+      }
+      if (at == 0)
+      {
+        const gp_Pnt mid  = c3->Value(0.5 * (f + l));
+        double       best = tol;
+        for (int j = 1; j <= faces.Extent(); ++j)
+        {
+          if (boxes[(size_t)j].IsOut(mid))
+            continue;
+          BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(mid).Vertex(), faces(j));
+          if (d.IsDone() && d.NbSolution() > 0 && d.Value() <= best)
+            best = d.Value(), at = j;
+        }
+        if (at == 0)
+          return no(__LINE__);
+        c2 = curve_on(e, TopoDS::Face(faces(at)), tol, dev, own);
+        if (c2.IsNull())
+          return no(__LINE__);
+      }
+      OnFace o;
+      o.tool = e;
+      o.face = TopoDS::Face(faces(at));
+      // (A copy, on copies of its vertices: OCCT's splitter gives the tools' edges and vertices Modified.)
+      TopoDS_Vertex v0, v1;
+      TopExp::Vertices(e, v0, v1);
+      if (v0.IsNull() || v1.IsNull())
+        return no(__LINE__);
+      const TopoDS_Vertex w0 = copy_of(v0), w1 = copy_of(v1);
+      if (own && dev <= BRep_Tool::Tolerance(e))
+        BOPTools_AlgoTools::MakeSplitEdge(e, w0, f, w1, l, o.edge);
+      else
+      {
+        // (Carrying its curve on its face.)
+        const double etol = std::max({BRep_Tool::Tolerance(e), dev, 0.1 * tol});
+        if (std::max(BRep_Tool::Pnt(v0).Distance(c3->Value(f)), BRep_Tool::Pnt(v1).Distance(c3->Value(l))) > etol)
+          return no(__LINE__);
+        b.MakeEdge(o.edge, c3, etol);
+        b.Add(o.edge, w0.Oriented(TopAbs_FORWARD));
+        b.Add(o.edge, w1.Oriented(TopAbs_REVERSED));
+        b.Range(o.edge, f, l);
+        b.UpdateEdge(o.edge, c2, o.face, etol);
+        b.Range(o.edge, o.face, f, l);
+      }
+      Bnd_Box box;
+      BRepBndLib::Add(o.edge, box);
+      box.Enlarge(tol);
+      tool_boxes.push_back(box);
+      on.push_back(o);
+    }
+  if (on.empty())
+    return no(__LINE__);
+  // (No two cross or touch but at a vertex they share.)
+  for (size_t i = 0; i < on.size(); ++i)
+    for (size_t k = i + 1; k < on.size(); ++k)
+    {
+      if (tool_boxes[i].IsOut(tool_boxes[k]))
+        continue;
+      double                        f1, l1, f2, l2;
+      const occ::handle<Geom_Curve> a = BRep_Tool::Curve(on[i].edge, f1, l1), c = BRep_Tool::Curve(on[k].edge, f2, l2);
+      GeomAPI_ExtremaCurveCurve     ex(a, c, f1, l1, f2, l2);
+      if (ex.Extrema().IsParallel())
+        return no(__LINE__);
+      for (int n = 1; n <= ex.NbExtrema(); ++n)
+        if (ex.Distance(n) <= tol)
+          return no(__LINE__);
+    }
+  // Where each meets its face's boundary: at its ends (on its own vertices) and across it (on new vertices).
+  NCollection_DataMap<TopoDS_Shape, std::vector<std::pair<double, TopoDS_Vertex>>, TopTools_ShapeMapHasher> bcuts;
+  std::vector<TopoDS_Vertex> made;
+  auto vertex_at = [&](const gp_Pnt& p) {
+    for (const TopoDS_Vertex& w : made)
+      if (BRep_Tool::Pnt(w).Distance(p) <= BRep_Tool::Tolerance(w))
+        return w;
+    TopoDS_Vertex v;
+    b.MakeVertex(v, p, tol);
+    made.push_back(v);
+    return v;
+  };
+  for (OnFace& o : on)
+  {
+    double                        f, l;
+    const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(o.edge, f, l);
+    TopoDS_Vertex                 v0, v1;
+    TopExp::Vertices(o.edge, v0, v1);
+    const Bnd_Box& tb = tool_boxes[(size_t)(&o - on.data())];
+    ShapeIMap      bound;
+    TopExp::MapShapes(o.face, TopAbs_EDGE, bound);
+    bool ends_met[2] = {false, false};
+    for (int k = 1; k <= bound.Extent(); ++k)
+    {
+      const TopoDS_Edge B = TopoDS::Edge(bound(k).Oriented(TopAbs_FORWARD));
+      if (BRep_Tool::Degenerated(B))
+        continue;
+      Bnd_Box bb;
+      BRepBndLib::Add(B, bb);
+      if (bb.IsOut(tb))
+        continue;
+      double                        b0, b1;
+      const occ::handle<Geom_Curve> cb = BRep_Tool::Curve(B, b0, b1);
+      if (cb.IsNull())
+        return no(__LINE__);
+      TopoDS_Vertex w0, w1;
+      TopExp::Vertices(B, w0, w1);
+      std::vector<std::pair<double, TopoDS_Vertex>>& onb = bcuts.IsBound(B) ? bcuts.ChangeFind(B) : *bcuts.Bound(B, {});
+      auto on_boundary = [&](double s, const TopoDS_Vertex& v) {
+        // (At one of the boundary edge's own vertices: the same vertex, else no cut of it.)
+        for (const TopoDS_Vertex& w : {w0, w1})
+          if (!w.IsNull() && BRep_Tool::Pnt(w).Distance(BRep_Tool::Pnt(v)) <= BRep_Tool::Tolerance(w) + BRep_Tool::Tolerance(v))
+            return w.IsSame(v);
+        if (std::none_of(onb.begin(), onb.end(), [&](const auto& x) { return x.second.IsSame(v); }))
+          onb.push_back({s, v});
+        return true;
+      };
+      // Its ends on the boundary edge.
+      ShapeAnalysis_Curve sac;
+      for (int end = 0; end < 2; ++end)
+      {
+        const TopoDS_Vertex& v = end == 0 ? v0 : v1;
+        gp_Pnt               proj;
+        double               s;
+        const double         d = sac.Project(cb, BRep_Tool::Pnt(v), tol, proj, s, b0, b1, true);
+        if (d > BRep_Tool::Tolerance(v))
+          continue;
+        if (!on_boundary(s, v))
+          return no(__LINE__);
+        ends_met[end] = true;
+      }
+      // Across it.
+      GeomAPI_ExtremaCurveCurve ex(c3, cb, f, l, b0, b1);
+      if (ex.Extrema().IsParallel())
+        return no(__LINE__);
+      for (int n = 1; n <= ex.NbExtrema(); ++n)
+      {
+        if (ex.Distance(n) > tol)
+          continue;
+        double u, s;
+        ex.Parameters(n, u, s);
+        gp_Pnt pu, ps;
+        ex.Points(n, pu, ps);
+        if (pu.Distance(BRep_Tool::Pnt(v0)) <= BRep_Tool::Tolerance(v0) || pu.Distance(BRep_Tool::Pnt(v1)) <= BRep_Tool::Tolerance(v1))
+          continue;
+        TopoDS_Vertex v;
+        for (const TopoDS_Vertex& w : {w0, w1})
+          if (v.IsNull() && !w.IsNull() && BRep_Tool::Pnt(w).Distance(pu) <= BRep_Tool::Tolerance(w))
+            v = w;
+        if (v.IsNull())
+        {
+          // (A new vertex: Generated by the two edges, as OCCT's history has their crossings.)
+          v = vertex_at(ps);
+          h->AddGenerated(o.tool, v);
+          h->AddGenerated(B, v);
+        }
+        if (!on_boundary(s, v))
+          return no(__LINE__);
+        o.cuts.push_back({u, v});
+      }
+    }
+    // (An open edge ends on its face's boundary at both ends; a closed one anywhere.)
+    if (!v0.IsSame(v1) && !(ends_met[0] && ends_met[1]))
+      return no(__LINE__);
+  }
+  // The boundary edges cut, each piece with all its curves (on each face it bounds).
+  NCollection_DataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> images;
+  ShapeIMap redo;
+  for (const OnFace& o : on)
+    redo.Add(o.face);
+  ShapeAncMap edge_faces;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_faces);
+  for (NCollection_DataMap<TopoDS_Shape, std::vector<std::pair<double, TopoDS_Vertex>>, TopTools_ShapeMapHasher>::Iterator it(bcuts); it.More(); it.Next())
+  {
+    std::vector<std::pair<double, TopoDS_Vertex>> cs = it.Value();
+    if (cs.empty())
+      continue;
+    const TopoDS_Edge B = TopoDS::Edge(it.Key());
+    double            b0, b1;
+    BRep_Tool::Range(B, b0, b1);
+    TopoDS_Vertex w0, w1;
+    TopExp::Vertices(B, w0, w1);
+    std::sort(cs.begin(), cs.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+    cs.insert(cs.begin(), {b0, w0});
+    cs.push_back({b1, w1});
+    NCollection_List<TopoDS_Shape>& pieces = *images.Bound(B, {});
+    for (size_t k = 0; k + 1 < cs.size(); ++k)
+    {
+      if (!(cs[k + 1].first - cs[k].first > 1e-9 * (b1 - b0)))
+        return no(__LINE__);
+      TopoDS_Edge piece;
+      BOPTools_AlgoTools::MakeSplitEdge(B, cs[k].second, cs[k].first, cs[k + 1].second, cs[k + 1].first, piece);
+      pieces.Append(piece);
+      h->AddModified(B, piece);
+    }
+    if (const NCollection_List<TopoDS_Shape>* fs = edge_faces.Seek(B))
+      for (NCollection_List<TopoDS_Shape>::Iterator f(*fs); f.More(); f.Next())
+        redo.Add(f.Value());
+  }
+  // The tool edges cut where they cross.
+  std::vector<std::pair<TopoDS_Face, TopoDS_Edge>> inside;
+  for (OnFace& o : on)
+  {
+    if (o.cuts.empty())
+    {
+      inside.push_back({o.face, o.edge});
+      h->AddModified(o.tool, o.edge);
+      continue;
+    }
+    double f, l;
+    BRep_Tool::Range(o.edge, f, l);
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(o.edge, v0, v1);
+    std::sort(o.cuts.begin(), o.cuts.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+    o.cuts.insert(o.cuts.begin(), {f, v0});
+    o.cuts.push_back({l, v1});
+    for (size_t k = 0; k + 1 < o.cuts.size(); ++k)
+    {
+      if (!(o.cuts[k + 1].first - o.cuts[k].first > 1e-9 * (l - f)))
+        return no(__LINE__);
+      TopoDS_Edge piece;
+      BOPTools_AlgoTools::MakeSplitEdge(o.edge, o.cuts[k].second, o.cuts[k].first, o.cuts[k + 1].second, o.cuts[k + 1].first, piece);
+      inside.push_back({o.face, piece});
+      h->AddModified(o.tool, piece);
+    }
+  }
+  // Each face touched made again from its edges (as OCCT's BuildSplitFaces gives them).
+  const occ::handle<IntTools_Context>                                                     ctx = new IntTools_Context;
+  NCollection_DataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> made_faces;
+  for (int i = 1; i <= redo.Extent(); ++i)
+  {
+    const TopoDS_Face              F  = TopoDS::Face(redo(i));
+    const TopoDS_Face              FF = TopoDS::Face(F.Oriented(TopAbs_FORWARD));
+    NCollection_List<TopoDS_Shape>                         es;
+    NCollection_Map<TopoDS_Shape, TopTools_ShapeMapHasher> fence;
+    for (TopExp_Explorer x(FF, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge&       E   = TopoDS::Edge(x.Current());
+      const TopAbs_Orientation ori = E.Orientation();
+      const NCollection_List<TopoDS_Shape>* im = images.Seek(E);
+      NCollection_List<TopoDS_Shape>        one;
+      if (im == nullptr)
+        one.Append(E);
+      const bool closed = BRep_Tool::IsClosed(E, FF) && !BRep_Tool::Degenerated(E);
+      for (NCollection_List<TopoDS_Shape>::Iterator p(im != nullptr ? *im : one); p.More(); p.Next())
+      {
+        TopoDS_Shape s = p.Value();
+        if (ori == TopAbs_INTERNAL || ori == TopAbs_EXTERNAL || (closed && im != nullptr))
+        {
+          if (closed && !fence.Add(s))
+            continue;
+          es.Append(s.Oriented(TopAbs_FORWARD));
+          es.Append(s.Oriented(TopAbs_REVERSED));
+          continue;
+        }
+        es.Append(s.Oriented(ori));
+      }
+    }
+    for (const auto& [face, e] : inside)
+      if (face.IsSame(F))
+      {
+        // (Its curve on the face moved by whole periods into the face's own: a fitted ring's continuous across the
+        // seam, its piece past the seam a turn out.)
+        double                          t0, t1;
+        const occ::handle<Geom2d_Curve> c2 = BRep_Tool::CurveOnSurface(e, FF, t0, t1);
+        if (c2.IsNull())
+          return no(__LINE__);
+        occ::handle<Geom2d_Curve> moved;
+        BOPTools_AlgoTools2D::AdjustPCurveOnFace(FF, t0, t1, c2, moved, ctx);
+        if (!moved.IsNull() && moved != c2)
+        {
+          b.UpdateEdge(e, moved, FF, BRep_Tool::Tolerance(e));
+          b.Range(e, FF, t0, t1);
+        }
+        es.Append(e.Oriented(TopAbs_FORWARD));
+        es.Append(e.Oriented(TopAbs_REVERSED));
+      }
+    BOPAlgo_BuilderFace bf;
+    bf.SetFace(F);
+    bf.SetShapes(es);
+    bf.SetContext(ctx);
+    bf.Perform();
+    if (bf.HasErrors() || bf.Areas().IsEmpty())
+      return no(__LINE__);
+    // (Their areas in the face's parameters adding up to its, none a sliver.)
+    NCollection_List<TopoDS_Shape>& to     = *made_faces.Bound(F, {});
+    const double                    before = uv_area(FF);
+    double                          after  = 0;
+    for (NCollection_List<TopoDS_Shape>::Iterator x(bf.Areas()); x.More(); x.Next())
+    {
+      TopoDS_Shape nf = x.Value();
+      if (F.Orientation() == TopAbs_REVERSED)
+        nf.Orientation(TopAbs_REVERSED);
+      const double a = uv_area(TopoDS::Face(x.Value().Oriented(TopAbs_FORWARD)));
+      if (!(a > 1e-9 * std::abs(before)))
+        return no(__LINE__);
+      after += a;
+      to.Append(nf);
+      h->AddModified(F, nf);
+    }
+    if (std::getenv("NOSHAPE_SPLIT_DEBUG") != nullptr)
+      std::fprintf(stderr, "split by edges: face %d in %d, area in its parameters %.12g -> %.12g\n", i, bf.Areas().Extent(), before, after);
+    if (!(before > 0) || std::abs(after - before) > 1e-9 * before)
+      return no(__LINE__);
+  }
+  // The solid again, its shells' faces those made where they were made again.
+  TopoDS_Solid so;
+  b.MakeSolid(so);
+  for (TopoDS_Iterator s(shape); s.More(); s.Next())
+  {
+    if (s.Value().ShapeType() != TopAbs_SHELL)
+      return no(__LINE__);
+    TopoDS_Shell sh;
+    b.MakeShell(sh);
+    for (TopoDS_Iterator f(s.Value()); f.More(); f.Next())
+    {
+      const NCollection_List<TopoDS_Shape>* im = made_faces.Seek(f.Value());
+      if (im == nullptr)
+      {
+        b.Add(sh, f.Value());
+        continue;
+      }
+      for (NCollection_List<TopoDS_Shape>::Iterator x(*im); x.More(); x.Next())
+        b.Add(sh, x.Value());
+    }
+    sh.Closed(BRep_Tool::IsClosed(sh));
+    sh.Orientation(s.Value().Orientation());
+    b.Add(so, sh);
+  }
+  so.Orientation(shape.Orientation());
+  if (!BRepCheck_Analyzer(so).IsValid())
+    return no(__LINE__);
+  TopoDS_Compound c;
+  b.MakeCompound(c);
+  b.Add(c, so);
+  h->AddModified(shape, so);
+  out  = c;
+  hist = h;
+  return true;
+}
+} // namespace
+
 OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts)
 {
   if (args.items.empty())
@@ -9548,6 +10025,13 @@ OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts
     fail_invalid("split needs at least one tool");
   check_all(args.items, "split argument");
   check_all(tools.items, "split tool");
+  if (std::getenv("NOSHAPE_DUMP_OPS") != nullptr)
+  {
+    std::ostringstream p;
+    p.precision(17);
+    p << "split args " << args.items.size() << " tools " << tools.items.size() << " fuzzy " << opts.fuzzy << " unify " << (int)opts.unify;
+    dump_op("split", compound_of(concat(args.items, tools.items)), {}, p.str());
+  }
   MeshFacets                facets;
   std::vector<TopoDS_Shape> a, t;
   for (const TopoDS_Shape& x : args.items)
@@ -9574,6 +10058,35 @@ OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts
       const KernelTimer timer("split.ours.result");
       return make_result(concat(args.items, tools.items), out, h.get());
     }
+  }
+  // One shape split by edges drawn on its faces (sections: c2-hunting-knife's Split 4, four rings round its handle
+  // across its faces, OCCT's splitter 2.2 s): each cut where it crosses the shape's edges, its pieces split onto the
+  // faces they lie on (op_split_on); OCCT's splitter where that fails.
+  bool only_edges = a.size() == 1 && facets.source.empty() && opts.fuzzy <= 0 && std::getenv("NOSHAPE_SPLIT_OCCT") == nullptr;
+  double edge_tol = Precision::Confusion();
+  for (const TopoDS_Shape& x : t)
+  {
+    TopExp_Explorer f(x, TopAbs_FACE), v(x, TopAbs_VERTEX, TopAbs_EDGE);
+    only_edges = only_edges && !f.More() && !v.More() && TopExp_Explorer(x, TopAbs_EDGE).More();
+    for (TopExp_Explorer e(x, TopAbs_EDGE); e.More(); e.Next())
+      edge_tol = std::max(edge_tol, BRep_Tool::Tolerance(TopoDS::Edge(e.Current())));
+  }
+  if (only_edges)
+  {
+    const KernelTimer timer("split.on_edges");
+    TopoDS_Shape      out;
+    HHist             h;
+    bool              done = false;
+    try
+    {
+      done = split_by_edges_on_faces(a[0], t, edge_tol, out, h);
+    }
+    catch (const Standard_Failure&)
+    {
+      done = false;
+    }
+    if (done)
+      return make_result(concat(args.items, tools.items), out, h.get());
   }
   BRepAlgoAPI_Splitter sp;
   sp.SetArguments(to_list(a));
@@ -11038,6 +11551,13 @@ std::unique_ptr<OcShape> project_along(const OcShape& curves, const OcShape& tar
   require_non_null(curves.shape, "curves");
   require_non_null(target.shape, "target");
   const gp_Dir              d     = to_dir(dir, "projection direction");
+  if (std::getenv("NOSHAPE_DUMP_OPS") != nullptr)
+  {
+    std::ostringstream p;
+    p.precision(17);
+    p << "project_along dir " << d.X() << " " << d.Y() << " " << d.Z();
+    dump_op("project_along", compound_of({curves.shape, target.shape}), {}, p.str());
+  }
   std::vector<TopoDS_Shape> items = projectable_curves(curves.shape);
   if (items.empty())
     fail_invalid("nothing to project: the curves contain no edges");
