@@ -4998,16 +4998,18 @@ fn ansi_radial_values_dropped_inside_the_circle() {
         let b = font::text_box(&t);
         let mid = [b.iter().map(|q| q[0]).sum::<f64>() / b.len() as f64, b.iter().map(|q| q[1]).sum::<f64>() / b.len() as f64];
         let lines = built.geometry.lines.iter().filter(|l| l.pick == p).count();
-        (c, mid, lines)
+        let r = built.placement(ViewId(2)).unwrap().len_to_sheet(0.012);
+        (c, mid, lines, r)
     };
     let s = &mut drawing.sheets[0];
     s.annotations.push(Annotation { id: 960, kind: AnnotationKind::RadialDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.012, diameter: true, angle: 0.0, dim_line: false, knee: Some(-3.0) }, position: [0.0; 2], ..Default::default() });
-    let (c, t, lines) = center(&drawing, 960);
+    let (c, t, lines, _) = center(&drawing, 960);
     assert!((t[0] - c[0]).abs() < 1.0 && (t[1] - c[1]).abs() < 1.0, "centred: {t:?} vs {c:?}");
     assert_eq!(lines, 1, "one line to the edge and on past it");
-    drawing.sheets[0].annotations.last_mut().unwrap().kind = AnnotationKind::RadialDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.012, diameter: false, angle: 0.0, dim_line: false, knee: Some(-4.0) };
-    let (c, t, _) = center(&drawing, 960);
-    assert!((t[0] - c[0]).abs() < 1.0 && (t[1] - c[1]).abs() < 1.0, "centred: {t:?} vs {c:?}");
+    // A radius's value: its middle halfway from the centre to the circle's 0° point (live2 foreshorten-s3 DXF).
+    drawing.sheets[0].annotations.last_mut().unwrap().kind = AnnotationKind::RadialDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.012, diameter: false, angle: 2.4, dim_line: false, knee: Some(-4.0) };
+    let (c, t, _, r) = center(&drawing, 960);
+    assert!((t[0] - c[0] - r / 2.0).abs() < 1.0 && (t[1] - c[1]).abs() < 1.0, "r/2 right: {t:?} vs {c:?}, r {r}");
 }
 
 /// Styles panel › Thickness / Pitch scale on a sheet sketch line (SK16): its

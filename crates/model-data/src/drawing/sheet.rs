@@ -1549,8 +1549,9 @@ impl SheetGeometry {
                     let t = if *diameter { env.text(a, radius * 2.0, false, "Ø") } else { env.text(a, *radius, false, "R") };
                     // ANSI, the value dropped inside the circle (live asbdt-3r-1 /
                     // 3d-1, drawing.md D13; live drw-dimension-foreshorten): a
-                    // radius's value centred on the circle, its arrow outside
-                    // pointing in with a tail, no leader; a diameter's value
+                    // radius's value halfway along the radius to the circle's 0°
+                    // point, its arrow outside pointing in with a tail, no
+                    // leader; a diameter's value
                     // centred, one arrow inside to the edge it faces, the line
                     // on 0.36 in past it.
                     if !self.style.iso && knee.is_some_and(|k| k < 0.0) {
@@ -1566,7 +1567,9 @@ impl SheetGeometry {
                         } else {
                             self.arrow(tip, [-dir[0], -dir[1]], 3.0);
                             self.lines.push(Polyline2 { points: vec![[tip[0] + dir[0] * a_len, tip[1] + dir[1] * a_len], [tip[0] + dir[0] * 2.0 * a_len, tip[1] + dir[1] * 2.0 * a_len]], style: LineStyle::Thin, closed: false, pick });
-                            self.dim_label(c, 0.0, 0.5, true, &t, dh, pick);
+                            // Its middle on the middle of the radius to the circle's 0° point (live2 foreshorten-s3: DXF
+                            // MTEXT middle centre at the centre + r/2 in x, whichever side the edge was picked).
+                            self.dim_label([c[0] + r / 2.0, c[1]], 0.0, 0.5, true, &t, dh, pick);
                         }
                         continue;
                     }
@@ -2397,10 +2400,10 @@ impl SheetGeometry {
                     if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 - 1e-9 {
                         ang += std::f64::consts::PI;
                     }
-                    // A value dropped inside the arc stays where the radius drew it, centred on the circle (live2
+                    // A value dropped inside the arc stays where the radius drew it, r/2 right of the centre (live2
                     // drw-dimension-foreshorten 11-15: the same place before, during and after); else on the leader.
                     if !self.style.iso && (a.position[0] - c[0]).hypot(a.position[1] - c[1]) < r {
-                        self.dim_label(c, 0.0, 0.5, true, &t, dh, pick);
+                        self.dim_label([c[0] + r / 2.0, c[1]], 0.0, 0.5, true, &t, dh, pick);
                         continue;
                     }
                     let on = [tip[0] - dir[0] * s_text.max(tw / 2.0), tip[1] - dir[1] * s_text.max(tw / 2.0)];

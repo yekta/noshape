@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-15 20:45 UTC.
+Updated 2026-11-15 21:45 UTC.
 
 ## In flight
 
@@ -22,10 +22,19 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncomm
   drw-dimension-radius and the drawing menu takes match; drw-dimension-foreshorten matches but for the value's x.
 
 ## Waiting on others
-- live2 (asked 19:58): retakes with screenshots for drw-insert-view-top-1to1, drw-hole-callout-palette,
-  drw-note-move-to-title-block, drw-view-align-horizontally, drw-datum-target-hide-dim,
-  drw-auxiliary-view-no-indicator, drw-datum-copy-paste, drw-dimension-dblclick-precision /
-  -tolerance-symmetrical (live's "(in)" panel), context-create-version-update, drw-centermark(-align).
+- live2's 10 retakes (queued 21:35, current reader; shots /root/onshape-research/live/uip/<name>-<step>.png). Their
+  answers, to act on when they are on main:
+  - drw-centermark / -align: now wait 2 s after Escape. The automatic mark exists from step 1, the DXF has one mark,
+    no Single mark survives (as dx's capture, our 60c111a68). Live's annotation reader flickers 0 / 1 on this mark.
+  - drw-insert-view-top-1to1 s7: VIEW Top again: the placed view stays selected (ours EDGE).
+  - drw-note-move-to-title-block s8, drw-view-align-horizontally s4: what's lit after the menu closes is the Front
+    view's edge under the pointer; in view-align, Right (whose menu was used) stays lit too.
+  - drw-datum-target-hide-dim s3: EDGE Front.
+  - drw-auxiliary-view-no-indicator: the note's y is 100.5 again (ours 98.0): ours to fix.
+  - drw-datum-copy-paste: the paste lands at the pointer where Paste was clicked + (3.0, 5.7) mm in both runs.
+  - The "(in)" panel in drw-dimension-dblclick-precision / -tolerance-symmetrical is the dimension palette (the old
+    reader saw only its Units select); a sheet click keeps it open (the halo).
+- live: drw-hole-callout-palette retake.
 
 ## Open (no owner action possible yet)
 - drw-insert-view-top-1to1: live reads VIEW where five other Insert view takes read EDGE (the reader's pixels).
@@ -45,10 +54,9 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncomm
   the code before taking an item from it.
 
 ## Next, in order
-1. drw-dimension-foreshorten's value x: live's text centre sits right of the hole's centre (recorder 83.5 vs the
-   hole's 80.9; live2's step-8 screenshot shows "R.197" from 51 to 95 px around the centre line at 67 px, vertically
-   centred, i.e. +1.4 mm). Ours is centred on the hole. Find live's rule (ask live2 for a shot at step 3 with the
-   pointer away, and the DXF).
+1. In the worktree, testing: a radius's value dropped inside its hole sits halfway from the centre to the circle's
+   0° point (live2 feel/foreshorten-s3: the DXF's MTEXT middle centre at centre + r/2 in x). Then land, rerun
+   drw-dimension-foreshorten on vibe5 after the full run there.
 2. Rerun the takes live2 retakes (list above) as they land.
 3. Refresh docs/parity/drawing-matrix.md (last 11-15 14:30: 949 of 1868 live items compared and matching).
 4. interaction-feel.md's remaining "?" rows in Drawings / Documents / Assembly (ask live2 for the missing captures).
