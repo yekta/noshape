@@ -7572,20 +7572,31 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     None => res.untranslated.push(format!("mate connector {}: LOOP_CENTER: its loop on {face} not found (the face's centroid taken)", key.1)),
                 }
             }
-            // An edge's midpoint picked on a face (live's query: the face, its second id the edge; asm-infento-subs'
-            // Planar 10, SQCyD / SQC1J): the edge's midpoint, Z along the face's normal.
+            // An edge's midpoint or centre picked on a face (live's query: the face, its second id the edge; asm-infento-
+            // subs' Planar 10, SQCyD / SQC1J; Revolute 15-17's U-block and Multi angle joint holes, not the faces'
+            // centroids): the edge's point, Z along the face's normal.
             let found = match (inference.as_str(), q["second"].as_str().filter(|s| !s.is_empty())) {
-                ("MID_POINT", Some(second)) => {
+                (point @ ("MID_POINT" | "CENTER"), Some(second)) => {
                     let face = t.resolve(q).ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("face:")));
                     // The edge of the face's part whose midpoint is at live's point; else the second id's (named at
                     // the feature live read it after, not always ours at the end: Fastened 18's read another edge).
                     let part = face.as_deref().and_then(|f| t.part_of_entity(f));
-                    let at_live = connector_origins.get(key).zip(part).and_then(|(o, part)| t.connector_candidates("MID_POINT", *o).ok()?.into_iter().find(|(_, p)| *p == part).map(|(id, _)| id));
-                    let edge = at_live.or_else(|| t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [second] })).ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("edge:"))));
-                    trace(&format!("{name}: mate connector {}: MID_POINT on face {face:?}, its second {second} edge {edge:?}", key.1));
+                    let at_live = connector_origins.get(key).zip(part.clone()).and_then(|(o, part)| t.connector_candidates(point, *o).ok()?.into_iter().find(|(_, p)| *p == part).map(|(id, _)| id));
+                    // (A centre only at live's point when it is known: a face's centre may be its centroid.)
+                    let by_second = !(point == "CENTER" && connector_origins.contains_key(key));
+                    let edge = at_live.or_else(|| by_second.then(|| t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [second] })).ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("edge:")))).flatten());
+                    trace(&format!("{name}: mate connector {}: {point} on face {face:?}, its second {second} edge {edge:?}", key.1));
+                    // (A centre on a curved face, a countersink's cone: the circle's own axis, as live; the normal there
+                    // leans, asm-infento-subs' Fastened 4 74° off.)
+                    let mut planar = |face: &str| {
+                        let faces = t.call("query_entities", json!({ "kind": "faces", "part": part.clone().unwrap_or_default(), "limit": 1000 })).ok();
+                        faces.and_then(|r| r["faces"].as_array()?.iter().find(|f| f["id"] == face).map(|f| f["surface"] == "plane")).unwrap_or(true)
+                    };
                     match (edge, face) {
                         (Some(edge), Some(face)) => {
-                            aligns.insert(key.clone(), face);
+                            if point == "MID_POINT" || planar(&face) {
+                                aligns.insert(key.clone(), face);
+                            }
                             Ok(edge)
                         }
                         _ => found,
