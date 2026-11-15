@@ -3179,6 +3179,33 @@ fn a_region_slit_by_a_line_extrudes() {
     assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), 4);
 }
 
+/// EXTRUDE-SLIT-HOLE (dx's 1dc32b "Large pully", Extrude 51): in a 100 mm square on Top, a Ø20 circle and a 20 mm
+/// square whose bottom side is one line run on to the circle: the region around them has one hole loop running out
+/// along the line and back; it extrudes as the square with both holes.
+#[test]
+fn a_region_with_holes_joined_by_a_side_run_on_extrudes() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    for (a, b) in [((-0.05, -0.05), (0.05, -0.05)), ((0.05, -0.05), (0.05, 0.05)), ((0.05, 0.05), (-0.05, 0.05)), ((-0.05, 0.05), (-0.05, -0.05))] {
+        sk.add_line(DVec2::new(a.0, a.1), DVec2::new(b.0, b.1));
+    }
+    sk.add_circle(DVec2::ZERO, 0.01);
+    sk.add_line(DVec2::new(0.01, 0.0), DVec2::new(0.04, 0.0));
+    sk.add_line(DVec2::new(0.04, 0.0), DVec2::new(0.04, 0.02));
+    sk.add_line(DVec2::new(0.04, 0.02), DVec2::new(0.02, 0.02));
+    sk.add_line(DVec2::new(0.02, 0.02), DVec2::new(0.02, 0.0));
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let area = 0.01 - std::f64::consts::PI * 1e-4 - 4e-4;
+    let plate: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().filter(|g| (g.area - area).abs() < 1e-7).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    assert_eq!(plate.len(), 1);
+    let x = t.add("extrude", &[("entities", q(plate)), ("depth", e("3 mm")), ("operationType", en("NEW"))]);
+    let r = t.ok(x);
+    let v = volume(&r);
+    assert!((v - area * 1e6 * 3.0).abs() < 1e-3, "{v}");
+    assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), 11);
+}
+
 /// CUT-LUMPS-TOUCHING (live: asm-infento-subs' Extrude 13 makes two parts of a cut whose lumps meet along a line): a
 /// 20 x 20 x 10 block cut through by two 10 mm squares meeting at a corner leaves two cubes touching along an edge:
 /// two parts, not Parasolid's non-manifold refusal (that is for one body touching itself).

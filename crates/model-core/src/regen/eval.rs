@@ -1623,9 +1623,11 @@ pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::R
         let one_line = |a: DVec2, b: DVec2| {
             s.sketch.entities().filter(|e| !e.construction).any(|e| matches!(s.sketch.curve(e.id), Some(c @ noshape_sketch::Curve2::Line { .. }) if c.distance(a) < 1e-9 && c.distance(b) < 1e-9))
         };
+        // (Not where the loop passes twice: the root of a slit, the line run out to a hole and back (dx 1dc32b's pulley).)
+        let twice = |p: DVec2| lp.segments.iter().filter(|g| (g.start() - p).length() < 1e-12).count() > 1;
         let joins = |a0: DVec2, b0: DVec2, a: DVec2, b: DVec2, e0: u32, e: u32| {
             let (d0, d) = ((b0 - a0).normalize_or_zero(), (b - a).normalize_or_zero());
-            (b0 - a).length() < 1e-12 && d0.perp_dot(d).abs() < 1e-9 && d0.dot(d) > 0.0 && (e0 == e || alone(a, e0, e) || one_line(a0, b))
+            (b0 - a).length() < 1e-12 && d0.perp_dot(d).abs() < 1e-9 && d0.dot(d) > 0.0 && (e0 == e || alone(a, e0, e) || one_line(a0, b)) && !twice(a)
         };
         for (seg, src) in lp.segments.iter().zip(lp.sources.iter()) {
             // (Arcs of other entities on one circle too, whatever else of the sketch meets them at the joint: live joins
@@ -1672,28 +1674,7 @@ pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::R
                 *fa = a;
             }
         }
-        // A loop made only of one entity's arcs may also wrap around at the start.
-        if out.len() == 2
-            && out[0].1 == out[1].1
-            && let (P::Arc { start_angle: a0, end_angle: a1, center, radius, ccw }, P::Arc { start_angle: b0, end_angle: b1, .. }) = (&out[0].0, &out[1].0)
-            && ((a1 - a0) + (b1 - b0)).abs() >= std::f64::consts::TAU - 1e-9
-        {
-            let e = out[0].1;
-            let full = P::Arc { center: *center, radius: *radius, start_angle: *a0, end_angle: *a0 + (a1 - a0) + (b1 - b0), ccw: *ccw };
-            out = vec![(full, e)];
-        }
-        // Likewise a whole ellipse (two halves of one entity): one edge, so
-        // its extrusion is one face (live psb NE: an elliptic boss's side is
-        // one face; OCCT can't merge two extrusion halves afterwards).
-        if out.len() == 2
-            && out[0].1 == out[1].1
-            && let (P::EllipseArc { center, major_axis, major_radius, minor_radius, start_param: a0, end_param: a1, ccw }, P::EllipseArc { start_param: b0, end_param: b1, .. }) = (&out[0].0, &out[1].0)
-            && ((a1 - a0).abs() + (b1 - b0).abs()) >= std::f64::consts::TAU - 1e-9
-        {
-            let e = out[0].1;
-            let full = P::EllipseArc { center: *center, major_axis: *major_axis, major_radius: *major_radius, minor_radius: *minor_radius, start_param: *a0, end_param: *a0 + std::f64::consts::TAU, ccw: *ccw };
-            out = vec![(full, e)];
-        }
+        out = whole_closed(out);
         // Likewise a closed spline (a periodic fit spline, split at its
         // seam): one edge, so its extrusion is one face (live's lobed recess).
         if out.len() == 2
@@ -1719,7 +1700,7 @@ pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::R
     // (A hole of no area, a curve inside the region run along and back, is no hole: live's tool has no slit there
     // (c2-sm-louver's Extrude 3).)
     let bb = region.outer.bbox();
-    let mut holes_m: Vec<_> = region.holes.iter().map(merge).filter(|h| area(h).abs() > 1e-9 * (bb.max - bb.min).length_squared()).collect();
+    let mut holes_m: Vec<_> = region.holes.iter().map(merge).flat_map(split_slits).filter(|h| !h.is_empty() && area(h).abs() > 1e-9 * (bb.max - bb.min).length_squared()).collect();
     let pieces = split_slits(outer_m.clone());
     if pieces.len() > 1 || pieces.first().is_some_and(|p| p.len() != outer_m.len()) {
         let mut pieces: Vec<_> = pieces.into_iter().filter(|p| !p.is_empty()).collect();
@@ -1757,6 +1738,35 @@ pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::R
     Ok(Profile { shape: tracked.shape, frame: s.frame, edge_sources, key, from_face: false })
 }
 
+/// A loop of one entity's two arcs (a circle's or an ellipse's halves) as the one whole curve: one edge, so one side
+/// face.
+fn whole_closed(mut out: Vec<(noshape_sketch::regions::ProfileSegment, u32)>) -> Vec<(noshape_sketch::regions::ProfileSegment, u32)> {
+    use noshape_sketch::regions::ProfileSegment as P;
+    // A loop made only of one entity's arcs may also wrap around at the start.
+    if out.len() == 2
+        && out[0].1 == out[1].1
+        && let (P::Arc { start_angle: a0, end_angle: a1, center, radius, ccw }, P::Arc { start_angle: b0, end_angle: b1, .. }) = (&out[0].0, &out[1].0)
+        && ((a1 - a0) + (b1 - b0)).abs() >= std::f64::consts::TAU - 1e-9
+    {
+        let e = out[0].1;
+        let full = P::Arc { center: *center, radius: *radius, start_angle: *a0, end_angle: *a0 + (a1 - a0) + (b1 - b0), ccw: *ccw };
+        out = vec![(full, e)];
+    }
+    // Likewise a whole ellipse (two halves of one entity): one edge, so
+    // its extrusion is one face (live psb NE: an elliptic boss's side is
+    // one face; OCCT can't merge two extrusion halves afterwards).
+    if out.len() == 2
+        && out[0].1 == out[1].1
+        && let (P::EllipseArc { center, major_axis, major_radius, minor_radius, start_param: a0, end_param: a1, ccw }, P::EllipseArc { start_param: b0, end_param: b1, .. }) = (&out[0].0, &out[1].0)
+        && ((a1 - a0).abs() + (b1 - b0).abs()) >= std::f64::consts::TAU - 1e-9
+    {
+        let e = out[0].1;
+        let full = P::EllipseArc { center: *center, major_axis: *major_axis, major_radius: *major_radius, minor_radius: *minor_radius, start_param: *a0, end_param: *a0 + std::f64::consts::TAU, ccw: *ccw };
+        out = vec![(full, e)];
+    }
+    out
+}
+
 /// A loop cut at each line it runs along and back along (a slit): the pieces between, each a loop.
 fn split_slits(lp: Vec<(noshape_sketch::regions::ProfileSegment, u32)>) -> Vec<Vec<(noshape_sketch::regions::ProfileSegment, u32)>> {
     let n = lp.len();
@@ -1766,7 +1776,7 @@ fn split_slits(lp: Vec<(noshape_sketch::regions::ProfileSegment, u32)>) -> Vec<V
             if lp[i].1 == lp[j].1 && back(&lp[i].0, &lp[j].0) {
                 let a: Vec<_> = lp[i + 1..j].to_vec();
                 let b: Vec<_> = lp[j + 1..].iter().chain(lp[..i].iter()).cloned().collect();
-                return split_slits(a).into_iter().chain(split_slits(b)).filter(|p| !p.is_empty()).collect();
+                return split_slits(a).into_iter().chain(split_slits(b)).filter(|p| !p.is_empty()).map(whole_closed).collect();
             }
         }
     }
