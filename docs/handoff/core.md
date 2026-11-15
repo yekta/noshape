@@ -1,26 +1,27 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-15 21:25 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-15 22:40 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
-- **Queued 55e517e0** (core-rmx, branch core-rayspeed; vibe6 pair SAME-PER-DOC, speed lines loaded-host noise):
-  a Hole's rays skip parts whose box they miss and cross a composite part's solids one by one (1dc32b Holes 1-7 71.7
-  -> 3.0 s); a loft takes curved faces as profiles (FS host `op_loft` and the Loft feature; GearLab 90f78b). asm told.
-- **core-oc, branch core-shellcheck** (not landed; same changes also in core-trace branch core-pusplit):
-  - 220142955 Shell by regions checks its result's volume with `rough_volume_by_faces` (c2-rings-loft Shell 2: check
-    65 -> 9 ms a call; same result).
-  - 3315dcd6d Shell by regions takes parts with pockets (SHELL-SLOW tail): block = polytope of the supporting planes,
-    pockets = block - part (each convex, planes / cylinders, clear of removed faces; a plain hole stays the hole tube),
-    each grown by t through by_regions itself (t < 0 returns the grown region) and added as a tube. Concave edges stay
-    sharp as live (behaviours S4); slabs rounded them. T1 features::a_pocketed_block_shells_with_sharp_concave_
-    corners_as_live (pocket with R2 floor fillets: 1.4 s / 41 faces in slabs -> ~75 ms / 29 faces = the exact walls).
-  - Gates: g++-13 + kernel / model shell tests ok (vibe7); hats/dock + qa's 47 ticket documents ALL-SAME (vibe5
-    ~/tmp/core/ud base-cli / branch-cli). Suite pair: vibe7 ~/tmp/core/g/run-hbase.log done; run-hshell.log runs
-    detached in vibe7's slot (binary core-oc all-93b192dee51da682). SAME-PER-DOC or every changed document checked
-    against live, then land.sh from core-oc.
-- **Queued cb0b6aad** (core-bis, core-bsinfo): a surface added onto faces already there notes NO_GEOMETRY_CHANGE (Info)
-  as live (psui's boundary-surface-new-edit-reedit step 4; psui told).
+- **core-oc, branch core-shellcheck** (2 commits, not landed): 220142955 regions' volume check via
+  `rough_volume_by_faces` (rings Shell 2 65 -> 9 ms a check); 3315dcd6d by_regions takes parts with convex pockets
+  (block of supporting planes - pockets, each grown by t through by_regions itself, added as tubes; concave edges sharp
+  as live's S4; pocket with R2 floor fillets 1.4 s / 41 faces in slabs -> ~75 ms / 29 faces, exact walls; T1
+  features::a_pocketed_block_shells_with_sharp_concave_corners_as_live). Gates: g++-13 + shell tests ok; hats/dock +
+  47 tickets ALL-SAME; **bool's gate** (lead: Shell is bool's area) running on vibe5 (bool reports); suite pair: vibe7
+  run-hbase.log done, run-hshell.log detached waiting in vibe7's slot. Land from core-oc after both.
+- **core-bis, branch core-pole** (ee2b83779): a sphere's / revolved face's pole is a vertex where the face has a boundary
+  (knife Revolve 1 dish: HANDLE 19 vertices as live; knife 46 -> 51/52). T1 seam::a_spherical_dish_keeps_its_pole_vertex;
+  g++-13 ok. Suite pair: binaries building on vibe5 (`.gob.sh` pbase from core-cache at bd7c25f88 / pole), then
+  `bash ~/tmp/core/pairrun.sh pbase ~/agents/core-cache/src pole ~/agents/core-bis/src` detached on vibe5; every
+  document whose vertex count changes: check against live.
+- **core-trace, branch core-kerf** (uncommitted): op_offset_faces retries in millimetres when OCCT's offset in metres
+  comes back empty / invalid (dx's 5d8bc1 Kerf Compensation 1: 3729.04 mm³, 11 faces); crash fixture kerf-offset + T1
+  crash_inputs::a_plates_sides_and_countersinks_offset_by_a_kerf; replay_one replays offsetfaces dumps. Gates running.
+- **Queued:** 55e517e0 (Hole rays + curved-face loft), cb0b6aad (no-change note, psui).
+- Probe kept: /root/core-scratch/bodies-probe.patch (ops parity::bodies_after_feature_probe: a saved document's bodies
+  after a feature as .brep, a part's OCCT edges / vertices with shown flags).
 
 ## Waiting on others
 - **GearLab 90f78b:** with ae8b7f751 plus asm's unlanded 93346d03d (custom features with a `def` map; std 1777/1793)
@@ -51,10 +52,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
    1 m² cylinder face). Not mine there: rings Shell 1 (bool's quadrics), Circular patterns and Extrude 5 / housing
    Rotieren 1 (bool's Rust Boolean), Fillet 1 / Chamfer 1 (blend). The suite's per-feature part checks cost seconds of
    area / volume on offset faces (impeller's -3 mm wall 2.8 s); that is harness time, not regeneration.
-3. c2-hunting-knife Revolve 1 (first difference since blend's b106b424; HANDLE 10/27/18, live 19): the 81.4 mm loop round
-   the sphere end cap is two OCCT edges joined by shown_topology (common.cpp: both join vertices hidden, at
-   (119.65, 0, 2.99) and (104.36, 0, -27.2)); live keeps one vertex on a closed B-spline edge, at (114.5, 0, -12.56)
-   where its lofted side starts: needs our split there (a model change), not only a display rule.
+3. asm's a2e4a2 Extrude 5 (32/74/42 vs live 32/72/40): the hole circle's 0.451 mm arc beyond Sketch 5's r 4.455
+   circle crosses its frame's angle 0; the extruded side is split at the cylinder seam there (line + vertex) and the
+   shown topology doesn't hide them. Repro vibe7 ~/agents/asm-keep/ma2 (save/a2e4a2.noshape); live in the corpus
+   studios/a2e4a2e9fdb090f64ffab7aa.jum-sketch5.json.
 4. psui's Move boundary: Up to vertex / face land for picked straight edges (81a182b14); other edge kinds and Up to part
    still open.
 5. SHELL-SLOW tail after pockets: hang402 Shell 5's cost is the corner patches' slab fans (archive "Next, in order" 2);
