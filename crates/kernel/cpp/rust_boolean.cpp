@@ -3214,6 +3214,175 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
   return true;
 }
 
+// A plane against a torus face (c2-rings-loft's ring against its patterned prongs: ~300 plane / torus pairs of OCCT's
+// marching): round the axis at angle u the plane meets the tube's circle where A + B cos v + C sin v = 0, two branches
+// v = phi +- acos(-A / rho), exact point by point; each run of a branch within both faces' boxes interpolated. A run
+// ends where the plane crosses a side of the face (found exactly) or leaves the plane face's box (bisected). False
+// where the branches meet inside the face (the plane all but tangent to the tube), or the plane is across the axis or
+// holds it (its sections circles: OCCT's then).
+bool plane_torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+{
+  const occ::handle<Geom_Plane> pa = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fa)), pb = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fb));
+  if (pa.IsNull() == pb.IsNull())
+    return false;
+  const bool         p_first = !pa.IsNull();
+  const TopoDS_Face& f       = p_first ? fb : fa;
+  occ::handle<Geom_Surface> base_s = BRep_Tool::Surface(f);
+  while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(base_s))
+    base_s = t->BasisSurface();
+  const occ::handle<Geom_ToroidalSurface> ts = occ::down_cast<Geom_ToroidalSurface>(base_s);
+  if (ts.IsNull())
+    return false;
+  const gp_Torus T  = ts->Torus();
+  const gp_Ax3   ax = T.Position();
+  const double   R = T.MajorRadius(), r = T.MinorRadius();
+  const gp_Pln   P = (p_first ? pa : pb)->Pln();
+  const gp_XYZ   n = P.Axis().Direction().XYZ();
+  const double   d = n.Dot(P.Location().XYZ());
+  const double   nx = n.Dot(ax.XDirection().XYZ()), ny = n.Dot(ax.YDirection().XYZ()), nz = n.Dot(ax.Direction().XYZ());
+  const double   h = std::hypot(nx, ny), psi = std::atan2(ny, nx), base = n.Dot(ax.Location().XYZ()) - d;
+  if (h < 1e-9 || std::abs(nz) < 1e-9 || !(r > 0) || !(R > r))
+    return false;
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  if (!(u1 > u0) || !(v1 > v0) || v1 - v0 > 2 * M_PI + 1e-9 || u1 - u0 > 2 * M_PI + 1e-9)
+    return false;
+  double pu0 = 0, pu1 = 0, pv0 = 0, pv1 = 0;
+  BRepTools::UVBounds(p_first ? fa : fb, pu0, pu1, pv0, pv1);
+  const double pe = 1e-9 * std::max(pu1 - pu0, pv1 - pv0), ve = 1e-12;
+  // A + B cos v + C sin v at u; the branch's v (branch -1 or +1), false where the circle misses the plane.
+  auto abc = [&](double u, double& A, double& B, double& C) {
+    const double c = h * std::cos(u - psi);
+    A = base + R * c, B = r * c, C = r * nz;
+  };
+  // (v as the face's range has it, the turn nearest `to` where two do (a whole tube's seam).)
+  auto wrap = [&](double v, double to) {
+    double best = v, gap = RealLast();
+    for (int turn = -3; turn <= 3; ++turn)
+      if (const double w = v + 2 * M_PI * turn; w >= v0 - ve && w <= v1 + ve && std::abs(w - to) < gap)
+        gap = std::abs(w - to), best = w;
+    return gap < RealLast() ? best : RealLast();
+  };
+  auto branch = [&](int k, double u, double& v, double to = 0) {
+    double A, B, C;
+    abc(u, A, B, C);
+    const double rho = std::hypot(B, C), q = -A / rho;
+    if (!(std::abs(q) <= 1 + 1e-12))
+      return false;
+    v = wrap(std::atan2(C, B) + k * std::acos(std::clamp(q, -1.0, 1.0)), to);
+    return true;
+  };
+  auto point = [&](double u, double v) { return ElSLib::TorusValue(u, v, ax, R, r); };
+  auto on_plane = [&](const gp_Pnt& x) {
+    double pu = 0, pv = 0;
+    ElSLib::Parameters(P, x, pu, pv);
+    return pu >= pu0 - pe && pu <= pu1 + pe && pv >= pv0 - pe && pv <= pv1 + pe;
+  };
+  auto in_range = [&](int k, double u) {
+    double v = 0;
+    return branch(k, u, v) && v <= v1 + ve && on_plane(point(u, v));
+  };
+  // The u where a run may end: the face's ends, where the plane crosses its sides v = v0 and v = v1, where the branches
+  // meet (A^2 = B^2 + C^2), and where a branch leaves the plane face's box (bisected between samples).
+  std::vector<double> cuts{u0, u1};
+  auto add_cos = [&](double c) {
+    if (std::abs(c) > 1)
+      return;
+    const double a = std::acos(c);
+    for (const double w : {psi + a, psi - a})
+      for (int turn = -2; turn <= 2; ++turn)
+        if (const double u = w + 2 * M_PI * turn; u > u0 && u < u1)
+          cuts.push_back(u);
+  };
+  for (const double vs : {v0, v1})
+    add_cos(-(base + r * std::sin(vs) * nz) / ((R + r * std::cos(vs)) * h));
+  {
+    // ((base + R h c)^2 = (r h c)^2 + (r nz)^2 in c = cos(u - psi).)
+    const double qa = (R * R - r * r) * h * h, qb = 2 * base * R * h, qc = base * base - r * r * nz * nz;
+    const double disc = qb * qb - 4 * qa * qc;
+    if (disc >= 0)
+      for (const double sg : {-1.0, 1.0})
+        add_cos((-qb + sg * std::sqrt(disc)) / (2 * qa));
+  }
+  std::sort(cuts.begin(), cuts.end());
+  {
+    const std::vector<double> sides = cuts;
+    for (size_t i = 0; i + 1 < sides.size(); ++i)
+      for (const int k : {-1, 1})
+      {
+        const int m = 64;
+        for (int j = 1; j <= m; ++j)
+        {
+          double a = sides[i] + (sides[i + 1] - sides[i]) * (j - 1) / m, b = sides[i] + (sides[i + 1] - sides[i]) * j / m;
+          double va = 0, vb = 0;
+          if (!branch(k, a, va) || !branch(k, b, vb) || va > v1 + ve || vb > v1 + ve)
+            continue;
+          const bool ia = on_plane(point(a, va));
+          if (ia == on_plane(point(b, vb)))
+            continue;
+          for (int it = 0; it < 80 && b - a > 1e-14 * (1 + std::abs(u0) + std::abs(u1)); ++it)
+          {
+            const double mid = 0.5 * (a + b);
+            double       vm  = 0;
+            if (!branch(k, mid, vm) || vm > v1 + ve)
+              return false;
+            (on_plane(point(mid, vm)) == ia ? a : b) = mid;
+          }
+          cuts.push_back(0.5 * (a + b));
+        }
+      }
+  }
+  std::sort(cuts.begin(), cuts.end());
+  std::vector<IntTools_Curve> found;
+  for (const int k : {-1, 1})
+  {
+    // Its runs: the pieces between cuts with the branch in range at their middles, joined end to end.
+    std::vector<std::pair<double, double>> runs;
+    for (size_t i = 0; i + 1 < cuts.size(); ++i)
+    {
+      const double a = cuts[i], b = cuts[i + 1];
+      if (b - a <= 1e-12 * (u1 - u0) || !in_range(k, 0.5 * (a + b)))
+        continue;
+      if (!runs.empty() && std::abs(runs.back().second - a) <= 1e-12 * (u1 - u0))
+        runs.back().second = b;
+      else
+        runs.emplace_back(a, b);
+    }
+    for (const auto& [a, b] : runs)
+    {
+      // (Not to where the branches meet: steep there in u.)
+      for (const double e : {a, b})
+      {
+        double A, B, C;
+        abc(e, A, B, C);
+        if (std::abs(A) > (1 - 1e-6) * std::hypot(B, C))
+          return false;
+      }
+      double vmid = 0;
+      if (!branch(k, 0.5 * (a + b), vmid, 0.5 * (v0 + v1)))
+        return false;
+      auto at = [&](double u, gp_Pnt& x, gp_Pnt2d& g, gp_Pnt2d& c) {
+        double v = 0;
+        if (!branch(k, u, v, vmid) || v > v1 + ve)
+          return false;
+        x         = point(u, v);
+        double pu = 0, pv = 0;
+        ElSLib::Parameters(P, x, pu, pv);
+        const gp_Pnt2d on_t(u, v), on_p(pu, pv);
+        g = p_first ? on_p : on_t;
+        c = p_first ? on_t : on_p;
+        return true;
+      };
+      IntTools_Curve ic;
+      if (!interpolated(at, a, b, 8, ic))
+        return false;
+      found.push_back(ic);
+    }
+  }
+  out.insert(out.end(), found.begin(), found.end());
+  return true;
+}
+
 // Where a surface generated along a cone's axis (an extrusion along it, a cylinder beside it) meets the cone: each
 // generator at the height where the cone's radius is its distance from the axis (`gen`: the parameter -> the
 // generator's point at height 0 of its own surface, its direction, its parameters there; `on_gen`: its curve on the
@@ -3853,6 +4022,9 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
     return true;
   out.clear();
   if (plane_tube_sections(fa, fb, out))
+    return true;
+  out.clear();
+  if (plane_torus_sections(fa, fb, out))
     return true;
   const std::optional<Extruded> xa = extruded(fa), xb = extruded(fb);
   // A cone and a surface generated along its axis: that surface lifted onto it.

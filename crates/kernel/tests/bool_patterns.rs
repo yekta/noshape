@@ -2259,6 +2259,26 @@ fn variable_rounds_against_a_boxs_planes_cut_as_occt() {
     assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
 }
 
+/// c2-rings-loft's Circular pattern 2: eight blocks of planes fused onto a ring of tori, each plane against a torus
+/// face sectioned on noshape's own (the tube's circle met at each angle round the axis: OCCT's marching was most of the
+/// fuse), the result as OCCT's.
+#[test]
+fn prongs_fused_onto_a_rings_tori_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "9be424409871783b").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    let counts = (r.shape.count(k::ShapeType::Face), r.shape.count(k::ShapeType::Edge), r.shape.count(k::ShapeType::Vertex));
+    assert_eq!(counts, (c.summary.faces, c.summary.edges, c.summary.vertices));
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
+}
+
 /// Parts of one torus fused (as a private document's rib ends): a half ring and a quarter of it, their torus faces one
 /// surface whose faces' own parameters hold different parts of it ("a piece's point on another solid's face" before),
 /// the quarter's end circle lying on the half's torus face across that face's seam ("an edge on another argument's
