@@ -5,6 +5,18 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 12:00 UTC: in flight
+- Branch dx-spline2 (6bc12e944, tests pass, not landed): crop spline chord-length, broken-out centripetal (live2 traces
+  11-15; `SplineKnots` in cad_objects, `closed_spline(pts, n, knots)`). Waits on studios' profile-tool snap reach (7 px
+  inside, their next batch): our scenario clicks snap onto the block's edges (crop crosses 5.3 / 25.3 for live's 6.5 /
+  23.4; broken-out points at y 2.993 / 3.390 in). Rerun exprun drw-crop-spline drw-broken-out-section after it lands;
+  land if both match (vibe7 exp-spl2: crop DXF 0.83 / 0.89, broken-out PDF 2388 / 2331, DXF splines 1.45 / 1.55,
+  2.47 / 2.37). Branch dx-spline (chord for both) superseded.
+- STL rule: live's REST default depends on the parts (OpenAPI: angle / chord "based on size and complexity"); live's
+  timer fetches cylinders r 0.05 / 0.5 / 5 / 25 / 100, a sphere, an r0.5 fillet at 18:35 UTC (quota): dx/q1137/summary.txt.
+- skasm has the sheet metal exchange rows (inexact edges); blend's spur gear opChamfer fix gating (rerun sgrel.py when
+  it lands); core queued cf-lighten's enclose volumes (8050c939).
+
 ## 11-15 11:32 UTC: exchange "live imports ours" findings; disk cache parked
 - Queued 206bb6dc (re-queued: the 11:03 failure was the land host SIGTERMing part-studio-ui's tests; 201 pass on the
   Mac in 28 s): evEdgeConvexity, std per-module slots, the suite's held rule (below), handoff.
