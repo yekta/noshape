@@ -1749,6 +1749,9 @@ impl Workspace {
                 continue;
             };
             let active = self.active == Some(id);
+            // The open Part Studio without parts: its menu has no Export… (live2 fs-ps-show-code 11-15: an empty studio
+            // has it while another tab is open).
+            let no_export = active && matches!(self.views.get(&id), Some(TabView::PartStudio(v)) if !v.read(cx).has_parts());
             // Compare mode (live 952): a status dot after the name; drawings and
             // tabs only in the base are greyed and can't be opened.
             let compare = crate::compare_mode::tab_status(&self.doc, id, cx);
@@ -1886,7 +1889,7 @@ impl Workspace {
                                 let t = v8.read(cx).doc.read(cx).session.doc.tab(id).cloned();
                                 cx.set_global(dd::CopiedTab(t));
                             }));
-                            return if matches!(kind, "partstudio" | "assembly" | "drawing") { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
+                            return if matches!(kind, "partstudio" | "assembly" | "drawing") && !no_export { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
                         }
                         // Onshape (live ui2-tabmenu-*): ⊗ Delete | Open in new browser
                         // tab, Rename, Properties…, Show code | Duplicate, Copy to
@@ -1970,8 +1973,8 @@ impl Workspace {
                             }));
                         // Live (dom/context-menus-partstudio.txt rmb-tab-partstudio / -assembly, TAB-EXPORT-MISSING):
                         // Part Studio, Assembly and Drawing tabs end with Export… (before an Assembly's Release…).
-                        // (Not a Part Studio without parts: live 2409.)
-                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
+                        // (Not the open Part Studio without parts: live 2409, live2 fs-ps-show-code.)
+                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") && !no_export { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
                         // Release management (help image Release_highlighted2, live
                         // rmb-tab-assembly / -drawing: the last entry, after Export…):
                         // Release… for Assemblies, Drawings, Variable Studios and files

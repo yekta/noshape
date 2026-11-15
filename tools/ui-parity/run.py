@@ -500,6 +500,8 @@ def normalize_live(state):
         lst["rows"] = [rows[i] for i in keep]
         if not any(lst.get("checked") or []):
             lst.pop("checked", None)
+    # A menu's name (recorder 2026-11-15.3: "Custom tables more", fs-tables-switch-to-studio): ours names none.
+    if isinstance(lst, dict):
         lst.pop("name", None)
     # Live's recorder from 2026-11-15.1 gives a menu's disabled rows as one flag per row (live
     # drw-hole-table-cell-format), before as the rows' indices (ours); the view cube's menus were always flags, on both
