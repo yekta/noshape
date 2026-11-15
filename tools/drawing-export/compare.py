@@ -5,8 +5,8 @@
 
 Each dir holds <name>.pdf / .dxf / .dwg: live's from its runner (a scenario's "export" key, after the last step),
 ours from tools/ui-parity/run.py (the same key). Compared:
-- DXF: per layer, each entity type's count and drawn length (lines, arcs, circles, polylines; a spline by its control
-  polygon), the linetypes and lineweights used, and the texts (TEXT / MTEXT strings, formatting codes stripped).
+- DXF: per layer, each entity type's count and drawn length (lines, arcs, circles, polylines; a spline along its
+  curve), the linetypes and lineweights used, and the texts (TEXT / MTEXT strings, formatting codes stripped).
 - PDF (poppler's pdftotext -bbox and pdftocairo -svg): the page size, the words, and the stroked path length per line
   width and dash pattern.
 - DWG: the format version (its header); the geometry through its DXF twin.
@@ -71,6 +71,34 @@ def num(e, code, k=0, default=0.0):
         return default
 
 
+def spline_curve(e, per_span=64):
+    """Points along a SPLINE's curve (de Boor; weights 41 if given), or None if it has no usable knots and poles. Its
+    length is the curve's, not its control polygon's: the same curve split into more pieces (live's broken-out outline
+    at its hole crossings) has a shorter polygon."""
+    k = int(num(e, "71", default=3))
+    knots = [float(v) for v in e.get("40", [])]
+    poles = [(float(x), float(y)) for x, y in zip(e.get("10", []), e.get("20", []))]
+    w = [float(v) for v in e.get("41", [])] or [1.0] * len(poles)
+    if k < 1 or not poles or len(knots) != len(poles) + k + 1 or len(w) != len(poles):
+        return None
+
+    def at(u):
+        s = max(k, min(len(poles) - 1, next((i - 1 for i in range(k + 1, len(knots)) if knots[i] > u), len(poles) - 1)))
+        d = [(poles[j][0] * w[j], poles[j][1] * w[j], w[j]) for j in range(s - k, s + 1)]
+        for r in range(1, k + 1):
+            for j in range(k, r - 1, -1):
+                i = s - k + j
+                den = knots[i + k - r + 1] - knots[i]
+                a = 0.0 if den == 0 else (u - knots[i]) / den
+                d[j] = tuple((1 - a) * d[j - 1][c] + a * d[j][c] for c in range(3))
+        return (d[k][0] / d[k][2], d[k][1] / d[k][2])
+
+    u0, u1 = knots[k], knots[len(poles)]
+    spans = max(1, len(set(knots[k : len(poles) + 1])) - 1)
+    n = spans * per_span
+    return [at(u0 + (u1 - u0) * i / n) for i in range(n + 1)]
+
+
 def entity_length(e):
     t = e["type"]
     if t == "LINE":
@@ -102,6 +130,9 @@ def entity_length(e):
                 theta = 4 * math.atan(abs(bulge))
                 total += theta * chord / (2 * math.sin(theta / 2))
         return total
+    if t == "SPLINE" and spline_curve(e):
+        pts = spline_curve(e)
+        return sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
     if t in ("LWPOLYLINE", "SPLINE"):
         xs, ys = e.get("10", []), e.get("20", [])
         pts = [(float(x), float(y)) for x, y in zip(xs, ys)]
