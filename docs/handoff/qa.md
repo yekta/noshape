@@ -4,6 +4,18 @@ qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA)
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 
+## 11-15 05:10: qa restarted on a new account; the nightly speed window is a repeating unit
+- **qa-w7-nightly** (systemd, bin/w7-nightly.sh): sleeps to 02:00 UTC every night, runs the newest release's Linux CLI on vibe7
+  (downloads it to ~/qa-rel/<v> if missing) with opentime.py + modeltime.py as 11-14's run (3 runs; the scripts in vibe7
+  ~/agents/qa-keep; hat15b / dock as 700 copies in ~/tmp/qa/priv, deleted after), sums with bin/nightly-sum.py (reproduces
+  11-14's 52 of 84, 54.7 s) and pushes the night's row into SCORE.md's "Nightly, vibe7 02:00" table from
+  /root/projects/noshape-wt/qa. Log suites/window-0200-<mmdd>.log; a failed night appends to /tmp/lead/qa-alerts. 11-15 was not
+  run (the old qa-w7-cli-window unit was one night only). Skip a night: touch nightly/skip-<mmdd>.
+- **qa-rel-0452** (bin/rel-check-0452.sh): the v0.4.52 release check against 0.4.51 (user + ticket documents, f197 x5) on the
+  lead's vibe5 ~/tmp/lead/noshape-rel; out compat/rel-0452.txt.
+- rust-zero-solid-f197's Fillet 1 vs 0.4.51: 'Failed to fillet selections.' at greens bf2be973, 9d0991ba, 0964814e, 149e2906,
+  0122a6c4, c6cb43da; Ok at c9d4c8d3, 0ad9b324, 00a8d4e3 (no fillet commits between): looks nondeterministic.
+
 
 ## 11-14 05:40: latency on the Mac, held (lead)
 Held: the Mac was overloaded and the user couldn't connect. When it runs: v0.4.50+ (has NOSHAPE_FRAME_LOG), everything in
