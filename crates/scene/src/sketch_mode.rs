@@ -1187,6 +1187,10 @@ pub fn constraint_icon(k: &ConstraintKind) -> Option<&'static str> {
     })
 }
 
+/// How near (screen px) a circle's radius point must come to a tangent radius to snap to it: live snapped 1.85 px off
+/// (sketch-mirror-preselected-batch) and not 3 px off (the snaps matrix's tool/circle-radius/no-midpoint).
+const CIRCLE_TANGENT_PX: f64 = 2.5;
+
 /// The sketch Mirror's prompts (live's i18n), shown as Onshape's tool prompt at the top of the graphics area.
 pub const MIRROR_LINE_PROMPT: &str = "Select a mirror line.";
 pub const MIRROR_ENTITIES_PROMPT: &str = "Select entities to be mirrored.";
@@ -1436,11 +1440,18 @@ impl SketchEditor {
                 }
                 EditOutcome::redraw()
             }
-            // Live (sketch-mirror recording): a lone preselected line is the mirror line.
-            Tool::Mirror if self.selection.len() == 1 && data.sketch.kind(self.selection[0]) == Some(EntityKind::Line) => {
-                self.mirror_axis = Some(self.selection[0]);
+            // Live (sketch-mirror recording, sketch-mirror-preselected-batch): a line in the preselection is the mirror
+            // line, the rest is mirrored at once and the tool asks for more.
+            Tool::Mirror if let Some(axis) = self.selection.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Line)) => {
+                self.mirror_axis = Some(axis);
                 self.message = Some(MIRROR_ENTITIES_PROMPT.into());
-                EditOutcome::redraw()
+                let rest: Vec<EntityId> = std::mem::take(&mut self.selection).into_iter().filter(|e| *e != axis).collect();
+                if rest.is_empty() {
+                    // (A lone line: it stays selected while the tool asks, ui-parity sketch-mirror-tool.)
+                    self.selection = vec![axis];
+                    return EditOutcome::redraw();
+                }
+                self.mirror_entities(data, &rest)
             }
             _ => EditOutcome::none(),
         }
@@ -1511,6 +1522,10 @@ impl SketchEditor {
                 let picks: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
                 self.selection.retain(|e| !picks.contains(e));
             }
+            // Live (sketch-mirror-escape-after-line): the mirror line doesn't stay selected, so Mirror again asks for one.
+            if let Some(axis) = self.mirror_axis.filter(|_| self.tool == Tool::Mirror) {
+                self.selection.retain(|e| *e != axis);
+            }
             self.set_tool(Tool::Select);
             return true;
         }
@@ -1567,6 +1582,8 @@ impl SketchEditor {
         // points and tangent points; no midpoints, no curves, no horizontal / vertical).
         if self.radius_point() {
             all.retain(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Center));
+            all.extend(self.circle_tangents(sk, p));
+            all.sort_by(|x, y| x.priority.cmp(&y.priority).then(x.distance.total_cmp(&y.distance)));
         }
         let mut best = all.first().cloned();
         // Two zones crossing near the pointer: the end where they cross, both constraints (live2 combo: a direction
@@ -1633,6 +1650,35 @@ impl SketchEditor {
             best = Some(Inference { kind: InferenceKind::Midpoint, position: s, entity: None, reference: Some((self.clicks[0].pos + self.clicks[1].pos) * 0.5), constraints: Vec::new(), distance: (s - p).length(), priority: 1 });
         }
         best
+    }
+
+    /// A circle's radius point tangent to a sketch line (its infinite line) or a circle or arc: the radius it would
+    /// take, where the pointer is within [`CIRCLE_TANGENT_PX`] of it on screen (live sketch-mirror-preselected-batch:
+    /// a circle at (20, 20) through (23, 20) tangent to the line from (5, 0) to (15, 10), 1.85 px off at 0.275 mm a
+    /// px; the catalogue's "toolNotes": a radius point takes coincident points and tangent points).
+    fn circle_tangents(&self, sk: &Sketch, p: DVec2) -> Vec<Inference> {
+        let Some(c) = self.clicks.first().map(|k| k.pos) else { return Vec::new() };
+        let Some(u) = (p - c).try_normalize() else { return Vec::new() };
+        let seen = |v: DVec2| self.screen_metric().map_or(v.length(), |m| m.len(v));
+        let mut out = Vec::new();
+        for e in sk.entities().filter(|e| !e.external || e.kind() == EntityKind::Line) {
+            let radii: Vec<f64> = match sk.curve(e.id) {
+                Some(Curve2::Line { a, b }) => (b - a).try_normalize().map(|d| (c - a).perp_dot(d).abs()).into_iter().collect(),
+                Some(Curve2::Circle { center, radius } | Curve2::Arc { center, radius, .. }) => {
+                    let d = (center - c).length();
+                    [(d - radius).abs(), d + radius].into_iter().filter(|_| d > 1e-12).collect()
+                }
+                _ => Vec::new(),
+            };
+            for t in radii.into_iter().filter(|t| *t > 1e-12) {
+                let q = c + u * t;
+                let off = seen(q - p);
+                if off <= self.world_per_px * CIRCLE_TANGENT_PX {
+                    out.push(Inference { kind: InferenceKind::Tangent, position: q, entity: Some(e.id), reference: Some(c), constraints: vec![AutoConstraint::TangentTo(e.id)], distance: off, priority: 1 });
+                }
+            }
+        }
+        out
     }
 
     /// The pointer places a circle's radius point (its centre clicked).
@@ -2368,13 +2414,18 @@ impl SketchEditor {
                             return EditOutcome::redraw();
                         }
                         self.selection.clear();
-                        let out = self.mirror_entities(data, &ids);
-                        // Pre-selection: the mirror resolves at once and the tool ends.
-                        self.set_tool(Tool::Select);
-                        out
+                        // Pre-selection: mirrored at once; the tool stays on, asking for more (live
+                        // sketch-mirror-preselected-batch).
+                        self.mirror_entities(data, &ids)
                     }
                     Some(axis) => {
-                        let Some(e) = hovered.filter(|e| *e != axis) else { return EditOutcome::none() };
+                        // A click on the mirror line itself deselects it; it stays the mirror line (live
+                        // sketch-mirror-construction-line).
+                        if hovered == Some(axis) {
+                            self.selection.retain(|e| *e != axis);
+                            return EditOutcome::redraw();
+                        }
+                        let Some(e) = hovered else { return EditOutcome::none() };
                         self.mirror_entities(data, &[e])
                     }
                 }
@@ -6325,6 +6376,9 @@ fn rim_autos(sk: &mut Sketch, circle: EntityId, click: &Click) {
     match inf.constraints.first() {
         Some(AutoConstraint::CoincidentPoint(pt)) => {
             let _ = sk.add_constraint(ConstraintKind::Coincident { a: *pt, b: circle });
+        }
+        Some(AutoConstraint::TangentTo(c)) => {
+            let _ = sk.add_constraint(ConstraintKind::Tangent { a: circle, b: *c });
         }
         Some(AutoConstraint::MidpointOf(c)) => {
             // Rim through a line's midpoint: a point at the midpoint on the circle.
@@ -10580,8 +10634,46 @@ mod tests {
         assert_eq!(ed.tool, Tool::Mirror);
     }
 
+    /// Live (sketch-mirror-preselected-batch, 0.275 mm a px): a circle centred at (20, 20) with its radius point at
+    /// (23, 20) is tangent to the line from (5, 0) to (15, 10) (its tangent radius 3.54 mm, 1.85 px further); 3 px
+    /// off a tangent radius it isn't (the snaps matrix).
     #[test]
-    fn mirror_with_preselection_resolves_and_ends() {
+    fn a_circle_snaps_tangent_to_a_line_near_its_radius() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let tangent = |radius_mm: f64| {
+            let (mut ed, mut d) = editor(Tool::Circle);
+            ed.world_per_px = 0.275365e-3;
+            let l = d.sketch.add_line(mm(5.0, 0.0), mm(15.0, 10.0));
+            click(&mut ed, &mut d, mm(20.0, 20.0));
+            click(&mut ed, &mut d, mm(20.0 + radius_mm, 20.0));
+            d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Tangent { b, .. } if b == l))
+        };
+        assert!(tangent(3.0), "1.85 px off: tangent");
+        let tangent_r = 5.0 / 2f64.sqrt();
+        assert!(!tangent(tangent_r - 3.0 * 0.275365), "3 px off: not");
+    }
+
+    /// Live (sketch-mirror-construction-line, -escape-after-line): a click on the mirror line again deselects it (it
+    /// stays the mirror line); Escape leaves it unselected, so Mirror again asks for a line.
+    #[test]
+    fn the_mirror_line_deselects_on_a_click_and_on_escape() {
+        let (mut ed, mut d) = editor(Tool::Mirror);
+        let axis = d.sketch.add_line(v(0.0, 0.0), v(0.0, 0.04));
+        click(&mut ed, &mut d, v(0.0, 0.02));
+        assert_eq!(ed.selection, vec![axis]);
+        click(&mut ed, &mut d, v(0.0, 0.03));
+        assert!(ed.selection.is_empty() && ed.has_mirror_axis(), "deselected, still the mirror line");
+        ed.selection = vec![axis];
+        ed.cancel();
+        assert!(ed.selection.is_empty(), "Escape: not selected");
+        ed.set_tool(Tool::Mirror);
+        assert_eq!(ed.message.as_deref(), Some(MIRROR_LINE_PROMPT));
+    }
+
+    /// Live (sketch-mirror-preselected-batch): entities preselected, then the line clicked: mirrored at once, the
+    /// tool stays on, asking for more.
+    #[test]
+    fn mirror_with_preselection_resolves_and_stays_on() {
         let (mut ed, mut d) = editor(Tool::Select);
         let axis = d.sketch.add_line(v(0.0, 0.0), v(0.0, 0.04));
         let c = d.sketch.add_circle(v(0.01, 0.02), 0.003);
@@ -10590,7 +10682,22 @@ mod tests {
         click(&mut ed, &mut d, v(0.0, 0.03));
         let _ = axis;
         assert_eq!(count(&d, EntityKind::Circle), 2);
-        assert_eq!(ed.tool, Tool::Select);
+        assert_eq!((ed.tool, ed.message.as_deref()), (Tool::Mirror, Some(MIRROR_ENTITIES_PROMPT)));
+    }
+
+    /// Live (sketch-mirror-preselected-batch): a circle and a line preselected, then Mirror: the line is the mirror
+    /// line, the circle mirrored at once (3 → 4), nothing stays selected, the tool asks for more.
+    #[test]
+    fn mirror_takes_the_line_of_a_preselection_and_mirrors_the_rest() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let axis = d.sketch.add_line(v(0.0, 0.0), v(0.0, 0.04));
+        let c = d.sketch.add_circle(v(0.01, 0.02), 0.003);
+        ed.selection = vec![c, axis];
+        ed.set_tool(Tool::Mirror);
+        ed.apply_preselection(&mut d);
+        assert_eq!(count(&d, EntityKind::Circle), 2);
+        assert!(ed.selection.is_empty());
+        assert_eq!((ed.tool, ed.message.as_deref()), (Tool::Mirror, Some(MIRROR_ENTITIES_PROMPT)));
     }
 
     #[test]

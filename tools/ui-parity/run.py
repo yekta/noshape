@@ -656,6 +656,10 @@ def material_as_panel(a, b):
     its recordings from runner 2026-11-14.11 on; before, as a panel of texts (its tabs, the picker's text, "No material
     assigned"): ours' put in that form when live's is."""
     da, db = (a or {}).get("dialog"), (b or {}).get("dialog")
+    # Live's panel still loading its library (no tabs, no fields; material-custom-tab-cancel's step 2, its tabs 1.5 s
+    # later): its wait, not a state of its own; ours, drawn at once, is read as that.
+    if isinstance(da, dict) and isinstance(db, dict) and da.get("kind") == "material" == db.get("kind") and not da.get("tabs") and not da.get("fields"):
+        return dict(b, dialog={k: (da[k] if k in ("tabs", "fields") else db.get(k)) for k in da})
     if not (isinstance(da, dict) and isinstance(db, dict) and da.get("kind") == "panel" and da.get("title") == "Material"
             and db.get("kind") == "material"):
         return b

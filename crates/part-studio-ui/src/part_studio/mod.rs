@@ -5973,8 +5973,11 @@ impl PartStudioView {
                 if this.pick_feature_into_dialog(id, cx) {
                     return;
                 }
-                // A dialog field that can't take it: nothing happens (live).
+                // A dialog field that can't take it: nothing is picked, and the field loses the keyboard (live
+                // mirror-face-pick-feature-in-list, mirror-part-entities-mate-connector: nothing focused after).
                 if this.active_field_filter(cx).is_some() {
+                    window.focus(&this.ui.list_focus, cx);
+                    cx.notify();
                     return;
                 }
                 this.click_feature(id, ev.modifiers().shift, cx);

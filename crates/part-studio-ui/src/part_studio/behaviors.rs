@@ -1244,10 +1244,17 @@ impl PartStudioView {
         }
         // In a sketch: the sketch, while something of it is selected or picked by the Dimension tool (live ui-parity
         // sketch-delete-line, sketch-circle-dimension).
-        if let Some(ed) = &self.sketch
-            && (!ed.selection.is_empty() || !ed.selected_regions.is_empty() || (ed.tool == crate::sketch_mode::Tool::Dimension && !ed.tool_picks().is_empty()))
-        {
-            out.insert(ed.feature);
+        // A selected model edge's (or plane's) reference line stands for what it was taken from: its feature lights,
+        // not the sketch (live sketch-mirror-model-edge: the box's edge as the mirror line lights Extrude 1).
+        let mut taken_from: Vec<Reference> = Vec::new();
+        if let Some(ed) = &self.sketch {
+            let data = self.sketch_data(cx);
+            let source = |e: &noshape_sketch::EntityId| data.as_ref().and_then(|d| d.external_refs.get(&e.0).cloned());
+            taken_from = ed.selection.iter().filter_map(source).collect();
+            let own = ed.selection.iter().any(|e| source(e).is_none());
+            if own || !ed.selected_regions.is_empty() || (ed.tool == crate::sketch_mode::Tool::Dimension && !ed.tool_picks().is_empty()) {
+                out.insert(ed.feature);
+            }
         }
         // In a feature dialog: what its active field picked (live
         // part-studio/440: Part 1 in Transform's field lights up Extrude 1;
@@ -1256,7 +1263,7 @@ impl PartStudioView {
         // A part's creators as before the edited feature (live ui-parity boolean-subtract: Part 1 in Targets lights up
         // Extrude 1 only, not Extrude 2 whose cut the preview shows on it).
         let display = self.edit.as_ref().and(self.ui.preview_before.as_deref()).unwrap_or(&self.display);
-        for r in picked.as_ref().unwrap_or(&self.selection) {
+        for r in picked.as_ref().unwrap_or(&self.selection).iter().chain(&taken_from) {
             // A point on an edge (its midpoint, an end) stands for that edge (live ui-parity fillet-asymmetric-toggle:
             // an edge clicked at its midpoint lights up Extrude 1).
             let mut r = r;
