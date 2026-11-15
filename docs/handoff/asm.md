@@ -4,49 +4,57 @@ Area: crates/assembly, crates/assembly-ui, the assembly ops in crates/ops and th
 scenarios, the assembly parity suite (`parity_assemblies`) and the parity translator (crates/ops/src/parity.rs) for
 the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: docs/DECISIONS.md.
 
-## State (2026-11-15 19:22 UTC)
+## State (2026-11-15 19:41 UTC)
 
 ### In flight
 - Worktree /root/projects/noshape-wt/asm (detached on 93346d03 = landed fd98e8a6), on top:
-  - 60b13cba (committed, not landed; **decision with the lead**, see below): `regions_by_sum` takes the closest group
-    of live's sketch regions (a sliver live splits off).
-  - 67e7cc0c: an older handoff commit; drop it when landing (this file replaces it).
-  - Uncommitted: in-context entities from live's `<element>.context.jsonl` (REQUESTS asm 19:20 / 19:21): the
-    translator rebuilds an importForeign isInContext sub-feature's planar face from live's edges (lines, circles,
-    arcs by their `mid`), for any feature (1b88ff's Extrude 3 / 4 extrude a face of the assembly; c3fdd43a Extrude
-    1; a04711a0 Mirror 1) and for sketches (instead of the 1 m square stand-in, so constraints to the context's
-    edges find them: a2e4a2's Sketch 1, JFF / JFB / JFR / JFI on body JFD). Loaders: features["contextEntities"]
-    from `studios/<element>.context.jsonl` (assembly) and `context.jsonl` (model dir). T1:
-    `parity::an_extrude_of_an_in_context_face_extrudes_lives_face`.
-  - Builds: Linux suite binary ops-s30 on vibe6 (~/agents/asm-keep/build-s30.log, bin/ops-s30); the T1 on the Mac.
-- live: context.jsonl for every in-context sub-feature: isaac-ball done (21 studios, 39 sub-features, 1571 lines;
-  synced to /root/parity/models; copy to vibe7 ~/agents/asm-keep/models before a run); other assembly corpora next.
+  - 60b13cba (not landed; **decision with the lead**, below): `regions_by_sum` takes the closest group of live's
+    sketch regions (a sliver live splits off).
+  - 70ae7e9b: in-context entities from live's `<element>.context.jsonl` (live, all assembly corpora: isaac-ball 21
+    studios, corexy 2, keyboard-pattern 2, scissor-lift 2, suspension 2). `context_bodies` imports each context body:
+    a planar sheet of one face as that face (`context_face`: edges chained into loops; lines, circles, arcs by `mid`,
+    splines / ellipses through live's 10 `points`), any other body (wires, curved or multi-face sheets) as its 3D
+    edges (`context_wire`); point bodies are skipped. A non-sketch feature's sub-feature maps to its first Import (an
+    Extrude of the face: 1b88ff's Extrude 3 / 4). An in-context sketch sits on live's planar face when there is one
+    (its edges split the sketch's regions as live's: with the 1 m square instead a2e4a2's Extrude 1 got 13 faces, not
+    12), else on the square on live's sketch frame, live's other bodies besides. Loaders: features["contextEntities"]
+    (studios/<element>.context.jsonl; a model dir's context.jsonl). Tests: T1
+    `parity::an_extrude_of_an_in_context_face_extrudes_lives_face`, unit `parity::tests::an_in_context_face_is_rebuilt_from_lives_edges`
+    (both pass on vibe6; Mac run going).
+  - One-model results (ops-s32): 1b88ff 6 -> 12/12 features (matches to the end); a2e4a2 7 -> 9/64 (first difference
+    now Extrude 5: 32/74/42 against live's 32/72/40, same faces, 2 extra edges); 3c5c58 unchanged 9/33 (Fillet 1 sent
+    to blend 19:2x with the repro m3c).
+- Runs: vibe7 isaac-ball s30 (finishing), then s29b (s29 on the new data, the A/B base) and s32, all through slot
+  (~/agents/asm-keep/s01/<build>/asm-isaac-ball.log). vibe6: model gate s30 (gate24/s30.log; for models s32 = s30:
+  no model has context data), then ctx32.sh: corexy / keyboard-pattern / scissor-lift / suspension, s29 vs s32
+  (~/agents/asm-keep/ctx/<build>/<corpus>.log).
 
 ### Queued to land
-- Nothing. Landed today: 790ecad5, 36ebccbc, 163918c9 (config-assembly 13 -> 18/18 mates), fd98e8a6 (GearLab runs).
+- Nothing. Landed today: 790ecad5, 36ebccbc, 163918c9 (config-assembly 13 -> 18/18 mates), fd98e8a6 (GearLab runs),
+  8ffdb51e (this file restructured).
 
 ### Decision with the lead
 - 60b13cba: isaac-ball 113 -> 116/121 occurrences but as-live mates 97/103 -> 89/121: a2e4a2's part now builds, its
   later in-context sketches land off, so their mates fail and others overdefine. Model gate clean (s28 = s29 per
-  model). My recommendation: hold until a2e4a2's later sketches are right (the context faces above may be that).
+  model). My recommendation: hold until a2e4a2's later sketches are right; s32 (with the context bodies) re-measures it.
 
 ### Next, in order
-1. s30 one-model runs: 1b88ff (vibe7 ~/agents/asm-keep/mb1: Extrude 3 / 4 should build: live 7383.7 / 8151.7 mm³),
-   a2e4a2 (ma2: Sketch 1 was "conflicting constraints" with live's refs and the square stand-in; Extrude 1 13 vs
-   live's 12 faces; Sketches 12–26 moved and taken back). Then the isaac-ball assembly (isaac29.sh pattern) against
-   s29, then the model gate (base s29 vs s30, gate24 dirs on vibe6) through `~/bin/slot`.
-2. Land the context change (+ 60b13cba if the lead says so) after the gate; update this file.
-3. isaac-ball studios: 3c5c58 Fillet 1 topology (blend's), 1b88ff / a2e4a2 as above, 1e81ca / 90f78b (GearLab:
-   core's opLoft fix ae8b7f751 needs my fd98e8a6, then opFillet on the 157-face gear: blend's, no dump yet).
-4. config-assembly 20e932 (optional, mates 18/18 already): Sketch 2's third PROJECTED ref unmapped; the studio is
-   built at an instance's configuration, live's refs are the default's; Revolve 1 / 2 miss the nut.
-5. Other corpora's in-context sketches once live's context files land (scissor-lift, suspension, …).
+1. Read the isaac-ball s29b vs s32 and the four corpora's s29 vs s32; the model gate (base24/s29 vs s30, per model).
+2. Land 70ae7e9b (and 60b13cba if the lead says so, else rebase it out); update this file.
+3. a2e4a2's Extrude 5 (2 extra edges), then its later features; isaac-ball's mates on a2e4a2.
+4. isaac-ball 1e81ca / 90f78b (GearLab): core's curved-face loft queued 55e517e0; then the opFillet on the toothed
+   solid (blend's). 3c5c58 Fillet 1: blend.
+5. config-assembly 20e932 (optional; 25/25 occurrences, 18/18 mates): Revolve 1 / 2 "tools and targets do not
+   intersect": the studio is built at an instance's configuration, and Sketch 1 / 2's configured dimensions move the
+   geometry (0.92 / 0.80 mm), which the translator takes back; its setData / custDesc Feature Studios aren't fetched.
 
 ### Others' items touching mine
 - dx keeps infento (1dc32b, 74d3d6) and bjr-config (5d8bc1). dx: derivedFrom + ORIGINAL_DEPENDENCY (top-level EDGE)
   queries resolve to faces / sketch regions in the translator; dx covered 1dc32b's Chamfer 4 / Fillet 5 with live's
   refs, not a general fix: tell dx before touching that path.
 - core: 1dc32b's Chamfer 3 (dx) brings back 14 infento occurrences; Hole 2 (2cc476fe) is core's.
+- dx (19:3x): assembly studios take the Feature Studios in studios/<element>.fs their sources import (bjr-config
+  5d8bc1); lands near my contextEntities loader lines in crates/ops/tests/parity.rs: whoever lands second rebases.
 - psui FYI (11-12): saving a named view is no Undo step in live; the assembly's `self.edit("Save view : …")`
   (assembly_view.rs) still makes one. Not done yet.
 - Lead ruling 11-15: don't copy live's unresolved-connector failure (DECISIONS.md).
